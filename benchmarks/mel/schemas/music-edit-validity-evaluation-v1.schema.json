@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-edit-validity-evaluation-v1.schema.json",
+  "title": "Melothaea musical edit validity evaluation receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "evaluator_version",
+    "envelope_sha256",
+    "candidate_output_sha256",
+    "source_lineage_sha256",
+    "observation_bundle_sha256",
+    "outcomes",
+    "decision",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mel-music-edit-validity-evaluation-v1"
+    },
+    "evaluator_version": {
+      "const": "mel-validity-evaluator-v1"
+    },
+    "envelope_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "candidate_output_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "source_lineage_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "observation_bundle_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/outcome"
+      }
+    },
+    "decision": {
+      "enum": [
+        "acceptable",
+        "rejected",
+        "abstain"
+      ]
+    },
+    "receipt_sha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "outcome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint_id",
+        "section",
+        "status",
+        "reason"
+      ],
+      "properties": {
+        "constraint_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "section": {
+          "enum": [
+            "requested_change",
+            "protected_invariant",
+            "permitted_variation",
+            "forbidden_change"
+          ]
+        },
+        "status": {
+          "enum": [
+            "satisfied",
+            "violated",
+            "indeterminate"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "relation_satisfied",
+            "relation_contradicted",
+            "missing_observation",
+            "insufficient_evidence_families",
+            "invalid_evidence_digest",
+            "empty_evidence_method",
+            "non_canonical_evidence_sources",
+            "wrong_payload_kind",
+            "unit_mismatch",
+            "invalid_uncertainty",
+            "non_finite_measurement",
+            "empty_or_short_series",
+            "non_monotonic_series",
+            "uncertain_monotonicity",
+            "malformed_expected_value",
+            "uncertain_equality",
+            "boundary_uncertainty"
+          ]
+        }
+      }
+    }
+  }
+}
