@@ -33,6 +33,7 @@ jobs:
           rustfmt --edition 2024 --check \
             crates/bridges/symthaea-camera-driving-bridge/src/lib.rs \
             crates/bridges/symthaea-camera-driving-bridge/src/policy_compatibility.rs \
+            crates/bridges/symthaea-camera-driving-bridge/src/training_labels.rs \
             crates/bridges/symthaea-camera-driving-bridge/src/bin/camera_driving_bridge.rs \
             crates/bridges/symthaea-camera-driving-bridge/examples/write_fixture_configs.rs
 
