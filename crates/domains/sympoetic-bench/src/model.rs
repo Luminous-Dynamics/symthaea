@@ -236,6 +236,10 @@ pub struct Scores {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expert_rater_agreement: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cohen_kappa_nominal: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub krippendorff_alpha_nominal: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synergy_delta: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collaboration_gap: Option<f64>,
