@@ -1,0 +1,8 @@
+{
+  "schema_version": "mel-music-review-panel-policy-v1",
+  "policy_id": "synthetic-unanimous-panel-v1",
+  "minimum_reviewers": 2,
+  "minimum_independence_groups": 2,
+  "required_role": "reference_adjudicator",
+  "require_unanimous_adequacy": true
+}

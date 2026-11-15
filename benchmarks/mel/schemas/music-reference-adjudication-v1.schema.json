@@ -1,0 +1,517 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel/music-reference-adjudication-v1.schema.json",
+  "title": "Melothaea signed music reference adjudication v1",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/review_task"
+    },
+    {
+      "$ref": "#/$defs/reviewer_credential"
+    },
+    {
+      "$ref": "#/$defs/trust_bundle"
+    },
+    {
+      "$ref": "#/$defs/signed_judgment"
+    },
+    {
+      "$ref": "#/$defs/panel_policy"
+    },
+    {
+      "$ref": "#/$defs/panel_receipt"
+    }
+  ],
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "public_key_hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "signature_hex": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{128}$"
+    },
+    "review_task": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "task_id",
+        "study_id",
+        "dataset_id",
+        "dataset_version",
+        "benchmark_track_id",
+        "sample_id",
+        "split",
+        "source_lineage_sha256",
+        "operation",
+        "instruction_sha256",
+        "target_selector_sha256",
+        "validity_envelope_sha256",
+        "reference_audio_sha256",
+        "renderer_profile_sha256",
+        "review_protocol_sha256",
+        "consent_scope_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-music-reference-review-task-v1"
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "study_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dataset_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "benchmark_track_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "split": {
+          "enum": [
+            "train",
+            "development",
+            "test"
+          ]
+        },
+        "source_lineage_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "operation": {
+          "enum": [
+            "remove_instrument",
+            "replace_instrument",
+            "extract_instrument",
+            "double_instrument",
+            "remove_drums",
+            "replace_drums",
+            "extract_drums",
+            "staccato",
+            "legato",
+            "crescendo",
+            "decrescendo",
+            "tuning_correction_440"
+          ]
+        },
+        "instruction_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "target_selector_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "validity_envelope_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reference_audio_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "renderer_profile_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "review_protocol_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "consent_scope_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "reviewer_credential": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "payload",
+        "issuer_signature_hex"
+      ],
+      "properties": {
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "credential_id",
+            "study_id",
+            "reviewer_role",
+            "issuer_id",
+            "issuer_key_id",
+            "reviewer_public_key_hex",
+            "independence_group_sha256",
+            "conflict_screening_sha256",
+            "valid_from_unix",
+            "valid_until_unix"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": "mel-music-reviewer-credential-v1"
+            },
+            "credential_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "study_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewer_role": {
+              "const": "reference_adjudicator"
+            },
+            "issuer_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issuer_key_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewer_public_key_hex": {
+              "$ref": "#/$defs/public_key_hex"
+            },
+            "independence_group_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "conflict_screening_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "valid_from_unix": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "valid_until_unix": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "issuer_signature_hex": {
+          "$ref": "#/$defs/signature_hex"
+        }
+      }
+    },
+    "trust_bundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "payload",
+        "root_signature_hex"
+      ],
+      "properties": {
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "bundle_id",
+            "issued_at_unix",
+            "expires_at_unix",
+            "trusted_issuers",
+            "revoked_credential_ids"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": "mel-music-review-trust-bundle-v1"
+            },
+            "bundle_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "issued_at_unix": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "expires_at_unix": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "trusted_issuers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "issuer_id",
+                  "key_id",
+                  "public_key_hex",
+                  "status"
+                ],
+                "properties": {
+                  "issuer_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "key_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "public_key_hex": {
+                    "$ref": "#/$defs/public_key_hex"
+                  },
+                  "status": {
+                    "enum": [
+                      "active",
+                      "revoked"
+                    ]
+                  }
+                }
+              }
+            },
+            "revoked_credential_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        "root_signature_hex": {
+          "$ref": "#/$defs/signature_hex"
+        }
+      }
+    },
+    "signed_judgment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "payload",
+        "reviewer_signature_hex"
+      ],
+      "properties": {
+        "payload": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_version",
+            "task_sha256",
+            "credential_sha256",
+            "credential_id",
+            "reviewer_key_fingerprint_sha256",
+            "adequacy",
+            "judgments",
+            "confidence_0_to_100",
+            "consent_scope_sha256",
+            "reviewed_at_unix"
+          ],
+          "properties": {
+            "schema_version": {
+              "const": "mel-music-signed-review-v1"
+            },
+            "task_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "credential_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "credential_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "reviewer_key_fingerprint_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "adequacy": {
+              "enum": [
+                "validated",
+                "ambiguous",
+                "inaudible",
+                "invalid"
+              ]
+            },
+            "judgments": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "edit_execution_1_to_5",
+                "source_preservation_1_to_5",
+                "musical_plausibility_1_to_5",
+                "instruction_alignment_1_to_5",
+                "artifact_absence_1_to_5"
+              ],
+              "properties": {
+                "edit_execution_1_to_5": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                },
+                "source_preservation_1_to_5": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                },
+                "musical_plausibility_1_to_5": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                },
+                "instruction_alignment_1_to_5": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                },
+                "artifact_absence_1_to_5": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 5
+                }
+              }
+            },
+            "confidence_0_to_100": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "consent_scope_sha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "reviewed_at_unix": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "reviewer_signature_hex": {
+          "$ref": "#/$defs/signature_hex"
+        }
+      }
+    },
+    "panel_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "policy_id",
+        "minimum_reviewers",
+        "minimum_independence_groups",
+        "required_role",
+        "require_unanimous_adequacy"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-music-review-panel-policy-v1"
+        },
+        "policy_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimum_reviewers": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "minimum_independence_groups": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "required_role": {
+          "const": "reference_adjudicator"
+        },
+        "require_unanimous_adequacy": {
+          "const": true
+        }
+      }
+    },
+    "panel_receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "task_sha256",
+        "trust_root_id",
+        "trust_root_key_id",
+        "trust_bundle_sha256",
+        "policy_sha256",
+        "reviewer_count",
+        "distinct_reviewer_key_count",
+        "distinct_independence_group_count",
+        "signed_review_digests",
+        "reviewer_key_fingerprints",
+        "independence_group_commitments",
+        "adequacy",
+        "receipt_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "mel-music-review-panel-receipt-v1"
+        },
+        "task_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "trust_root_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_root_key_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trust_bundle_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "policy_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "reviewer_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "distinct_reviewer_key_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "distinct_independence_group_count": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "signed_review_digests": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "reviewer_key_fingerprints": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "independence_group_commitments": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/sha256"
+          }
+        },
+        "adequacy": {
+          "enum": [
+            "validated",
+            "ambiguous",
+            "inaudible",
+            "invalid"
+          ]
+        },
+        "receipt_sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    }
+  }
+}
