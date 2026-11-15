@@ -525,12 +525,12 @@ fn validate_execution_events(
         issues.push(MusicRealizationBridgeIssueV1::MissingIdempotencyKeyForRetry);
     }
 
-    if let Some(key) = payload.idempotency_key_sha256.as_deref() {
-        if !is_sha256(key) {
-            issues.push(MusicRealizationBridgeIssueV1::InvalidDigest(
-                "idempotency_key_sha256",
-            ));
-        }
+    if let Some(key) = payload.idempotency_key_sha256.as_deref()
+        && !is_sha256(key)
+    {
+        issues.push(MusicRealizationBridgeIssueV1::InvalidDigest(
+            "idempotency_key_sha256",
+        ));
     }
 
     if issues.is_empty() {
