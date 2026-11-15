@@ -207,13 +207,13 @@ pub fn calculate_oee(
     let ideal_total_seconds = u128::from(ideal_cycle_time_seconds_per_unit)
         .checked_mul(u128::from(total_count))
         .ok_or(KpiError::ArithmeticOverflow)?;
+    if ideal_total_seconds > u128::from(run_time_seconds) {
+        return Err(KpiError::PerformanceAboveOneHundredPercent);
+    }
     let performance = ratio_ppm_u128(
         ideal_total_seconds,
         u128::from(run_time_seconds),
     )?;
-    if performance.value_ppm > PPM_SCALE {
-        return Err(KpiError::PerformanceAboveOneHundredPercent);
-    }
     let quality = bounded_ratio_ppm(first_pass_good_count, total_count)?;
 
     // Compute the combined product from the exact inputs rather than
@@ -379,6 +379,15 @@ mod tests {
         assert_eq!(
             calculate_oee("asset", 100, 90, 0, 50, 50),
             Err(KpiError::ZeroIdealCycleTime)
+        );
+    }
+
+
+    #[test]
+    fn oee_rejects_performance_above_one_hundred_even_below_one_ppm() {
+        assert_eq!(
+            calculate_oee("asset", 10_000_000, 10_000_000, 10_000_001, 1, 1),
+            Err(KpiError::PerformanceAboveOneHundredPercent)
         );
     }
 
