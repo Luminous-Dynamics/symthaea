@@ -4697,6 +4697,72 @@ mod tests {
     }
 
     #[test]
+    fn action_history_projection_rejects_commit_after_terminal_and_not_applied_with_commit() {
+        let (schedule, mut resolutions, receipts, _) = action_history_fixture();
+        let (commit_action, commit_mapping, commit_timestamp) = schedule.actions.iter().find_map(|action| {
+            if let ScheduleAction::EffectCommitted { .. } = &action.action {
+                action.owner_time_ref.as_ref().map(|reference| (
+                    action.action_id.clone(),
+                    reference.clock_mapping_action_id.clone(),
+                    reference.local_timestamp_ns,
+                ))
+            } else {
+                None
+            }
+        }).expect("commit owner time");
+        let commit_time = resolutions.get_mut(&(commit_mapping, commit_timestamp))
+            .expect("commit resolution");
+        commit_time.interval.earliest_ns = 1_300;
+        commit_time.interval.latest_ns = 1_300;
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("commit/terminal ordering assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code.contains("EFFECT_COMMIT_AFTER_TERMINAL_RECONCILIATION")));
+        assert_eq!(commit_action, report.effect_commits.first().map(|commit| commit.action_id.clone()).unwrap_or_default());
+
+        let (mut schedule, resolutions, receipts, _) = action_history_fixture();
+        let terminal = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::AttemptReconciled { .. })
+        }).expect("terminal action");
+        if let ScheduleAction::AttemptReconciled { outcome, .. } = &mut terminal.action {
+            *outcome = ReconciliationOutcome::NotApplied;
+        }
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("not-applied/commit contradiction assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code.contains("NOT_APPLIED_TERMINAL_HAS_EFFECT_COMMIT")));
+    }
+
+    #[test]
+    fn action_history_projection_requires_frontier_event_and_exact_discharge_manifest() {
+        let (mut schedule, resolutions, receipts, _) = action_history_fixture();
+        let frontier = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::EventProduced { event_id, .. } if event_id == "inventory-frontier-1")
+        }).expect("inventory frontier event");
+        if let ScheduleAction::EventProduced { event_id, .. } = &mut frontier.action {
+            *event_id = "substituted-frontier".to_owned();
+        }
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("missing frontier is an assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code == "ATTEMPT_INVENTORY_FRONTIER_EVENT_NOT_UNIQUE"));
+
+        let (mut schedule, resolutions, receipts, _) = action_history_fixture();
+        let discharge = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::StopDischarged { .. })
+        }).expect("discharge action");
+        discharge.evidence = Some(ActionEvidence::StopDischarge {
+            scope: StopScope::Global,
+            inventory_frontier_event_id: "inventory-frontier-1".to_owned(),
+            attempt_manifest_sha256: "0".repeat(64),
+        });
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("manifest substitution is an assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code.contains("STOP_DISCHARGE_NOT_REPLAY_APPLIED")));
+    }
+
+    #[test]
     fn action_history_projection_is_invariant_under_action_vector_permutation() {
         let (schedule, resolutions, receipts, _) = action_history_fixture();
         let original = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
