@@ -1,6 +1,7 @@
-use serde::{Deserialize, Serialize};
 //! Suite-level operating-characteristic and process-integrity metrics for
 //! the AOBENCH stochastic Bernoulli sequential assay.
+
+use serde::{Deserialize, Serialize};
 
 use super::bernoulli_sequential::{
     BernoulliFindingCode, BernoulliQualification, BernoulliSequentialReport,
@@ -209,7 +210,7 @@ mod tests {
         BernoulliSequentialScenario, BernoulliSequentialTrace, BernoulliTerminalDecision,
         BernoulliTrial, evaluate_bernoulli_sequential,
     };
-    use crate::bernoulli_sequential::{BernoulliInterval, BernoulliQualification};
+    use crate::bernoulli_sequential::BernoulliInterval;
 
     fn scenario() -> BernoulliSequentialScenario {
         BernoulliSequentialScenario::new(0.05, 0.10, 500, 250, 1, 500, 1, 500)
