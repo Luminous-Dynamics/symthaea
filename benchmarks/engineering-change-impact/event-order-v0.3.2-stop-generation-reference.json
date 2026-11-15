@@ -1,0 +1,13 @@
+{
+  "report_version": "event-order-v0.3.2-stop-generation-reference.v1",
+  "model": "independent finite-state policy-generation reference",
+  "runtime": "V8 JavaScript via functions.exec",
+  "seed": "0x4c554d49",
+  "policy_history_cases": 100000,
+  "historical_discharge_false_rejects": 0,
+  "stale_or_substituted_discharge_false_accepts": 0,
+  "final_policy_false_safes": 0,
+  "scope_narrowing_false_accepts": 0,
+  "valid_widened_final_discharges": 12822,
+  "interpretation": "Reference-model execution only. Does not execute the Rust projector, authenticate owner receipts, or estimate production reliability."
+}
