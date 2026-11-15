@@ -698,3 +698,12 @@ The new [PLASMA-QUENCH-001 #12342](https://github.com/Luminous-Dynamics/symthaea
 - **Thermal-management measurements/model:** Kaufmann et al., Results in Chemistry 27 (2026), DOI 10.1016/j.rechem.2026.103513. The source reports radiation up to 70% of plasma power in its reactor and source-specific thermal gradients / catalyst-zone temperature results; these are not universal constants or a complete product efficiency.
 
 The benchmark treats product-species preservation, cooling trajectory, discharge stability, heat recovery, pressure drop, quench auxiliaries, separation, uptime and maintenance as coupled but separately measured dimensions. The corpus now includes four quench source cases and eight adversarial controls against operating-point mixing, relative/absolute metric confusion, model-to-experiment promotion, ideal-wall extrapolation, chemistry transfer and omitted quench loads.
+
+
+## 9.18 CO2 quench benchmark and point identity — 2026-11-15
+
+The new scientific workstream is [PLASMA-QUENCH-001 #12342](https://github.com/Luminous-Dynamics/symthaea/issues/12342), with Symtropy scenario-replay integration at [#5391](https://github.com/Luminous-Dynamics/symtropy/issues/5391).
+
+Four 2026 source cases were added for counterflow quenching, particle-assisted catalytic kinetic quenching, multidimensional arc quenching CFD, and thermal-management measurements/modeling. Eight negative controls prevent mixing operating points, confusing relative with absolute gains, promoting model predictions into experimental evidence, applying ideal-wall assumptions as measured results, transferring chemistry regimes and omitting quench energy/auxiliary burdens.
+
+The counterflow paper's 792 W / 4 slm MAGD point (23.6% conversion / 25.1% efficiency) is separate from its 302 W point (46.2% efficiency; conversion not specified in that highlight). The 207.3% / 203.6% values at a 2.5 ratio and 30 mm distance are relative improvements against a paper-defined baseline.
