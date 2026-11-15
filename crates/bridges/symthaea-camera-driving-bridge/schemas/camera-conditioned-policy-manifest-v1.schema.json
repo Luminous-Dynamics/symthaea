@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/camera-conditioned-policy-manifest-v1.schema.json",
+  "title": "Camera-conditioned driving policy compatibility manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_revision",
+    "checkpoint_sha256",
+    "architecture_sha256",
+    "fused_input_schema_sha256",
+    "action_output_schema_sha256",
+    "vision_config_sha256",
+    "vehicle_encoder_seed_sha256",
+    "camera_id",
+    "camera_calibration_sha256",
+    "simulator_revision",
+    "renderer_revision",
+    "visual_weight_ppm",
+    "hdc_dimension",
+    "maximum_frame_width",
+    "maximum_frame_height",
+    "maximum_capture_delivery_age_us",
+    "training_corpus_sha256",
+    "training_split_manifest_sha256",
+    "privilege_manifest_sha256",
+    "privilege_profile",
+    "qualified_scope_sha256"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "policy_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "checkpoint_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "architecture_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "fused_input_schema_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "action_output_schema_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "vision_config_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "vehicle_encoder_seed_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "camera_calibration_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "renderer_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "visual_weight_ppm": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    "hdc_dimension": {
+      "const": 16384
+    },
+    "maximum_frame_width": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096
+    },
+    "maximum_frame_height": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 4096
+    },
+    "maximum_capture_delivery_age_us": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "training_corpus_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "training_split_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "privilege_manifest_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "privilege_profile": {
+      "enum": [
+        "NO_PRIVILEGED_INPUTS",
+        "PRIVILEGED_EXPERT",
+        "GROUND_TRUTH_PERCEPTION",
+        "MIXED_DECLARED",
+        "UNKNOWN"
+      ]
+    },
+    "qualified_scope_sha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "camera_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "simulator_revision": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  }
+}
