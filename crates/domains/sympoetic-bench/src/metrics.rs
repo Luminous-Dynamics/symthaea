@@ -386,6 +386,237 @@ pub fn synergy_bootstrap(
     paired_cluster_bootstrap_difference(&solo_best, &joint, draws, seed)
 }
 
+
+/// One independently adjudicated claim with a confidence estimate made before
+/// feedback. Confidence is the probability assigned to the claim being correct.
+#[derive(Debug, Clone, Copy)]
+pub struct ConfidenceObservation {
+    pub confidence: f64,
+    pub correct: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct ConfidenceSummary {
+    pub observation_count: usize,
+    pub correct_count: usize,
+    pub incorrect_count: usize,
+    /// Mean squared probability error.
+    pub brier_score: f64,
+    /// Fixed-width, count-weighted calibration error.
+    pub expected_calibration_error: f64,
+    /// AUC for confidence discriminating correct from incorrect judgments.
+    /// None when the sample contains only correct or only incorrect judgments.
+    pub metacognitive_sensitivity_auc: Option<f64>,
+    /// Actual coverage after rounding the requested coverage up to whole cases.
+    pub selective_coverage: f64,
+    /// Accuracy among the highest-confidence cases at the requested coverage.
+    pub selective_accuracy: f64,
+}
+
+/// Compute calibration, metacognitive sensitivity, and selective accuracy.
+///
+/// Calibration and sensitivity are distinct: a system may be calibrated on
+/// average while failing to rank its own errors below its correct judgments.
+/// Confidence observations must be elicited before ground-truth feedback.
+pub fn summarize_confidence(
+    observations: &[ConfidenceObservation],
+    calibration_bins: usize,
+    selective_coverage: f64,
+) -> Result<ConfidenceSummary> {
+    if observations.is_empty() {
+        bail!("confidence summary requires at least one observation");
+    }
+    if !(2..=100).contains(&calibration_bins) {
+        bail!("calibration_bins must be in 2..=100");
+    }
+    if !selective_coverage.is_finite() || !(0.0..=1.0).contains(&selective_coverage)
+        || selective_coverage == 0.0
+    {
+        bail!("selective_coverage must be finite and in (0, 1]");
+    }
+
+    let mut brier_sum = 0.0;
+    let mut bin_counts = vec![0usize; calibration_bins];
+    let mut bin_confidence = vec![0.0; calibration_bins];
+    let mut bin_correct = vec![0usize; calibration_bins];
+    let mut correct_count = 0usize;
+
+    for (index, observation) in observations.iter().enumerate() {
+        if !observation.confidence.is_finite()
+            || !(0.0..=1.0).contains(&observation.confidence)
+        {
+            bail!("confidence[{index}] must be finite and in [0, 1]");
+        }
+        let target = if observation.correct { 1.0 } else { 0.0 };
+        let error = observation.confidence - target;
+        brier_sum += error * error;
+
+        let bin = ((observation.confidence * calibration_bins as f64).floor() as usize)
+            .min(calibration_bins - 1);
+        bin_counts[bin] += 1;
+        bin_confidence[bin] += observation.confidence;
+        if observation.correct {
+            bin_correct[bin] += 1;
+            correct_count += 1;
+        }
+    }
+
+    let count = observations.len();
+    let brier_score = brier_sum / count as f64;
+    let mut expected_calibration_error = 0.0;
+    for bin in 0..calibration_bins {
+        if bin_counts[bin] == 0 {
+            continue;
+        }
+        let bin_size = bin_counts[bin] as f64;
+        let mean_confidence = bin_confidence[bin] / bin_size;
+        let empirical_accuracy = bin_correct[bin] as f64 / bin_size;
+        expected_calibration_error +=
+            bin_size / count as f64 * (mean_confidence - empirical_accuracy).abs();
+    }
+
+    let incorrect_count = count - correct_count;
+    let mut ranked = observations
+        .iter()
+        .map(|item| (item.confidence, item.correct))
+        .collect::<Vec<_>>();
+    ranked.sort_by(|left, right| left.0.total_cmp(&right.0));
+
+    let metacognitive_sensitivity_auc = if correct_count == 0 || incorrect_count == 0 {
+        None
+    } else {
+        let mut positive_rank_sum = 0.0;
+        let mut start = 0usize;
+        while start < ranked.len() {
+            let mut end = start + 1;
+            while end < ranked.len() && ranked[end].0 == ranked[start].0 {
+                end += 1;
+            }
+            // Average one-based rank gives ties half credit in the AUC.
+            let average_rank = (start + 1 + end) as f64 / 2.0;
+            let correct_in_tie = ranked[start..end]
+                .iter()
+                .filter(|(_, correct)| *correct)
+                .count();
+            positive_rank_sum += average_rank * correct_in_tie as f64;
+            start = end;
+        }
+        let positive = correct_count as f64;
+        let negative = incorrect_count as f64;
+        Some(
+            (positive_rank_sum - positive * (positive + 1.0) / 2.0)
+                / (positive * negative),
+        )
+    };
+
+    let mut selective = observations.to_vec();
+    selective.sort_by(|left, right| right.confidence.total_cmp(&left.confidence));
+    let selected_count = ((count as f64 * selective_coverage).ceil() as usize)
+        .max(1)
+        .min(count);
+    let selected_correct = selective[..selected_count]
+        .iter()
+        .filter(|item| item.correct)
+        .count();
+
+    Ok(ConfidenceSummary {
+        observation_count: count,
+        correct_count,
+        incorrect_count,
+        brier_score,
+        expected_calibration_error,
+        metacognitive_sensitivity_auc,
+        selective_coverage: selected_count as f64 / count as f64,
+        selective_accuracy: selected_correct as f64 / selected_count as f64,
+    })
+}
+
+/// An independently coded opportunity to observe human cognitive engagement.
+/// These are process annotations, not personality or ability labels.
+#[derive(Debug, Clone, Copy)]
+pub struct CognitiveProcessObservation {
+    pub human_planned: bool,
+    pub human_attempted_before_ai: bool,
+    pub human_monitored: bool,
+    pub ai_supplied_core_step: bool,
+    pub human_verified_ai_step: bool,
+    pub human_reflected: bool,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct CognitiveProcessSummary {
+    pub opportunity_count: usize,
+    pub ai_core_step_count: usize,
+    pub human_planning_rate: Option<f64>,
+    pub human_first_attempt_rate: Option<f64>,
+    pub human_monitoring_rate: Option<f64>,
+    pub human_reflection_rate: Option<f64>,
+    /// AI supplied a core step before a participant attempt / all opportunities.
+    pub ai_core_step_substitution_rate: Option<f64>,
+    /// Participant independently checked the AI's core steps / AI core steps.
+    pub human_verification_rate: Option<f64>,
+}
+
+/// Aggregate observable learning-process indicators without treating tool use
+/// or delegation as inherently harmful. Labels require blinded trace coding.
+pub fn summarize_cognitive_process(
+    observations: &[CognitiveProcessObservation],
+) -> Result<CognitiveProcessSummary> {
+    if observations.is_empty() {
+        return Ok(CognitiveProcessSummary {
+            opportunity_count: 0,
+            ai_core_step_count: 0,
+            human_planning_rate: None,
+            human_first_attempt_rate: None,
+            human_monitoring_rate: None,
+            human_reflection_rate: None,
+            ai_core_step_substitution_rate: None,
+            human_verification_rate: None,
+        });
+    }
+
+    let mut planned = 0usize;
+    let mut attempted_first = 0usize;
+    let mut monitored = 0usize;
+    let mut reflected = 0usize;
+    let mut ai_core_steps = 0usize;
+    let mut ai_substitution = 0usize;
+    let mut verified_ai_steps = 0usize;
+
+    for (index, observation) in observations.iter().enumerate() {
+        if observation.human_verified_ai_step && !observation.ai_supplied_core_step {
+            bail!(
+                "cognitive process observation {index}: verification requires an AI-supplied core step"
+            );
+        }
+        planned += usize::from(observation.human_planned);
+        attempted_first += usize::from(observation.human_attempted_before_ai);
+        monitored += usize::from(observation.human_monitored);
+        reflected += usize::from(observation.human_reflected);
+        if observation.ai_supplied_core_step {
+            ai_core_steps += 1;
+            verified_ai_steps += usize::from(observation.human_verified_ai_step);
+            ai_substitution += usize::from(!observation.human_attempted_before_ai);
+        }
+    }
+
+    let total = observations.len() as f64;
+    let rate = |numerator: usize, denominator: usize| {
+        (denominator > 0).then_some(numerator as f64 / denominator as f64)
+    };
+
+    Ok(CognitiveProcessSummary {
+        opportunity_count: observations.len(),
+        ai_core_step_count: ai_core_steps,
+        human_planning_rate: rate(planned, observations.len()),
+        human_first_attempt_rate: rate(attempted_first, observations.len()),
+        human_monitoring_rate: rate(monitored, observations.len()),
+        human_reflection_rate: rate(reflected, observations.len()),
+        ai_core_step_substitution_rate: rate(ai_substitution, observations.len()),
+        human_verification_rate: rate(verified_ai_steps, ai_core_steps),
+    })
+}
+
 fn mean(values: &[f64]) -> f64 {
     values.iter().sum::<f64>() / values.len() as f64
 }
@@ -398,6 +629,122 @@ fn percentile(sorted: &[f64], quantile: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+        #[test]
+    fn confidence_metrics_separate_calibration_from_metacognitive_sensitivity() {
+        let observations = [
+            ConfidenceObservation { confidence: 0.9, correct: true },
+            ConfidenceObservation { confidence: 0.8, correct: true },
+            ConfidenceObservation { confidence: 0.2, correct: false },
+            ConfidenceObservation { confidence: 0.1, correct: false },
+        ];
+        let summary = summarize_confidence(&observations, 5, 0.5).unwrap();
+        assert_eq!(summary.observation_count, 4);
+        assert_eq!(summary.correct_count, 2);
+        assert_eq!(summary.incorrect_count, 2);
+        assert!((summary.metacognitive_sensitivity_auc.unwrap() - 1.0).abs() < 1e-12);
+        assert!((summary.selective_accuracy - 1.0).abs() < 1e-12);
+        assert!((summary.selective_coverage - 0.5).abs() < 1e-12);
+        assert!(summary.brier_score < 0.05);
+    }
+
+    #[test]
+    fn confidence_auc_gives_half_credit_for_tied_confidence() {
+        let observations = [
+            ConfidenceObservation { confidence: 0.5, correct: true },
+            ConfidenceObservation { confidence: 0.5, correct: false },
+        ];
+        let summary = summarize_confidence(&observations, 2, 1.0).unwrap();
+        assert_eq!(summary.metacognitive_sensitivity_auc, Some(0.5));
+        assert!((summary.expected_calibration_error).abs() < 1e-12);
+    }
+
+    #[test]
+    fn confidence_sensitivity_is_unavailable_without_both_outcome_classes() {
+        let observations = [
+            ConfidenceObservation { confidence: 0.7, correct: true },
+            ConfidenceObservation { confidence: 0.8, correct: true },
+        ];
+        let summary = summarize_confidence(&observations, 4, 0.8).unwrap();
+        assert_eq!(summary.metacognitive_sensitivity_auc, None);
+    }
+
+    #[test]
+    fn confidence_metrics_reject_invalid_bins_coverage_and_scores() {
+        let valid = [ConfidenceObservation { confidence: 0.7, correct: true }];
+        assert!(summarize_confidence(&valid, 1, 0.8).is_err());
+        assert!(summarize_confidence(&valid, 4, 0.0).is_err());
+        let invalid = [ConfidenceObservation { confidence: 1.1, correct: true }];
+        assert!(summarize_confidence(&invalid, 4, 0.8).is_err());
+    }
+
+    #[test]
+    fn cognitive_process_metrics_distinguish_scaffolding_from_substitution() {
+        let observations = [
+            CognitiveProcessObservation {
+                human_planned: true,
+                human_attempted_before_ai: true,
+                human_monitored: true,
+                ai_supplied_core_step: true,
+                human_verified_ai_step: true,
+                human_reflected: true,
+            },
+            CognitiveProcessObservation {
+                human_planned: false,
+                human_attempted_before_ai: false,
+                human_monitored: false,
+                ai_supplied_core_step: true,
+                human_verified_ai_step: false,
+                human_reflected: false,
+            },
+            CognitiveProcessObservation {
+                human_planned: true,
+                human_attempted_before_ai: true,
+                human_monitored: true,
+                ai_supplied_core_step: false,
+                human_verified_ai_step: false,
+                human_reflected: true,
+            },
+        ];
+        let summary = summarize_cognitive_process(&observations).unwrap();
+        assert_eq!(summary.opportunity_count, 3);
+        assert_eq!(summary.ai_core_step_count, 2);
+        assert!((summary.human_first_attempt_rate.unwrap() - 2.0 / 3.0).abs() < 1e-12);
+        assert!((summary.ai_core_step_substitution_rate.unwrap() - 1.0 / 3.0).abs() < 1e-12);
+        assert_eq!(summary.human_verification_rate, Some(0.5));
+    }
+
+    #[test]
+    fn cognitive_process_metrics_report_missing_denominators_as_unavailable() {
+        let empty = summarize_cognitive_process(&[]).unwrap();
+        assert_eq!(empty.human_planning_rate, None);
+        assert_eq!(empty.human_verification_rate, None);
+        let no_ai = [CognitiveProcessObservation {
+            human_planned: true,
+            human_attempted_before_ai: true,
+            human_monitored: true,
+            ai_supplied_core_step: false,
+            human_verified_ai_step: false,
+            human_reflected: true,
+        }];
+        assert_eq!(
+            summarize_cognitive_process(&no_ai).unwrap().human_verification_rate,
+            None
+        );
+    }
+
+    #[test]
+    fn cognitive_process_metrics_reject_impossible_verification_labels() {
+        let invalid = [CognitiveProcessObservation {
+            human_planned: false,
+            human_attempted_before_ai: false,
+            human_monitored: false,
+            ai_supplied_core_step: false,
+            human_verified_ai_step: true,
+            human_reflected: false,
+        }];
+        assert!(summarize_cognitive_process(&invalid).is_err());
+    }
 
     #[test]
     fn positive_synergy_means_joint_exceeds_best_solo() {
