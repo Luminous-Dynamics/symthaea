@@ -952,18 +952,14 @@ pub fn assess_start_under_stop_obligations(
     obligations: &[ScopedStopObligation],
 ) -> StartGateReport {
     assess_start_under_stop_obligations_with_inventory_cut(
-        logical_operation_id,
-        prior_attempts,
-        prior_attempts,
-        inventory,
-        obligations,
+        logical_operation_id, prior_attempts, prior_attempts, inventory, obligations,
     )
 }
 
 /// Assess full current history against a separately attested point-in-time
-/// inventory cut. The snapshot slice is hashed against the inventory manifest;
-/// the current slice is still checked for lifecycle and stop-relation integrity.
-/// This permits a post-discharge append-only delta without weakening lineage.
+/// inventory cut. The snapshot is hashed against the inventory manifest;
+/// current history is checked for lifecycle and stop-relation integrity.
+/// This preserves post-discharge append-only deltas without weakening lineage.
 pub fn assess_start_under_stop_obligations_with_inventory_cut(
     logical_operation_id: &str,
     current_attempts: &[OperationAttemptRecord],
@@ -971,8 +967,197 @@ pub fn assess_start_under_stop_obligations_with_inventory_cut(
     inventory: &AttemptHistoryInventory,
     obligations: &[ScopedStopObligation],
 ) -> StartGateReport {
+    let mut reasons = BTreeSet::new();
+    let mut critical = false;
+    let mut indeterminate = false;
+    let mut applicable = BTreeSet::new();
 
+    if logical_operation_id.trim().is_empty() {
+        critical = true;
+        reasons.insert("START_LOGICAL_OPERATION_ID_INVALID".to_owned());
+    }
 
+    // Validate complete-history structural integrity across the supplied snapshot.
+    // A critical identity/lineage defect anywhere in the qualified inventory is
+    // not hidden by filtering to one logical operation.
+    let full_history_report = validate_attempt_lifecycle(current_attempts);
+    if full_history_report.disposition == EventTraceDisposition::CriticalFailure {
+        critical = true;
+        reasons.insert("ATTEMPT_INVENTORY_CONTAINS_CRITICAL_HISTORY_DEFECT".to_owned());
+    }
+
+    // Retry/active-attempt admissibility is local to the requested logical
+    // operation. A pending sibling operation inside a discharged global scope
+    // is not, by itself, a reason to serialize otherwise independent work.
+    let relevant_prior_attempts = current_attempts
+        .iter()
+        .filter(|attempt| attempt.identity.logical_operation_id == logical_operation_id)
+        .cloned()
+        .collect::<Vec<_>>();
+    let (inventory_disposition, inventory_reasons) = validate_attempt_inventory(
+        inventory_snapshot_attempts,
+        inventory,
+        logical_operation_id,
+        obligations,
+    );
+    reasons.extend(inventory_reasons);
+    match inventory_disposition {
+        EventTraceDisposition::CriticalFailure => critical = true,
+        EventTraceDisposition::Indeterminate => indeterminate = true,
+        EventTraceDisposition::Safe => {}
+    }
+
+    let attempts_report = validate_attempt_lifecycle(&relevant_prior_attempts);
+    match attempts_report.disposition {
+        EventTraceDisposition::CriticalFailure => {
+            critical = true;
+            reasons.insert("PRIOR_ATTEMPT_HISTORY_CRITICAL_FAILURE".to_owned());
+        }
+        EventTraceDisposition::Indeterminate => {
+            indeterminate = true;
+            reasons.insert("PRIOR_ATTEMPT_HISTORY_INDETERMINATE".to_owned());
+        }
+        EventTraceDisposition::Safe => {}
+    }
+    for attempt in relevant_prior_attempts.iter().filter(|attempt| {
+        attempt.identity.logical_operation_id == logical_operation_id
+    }) {
+        if !attempt_is_reconciled(attempt) {
+            indeterminate = true;
+            reasons.insert(format!(
+                "PRIOR_ATTEMPT_NOT_RECONCILED:{}",
+                attempt.identity.attempt_id
+            ));
+        }
+    }
+
+    let mut seen_obligation_ids = BTreeSet::new();
+    for obligation in obligations {
+        if !obligation.scope.is_well_formed() {
+            critical = true;
+            reasons.insert("STOP_OBLIGATION_SCOPE_INVALID".to_owned());
+            continue;
+        }
+        if !obligation.scope.applies_to(logical_operation_id) {
+            continue;
+        }
+        if obligation.obligation_id.trim().is_empty()
+            || obligation.trigger_event_id.trim().is_empty()
+            || obligation.policy_revision.trim().is_empty()
+            || !seen_obligation_ids.insert(obligation.obligation_id.clone())
+        {
+            critical = true;
+            reasons.insert("STOP_OBLIGATION_ID_OR_POLICY_INVALID".to_owned());
+            continue;
+        }
+        applicable.insert(obligation.obligation_id.clone());
+
+        let Some(discharge) = obligation.discharge.as_ref() else {
+            indeterminate = true;
+            reasons.insert(format!(
+                "STOP_OBLIGATION_NOT_DISCHARGED:{}",
+                obligation.obligation_id
+            ));
+            continue;
+        };
+
+        let bindings_valid = !discharge.event_id.trim().is_empty()
+            && discharge.obligation_id == obligation.obligation_id
+            && discharge.trigger_event_id == obligation.trigger_event_id
+            && discharge.policy_revision == obligation.policy_revision
+            && discharge.scope == obligation.scope
+            && !discharge.receipt_ref.trim().is_empty()
+            && is_sha256_hex(&discharge.receipt_sha256)
+            && !discharge.in_flight_inventory_frontier_event_id.trim().is_empty()
+            && is_sha256_hex(&discharge.in_flight_attempt_manifest_sha256);
+        if !bindings_valid {
+            critical = true;
+            reasons.insert(format!(
+                "STOP_DISCHARGE_RECEIPT_OR_INVENTORY_BINDING_INVALID:{}",
+                obligation.obligation_id
+            ));
+        }
+
+        match discharge.qualification {
+            GateState::Pass => {}
+            GateState::Fail => {
+                critical = true;
+                reasons.insert(format!(
+                    "STOP_DISCHARGE_QUALIFICATION_FAILED:{}",
+                    obligation.obligation_id
+                ));
+            }
+            GateState::Indeterminate | GateState::NotApplicable => {
+                indeterminate = true;
+                reasons.insert(format!(
+                    "STOP_DISCHARGE_QUALIFICATION_UNRESOLVED:{}",
+                    obligation.obligation_id
+                ));
+            }
+        }
+
+        match discharge.trigger_to_discharge_order {
+            EventOrder::Before => {}
+            EventOrder::After | EventOrder::Inconsistent => {
+                critical = true;
+                reasons.insert(format!(
+                    "STOP_DISCHARGE_NOT_AFTER_TRIGGER:{}",
+                    obligation.obligation_id
+                ));
+            }
+            EventOrder::Overlapping | EventOrder::Unknown => {
+                indeterminate = true;
+                reasons.insert(format!(
+                    "STOP_DISCHARGE_ORDER_UNRESOLVED:{}",
+                    obligation.obligation_id
+                ));
+            }
+        }
+
+        match discharge.in_flight_reconciliation {
+            GateState::Pass => {}
+            GateState::Fail => {
+                critical = true;
+                reasons.insert(format!(
+                    "STOP_DISCHARGE_IN_FLIGHT_RECONCILIATION_FAILED:{}",
+                    obligation.obligation_id
+                ));
+            }
+            GateState::Indeterminate | GateState::NotApplicable => {
+                indeterminate = true;
+                reasons.insert(format!(
+                    "STOP_DISCHARGE_IN_FLIGHT_RECONCILIATION_UNRESOLVED:{}",
+                    obligation.obligation_id
+                ));
+            }
+        }
+    }
+
+    let (relation_disposition, relation_reasons) =
+        validate_attempt_stop_discharge_relations(current_attempts, obligations);
+    reasons.extend(relation_reasons);
+    match relation_disposition {
+        EventTraceDisposition::CriticalFailure => critical = true,
+        EventTraceDisposition::Indeterminate => indeterminate = true,
+        EventTraceDisposition::Safe => {}
+    }
+
+    let disposition = if critical {
+        EventTraceDisposition::CriticalFailure
+    } else if indeterminate {
+        EventTraceDisposition::Indeterminate
+    } else {
+        EventTraceDisposition::Safe
+    };
+
+    StartGateReport {
+        start_permitted_by_stop_contract: disposition == EventTraceDisposition::Safe,
+        disposition,
+        applicable_obligation_ids: applicable.into_iter().collect(),
+        reason_codes: reasons.into_iter().collect(),
+    }
+
+}
 #[cfg(test)]
 mod tests {
     use super::*;
