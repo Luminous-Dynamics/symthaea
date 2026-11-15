@@ -144,12 +144,12 @@ Unknown or uncertainty-overlapping hard gates HOLD or remain INCOMPLETE. They ar
 
 1. Reproduce one published toroidal experimental/CFD case and one conventional comparator before designing a new candidate.
 2. Report held-out calibration by observable and operating regime, including false-feasible rate, conditional coverage, ranking stability and selection regret.
-3. Target at least **5% independently validated reduction** in delivered propulsion power or mission energy for one preregistered vessel/service class; stretch target **10%**. The full service and every hard gate must remain satisfied.
+3. For this propulsor-specific benchmark, target at least **5% independently validated reduction in delivered propulsor/shaft power** under matched vessel service; stretch target **10%**. The full service and every hard gate must remain satisfied.
 4. Target at least **20% lower cost to reach the independently confirmed Pareto frontier** versus preregistered random/grid baselines, using the existing #11513 evaluation-cost owner.
 5. Admit **zero mandatory safety/environmental gate violations** to the validated frontier.
 6. Publish negative, neutral and positive results. Do not issue a universal architecture winner ranking.
 
-The percentage targets are programme hypotheses, not expected outcomes or current achievements.
+These are subsystem-stage research hypotheses, not expected outcomes or current achievements. They do not replace the parent MARINE-WAPS programme targets: at least **10% validated whole-mission energy improvement**, **15% stretch**, at least **10% validated Pareto-hypervolume improvement**, and at least **20% lower cost to reach the validated frontier**. Those targets are assessed only at the whole-vessel service boundary; a propulsor-level improvement does not automatically imply a mission-level gain.
 
 ## 9. Work sequence
 
