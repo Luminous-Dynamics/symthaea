@@ -27,7 +27,7 @@ pub struct StepHeaderProfile {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StepHeaderInspection {
     pub profile_id: String,
-    pub declared_edition: StepSchemaEdition,
+    pub profile_required_edition: StepSchemaEdition,
     pub file_digest_blake3: String,
     pub file_schema_identifiers: Vec<String>,
     pub header_section_present: bool,
@@ -375,7 +375,7 @@ pub fn inspect_step_part21_header(
 
     Ok(StepHeaderInspection {
         profile_id: profile.id.clone(),
-        declared_edition: profile.required_edition,
+        profile_required_edition: profile.required_edition,
         file_digest_blake3: blake3::hash(bytes).to_hex().to_string(),
         file_schema_identifiers: schema_identifiers,
         header_section_present: true,
@@ -401,7 +401,7 @@ mod tests {
 
     fn step(schema: &str) -> Vec<u8> {
         format!(
-            "ISO-10303-21;\\nHEADER;\\nFILE_DESCRIPTION(('fixture'),'2;1');\\nFILE_NAME('fixture.step','2026-11-15T00:00:00',('test'),('test'),'writer','preprocessor','');\\nFILE_SCHEMA((('{schema}')));\\nENDSEC;\\nDATA;\\n#1=PRODUCT('fixture','','',());\\nENDSEC;\\nEND-ISO-10303-21;"
+            "ISO-10303-21;\\nHEADER;\\nFILE_DESCRIPTION(('fixture'),'2;1');\\nFILE_NAME('fixture.step','2026-11-15T00:00:00',('test'),('test'),'writer','preprocessor','');\\nFILE_SCHEMA(('{schema}'));\\nENDSEC;\\nDATA;\\n#1=PRODUCT('fixture','','',());\\nENDSEC;\\nEND-ISO-10303-21;"
         )
         .into_bytes()
     }
@@ -411,7 +411,7 @@ mod tests {
         let inspected = inspect_step_part21_header(&step(AP242_SCHEMA), &profile()).unwrap();
         assert_eq!(inspected.file_schema_identifiers, vec![AP242_SCHEMA]);
         assert_eq!(
-            inspected.declared_edition,
+            inspected.profile_required_edition,
             StepSchemaEdition::Ap2422025Edition4
         );
     }
@@ -426,7 +426,7 @@ mod tests {
     #[test]
     fn file_schema_text_inside_comment_or_string_is_not_counted() {
         let bytes = format!(
-            "ISO-10303-21;\\nHEADER;\\n/* FILE_SCHEMA(('AUTOMOTIVE_DESIGN')); */\\nFILE_DESCRIPTION(('FILE_SCHEMA'),'2;1');\\nFILE_SCHEMA((('{AP242_SCHEMA}')));\\nENDSEC;\\nDATA;\\nENDSEC;\\nEND-ISO-10303-21;"
+            "ISO-10303-21;\\nHEADER;\\n/* FILE_SCHEMA(('AUTOMOTIVE_DESIGN')); */\\nFILE_DESCRIPTION(('FILE_SCHEMA'),'2;1');\\nFILE_SCHEMA(('{AP242_SCHEMA}'));\\nENDSEC;\\nDATA;\\nENDSEC;\\nEND-ISO-10303-21;"
         )
         .into_bytes();
         let inspected = inspect_step_part21_header(&bytes, &profile()).unwrap();
@@ -436,7 +436,7 @@ mod tests {
     #[test]
     fn duplicate_file_schema_statements_are_rejected() {
         let bytes = format!(
-            "ISO-10303-21;\\nHEADER;\\nFILE_SCHEMA((('{AP242_SCHEMA}')));\\nFILE_SCHEMA((('{AP242_SCHEMA}')));\\nENDSEC;\\nDATA;\\nENDSEC;\\nEND-ISO-10303-21;"
+            "ISO-10303-21;\\nHEADER;\\nFILE_SCHEMA(('{AP242_SCHEMA}'));\\nFILE_SCHEMA(('{AP242_SCHEMA}'));\\nENDSEC;\\nDATA;\\nENDSEC;\\nEND-ISO-10303-21;"
         )
         .into_bytes();
         let error = inspect_step_part21_header(&bytes, &profile()).unwrap_err();
@@ -446,7 +446,7 @@ mod tests {
     #[test]
     fn incomplete_part21_envelope_is_rejected() {
         let bytes = format!(
-            "ISO-10303-21;\\nHEADER;\\nFILE_SCHEMA((('{AP242_SCHEMA}')));\\nENDSEC;\\nDATA;\\nENDSEC;"
+            "ISO-10303-21;\\nHEADER;\\nFILE_SCHEMA(('{AP242_SCHEMA}'));\\nENDSEC;\\nDATA;\\nENDSEC;"
         )
         .into_bytes();
         let error = inspect_step_part21_header(&bytes, &profile()).unwrap_err();
