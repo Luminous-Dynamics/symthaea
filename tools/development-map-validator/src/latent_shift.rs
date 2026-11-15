@@ -664,7 +664,6 @@ pub fn score_latent_shift_bundle_json(input: &str) -> Result<LatentShiftReport, 
         }
         episode_reports.push(score_episode(episode)?);
     }
-    episode_reports.sort_by(|left, right| left.episode_id.cmp(&right.episode_id));
     Ok(LatentShiftReport {
         episode_reports,
         claim_ceiling: "Deterministic scoring of supplied candidate-visible observations and evaluator-side latent-shift labels. Does not authenticate observation producers, independently adjudicate hidden truth, implement a detector or probe planner, or establish production monitoring reliability.".to_owned(),
