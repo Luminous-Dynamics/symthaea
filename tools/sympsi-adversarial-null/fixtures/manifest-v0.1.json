@@ -1,0 +1,30 @@
+{
+  "schema_version": "sympsi.adversarial-null.v0.1",
+  "synthetic_only": true,
+  "master_seed": 20261115,
+  "campaigns_per_scenario": 10000,
+  "alpha": 0.005,
+  "confidence_z": 2.5758293035489004,
+  "conditional_randomization_z_critical": 2.5758293035489004,
+  "scenario_ids": [
+    "uniform_iid",
+    "static_marginal_alignment",
+    "target_imbalance_uniform_response",
+    "persistent_response_preference",
+    "blockwise_shared_drift"
+  ],
+  "profiles": {
+    "four-choice": {
+      "choice_count": 4,
+      "analysis_trials": 7300,
+      "naive_critical_hits": 1922,
+      "block_count": 10
+    },
+    "five-choice": {
+      "choice_count": 5,
+      "analysis_trials": 6300,
+      "naive_critical_hits": 1343,
+      "block_count": 10
+    }
+  }
+}
