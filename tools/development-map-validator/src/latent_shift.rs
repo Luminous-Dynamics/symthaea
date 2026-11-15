@@ -22,10 +22,14 @@ pub struct LatentShiftEpisodeReport {
     pub event_detection_delay_seconds: Option<i64>,
     pub candidate_detection_delay_seconds: Option<i64>,
     pub affected_obligations: Vec<String>,
+    pub dependency_implied_affected_obligations: Vec<String>,
+    pub dependency_only_impact_obligations: Vec<String>,
+    pub gold_only_impact_obligations: Vec<String>,
     pub blocked_obligations: Vec<String>,
     pub obligation_precision: Option<f64>,
     pub obligation_recall: Option<f64>,
     pub unsupported_current_claims: Vec<String>,
+    pub critical_unsupported_current_claims: Vec<String>,
     pub unnecessary_invalidations: Vec<String>,
     pub unauthorized_probe_ids: Vec<String>,
     pub probe_cost_units: u64,
@@ -37,6 +41,12 @@ pub struct LatentShiftEpisodeReport {
 pub struct LatentShiftReport {
     pub episode_reports: Vec<LatentShiftEpisodeReport>,
     pub claim_ceiling: String,
+}
+
+#[derive(Debug, Clone)]
+struct ObligationInfo {
+    critical: bool,
+    dependency_dimensions: BTreeSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -170,12 +180,12 @@ fn parse_candidate_observations(
     Ok(observations)
 }
 
-fn parse_obligations(candidate_view: &Value) -> Result<BTreeSet<String>, String> {
+fn parse_obligations(candidate_view: &Value) -> Result<BTreeMap<String, ObligationInfo>, String> {
     let values = candidate_view
         .get("obligations")
         .and_then(Value::as_array)
         .ok_or_else(|| "candidate_view.obligations must be an array".to_owned())?;
-    let mut obligations = BTreeSet::new();
+    let mut obligations = BTreeMap::new();
     for (index, value) in values.iter().enumerate() {
         let label = format!("candidate_view.obligations[{index}]");
         let id = required_str(value, "obligation_id", &label)?.to_owned();
@@ -188,8 +198,13 @@ fn parse_obligations(candidate_view: &Value) -> Result<BTreeSet<String>, String>
             return Err(format!("{label}.dependency_dimensions must not be empty"));
         }
         required_str(value, "baseline_receipt_id", &label)?;
-        let _ = critical;
-        if !obligations.insert(id.clone()) {
+        if obligations.insert(
+            id.clone(),
+            ObligationInfo {
+                critical,
+                dependency_dimensions: dimensions,
+            },
+        ).is_some() {
             return Err(format!("duplicate obligation_id {id:?}"));
         }
     }
@@ -201,7 +216,8 @@ fn parse_obligations(candidate_view: &Value) -> Result<BTreeSet<String>, String>
         "initial_validity_claims",
         "candidate_view",
     )?;
-    if !initial.is_subset(&obligations) {
+    let obligation_ids: BTreeSet<String> = obligations.keys().cloned().collect();
+    if !initial.is_subset(&obligation_ids) {
         return Err("initial_validity_claims references an unknown obligation".to_owned());
     }
     Ok(obligations)
@@ -277,7 +293,7 @@ fn validate_candidate_view(candidate_view: &Value) -> Result<(), String> {
 fn validate_candidate_trace(
     candidate_trace: &Value,
     candidate_view: &Value,
-    obligations: &BTreeSet<String>,
+    obligations: &BTreeMap<String, ObligationInfo>,
     probes: &BTreeMap<String, ProbeInfo>,
     observations: &mut BTreeMap<String, ObservationInfo>,
 ) -> Result<(Vec<DecisionInfo>, Vec<String>, u64, Vec<String>), String> {
@@ -397,7 +413,7 @@ fn validate_candidate_trace(
         let _ = suspected;
         let claimed_current = parse_string_set(value, "claimed_current_obligations", &label)?;
         let blocked = parse_string_set(value, "blocked_obligations", &label)?;
-        if !claimed_current.is_subset(obligations) || !blocked.is_subset(obligations) {
+        if claimed_current.iter().chain(blocked.iter()).any(|id| !obligations.contains_key(id)) {
             return Err(format!("{label} references an unknown obligation"));
         }
         let uses_prior_evidence = required_bool(value, "uses_prior_evidence", &label)?;
@@ -475,10 +491,18 @@ fn score_episode(episode: &Value) -> Result<LatentShiftEpisodeReport, String> {
         "first_sufficient_observation_available_at",
         "gold_overlay",
     )?;
+    let adjudication_status = required_str(gold, "adjudication_status", "gold_overlay")?.to_owned();
+    if ![
+        "synthetic_known_answer_not_independently_adjudicated",
+        "independently_adjudicated",
+    ].contains(&adjudication_status.as_str()) {
+        return Err(format!("unsupported gold adjudication status {adjudication_status:?}"));
+    }
     let changed_dimensions = parse_string_set(gold, "changed_dimensions", "gold_overlay")?;
     let affected = parse_string_set(gold, "affected_obligations", "gold_overlay")?;
     let unaffected = parse_string_set(gold, "unaffected_obligations", "gold_overlay")?;
-    if !affected.is_disjoint(&unaffected) || affected.union(&unaffected).cloned().collect::<BTreeSet<_>>() != obligations {
+    let obligation_ids: BTreeSet<String> = obligations.keys().cloned().collect();
+    if !affected.is_disjoint(&unaffected) || affected.union(&unaffected).cloned().collect::<BTreeSet<_>>() != obligation_ids {
         return Err("gold affected/unaffected sets must partition the episode obligations".to_owned());
     }
     if truth_kind == "sham_no_shift" && (!changed_dimensions.is_empty() || !affected.is_empty()) {
@@ -486,6 +510,28 @@ fn score_episode(episode: &Value) -> Result<LatentShiftEpisodeReport, String> {
     }
     if truth_kind == "latent_shift" && (changed_dimensions.is_empty() || affected.is_empty()) {
         return Err("latent_shift must declare changed dimensions and affected obligations".to_owned());
+    }
+    if first_sufficient < hidden_event_time {
+        return Err("first_sufficient_observation_available_at precedes the hidden event".to_owned());
+    }
+    let dependency_implied: BTreeSet<String> = obligations
+        .iter()
+        .filter(|(_, obligation)| {
+            obligation.dependency_dimensions.iter().any(|dimension| changed_dimensions.contains(dimension))
+        })
+        .map(|(id, _)| id.clone())
+        .collect();
+    let dependency_only: BTreeSet<String> =
+        dependency_implied.difference(&affected).cloned().collect();
+    let gold_only: BTreeSet<String> =
+        affected.difference(&dependency_implied).cloned().collect();
+    if adjudication_status == "synthetic_known_answer_not_independently_adjudicated"
+        && (!dependency_only.is_empty() || !gold_only.is_empty())
+    {
+        return Err(format!(
+            "synthetic gold impact disagrees with dependency-implied impact: dependency_only={:?}, gold_only={:?}",
+            dependency_only, gold_only
+        ));
     }
 
     let groups = gold
@@ -520,6 +566,7 @@ fn score_episode(episode: &Value) -> Result<LatentShiftEpisodeReport, String> {
     let mut premature_detection_decision_ids = Vec::new();
     let mut stale_use_times = Vec::new();
     let mut unsupported_current = BTreeSet::new();
+    let mut critical_unsupported_current = BTreeSet::new();
 
     for decision in &decisions {
         if decision.shift_disposition == "shift_detected" {
@@ -537,6 +584,9 @@ fn score_episode(episode: &Value) -> Result<LatentShiftEpisodeReport, String> {
         if truth_kind == "latent_shift" && decision.decision_at >= hidden_event_time {
             for id in decision.claimed_current.intersection(&affected) {
                 unsupported_current.insert(id.clone());
+                if obligations.get(id).is_some_and(|obligation| obligation.critical) {
+                    critical_unsupported_current.insert(id.clone());
+                }
                 if decision.uses_prior_evidence {
                     stale_use_times.push(decision.decision_at.clone());
                 }
@@ -616,10 +666,14 @@ fn score_episode(episode: &Value) -> Result<LatentShiftEpisodeReport, String> {
         event_detection_delay_seconds,
         candidate_detection_delay_seconds,
         affected_obligations: affected.iter().cloned().collect(),
+        dependency_implied_affected_obligations: dependency_implied.iter().cloned().collect(),
+        dependency_only_impact_obligations: dependency_only.iter().cloned().collect(),
+        gold_only_impact_obligations: gold_only.iter().cloned().collect(),
         blocked_obligations: blocked.iter().cloned().collect(),
         obligation_precision: precision,
         obligation_recall: recall,
         unsupported_current_claims: unsupported_current.iter().cloned().collect(),
+        critical_unsupported_current_claims: critical_unsupported_current.iter().cloned().collect(),
         unnecessary_invalidations: unnecessary_invalidations.into_iter().collect(),
         unauthorized_probe_ids,
         probe_cost_units,
