@@ -53,6 +53,8 @@ The verifier should emit separate outcomes, not a generic "trusted" boolean:
 
 The machine-readable schema added in this branch defines the predicate object for an in-toto Statement/v1 with predicate type `https://luminousdynamics.io/attestations/egddm-execution-receipt/v0.1`; it does not define a new envelope. The examples are complete in-toto Statements with immutable subject digests:
 - [Runner/test compatibility claim](fixtures/egddm-execution-receipt-predicate-v0.1.synthetic.json), referencing the standard Test Result predicate.
+- [Runner/build claim](fixtures/egddm-build-execution-statement-v0.1.synthetic.json), referencing SLSA Build Provenance v1.2.
+- [Independent-grader/test claim](fixtures/egddm-independent-regrade-statement-v0.1.synthetic.json), referencing the standard Test Result predicate.
 - [Agent observation claim](fixtures/egddm-agent-observation-statement-v0.1.synthetic.json), intentionally without runner execution fields.
 - [Authority decision claim](fixtures/egddm-authority-decision-statement-v0.1.synthetic.json), also without runner execution fields.
 
