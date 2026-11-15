@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-adequacy-calibration-output-v1.schema.json",
+  "title": "Open-world model-adequacy calibration report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "calibrator"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "connectome-open-world-adequacy-v1"
+    },
+    "calibrator": {
+      "$ref": "#/$defs/calibrator"
+    }
+  },
+  "$defs": {
+    "calibrator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "false_adequacy_alpha",
+        "minimum_in_scope_acceptance",
+        "wilson_z_critical",
+        "in_scope_unit_count",
+        "omitted_mechanism_family_count",
+        "lower_order_statistic_k",
+        "nonconformity_threshold",
+        "false_adequacy_probability_bound",
+        "in_scope_acceptance",
+        "usable"
+      ],
+      "properties": {
+        "false_adequacy_alpha": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "minimum_in_scope_acceptance": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "wilson_z_critical": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "in_scope_unit_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "omitted_mechanism_family_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "lower_order_statistic_k": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nonconformity_threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "false_adequacy_probability_bound": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "in_scope_acceptance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/in_scope_acceptance"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "usable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "in_scope_acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accepted_in_scope_units",
+        "total_in_scope_units",
+        "observed_acceptance_rate",
+        "one_sided_wilson_lower_bound"
+      ],
+      "properties": {
+        "accepted_in_scope_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_in_scope_units": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_acceptance_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "one_sided_wilson_lower_bound": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

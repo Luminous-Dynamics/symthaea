@@ -1,0 +1,181 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/connectome-hit-probability-output-v1.schema.json",
+  "title": "Open-world threshold-hit experiment-design report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "objective",
+    "ranked_experiments"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "connectome-hit-probability-v1"
+    },
+    "objective": {
+      "$ref": "#/$defs/objective"
+    },
+    "ranked_experiments": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/ranked_experiment"
+      }
+    }
+  },
+  "$defs": {
+    "objective": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "outcome_ids",
+        "outcome_values",
+        "threshold",
+        "direction"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "outcome_values": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "number"
+          }
+        },
+        "threshold": {
+          "type": "number"
+        },
+        "direction": {
+          "enum": [
+            "AtLeast",
+            "AtMost"
+          ]
+        }
+      }
+    },
+    "ranked_experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "score"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "score": {
+          "$ref": "#/$defs/score"
+        }
+      }
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "experiment_id",
+        "objective_id",
+        "cost",
+        "unresolved_prior_mass",
+        "worst_case_scenario_id",
+        "best_case_scenario_id",
+        "worst_case_probability_of_hit",
+        "best_case_probability_of_hit",
+        "worst_case_probability_of_hit_per_cost",
+        "best_case_probability_of_hit_per_cost",
+        "scenario_probabilities"
+      ],
+      "properties": {
+        "experiment_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "objective_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cost": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "unresolved_prior_mass": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "worst_case_scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "best_case_scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "worst_case_probability_of_hit": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "best_case_probability_of_hit": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "worst_case_probability_of_hit_per_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "best_case_probability_of_hit_per_cost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "scenario_probabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/scenario_probability"
+          }
+        }
+      }
+    },
+    "scenario_probability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "probability_of_hit",
+        "probability_of_hit_per_cost"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "probability_of_hit": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "probability_of_hit_per_cost": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
