@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-execution-receipt-predicate-v0.1.schema.json",
+  "title": "EGDDM signed execution receipt predicate v0.1",
+  "description": "Custom in-toto predicate payload. This schema does not define or verify a signature envelope or transparency receipt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "predicate_version",
+    "receipt_id",
+    "claim_kind",
+    "subject_scope",
+    "obligation",
+    "producer",
+    "execution",
+    "observation",
+    "authority",
+    "anti_replay"
+  ],
+  "properties": {
+    "predicate_version": {
+      "const": "0.1.0"
+    },
+    "receipt_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_kind": {
+      "enum": [
+        "agent_observation",
+        "runner_execution",
+        "independent_regrade",
+        "authority_decision"
+      ]
+    },
+    "subject_scope": {
+      "$ref": "#/$defs/subject_scope"
+    },
+    "obligation": {
+      "$ref": "#/$defs/obligation"
+    },
+    "producer": {
+      "$ref": "#/$defs/producer"
+    },
+    "execution": {
+      "$ref": "#/$defs/execution"
+    },
+    "observation": {
+      "$ref": "#/$defs/observation"
+    },
+    "authority": {
+      "$ref": "#/$defs/authority"
+    },
+    "anti_replay": {
+      "$ref": "#/$defs/anti_replay"
+    },
+    "supersedes_receipt_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "related_receipt_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "value"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        }
+      }
+    },
+    "subject_scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository_full_name",
+        "revision_oid",
+        "tree_oid",
+        "configuration_world_digest"
+      ],
+      "properties": {
+        "repository_full_name": {
+          "type": "string",
+          "pattern": "^[^/\\s]+/[^/\\s]+$"
+        },
+        "revision_oid": {
+          "type": "string",
+          "pattern": "^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"
+        },
+        "tree_oid": {
+          "type": "string",
+          "pattern": "^([0-9a-fA-F]{40}|[0-9a-fA-F]{64})$"
+        },
+        "configuration_world_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_artifact_digests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/digest"
+          }
+        },
+        "target_artifact_digests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      }
+    },
+    "obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligation_id",
+        "check_id",
+        "check_kind",
+        "outcome"
+      ],
+      "properties": {
+        "obligation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "check_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "check_kind": {
+          "enum": [
+            "test",
+            "build",
+            "review",
+            "runtime",
+            "policy",
+            "security",
+            "compatibility",
+            "other"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown",
+            "not_run"
+          ]
+        },
+        "critical": {
+          "type": "boolean"
+        },
+        "active_requirement_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "role",
+        "workload_identity"
+      ],
+      "properties": {
+        "role": {
+          "enum": [
+            "agent",
+            "runner",
+            "independent_grader",
+            "authority_service",
+            "transparency_service"
+          ]
+        },
+        "workload_identity": {
+          "type": "string",
+          "minLength": 1
+        },
+        "issuer_uri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "signing_key_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "identity_provider": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "attempt_id",
+        "invocation_id",
+        "runner_image_digest",
+        "toolchain_digest",
+        "harness_digest",
+        "command_digest",
+        "test_input_digest",
+        "isolation_profile_digest"
+      ],
+      "properties": {
+        "attempt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "invocation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "runner_image_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "toolchain_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "harness_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "command_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "test_input_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "isolation_profile_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "network_policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "environment_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "workflow_run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "workflow_attempt": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "started_at",
+        "completed_at",
+        "observed_at",
+        "available_at"
+      ],
+      "properties": {
+        "started_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "completed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "available_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "artifact_digests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/digest"
+          }
+        },
+        "log_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "grader_report_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision_id",
+        "policy_digest",
+        "permitted_scope",
+        "valid_from",
+        "valid_until"
+      ],
+      "properties": {
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "permitted_scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "operation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "valid_from": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "anti_replay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "challenge_id",
+        "nonce_digest",
+        "issued_at",
+        "expires_at"
+      ],
+      "properties": {
+        "challenge_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "nonce_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "issued_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "single_use": {
+          "const": true
+        },
+        "challenge_issuer": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}
