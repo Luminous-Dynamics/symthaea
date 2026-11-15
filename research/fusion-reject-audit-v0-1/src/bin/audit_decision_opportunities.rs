@@ -2,9 +2,9 @@ use std::collections::BTreeMap;
 
 use fusion_reject_audit::{
     AcceptedCandidate, AcceptedCandidateManifest, AuditOutcome, FrozenCandidateUniverse,
-    RejectAuditPlan, RejectStratum, audit_decision_opportunities,
+    RejectAuditPlan, RejectStratum,
     decision_opportunity::{
-        DecisionEvaluation, DecisionOpportunityPlan, IncumbentFrontierPoint, ObjectiveDefinition,
+        audit_decision_opportunities, DecisionEvaluation, DecisionOpportunityPlan, IncumbentFrontierPoint, ObjectiveDefinition,
         ObjectiveDirection, ObjectiveValue, StratumDecisionEvaluations,
     },
     deterministic_audit_sample_ids,
