@@ -141,7 +141,7 @@
     "repeated_trials": "retain trial-level outcomes; model within-task repeated measures; do not treat runs as independent tasks",
     "secondary_multiple_comparisons": "holm_bonferroni",
     "missing_or_timeout": "count as shifted failure; retain incurred cost; report missingness and censoring separately",
-    "heterogeneity": "report all 12 intervention families and 3 positions; no post-hoc pooling to hide failures",
+    "heterogeneity": "report all 12 intervention families and all nine exact planned-work percentiles; early/middle/late are aggregates only; no post-hoc pooling to hide failures",
     "aggregate_score": "prohibited"
   },
   "preregistration_lock": {
