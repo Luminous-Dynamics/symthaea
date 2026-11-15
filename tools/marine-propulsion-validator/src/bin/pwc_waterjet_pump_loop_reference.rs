@@ -603,6 +603,8 @@ mod tests {
     const IDLE: &str = include_str!("../../../../docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-idle-v0.1.0.json");
     const NEGATIVE_FLOW: &str = include_str!("../../../../docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-negative-flow-v0.1.0.json");
     const IMPOSSIBLE: &str = include_str!("../../../../docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-impossible-efficiency-v0.1.0.json");
+    const UNCERTAINTY_CROSSES_UNITY: &str = include_str!("../../../../docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-uncertainty-crosses-unity-v0.1.0.json");
+    const TORQUE_BOUNDARY: &str = include_str!("../../../../docs/research/marine/fixtures/synthetic-pwc-waterjet-pump-loop-torque-boundary-v0.1.0.json");
 
     fn record(json: &str) -> Record {
         let value: Value = serde_json::from_str(json).unwrap();
@@ -667,6 +669,25 @@ mod tests {
         assert_eq!(report.disposition, "BLOCKED");
         assert_eq!(report.reason_code, "PHYSICALLY_INADMISSIBLE_EFFICIENCY");
         assert!(report.free_stream_pump_loop_efficiency_eta_p0.unwrap().value > 1.0);
+    }
+
+    #[test]
+    fn uncertainty_interval_crossing_unity_is_incomplete_not_clipped() {
+        let report = audit(&record(UNCERTAINTY_CROSSES_UNITY));
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.reason_code, "UNCERTAINTY_CROSSES_PHYSICAL_LIMIT");
+        let eta = report.free_stream_pump_loop_efficiency_eta_p0.unwrap();
+        assert!(eta.value < 1.0);
+        assert!(eta.upper > 1.0);
+    }
+
+    #[test]
+    fn friction_corrected_torque_interval_must_be_bounded_away_from_zero() {
+        let report = audit(&record(TORQUE_BOUNDARY));
+        assert_eq!(report.disposition, "INCOMPLETE");
+        assert_eq!(report.reason_code, "INCOMPLETE_INPUT");
+        assert!(report.impeller_shaft_power.is_none());
+        assert!(report.free_stream_pump_loop_efficiency_eta_p0.is_none());
     }
 
     #[test]
