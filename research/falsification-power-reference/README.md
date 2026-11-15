@@ -64,3 +64,22 @@ These are authored Rust tests. They must be compiled and executed on the exact c
 
 
 The alpha level is per declared alternative. A campaign-level claim that searches across alternatives must separately control family-wise error or use a qualified joint/sequential test; this reference does not do that.
+
+
+## Sequential falsification reference
+
+The sequential module adds predictable Gaussian likelihood-ratio e-processes:
+
+- PredictableGaussianEProcess: one predeclared alternative, with a commit-prediction then observe protocol.
+- PredictableGaussianMixture: a fixed, normalized mixture over predeclared alternatives, also using commit then observe.
+- SequentialUpdate / MixtureSequentialUpdate: current and running-maximum log-evidence, an anytime p-value, and the alpha-boundary disposition.
+
+The one-step log likelihood ratio is:
+
+    d * y / sigma^2 - d^2 / (2 * sigma^2)
+
+The reported anytime p-value uses the running maximum e-value: min(1, exp(-max_log_e_value)). It does not reset when later evidence moves against an alternative.
+
+This is valid only under a simple conditional Gaussian null with known common sigma and a discrepancy committed predictably before the observation. It is not automatically valid for unknown variance, composite nulls, serial dependence, heteroskedasticity, post-hoc alternative selection or physical trajectories. The commit/observe API enforces local call order but cannot prove absence of out-of-band leakage.
+
+See docs/research/SEQUENTIAL_FALSIFICATION_EPROCESS_V0_2026-11-15.md for assumptions, equations, benchmark controls and the distinction from SLICE and terminal-test induction.
