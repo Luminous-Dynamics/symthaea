@@ -495,7 +495,7 @@ mod tests {
         let report = score_selective_revalidation_oracle_json(&scenario.to_string()).unwrap();
         let shifted = report.arm_reports.iter().find(|arm| arm.condition == "shifted").unwrap();
         assert_eq!(shifted.total_under_revalidation_units, 0);
-        assert_eq!(shifted.epochs[0].required_without_fresh_pass_obligations, vec!["api-contract"]);
+        assert_eq!(shifted.epochs[0].required_without_fresh_pass_obligations, vec!["api-contract".to_owned()]);
     }
 
     #[test]
