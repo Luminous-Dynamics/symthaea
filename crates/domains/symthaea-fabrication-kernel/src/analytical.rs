@@ -4,8 +4,8 @@
 //! Analytical Physics Backend
 //!
 //! Closed-form stress/strain calculations for simple beam geometries.
-//! Covers ~80% of fabrication use cases (brackets, pipes, hinges) without
-//! requiring external simulation dependencies.
+//! Provides bounded analytical/reference proxies for declared simple-beam profiles
+//! without requiring external simulation dependencies.
 
 use crate::simulator::*;
 use crate::units::{Meters, Newtons};
@@ -275,6 +275,9 @@ pub struct AnalyticalBackend {
     pub cross_section: CrossSection,
     pub beam_length: f64,
     state: SimState,
+    /// Last summed force magnitude used by the backend's simply-supported,
+    /// center-load proxy. This is a force quantity, unlike `state.total_energy`.
+    last_transverse_force_proxy: f32,
 }
 
 impl AnalyticalBackend {
@@ -293,6 +296,7 @@ impl AnalyticalBackend {
                 velocities: vec![[0.0; 3]],
                 total_energy: 0.0,
             },
+            last_transverse_force_proxy: 0.0,
         }
     }
 
@@ -377,8 +381,10 @@ impl PhysicsBackend for AnalyticalBackend {
     fn step(&mut self, dt: f32, forces: &[ForceHV]) -> SimState {
         self.state.time += dt;
 
-        // Sum force magnitudes for analytical calculation
+        // Sum force magnitudes under this backend's simply-supported,
+        // center-load proxy. This remains a proxy, not a general force reduction.
         let total_force: f32 = forces.iter().map(|f| f.magnitude).sum();
+        self.last_transverse_force_proxy = total_force;
         let deflection = self.max_deflection(total_force as f64);
 
         self.state.positions = vec![[0.0, deflection as f32, 0.0]];
@@ -388,17 +394,19 @@ impl PhysicsBackend for AnalyticalBackend {
     }
 
     fn get_contacts(&self) -> Vec<ContactPoint> {
-        // Simply-supported beam: two support reactions
+        // Under the declared simply-supported center-load proxy, the two
+        // supports carry equal vertical reactions.
+        let reaction_force_proxy = 0.5 * self.last_transverse_force_proxy;
         vec![
             ContactPoint {
                 position: [0.0, 0.0, 0.0],
                 normal: [0.0, 1.0, 0.0],
-                force_magnitude: 0.0, // Set during step
+                force_magnitude: reaction_force_proxy,
             },
             ContactPoint {
                 position: [self.beam_length as f32, 0.0, 0.0],
                 normal: [0.0, 1.0, 0.0],
-                force_magnitude: 0.0,
+                force_magnitude: reaction_force_proxy,
             },
         ]
     }
@@ -424,8 +432,9 @@ impl PhysicsBackend for AnalyticalBackend {
     }
 
     fn get_reaction_force(&self, _point: [f32; 3]) -> f32 {
-        // For simply-supported beam, each support carries half the load
-        self.state.total_energy // Simplified
+        // This is valid only for the backend's declared simply-supported,
+        // centered transverse-load proxy. It is not a general reaction solver.
+        0.5 * self.last_transverse_force_proxy
     }
 
     fn reset(&mut self) {
@@ -435,6 +444,7 @@ impl PhysicsBackend for AnalyticalBackend {
             velocities: vec![[0.0; 3]],
             total_energy: 0.0,
         };
+        self.last_transverse_force_proxy = 0.0;
     }
 }
 
@@ -613,6 +623,58 @@ mod tests {
         let state = backend.step(0.01, &[force]);
         assert!(state.time > 0.0);
         assert!(state.total_energy > 0.0);
+        assert!((backend.get_reaction_force([0.0, 0.0, 0.0]) - 25.0).abs() < 1e-6);
+        for contact in backend.get_contacts() {
+            assert!((contact.force_magnitude - 25.0).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn reaction_force_proxy_is_not_energy_state() {
+        let mut backend = AnalyticalBackend::new(
+            MaterialProperties::steel(),
+            CrossSection::Rectangle {
+                width: 0.02,
+                height: 0.02,
+            },
+            0.5,
+        );
+        let force = ForceHV {
+            force_vector: bending_hv(),
+            magnitude: 200.0,
+            application_point: [0.25, 0.0, 0.0],
+            expected_resistance: 100.0,
+        };
+        let state = backend.step(0.01, &[force]);
+        let reaction = backend.get_reaction_force([0.0, 0.0, 0.0]);
+        assert!((reaction - 100.0).abs() < 1e-6);
+        assert_ne!(reaction, state.total_energy);
+    }
+
+    #[test]
+    fn reset_clears_reaction_force_proxy() {
+        let mut backend = AnalyticalBackend::new(
+            MaterialProperties::steel(),
+            CrossSection::Rectangle {
+                width: 0.02,
+                height: 0.02,
+            },
+            0.5,
+        );
+        let force = ForceHV {
+            force_vector: bending_hv(),
+            magnitude: 80.0,
+            application_point: [0.25, 0.0, 0.0],
+            expected_resistance: 40.0,
+        };
+        backend.step(0.01, &[force]);
+        assert!((backend.get_reaction_force([0.0, 0.0, 0.0]) - 40.0).abs() < 1e-6);
+        backend.reset();
+        assert_eq!(backend.get_reaction_force([0.0, 0.0, 0.0]), 0.0);
+        assert!(backend
+            .get_contacts()
+            .iter()
+            .all(|contact| contact.force_magnitude == 0.0));
     }
 
     #[test]
