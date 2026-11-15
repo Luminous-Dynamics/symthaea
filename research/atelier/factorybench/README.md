@@ -48,3 +48,20 @@ ISO 23247-5:2026 is published and provides a digital-thread architecture referen
 - A claimed improvement must state exactly what was held constant, what changed, the evidence class, uncertainty and independent-verification status.
 - Optimizer scores are not accepted until an independent feasibility verifier confirms the plan.
 - The protocol explicitly prevents comparisons between unlike garment complexity, staffing, paid-time, quality, facility and cost boundaries.
+
+
+## Modular reconfiguration and diagnosability
+
+- `reconfigbench-cases.v0.1.0.json` (implemented on the companion feature branch) defines 21 synthetic transition cases. The case matrix separates NoChange, AllocationOnly and PhysicalReconfiguration and includes site mismatch, expired evidence, process digest drift, interface incompatibility, footprint/keepout conflicts, coordinate frames, missing commissioning and partial owner data.
+- `metric-dictionary.v0.1.0.json` now contains six additional reconfiguration KPIs: soft reallocation share, time to first independently accepted unit after a change, physical reconfiguration downtime, injected-fault diagnostic coverage, requalification-obligation count and qualified module reuse rate.
+- The SOTA matrix adds a 247-paper RMS systematic review (2026) and a 112-company PCA-derived reconfigurability-index study (2026). These are research-gap and construct comparators, not direct textile production baselines.
+
+### Research conclusion
+
+Do not optimize physical modularity as an end in itself. Prefer soft allocation changes within the currently qualified layout; change tooling/process envelopes only within approved revisions; move/reconnect modules only when the expected product-quality, throughput or resilience benefit exceeds setup, downtime, validation and requalification burden.
+
+The September 2026 apparel GA study is an important baseline because it reports additional-order rescheduling and machine reallocation inside a fixed modular structure without physical line reconfiguration. ReconfigBench therefore treats the share of demand changes handled without physical movement as a primary metric, but only when first-pass acceptance and qualified capability remain intact.
+
+The May 2026 RMS review identifies diagnosability as under-studied and notes that the theory-to-practice relationship with resilience still needs experimental work. The June 2026 reconfigurability-index study gives adaptability and diagnosability prominent roles in its Portugal sample. Atelier's proposed contribution is to make those dimensions executable and auditable: inject known failures, localize them, track evidence invalidation and count the requalification consequences.
+
+The current ReconfigBench cases are synthetic. They are not physical changeover-time, resilience or quality results.
