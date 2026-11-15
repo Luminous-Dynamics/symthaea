@@ -7,6 +7,7 @@ It is an integration contract, not another fusion system code. It does not repla
 ## Initial capabilities
 
 - Candidate and objective identity checks.
+- Typed service metrics with units encoded by variant: target gain, plasma gain, driver wall-plug gain, gross thermal/electric power, net electric export, useful heat, lifetime energy and availability.
 - Exact solver-run binding to candidate revision and geometry digest.
 - Explicit energy-service boundary admission, resolved to the exact evidence record consumed by the energy hard gate.
 - Required hard-gate evaluation for energy, material, manufacturing, inspection, assembly and replacement.
@@ -49,7 +50,7 @@ cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
-The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The crate has 30 authored Rust unit tests, including one that applies all 26 corpus mutations to the actual compiler and checks each disposition. These are authored test cases, not executed test results.
+The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The crate has 31 authored Rust unit tests, including one that applies all 26 corpus mutations to the actual compiler and checks each disposition. These are authored test cases, not executed test results.
 
 ## Claim ceiling
 
