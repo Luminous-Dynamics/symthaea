@@ -48,7 +48,10 @@
         "validation_pilot_candidate_seeds",
         "independent_trials_per_model_harness_target",
         "model_harness_families_target",
-        "holdouts"
+        "holdouts",
+        "phase_aggregates",
+        "trajectories_per_model_per_trial_target",
+        "total_trajectories_across_three_models_and_trials_target"
       ],
       "properties": {
         "paired_unit": {
@@ -73,19 +76,25 @@
         },
         "intervention_positions": {
           "const": [
-            "early",
-            "middle",
-            "late"
+            "p10",
+            "p20",
+            "p30",
+            "p40",
+            "p50",
+            "p60",
+            "p70",
+            "p80",
+            "p90"
           ]
         },
         "seeds_per_family_position_cell_target": {
-          "const": 10
+          "const": 5
         },
         "matched_scenario_pairs_target": {
-          "const": 360
+          "const": 540
         },
         "validation_pilot_candidate_seeds": {
-          "const": 36
+          "const": 108
         },
         "independent_trials_per_model_harness_target": {
           "const": 3
@@ -112,6 +121,19 @@
               "const": true
             }
           }
+        },
+        "phase_aggregates": {
+          "const": [
+            "early:p10-p30",
+            "middle:p40-p60",
+            "late:p70-p90"
+          ]
+        },
+        "trajectories_per_model_per_trial_target": {
+          "const": 1080
+        },
+        "total_trajectories_across_three_models_and_trials_target": {
+          "const": 9720
         }
       }
     },
