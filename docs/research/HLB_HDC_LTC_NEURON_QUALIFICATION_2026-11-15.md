@@ -272,6 +272,26 @@ The fixed transform must be invertible or have an explicitly stated cleanup meth
 
 Group-level dynamics are a potentially better engineering point than either one global time constant or 16K independently adapted values: they can represent a few meaningful time scales without multiplying parameter count and optimizer state unnecessarily. This is a hypothesis, not a result.
 
+**Timescale grouping must also respect HDC basis symmetry.**
+
+A ContinuousHV coordinate index is not automatically a semantic channel. A design that assigns one time constant to coordinates 0–255 and another to 256–511 may be exploiting an arbitrary basis ordering rather than discovering meaningful temporal structure. Treat coordinate grouping as a model-family hypothesis, not a free improvement.
+
+Compare three distinct designs:
+
+1. **Seeded coordinate partition:** a balanced, versioned coordinate→timescale map. Its seed/map digest is part of model identity. Test multiple independently generated maps and apply a common coordinate permutation to state, input, weights, gates and the map; outputs should transform equivariantly.
+2. **Whole-hypervector timescale bank:** maintain G independent or explicitly coupled ContinuousHV liquid traces with distinct τ values, then combine them through a declared readout/gating rule. This gives each timescale a complete HDC representation rather than assigning arbitrary meanings to vector indices. Include its G×D state cost and all readout cost.
+3. **Basis-defined subspaces:** mix through an explicit orthogonal/permutation transform, evolve the named subspaces at different rates, and invert/clean up using a declared transform contract. Include the transform and memory-traffic costs; do not assume a continuous-HV Hadamard transform is a self-inverse bipolar binding.
+
+Required controls:
+
+- Randomly permute every coordinate consistently across state, input and all learned/fixed parameter vectors. Scalar-τ dynamics should commute with this relabeling up to floating-point order effects.
+- For grouped τ, compare a correctly permuted group map against a deliberately unpermuted map. The latter is a negative control for arbitrary index dependence, not a valid symmetry-preserving comparison.
+- Sweep group counts (e.g. 2, 4, 8, 16, 32) and several independent group assignments; report between-assignment variance rather than selecting the most favorable partition.
+- Compare coordinate-partition, full-HV bank and basis-defined subspace families at matched total state bytes and compute budgets where possible.
+- Include nested role/filler retrieval and held-out composition probes after any basis transform to ensure the dynamical optimization has not silently degraded HDC algebra.
+
+A grouped-time result is not a semantic timescale discovery unless it survives these relabeling and assignment controls. It may still be a useful implementation profile, but its claim must remain limited to that profile.
+
 **Factor C — integration/update strategy**
 
 - one-shot frozen-equilibrium interpolation;
