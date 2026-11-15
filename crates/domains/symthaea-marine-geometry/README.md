@@ -34,6 +34,14 @@ The contract is not a STEP parser/writer or CAD kernel. It validates receipt com
 
 See [CAD_INTEROP_PROTOCOL.md](./CAD_INTEROP_PROTOCOL.md) for the standard/version policy, representation semantics, validation metrics, negative controls and cross-kernel benchmark sequence.
 
+## G3b CAD backend capability evaluation
+
+G3b is under development for [issue #12381](https://github.com/Luminous-Dynamics/symthaea/issues/12381) on branch `research/marine-cad-kernel-bakeoff-g3b-20261115`. It adds a typed backend capability manifest and evaluator. A capability can qualify only with both a frozen fixture-manifest digest and a test-report digest; missing/unknown results remain incomplete and failed results reject the selected profile.
+
+The current comparison candidates are OCCT 8.0.1, the experimental Rust `cad-kernel`, `brep-to-step` and `vcad_kernel_step`. Their documented STEP schema coverage differs; do not treat AP214, AP242 Edition 2 and AP242:2025 Edition 4 as equivalent.
+
+See [CAD_BACKEND_EVALUATION.md](./CAD_BACKEND_EVALUATION.md) for candidate capabilities, CAx-IF fixture families and the cross-kernel bake-off. No backend is qualified by this manifest alone; real backend tests remain required.
+
 ## Research benchmark protocol
 
 The matched external comparison, metrics, uncertainty policy, target ladder, and implementation sequence are specified in [BENCHMARK_PROTOCOL.md](./BENCHMARK_PROTOCOL.md). It is a frozen research protocol and target set, not a claim that the current crate generates hulls or has achieved hydrodynamic performance.
