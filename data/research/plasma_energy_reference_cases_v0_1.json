@@ -2629,6 +2629,27 @@
         "matched_haber_bosch_baseline_includes_hydrogen_energy": true
       },
       "rationale": "The current review's 0.3–3 g NH3/kWh plasma range is not a matched full-chain comparison because hydrogen-production energy is omitted. The challenge is to reach at least 3 g accepted NH3/kWh after including H2 generation, plasma, electrolysis, gas handling and product separation, then compare with Haber-Bosch under the same boundary."
+    },
+    {
+      "target_id": "BIOGAS-PLASMA-SYNGAS-COST-001",
+      "lane": "PLASMA_POWER_TO_X_BIOGAS_REFORMING",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "PLASMA-POWERT0X-BIOGAS-REFORMING-TEA-2026"
+      ],
+      "metric_thresholds": {
+        "syngas_cost_eur_per_tonne_max": 600,
+        "plant_efficiency_min_fraction": 0.44,
+        "all_thresholds_must_hold_at_same_operating_point": true
+      },
+      "claim_guards": {
+        "matched_syngas_composition_and_quality_required": true,
+        "full_plant_grid_side_energy_boundary_required": true,
+        "electricity_price_and_capacity_factor_scenario_required": true,
+        "downstream_product_service_boundary_required": true,
+        "unqualified_coproduct_credit_forbidden": true
+      },
+      "rationale": "The 2026 300 MW plasma-biogas-reforming TEA reports about EUR 840/t syngas and about 44% plant efficiency, with modeled cases below EUR 600/t under favourable renewable-electricity assumptions. The stretch target requires the cost and plant-efficiency thresholds to hold together under the same matched service and full plant boundary."
     }
   ]
 }
