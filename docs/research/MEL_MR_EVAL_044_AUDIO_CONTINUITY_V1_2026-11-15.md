@@ -34,7 +34,7 @@ No single threshold should be used indiscriminately for hard cuts, crossfades, t
 
 ## Implemented controls
 
-Fourteen unit tests are authored for:
+Sixteen unit tests are authored for:
 - exact preservation outside the support;
 - one-sample off-support leakage;
 - declared transition support versus undeclared dilation;
