@@ -168,22 +168,37 @@ For paired binary outcomes, report discordant pairs and a paired confidence inte
 
 ## 9. Positioning against industry and SOTA
 
-SWE-Bench Pro, SWE-Time, SWE-Shift, ChainSWE, SWE-Gate and SWE-Atlas examine different parts of the engineering loop. A single leaderboard rank cannot fairly compare EGDDM with all of them. D6 should publish adapters and matched task subsets rather than assert equivalence between unlike datasets.
+These benchmarks are complementary, not interchangeable:
 
-The strongest near-term claim to pursue is narrower and testable:
+| Benchmark | What it measures | Design lesson for EGDDM |
+|---|---|---|
+| [SWE-Bench Pro V2](https://labs.scale.com/leaderboard/swe_bench_pro_public_v2?tab=full) | Large-scale repair with aggressive task/evaluator integrity, including reference-pass and empty-patch-fail controls | Treat task validity and evaluator integrity as first-class; no single score without denominator, clean regrade and invalid-task accounting |
+| [SWE-Shift](https://arxiv.org/abs/2610.32196) | Mid-task workspace shifts across 12 families and nine intervention positions, evaluated across 17 systems | Do not claim novelty for shift testing; add explicit evidence identity, temporal admissibility and selective invalidation |
+| [ChainSWE](https://aclanthology.org/2026.emnlp-main.371/) | 304 chronological issue chains across 54 projects | Test multi-stage maintenance and preservation of previous work, not only isolated fixes |
+| [SWE-Time](https://arxiv.org/abs/2611.12083) | 1,661 temporal repository tasks across 65 repositories | Pin T0/T1 information cutoffs and distinguish retrospective from prospective knowledge |
+| [SWE-Gate](https://arxiv.org/abs/2609.04167) | Review-derived constraints beyond functional tests; 221 of 644 functionally passing repairs failed those constraints | Score active requirements, review constraints and critical misses separately from functional pass |
+| [SWE-Atlas](https://scale.com/blog/swe-atlas-complete) | 284 codebase Q&A, test-writing and refactoring tasks, including repeated-trial reliability | Report pass-all reliability, investigation precision and harness/tooling identity, not best-of-N only |
+| [SWE-fficiency](https://proceedings.mlr.press/v306/ma26l.html) | 498 performance-optimisation tasks across nine repositories, benchmarked against expert speedup | Measure end-to-end cost and reviewer time; successful patching is not equivalent to expert-level engineering efficiency |
 
-> At matched recovery success and critical-control coverage, EGDDM reduces unnecessary revalidation while preserving more previously validated behavior and meeting the new active requirements after a workspace shift.
+A single leaderboard rank cannot fairly compare EGDDM with these suites. D6 should publish adapters and matched task subsets rather than assert equivalence between unlike datasets.
 
-This claim must beat full-rerun, static dependency, conversation-memory and reset baselines on held-out tasks. If it does not, the selective-invalidation thesis is not supported.
+### Proposed differentiation to test
+
+The strongest near-term claim is narrower and falsifiable:
+
+> At matched recovery success and critical-control coverage, EGDDM reduces unnecessary revalidation while preserving more previously validated behavior and meeting new active requirements after a workspace shift.
+
+This is a proposed contribution, not a demonstrated lead. It must beat full-rerun, static dependency, conversation-memory and reset baselines on held-out tasks. If it does not, the selective-invalidation thesis is not supported.
 
 To exceed current SOTA in a meaningful way, aim for:
 - better paired shifted-continuation success, not a higher score on a different dataset;
 - better retention and active-requirement conformance across agent-produced histories;
 - fewer stale-evidence and authority-gate failures;
-- lower end-to-end recovery cost at equal or better critical-check coverage; and
+- lower end-to-end recovery cost at equal or better critical-check coverage;
+- better pass-all reliability over repeated trials; and
 - calibrated abstention where impact cannot be distinguished.
 
-No cross-paper headline score should be described as a direct apples-to-apples comparison without a common harness and task split.
+No cross-paper headline score should be described as a direct apples-to-apples comparison without a common harness, model version, task split and cost accounting.
 
 ## 10. Next experiments
 
