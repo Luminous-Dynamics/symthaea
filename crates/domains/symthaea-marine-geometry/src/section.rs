@@ -76,6 +76,7 @@ pub struct SectionFamilyArtifact {
     pub length_m: f64,
     pub beam_m: f64,
     pub draft_m: f64,
+    pub units: String,
     pub coordinate_frame: CoordinateFrame,
     pub sections: Vec<SampledSection>,
 }
@@ -457,6 +458,7 @@ pub fn generate_section_artifact(
         length_m: spec.length_m,
         beam_m: spec.beam_m,
         draft_m: spec.draft_m,
+        units: "m".into(),
         coordinate_frame: spec.coordinate_frame.clone(),
         sections,
     })
