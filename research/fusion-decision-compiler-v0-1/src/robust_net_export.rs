@@ -18,6 +18,14 @@ pub enum NetExportBoundMethod {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ModelFormValidity {
+    WithinDeclaredDomain,
+    Unknown,
+    OutOfDomain,
+    MaterialDiscrepancy,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NetExportEvidenceClass {
     SyntheticFixture,
     Assumption,
@@ -54,6 +62,9 @@ pub struct NetExportLowerBoundReceipt {
     pub distribution_assumption_ref: String,
     pub assumption_manifest_sha256: String,
     pub validity_domain_ref: String,
+    pub model_form_validity: ModelFormValidity,
+    pub model_form_evidence_ref: String,
+    pub model_form_evidence_sha256: String,
     /// Required for JointCovarianceContrast; absent for other methods.
     pub covariance_receipt_ref: Option<String>,
     pub covariance_receipt_sha256: Option<String>,
@@ -87,6 +98,12 @@ pub enum RobustNetExportDisposition {
     SyntheticOnly,
     /// Assumption-only bounds can support sensitivity analysis, not robust qualification.
     AssumptionOnly,
+    /// The parametric interval exists but model-form validity is unresolved.
+    ModelFormUnresolved,
+    /// The evaluated solver output lies outside its declared validity domain.
+    OutOfDomain,
+    /// A material structural/model-form discrepancy remains unresolved.
+    ModelFormDiscrepancy,
     /// A supplied receipt or its source binding is invalid/stale/incompatible.
     NotEvaluable,
 }
@@ -118,6 +135,7 @@ pub enum RobustNetExportDiagnostic {
     EmptyDistributionAssumption,
     InvalidAssumptionManifestDigest,
     EmptyValidityDomain,
+    InvalidModelFormEvidence,
     MissingCovarianceReceipt,
     MissingSimultaneousAllocationReceipt,
     MethodEvidenceReceiptMismatch,
@@ -145,6 +163,8 @@ pub struct RobustNetExportReport {
     pub method_evidence_sha256: Option<String>,
     pub assumption_manifest_sha256: Option<String>,
     pub validity_domain_ref: Option<String>,
+    pub model_form_validity: Option<ModelFormValidity>,
+    pub model_form_evidence_ref: Option<String>,
     pub receipt_id: Option<String>,
     pub diagnostics: Vec<RobustNetExportDiagnostic>,
     pub evidence_refs: Vec<String>,
@@ -292,6 +312,11 @@ pub fn evaluate_robust_net_export(
     if receipt.validity_domain_ref.trim().is_empty() {
         diagnostics.push(RobustNetExportDiagnostic::EmptyValidityDomain);
     }
+    if receipt.model_form_evidence_ref.trim().is_empty()
+        || !is_sha256(&receipt.model_form_evidence_sha256)
+    {
+        diagnostics.push(RobustNetExportDiagnostic::InvalidModelFormEvidence);
+    }
     if receipt.evidence_ref.trim().is_empty() {
         diagnostics.push(RobustNetExportDiagnostic::EmptyEvidenceReference);
     }
@@ -415,25 +440,30 @@ pub fn evaluate_robust_net_export(
 
     let lower = receipt.lower_bound_mwe;
     let margin = lower - power_profile.required_net_export_reserve_mw;
-    let disposition = match receipt.evidence_class {
-        NetExportEvidenceClass::SyntheticFixture => RobustNetExportDisposition::SyntheticOnly,
-        NetExportEvidenceClass::Assumption => RobustNetExportDisposition::AssumptionOnly,
-        NetExportEvidenceClass::ModelledOutput
-        | NetExportEvidenceClass::MeasuredObservation
-        | NetExportEvidenceClass::IndependentVerification
-        | NetExportEvidenceClass::PhysicalQualification => {
-            if power_profile.reserve_threshold_inclusive {
-                if margin >= 0.0 {
+    let disposition = match receipt.model_form_validity {
+        ModelFormValidity::Unknown => RobustNetExportDisposition::ModelFormUnresolved,
+        ModelFormValidity::OutOfDomain => RobustNetExportDisposition::OutOfDomain,
+        ModelFormValidity::MaterialDiscrepancy => RobustNetExportDisposition::ModelFormDiscrepancy,
+        ModelFormValidity::WithinDeclaredDomain => match receipt.evidence_class {
+            NetExportEvidenceClass::SyntheticFixture => RobustNetExportDisposition::SyntheticOnly,
+            NetExportEvidenceClass::Assumption => RobustNetExportDisposition::AssumptionOnly,
+            NetExportEvidenceClass::ModelledOutput
+            | NetExportEvidenceClass::MeasuredObservation
+            | NetExportEvidenceClass::IndependentVerification
+            | NetExportEvidenceClass::PhysicalQualification => {
+                if power_profile.reserve_threshold_inclusive {
+                    if margin >= 0.0 {
+                        RobustNetExportDisposition::RobustlyAboveReserve
+                    } else {
+                        RobustNetExportDisposition::RobustlyBelowReserve
+                    }
+                } else if margin > 0.0 {
                     RobustNetExportDisposition::RobustlyAboveReserve
                 } else {
                     RobustNetExportDisposition::RobustlyBelowReserve
                 }
-            } else if margin > 0.0 {
-                RobustNetExportDisposition::RobustlyAboveReserve
-            } else {
-                RobustNetExportDisposition::RobustlyBelowReserve
             }
-        }
+        },
     };
 
     report(
@@ -475,6 +505,8 @@ fn report(
         method_evidence_sha256: receipt.map(|value| value.method_evidence_sha256.clone()),
         assumption_manifest_sha256: receipt.map(|value| value.assumption_manifest_sha256.clone()),
         validity_domain_ref: receipt.map(|value| value.validity_domain_ref.clone()),
+        model_form_validity: receipt.map(|value| value.model_form_validity),
+        model_form_evidence_ref: receipt.map(|value| value.model_form_evidence_ref.clone()),
         receipt_id: receipt.map(|value| value.receipt_id.clone()),
         diagnostics,
         evidence_refs,
@@ -591,6 +623,9 @@ mod tests {
             distribution_assumption_ref: "calibrated-coverage-method-v1".to_string(),
             assumption_manifest_sha256: sha('c'),
             validity_domain_ref: "declared-process-regime-v1".to_string(),
+            model_form_validity: ModelFormValidity::WithinDeclaredDomain,
+            model_form_evidence_ref: "model-form-validity-receipt-v1".to_string(),
+            model_form_evidence_sha256: sha('f'),
             covariance_receipt_ref: Some("symtropy-joint-covariance-42".to_string()),
             covariance_receipt_sha256: Some(sha('d')),
             covariance_run_id: Some(run.run_id.clone()),
@@ -644,6 +679,47 @@ mod tests {
             evaluate(Some(&receipt)).disposition,
             RobustNetExportDisposition::AssumptionOnly
         );
+    }
+
+    #[test]
+    fn parametric_covariance_does_not_override_unknown_model_form_validity() {
+        let mut receipt = lower_bound(60.0);
+        receipt.model_form_validity = ModelFormValidity::Unknown;
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::ModelFormUnresolved
+        );
+    }
+
+    #[test]
+    fn out_of_domain_receipt_cannot_qualify_net_export() {
+        let mut receipt = lower_bound(60.0);
+        receipt.model_form_validity = ModelFormValidity::OutOfDomain;
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::OutOfDomain
+        );
+    }
+
+    #[test]
+    fn material_model_form_discrepancy_blocks_robust_qualification() {
+        let mut receipt = lower_bound(60.0);
+        receipt.model_form_validity = ModelFormValidity::MaterialDiscrepancy;
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::ModelFormDiscrepancy
+        );
+    }
+
+    #[test]
+    fn model_form_validity_must_have_exact_evidence() {
+        let mut receipt = lower_bound(60.0);
+        receipt.model_form_evidence_sha256 = "bad-digest".to_string();
+        let report = evaluate(Some(&receipt));
+        assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
+        assert!(report.diagnostics.contains(
+            &RobustNetExportDiagnostic::InvalidModelFormEvidence
+        ));
     }
 
     #[test]
