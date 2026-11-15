@@ -2984,7 +2984,7 @@ pub fn project_action_history(
             event_id: action.action_id.clone(),
             obligation_id: obligation_id.clone(),
             trigger_event_id: trigger_action.action_id.clone(),
-            policy_revision: trigger_policy.clone(),
+            policy_revision: current_policy.clone(),
             scope: scope.clone(),
             receipt_ref: receipt_ref.clone(),
             receipt_sha256: receipt_sha256.clone(),
@@ -3490,7 +3490,7 @@ mod tests {
         }
     }
 
-    #[derive(Deserialize)]
+    #[derive(serde::Deserialize)]
     struct ActionHistoryFixtureInput {
         fixture_version: String,
         schedule: VirtualSchedule,
@@ -3500,14 +3500,14 @@ mod tests {
         expected: ActionHistoryExpected,
     }
 
-    #[derive(Deserialize)]
+    #[derive(serde::Deserialize)]
     struct ActionHistoryTimeResolutionInput {
         mapping_action_id: String,
         local_timestamp_ns: u64,
         qualified_time: QualifiedEventTime,
     }
 
-    #[derive(Deserialize)]
+    #[derive(serde::Deserialize)]
     struct ActionHistoryExpected {
         disposition: String,
         attempt_count: usize,
