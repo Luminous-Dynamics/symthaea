@@ -105,7 +105,8 @@
         "reused_receipts",
         "reuse_policy",
         "expected_required_revalidation",
-        "expected_false_resurrection_count"
+        "expected_false_resurrection_count",
+        "active_obligation_ids"
       ],
       "properties": {
         "control_id": {
@@ -139,6 +140,15 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/receipt"
+          }
+        },
+        "active_obligation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
@@ -410,7 +420,7 @@
             "required": [
               "epoch",
               "decision_cutoff",
-              "fresh_pass_receipts",
+              "fresh_receipts",
               "reused_receipts",
               "declared_current_obligations"
             ],
@@ -423,12 +433,6 @@
                 "type": "string",
                 "format": "date-time"
               },
-              "fresh_pass_receipts": {
-                "type": "array",
-                "items": {
-                  "$ref": "#/$defs/receipt"
-                }
-              },
               "reused_receipts": {
                 "type": "array",
                 "items": {
@@ -440,6 +444,12 @@
                 "uniqueItems": true,
                 "items": {
                   "type": "string"
+                }
+              },
+              "fresh_receipts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/receipt"
                 }
               }
             }
