@@ -125,6 +125,19 @@ r_n = (U-L)
 
 The arm interval is the sample mean plus or minus this radius, clipped to the declared support. For a treatment-minus-control contrast, subtract the control interval from the treatment interval. This is a transparent conservative construction, not a claim of optimality.
 
+### Analytic check: the two simple alpha schedules
+
+Before spending implementation effort on the telescoping schedule, compare the formulas directly. For one two-arm query with family-wise alpha 0.05, each arm receives alpha_arm = 0.025. The table reports the un-clipped per-arm Hoeffding radius; the two schedules use the same base alpha and differ only in how it is allocated across looks.
+
+| Qualified samples per arm | Inverse-square radius | Telescoping radius | Telescoping change |
+|---:|---:|---:|---:|
+| 10 | 0.68865 | 0.67389 | -2.14% |
+| 100 | 0.26542 | 0.26079 | -1.75% |
+| 1,000 | 0.09668 | 0.09539 | -1.34% |
+| 10,000 | 0.03413 | 0.03377 | -1.07% |
+
+The n=1 radii are both clipped to one by the current Bernoulli helper. This is an analytical width calculation, not a coverage, power, stopping-time or Monte Carlo result. It shows why the telescoping schedule deserves a matched baseline but should not be presented as a paradigm-level efficiency improvement by itself. The more promising gains are likely to come from variance adaptation, betting/mixture constructions, valid covariate adjustment, and better experiment allocation.
+
 For every method, report:
 - exact alpha allocation across arms, queries and looks;
 - whether its guarantee is finite-sample or asymptotic;
