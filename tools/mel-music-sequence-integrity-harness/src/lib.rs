@@ -499,13 +499,13 @@ mod tests {
         vec![event("event-a", 60_000), event("event-b", 64_000)]
     }
 
-    fn request(count: u8) -> SequenceRequestV1 {
+    fn request(count: u8, initial_events: &[MusicalEventV1]) -> SequenceRequestV1 {
         SequenceRequestV1 {
             schema_version: SEQUENCE_REQUEST_SCHEMA_V1.to_owned(),
             session_id: format!("session-{count}"),
             source_lineage_sha256: h(10),
             initial_artifact_sha256: h(11),
-            initial_state_sha256: symbolic_state_sha256_v1(&initial_fixture_events()).unwrap(),
+            initial_state_sha256: symbolic_state_sha256_v1(initial_events).unwrap(),
             operation_plan_sha256: h(12),
             expected_step_count: count,
         }
@@ -549,7 +549,7 @@ mod tests {
     #[test]
     fn initial_symbolic_state_must_be_bound_to_frozen_source() {
         let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
-        let mut req = request(1);
+        let mut req = request(1, &initial);
         req.initial_state_sha256 = h(999);
         assert_eq!(
             evaluate_sequence_v1(&req, &initial, &[]),
@@ -563,7 +563,7 @@ mod tests {
         let output = vec![event("event-a", 61_000), event("event-b", 64_000)];
         let first = step(1, h(11), h(11), &initial, output, "event-a", StepGateVerdictV1::Verified);
         assert_eq!(
-            evaluate_sequence_v1(&request(1), &initial, &[first]),
+            evaluate_sequence_v1(&request(1, &initial), &initial, &[first]),
             Err(SequenceErrorV1::ArtifactIdentityNoChange)
         );
     }
@@ -576,7 +576,7 @@ mod tests {
         let first = step(1, h(11), h(21), &initial, state_1.clone(), "event-a", StepGateVerdictV1::Verified);
         let mut second = step(2, h(21), h(22), &state_1, state_2, "event-b", StepGateVerdictV1::Verified);
         second.hard_gates.integrity = StepGateVerdictV1::Unknown;
-        let result = evaluate_sequence_v1(&request(2), &initial, &[first, second]).unwrap();
+        let result = evaluate_sequence_v1(&request(2, &initial), &initial, &[first, second]).unwrap();
         assert_eq!(result.disposition, SequenceDispositionV1::RejectedAtStep);
         assert_eq!(result.accepted_step_count, 1);
         assert_eq!(result.rejected_at_step, Some(2));
@@ -589,7 +589,7 @@ mod tests {
         let state_2 = vec![event("event-a", 62_000), event("event-b", 65_000), event("event-c", 67_000)];
         let first = step(1, h(11), h(21), &initial, state_1.clone(), "event-b", StepGateVerdictV1::Verified);
         let second = step(2, h(21), h(22), &state_1, state_2, "event-a", StepGateVerdictV1::Verified);
-        let result = evaluate_sequence_v1(&request(2), &initial, &[first, second]).unwrap();
+        let result = evaluate_sequence_v1(&request(2, &initial), &initial, &[first, second]).unwrap();
         assert_eq!(result.disposition, SequenceDispositionV1::Accepted);
         assert_eq!(result.accepted_step_count, 2);
         assert_eq!(result.cumulative_event_mutations, 2);
@@ -604,7 +604,7 @@ mod tests {
         let output = vec![event("event-a", 60_000), event("event-b", 65_000), event("event-c", 68_000)];
         let first = step(1, h(11), h(21), &initial, output, "event-b", StepGateVerdictV1::Verified);
         assert_eq!(
-            evaluate_sequence_v1(&request(1), &initial, &[first]),
+            evaluate_sequence_v1(&request(1, &initial), &initial, &[first]),
             Err(SequenceErrorV1::UnauthorizedEventMutation)
         );
     }
@@ -614,7 +614,7 @@ mod tests {
         let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
         let first = step(1, h(999), h(21), &initial, vec![event("event-a", 61_000), event("event-b", 64_000)], "event-a", StepGateVerdictV1::Verified);
         assert_eq!(
-            evaluate_sequence_v1(&request(1), &initial, &[first]),
+            evaluate_sequence_v1(&request(1, &initial), &initial, &[first]),
             Err(SequenceErrorV1::ArtifactAncestryMismatch)
         );
     }
@@ -625,7 +625,7 @@ mod tests {
         let mut first = step(1, h(11), h(21), &initial, vec![event("event-a", 61_000), event("event-b", 64_000)], "event-a", StepGateVerdictV1::Verified);
         first.input_state_sha256 = h(777);
         assert_eq!(
-            evaluate_sequence_v1(&request(1), &initial, &[first]),
+            evaluate_sequence_v1(&request(1, &initial), &initial, &[first]),
             Err(SequenceErrorV1::StateAncestryMismatch)
         );
     }
@@ -638,7 +638,7 @@ mod tests {
         let first = step(1, h(11), h(21), &initial, state_1.clone(), "event-a", StepGateVerdictV1::Rejected);
         let second = step(2, h(21), h(22), &state_1, state_2, "event-a", StepGateVerdictV1::Verified);
         assert_eq!(
-            evaluate_sequence_v1(&request(2), &initial, &[first, second]),
+            evaluate_sequence_v1(&request(2, &initial), &initial, &[first, second]),
             Err(SequenceErrorV1::ContinuationAfterHardGateFailure)
         );
     }
@@ -648,7 +648,7 @@ mod tests {
         let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
         let output = vec![event("event-a", 61_000), event("event-b", 64_000)];
         let first = step(1, h(11), h(21), &initial, output, "event-a", StepGateVerdictV1::Unknown);
-        let result = evaluate_sequence_v1(&request(2), &initial, &[first]).unwrap();
+        let result = evaluate_sequence_v1(&request(2, &initial), &initial, &[first]).unwrap();
         assert_eq!(result.disposition, SequenceDispositionV1::RejectedAtStep);
         assert_eq!(result.rejected_at_step, Some(1));
         assert_eq!(result.accepted_step_count, 0);
@@ -660,7 +660,7 @@ mod tests {
         let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
         let output = vec![event("event-a", 61_000), event("event-b", 64_000)];
         let first = step(1, h(11), h(21), &initial, output, "event-a", StepGateVerdictV1::Verified);
-        let result = evaluate_sequence_v1(&request(2), &initial, &[first]).unwrap();
+        let result = evaluate_sequence_v1(&request(2, &initial), &initial, &[first]).unwrap();
         assert_eq!(result.disposition, SequenceDispositionV1::Incomplete);
     }
 
@@ -671,7 +671,7 @@ mod tests {
         let mut first = step(1, h(11), h(21), &initial, output, "event-a", StepGateVerdictV1::Verified);
         first.output_state_sha256 = h(999);
         assert_eq!(
-            evaluate_sequence_v1(&request(1), &initial, &[first]),
+            evaluate_sequence_v1(&request(1, &initial), &initial, &[first]),
             Err(SequenceErrorV1::OutputStateDigestMismatch)
         );
     }
@@ -697,7 +697,7 @@ mod tests {
         let mut first = step(1, h(11), h(21), &initial, output, "event-a", StepGateVerdictV1::Verified);
         first.failed_candidate_attempt_count = 3;
         assert_eq!(
-            evaluate_sequence_v1(&request(1), &initial, &[first]),
+            evaluate_sequence_v1(&request(1, &initial), &initial, &[first]),
             Err(SequenceErrorV1::InvalidAttemptAccounting)
         );
     }
@@ -705,7 +705,7 @@ mod tests {
     #[test]
     fn session_length_is_limited_to_preregistered_ladder() {
         assert_eq!(
-            evaluate_sequence_v1(&request(3), &[event("event-a", 60_000)], &[]),
+            evaluate_sequence_v1(&request(3, &initial), &[event("event-a", 60_000)], &[]),
             Err(SequenceErrorV1::InvalidRequest)
         );
     }
