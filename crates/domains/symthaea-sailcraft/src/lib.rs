@@ -272,10 +272,6 @@ fn lerp(a: f64, b: f64, fraction: f64) -> f64 {
     a + (b - a) * fraction
 }
 
-fn normalize_bearing(degrees: f64) -> f64 {
-    degrees.rem_euclid(360.0)
-}
-
 fn signed_angle_deg(from_bearing: f64, to_bearing: f64) -> f64 {
     (from_bearing - to_bearing + 180.0).rem_euclid(360.0) - 180.0
 }
