@@ -18,6 +18,10 @@
 
 | Capability Amplification (SympoeticBench extension) | Whether co-creation builds independent human capability, not only a better in-session artifact | Development protocol and a 15th seed scenario; no human-subject results yet | Measure pre/post gain, delayed retention, and transfer against matched controls; keep agency and self-efficacy separate |
 
+| KaBLE (Stanford AI Index 2026) | Distinguishing knowledge from belief, including first-person false-belief framing | 13,000 questions across 13 tasks; evaluated on 24 leading models | Extend epistemic reliability into human-AI collaboration: provenance, belief revision, confidence, and verification of partner claims |
+| Metacognitive sensitivity (J. Mathematical Psychology, 2026) | Whether confidence discriminates correct from incorrect judgments, beyond calibration alone | Analytical signal-detection account with naturalistic classification application | Add separate Brier/ECE calibration and AUC-style sensitivity for both human and AI judgments |
+| OHAI persistent human-AI teams (Frontiers, Oct 2026) | Collective functioning and collective intelligence across repeated interdependent cycles | Theoretical framework; calls for configuration and measurement qualification before longitudinal CI claims | Separate one-shot feasibility from multi-cycle team-level evidence and CI trajectories |
+
 ## 2. Findings that shape our design
 
 The 2026 common-ground benchmark formalizes shared assumptions, goals, situation awareness, joint action and repair as core conditions for collaboration. This is a strong reference for SympoeticBench's common-ground and repair tasks.
@@ -25,6 +29,10 @@ The 2026 common-ground benchmark formalizes shared assumptions, goals, situation
 AgentWorld reports long-horizon failures in communication, role tracking and shared-plan maintenance, and introduces Causal Collaboration Effectiveness to ask whether agent actions actually contributed to a team's outcome. SympoeticBench should adopt the general lesson that activity volume is not contribution, while measuring individual agency and artifact provenance in addition to group completion.
 
 The COLM 2026 *Collaboration Gap* study shows that strong solo model performance can degrade in paired collaboration, and that partner order and relay strategy can matter. SympoeticBench therefore adds matched solo and paired baselines, counterbalanced A→B/B→A ordering, specialist role-loss tests, and structured handoff evaluation. The May 2026 multi-agent creativity study reports that AI-agent teams can outperform human teams on its creativity measure, driven by novelty with comparable usefulness. We should reproduce its distinction between novelty and usefulness where possible, while not treating AI-only team results as proof of superior human-AI collaboration.
+
+The Stanford AI Index 2026's summary of KaBLE highlights that models can collapse the distinction between first-person false beliefs and established facts. SympoeticBench now tests that failure within a collaborative exchange, where the participant's belief must be represented accurately without being promoted to external truth. A May 2026 mathematical-psychology paper further motivates separating confidence calibration from metacognitive sensitivity: an agent should not only be calibrated on average, it should assign lower confidence to the judgments it gets wrong.
+
+The October 2026 OHAI framework adds an important inference boundary. A one-shot collaboration task can qualify measures and test local relationships, but it cannot establish collective intelligence in a persistent human-AI team. Our reporting will distinguish component capability, enacted collective functioning, and cross-task collective capacity. Longitudinal claims require multi-cycle, comparable multi-task evidence.
 
 The Human Creativity Benchmark argues that professional agreement and disagreement carry different information: technical correctness can invite convergence, while aesthetic direction and conceptual risk legitimately diverge. SympoeticBench should not collapse all rater disagreement into noise or force one universally preferred output.
 
@@ -49,6 +57,8 @@ No benchmark should claim that the adjacent work is absent. The opportunity is t
 11. Collaboration gap, partner-order sensitivity, and handoff recovery.
 12. Adaptive intervention policy: when to ask, suggest, challenge, delegate, synthesize, preserve disagreement, or step back.
 13. Human capability amplification: independent learning, delayed retention, and transfer after collaboration.
+14. Epistemic resilience: knowledge/belief distinction, confidence calibration, evidence provenance, contradiction handling, and human verification.
+15. Persistent-team collective functioning across multiple cycles; collective-intelligence claims require comparable multi-task longitudinal evidence.
 14. Coalition contribution allocation with exact Shapley values when every required counterfactual coalition is identifiable.
 
 The benchmark's contribution is the integrated measurement protocol and reproducible corpus, not a claim that any one of these constructs is newly invented.
@@ -74,6 +84,8 @@ The first goal is construct validity and reproducibility, not leaderboard rank. 
 - A long-horizon contribution analysis comparable in spirit to AgentWorld's CCE.
 - A matched solo/pair and counterbalanced relay evaluation inspired by The Collaboration Gap.
 - An adaptive-intervention comparison measuring overreach, missed critical warnings, and unnecessary interruption.
+- An epistemic-resilience slice with first-person false beliefs, stale evidence, non-independent sources, contradictory telemetry, and prompt injection in untrusted evidence.
+- A longitudinal persistent-team study before any claim about collective-intelligence trajectories.
 - An external human study with preregistered outcomes and blinded raters.
 - A learning/transfer study showing independent human capability gain versus matched practice controls, including delayed retention.
 - An independent replication on a held-out scenario set.
