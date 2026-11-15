@@ -19,7 +19,7 @@ jobs:
       - name: Check out exact pull request head
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Verify exact pull request head
@@ -27,7 +27,7 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
           echo "MEL_SEQUENCE_REVISION=$actual" >> "$GITHUB_ENV"
 
@@ -84,7 +84,7 @@ jobs:
       - name: Upload sequence qualification evidence
         uses: actions/upload-artifact@v4
         with:
-          name: mel-sequence-\${{ github.event.pull_request.head.sha || github.sha }}
-          path: \${{ runner.temp }}/mel-sequence-evidence/
+          name: mel-sequence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-sequence-evidence/
           if-no-files-found: error
           retention-days: 90
