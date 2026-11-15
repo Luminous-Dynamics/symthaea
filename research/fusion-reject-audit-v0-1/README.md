@@ -117,7 +117,7 @@ Out-of-domain, failed, non-converged, unsupported, inconclusive and missing scen
 - The audit consumes exact declared scenario results; it does not run PROCESS, D0FUS, FUSE.jl or a physical solver.
 - Synthetic examples verify the software contract only.
 
-The module adds 15 authored Rust tests covering nominal/stress opportunities, union classification, missing/reordered scenario bundles, primary outcome/evidence binding, out-of-domain refusal, frontier validity, objective units/order, sample identity, simultaneous alpha allocation and zero-sample conservatism. The scenario runner exercises a synthetic two-scenario family. Its example intentionally includes a candidate that extends the frontier only under stress and an unresolved out-of-domain result. These are authored contract tests and synthetic outputs, not physical validation.
+The module adds 17 authored Rust tests covering nominal/stress opportunities, union classification, missing/reordered scenario bundles, primary outcome/evidence binding, globally unique run/evidence references, out-of-domain refusal, frontier validity, objective units/order, sample identity, simultaneous alpha allocation and zero-sample conservatism. The scenario runner exercises a synthetic two-scenario family. Its example intentionally includes a candidate that extends the frontier only under stress and an unresolved out-of-domain result. These are authored contract tests and synthetic outputs, not physical validation.
 
 
 ## Run
