@@ -401,3 +401,13 @@ The pump-loop report must leave installation, ducting, ideal, interaction, and o
 hull-waterjet efficiencies unset. ITTC 7.5-02-05-03.2 separates pump-loop, inlet-duct,
 and waterjet-system tests; these have distinct measurement boundaries. This calculator
 is not an ITTC conformance tool, PWC model, pump map, or physical-validation claim.
+
+
+Additional adversarial controls:
+- uncertainty interval crosses unity while nominal efficiency remains below unity -> INCOMPLETE, not a claimed pass;
+- friction-corrected torque interval reaches zero -> INCOMPLETE with no efficiency denominator.
+
+The current product crosswalk and matched ride-service benchmark proposal are in
+`../../docs/research/marine/PWC-INDUSTRY-BENCHMARK-CROSSWALK-2026-11-15.md`.
+The next independent stage—station energy flux, NVR, inlet/duct and interaction-efficiency
+joining—is tracked in Symthaea issue #12232.
