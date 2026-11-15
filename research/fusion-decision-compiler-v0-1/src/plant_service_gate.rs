@@ -7,10 +7,8 @@
 use std::collections::BTreeMap;
 
 pub const PLANT_SERVICE_GATE_VERSION: &str = "fusion-plant-service-gate/0.1";
-pub const D0FUS_3_2_0_ITER_SCHEMA_REF: &str =
-    "d0fus-3.2.0-iter-run-output-165-v1";
-pub const D0FUS_3_2_0_SOURCE_COMMIT: &str =
-    "a682c3511dc189b2a4cdd6f4b8bc545d3cdb8924";
+pub const D0FUS_3_2_0_ITER_SCHEMA_REF: &str = "d0fus-3.2.0-iter-run-output-165-v1";
+pub const D0FUS_3_2_0_SOURCE_COMMIT: &str = "a682c3511dc189b2a4cdd6f4b8bc545d3cdb8924";
 pub const D0FUS_3_2_0_ITER_SCHEMA_SHA256: &str =
     "a390b317a336f1ec683e3c2e2950cb7480c7d79bdac38d498258270266b2f774";
 pub const D0FUS_3_2_0_EXPECTED_OUTPUT_LENGTH: usize = 165;
@@ -154,8 +152,14 @@ pub struct D0fusIterPowerValues {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum D0fusSchemaError {
-    WrongOutputLength { expected: usize, actual: usize },
-    NonFinitePowerValue { observable: PowerObservable, index: usize },
+    WrongOutputLength {
+        expected: usize,
+        actual: usize,
+    },
+    NonFinitePowerValue {
+        observable: PowerObservable,
+        index: usize,
+    },
 }
 
 /// Extract exact D0FUS 3.2.0 ITER RUN power observables from the frozen 165-value
@@ -268,7 +272,11 @@ pub fn evaluate_plant_power_balance(
         }
     }
 
-    let evidence_refs = run.terms.iter().map(|term| term.evidence_ref.clone()).collect();
+    let evidence_refs = run
+        .terms
+        .iter()
+        .map(|term| term.evidence_ref.clone())
+        .collect();
     let get = |observable| term_map.get(&observable).map(|term| term.value_mw);
 
     let gross = get(PowerObservable::GrossElectric);
@@ -288,16 +296,13 @@ pub fn evaluate_plant_power_balance(
     }
 
     let calculated_total = variable.zip(fixed).map(|(v, f)| v + f);
-    let calculated_net = gross
-        .zip(variable)
-        .zip(fixed)
-        .map(|((g, v), f)| g - v - f);
-    let total_residual = total.zip(calculated_total).map(|(reported, calculated)| {
-        reported - calculated
-    });
-    let net_residual = net.zip(calculated_net).map(|(reported, calculated)| {
-        reported - calculated
-    });
+    let calculated_net = gross.zip(variable).zip(fixed).map(|((g, v), f)| g - v - f);
+    let total_residual = total
+        .zip(calculated_total)
+        .map(|(reported, calculated)| reported - calculated);
+    let net_residual = net
+        .zip(calculated_net)
+        .map(|(reported, calculated)| reported - calculated);
     let max_residual = total_residual
         .zip(net_residual)
         .map(|(total_value, net_value)| total_value.abs().max(net_value.abs()));
@@ -309,9 +314,8 @@ pub fn evaluate_plant_power_balance(
         .chain(net)
         .map(f64::abs)
         .fold(0.0_f64, f64::max);
-    let normalized_residual = max_residual.map(|value| {
-        if scale == 0.0 { value } else { value / scale }
-    });
+    let normalized_residual =
+        max_residual.map(|value| if scale == 0.0 { value } else { value / scale });
     let reserve_margin = net.map(|value| value - profile.required_net_export_reserve_mw);
 
     let required_values_present = PowerObservable::REQUIRED
@@ -324,29 +328,29 @@ pub fn evaluate_plant_power_balance(
                 | PowerBalanceDiagnostic::NegativeRecirculationLoad
         )
     });
-    let disposition = if !required_values_present || has_non_balance_diagnostic {
-        PowerBalanceDisposition::NotEvaluable
-    } else if diagnostics.contains(&PowerBalanceDiagnostic::NegativeGrossGeneration)
-        || diagnostics.contains(&PowerBalanceDiagnostic::NegativeRecirculationLoad)
-    {
-        PowerBalanceDisposition::NotEvaluable
-    } else if max_residual.is_none_or(|value| value > profile.absolute_balance_tolerance_mw) {
-        PowerBalanceDisposition::BalanceInconsistent
-    } else if net.is_some_and(|value| value < 0.0) {
-        PowerBalanceDisposition::NetImport
-    } else if net.is_some_and(|value| value == 0.0) {
-        PowerBalanceDisposition::NoNetExport
-    } else if reserve_margin.is_some_and(|margin| {
-        if profile.reserve_threshold_inclusive {
-            margin < 0.0
+    let has_invalid_power_sign = diagnostics
+        .contains(&PowerBalanceDiagnostic::NegativeGrossGeneration)
+        || diagnostics.contains(&PowerBalanceDiagnostic::NegativeRecirculationLoad);
+    let disposition =
+        if !required_values_present || has_non_balance_diagnostic || has_invalid_power_sign {
+            PowerBalanceDisposition::NotEvaluable
+        } else if max_residual.is_none_or(|value| value > profile.absolute_balance_tolerance_mw) {
+            PowerBalanceDisposition::BalanceInconsistent
+        } else if net.is_some_and(|value| value < 0.0) {
+            PowerBalanceDisposition::NetImport
+        } else if net.is_some_and(|value| value == 0.0) {
+            PowerBalanceDisposition::NoNetExport
+        } else if reserve_margin.is_some_and(|margin| {
+            if profile.reserve_threshold_inclusive {
+                margin < 0.0
+            } else {
+                margin <= 0.0
+            }
+        }) {
+            PowerBalanceDisposition::NetExportBelowReserve
         } else {
-            margin <= 0.0
-        }
-    }) {
-        PowerBalanceDisposition::NetExportBelowReserve
-    } else {
-        PowerBalanceDisposition::NetExportQualifiedForDeclaredBoundary
-    };
+            PowerBalanceDisposition::NetExportQualifiedForDeclaredBoundary
+        };
 
     PowerBalanceReport {
         contract_version: PLANT_SERVICE_GATE_VERSION,
@@ -398,13 +402,7 @@ mod tests {
         }
     }
 
-    fn run(
-        gross: f64,
-        variable: f64,
-        fixed: f64,
-        total: f64,
-        net: f64,
-    ) -> PowerBalanceRun {
+    fn run(gross: f64, variable: f64, fixed: f64, total: f64, net: f64) -> PowerBalanceRun {
         PowerBalanceRun {
             run_id: "d0fus-iter-run-v1".to_string(),
             solver_id: "D0FUS".to_string(),
@@ -525,13 +523,19 @@ mod tests {
             .retain(|term| term.observable != PowerObservable::FixedRecirculated);
         let report = evaluate_plant_power_balance(&profile(), &source);
         assert_eq!(report.disposition, PowerBalanceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&PowerBalanceDiagnostic::MissingObservable));
+        assert!(
+            report
+                .diagnostics
+                .contains(&PowerBalanceDiagnostic::MissingObservable)
+        );
     }
 
     #[test]
     fn duplicate_terms_are_rejected() {
         let mut source = run(300.0, 100.0, 50.0, 150.0, 150.0);
-        source.terms.push(term(PowerObservable::NetElectric, 150.0, "duplicate"));
+        source
+            .terms
+            .push(term(PowerObservable::NetElectric, 150.0, "duplicate"));
         assert_eq!(
             evaluate_plant_power_balance(&profile(), &source).disposition,
             PowerBalanceDisposition::NotEvaluable
@@ -656,7 +660,15 @@ mod tests {
         source.receipt_ref.clear();
         let report = evaluate_plant_power_balance(&profile(), &source);
         assert_eq!(report.disposition, PowerBalanceDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&PowerBalanceDiagnostic::InvalidOutputDigest));
-        assert!(report.diagnostics.contains(&PowerBalanceDiagnostic::EmptyReceiptReference));
+        assert!(
+            report
+                .diagnostics
+                .contains(&PowerBalanceDiagnostic::InvalidOutputDigest)
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&PowerBalanceDiagnostic::EmptyReceiptReference)
+        );
     }
 }
