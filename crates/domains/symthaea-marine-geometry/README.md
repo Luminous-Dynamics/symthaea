@@ -58,6 +58,12 @@ Run it with:
 
 Important: this inspects the Part 21 envelope and exact FILE_SCHEMA string only. The required edition is profile metadata; the header string alone does not prove ISO edition/conformance, valid DATA entities, B-rep correctness, PMI preservation or geometric equivalence.
 
+The composed `marine-cad-translation-verify` CLI reads a real STEP file, a CAD translation receipt and a frozen header profile. It verifies that the actual STEP bytes match the receipt's file digest and that the Part 21 envelope/FILE_SCHEMA identifiers match the profile:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-cad-translation-verify -- model.step translation-receipt.json ap242e4-header-profile.json
+
+This is still an envelope-and-identity check. It does not parse B-rep DATA entities or perform independent geometric/PMI validation.
+
 ## Research benchmark protocol
 
 The matched external comparison, metrics, uncertainty policy, target ladder, and implementation sequence are specified in [BENCHMARK_PROTOCOL.md](./BENCHMARK_PROTOCOL.md). It is a frozen research protocol and target set, not a claim that the current crate generates hulls or has achieved hydrodynamic performance.
