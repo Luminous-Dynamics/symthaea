@@ -30,7 +30,11 @@ jobs:
           components: rustfmt, clippy
 
       - name: Resolve and freeze dependency graph
-        run: cargo generate-lockfile --manifest-path tools/sympsi-beacon-verifier/Cargo.toml
+        run: |
+          cargo generate-lockfile --manifest-path tools/sympsi-beacon-verifier/Cargo.toml
+          echo "17511321f5887225ec313b2e4b0689c24aabf8103a5bf6042167575c6334ff3c  tools/sympsi-beacon-verifier/Cargo.lock" \
+            | sha256sum --check --status
+          sha256sum tools/sympsi-beacon-verifier/Cargo.lock
 
       - name: Inspect cryptographic dependency metadata
         run: |
