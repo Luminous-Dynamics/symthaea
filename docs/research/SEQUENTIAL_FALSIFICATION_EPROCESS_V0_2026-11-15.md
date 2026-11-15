@@ -17,13 +17,13 @@ Let F_(t-1) contain all information before observation t, including prior observ
 
 Under the simple null:
 
-    Y_t | F_(t-1), A_t ~ Normal(0, sigma^2)
+    Y_t | F_(t-1), A_t ~ Normal(0, sigma_t^2), where sigma_t is known and predictable
 
-For one predeclared alternative, the evaluator chooses a discrepancy d_t using only information available before Y_t. Under the alternative the conditional mean is d_t, with the same known variance.
+For one predeclared alternative, the evaluator chooses a discrepancy d_t using only information available before Y_t. Under the alternative the conditional mean is d_t, with the same per-step known variance sigma_t. The action may change sigma_t, provided its value is committed before the observation.
 
 The conditional likelihood-ratio increment is:
 
-    e_t = exp(d_t * Y_t / sigma^2 - d_t^2 / (2 * sigma^2))
+    e_t = exp(d_t * Y_t / sigma_t^2 - d_t^2 / (2 * sigma_t^2))
 
 Under the stated null and predictable d_t:
 
@@ -43,7 +43,7 @@ This is the time-uniform boundary implemented in the Rust reference. It is not t
 
 The API uses a two-stage transition:
 
-1. commit_prediction(observation_id, decision_digest, d_t) (or the mixture variant) records the discrepancy for the next observation.
+1. commit_prediction(observation_id, decision_digest, d_t) (or the mixture variant) records the discrepancy for the next observation. Use commit_prediction_with_sigma / commit_predictions_with_sigma to bind a known action-dependent sigma_t in the same step.
 2. observe(observation_id, decision_digest, Y_t) consumes only the matching observation.
 
 The implementation rejects:
@@ -72,7 +72,7 @@ This does not provide a generic family-wise test for an adaptively selected alte
 
 v0 requires:
 - a simple conditional Gaussian null with zero residual mean;
-- known, common, strictly positive sigma;
+- known, strictly positive per-step sigma_t committed with each prediction;
 - conditional variance and distribution correctly specified at every step;
 - discrepancy predictions committed before their scored outcomes;
 - a fixed alternative identity/mixture and predeclared weights;
@@ -82,7 +82,7 @@ It does not qualify:
 - unknown or estimated variance;
 - composite nulls and nuisance-parameter estimation;
 - autocorrelation or cross-observation dependence not captured by the conditional model;
-- heteroskedasticity, heavy tails, censoring, missing-not-at-random or sensor drift;
+- unmodelled heteroskedasticity, heavy tails, censoring, missing-not-at-random or sensor drift;
 - data-dependent post-hoc alternative selection;
 - simulator nulls without a valid null simulator;
 - physical trajectories merely because their one-step residuals look Gaussian.
