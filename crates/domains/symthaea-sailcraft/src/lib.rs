@@ -345,7 +345,7 @@ pub fn evaluate_route_candidates(
         }
     };
     let current = match evidence_gate(&request.current) {
-        Ok(value) => value,
+        Ok(value) => *value,
         Err(status) => {
             return RouteEvaluation::blocked(
                 status,
@@ -354,7 +354,7 @@ pub fn evaluate_route_candidates(
         }
     };
     let target_bearing = match evidence_gate(&request.target_bearing) {
-        Ok(value) => value,
+        Ok(value) => *value,
         Err(status) => {
             return RouteEvaluation::blocked(
                 status,
