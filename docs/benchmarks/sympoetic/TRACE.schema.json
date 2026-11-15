@@ -89,7 +89,12 @@
               "evaluator_annotation",
               "session_end",
               "execution_reconciled",
-              "intervention_decision"
+              "intervention_decision",
+              "participant_assessment",
+              "scaffold_adjustment",
+              "independent_assessment",
+              "retention_assessment",
+              "transfer_assessment"
             ]
           },
           "parent_event_ids": {
