@@ -1,0 +1,67 @@
+# Fusion decision compiler contract v0.1
+
+An isolated, dependency-free Rust research crate for the first FECOMP-0 compiler semantics.
+
+It is an integration contract, not another fusion system code. It does not replace PROCESS, Bluemira, FreeGSNKE, DESC, materials solvers, thermal/structural/neutronics solvers, Symtropy's engineering twin, or independent engineering authorities.
+
+## Initial capabilities
+
+- Candidate and objective identity checks.
+- Typed service metrics with units encoded by variant: target gain, plasma gain, driver wall-plug gain, gross thermal/electric power, net electric export, useful heat, lifetime energy and availability.
+- Each typed service metric requires its own exact evidence scope (for example net-electric-export-boundary versus plasma-gain-boundary); the compiler rejects reusing a different metric's boundary evidence.
+- Exact solver-run binding to candidate revision and geometry digest.
+- Explicit energy-service boundary admission, resolved to the exact evidence record consumed by the energy hard gate.
+- Required hard-gate evaluation for energy, material, manufacturing, inspection, assembly and replacement.
+- Solver capability, regime, observable, intended model use, applicability, execution and convergence checks.
+- Intended-use classes distinguish engineering screening, single-step prediction, open-loop rollout, optimization inside a surrogate, and reference-solver evaluation.
+- Explicit distinction between blocked and indeterminate candidates.
+- Evidence-to-claim class and revision/scope binding.
+- Pairwise solver dependence classification across declared dataset, code and assumption groups; empty or missing dependency identities remain unknown.
+- Deterministic transitive invalidation of downstream dependency nodes.
+- Fixed claim ceiling: eligible candidates are only eligible for further engineering review.
+- Candidate-funnel audit across the frozen universe at analytical, low-fidelity and high-fidelity stages; every candidate/stage pair must have an explicit disposition, including NotEvaluated.
+- Pipeline advancement must follow prior passes; rejected candidates can re-enter only through a documented stratified audit or human override.
+- Exact screening recall is reported only when retrospective reference labels cover the full candidate universe; partial labels never masquerade as an exact recall estimate.
+- Validation-domain module distinguishes calibration exposure, measured test-stand evidence and blind holdout; it checks source/dataset/episode non-overlap, holdout exposure flags, measured-evidence class, diagnostic/uncertainty provenance, model revision and declared regime/geometry/facility/case/operating-point envelope.
+- Holdout transfer requires at least one declared difference from the test-stand measurement (facility, case or operating point), while remaining inside the model's declared domain.
+- A successful validation-domain audit grants only eligibility for independent metric evaluation; it is not a model-performance or physical-validation result.
+
+## Dispositions
+
+- `Blocked`: at least one explicit hard failure, unsupported solver capability, out-of-domain model or failed execution.
+- `Indeterminate`: a required boundary, model result, gate or applicability state is missing or unknown.
+- `EligibleForFurtherEngineeringReview`: every required gate and solver contract is satisfied under the declared synthetic/modelled scope. This is not physical qualification or manufacturing release.
+
+A hard failure takes precedence over an unknown. Missing evidence is never treated as zero cost, zero uncertainty or a passing gate.
+
+## Evidence classes
+
+A claim must cite evidence with an exact compatible class and the same subject revision. Synthetic fixtures cannot support measured, independently verified or physically qualified claims. A digest string is an identity declaration; the crate does not fetch or hash arbitrary source payloads. Solver run records must bind the exact candidate revision and geometry, but source-byte verification remains the responsibility of a separate payload verifier.
+
+## Solver dependence
+
+Two runs are only classified as independent under declared dependencies when dataset, code and assumption groups are all present and pairwise distinct. Any shared group is marked common-mode. Missing group identity is marked unknown. This is not a statistical proof of independence.
+
+## Dependency invalidation
+
+The graph helper returns the changed nodes and their full transitive downstream closure. Cycles are tolerated and traversal is deterministic. This is a structural impact calculation, not automatic revocation of an external certificate or authority decision.
+
+## Run locally
+
+From this directory:
+
+```sh
+cargo fmt --manifest-path Cargo.toml -- --check
+cargo test --manifest-path Cargo.toml
+cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
+cargo run --manifest-path Cargo.toml --bin verify_validation_domain_corpus
+cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
+```
+
+The independent compiler corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current compiler corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 32 authored Rust unit tests, including one that applies all 26 compiler corpus mutations to the actual compiler. The candidate-funnel module adds 16 authored tests for full stage matrices, missing/duplicate records, skip reasons, pipeline transitions, explicit audit overrides, failure/non-convergence and exact-vs-partial recall. The validation-domain module adds 16 authored tests for calibration/test/holdout separation, source and episode overlap, leakage, measurement class, metrology provenance, model revision and domain applicability; it also executes all 16 frozen split-integrity cases. Total authored Rust test declarations across the three source modules: 64. These are authored test cases, not executed test results.
+
+The separate validation-domain inventory binary checks fixture structure without calling the split validator. Its 16 synthetic cases contain 3 expected acceptances and 13 expected refusals.
+
+## Claim ceiling
+
+A pass establishes only that this exact software contract behaves as tested on synthetic fixtures. It does not validate a solver, equilibrium, reactor architecture, material, component, manufacturing process, plant economics, physical experiment, safety case or net-energy claim. It cannot authorize experiments, hardware, fabrication, commissioning or operation.
