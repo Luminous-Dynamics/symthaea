@@ -46,7 +46,7 @@ jobs:
         run: cargo fmt --check -p symthaea-marine-geometry
 
       - name: Unit tests
-        run: cargo test -p symthaea-marine-geometry
+        run: cargo test --locked -p symthaea-marine-geometry
 
       - name: Clippy
-        run: cargo clippy -p symthaea-marine-geometry --all-targets -- -D warnings
+        run: cargo clippy --locked -p symthaea-marine-geometry --all-targets -- -D warnings
