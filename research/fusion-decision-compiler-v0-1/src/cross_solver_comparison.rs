@@ -258,13 +258,12 @@ pub fn compare_solver_outputs(
         CrossSolverComparisonDisposition::ComparableDescriptiveOnly
     };
 
-    let covariance_receipt_ref = if covariance_disposition
-        == CrossCovarianceDisposition::BoundToExactOutputPair
-    {
-        covariance.receipt_ref.clone()
-    } else {
-        None
-    };
+    let covariance_receipt_ref =
+        if covariance_disposition == CrossCovarianceDisposition::BoundToExactOutputPair {
+            covariance.receipt_ref.clone()
+        } else {
+            None
+        };
 
     Ok(CrossSolverComparison {
         contract_version: CROSS_SOLVER_COMPARISON_VERSION,
@@ -293,7 +292,10 @@ fn validate_case(case: &FrozenComparisonCase) -> Vec<ComparisonValidationError> 
         (case.case_id.as_str(), "case.case_id"),
         (case.candidate_id.as_str(), "case.candidate_id"),
         (case.candidate_revision.as_str(), "case.candidate_revision"),
-        (case.service_boundary_ref.as_str(), "case.service_boundary_ref"),
+        (
+            case.service_boundary_ref.as_str(),
+            "case.service_boundary_ref",
+        ),
         (case.observable_id.as_str(), "case.observable_id"),
         (
             case.canonical_quantity_ref.as_str(),
@@ -301,7 +303,10 @@ fn validate_case(case: &FrozenComparisonCase) -> Vec<ComparisonValidationError> 
         ),
         (case.unit_ref.as_str(), "case.unit_ref"),
         (case.frame_ref.as_str(), "case.frame_ref"),
-        (case.sign_convention_ref.as_str(), "case.sign_convention_ref"),
+        (
+            case.sign_convention_ref.as_str(),
+            "case.sign_convention_ref",
+        ),
         (case.time_basis_ref.as_str(), "case.time_basis_ref"),
         (
             case.normalization_contract_ref.as_str(),
@@ -334,7 +339,10 @@ fn validate_output(
         (output.candidate_revision.as_str(), "candidate_revision"),
         (output.service_boundary_ref.as_str(), "service_boundary_ref"),
         (output.observable_id.as_str(), "observable_id"),
-        (output.canonical_quantity_ref.as_str(), "canonical_quantity_ref"),
+        (
+            output.canonical_quantity_ref.as_str(),
+            "canonical_quantity_ref",
+        ),
         (output.unit_ref.as_str(), "unit_ref"),
         (output.frame_ref.as_str(), "frame_ref"),
         (output.sign_convention_ref.as_str(), "sign_convention_ref"),
@@ -429,10 +437,7 @@ fn compare_case_identity(
         push_once(diagnostics, ComparisonDiagnostic::DifferentGeometry);
     }
     if output.service_boundary_ref != case.service_boundary_ref {
-        push_once(
-            diagnostics,
-            ComparisonDiagnostic::DifferentServiceBoundary,
-        );
+        push_once(diagnostics, ComparisonDiagnostic::DifferentServiceBoundary);
     }
     if output.observable_id != case.observable_id {
         push_once(diagnostics, ComparisonDiagnostic::DifferentObservable);
@@ -450,10 +455,7 @@ fn compare_case_identity(
         push_once(diagnostics, ComparisonDiagnostic::DifferentFrame);
     }
     if output.sign_convention_ref != case.sign_convention_ref {
-        push_once(
-            diagnostics,
-            ComparisonDiagnostic::DifferentSignConvention,
-        );
+        push_once(diagnostics, ComparisonDiagnostic::DifferentSignConvention);
     }
     if output.time_basis_ref != case.time_basis_ref {
         push_once(diagnostics, ComparisonDiagnostic::DifferentTimeBasis);
@@ -595,10 +597,8 @@ fn evaluate_covariance_binding(
                 && evidence.first_run_id.as_deref() == Some(first.run_id.as_str())
                 && evidence.second_run_id.as_deref() == Some(second.run_id.as_str())
                 && evidence.observable_id.as_deref() == Some(case.observable_id.as_str())
-                && evidence.first_output_sha256.as_deref()
-                    == Some(first.output_sha256.as_str())
-                && evidence.second_output_sha256.as_deref()
-                    == Some(second.output_sha256.as_str());
+                && evidence.first_output_sha256.as_deref() == Some(first.output_sha256.as_str())
+                && evidence.second_output_sha256.as_deref() == Some(second.output_sha256.as_str());
             if matches {
                 CrossCovarianceDisposition::BoundToExactOutputPair
             } else {
@@ -621,9 +621,7 @@ fn is_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::evidence_dependence::{
-        DependencyIdentity, DependencyKind, ObservableDependency,
-    };
+    use crate::evidence_dependence::{DependencyIdentity, DependencyKind, ObservableDependency};
 
     fn digest(character: char) -> String {
         character.to_string().repeat(64)
@@ -761,10 +759,7 @@ mod tests {
         );
         assert_eq!(result.second_minus_first, Some(-15.0));
         assert_eq!(result.absolute_difference, Some(15.0));
-        assert_eq!(
-            result.cross_covariance,
-            CrossCovarianceDisposition::Unknown
-        );
+        assert_eq!(result.cross_covariance, CrossCovarianceDisposition::Unknown);
         assert_eq!(
             result.dependence.state,
             super::super::evidence_dependence::ObservableDependenceState::NoSharedDependencyInCompleteDeclarations
@@ -850,7 +845,11 @@ mod tests {
             result.disposition,
             CrossSolverComparisonDisposition::NotComparable
         );
-        assert!(result.diagnostics.contains(&ComparisonDiagnostic::DifferentGeometry));
+        assert!(
+            result
+                .diagnostics
+                .contains(&ComparisonDiagnostic::DifferentGeometry)
+        );
         assert_eq!(result.second_minus_first, None);
     }
 
@@ -866,9 +865,11 @@ mod tests {
             &dependencies("run-process", "dataset-a", true),
             &dependencies("run-d0fus", "dataset-b", true),
         );
-        assert!(result.diagnostics.contains(
-            &ComparisonDiagnostic::DifferentServiceBoundary
-        ));
+        assert!(
+            result
+                .diagnostics
+                .contains(&ComparisonDiagnostic::DifferentServiceBoundary)
+        );
         assert_eq!(
             result.disposition,
             CrossSolverComparisonDisposition::NotComparable
@@ -920,9 +921,11 @@ mod tests {
             &dependencies("run-process", "dataset-a", true),
             &dependencies("run-d0fus", "dataset-b", true),
         );
-        assert!(result.diagnostics.contains(
-            &ComparisonDiagnostic::DifferentCandidateRevision
-        ));
+        assert!(
+            result
+                .diagnostics
+                .contains(&ComparisonDiagnostic::DifferentCandidateRevision)
+        );
     }
 
     #[test]
@@ -942,8 +945,16 @@ mod tests {
             result.disposition,
             CrossSolverComparisonDisposition::NotComparable
         );
-        assert!(result.diagnostics.contains(&ComparisonDiagnostic::FirstRunOutOfDomain));
-        assert!(result.diagnostics.contains(&ComparisonDiagnostic::FirstRunNotConverged));
+        assert!(
+            result
+                .diagnostics
+                .contains(&ComparisonDiagnostic::FirstRunOutOfDomain)
+        );
+        assert!(
+            result
+                .diagnostics
+                .contains(&ComparisonDiagnostic::FirstRunNotConverged)
+        );
     }
 
     #[test]
@@ -967,9 +978,11 @@ mod tests {
             result.cross_covariance,
             CrossCovarianceDisposition::StaleOrMismatched
         );
-        assert!(result.diagnostics.contains(
-            &ComparisonDiagnostic::CrossCovarianceReceiptMismatch
-        ));
+        assert!(
+            result
+                .diagnostics
+                .contains(&ComparisonDiagnostic::CrossCovarianceReceiptMismatch)
+        );
         assert_eq!(result.covariance_receipt_ref, None);
     }
 
@@ -1080,7 +1093,11 @@ mod tests {
             result.disposition,
             CrossSolverComparisonDisposition::NotComparable
         );
-        assert!(result.diagnostics.contains(&ComparisonDiagnostic::NonFiniteDifference));
+        assert!(
+            result
+                .diagnostics
+                .contains(&ComparisonDiagnostic::NonFiniteDifference)
+        );
         assert_eq!(result.second_minus_first, None);
     }
 }
