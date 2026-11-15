@@ -280,7 +280,7 @@ fn synergy_and_collaboration_gap_are_sign_consistent() {
     let synergy = synergy_delta(0.7, 0.8, 0.6).unwrap();
     let gap = collaboration_gap(0.8, 0.6).unwrap();
     assert!((synergy + gap).abs() < 1e-12);
-    assert_eq!(partner_order_sensitivity(0.7, 0.6).unwrap(), 0.1);
+    assert!((partner_order_sensitivity(0.7, 0.6).unwrap() - 0.1).abs() < 1e-12);
     assert_eq!(handoff_recovery_rate(9, 10).unwrap(), Some(0.9));
 }
 
