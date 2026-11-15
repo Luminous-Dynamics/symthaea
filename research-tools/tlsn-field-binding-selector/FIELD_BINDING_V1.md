@@ -15,6 +15,14 @@ Select an exact raw JSON value token using a verifier-supplied RFC 6901 JSON Poi
 - Returns the exact raw JSON token byte range within the supplied body, including string quotes and preserving number lexemes such as 1.00 versus 1e2.
 - Does not return or hash the private field value in a public receipt.
 
+## Partial structural disclosure and HTTP mapping
+
+The implementation now supports one hidden string-content range represented as exactly one contiguous run of None bytes. The verifier parses the body after removing that run; the requested JSON Pointer must resolve to an empty string token, and the removed run must sit exactly between that token's two quote bytes. This binds the sole structural hole to the verifier-selected field under the declared serde_json profile. Duplicate decoded keys anywhere in the document reject.
+
+The strict HTTP/1.1 helper admits only one status-200 response with exactly one Content-Length and Content-Type equal to application/json, no Transfer-Encoding, no Content-Encoding, no Trailer/Upgrade/Content-Range, and no trailing bytes. It maps body-relative ranges into offsets within the received application-data stream. It intentionally rejects chunked framing, compressed content, parameterized media types, partial responses, pipelining and duplicate headers.
+
+A hidden string's actual contents are not validated by the structural skeleton. The downstream private predicate relation must constrain the exact hidden raw bytes to the claim schema (for example, ten ASCII bytes matching YYYY-MM-DD for a DOB), including any required JSON lexical restrictions. Generic hidden strings need a corresponding grammar proof. The parser profile/path result is not enough by itself.
+
 ## Crucial boundary
 
 The returned range is relative to the exact JSON body byte slice supplied to the selector. The crate does not:
@@ -31,6 +39,11 @@ A separate HTTP capture/framing layer must prove that the body slice is the exac
 ## Tests authored
 
 - exact nested field range;
+- one hidden string field bound to the exact JSON Pointer;
+- wrong-field hidden value rejection;
+- rejection of multiple/no hidden ranges and quote-boundary removal;
+- HTTP/1.1 response framing and exact body-to-received-stream range mapping;
+- rejection of duplicate Content-Length, Transfer-Encoding, Content-Encoding, parameterized Content-Type, non-200 status, trailing bytes, malformed lengths, folded headers and oversized bodies;
 - similar sibling field selection;
 - duplicate keys and escaped duplicate keys;
 - RFC 6901 slash/tilde escapes;
@@ -41,7 +54,7 @@ A separate HTTP capture/framing layer must prove that the body slice is the exac
 - document resource bound;
 - duplicates in unselected nested subtrees.
 
-All tests are authored but not executed. No compile or runtime result is claimed.
+All tests are authored but not executed. No compile or runtime result is claimed. The Rust source currently includes 19 selector/partial-hole tests and 13 HTTP framing/composition tests; check the branch head for the exact authored count.
 
 
 ## Reproducibility
