@@ -14,7 +14,7 @@
   "$defs": {
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "action": { "enum": ["wait", "respond", "continue", "yield"] },
-    "prediction": { "enum": ["wait", "respond", "continue", "yield", "parse_failure"] },
+    "decision": { "enum": ["wait", "respond", "continue", "yield", "parse_failure"] },
     "request": {
       "type": "object", "additionalProperties": false,
       "required": [
@@ -70,32 +70,6 @@
         "effect_window": { "$ref": "#/$defs/window" }
       }
     },
-    "stream_prediction": {
-      "type": "object", "additionalProperties": false,
-      "required": [
-        "schema_version", "chunk_index", "chunk_id", "decision", "observed_through_frame",
-        "chunk_received_at_ns", "decision_at_ns", "input_prefix_sha256",
-        "pre_state_sha256", "post_state_sha256", "immutable_policy_identity_sha256",
-        "runner_build_sha256"
-      ],
-      "properties": {
-        "schema_version": { "const": "mel-rti-stream-prediction-v1" },
-        "chunk_index": { "type": "integer", "minimum": 0 },
-        "chunk_id": { "type": "string", "minLength": 1 },
-        "decision": { "$ref": "#/$defs/prediction" },
-        "observed_through_frame": { "type": "integer", "minimum": 0 },
-        "chunk_received_at_ns": { "type": "integer", "minimum": 0 },
-        "decision_at_ns": { "type": "integer", "minimum": 0 },
-        "effect_at_ns": { "type": "integer", "minimum": 0 },
-        "effect_frame": { "type": "integer", "minimum": 0 },
-        "input_prefix_sha256": { "$ref": "#/$defs/sha256" },
-        "pre_state_sha256": { "$ref": "#/$defs/sha256" },
-        "post_state_sha256": { "$ref": "#/$defs/sha256" },
-        "immutable_policy_identity_sha256": { "$ref": "#/$defs/sha256" },
-        "runner_build_sha256": { "$ref": "#/$defs/sha256" },
-        "parse_failure_sha256": { "$ref": "#/$defs/sha256" }
-      }
-    },
     "prediction": {
       "type": "object", "additionalProperties": false,
       "required": [
@@ -108,7 +82,7 @@
         "schema_version": { "const": "mel-rti-stream-prediction-v1" },
         "chunk_index": { "type": "integer", "minimum": 0 },
         "chunk_id": { "type": "string", "minLength": 1 },
-        "decision": { "$ref": "#/$defs/prediction" },
+        "decision": { "$ref": "#/$defs/decision" },
         "observed_through_frame": { "type": "integer", "minimum": 0 },
         "chunk_received_at_ns": { "type": "integer", "minimum": 0 },
         "decision_at_ns": { "type": "integer", "minimum": 0 },
