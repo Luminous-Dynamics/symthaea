@@ -2,12 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research-tools/claim-plan-ir/CLAIM_PLAN_IR_V1.schema.json",
   "title": "Symthaea Claim Plan IR v1",
-  "description": "Verifier-authorized plan envelope. This schema validates structure only; it does not authenticate evidence, verify a proof, or grant authority. Privacy profile references bind cumulative-disclosure, presentation-linkability, proof-shape, adaptive-query, budget-enforcement, status-lookup and observer-metadata contracts owned by their named systems.",
+  "description": "Verifier-authorized plan envelope. This schema validates structure only; it does not authenticate evidence, verify a proof, or grant authority. Privacy profile references bind cumulative-disclosure, presentation-linkability, proof-shape, adaptive-query, budget-enforcement, status-lookup and observer-metadata contracts owned by their named systems. Canonicalization is an explicit required field; raw JSON duplicate-name detection and I-JSON/JCS numeric admission must occur before canonical serialization.",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "version",
     "plan_id",
+    "canonicalization",
     "authority",
     "source",
     "field",
@@ -159,7 +160,8 @@
             "origin": {
               "type": "string",
               "format": "uri",
-              "maxLength": 2048
+              "maxLength": 2048,
+              "pattern": "^https://[A-Za-z0-9.-]+(?::[0-9]{1,5})?$"
             },
             "path_template": {
               "type": "string",
@@ -205,7 +207,9 @@
           "required": [
             "strategy",
             "hash_algorithm",
-            "opening_profile_id"
+            "opening_profile_id",
+            "commitment_suite_id",
+            "commitment_suite_digest"
           ],
           "properties": {
             "strategy": {
@@ -229,6 +233,14 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 128
+            },
+            "commitment_suite_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "commitment_suite_digest": {
+              "$ref": "#/$defs/sha256"
             }
           }
         }
@@ -571,10 +583,46 @@
           }
         },
         "status_lookup": {
-          "$ref": "#/$defs/profile_reference"
+          "$ref": "#/$defs/status_lookup_profile"
         },
         "observer_metadata": {
           "$ref": "#/$defs/profile_reference"
+        }
+      }
+    },
+    "canonicalization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "hash_algorithm",
+        "domain_separator",
+        "duplicate_key_policy",
+        "number_policy",
+        "unicode_policy",
+        "separator_encoding"
+      ],
+      "properties": {
+        "profile": {
+          "const": "RFC8785-JCS"
+        },
+        "hash_algorithm": {
+          "const": "SHA-256"
+        },
+        "domain_separator": {
+          "const": "LUMINOUS/CLAIM-PLAN-IR/V1"
+        },
+        "separator_encoding": {
+          "const": "single_nul_byte_after_utf8_domain"
+        },
+        "duplicate_key_policy": {
+          "const": "reject_before_canonicalization"
+        },
+        "number_policy": {
+          "const": "I-JSON_IEEE754_exact_safe_integers_decimal_as_strings"
+        },
+        "unicode_policy": {
+          "const": "preserve_as_is_no_normalization"
         }
       }
     }
@@ -614,7 +662,11 @@
                 "string",
                 "integer",
                 "boolean"
-              ]
+              ],
+              "maxLength": 256,
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991,
+              "description": "Integer literals are limited to the interoperable exact-integer range; larger values MUST be encoded as strings under a typed conversion profile."
             }
           }
         },
@@ -711,6 +763,114 @@
         },
         "profile_digest": {
           "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "status_lookup_profile": {
+      "type": "object",
+      "description": "Status lookup privacy/freshness profile. Version maturity and observer-visible fetch policy are explicit; schema conformance does not establish status truth or cache integrity.",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "profile_id",
+        "profile_digest",
+        "specification",
+        "maturity",
+        "retrieval_mode",
+        "index_assignment",
+        "cache_policy",
+        "exposure_channels",
+        "freshness_seconds",
+        "anti_rollback_required"
+      ],
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "specification": {
+          "enum": [
+            "bitstring-status-list-v1.0",
+            "bitstring-status-list-v1.1-wd-2026-11-11",
+            "other-qualified"
+          ]
+        },
+        "maturity": {
+          "enum": [
+            "w3c-recommendation",
+            "w3c-working-draft",
+            "other-profile"
+          ]
+        },
+        "retrieval_mode": {
+          "enum": [
+            "direct_fetch",
+            "verifier_cache",
+            "cdn",
+            "privacy_proxy",
+            "batched_fetch",
+            "holder_disclosure",
+            "hybrid"
+          ]
+        },
+        "index_assignment": {
+          "enum": [
+            "randomized",
+            "sequential",
+            "profile_defined",
+            "not_applicable"
+          ]
+        },
+        "cache_policy": {
+          "enum": [
+            "no_cache",
+            "bounded_ttl",
+            "shared_cache",
+            "cdn",
+            "profile_defined"
+          ]
+        },
+        "exposure_channels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "status_list_url",
+              "status_list_index",
+              "entry_id",
+              "fetch_timing",
+              "cache_hit_miss",
+              "status_change_cadence",
+              "response_size",
+              "response_status",
+              "network_origin",
+              "geography",
+              "verifier_identity",
+              "other"
+            ]
+          }
+        },
+        "freshness_seconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 31536000
+        },
+        "anti_rollback_required": {
+          "const": true
+        },
+        "target_minimum_bitstring_bits": {
+          "type": "integer",
+          "minimum": 131072,
+          "maximum": 2147483647
         }
       }
     }
