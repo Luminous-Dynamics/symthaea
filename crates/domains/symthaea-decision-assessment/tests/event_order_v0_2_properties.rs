@@ -13,7 +13,9 @@ use symthaea_decision_assessment::{
 use symthaea_decision_assessment::event_order_v0_2::{
     AttemptIdentity, AttemptTerminalReconciliation, EventTimeIntervalNs,
     OperationAttemptRecord, QualifiedEventTime, TimeBasisDescriptor, EventTimeUnit,
-    compare_qualified_event_times, validate_attempt_lifecycle,
+    ScopedStopObligation, StopDischargeReceipt, StopScope,
+    assess_start_under_stop_obligations, compare_qualified_event_times,
+    validate_attempt_lifecycle,
 };
 
 fn qualified_time(
@@ -41,6 +43,36 @@ fn qualified_time(
             earliest_ns,
             latest_ns,
         },
+    }
+}
+
+ 
+fn scoped_obligation(id: usize, logical_operation_id: &str, discharged: bool) -> ScopedStopObligation {
+    let obligation_id = format!("obligation-{id}");
+    let trigger_event_id = format!("trigger-{id}");
+    let scope = StopScope::LogicalOperations(
+        [logical_operation_id.to_owned()].into_iter().collect(),
+    );
+    let discharge = discharged.then(|| StopDischargeReceipt {
+        event_id: format!("discharge-{id}"),
+        obligation_id: obligation_id.clone(),
+        trigger_event_id: trigger_event_id.clone(),
+        policy_revision: "policy-v1".to_owned(),
+        scope: scope.clone(),
+        receipt_ref: format!("synthetic://receipt/{id}"),
+        receipt_sha256: "b".repeat(64),
+        qualification: GateState::Pass,
+        in_flight_reconciliation: GateState::Pass,
+        in_flight_inventory_frontier_event_id: format!("inventory-frontier-{id}"),
+        in_flight_attempt_manifest_sha256: "c".repeat(64),
+        trigger_to_discharge_order: EventOrder::Before,
+    });
+    ScopedStopObligation {
+        obligation_id,
+        trigger_event_id,
+        policy_revision: "policy-v1".to_owned(),
+        scope,
+        discharge,
     }
 }
 
@@ -175,4 +207,88 @@ proptest! {
         rotated.rotate_left(rotate_by);
         prop_assert_eq!(validate_attempt_lifecycle(&rotated), canonical);
     }
+ 
+    #[test]
+    fn historical_event_time_cannot_make_late_evidence_available_at_k(
+        frontier_ns in -1_000_000i64..1_000_000i64,
+        occurrence_age_ns in 1i64..10_000i64,
+        observation_delay_ns in 0i64..10_000i64,
+        durable_delay_ns in 0i64..10_000i64,
+    ) {
+        let observed_ns = frontier_ns + observation_delay_ns + 1;
+        let recorded_ns = observed_ns + durable_delay_ns;
+        let event = symthaea_decision_assessment::event_order_v0_2::BitemporalEventEnvelope {
+            event_id: "late-generated-event".to_owned(),
+            occurred_at: Some(qualified_time(
+                "device-clock",
+                frontier_ns - occurrence_age_ns,
+                frontier_ns - occurrence_age_ns,
+                -2_000_000,
+                2_000_000,
+            )),
+            first_observed_at: qualified_time(
+                "collector-clock",
+                observed_ns,
+                observed_ns,
+                -2_000_000,
+                2_000_000,
+            ),
+            durably_recorded_at: qualified_time(
+                "store-clock",
+                recorded_ns,
+                recorded_ns,
+                -2_000_000,
+                2_000_000,
+            ),
+            capture_qualification: GateState::Pass,
+            supersedes_event_id: None,
+        };
+        let frontier = qualified_time(
+            "decision-clock",
+            frontier_ns,
+            frontier_ns,
+            -2_000_000,
+            2_000_000,
+        );
+        let assessment = symthaea_decision_assessment::event_order_v0_2::assess_visibility_at_frontier(
+            &event,
+            &frontier,
+        );
+        prop_assert_eq!(
+            assessment.visibility,
+            symthaea_decision_assessment::event_order_v0_2::FrontierVisibility::NotAvailableAtK
+        );
+    }
+
+    #[test]
+    fn all_applicable_stop_obligations_are_conjunctive_and_delivery_order_independent(
+        obligation_count in 1usize..16,
+        missing_selector in 0usize..32,
+    ) {
+        let missing = missing_selector % obligation_count;
+        let obligations = (0..obligation_count)
+            .map(|index| scoped_obligation(index, "robot-17", index != missing))
+            .collect::<Vec<_>>();
+        let forward = assess_start_under_stop_obligations(
+            "robot-17",
+            &[],
+            &obligations,
+        );
+        prop_assert!(!forward.start_permitted_by_stop_contract);
+        prop_assert_eq!(forward.disposition, EventTraceDisposition::Indeterminate);
+        prop_assert_eq!(forward.applicable_obligation_ids.len(), obligation_count);
+        prop_assert!(forward.reason_codes.iter().any(|reason| {
+            reason == &format!("STOP_OBLIGATION_NOT_DISCHARGED:obligation-{missing}")
+        }));
+
+        let mut reversed = obligations;
+        reversed.reverse();
+        let reverse = assess_start_under_stop_obligations(
+            "robot-17",
+            &[],
+            &reversed,
+        );
+        prop_assert_eq!(forward, reverse);
+    }
+
 }

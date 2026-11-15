@@ -152,3 +152,6 @@ The integration test target `tests/event_order_v0_2_properties.rs` uses Proptest
 - attempt-lifecycle report invariance under reverse and rotated delivery orders for generated valid retry chains.
 
 The properties complement the named unit cases; they do not simulate a real network, physical clock, executor, or owner verifier. On failure, preserve the Proptest seed and minimized counterexample with the exact commit. A passing property target is still not evidence of production clock calibration or physical event completeness.
+
+
+The generated property target now also checks that an old occurrence timestamp cannot make late evidence available at K, and that one missing discharge blocks a start under any number of applicable overlapping obligations regardless of delivery order.
