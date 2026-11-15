@@ -1,0 +1,27 @@
+{
+  "report_version": "event-order-v0.3.1-independent-reference.v1",
+  "tested_contract": "symthaea.event-order-schedule.v0.3.1",
+  "generator_version": "symthaea.event-order-generator.v0.3.2",
+  "tested_contract_source_head": "98688d36bb58db4883e095c3d9af89794c29f30b",
+  "implementation": "standalone JavaScript reference model; no package dependencies",
+  "runtime": "Node.js v22.16.0",
+  "not_rust_execution": true,
+  "seed": "0x4c554d49",
+  "capture_clock_fault_checks": 8000,
+  "exact_mapping_identity_check": "pass",
+  "epoch_local_reset_identity_check": "pass",
+  "interval_pairs": 100000,
+  "interval_antisymmetry_violations": 0,
+  "common_translation_violations": 0,
+  "projection_order_cases": 100000,
+  "projection_reference_counts": {
+    "safe": 13967,
+    "indeterminate": 12817,
+    "critical": 73216
+  },
+  "zero_failure_one_sided_95_percent_upper_bound": {
+    "trials_3000": 0.0009980790119965555,
+    "trials_30000": 0.00009985275683344064
+  },
+  "interpretation": "Semantic checks of a separately implemented reference model only. This is not a Rust build/test result, not execution of the repository implementation, not CI evidence, and not a real-world reliability estimate."
+}
