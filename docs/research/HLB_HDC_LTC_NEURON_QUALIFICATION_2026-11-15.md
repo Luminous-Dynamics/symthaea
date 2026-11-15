@@ -138,7 +138,7 @@ The sigmoid gate is generally nonzero. Therefore, whenever the current state dif
 x'=(1-\sigma)x+\sigma x_\infty
 \]
 
-moves the state even though no time elapsed. This does not satisfy the continuous-time identity invariant (F(0,x)=x). The source-level derivation is direct; a runtime regression test has not yet been executed.
+moves the state even though no time elapsed. This violates the expected continuous-time identity \\(F(0,x)=x\\). The source-level derivation is direct; a runtime regression test has not yet been executed.
 
 **Required first test:**
 
