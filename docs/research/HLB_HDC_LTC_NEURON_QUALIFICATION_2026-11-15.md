@@ -197,6 +197,15 @@ let sigma = -(-rate * dt).exp_m1();
 
 Use a stable \`softplus(a) = max(a, 0) + ln1p(exp(-abs(a)))\` implementation. This avoids materializing a sigmoid that may round to exactly 1.0 before taking the logarithm of its complement. \`expm1\` preserves precision for small positive intervals. The mapping gives \`sigma(dt = tau) = sigma_base\` (up to rounding) and \`sigma(0) = 0\`.
 
+A second semigroup-consistent interpretation is to use the sigmoid as a **bounded rate multiplier** rather than map the original interpolation fraction at \`dt=tau\`:
+
+\`\`\`rust
+let rate = sigmoid(gate_activation * gating_steepness) / tau;
+let sigma = -(-rate * dt).exp_m1();
+\`\`\`
+
+This also has zero-time identity and frozen-equilibrium composition, but its value at \`dt=tau\` is \`1 - exp(-sigma_base)\`, not \`sigma_base\`. The two rate mappings therefore encode different gate semantics and must remain separate candidates in the task ablation. The softplus mapping preserves the prior interpolation fraction at one time constant; the sigmoid-rate mapping bounds the rate multiplier to \`(0,1)\` and changes the effective time constant to \`tau / sigma_base\`.
+
 This yields zero-time identity and exact interval-partition consistency **for the frozen-equilibrium scalar interpolation model**. It does not establish exact flow for the state-dependent neuron.
 
 A scalar calculation illustrates why the distinction matters. With `sigma_base = 0.5` and `dt = tau`, the product candidate `sigma = sigma_base * (1 - exp(-dt/tau))` has retention `0.6839397` for one full step, but `0.6452352` for two half-steps. The partition discrepancy is about `0.0387045`. The exponential-rate mapping has matching retention for the one-step and two-half-step calculations (up to floating-point rounding). These are algebraic toy calculations, not Symthaea runtime measurements.
@@ -207,9 +216,10 @@ Required candidate matrix:
 
 1. Current production gate (negative control for the identity property).
 2. Product gate `sigma_base * (1 - exp(-dt/tau))` (identity-only candidate).
-3. Exponential-rate gate `1 - exp(-lambda*dt)` (identity + frozen-parameter composition candidate).
-4. Ungated physical relaxation `1 - exp(-dt/tau)` (constant-equilibrium ODE reference).
-5. Iterative/re-evaluated and high-accuracy numerical integration (trajectory references).
+3. Softplus-rate gate with `lambda = softplus(gate_logit)/tau` (identity + frozen-parameter composition; preserves `sigma_base` at `dt=tau`).
+4. Sigmoid-rate gate with `lambda = sigmoid(gate_logit)/tau` (identity + frozen-parameter composition; treats the sigmoid as a bounded rate multiplier).
+5. Ungated physical relaxation `1 - exp(-dt/tau)` (constant-equilibrium ODE reference).
+6. Iterative/re-evaluated and high-accuracy numerical integration (trajectory references).
 
 Do not select a winner from the algebra alone. Test zero-time identity, the right-hand derivative as `dt -> 0+`, monotonicity, finite values, positive-time stability, frozen-equilibrium partition consistency, full state-dependent partition error, scalar/SIMD agreement, and the documented semantics for negative/non-finite `dt`. Also decide whether zero-duration calls may update counters/statistics; state identity and bookkeeping identity are separate contracts.
 
