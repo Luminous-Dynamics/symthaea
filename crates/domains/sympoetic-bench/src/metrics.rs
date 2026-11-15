@@ -63,6 +63,86 @@ pub fn handoff_recovery_rate(recovered: u64, attempted: u64) -> Result<Option<f6
 }
 
 
+
+/// A blinded, task-specific adjudication of one intervention decision.
+/// These labels must come from a preregistered rubric and independent review,
+/// not from the evaluated agent's own self-score.
+#[derive(Debug, Clone, Copy)]
+pub struct InterventionRecord {
+    pub appropriate: bool,
+    pub unnecessary: bool,
+    pub critical_opportunity: bool,
+    pub critical_missed: bool,
+    /// Counterfactual outcome loss, only when an admissible replay is identifiable.
+    pub counterfactual_regret: Option<f64>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct InterventionSummary {
+    pub decision_count: usize,
+    pub critical_opportunity_count: usize,
+    pub counterfactually_identifiable_count: usize,
+    pub intervention_appropriateness: Option<f64>,
+    pub unnecessary_intervention_rate: Option<f64>,
+    pub missed_critical_intervention_rate: Option<f64>,
+    pub mean_intervention_regret: Option<f64>,
+}
+
+/// Aggregate adaptive-intervention metrics over independently adjudicated
+/// decision points. Missing denominators remain None; they are never converted
+/// to zero. Missed-critical rate is divided only by critical opportunities.
+pub fn summarize_interventions(records: &[InterventionRecord]) -> Result<InterventionSummary> {
+    let mut appropriate_count = 0usize;
+    let mut unnecessary_count = 0usize;
+    let mut critical_opportunity_count = 0usize;
+    let mut critical_missed_count = 0usize;
+    let mut regret_sum = 0.0f64;
+    let mut regret_count = 0usize;
+
+    for (index, record) in records.iter().enumerate() {
+        if record.unnecessary && record.appropriate {
+            bail!("intervention record {index}: an unnecessary intervention cannot be adjudicated appropriate");
+        }
+        if record.critical_missed && !record.critical_opportunity {
+            bail!("intervention record {index}: a missed critical intervention requires a critical opportunity");
+        }
+        if record.appropriate {
+            appropriate_count += 1;
+        }
+        if record.unnecessary {
+            unnecessary_count += 1;
+        }
+        if record.critical_opportunity {
+            critical_opportunity_count += 1;
+        }
+        if record.critical_missed {
+            critical_missed_count += 1;
+        }
+        if let Some(regret) = record.counterfactual_regret {
+            if !regret.is_finite() || !(0.0..=1.0).contains(&regret) {
+                bail!("intervention record {index}: counterfactual regret must be finite and in [0, 1]");
+            }
+            regret_sum += regret;
+            regret_count += 1;
+        }
+    }
+
+    let decision_count = records.len();
+    Ok(InterventionSummary {
+        decision_count,
+        critical_opportunity_count,
+        counterfactually_identifiable_count: regret_count,
+        intervention_appropriateness: (decision_count > 0)
+            .then_some(appropriate_count as f64 / decision_count as f64),
+        unnecessary_intervention_rate: (decision_count > 0)
+            .then_some(unnecessary_count as f64 / decision_count as f64),
+        missed_critical_intervention_rate: (critical_opportunity_count > 0)
+            .then_some(critical_missed_count as f64 / critical_opportunity_count as f64),
+        mean_intervention_regret: (regret_count > 0)
+            .then_some(regret_sum / regret_count as f64),
+    })
+}
+
 /// Counterfactual marginal impact of a contribution on a bounded outcome.
 /// Returns None when the replay is not causally identifiable (for example,
 /// removing the event invalidates later dependent actions). This is not a legal
@@ -192,6 +272,80 @@ mod tests {
         assert_eq!(handoff_recovery_rate(0, 0).unwrap(), None);
         assert_eq!(handoff_recovery_rate(3, 4).unwrap(), Some(0.75));
         assert!(handoff_recovery_rate(5, 4).is_err());
+    }
+
+    #[test]
+    fn intervention_metrics_use_distinct_denominators_and_blinded_labels() {
+        let records = [
+            InterventionRecord {
+                appropriate: true,
+                unnecessary: false,
+                critical_opportunity: true,
+                critical_missed: false,
+                counterfactual_regret: Some(0.1),
+            },
+            InterventionRecord {
+                appropriate: false,
+                unnecessary: true,
+                critical_opportunity: false,
+                critical_missed: false,
+                counterfactual_regret: Some(0.3),
+            },
+            InterventionRecord {
+                appropriate: false,
+                unnecessary: false,
+                critical_opportunity: true,
+                critical_missed: true,
+                counterfactual_regret: None,
+            },
+        ];
+        let summary = summarize_interventions(&records).unwrap();
+        assert_eq!(summary.decision_count, 3);
+        assert_eq!(summary.critical_opportunity_count, 2);
+        assert_eq!(summary.counterfactually_identifiable_count, 2);
+        assert!((summary.intervention_appropriateness.unwrap() - 1.0 / 3.0).abs() < 1e-12);
+        assert!((summary.unnecessary_intervention_rate.unwrap() - 1.0 / 3.0).abs() < 1e-12);
+        assert!((summary.missed_critical_intervention_rate.unwrap() - 0.5).abs() < 1e-12);
+        assert!((summary.mean_intervention_regret.unwrap() - 0.2).abs() < 1e-12);
+    }
+
+    #[test]
+    fn intervention_metrics_do_not_invent_zero_for_missing_denominators() {
+        let summary = summarize_interventions(&[]).unwrap();
+        assert_eq!(summary.intervention_appropriateness, None);
+        assert_eq!(summary.unnecessary_intervention_rate, None);
+        assert_eq!(summary.missed_critical_intervention_rate, None);
+        assert_eq!(summary.mean_intervention_regret, None);
+    }
+
+    #[test]
+    fn intervention_metric_rejects_inconsistent_and_unbounded_adjudications() {
+        let unnecessary_and_appropriate = [InterventionRecord {
+            appropriate: true,
+            unnecessary: true,
+            critical_opportunity: false,
+            critical_missed: false,
+            counterfactual_regret: None,
+        }];
+        assert!(summarize_interventions(&unnecessary_and_appropriate).is_err());
+
+        let missed_without_opportunity = [InterventionRecord {
+            appropriate: false,
+            unnecessary: false,
+            critical_opportunity: false,
+            critical_missed: true,
+            counterfactual_regret: None,
+        }];
+        assert!(summarize_interventions(&missed_without_opportunity).is_err());
+
+        let invalid_regret = [InterventionRecord {
+            appropriate: false,
+            unnecessary: false,
+            critical_opportunity: false,
+            critical_missed: false,
+            counterfactual_regret: Some(1.5),
+        }];
+        assert!(summarize_interventions(&invalid_regret).is_err());
     }
 
     #[test]
