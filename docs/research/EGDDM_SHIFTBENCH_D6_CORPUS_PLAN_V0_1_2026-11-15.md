@@ -4,21 +4,23 @@
 
 ## 1. Target scale
 
-The proposed benchmark uses 12 intervention families and three intervention positions. Each family/position cell targets ten independently authored task seeds.
+The proposed benchmark uses 12 intervention families and nine scheduled intervention positions (10% through 90% of planned work, in 10-point steps). Each family/position cell targets five independently authored task seeds. Early, middle and late remain reporting aggregates across positions 10–30%, 40–60% and 70–90%.
 
 | Component | Target |
 |---|---:|
 | Intervention families | 12 |
-| Positions per family | 3 |
-| Family/position cells | 36 |
-| Seeds per cell | 10 |
-| Matched clean/shifted scenario pairs | 360 |
+| Positions per family | 9 |
+| Family/position cells | 108 |
+| Seeds per cell | 5 |
+| Matched clean/shifted scenario pairs | 540 |
 | Trajectories per pair | 2 |
-| Trajectories per model per trial | 720 |
+| Trajectories per model per trial | 1,080 |
 | Independent trials | 3 |
 | Model/harness families | 3 |
+| Initial validity-pilot candidate seeds | 108 |
+| Total trajectories across 3 model/harness families × 3 trials | 9,720 |
 
-The target is 360 matched scenario pairs and 720 trajectories per model per trial, not 360 already-existing tasks. Three independent trials across three model/harness families would imply up to 6,480 trajectories before baseline and expert runs. Stage the study so task validity and evaluator quality are established before incurring that cost.
+The target is 540 matched scenario pairs and 1,080 trajectories per model per trial, not 540 already-existing tasks. Three independent trials across three model/harness families would imply up to 9,720 trajectories before baseline and expert runs. Stage the study so task validity and evaluator quality are established before incurring that cost.
 
 ## 2. Intervention families
 
@@ -37,7 +39,7 @@ The machine-readable blueprint lists the families, gold-impact design and negati
 11. Common-cause environment change.
 12. Cross-repository contract/schema change.
 
-The three positions are early (15% of planned work), middle (50%) and late (85%). These are scheduling strata, not wall-clock times; define work units before randomization.
+Use nine preregistered intervention positions at 10%, 20%, 30%, 40%, 50%, 60%, 70%, 80% and 90% of planned work. These are scheduling positions, not wall-clock times; define the work-unit denominator before randomization. For aggregate reporting only, retain early (10–30%), middle (40–60%) and late (70–90%) strata.
 
 ## 3. Two-sided task admission
 
@@ -86,9 +88,9 @@ Use repository-family and forward-time holdouts. Report paired differences, disc
 
 ## 7. Phased execution
 
-**Phase A — validity pilot:** one task per family/position cell, plus positive, negative, sham and common-cause controls. Validate scoring and blind custody before expanding.
+**Phase A — validity pilot:** one candidate task seed per family/position cell (108 candidates), plus positive, negative, sham and common-cause controls. Validate scoring and blind custody before expanding.
 
-**Phase B — corpus expansion:** ten seeds per family/position cell. Independently curate gold affected-obligation labels and acceptance oracles.
+**Phase B — corpus expansion:** five seeds per family/position cell (540 matched pairs total). Independently curate gold affected-obligation labels and acceptance oracles.
 
 **Phase C — matched evaluations:** three trials where feasible across at least three model/harness families; execute baseline and ablation arms at matched budgets.
 
