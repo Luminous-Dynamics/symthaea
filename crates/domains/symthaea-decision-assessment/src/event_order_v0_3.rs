@@ -2580,6 +2580,32 @@ pub fn project_action_history(
             (None, None)
         };
 
+        if let (Some(terminal), Some(terminal_time)) = (terminal_record.as_ref(), terminal_time.as_ref()) {
+            let linked_commits = commits.iter().filter(|commit| {
+                commit.logical_operation_id == *operation_id
+                    && commit.attempt_id == *attempt_id
+            }).collect::<Vec<_>>();
+            if terminal.outcome == ReconciledOperationOutcome::NotApplied && !linked_commits.is_empty() {
+                critical = true;
+                reasons.insert(format!("NOT_APPLIED_TERMINAL_HAS_EFFECT_COMMIT:{attempt_id}"));
+            }
+            if terminal.outcome == ReconciledOperationOutcome::Applied {
+                for commit in linked_commits {
+                    match event_order_between(&commit.owner_time, terminal_time) {
+                        EventOrder::Before => {}
+                        EventOrder::After | EventOrder::Inconsistent => {
+                            critical = true;
+                            reasons.insert(format!("EFFECT_COMMIT_AFTER_TERMINAL_RECONCILIATION:{attempt_id}"));
+                        }
+                        EventOrder::Overlapping | EventOrder::Unknown => {
+                            indeterminate = true;
+                            reasons.insert(format!("EFFECT_COMMIT_TERMINAL_ORDER_UNRESOLVED:{attempt_id}"));
+                        }
+                    }
+                }
+            }
+        }
+
         attempts.push(OperationAttemptRecord {
             identity: AttemptIdentity {
                 logical_operation_id: operation_id.clone(),
@@ -4572,6 +4598,22 @@ mod tests {
             .expect("failed authenticity is an assessment");
         assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
         assert!(report.reason_codes.iter().any(|code| code.contains("OWNER_RECEIPT_QUALIFICATION_FAILED")));
+
+        let (schedule, resolutions, mut receipts, _) = action_history_fixture();
+        let terminal_action_id = schedule.actions.iter().find_map(|action| {
+            if matches!(action.action, ScheduleAction::AttemptReconciled { .. }) {
+                Some(action.action_id.clone())
+            } else {
+                None
+            }
+        }).expect("terminal action");
+        let mut receipt = receipts.get(&terminal_action_id).cloned().expect("owner assessment");
+        receipt.receipt_ref = "synthetic://different-receipt".to_owned();
+        receipts.insert(terminal_action_id, receipt);
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("receipt identity substitution is an assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code.contains("OWNER_RECEIPT_IDENTITY_BINDING_MISMATCH")));
     }
 
     #[test]
