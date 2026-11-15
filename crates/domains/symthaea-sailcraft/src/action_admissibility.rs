@@ -101,6 +101,7 @@ impl QualifiedEvidenceRef {
     pub fn conflicted(
         source_sha256: [u8; 32],
         subject_asset_id: impl Into<String>,
+        target_track_id: impl Into<String>,
         configuration_sha256: [u8; 32],
         scenario_id: impl Into<String>,
         timebase_id: impl Into<String>,
@@ -109,6 +110,7 @@ impl QualifiedEvidenceRef {
             state: EvidenceState::Conflicted,
             source_sha256,
             subject_asset_id: subject_asset_id.into(),
+            target_track_id: target_track_id.into(),
             configuration_sha256,
             scenario_id: scenario_id.into(),
             timebase_id: timebase_id.into(),
