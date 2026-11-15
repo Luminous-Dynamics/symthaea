@@ -67,6 +67,12 @@ pub struct ResidualDiscoveryScenario {
     pub require_dag: bool,
     /// Chosen using a disjoint calibration split and frozen before evaluation.
     pub calibration_selected_baseline_id: String,
+    /// Harness-authenticated digest of the calibration partition.
+    pub calibration_split_digest: String,
+    /// Harness-authenticated digest of the sealed evaluation partition.
+    pub evaluation_split_digest: String,
+    /// Digest of the exact algorithm registry and versions used for this task.
+    pub algorithm_registry_digest: String,
     pub algorithm_portfolio: Vec<AlgorithmGraphOutput>,
     pub available_evidence: BTreeMap<String, AgentEvidenceReceipt>,
     pub max_edge_edits: usize,
@@ -92,8 +98,17 @@ pub struct EvidenceReceiptOracle {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BaselineSelectionOracle {
+    pub selected_algorithm_id: String,
+    pub calibration_split_digest: String,
+    pub evaluation_split_digest: String,
+    pub algorithm_registry_digest: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ResidualDiscoveryOracle {
     pub ground_truth: CausalGraph,
+    pub baseline_selection: BaselineSelectionOracle,
     pub evidence: BTreeMap<String, EvidenceReceiptOracle>,
 }
 
@@ -137,6 +152,12 @@ pub enum ResidualFindingCode {
     EmptyAlgorithmId,
     DuplicateAlgorithmId,
     FrozenBaselineMissing,
+    EmptyCalibrationDigest,
+    EmptyEvaluationDigest,
+    EmptyAlgorithmRegistryDigest,
+    CalibrationEvaluationSplitReuse,
+    BaselineSelectionMismatch,
+    AlgorithmRegistryMismatch,
     OracleNodeSetMismatch,
     OracleGraphInvalid,
     AlgorithmGraphInvalid,
@@ -454,6 +475,29 @@ pub fn evaluate_algorithmic_residual(
     if scenario.mechanism_family.trim().is_empty() {
         finding(&mut findings, ResidualFindingCode::EmptyMechanismFamily, None, None, "mechanism family is empty");
     }
+    if scenario.calibration_split_digest.trim().is_empty() {
+        finding(&mut findings, ResidualFindingCode::EmptyCalibrationDigest, None, None, "calibration split digest is empty");
+    }
+    if scenario.evaluation_split_digest.trim().is_empty() {
+        finding(&mut findings, ResidualFindingCode::EmptyEvaluationDigest, None, None, "evaluation split digest is empty");
+    }
+    if scenario.algorithm_registry_digest.trim().is_empty() {
+        finding(&mut findings, ResidualFindingCode::EmptyAlgorithmRegistryDigest, None, None, "algorithm registry digest is empty");
+    }
+    if scenario.calibration_split_digest == scenario.evaluation_split_digest {
+        finding(&mut findings, ResidualFindingCode::CalibrationEvaluationSplitReuse, None, None,
+            "calibration and evaluation split digests must differ");
+    }
+    if scenario.calibration_selected_baseline_id != oracle.baseline_selection.selected_algorithm_id
+        || scenario.calibration_split_digest != oracle.baseline_selection.calibration_split_digest
+        || scenario.evaluation_split_digest != oracle.baseline_selection.evaluation_split_digest {
+        finding(&mut findings, ResidualFindingCode::BaselineSelectionMismatch, None, None,
+            "agent-facing baseline selection or split digests differ from the evaluator-authenticated calibration receipt");
+    }
+    if scenario.algorithm_registry_digest != oracle.baseline_selection.algorithm_registry_digest {
+        finding(&mut findings, ResidualFindingCode::AlgorithmRegistryMismatch, None, None,
+            "algorithm registry/version digest differs from the evaluator-authenticated calibration receipt");
+    }
     if scenario.algorithm_portfolio.is_empty() {
         finding(&mut findings, ResidualFindingCode::EmptyAlgorithmPortfolio, None, None, "algorithm portfolio is empty");
     }
@@ -630,6 +674,9 @@ mod tests {
             declared_nodes: ["A", "B", "C", "D"].into_iter().map(str::to_owned).collect(),
             require_dag: true,
             calibration_selected_baseline_id: "pc-calibrated".into(),
+            calibration_split_digest: "calibration-split-sha256".into(),
+            evaluation_split_digest: "sealed-evaluation-split-sha256".into(),
+            algorithm_registry_digest: "algorithm-registry-sha256".into(),
             algorithm_portfolio: vec![
                 AlgorithmGraphOutput { algorithm_id: "pc-calibrated".into(), graph: baseline },
                 AlgorithmGraphOutput { algorithm_id: "ges".into(), graph: graph(vec![edge("A", "B")]) },
@@ -644,6 +691,12 @@ mod tests {
         };
         let oracle = ResidualDiscoveryOracle {
             ground_truth: graph(vec![edge("A", "B"), edge("B", "C"), edge("C", "D")]),
+            baseline_selection: BaselineSelectionOracle {
+                selected_algorithm_id: "pc-calibrated".into(),
+                calibration_split_digest: "calibration-split-sha256".into(),
+                evaluation_split_digest: "sealed-evaluation-split-sha256".into(),
+                algorithm_registry_digest: "algorithm-registry-sha256".into(),
+            },
             evidence: [("r-cd".into(), EvidenceReceiptOracle {
                 receipt_id: "r-cd".into(),
                 status: EvidenceReceiptStatus::Verified,
@@ -721,6 +774,17 @@ mod tests {
         let report = evaluate_algorithmic_residual(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ResidualQualification::NotQualified);
         assert!(report.findings.iter().any(|f| f.code == ResidualFindingCode::FrozenBaselineMissing));
+    }
+
+    #[test]
+    fn calibration_and_evaluation_splits_must_be_distinct_and_authenticated() {
+        let (mut scenario, oracle, trace) = fixture();
+        scenario.evaluation_split_digest = scenario.calibration_split_digest.clone();
+        let report = evaluate_algorithmic_residual(&scenario, &oracle, &trace);
+        assert_eq!(report.qualification, ResidualQualification::NotQualified);
+        assert!(report.findings.iter().any(|f| {
+            f.code == ResidualFindingCode::CalibrationEvaluationSplitReuse
+        }));
     }
 
     #[test]
