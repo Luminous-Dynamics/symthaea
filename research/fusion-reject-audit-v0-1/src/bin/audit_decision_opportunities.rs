@@ -94,7 +94,7 @@ fn main() {
         })
         .collect();
 
-    let accepted_rows = vec![
+    let accepted_rows = [
         (
             "accepted-0",
             AuditOutcome::ConfirmedFeasible,
