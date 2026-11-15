@@ -87,6 +87,83 @@ fn cycle_one(previous: &TeamCycle) -> TeamCycle {
 }
 
 #[test]
+fn trajectory_fixture_file_validates_as_a_reproducible_two_cycle_example() {
+    let fixture = include_str!(
+        "../../../../docs/benchmarks/sympoetic/fixtures/team-trajectory.example.json"
+    );
+    let trajectory: TeamTrajectory = serde_json::from_str(fixture).unwrap();
+    let receipt = validate_trajectory(&trajectory, fixture.as_bytes()).unwrap();
+    assert_eq!(receipt.cycle_count, 2);
+    assert_eq!(receipt.status, "pass");
+}
+
+#[test]
+fn team_configuration_changes_require_a_human_authorizer() {
+    let first = cycle_zero();
+    let mut second = cycle_one(&first);
+    second.changes[0].actor_principal_id = "agent-01".to_owned();
+    second.cycle_digest = compute_cycle_digest(&second).unwrap();
+    let trajectory = TeamTrajectory {
+        schema_version: "sympoetic-team-trajectory/0.1".to_owned(),
+        team_id: "team-pseudonym-01".to_owned(),
+        cycles: vec![first, second],
+    };
+    let bytes = serde_json::to_vec(&trajectory).unwrap();
+    assert!(validate_trajectory(&trajectory, &bytes).is_err());
+}
+
+#[test]
+fn trajectory_rejects_duplicate_change_type_for_one_subject() {
+    let first = cycle_zero();
+    let mut second = cycle_one(&first);
+    second.changes.push(TeamChange {
+        change_id: "duplicate-role-change".to_owned(),
+        change_type: "role_changed".to_owned(),
+        actor_principal_id: "human-01".to_owned(),
+        subject_principal_id: "agent-01".to_owned(),
+    });
+    second.cycle_digest = compute_cycle_digest(&second).unwrap();
+    let trajectory = TeamTrajectory {
+        schema_version: "sympoetic-team-trajectory/0.1".to_owned(),
+        team_id: "team-pseudonym-01".to_owned(),
+        cycles: vec![first, second],
+    };
+    let bytes = serde_json::to_vec(&trajectory).unwrap();
+    assert!(validate_trajectory(&trajectory, &bytes).is_err());
+}
+
+#[test]
+fn team_memory_policy_change_must_target_the_team_and_match_a_real_transition() {
+    let first = cycle_zero();
+    let mut second = cycle_one(&first);
+    second.memory_policy = "task_only".to_owned();
+    second.changes.push(TeamChange {
+        change_id: "memory-policy-change".to_owned(),
+        change_type: "memory_policy_changed".to_owned(),
+        actor_principal_id: "human-01".to_owned(),
+        subject_principal_id: "team-pseudonym-01".to_owned(),
+    });
+    second.cycle_digest = compute_cycle_digest(&second).unwrap();
+    let valid = TeamTrajectory {
+        schema_version: "sympoetic-team-trajectory/0.1".to_owned(),
+        team_id: "team-pseudonym-01".to_owned(),
+        cycles: vec![first.clone(), second.clone()],
+    };
+    let bytes = serde_json::to_vec(&valid).unwrap();
+    assert!(validate_trajectory(&valid, &bytes).is_ok());
+
+    second.changes.last_mut().unwrap().subject_principal_id = "agent-01".to_owned();
+    second.cycle_digest = compute_cycle_digest(&second).unwrap();
+    let invalid = TeamTrajectory {
+        schema_version: "sympoetic-team-trajectory/0.1".to_owned(),
+        team_id: "team-pseudonym-01".to_owned(),
+        cycles: vec![first, second],
+    };
+    let bytes = serde_json::to_vec(&invalid).unwrap();
+    assert!(validate_trajectory(&invalid, &bytes).is_err());
+}
+
+#[test]
 fn persistent_team_trajectory_validates_receipt_and_state_continuity() {
     let first = cycle_zero();
     let second = cycle_one(&first);
