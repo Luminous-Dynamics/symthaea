@@ -56,8 +56,19 @@ jobs:
           [lib]
           path = "$GITHUB_WORKSPACE/crates/domains/symthaea-sailcraft/src/lib.rs"
           EOF
-      - name: Format sailcraft kernel without loading unrelated workspace members
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-sailcraft/src/lib.rs
+      - name: Apply canonical rustfmt to sailcraft kernel for repair handoff
+        run: rustfmt --edition 2024 crates/domains/symthaea-sailcraft/src/lib.rs
+      - name: Package formatted sailcraft kernel
+        run: |
+          set -euo pipefail
+          tar -czf "$RUNNER_TEMP/symthaea-sailcraft-formatted.tar.gz" crates/domains/symthaea-sailcraft/src/lib.rs
+      - name: Upload formatted sailcraft source
+        uses: actions/upload-artifact@v4
+        with:
+          name: symthaea-sailcraft-rustfmt-${{ github.sha }}
+          path: ${{ runner.temp }}/symthaea-sailcraft-formatted.tar.gz
+          if-no-files-found: error
+          retention-days: 1
       - name: Unit tests in isolated manifest
         run: cargo test --manifest-path "$RUNNER_TEMP/sailcraft-p0/Cargo.toml" --all-targets
       - name: Strict Clippy in isolated manifest
