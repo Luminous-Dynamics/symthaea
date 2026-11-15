@@ -125,7 +125,7 @@ Measure partner-order sensitivity as the absolute difference between A→B and B
 
 Include blind handoff, structured handoff, strong-first relay, weak-first relay, and role-specialized parallel work where the task supports them. Counterbalance order. Do not assume that strongest-first or any other ordering is universally optimal.
 
-Use the separate [Collaboration Gap and Relay Protocol](COLLABORATION_GAP_AND_RELAY_PROTOCOL.md) for the detailed experimental matrix and reporting rules. Use [Adaptive Intervention Policy](ADAPTIVE_INTERVENTION_POLICY.md) for action-selection constructs and negative controls. Use [Capability Amplification](CAPABILITY_AMPLIFICATION.md) for independent learning, retention, transfer, and coalition attribution.
+Use the separate [Collaboration Gap and Relay Protocol](COLLABORATION_GAP_AND_RELAY_PROTOCOL.md) for the detailed experimental matrix and reporting rules. Use [Adaptive Intervention Policy](ADAPTIVE_INTERVENTION_POLICY.md) for action-selection constructs and negative controls. Use [Capability Amplification](CAPABILITY_AMPLIFICATION.md) for independent learning, retention, transfer, and coalition attribution. Use [Epistemic Resilience and Metacognition](EPISTEMIC_RESILIENCE_AND_METACOGNITION.md) for belief/fact distinctions, evidence provenance, confidence calibration, and cognitive process measures.
 
 ## 5. Scenario domains
 
@@ -140,8 +140,9 @@ The first suite covers:
 - Partner coordination, role specialization, team handoffs, and order-sensitive collaboration.
 - Adaptive intervention selection, including when to ask, challenge, delegate, or step back.
 - Capability amplification, independent learning, delayed retention, and transfer to new tasks.
+- Epistemic resilience, first-person belief handling, evidence provenance, and metacognitive sensitivity.
 
-The development corpus in SEED_CORPUS.v0.1.jsonl contains fifteen task templates. It is not a representative sample of human creativity and is not a locked test set.
+The development corpus in SEED_CORPUS.v0.1.jsonl contains sixteen task templates. It is not a representative sample of human creativity and is not a locked test set.
 
 ## 6. Evaluation protocol
 
