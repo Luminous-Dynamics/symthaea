@@ -28,6 +28,11 @@ pub enum EvidenceState {
 pub struct QualifiedEvidenceRef {
     pub state: EvidenceState,
     pub source_sha256: [u8; 32],
+    /// Subject identity and exact configuration to which this reference applies.
+    pub subject_asset_id: String,
+    pub configuration_sha256: [u8; 32],
+    /// Encounter/scenario scope; a valid receipt from another scenario is not reusable.
+    pub scenario_id: String,
     pub timebase_id: String,
     pub age_seconds: f64,
     pub maximum_age_seconds: f64,
@@ -36,6 +41,9 @@ pub struct QualifiedEvidenceRef {
 impl QualifiedEvidenceRef {
     pub fn qualified(
         source_sha256: [u8; 32],
+        subject_asset_id: impl Into<String>,
+        configuration_sha256: [u8; 32],
+        scenario_id: impl Into<String>,
         timebase_id: impl Into<String>,
         age_seconds: f64,
         maximum_age_seconds: f64,
@@ -43,6 +51,9 @@ impl QualifiedEvidenceRef {
         Self {
             state: EvidenceState::Qualified,
             source_sha256,
+            subject_asset_id: subject_asset_id.into(),
+            configuration_sha256,
+            scenario_id: scenario_id.into(),
             timebase_id: timebase_id.into(),
             age_seconds,
             maximum_age_seconds,
@@ -53,26 +64,47 @@ impl QualifiedEvidenceRef {
         Self {
             state: EvidenceState::Missing,
             source_sha256: [0; 32],
+            subject_asset_id: String::new(),
+            configuration_sha256: [0; 32],
+            scenario_id: String::new(),
             timebase_id: String::new(),
             age_seconds: 0.0,
             maximum_age_seconds: 0.0,
         }
     }
 
-    pub fn stale(source_sha256: [u8; 32], timebase_id: impl Into<String>) -> Self {
+    pub fn stale(
+        source_sha256: [u8; 32],
+        subject_asset_id: impl Into<String>,
+        configuration_sha256: [u8; 32],
+        scenario_id: impl Into<String>,
+        timebase_id: impl Into<String>,
+    ) -> Self {
         Self {
             state: EvidenceState::Stale,
             source_sha256,
+            subject_asset_id: subject_asset_id.into(),
+            configuration_sha256,
+            scenario_id: scenario_id.into(),
             timebase_id: timebase_id.into(),
             age_seconds: 1.0,
             maximum_age_seconds: 0.0,
         }
     }
 
-    pub fn conflicted(source_sha256: [u8; 32], timebase_id: impl Into<String>) -> Self {
+    pub fn conflicted(
+        source_sha256: [u8; 32],
+        subject_asset_id: impl Into<String>,
+        configuration_sha256: [u8; 32],
+        scenario_id: impl Into<String>,
+        timebase_id: impl Into<String>,
+    ) -> Self {
         Self {
             state: EvidenceState::Conflicted,
             source_sha256,
+            subject_asset_id: subject_asset_id.into(),
+            configuration_sha256,
+            scenario_id: scenario_id.into(),
             timebase_id: timebase_id.into(),
             age_seconds: 0.0,
             maximum_age_seconds: 1.0,
@@ -150,6 +182,10 @@ pub struct HumanOversight {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ActionAdmissibilityInput {
+    pub own_asset_id: String,
+    pub target_track_id: String,
+    pub scenario_id: String,
+    pub configuration_sha256: [u8; 32],
     pub candidate: CandidateManeuver,
     pub common_timebase_id: String,
     pub route_evidence: QualifiedEvidenceRef,
@@ -202,6 +238,9 @@ impl ActionAdmissibilityResult {
 
 fn evidence_status(
     evidence: &QualifiedEvidenceRef,
+    own_asset_id: &str,
+    configuration_sha256: &[u8; 32],
+    scenario_id: &str,
     common_timebase_id: &str,
 ) -> Result<(), ActionAdmissibilityDisposition> {
     match evidence.state {
@@ -221,6 +260,12 @@ fn evidence_status(
     }
 
     if evidence.source_sha256 == [0; 32]
+        || evidence.subject_asset_id.trim().is_empty()
+        || evidence.subject_asset_id != own_asset_id
+        || evidence.configuration_sha256 == [0; 32]
+        || &evidence.configuration_sha256 != configuration_sha256
+        || evidence.scenario_id.trim().is_empty()
+        || evidence.scenario_id != scenario_id
         || evidence.timebase_id.trim().is_empty()
         || evidence.timebase_id != common_timebase_id
         || !evidence.age_seconds.is_finite()
@@ -267,10 +312,15 @@ pub fn evaluate_action_admissibility(
     input: &ActionAdmissibilityInput,
 ) -> ActionAdmissibilityResult {
     let timebase = input.common_timebase_id.trim();
-    if timebase.is_empty() {
+    if input.own_asset_id.trim().is_empty()
+        || input.target_track_id.trim().is_empty()
+        || input.scenario_id.trim().is_empty()
+        || input.configuration_sha256 == [0; 32]
+        || timebase.is_empty()
+    {
         return ActionAdmissibilityResult::new(
             ActionAdmissibilityDisposition::NotEvaluatedMissingEvidence,
-            "common timebase identity is missing",
+            "own asset, target track, scenario, configuration or common timebase identity is missing",
         );
     }
 
@@ -282,7 +332,13 @@ pub fn evaluate_action_admissibility(
         &input.authority.evidence,
     ];
     for reference in evidence {
-        if let Err(error) = evidence_status(reference, timebase) {
+        if let Err(error) = evidence_status(
+            reference,
+            &input.own_asset_id,
+            &input.configuration_sha256,
+            &input.scenario_id,
+            timebase,
+        ) {
             return result_for_evidence_error(error);
         }
     }
@@ -349,7 +405,13 @@ pub fn evaluate_action_admissibility(
         }
         RuleAssessment::Ambiguous => {
             let oversight = &input.human_oversight;
-            match evidence_status(&oversight.evidence, timebase) {
+            match evidence_status(
+                &oversight.evidence,
+                &input.own_asset_id,
+                &input.configuration_sha256,
+                &input.scenario_id,
+                timebase,
+            ) {
                 Ok(()) if oversight.readiness == HumanReadiness::Ready => {
                     return ActionAdmissibilityResult::new(
                         ActionAdmissibilityDisposition::AmbiguousRequiresHuman,
@@ -391,13 +453,28 @@ mod tests {
     use super::*;
 
     const CLOCK: &str = "synthetic-common-timebase";
+    const ASSET: &str = "synthetic-sailcraft-01";
+    const SCENARIO: &str = "synthetic-crossing-episode-01";
+    const CONFIGURATION: [u8; 32] = [0xa1; 32];
 
     fn ev(byte: u8) -> QualifiedEvidenceRef {
-        QualifiedEvidenceRef::qualified([byte; 32], CLOCK, 0.0, 1.0)
+        QualifiedEvidenceRef::qualified(
+            [byte; 32],
+            ASSET,
+            CONFIGURATION,
+            SCENARIO,
+            CLOCK,
+            0.0,
+            1.0,
+        )
     }
 
     fn input() -> ActionAdmissibilityInput {
         ActionAdmissibilityInput {
+            own_asset_id: ASSET.to_string(),
+            target_track_id: "synthetic-target-07".to_string(),
+            scenario_id: SCENARIO.to_string(),
+            configuration_sha256: CONFIGURATION,
             candidate: CandidateManeuver {
                 maneuver: ManeuverClass::TackPort,
                 target_course_deg: 315.0,
@@ -453,7 +530,9 @@ mod tests {
     #[test]
     fn stale_encounter_evidence_fails_closed() {
         let mut value = input();
-        value.encounter_evidence = QualifiedEvidenceRef::stale([7; 32], CLOCK);
+        value.encounter_evidence = QualifiedEvidenceRef::stale(
+            [7; 32], ASSET, CONFIGURATION, SCENARIO, CLOCK,
+        );
         assert_eq!(
             disposition(&value),
             ActionAdmissibilityDisposition::NotEvaluatedStaleEvidence
@@ -463,7 +542,9 @@ mod tests {
     #[test]
     fn conflicted_odd_evidence_fails_closed() {
         let mut value = input();
-        value.odd_evidence = QualifiedEvidenceRef::conflicted([8; 32], CLOCK);
+        value.odd_evidence = QualifiedEvidenceRef::conflicted(
+            [8; 32], ASSET, CONFIGURATION, SCENARIO, CLOCK,
+        );
         assert_eq!(
             disposition(&value),
             ActionAdmissibilityDisposition::ConflictedInput
@@ -623,8 +704,9 @@ mod tests {
     fn ambiguous_human_evidence_stale_or_missing_never_admits_candidate() {
         let mut stale = input();
         stale.rule_assessment = RuleAssessment::Ambiguous;
-        stale.human_oversight.evidence =
-            QualifiedEvidenceRef::stale([9; 32], CLOCK);
+        stale.human_oversight.evidence = QualifiedEvidenceRef::stale(
+            [9; 32], ASSET, CONFIGURATION, SCENARIO, CLOCK,
+        );
         assert_eq!(
             disposition(&stale),
             ActionAdmissibilityDisposition::FallbackRequired
@@ -636,6 +718,53 @@ mod tests {
         assert_eq!(
             disposition(&missing),
             ActionAdmissibilityDisposition::FallbackRequired
+        );
+    }
+
+    #[test]
+    fn evidence_from_another_vessel_configuration_is_not_reused() {
+        let mut value = input();
+        value.model_evidence.configuration_sha256 = [0xb2; 32];
+        assert_eq!(
+            disposition(&value),
+            ActionAdmissibilityDisposition::NotEvaluatedMissingEvidence
+        );
+    }
+
+    #[test]
+    fn evidence_from_another_vessel_identity_is_not_reused() {
+        let mut value = input();
+        value.encounter_evidence.subject_asset_id = "another-sailcraft".to_string();
+        assert_eq!(
+            disposition(&value),
+            ActionAdmissibilityDisposition::NotEvaluatedMissingEvidence
+        );
+    }
+
+    #[test]
+    fn evidence_from_another_encounter_scenario_is_not_reused() {
+        let mut value = input();
+        value.odd_evidence.scenario_id = "different-encounter".to_string();
+        assert_eq!(
+            disposition(&value),
+            ActionAdmissibilityDisposition::NotEvaluatedMissingEvidence
+        );
+    }
+
+    #[test]
+    fn configuration_and_encounter_identity_are_required() {
+        let mut value = input();
+        value.configuration_sha256 = [0; 32];
+        assert_eq!(
+            disposition(&value),
+            ActionAdmissibilityDisposition::NotEvaluatedMissingEvidence
+        );
+
+        let mut missing_target = input();
+        missing_target.target_track_id.clear();
+        assert_eq!(
+            disposition(&missing_target),
+            ActionAdmissibilityDisposition::NotEvaluatedMissingEvidence
         );
     }
 
@@ -653,8 +782,8 @@ mod tests {
     fn every_disposition_remains_decision_support_only() {
         let mut cases = Vec::new();
         let mut a = input(); a.route_evidence = QualifiedEvidenceRef::missing(); cases.push(a);
-        let mut b = input(); b.encounter_evidence = QualifiedEvidenceRef::stale([7; 32], CLOCK); cases.push(b);
-        let mut c = input(); c.odd_evidence = QualifiedEvidenceRef::conflicted([8; 32], CLOCK); cases.push(c);
+        let mut b = input(); b.encounter_evidence = QualifiedEvidenceRef::stale([7; 32], ASSET, CONFIGURATION, SCENARIO, CLOCK); cases.push(b);
+        let mut c = input(); c.odd_evidence = QualifiedEvidenceRef::conflicted([8; 32], ASSET, CONFIGURATION, SCENARIO, CLOCK); cases.push(c);
         let mut d = input(); d.authority.evidence.state = EvidenceState::Revoked; cases.push(d);
         let mut e = input(); e.odd_assessment = OddAssessment::OutsideDeclaredDomain; cases.push(e);
         let mut f = input(); f.model_assessment = ModelAssessment::Infeasible; cases.push(f);
