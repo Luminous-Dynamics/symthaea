@@ -16,10 +16,24 @@ use crate::{EventOrder, EventTraceDisposition, GateState, ReconciledOperationOut
 
 pub const EVENT_ORDER_V0_2_SCHEMA_VERSION: &str = "engineering-decision-event-order-v0.2";
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EventTimeUnit {
+    Nanoseconds,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TimeBasisDescriptor {
+    pub basis_id: String,
+    pub epoch: String,
+    pub scale: String,
+    pub unit: EventTimeUnit,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EventTimeIntervalNs {
-    pub earliest_unix_ns: i64,
-    pub latest_unix_ns: i64,
+    pub earliest_ns: i64,
+    pub latest_ns: i64,
 }
 
 /// A source-clock mapping into one explicitly named common time basis.
@@ -29,7 +43,7 @@ pub struct EventTimeIntervalNs {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QualifiedClockMapping {
     pub source_clock_domain_id: String,
-    pub target_time_basis_id: String,
+    pub target_time_basis: TimeBasisDescriptor,
     pub mapping_receipt_ref: String,
     pub mapping_receipt_sha256: String,
     pub qualification: GateState,
@@ -44,7 +58,7 @@ pub struct QualifiedClockMapping {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct QualifiedEventTime {
     pub source_clock_domain_id: String,
-    pub time_basis_id: String,
+    pub time_basis: TimeBasisDescriptor,
     pub mapping_receipt_ref: String,
     pub mapping_receipt_sha256: String,
     pub mapping_qualification: GateState,
@@ -61,7 +75,7 @@ impl QualifiedClockMapping {
     pub fn bind_normalized_interval(&self, interval: EventTimeIntervalNs) -> QualifiedEventTime {
         QualifiedEventTime {
             source_clock_domain_id: self.source_clock_domain_id.clone(),
-            time_basis_id: self.target_time_basis_id.clone(),
+            time_basis: self.target_time_basis.clone(),
             mapping_receipt_ref: self.mapping_receipt_ref.clone(),
             mapping_receipt_sha256: self.mapping_receipt_sha256.clone(),
             mapping_qualification: self.qualification,
@@ -90,14 +104,16 @@ fn validate_qualified_time(
 ) -> bool {
     let mut valid = true;
     if value.source_clock_domain_id.trim().is_empty()
-        || value.time_basis_id.trim().is_empty()
+        || value.time_basis.basis_id.trim().is_empty()
+        || value.time_basis.epoch.trim().is_empty()
+        || value.time_basis.scale.trim().is_empty()
         || value.mapping_receipt_ref.trim().is_empty()
         || !is_sha256_hex(&value.mapping_receipt_sha256)
     {
         reasons.insert(format!("CLOCK_MAPPING_BINDING_INVALID:{side}"));
         valid = false;
     }
-    if value.interval.earliest_unix_ns > value.interval.latest_unix_ns {
+    if value.interval.earliest_ns > value.interval.latest_ns {
         reasons.insert(format!("CLOCK_INTERVAL_REVERSED:{side}"));
         valid = false;
     }
@@ -105,14 +121,14 @@ fn validate_qualified_time(
         reasons.insert(format!("CLOCK_MAPPING_VALIDITY_INTERVAL_INVALID:{side}"));
         valid = false;
     }
-    if value.interval.earliest_unix_ns < value.mapping_valid_from_unix_ns
-        || value.interval.latest_unix_ns > value.mapping_valid_through_unix_ns
+    if value.interval.earliest_ns < value.mapping_valid_from_unix_ns
+        || value.interval.latest_ns > value.mapping_valid_through_unix_ns
     {
         reasons.insert(format!("CLOCK_MAPPING_OUTSIDE_VALIDITY:{side}"));
         valid = false;
     }
-    let width = (value.interval.latest_unix_ns as i128
-        - value.interval.earliest_unix_ns as i128) as u128;
+    let width = (value.interval.latest_ns as i128
+        - value.interval.earliest_ns as i128) as u128;
     if width > value.max_interval_width_ns as u128 {
         reasons.insert(format!("CLOCK_UNCERTAINTY_EXCEEDS_DECLARED_BOUND:{side}"));
         valid = false;
@@ -159,7 +175,7 @@ pub fn compare_qualified_event_times(
             reason_codes: reasons.into_iter().collect(),
         };
     }
-    if first.time_basis_id != second.time_basis_id {
+    if first.time_basis != second.time_basis {
         reasons.insert("CLOCK_TIME_BASIS_MISMATCH".to_owned());
         return ClockOrderAssessment {
             order: EventOrder::Unknown,
@@ -167,9 +183,9 @@ pub fn compare_qualified_event_times(
         };
     }
 
-    let order = if first.interval.latest_unix_ns < second.interval.earliest_unix_ns {
+    let order = if first.interval.latest_ns < second.interval.earliest_ns {
         EventOrder::Before
-    } else if first.interval.earliest_unix_ns > second.interval.latest_unix_ns {
+    } else if first.interval.earliest_ns > second.interval.latest_ns {
         EventOrder::After
     } else {
         reasons.insert("CLOCK_INTERVALS_OVERLAP".to_owned());
@@ -222,6 +238,10 @@ pub fn assess_visibility_at_frontier(
     let mut reasons = BTreeSet::new();
     if event.event_id.trim().is_empty() {
         reasons.insert("BITEMPORAL_EVENT_ID_INVALID".to_owned());
+        return FrontierVisibilityAssessment {
+            visibility: FrontierVisibility::IndeterminateAtK,
+            reason_codes: reasons.into_iter().collect(),
+        };
     }
     if event.capture_qualification == GateState::Fail {
         reasons.insert("BITEMPORAL_CAPTURE_QUALIFICATION_FAILED".to_owned());
@@ -238,6 +258,24 @@ pub fn assess_visibility_at_frontier(
         };
     }
 
+    let observation_to_record = compare_qualified_event_times(
+        &event.first_observed_at,
+        &event.durably_recorded_at,
+    );
+    if matches!(observation_to_record.order, EventOrder::After | EventOrder::Inconsistent) {
+        reasons.insert("BITEMPORAL_RECORD_PRECEDES_OBSERVATION".to_owned());
+        return FrontierVisibilityAssessment {
+            visibility: FrontierVisibility::IndeterminateAtK,
+            reason_codes: reasons.into_iter().collect(),
+        };
+    }
+    if observation_to_record.order == EventOrder::Unknown {
+        reasons.insert("BITEMPORAL_OBSERVATION_RECORD_ORDER_UNRESOLVED".to_owned());
+        return FrontierVisibilityAssessment {
+            visibility: FrontierVisibility::IndeterminateAtK,
+            reason_codes: reasons.into_iter().collect(),
+        };
+    }
     let observed = compare_qualified_event_times(&event.first_observed_at, decision_frontier);
     let recorded = compare_qualified_event_times(&event.durably_recorded_at, decision_frontier);
     for reason in observed.reason_codes.iter().chain(recorded.reason_codes.iter()) {
@@ -278,6 +316,8 @@ pub struct AttemptIdentity {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AttemptTerminalReconciliation {
     pub event_id: String,
+    /// Exact start event this terminal reconciles.
+    pub start_event_id: String,
     pub outcome: ReconciledOperationOutcome,
     pub qualification: GateState,
     /// Relation of the start event to this terminal event.
@@ -376,6 +416,13 @@ pub fn validate_attempt_lifecycle(
         match (&attempt.terminal_reconciliation, attempt.terminal_reconciliation_event_ids.as_slice()) {
             (None, []) => {}
             (Some(terminal), [event_id]) if &terminal.event_id == event_id => {
+                let exact_start_binding = attempt.start_event_ids.first().is_some_and(|start_id| {
+                    start_id == &terminal.start_event_id
+                });
+                if !exact_start_binding {
+                    critical = true;
+                    reasons.insert(format!("TERMINAL_RECONCILIATION_START_BINDING_INVALID:{}", attempt.identity.attempt_id));
+                }
                 if terminal.event_id.trim().is_empty() {
                     critical = true;
                     reasons.insert(format!("TERMINAL_RECONCILIATION_EVENT_ID_INVALID:{}", attempt.identity.attempt_id));
@@ -559,6 +606,10 @@ pub struct StopDischargeReceipt {
     /// Owner-native qualification that the complete in-flight attempt inventory
     /// in this obligation's scope was reconciled at discharge time.
     pub in_flight_reconciliation: GateState,
+    /// Exact inventory frontier and canonical attempt-manifest digest qualified
+    /// by the owner receipt at discharge time.
+    pub in_flight_inventory_frontier_event_id: String,
+    pub in_flight_attempt_manifest_sha256: String,
     /// Relation of the trigger event to the discharge event.
     pub trigger_to_discharge_order: EventOrder,
 }
@@ -585,6 +636,9 @@ fn attempt_is_reconciled(attempt: &OperationAttemptRecord) -> bool {
     attempt.terminal_reconciliation.as_ref().is_some_and(|terminal| {
         terminal.qualification == GateState::Pass
             && terminal.start_to_terminal_order == EventOrder::Before
+            && attempt.start_event_ids.first().is_some_and(|start_id| {
+                start_id == &terminal.start_event_id
+            })
     })
 }
 
@@ -676,11 +730,13 @@ pub fn assess_start_under_stop_obligations(
             && discharge.policy_revision == obligation.policy_revision
             && discharge.scope == obligation.scope
             && !discharge.receipt_ref.trim().is_empty()
-            && is_sha256_hex(&discharge.receipt_sha256);
+            && is_sha256_hex(&discharge.receipt_sha256)
+            && !discharge.in_flight_inventory_frontier_event_id.trim().is_empty()
+            && is_sha256_hex(&discharge.in_flight_attempt_manifest_sha256);
         if !bindings_valid {
             critical = true;
             reasons.insert(format!(
-                "STOP_DISCHARGE_RECEIPT_BINDING_INVALID:{}",
+                "STOP_DISCHARGE_RECEIPT_OR_INVENTORY_BINDING_INVALID:{}",
                 obligation.obligation_id
             ));
         }
@@ -763,7 +819,12 @@ mod tests {
     fn qualified_time(domain: &str, basis: &str, earliest: i64, latest: i64) -> QualifiedEventTime {
         QualifiedEventTime {
             source_clock_domain_id: domain.to_owned(),
-            time_basis_id: basis.to_owned(),
+            time_basis: TimeBasisDescriptor {
+                basis_id: basis.to_owned(),
+                epoch: "unix-epoch-1970".to_owned(),
+                scale: "TAI".to_owned(),
+                unit: EventTimeUnit::Nanoseconds,
+            },
             mapping_receipt_ref: format!("synthetic://clock-map/{domain}"),
             mapping_receipt_sha256: "a".repeat(64),
             mapping_qualification: GateState::Pass,
@@ -771,15 +832,20 @@ mod tests {
             mapping_valid_through_unix_ns: 10_000,
             max_interval_width_ns: 1_000,
             interval: EventTimeIntervalNs {
-                earliest_unix_ns: earliest,
-                latest_unix_ns: latest,
+                earliest_ns: earliest,
+                latest_ns: latest,
             },
         }
     }
 
-    fn terminal(event_id: &str, outcome: ReconciledOperationOutcome) -> AttemptTerminalReconciliation {
+    fn terminal(
+        event_id: &str,
+        start_event_id: &str,
+        outcome: ReconciledOperationOutcome,
+    ) -> AttemptTerminalReconciliation {
         AttemptTerminalReconciliation {
             event_id: event_id.to_owned(),
+            start_event_id: start_event_id.to_owned(),
             outcome,
             qualification: GateState::Pass,
             start_to_terminal_order: EventOrder::Before,
@@ -831,6 +897,8 @@ mod tests {
                 receipt_sha256: "b".repeat(64),
                 qualification: GateState::Pass,
                 in_flight_reconciliation: GateState::Pass,
+                in_flight_inventory_frontier_event_id: format!("inventory-frontier-{id}"),
+                in_flight_attempt_manifest_sha256: "c".repeat(64),
                 trigger_to_discharge_order: EventOrder::Before,
             }),
         }
@@ -850,6 +918,24 @@ mod tests {
             compare_qualified_event_times(&effect, &unrelated_basis).order,
             EventOrder::Unknown
         );
+    }
+
+    #[test]
+    fn time_basis_requires_epoch_and_scale_identity() {
+        let mut first = qualified_time("clock-a", "basis", 10, 20);
+        let mut second = qualified_time("clock-b", "basis", 30, 40);
+        second.time_basis.epoch = "different-epoch".to_owned();
+        assert_eq!(
+            compare_qualified_event_times(&first, &second).order,
+            EventOrder::Unknown
+        );
+        second.time_basis.epoch = first.time_basis.epoch.clone();
+        second.time_basis.scale = "UTC".to_owned();
+        assert_eq!(
+            compare_qualified_event_times(&first, &second).order,
+            EventOrder::Unknown
+        );
+        first.time_basis.scale = "UTC".to_owned();
     }
 
     #[test]
@@ -900,6 +986,22 @@ mod tests {
     }
 
     #[test]
+    fn record_time_cannot_precede_first_observation() {
+        let frontier = qualified_time("decision-clock", "basis", 500, 500);
+        let event = BitemporalEventEnvelope {
+            event_id: "contradictory-ingest".to_owned(),
+            occurred_at: None,
+            first_observed_at: qualified_time("collector", "basis", 430, 440),
+            durably_recorded_at: qualified_time("store", "basis", 400, 410),
+            capture_qualification: GateState::Pass,
+            supersedes_event_id: None,
+        };
+        let assessment = assess_visibility_at_frontier(&event, &frontier);
+        assert_eq!(assessment.visibility, FrontierVisibility::IndeterminateAtK);
+        assert!(assessment.reason_codes.iter().any(|reason| reason == "BITEMPORAL_RECORD_PRECEDES_OBSERVATION"));
+    }
+
+    #[test]
     fn observed_and_recorded_before_frontier_are_available_at_k() {
         let frontier = qualified_time("decision-clock", "basis", 500, 500);
         let event = BitemporalEventEnvelope {
@@ -923,7 +1025,7 @@ mod tests {
             "attempt-1",
             None,
             "start-1",
-            Some(terminal("terminal-1", ReconciledOperationOutcome::NotApplied)),
+            Some(terminal("terminal-1", "start-1", ReconciledOperationOutcome::NotApplied)),
             None,
             None,
         );
@@ -965,13 +1067,35 @@ mod tests {
     }
 
     #[test]
+    fn terminal_reconciliation_must_bind_the_exact_start_event() {
+        let malformed = attempt(
+            "motor-1",
+            "attempt-1",
+            None,
+            "start-1",
+            Some(terminal(
+                "terminal-1",
+                "different-start",
+                ReconciledOperationOutcome::Applied,
+            )),
+            None,
+            None,
+        );
+        let report = validate_attempt_lifecycle(&[malformed]);
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|reason| {
+            reason == "TERMINAL_RECONCILIATION_START_BINDING_INVALID:attempt-1"
+        }));
+    }
+
+    #[test]
     fn duplicate_starts_and_terminal_reconciliations_are_rejected() {
         let mut malformed = attempt(
             "motor-1",
             "attempt-1",
             None,
             "start-1",
-            Some(terminal("terminal-1", ReconciledOperationOutcome::Applied)),
+            Some(terminal("terminal-1", "start-1", ReconciledOperationOutcome::Applied)),
             None,
             None,
         );
@@ -990,7 +1114,7 @@ mod tests {
             "attempt-1",
             None,
             "start-1",
-            Some(terminal("terminal-1", ReconciledOperationOutcome::NotApplied)),
+            Some(terminal("terminal-1", "start-1", ReconciledOperationOutcome::NotApplied)),
             None,
             None,
         )];
@@ -1035,6 +1159,18 @@ mod tests {
     }
 
     #[test]
+    fn discharge_requires_an_exact_in_flight_inventory_commitment() {
+        let mut obligation = scoped_obligation("obligation-a", "robot-7");
+        obligation.discharge.as_mut().unwrap().in_flight_attempt_manifest_sha256 =
+            "not-a-digest".to_owned();
+        let report = assess_start_under_stop_obligations("robot-7", &[], &[obligation]);
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|reason| {
+            reason == "STOP_DISCHARGE_RECEIPT_OR_INVENTORY_BINDING_INVALID:obligation-a"
+        }));
+    }
+
+    #[test]
     fn two_discharge_receipts_must_bind_their_own_obligation_and_policy() {
         let mut first = scoped_obligation("obligation-a", "robot-7");
         let second = scoped_obligation("obligation-b", "robot-7");
@@ -1054,7 +1190,7 @@ mod tests {
             "attempt-1",
             None,
             "start-1",
-            Some(terminal("terminal-1", ReconciledOperationOutcome::NotApplied)),
+            Some(terminal("terminal-1", "start-1", ReconciledOperationOutcome::NotApplied)),
             None,
             None,
         );
@@ -1112,7 +1248,7 @@ mod tests {
             "a1",
             None,
             "start-a1",
-            Some(terminal("term-a1", ReconciledOperationOutcome::NotApplied)),
+            Some(terminal("term-a1", "start-a1", ReconciledOperationOutcome::NotApplied)),
             None,
             None,
         );

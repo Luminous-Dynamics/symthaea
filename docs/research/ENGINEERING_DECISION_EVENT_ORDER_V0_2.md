@@ -20,7 +20,7 @@ It also adds a bitemporal visibility query: what was durably knowable at decisio
 A wall-clock value is not comparable merely because two sources both say PASS. A comparison requires:
 
 - source clock-domain identity;
-- target time-basis identity (epoch, scale, and unit are defined by the owner mapping contract);
+- target time-basis descriptor: identifier, epoch, scale and unit;
 - mapping receipt reference and SHA-256 commitment;
 - owner qualification of that mapping;
 - mapping validity interval;
@@ -41,7 +41,7 @@ Each event separates:
 
 An event is AVAILABLE_AT_K only when both first observation and durable recording are definitely BEFORE K in the qualified common basis. If both are AFTER K it is NOT_AVAILABLE_AT_K. Mixed, overlapping, unknown, inconsistent, or unqualified comparisons are INDETERMINATE_AT_K.
 
-Occurrence time alone never proves that the event was knowable at K. Corrections append a new record and preserve the historical record.
+Occurrence time alone never proves that the event was knowable at K. First observation must not be definitely after durable recording. Corrections append a new record and preserve the historical record.
 
 ## 4. Attempt identity and reconciliation
 
@@ -90,6 +90,8 @@ The source includes unit tests for:
 - retry before reconciliation;
 - multiple roots and retry forks are rejected;
 - retry ordering cannot be reused for a different pair of event IDs;
+- terminal reconciliation binds the exact start event ID;
+- in-flight inventory qualification binds a frontier event ID and canonical attempt-manifest digest;
 - duplicate start and terminal cardinality;
 - independent overlapping stop obligations;
 - owner in-flight-inventory qualification required for discharge;
