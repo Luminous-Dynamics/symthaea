@@ -824,4 +824,53 @@ mod tests {
             "shared-z"
         );
     }
+    #[test]
+    fn comparing_a_run_to_itself_is_rejected() {
+        let run = manifest("run-a", &["psi"], &["psi"], Vec::new());
+        let errors = compare_observable_dependencies(&run, &run, &["psi".into()])
+            .unwrap_err();
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            DependencyValidationError::DuplicateRunIdentity(run_id) if run_id == "run-a"
+        )));
+    }
+
+    #[test]
+    fn shared_node_with_conflicting_kinds_is_rejected() {
+        let first = manifest(
+            "run-a",
+            &["psi"],
+            &["psi"],
+            vec![binding(
+                "psi",
+                dependency(
+                    "ambiguous-source",
+                    "v1",
+                    DependencyKind::InputDataset,
+                    None,
+                ),
+            )],
+        );
+        let second = manifest(
+            "run-b",
+            &["psi"],
+            &["psi"],
+            vec![binding(
+                "psi",
+                dependency(
+                    "ambiguous-source",
+                    "v1",
+                    DependencyKind::CalibrationDataset,
+                    None,
+                ),
+            )],
+        );
+        let errors = compare_observable_dependencies(&first, &second, &["psi".into()])
+            .unwrap_err();
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            DependencyValidationError::ConflictingDependencyKind(_)
+        )));
+    }
+
 }
