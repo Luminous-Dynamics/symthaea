@@ -1,0 +1,1058 @@
+{
+  "schema_version": "atelier.factorybench-corpus/0.1",
+  "status": "synthetic_only_not_measured",
+  "benchmark_owner_issue": 12289,
+  "parent_issue": 12288,
+  "units": {
+    "work_content": "synthetic_work_ticks_per_unit_not_minutes_not_smv",
+    "batch_quantity": "synthetic_garments_per_case",
+    "flow": "synthetic_unit_moves_per_batch",
+    "distance": "not_assigned_until_geometry_is_declared",
+    "currency": "not_assigned"
+  },
+  "baseline_case": {
+    "id": "BASE-MIX-01",
+    "description": "Illustrative mixed-product lot. Quantities and work ticks are deliberately synthetic and cannot be used for costing or capacity claims.",
+    "product_quantities": {
+      "AO-01": 4,
+      "K-01": 8,
+      "T-01": 4,
+      "CR-01": 2
+    },
+    "shift_calendar": "UNSPECIFIED_SYNTHETIC",
+    "service_promise": "UNSPECIFIED_SYNTHETIC"
+  },
+  "products": [
+    {
+      "product_id": "AO-01",
+      "name": "Everyday woven overshirt",
+      "batch_quantity": 4,
+      "route_zones": [
+        "Z01",
+        "Z02",
+        "Z03",
+        "Z04",
+        "Z05",
+        "Z06",
+        "Z08",
+        "Z11",
+        "Z10",
+        "Z12",
+        "Z14"
+      ],
+      "operations": [
+        {
+          "operation_id": "AO-RX",
+          "operation": "receive_and_identify",
+          "zone_id": "Z01",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [],
+          "required_machine_capability": "receiving",
+          "required_worker_skill": "receiving_operator"
+        },
+        {
+          "operation_id": "AO-IN",
+          "operation": "material_inspection",
+          "zone_id": "Z04",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "AO-RX"
+          ],
+          "required_machine_capability": "textile_inspection",
+          "required_worker_skill": "textile_inspector"
+        },
+        {
+          "operation_id": "AO-PAT",
+          "operation": "pattern_marker_preparation",
+          "zone_id": "Z05",
+          "synthetic_work_ticks_per_unit": 3,
+          "predecessors": [
+            "AO-IN"
+          ],
+          "required_machine_capability": "pattern_engineering",
+          "required_worker_skill": "patternmaker"
+        },
+        {
+          "operation_id": "AO-CUT",
+          "operation": "fabric_cutting",
+          "zone_id": "Z06",
+          "synthetic_work_ticks_per_unit": 4,
+          "predecessors": [
+            "AO-PAT"
+          ],
+          "required_machine_capability": "fabric_cutting",
+          "required_worker_skill": "cutter"
+        },
+        {
+          "operation_id": "AO-SEW1",
+          "operation": "shoulder_yoke_join",
+          "zone_id": "Z08",
+          "synthetic_work_ticks_per_unit": 3,
+          "predecessors": [
+            "AO-CUT"
+          ],
+          "required_machine_capability": "lockstitch_sewing",
+          "required_worker_skill": "sewing_operator"
+        },
+        {
+          "operation_id": "AO-SEW2",
+          "operation": "sleeve_body_pocket_assembly",
+          "zone_id": "Z08",
+          "synthetic_work_ticks_per_unit": 6,
+          "predecessors": [
+            "AO-SEW1"
+          ],
+          "required_machine_capability": "lockstitch_sewing",
+          "required_worker_skill": "sewing_operator"
+        },
+        {
+          "operation_id": "AO-EDGE",
+          "operation": "edge_finishing",
+          "zone_id": "Z08",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "AO-SEW2"
+          ],
+          "required_machine_capability": "overlock_finishing",
+          "required_worker_skill": "sewing_operator"
+        },
+        {
+          "operation_id": "AO-IPQC",
+          "operation": "in_process_inspection",
+          "zone_id": "Z11",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [
+            "AO-EDGE"
+          ],
+          "required_machine_capability": "in_process_inspection",
+          "required_worker_skill": "quality_operator"
+        },
+        {
+          "operation_id": "AO-PRESS",
+          "operation": "pressing",
+          "zone_id": "Z10",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "AO-IPQC"
+          ],
+          "required_machine_capability": "garment_pressing",
+          "required_worker_skill": "finishing_operator"
+        },
+        {
+          "operation_id": "AO-FQC",
+          "operation": "final_inspection",
+          "zone_id": "Z12",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "AO-PRESS"
+          ],
+          "required_machine_capability": "final_quality_inspection",
+          "required_worker_skill": "qualified_inspector"
+        },
+        {
+          "operation_id": "AO-PACK",
+          "operation": "packing_dispatch",
+          "zone_id": "Z14",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [
+            "AO-FQC"
+          ],
+          "required_machine_capability": "garment_packing",
+          "required_worker_skill": "fulfilment_operator"
+        }
+      ]
+    },
+    {
+      "product_id": "K-01",
+      "name": "Everyday knit tee",
+      "batch_quantity": 8,
+      "route_zones": [
+        "Z01",
+        "Z02",
+        "Z03",
+        "Z04",
+        "Z05",
+        "Z06",
+        "Z08",
+        "Z11",
+        "Z10",
+        "Z12",
+        "Z14"
+      ],
+      "operations": [
+        {
+          "operation_id": "K-RX",
+          "operation": "receive_and_identify",
+          "zone_id": "Z01",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [],
+          "required_machine_capability": "receiving",
+          "required_worker_skill": "receiving_operator"
+        },
+        {
+          "operation_id": "K-IN",
+          "operation": "knit_material_inspection",
+          "zone_id": "Z04",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "K-RX"
+          ],
+          "required_machine_capability": "knit_material_inspection",
+          "required_worker_skill": "textile_inspector"
+        },
+        {
+          "operation_id": "K-PAT",
+          "operation": "pattern_marker_preparation",
+          "zone_id": "Z05",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "K-IN"
+          ],
+          "required_machine_capability": "pattern_engineering",
+          "required_worker_skill": "patternmaker"
+        },
+        {
+          "operation_id": "K-CUT",
+          "operation": "knit_panel_cutting",
+          "zone_id": "Z06",
+          "synthetic_work_ticks_per_unit": 3,
+          "predecessors": [
+            "K-PAT"
+          ],
+          "required_machine_capability": "knit_fabric_cutting",
+          "required_worker_skill": "cutter"
+        },
+        {
+          "operation_id": "K-OV",
+          "operation": "overlock_assembly",
+          "zone_id": "Z08",
+          "synthetic_work_ticks_per_unit": 4,
+          "predecessors": [
+            "K-CUT"
+          ],
+          "required_machine_capability": "overlock_sewing",
+          "required_worker_skill": "sewing_operator"
+        },
+        {
+          "operation_id": "K-COV",
+          "operation": "neckband_and_hem_coverstitch",
+          "zone_id": "Z08",
+          "synthetic_work_ticks_per_unit": 3,
+          "predecessors": [
+            "K-OV"
+          ],
+          "required_machine_capability": "coverstitch_sewing",
+          "required_worker_skill": "sewing_operator"
+        },
+        {
+          "operation_id": "K-IPQC",
+          "operation": "in_process_inspection",
+          "zone_id": "Z11",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [
+            "K-COV"
+          ],
+          "required_machine_capability": "in_process_inspection",
+          "required_worker_skill": "quality_operator"
+        },
+        {
+          "operation_id": "K-PRESS",
+          "operation": "light_pressing_if_specified",
+          "zone_id": "Z10",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [
+            "K-IPQC"
+          ],
+          "required_machine_capability": "garment_pressing",
+          "required_worker_skill": "finishing_operator"
+        },
+        {
+          "operation_id": "K-FQC",
+          "operation": "final_inspection",
+          "zone_id": "Z12",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "K-PRESS"
+          ],
+          "required_machine_capability": "final_quality_inspection",
+          "required_worker_skill": "qualified_inspector"
+        },
+        {
+          "operation_id": "K-PACK",
+          "operation": "packing_dispatch",
+          "zone_id": "Z14",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [
+            "K-FQC"
+          ],
+          "required_machine_capability": "garment_packing",
+          "required_worker_skill": "fulfilment_operator"
+        }
+      ]
+    },
+    {
+      "product_id": "T-01",
+      "name": "Everyday woven trouser",
+      "batch_quantity": 4,
+      "route_zones": [
+        "Z01",
+        "Z02",
+        "Z03",
+        "Z04",
+        "Z05",
+        "Z06",
+        "Z08",
+        "Z11",
+        "Z10",
+        "Z12",
+        "Z14"
+      ],
+      "operations": [
+        {
+          "operation_id": "T-RX",
+          "operation": "receive_and_identify",
+          "zone_id": "Z01",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [],
+          "required_machine_capability": "receiving",
+          "required_worker_skill": "receiving_operator"
+        },
+        {
+          "operation_id": "T-IN",
+          "operation": "material_inspection",
+          "zone_id": "Z04",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "T-RX"
+          ],
+          "required_machine_capability": "textile_inspection",
+          "required_worker_skill": "textile_inspector"
+        },
+        {
+          "operation_id": "T-PAT",
+          "operation": "pattern_marker_preparation",
+          "zone_id": "Z05",
+          "synthetic_work_ticks_per_unit": 3,
+          "predecessors": [
+            "T-IN"
+          ],
+          "required_machine_capability": "pattern_engineering",
+          "required_worker_skill": "patternmaker"
+        },
+        {
+          "operation_id": "T-CUT",
+          "operation": "fabric_cutting",
+          "zone_id": "Z06",
+          "synthetic_work_ticks_per_unit": 4,
+          "predecessors": [
+            "T-PAT"
+          ],
+          "required_machine_capability": "fabric_cutting",
+          "required_worker_skill": "cutter"
+        },
+        {
+          "operation_id": "T-POCK",
+          "operation": "pocket_fly_and_closure_assembly",
+          "zone_id": "Z08",
+          "synthetic_work_ticks_per_unit": 5,
+          "predecessors": [
+            "T-CUT"
+          ],
+          "required_machine_capability": "lockstitch_sewing",
+          "required_worker_skill": "sewing_operator"
+        },
+        {
+          "operation_id": "T-RISE",
+          "operation": "rise_inseam_outseam_join",
+          "zone_id": "Z08",
+          "synthetic_work_ticks_per_unit": 5,
+          "predecessors": [
+            "T-POCK"
+          ],
+          "required_machine_capability": "lockstitch_sewing",
+          "required_worker_skill": "sewing_operator"
+        },
+        {
+          "operation_id": "T-WB",
+          "operation": "waistband_loops_and_hem",
+          "zone_id": "Z08",
+          "synthetic_work_ticks_per_unit": 4,
+          "predecessors": [
+            "T-RISE"
+          ],
+          "required_machine_capability": "lockstitch_and_bartack",
+          "required_worker_skill": "sewing_operator"
+        },
+        {
+          "operation_id": "T-IPQC",
+          "operation": "in_process_inspection",
+          "zone_id": "Z11",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [
+            "T-WB"
+          ],
+          "required_machine_capability": "in_process_inspection",
+          "required_worker_skill": "quality_operator"
+        },
+        {
+          "operation_id": "T-PRESS",
+          "operation": "pressing",
+          "zone_id": "Z10",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "T-IPQC"
+          ],
+          "required_machine_capability": "garment_pressing",
+          "required_worker_skill": "finishing_operator"
+        },
+        {
+          "operation_id": "T-FQC",
+          "operation": "final_inspection",
+          "zone_id": "Z12",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "T-PRESS"
+          ],
+          "required_machine_capability": "final_quality_inspection",
+          "required_worker_skill": "qualified_inspector"
+        },
+        {
+          "operation_id": "T-PACK",
+          "operation": "packing_dispatch",
+          "zone_id": "Z14",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [
+            "T-FQC"
+          ],
+          "required_machine_capability": "garment_packing",
+          "required_worker_skill": "fulfilment_operator"
+        }
+      ]
+    },
+    {
+      "product_id": "CR-01",
+      "name": "Continuum modular travel wrap",
+      "batch_quantity": 2,
+      "route_zones": [
+        "Z01",
+        "Z02",
+        "Z03",
+        "Z04",
+        "Z05",
+        "Z06",
+        "Z08",
+        "Z11",
+        "Z10",
+        "Z12",
+        "Z14"
+      ],
+      "operations": [
+        {
+          "operation_id": "CR-RX",
+          "operation": "receive_and_identify",
+          "zone_id": "Z01",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [],
+          "required_machine_capability": "receiving",
+          "required_worker_skill": "receiving_operator"
+        },
+        {
+          "operation_id": "CR-IN",
+          "operation": "material_and_panel_inspection",
+          "zone_id": "Z04",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "CR-RX"
+          ],
+          "required_machine_capability": "textile_inspection",
+          "required_worker_skill": "textile_inspector"
+        },
+        {
+          "operation_id": "CR-PAT",
+          "operation": "pattern_marker_preparation",
+          "zone_id": "Z05",
+          "synthetic_work_ticks_per_unit": 3,
+          "predecessors": [
+            "CR-IN"
+          ],
+          "required_machine_capability": "pattern_engineering",
+          "required_worker_skill": "patternmaker"
+        },
+        {
+          "operation_id": "CR-CUT",
+          "operation": "shell_and_panel_cutting",
+          "zone_id": "Z06",
+          "synthetic_work_ticks_per_unit": 4,
+          "predecessors": [
+            "CR-PAT"
+          ],
+          "required_machine_capability": "fabric_cutting",
+          "required_worker_skill": "cutter"
+        },
+        {
+          "operation_id": "CR-BODY",
+          "operation": "body_collar_and_pocket_assembly",
+          "zone_id": "Z08",
+          "synthetic_work_ticks_per_unit": 6,
+          "predecessors": [
+            "CR-CUT"
+          ],
+          "required_machine_capability": "lockstitch_sewing",
+          "required_worker_skill": "sewing_operator"
+        },
+        {
+          "operation_id": "CR-MOD",
+          "operation": "modular_panel_closure_assembly",
+          "zone_id": "Z08",
+          "synthetic_work_ticks_per_unit": 4,
+          "predecessors": [
+            "CR-BODY"
+          ],
+          "required_machine_capability": "modular_garment_assembly",
+          "required_worker_skill": "sewing_operator"
+        },
+        {
+          "operation_id": "CR-IPQC",
+          "operation": "in_process_inspection",
+          "zone_id": "Z11",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [
+            "CR-MOD"
+          ],
+          "required_machine_capability": "in_process_inspection",
+          "required_worker_skill": "quality_operator"
+        },
+        {
+          "operation_id": "CR-PRESS",
+          "operation": "pressing",
+          "zone_id": "Z10",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "CR-IPQC"
+          ],
+          "required_machine_capability": "garment_pressing",
+          "required_worker_skill": "finishing_operator"
+        },
+        {
+          "operation_id": "CR-FQC",
+          "operation": "final_inspection",
+          "zone_id": "Z12",
+          "synthetic_work_ticks_per_unit": 2,
+          "predecessors": [
+            "CR-PRESS"
+          ],
+          "required_machine_capability": "final_quality_inspection",
+          "required_worker_skill": "qualified_inspector"
+        },
+        {
+          "operation_id": "CR-PACK",
+          "operation": "packing_dispatch",
+          "zone_id": "Z14",
+          "synthetic_work_ticks_per_unit": 1,
+          "predecessors": [
+            "CR-FQC"
+          ],
+          "required_machine_capability": "garment_packing",
+          "required_worker_skill": "fulfilment_operator"
+        }
+      ]
+    }
+  ],
+  "resources": [
+    {
+      "id": "RES-CUT-01",
+      "capabilities": [
+        "fabric_cutting",
+        "knit_fabric_cutting"
+      ],
+      "synthetic_availability": "one resource token"
+    },
+    {
+      "id": "RES-LOCK-01",
+      "capabilities": [
+        "lockstitch_sewing"
+      ],
+      "synthetic_availability": "one resource token"
+    },
+    {
+      "id": "RES-OVER-01",
+      "capabilities": [
+        "overlock_sewing",
+        "overlock_finishing"
+      ],
+      "synthetic_availability": "one resource token"
+    },
+    {
+      "id": "RES-COVER-01",
+      "capabilities": [
+        "coverstitch_sewing"
+      ],
+      "synthetic_availability": "one resource token"
+    },
+    {
+      "id": "RES-BARTACK-01",
+      "capabilities": [
+        "lockstitch_and_bartack"
+      ],
+      "synthetic_availability": "one resource token"
+    },
+    {
+      "id": "RES-PRESS-01",
+      "capabilities": [
+        "garment_pressing"
+      ],
+      "synthetic_availability": "one resource token"
+    },
+    {
+      "id": "RES-IPQC-01",
+      "capabilities": [
+        "in_process_inspection"
+      ],
+      "synthetic_availability": "one resource token"
+    },
+    {
+      "id": "RES-FQC-01",
+      "capabilities": [
+        "final_quality_inspection"
+      ],
+      "synthetic_availability": "one resource token"
+    },
+    {
+      "id": "RES-PACK-01",
+      "capabilities": [
+        "garment_packing"
+      ],
+      "synthetic_availability": "one resource token"
+    }
+  ],
+  "worker_pools": [
+    {
+      "skill": "receiving_operator",
+      "synthetic_count": 1
+    },
+    {
+      "skill": "textile_inspector",
+      "synthetic_count": 1
+    },
+    {
+      "skill": "patternmaker",
+      "synthetic_count": 1
+    },
+    {
+      "skill": "cutter",
+      "synthetic_count": 1
+    },
+    {
+      "skill": "sewing_operator",
+      "synthetic_count": 2
+    },
+    {
+      "skill": "quality_operator",
+      "synthetic_count": 1
+    },
+    {
+      "skill": "finishing_operator",
+      "synthetic_count": 1
+    },
+    {
+      "skill": "qualified_inspector",
+      "synthetic_count": 1
+    },
+    {
+      "skill": "fulfilment_operator",
+      "synthetic_count": 1
+    }
+  ],
+  "layouts": [
+    {
+      "id": "L-A",
+      "name": "Functional job shop",
+      "cells": [
+        {
+          "id": "JOB-RECEIVE",
+          "zones": [
+            "Z01",
+            "Z02",
+            "Z03"
+          ]
+        },
+        {
+          "id": "JOB-PREP",
+          "zones": [
+            "Z04",
+            "Z05",
+            "Z06"
+          ]
+        },
+        {
+          "id": "JOB-SEW",
+          "zones": [
+            "Z08"
+          ]
+        },
+        {
+          "id": "JOB-FINISH-QA",
+          "zones": [
+            "Z10",
+            "Z11",
+            "Z12"
+          ]
+        },
+        {
+          "id": "JOB-DISPATCH",
+          "zones": [
+            "Z14"
+          ]
+        },
+        {
+          "id": "JOB-REPAIR",
+          "zones": [
+            "Z13",
+            "Z15"
+          ]
+        }
+      ],
+      "resource_policy": "shared_by_process_class",
+      "partner_policy": "outsource_future_knitting_and_wet_processes"
+    },
+    {
+      "id": "L-B",
+      "name": "Product-family U-cells",
+      "cells": [
+        {
+          "id": "U-WOVEN-TOP",
+          "products": [
+            "AO-01"
+          ],
+          "zones": [
+            "Z05",
+            "Z06",
+            "Z08",
+            "Z10",
+            "Z11"
+          ]
+        },
+        {
+          "id": "U-KNIT",
+          "products": [
+            "K-01"
+          ],
+          "zones": [
+            "Z05",
+            "Z06",
+            "Z08",
+            "Z10",
+            "Z11"
+          ]
+        },
+        {
+          "id": "U-BOTTOM",
+          "products": [
+            "T-01"
+          ],
+          "zones": [
+            "Z05",
+            "Z06",
+            "Z08",
+            "Z10",
+            "Z11"
+          ]
+        },
+        {
+          "id": "U-WRAP",
+          "products": [
+            "CR-01"
+          ],
+          "zones": [
+            "Z05",
+            "Z06",
+            "Z08",
+            "Z10",
+            "Z11"
+          ]
+        },
+        {
+          "id": "SHARED-IN-QA-OUT",
+          "zones": [
+            "Z01",
+            "Z02",
+            "Z03",
+            "Z04",
+            "Z12",
+            "Z14"
+          ]
+        },
+        {
+          "id": "REPAIR",
+          "zones": [
+            "Z13",
+            "Z15"
+          ]
+        }
+      ],
+      "resource_policy": "family_dedicated_machines_where_feasible_shared_inspection",
+      "partner_policy": "outsource_future_knitting_and_wet_processes"
+    },
+    {
+      "id": "L-C",
+      "name": "Hybrid microfactory",
+      "cells": [
+        {
+          "id": "SHARED-IN-MATERIAL",
+          "zones": [
+            "Z01",
+            "Z02",
+            "Z03",
+            "Z04"
+          ]
+        },
+        {
+          "id": "SHARED-PATTERN-CUT",
+          "zones": [
+            "Z05",
+            "Z06"
+          ]
+        },
+        {
+          "id": "CELL-WOVEN",
+          "products": [
+            "AO-01",
+            "T-01"
+          ],
+          "zones": [
+            "Z08"
+          ]
+        },
+        {
+          "id": "CELL-KNIT-MODULAR",
+          "products": [
+            "K-01",
+            "CR-01"
+          ],
+          "zones": [
+            "Z08"
+          ]
+        },
+        {
+          "id": "SHARED-QA-FINISH",
+          "zones": [
+            "Z10",
+            "Z11",
+            "Z12"
+          ]
+        },
+        {
+          "id": "SHARED-OUTBOUND",
+          "zones": [
+            "Z14"
+          ]
+        },
+        {
+          "id": "REPAIR-RECOVERY",
+          "zones": [
+            "Z13",
+            "Z15"
+          ]
+        }
+      ],
+      "resource_policy": "shared_specialist_support_with_reconfigurable_assembly",
+      "partner_policy": "outsource_future_knitting_and_wet_processes"
+    },
+    {
+      "id": "L-D",
+      "name": "Distributed qualified network",
+      "cells": [
+        {
+          "id": "ATELIER-HUB",
+          "zones": [
+            "Z01",
+            "Z02",
+            "Z04",
+            "Z05",
+            "Z11",
+            "Z12",
+            "Z13",
+            "Z14",
+            "Z15"
+          ]
+        },
+        {
+          "id": "PARTNER-CUT",
+          "external": true,
+          "processes": [
+            "fabric_cutting"
+          ]
+        },
+        {
+          "id": "PARTNER-CMT",
+          "external": true,
+          "processes": [
+            "lockstitch_sewing",
+            "overlock_sewing",
+            "coverstitch_sewing",
+            "pressing"
+          ]
+        },
+        {
+          "id": "PARTNER-KNIT",
+          "external": true,
+          "processes": [
+            "flat_knitting",
+            "whole_garment_knitting"
+          ],
+          "phase": "P3"
+        }
+      ],
+      "resource_policy": "make_buy_partner_per_operation",
+      "partner_policy": "exact_partner_capability_and_lot_traceability_required"
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "S00",
+      "name": "Base mixed product demand",
+      "changes": []
+    },
+    {
+      "id": "S01",
+      "name": "Knit-heavy demand",
+      "changes": [
+        {
+          "product": "K-01",
+          "quantity_multiplier": 2
+        }
+      ]
+    },
+    {
+      "id": "S02",
+      "name": "Trouser-heavy demand",
+      "changes": [
+        {
+          "product": "T-01",
+          "quantity_multiplier": 2
+        }
+      ]
+    },
+    {
+      "id": "S03",
+      "name": "Wrap-heavy demand",
+      "changes": [
+        {
+          "product": "CR-01",
+          "quantity_multiplier": 3
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "name": "One lockstitch machine unavailable",
+      "changes": [
+        {
+          "resource": "RES-LOCK-01",
+          "available": false
+        }
+      ]
+    },
+    {
+      "id": "S05",
+      "name": "One overlock/coverstitch capability unavailable",
+      "changes": [
+        {
+          "resource": "RES-OVER-01",
+          "available": false
+        }
+      ]
+    },
+    {
+      "id": "S06",
+      "name": "Qualified inspector unavailable",
+      "changes": [
+        {
+          "worker_skill": "qualified_inspector",
+          "available": false
+        }
+      ]
+    },
+    {
+      "id": "S07",
+      "name": "Supplier lot quarantined",
+      "changes": [
+        {
+          "material_lot": "SYNTH-LOT-01",
+          "disposition": "hold"
+        }
+      ]
+    },
+    {
+      "id": "S08",
+      "name": "Power interruption",
+      "changes": [
+        {
+          "utility": "electricity",
+          "availability": "interrupted"
+        }
+      ]
+    },
+    {
+      "id": "S09",
+      "name": "Repair/returns surge",
+      "changes": [
+        {
+          "reverse_flow_multiplier": 3
+        }
+      ]
+    },
+    {
+      "id": "S10",
+      "name": "One assembly cell reconfigured",
+      "changes": [
+        {
+          "layout_change": true
+        }
+      ]
+    },
+    {
+      "id": "S11",
+      "name": "Partner CMT outage",
+      "changes": [
+        {
+          "partner_capability": "lockstitch_sewing",
+          "available": false
+        }
+      ]
+    }
+  ],
+  "hard_constraints": [
+    "all_operations_scheduled_once",
+    "precedence_preserved",
+    "machine_capability_present",
+    "worker_skill_present",
+    "inspection_gate_preserved",
+    "material_lot_accepted",
+    "egress_not_traded",
+    "safety_not_traded",
+    "worker_calendar_and_breaks_preserved",
+    "unknown_not_promoted_to_pass"
+  ],
+  "metrics": [
+    "weighted_from_to_flow",
+    "material_travel_distance_after_geometry",
+    "person_travel_distance_after_geometry",
+    "synthetic_workload_balance",
+    "resource_queue_and_wip",
+    "lead_time_after_calendar_and_setup_inputs",
+    "first_pass_yield_only_when_measured",
+    "changeover_and_cell_reconfiguration",
+    "accepted_output_per_resource_hour",
+    "worker_skill_coverage",
+    "recovery_time_by_scenario"
+  ],
+  "claim_ceiling": [
+    "synthetic_ticks_are_not_minutes_or_smv",
+    "synthetic_counts_are_not_factory_capacity",
+    "no_actual_machine_inventory",
+    "no_measured_floor_geometry",
+    "no_cost_or_energy_results",
+    "no_site_or_building_approval"
+  ]
+}
