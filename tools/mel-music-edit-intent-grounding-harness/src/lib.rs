@@ -1207,8 +1207,8 @@ mod tests {
     fn occurrence_must_contain_every_referenced_event() {
         let mut observation = source();
         observation.occurrences[1].start_tick = 4_200;
-        observation = seal_source_observation_v1(observation).unwrap_err();
-        assert_eq!(observation, IntentPlanIssueV1::EventOutsideOccurrenceWindow);
+        let result = seal_source_observation_v1(observation);
+        assert_eq!(result, Err(IntentPlanIssueV1::EventOutsideOccurrenceWindow));
     }
 
     #[test]
