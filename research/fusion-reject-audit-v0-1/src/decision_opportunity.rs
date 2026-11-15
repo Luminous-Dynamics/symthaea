@@ -95,6 +95,11 @@ pub enum DecisionOpportunityError {
     MissingAcceptedEvaluation(String),
     UnexpectedAcceptedEvaluation(String),
     AcceptedOutcomeMismatch(String),
+    AcceptedEvidenceMismatch(String),
+    RejectedEvidenceMismatch {
+        stratum_id: String,
+        sample_index: usize,
+    },
     OutOfDomainOutcomeMustBeUnresolved(String),
     DuplicateStratumEvaluations(String),
     MissingStratumEvaluations(String),
@@ -277,12 +282,12 @@ pub fn audit_decision_opportunities(
         }
     }
 
-    let accepted_expected: BTreeMap<&str, AuditOutcome> = plan
+    let accepted_expected: BTreeMap<&str, &super::AcceptedCandidate> = plan
         .base_plan
         .accepted
         .candidates
         .iter()
-        .map(|candidate| (candidate.candidate_id.as_str(), candidate.outcome))
+        .map(|candidate| (candidate.candidate_id.as_str(), candidate))
         .collect();
     let mut accepted_results = BTreeMap::new();
     for evaluation in &plan.accepted_evaluations {
@@ -296,12 +301,17 @@ pub fn audit_decision_opportunities(
                 evaluation.candidate_id.clone(),
             ));
         }
-        if let Some(expected) = accepted_expected.get(evaluation.candidate_id.as_str())
-            && *expected != evaluation.reference_outcome
-        {
-            errors.push(DecisionOpportunityError::AcceptedOutcomeMismatch(
-                evaluation.candidate_id.clone(),
-            ));
+        if let Some(expected) = accepted_expected.get(evaluation.candidate_id.as_str()) {
+            if expected.outcome != evaluation.reference_outcome {
+                errors.push(DecisionOpportunityError::AcceptedOutcomeMismatch(
+                    evaluation.candidate_id.clone(),
+                ));
+            }
+            if expected.evidence_ref != evaluation.evidence_ref {
+                errors.push(DecisionOpportunityError::AcceptedEvidenceMismatch(
+                    evaluation.candidate_id.clone(),
+                ));
+            }
         }
         if !evaluation.within_declared_domain
             && matches!(
@@ -404,6 +414,12 @@ pub fn audit_decision_opportunities(
             }
             if base_sample.outcome != evaluation.reference_outcome {
                 errors.push(DecisionOpportunityError::RejectedOutcomeMismatch {
+                    stratum_id: (*stratum_id).to_string(),
+                    sample_index,
+                });
+            }
+            if base_sample.evidence_ref != evaluation.evidence_ref {
+                errors.push(DecisionOpportunityError::RejectedEvidenceMismatch {
                     stratum_id: (*stratum_id).to_string(),
                     sample_index,
                 });
@@ -779,12 +795,12 @@ mod tests {
             AcceptedCandidate {
                 candidate_id: "accepted-0".to_string(),
                 outcome: AuditOutcome::ConfirmedFeasible,
-                evidence_ref: "accepted-evidence-0".to_string(),
+                evidence_ref: "reference-run-accepted-0".to_string(),
             },
             AcceptedCandidate {
                 candidate_id: "accepted-1".to_string(),
                 outcome: AuditOutcome::Failed,
-                evidence_ref: "accepted-evidence-1".to_string(),
+                evidence_ref: "reference-run-accepted-1".to_string(),
             },
         ];
         let rejected = vec![
@@ -799,7 +815,7 @@ mod tests {
             .map(|candidate_id| AuditSample {
                 candidate_id,
                 outcome: AuditOutcome::ConfirmedInfeasible,
-                evidence_ref: "sample-evidence".to_string(),
+                evidence_ref: format!("reference-run-{candidate_id}"),
             })
             .collect();
         let mut candidate_ids = vec!["accepted-0".to_string(), "accepted-1".to_string()];
@@ -1044,6 +1060,33 @@ mod tests {
         assert!(report.conditional_opportunity_recall_lower_bound.is_some());
         assert_eq!(report.decision_rule, DECISION_RULE);
         assert_eq!(report.campaign_id, "campaign-1");
+    }
+
+    #[test]
+    fn accepted_objectives_must_reference_the_accepted_solver_evidence() {
+        let mut test_plan = plan();
+        test_plan.accepted_evaluations[0].evidence_ref = "different-run".to_string();
+        let errors = audit_decision_opportunities(&test_plan).unwrap_err();
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            DecisionOpportunityError::AcceptedEvidenceMismatch(candidate_id)
+                if candidate_id == "accepted-0"
+        )));
+    }
+
+    #[test]
+    fn rejected_objectives_must_reference_the_exact_sampled_solver_evidence() {
+        let mut test_plan = plan();
+        test_plan.rejected_evaluations[0].evaluations[0].evidence_ref =
+            "different-run".to_string();
+        let errors = audit_decision_opportunities(&test_plan).unwrap_err();
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            DecisionOpportunityError::RejectedEvidenceMismatch {
+                stratum_id,
+                sample_index: 0
+            } if stratum_id == "reject-all"
+        )));
     }
 
     #[test]
