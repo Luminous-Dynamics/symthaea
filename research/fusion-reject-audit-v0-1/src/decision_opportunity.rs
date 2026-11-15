@@ -1077,8 +1077,7 @@ mod tests {
     #[test]
     fn rejected_objectives_must_reference_the_exact_sampled_solver_evidence() {
         let mut test_plan = plan();
-        test_plan.rejected_evaluations[0].evaluations[0].evidence_ref =
-            "different-run".to_string();
+        test_plan.rejected_evaluations[0].evaluations[0].evidence_ref = "different-run".to_string();
         let errors = audit_decision_opportunities(&test_plan).unwrap_err();
         assert!(errors.iter().any(|error| matches!(
             error,
