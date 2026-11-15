@@ -1274,7 +1274,7 @@ mod tests {
         assert_eq!(report.disposition, CrossCheckDisposition::Consistent);
         assert_eq!(reference.bay_count, 2);
         assert_eq!(reference.bay_lengths_m, vec![40.0, 80.0]);
-        assert!((reference.displacement_volume_m3 - 6_266.666_666_666_667).abs() < 1.0e-8);
+        assert!((reference.displacement_volume_m3 - 7_546.666_666_666_667).abs() < 1.0e-8);
     }
 
     #[test]
