@@ -105,15 +105,46 @@ A deterministic generator creates event → delivery → observer clock/observat
 
 Missing owner time is Indeterminate; explicit owner FAIL, substituted clock identity or receipt mismatch is CriticalFailure. It does not normalize source clocks, authenticate signatures or trust roots, or infer durable time from simulator time. Occurrence time remains optional if no independently qualified occurrence-time resolution is supplied. The projected envelope is suitable for the v0.2 bitemporal visibility evaluator; attempt lineage, scoped stops and complete attempt inventory are not yet reconstructed by this adapter.
 
-The v0.3.1 branch has 24 authored module unit tests, six Proptest properties (256 cases each configured; 1,536 potential property cases), and one frozen integration known-answer fixture at `benchmarks/engineering-change-impact/event-order-v0.3.1-clocked-observation-persistence.json`. The fixture contains seven schedule actions and is linked through the v0.3.1 JSON Schema. These are source counts and a frozen input, not executed results.
+The v0.3.1 branch historically contained 24 module unit tests, six Proptest properties (256 cases each configured), and one frozen integration known-answer fixture. The stacked v0.3.2 branch extends this with the action-history projection and additional tests documented above.
 
-## Known limitations / next increment
+## v0.3.2: action-level evidence and attempt/stop projection
+
+The follow-on is tracked by [issue #12316](https://github.com/Luminous-Dynamics/symthaea/issues/12316) on branch `research/event-order-v0-3-2-action-evidence-2026-11-15`, based on the exact v0.3.1 head. It introduces the separate `symthaea.event-order-schedule.v0.3.2` schema; it does not overwrite the v0.3.1 schema.
+
+### Contract changes
+
+- `ScheduledAction.owner_time_ref` names an exact earlier mapping-action ID and source-local timestamp. The reference must match native event source fields for production, observation and persistence actions. Scheduler `at_ns` remains a replay-ordering coordinate only.
+- `ActionEvidence` sidecars are typed by action kind: attempt start and retry parent; effect-commit receipt; cancellation-ack receipt; terminal-reconciliation exact-start binding and qualification; stop trigger and policy revision receipts plus scope; discharge scope/frontier/manifest; and complete inventory attestation.
+- The owner verifier input is now bound to the exact action ID, receipt reference and SHA-256 that were checked. Its injected gates cover identity, digest integrity, authenticity, scope and semantics; inventory completeness and in-flight reconciliation remain separately represented. This is a trust boundary, not an implementation of signature or trust-root verification.
+- `project_action_history` constructs `OperationAttemptRecord`, `ScopedStopObligation`, `StopDischargeReceipt` and `AttemptHistoryInventory` from canonical replay order and externally qualified owner-time/receipt inputs. It calls the v0.2 lifecycle and start-eligibility validators.
+- An inventory frontier must be exactly one replay-applied produced event and owner-time-before its inventory attestation. Its manifest digest is recomputed by the v0.2 attempt-manifest projection.
+- A stop discharge binds exact trigger action, latest policy-revision action, unchanged scope, unique complete inventory attestation, frontier and manifest digest. Per-attempt relations bind exact start and discharge event IDs; pre-discharge attempts require exact terminal-before-discharge evidence.
+- Cancellation acknowledgements have their own owner time, request-action binding and receipt, but never imply `NOT_APPLIED`. Retry requires the exact predecessor, a qualified `NOT_APPLIED` terminal, and terminal-before-retry-start.
+- The action projector rejects effect-commit-after-terminal and `NOT_APPLIED`-with-commit contradictions. If any owner-time, receipt, lifecycle, stop or inventory check fails, the combined report suppresses a positive start-eligibility flag.
+
+### v0.3.2 source and reference evidence
+
+- 43 module `#[test]` cases are authored.
+- Eight Proptest properties are configured for 256 cases each (2,048 potential property cases per full run).
+- Two integration tests cover the frozen clocked schedule and action-evidence variant rejection.
+- A standalone independent reference model is stored at `benchmarks/engineering-change-impact/event-order-v0.3.2-independent-reference.mjs` with result record `event-order-v0.3.2-independent-reference.json`. On Node.js v22.16.0 with seed `0x4c554d49` it exercised 100,000 interval pairs, 150,000 receipt identity checks, 100,000 retry cases, 90,000 stop/inventory cases, 10,000 action-vector permutations, 50,000 cancellation semantics checks, and 50,000 effect/terminal chronology cases. All recorded semantic violation counters were zero. This is a separately authored JavaScript reference model, not Rust execution or evidence of production reliability.
+- JSON Schema syntax/JSON parsing and source-level identity/cardinality audits are separate from a full schema-engine test and Rust compile. No `cargo test`, `cargo clippy`, `cargo fmt` or physical qualification is claimed. The authoring environment has no `rustc`, `cargo` or `rustfmt`, and skipped CI is not pass.
+
+### Remaining hard gates
+
+1. Run exact-head Rust tests, clippy and format checks; resolve all compile or lint failures without weakening safety semantics.
+2. Implement owner-native receipt verification (signature chain, revocation, trust-root version, semantic scope, inventory completeness and freshness).
+3. Add crash windows between physical effect and durable reconciliation, retry-after-restart, policy-revision races, stop-scope expansion, receipt revocation, late arrivals and inventory omission generators.
+4. Validate action/effect projection against independently authored oracles and real adapter traces; report per-family false-safe, false-hold and indeterminate rates.
+5. Benchmark projection latency, throughput, memory, counterexample shrinking and deterministic replay under increasing action cardinality.
+
+## Known limitations at the v0.3.1 stage
 
 - The implemented generator families cover event production/delivery/partition, source-clock unqualified/expired/stale mapping faults, eight observer/store mapping faults (unqualified, expired, not-yet-valid and invalid validity interval), and the two principal stop/cancel/commit orderings. Dedicated generators are still needed for gradual calibration drift/step changes, crash precisely between physical effect and durable reconciliation, multi-scope stops, bitemporal late arrival, revocation and inventory omission.
 - The current scheduler records owner receipt fields but does not authenticate them. Owner-native signature, trust-root, scope, completeness and semantic verifiers must qualify those receipts.
-- The v0.3.1 bitemporal projection is wired to v0.2's bitemporal envelope and returns exact action/mapping/receipt sidecars, but does not yet reconstruct attempt lifecycle, retry lineage, scoped stop obligations or complete attempt inventory. A full action/effect adapter and separately implemented independent oracle remain critical next steps.
+- The v0.3.1 bitemporal projection alone does not reconstruct attempt lifecycle, retry lineage, scoped stop obligations or complete attempt inventory; the v0.3.2 action projector now supplies a synthetic-schedule adapter for these contracts, but production owner verification and real effect-system adapters remain unimplemented.
 - Deterministic replay depends on exact code build and input digest. The schedule seed alone is not a full reproducibility receipt.
-- Thirty Rust module unit tests and seven Proptest properties (256 cases each configured; 1,792 potential cases) are authored in the v0.3.1 branch at this point. No Rust toolchain is available in the execution environment used for this authoring pass. Source checks and independent reference tests must not be represented as Rust execution or CI pass.
+- At v0.3.2, 43 Rust module unit tests and eight Proptest properties (256 cases each configured; 2,048 potential cases) are authored, not executed. The local authoring environment has no Rust toolchain. Independent JavaScript reference checks must not be represented as Rust execution or CI pass.
 
 ## Reproduction
 
