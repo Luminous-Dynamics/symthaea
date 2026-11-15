@@ -986,6 +986,92 @@ mod tests {
     }
 
     #[test]
+    fn later_failure_reopens_an_unverified_gap_until_recovery() {
+        let mut scenario = fixture();
+        let digest_scenario = scenario.clone();
+        for arm in &mut scenario.arms {
+            let arm_id = arm.arm_id.clone();
+            let shifted = arm.condition == ArmCondition::Shifted;
+            let snapshot = arm.epochs[1].snapshot.clone();
+            let active = arm.epochs[1].active_obligation_ids.clone();
+            let second_epoch_at = if shifted { "2026-11-15T07:14:00Z" } else { "2026-11-15T07:16:00Z" };
+            let third_epoch_at = if shifted { "2026-11-15T07:17:00Z" } else { "2026-11-15T07:18:00Z" };
+            arm.epochs.push(StateEpoch {
+                epoch: 2,
+                observed_at: second_epoch_at.to_owned(),
+                snapshot: snapshot.clone(),
+                change_kind: "none".to_owned(),
+                affected_obligation_ids: Vec::new(),
+                active_obligation_ids: active.clone(),
+            });
+            arm.epochs.push(StateEpoch {
+                epoch: 3,
+                observed_at: third_epoch_at.to_owned(),
+                snapshot,
+                change_kind: "none".to_owned(),
+                affected_obligation_ids: Vec::new(),
+                active_obligation_ids: active,
+            });
+
+            if shifted {
+                arm.checkpoints[1].checkpoint_at = "2026-11-15T07:13:00Z".to_owned();
+                let initial_pass = arm.checkpoints[1].receipts.iter_mut()
+                    .find(|receipt| receipt.obligation_id == "api-contract").expect("API pass receipt");
+                initial_pass.observed_at = "2026-11-15T07:11:00Z".to_owned();
+                initial_pass.available_at = "2026-11-15T07:12:00Z".to_owned();
+                initial_pass.receipt_digest =
+                    receipt_digest(&digest_scenario, &arm_id, initial_pass).expect("reseal initial pass");
+
+                let mut failure_checkpoint = arm.checkpoints[1].clone();
+                failure_checkpoint.epoch = 2;
+                failure_checkpoint.checkpoint_at = "2026-11-15T07:16:00Z".to_owned();
+                let failure = failure_checkpoint.receipts.iter_mut()
+                    .find(|receipt| receipt.obligation_id == "api-contract").expect("API receipt");
+                failure.receipt_id = "shifted-epoch2-api-fail".to_owned();
+                failure.outcome = CheckOutcome::Fail;
+                failure.source_epoch = 2;
+                failure.observed_at = "2026-11-15T07:14:30Z".to_owned();
+                failure.available_at = "2026-11-15T07:15:00Z".to_owned();
+                failure.receipt_digest =
+                    receipt_digest(&digest_scenario, &arm_id, failure).expect("reseal failure");
+
+                let mut recovery_checkpoint = failure_checkpoint.clone();
+                recovery_checkpoint.epoch = 3;
+                recovery_checkpoint.checkpoint_at = "2026-11-15T07:20:00Z".to_owned();
+                let recovery = recovery_checkpoint.receipts.iter_mut()
+                    .find(|receipt| receipt.obligation_id == "api-contract").expect("API failure receipt");
+                recovery.receipt_id = "shifted-epoch3-api-pass".to_owned();
+                recovery.outcome = CheckOutcome::Pass;
+                recovery.source_epoch = 3;
+                recovery.observed_at = "2026-11-15T07:18:00Z".to_owned();
+                recovery.available_at = "2026-11-15T07:19:00Z".to_owned();
+                recovery.receipt_digest =
+                    receipt_digest(&digest_scenario, &arm_id, recovery).expect("reseal recovery");
+
+                arm.checkpoints.push(failure_checkpoint);
+                arm.checkpoints.push(recovery_checkpoint);
+            } else {
+                let mut second_checkpoint = arm.checkpoints[1].clone();
+                second_checkpoint.epoch = 2;
+                second_checkpoint.checkpoint_at = "2026-11-15T07:17:00Z".to_owned();
+                let mut third_checkpoint = second_checkpoint.clone();
+                third_checkpoint.epoch = 3;
+                third_checkpoint.checkpoint_at = "2026-11-15T07:20:00Z".to_owned();
+                arm.checkpoints.push(second_checkpoint);
+                arm.checkpoints.push(third_checkpoint);
+            }
+        }
+
+        let report = evaluate_shift_scenario(&scenario).expect("valid transient-failure trace");
+        let shifted = report.arm_scores.iter()
+            .find(|score| score.condition == ArmCondition::Shifted).expect("shifted score");
+        assert!(shifted.final_checkpoint_success);
+        assert_eq!(shifted.critical_unverified_obligation_seconds, 660);
+        assert_eq!(shifted.max_critical_unverified_gap_seconds, 240);
+        assert_eq!(shifted.recovery_event_count, 4);
+    }
+
+    #[test]
     fn receipt_cannot_be_withheld_until_after_its_first_available_checkpoint() {
         let mut scenario = fixture();
         let digest_scenario = scenario.clone();
