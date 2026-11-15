@@ -722,6 +722,82 @@ mod tests {
         );
     }
 
+    fn surface_reference_case(case_id: &str) -> serde_json::Value {
+        let register: serde_json::Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_surface_reference_cases_v0_1.json"
+        ))
+        .expect("surface source register parses");
+        register["cases"]
+            .as_array()
+            .and_then(|cases| {
+                cases.iter().find(|case| case["case_id"] == case_id).cloned()
+            })
+            .expect("source case exists")
+    }
+
+    #[test]
+    fn 2026_pp_epoxy_source_pairing_is_pinned() {
+        let case = surface_reference_case("SURF-THERMOPLASTIC-ARGON-NITROGEN-2026");
+        let observations = case["selected_reported_observations"].as_array().unwrap();
+        let pp_epoxy = observations
+            .iter()
+            .find(|observation| {
+                observation["material"] == "PP"
+                    && observation["adhesive"] == "Loctite EA 9466"
+            })
+            .expect("PP/Loctite EA 9466 observation exists");
+        assert_eq!(pp_epoxy["nitrogen_lap_shear_mpa"]["mean"], 11.6);
+        assert_eq!(pp_epoxy["nitrogen_lap_shear_mpa"]["uncertainty"], 0.7);
+        assert_eq!(pp_epoxy["untreated_lap_shear_mpa"]["mean"], 0.5);
+        assert_eq!(pp_epoxy["untreated_lap_shear_mpa"]["uncertainty"], 0.1);
+        assert_eq!(pp_epoxy["nitrogen_water_contact_angle_deg"], 17);
+        assert_eq!(pp_epoxy["untreated_water_contact_angle_deg"], 94);
+        assert_eq!(pp_epoxy["nitrogen_failure_mode"], "substrate_failure");
+    }
+
+    #[test]
+    fn 2026_pp_adhesive_counterexample_is_pinned() {
+        let case = surface_reference_case("SURF-THERMOPLASTIC-ARGON-NITROGEN-2026");
+        let observations = case["selected_reported_observations"].as_array().unwrap();
+        let pp_flexi = observations
+            .iter()
+            .find(|observation| {
+                observation["material"] == "PP"
+                    && observation["adhesive"] == "Soudal Fix All Flexi"
+            })
+            .expect("PP/Fix All Flexi observation exists");
+        assert_eq!(pp_flexi["argon_lap_shear_mpa"]["mean"], 0.8);
+        assert_eq!(pp_flexi["nitrogen_lap_shear_mpa"]["mean"], 0.3);
+        assert_eq!(pp_flexi["nitrogen_lap_shear_mpa"]["uncertainty"], 0.05);
+        assert_eq!(pp_flexi["argon_water_contact_angle_deg"], 60);
+        assert_eq!(pp_flexi["nitrogen_water_contact_angle_deg"], 17);
+    }
+
+    #[test]
+    fn 2026_surface_source_does_not_claim_lifetime_or_physical_reproduction() {
+        let case = surface_reference_case("SURF-THERMOPLASTIC-ARGON-NITROGEN-2026");
+        assert_eq!(case["luminous_reproduction"], false);
+        let experiment = &case["experiment"];
+        assert_eq!(experiment["bond_test"]["bond_timing"], "immediately_after_treatment");
+        assert_eq!(experiment["bond_test"]["specimens_per_treatment_category"], 3);
+        assert_eq!(experiment["bond_test"]["bondline_thickness_measured"], false);
+        assert_eq!(experiment["substrate_temperature_c"]["substrate_temperature_measured_directly"], false);
+        assert!(case["blockers"].as_array().unwrap().iter().any(|value| {
+            value.as_str().unwrap_or_default().contains("no delayed-bonding")
+        }));
+    }
+
+    #[test]
+    fn 2026_surface_damage_thresholds_are_source_pinned() {
+        let case = surface_reference_case("SURF-THERMOPLASTIC-ARGON-NITROGEN-2026");
+        let damage = &case["experiment"]["nitrogen_overexposure_damage"];
+        assert_eq!(damage["pp_first_visible_burning_head_speed_mm_per_min"], 500);
+        assert_eq!(damage["pvc_first_visible_damage_head_speed_mm_per_min"], 250);
+        assert_eq!(damage["hips_first_visible_damage_head_speed_mm_per_min"], 250);
+        assert_eq!(damage["all_polymers_visible_damage_below_mm_per_min"], 250);
+        assert_eq!(damage["argon_visible_damage_in_tested_window"], false);
+    }
+
     #[test]
     fn service_profile_mismatch_is_not_comparable() {
         let input = fixture();
