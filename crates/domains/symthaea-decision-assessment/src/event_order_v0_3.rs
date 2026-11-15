@@ -3143,6 +3143,296 @@ mod tests {
         }
     }
 
+    fn push_clocked_action(
+        actions: &mut Vec<ScheduledAction>,
+        ordinal: &mut u64,
+        at_ns: u64,
+        action: ScheduleAction,
+        owner_time_ref: ActionClockTimeReference,
+        evidence: ActionEvidence,
+    ) -> String {
+        let action_id = format!("action-{ordinal:06}");
+        push_action(actions, ordinal, at_ns, action);
+        let scheduled = actions.last_mut().expect("action was pushed");
+        scheduled.owner_time_ref = Some(owner_time_ref);
+        scheduled.evidence = Some(evidence);
+        action_id
+    }
+
+    fn push_test_clock_mapping(
+        actions: &mut Vec<ScheduledAction>,
+        ordinal: &mut u64,
+        at_ns: u64,
+        local_tick_ns: u64,
+    ) -> String {
+        let action_id = format!("action-{ordinal:06}");
+        push_action(
+            actions,
+            ordinal,
+            at_ns,
+            ScheduleAction::ClockAdvance {
+                clock_domain: "action-clock".to_owned(),
+                basis_id: "action-basis".to_owned(),
+                epoch: "action-epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                local_tick_ns,
+                offset_ns: 0,
+                uncertainty_ns: 0,
+                calibration_id: format!("cal-{local_tick_ns}"),
+                mapping_valid_from_ns: 0,
+                mapping_valid_through_ns: 10_000,
+                mapping_receipt_ref: format!("synthetic://action-clock/{local_tick_ns}"),
+                mapping_receipt_sha256: "a".repeat(64),
+                qualification: GateState::Pass,
+            },
+        );
+        action_id
+    }
+
+    fn passing_owner_receipt() -> OwnerReceiptAssessment {
+        OwnerReceiptAssessment {
+            identity: GateState::Pass,
+            digest_integrity: GateState::Pass,
+            authenticity: GateState::Pass,
+            scope_qualification: GateState::Pass,
+            completeness: GateState::Pass,
+            semantic_qualification: GateState::Pass,
+            in_flight_reconciliation: GateState::Pass,
+        }
+    }
+
+    fn action_history_fixture() -> (
+        VirtualSchedule,
+        BTreeMap<(String, u64), QualifiedEventTime>,
+        BTreeMap<String, OwnerReceiptAssessment>,
+        String,
+    ) {
+        let mut actions = Vec::new();
+        let mut ordinal = 0_u64;
+        let mut resolutions = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        let operation_id = "robot-1".to_owned();
+        let attempt_id = "attempt-1".to_owned();
+        let obligation_id = "global-stop-1".to_owned();
+
+        let start_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 1, 100);
+        let start_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::EffectAttempted {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: start_mapping.clone(),
+                local_timestamp_ns: 100,
+            },
+            ActionEvidence::AttemptStart { retry_of_attempt_id: None },
+        );
+        resolutions.insert(
+            (start_mapping.clone(), 100),
+            qualified_resolution_from_fixture(
+                &actions, &start_mapping, 100, 1_000,
+            ),
+        );
+
+        let commit_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 3, 110);
+        let commit_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::EffectCommitted {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                effect_id: "effect-1".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: commit_mapping.clone(),
+                local_timestamp_ns: 110,
+            },
+            ActionEvidence::EffectCommit {
+                receipt_ref: "synthetic://effect-commit/1".to_owned(),
+                receipt_sha256: "b".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (commit_mapping.clone(), 110),
+            qualified_resolution_from_fixture(&actions, &commit_mapping, 110, 1_050),
+        );
+        receipts.insert(commit_action_id, passing_owner_receipt());
+
+        let terminal_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 5, 120);
+        let terminal_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            6,
+            ScheduleAction::AttemptReconciled {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                outcome: ReconciliationOutcome::Applied,
+                receipt_ref: "synthetic://terminal/1".to_owned(),
+                receipt_sha256: "c".repeat(64),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: terminal_mapping.clone(),
+                local_timestamp_ns: 120,
+            },
+            ActionEvidence::TerminalReconciliation {
+                exact_start_action_id: start_action_id.clone(),
+                qualification: GateState::Pass,
+            },
+        );
+        resolutions.insert(
+            (terminal_mapping.clone(), 120),
+            qualified_resolution_from_fixture(&actions, &terminal_mapping, 120, 1_100),
+        );
+        receipts.insert(terminal_action_id.clone(), passing_owner_receipt());
+
+        let trigger_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 7, 130);
+        let trigger_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            8,
+            ScheduleAction::StopTriggered {
+                obligation_id: obligation_id.clone(),
+                policy_revision: "policy-v1".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: trigger_mapping.clone(),
+                local_timestamp_ns: 130,
+            },
+            ActionEvidence::StopTrigger {
+                scope: StopScope::Global,
+                receipt_ref: "synthetic://stop-trigger/1".to_owned(),
+                receipt_sha256: "d".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (trigger_mapping.clone(), 130),
+            qualified_resolution_from_fixture(&actions, &trigger_mapping, 130, 1_150),
+        );
+        receipts.insert(trigger_action_id.clone(), passing_owner_receipt());
+
+        let inventory_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 9, 135);
+        let inventory_frontier = "inventory-frontier-1".to_owned();
+        let discharge_action_id = format!("action-{:06}", ordinal + 3);
+        let mut expected_attempt = OperationAttemptRecord {
+            identity: AttemptIdentity {
+                logical_operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                retry_of_attempt_id: None,
+            },
+            start_event_ids: vec![start_action_id.clone()],
+            terminal_reconciliation_event_ids: vec![terminal_action_id.clone()],
+            terminal_reconciliation: Some(AttemptTerminalReconciliation {
+                event_id: terminal_action_id.clone(),
+                start_event_id: start_action_id.clone(),
+                outcome: ReconciledOperationOutcome::Applied,
+                qualification: GateState::Pass,
+                start_to_terminal_order: EventOrder::Before,
+            }),
+            stop_discharge_relations: vec![AttemptStopDischargeRelation {
+                obligation_id: obligation_id.clone(),
+                discharge_event_id: discharge_action_id.clone(),
+                attempt_start_event_id: start_action_id.clone(),
+                discharge_to_start_order: EventOrder::After,
+                terminal_event_id_at_discharge: Some(terminal_action_id.clone()),
+                terminal_to_discharge_order: Some(EventOrder::Before),
+            }],
+            retry_predecessor_terminal_event_id: None,
+            retry_predecessor_start_event_id: None,
+            retry_predecessor_terminal_to_start_order: None,
+        };
+        let manifest = crate::event_order_v0_2::canonical_attempt_manifest_sha256(
+            std::slice::from_ref(&expected_attempt),
+        ).expect("canonical attempt manifest");
+        expected_attempt.stop_discharge_relations.sort_by(|a, b| a.obligation_id.cmp(&b.obligation_id));
+
+        let inventory_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            10,
+            ScheduleAction::AttemptInventoryAttested {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: inventory_frontier.clone(),
+                attempt_manifest_sha256: manifest.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: inventory_mapping.clone(),
+                local_timestamp_ns: 135,
+            },
+            ActionEvidence::InventoryAttestation {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: inventory_frontier.clone(),
+                attempt_manifest_sha256: manifest.clone(),
+                receipt_ref: "synthetic://inventory-attestation/1".to_owned(),
+                receipt_sha256: "e".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (inventory_mapping.clone(), 135),
+            qualified_resolution_from_fixture(&actions, &inventory_mapping, 135, 1_175),
+        );
+        receipts.insert(inventory_action_id, passing_owner_receipt());
+
+        let discharge_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 11, 140);
+        let discharge_action_id_actual = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            12,
+            ScheduleAction::StopDischarged {
+                obligation_id,
+                trigger_action_id: trigger_action_id.clone(),
+                policy_revision_action_id: trigger_action_id,
+                policy_revision: "policy-v1".to_owned(),
+                receipt_ref: "synthetic://stop-discharge/1".to_owned(),
+                receipt_sha256: "f".repeat(64),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: discharge_mapping.clone(),
+                local_timestamp_ns: 140,
+            },
+            ActionEvidence::StopDischarge {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: inventory_frontier,
+                attempt_manifest_sha256: manifest.clone(),
+            },
+        );
+        assert_eq!(discharge_action_id, discharge_action_id_actual);
+        resolutions.insert(
+            (discharge_mapping.clone(), 140),
+            qualified_resolution_from_fixture(&actions, &discharge_mapping, 140, 1_200),
+        );
+        receipts.insert(discharge_action_id_actual, passing_owner_receipt());
+
+        let schedule = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 0x2026_1123,
+            scenario_family: "qualified_attempt_terminal_stop_inventory".to_owned(),
+            actions,
+        };
+        (schedule, resolutions, receipts, manifest)
+    }
+
+    fn qualified_resolution_from_fixture(
+        actions: &[ScheduledAction],
+        mapping_action_id: &str,
+        local_timestamp_ns: u64,
+        normalized_ns: i64,
+    ) -> QualifiedEventTime {
+        let temporary = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 1,
+            scenario_family: "test_resolution".to_owned(),
+            actions: actions.to_vec(),
+        };
+        qualified_resolution(&temporary, mapping_action_id, local_timestamp_ns, normalized_ns)
+    }
+
     fn owner_time_resolutions(schedule: &VirtualSchedule) -> BTreeMap<(String, u64), QualifiedEventTime> {
         let mut resolutions = BTreeMap::new();
         for action in &schedule.actions {
@@ -3777,6 +4067,58 @@ mod tests {
             matches!(record.action, ScheduleAction::EventObserved { .. })
                 && record.disposition == SchedulerDisposition::ClockTimestampBeyondQualifiedTick
         }));
+    }
+
+    #[test]
+    fn action_history_projection_composes_attempt_stop_and_complete_inventory() {
+        let (schedule, resolutions, receipts, expected_manifest) = action_history_fixture();
+        validate_schedule(&schedule).expect("valid action-history fixture");
+        let report = project_action_history(
+            &schedule,
+            "robot-1",
+            &resolutions,
+            &receipts,
+        ).expect("action-history projection");
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+        assert_eq!(report.attempts.len(), 1);
+        assert_eq!(report.attempt_lifecycle.disposition, EventTraceDisposition::Safe);
+        assert_eq!(
+            report.inventory.as_ref().map(|inventory| inventory.attempt_manifest_sha256.as_str()),
+            Some(expected_manifest.as_str()),
+        );
+        assert_eq!(report.obligations.len(), 1);
+        assert_eq!(report.obligations[0].discharge.as_ref().map(|receipt| receipt.qualification), Some(GateState::Pass));
+        assert!(report.start_gate.as_ref().is_some_and(|gate| gate.start_permitted_by_stop_contract));
+        assert_eq!(report.effect_commits.len(), 1);
+    }
+
+    #[test]
+    fn action_history_projection_blocks_missing_owner_time_and_receipt_authenticity() {
+        let (mut schedule, resolutions, mut receipts, _) = action_history_fixture();
+        let start = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::EffectAttempted { .. })
+        }).expect("attempt start");
+        start.owner_time_ref = None;
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("missing owner time is an assessment");
+        assert_ne!(report.disposition, EventTraceDisposition::Safe);
+        assert!(report.reason_codes.iter().any(|code| code.contains("ACTION_OWNER_TIME_REFERENCE_MISSING")));
+
+        let (schedule, resolutions, mut receipts, _) = action_history_fixture();
+        let terminal_action_id = schedule.actions.iter().find_map(|action| {
+            if matches!(action.action, ScheduleAction::AttemptReconciled { .. }) {
+                Some(action.action_id.clone())
+            } else {
+                None
+            }
+        }).expect("terminal action");
+        let mut receipt = receipts.get(&terminal_action_id).copied().expect("owner assessment");
+        receipt.authenticity = GateState::Fail;
+        receipts.insert(terminal_action_id, receipt);
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("failed authenticity is an assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code.contains("OWNER_RECEIPT_QUALIFICATION_FAILED")));
     }
 
     #[test]
