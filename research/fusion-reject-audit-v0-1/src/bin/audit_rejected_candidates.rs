@@ -1,5 +1,6 @@
 use fusion_reject_audit::{
-    AuditOutcome, AcceptedFeasibleManifest, RejectAuditPlan, RejectStratum, audit_rejected_candidates,
+    AcceptedFeasibleCandidate, AcceptedFeasibleManifest, AuditOutcome, RejectAuditPlan,
+    RejectStratum, audit_rejected_candidates,
     deterministic_audit_sample_ids,
 };
 
@@ -38,7 +39,12 @@ fn main() {
         familywise_confidence_level: 0.95,
         target_feasible_recall: 0.99,
         accepted_feasible: AcceptedFeasibleManifest {
-            count_lower_bound: 100_000,
+            candidates: (0..100_000)
+                .map(|index| AcceptedFeasibleCandidate {
+                    candidate_id: format!("accepted-feasible-{index:08}"),
+                    evidence_ref: format!("synthetic-accepted-run-{index:08}"),
+                })
+                .collect(),
             manifest_sha256: digest('a'),
             evidence_ref: "synthetic-accepted-feasible-manifest".to_string(),
         },
