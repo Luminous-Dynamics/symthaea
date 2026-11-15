@@ -417,6 +417,17 @@ fn validate_semantics(value: &Value) -> Result<usize, String> {
         }
     }
 
+    let request = value
+        .pointer("/request")
+        .ok_or_else(|| "request envelope is missing".to_owned())?;
+    let issued_at = str_at(request, "issued_at", "request")?;
+    let expires_at = str_at(request, "expires_at", "request")?;
+    // The schema restricts both values to fixed-width UTC seconds. Lexical
+    // order is therefore chronological order after the RFC3339 format check.
+    if expires_at <= issued_at {
+        return Err("request expires_at must be later than issued_at".to_owned());
+    }
+
     let mode = str_at(
         value.pointer("/source").ok_or("source missing")?,
         "protocol_mode",
@@ -505,6 +516,8 @@ mod tests {
         include_str!("../../fixtures/negative/duplicate_member_name.raw.json");
     const BAD_POINTER: &str =
         include_str!("../../fixtures/negative/invalid_json_pointer_escape.json");
+    const EXPIRED_REQUEST: &str =
+        include_str!("../../fixtures/negative/expiry_not_after_issued_at.json");
 
     #[test]
     fn jcs_uses_utf16_code_unit_order_for_object_keys() {
@@ -522,6 +535,13 @@ mod tests {
         let (digest, count) = validate_plan(POSITIVE).expect("positive fixture should pass");
         assert_eq!(count, 3);
         assert_eq!(digest.len(), 64);
+    }
+
+    #[test]
+    fn request_expiry_must_follow_issue_time() {
+        let error = validate_plan(EXPIRED_REQUEST)
+            .expect_err("expiry at/before issue time must reject");
+        assert!(error.contains("expires_at must be later than issued_at"));
     }
 
     #[test]
