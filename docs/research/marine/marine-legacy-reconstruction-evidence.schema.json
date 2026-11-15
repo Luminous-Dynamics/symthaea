@@ -1,0 +1,816 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-legacy-reconstruction-evidence.schema.json",
+  "title": "Marine legacy vessel reconstruction evidence",
+  "description": "A provenance-preserving reconstruction record. It does not assert that inferred geometry is as-built or physically qualified.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_id",
+    "evidence_class",
+    "status",
+    "created_utc",
+    "source_artifacts",
+    "views",
+    "constraints",
+    "conflicts",
+    "unresolved_regions",
+    "candidate_reconstructions",
+    "review",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "record_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"
+    },
+    "evidence_class": {
+      "enum": [
+        "SYNTHETIC",
+        "ARCHIVAL_DOCUMENT",
+        "MEASURED_AS_BUILT",
+        "MIXED_WITH_EXPLICIT_LINEAGE"
+      ]
+    },
+    "status": {
+      "enum": [
+        "INCOMPLETE",
+        "READY_FOR_REVIEW",
+        "REVIEWED_WITH_UNRESOLVED_REGIONS",
+        "RECONSTRUCTION_ADMITTED_WITHIN_PROFILE",
+        "REJECTED"
+      ]
+    },
+    "created_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "vessel_identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity_status"
+      ],
+      "properties": {
+        "vessel_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "yard_hull_number": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "imo_number": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9]{7}$"
+        },
+        "vessel_class": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "identity_status": {
+          "enum": [
+            "DOCUMENT_ASSERTED",
+            "CROSS_SOURCE_CORROBORATED",
+            "UNRESOLVED",
+            "SYNTHETIC"
+          ]
+        }
+      }
+    },
+    "source_artifacts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/source_artifact"
+      }
+    },
+    "views": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/view"
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/constraint"
+      }
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/conflict"
+      }
+    },
+    "unresolved_regions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unresolved_region"
+      }
+    },
+    "candidate_reconstructions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "required_actions",
+        "reviewed_by"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "NOT_REVIEWED",
+            "IN_REVIEW",
+            "ACCEPTED_WITHIN_PROFILE",
+            "REJECTED"
+          ]
+        },
+        "required_actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reviewed_by": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reviewed_utc": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "NOT_AS_BUILT_EVIDENCE",
+          "NOT_STRUCTURAL_QUALIFICATION",
+          "NOT_HYDRODYNAMIC_QUALIFICATION",
+          "NOT_STABILITY_OR_CLASS_APPROVAL",
+          "NOT_MANUFACTURING_AUTHORIZATION",
+          "NOT_OPERATIONAL_AUTHORITY"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "hex"
+      ],
+      "properties": {
+        "algorithm": {
+          "const": "SHA-256"
+        },
+        "hex": {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{64}$"
+        }
+      }
+    },
+    "source_artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "source_type",
+        "locator",
+        "revision_or_date",
+        "mime_type",
+        "byte_length",
+        "digest",
+        "rights",
+        "acquisition"
+      ],
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"
+        },
+        "source_type": {
+          "enum": [
+            "GENERAL_ARRANGEMENT",
+            "LINES_PLAN",
+            "BODY_PLAN",
+            "SHEER_PLAN",
+            "HALF_BREADTH_PLAN",
+            "OFFSET_TABLE",
+            "SPECIFICATION",
+            "SURVEY_REPORT",
+            "PHOTOGRAPH",
+            "LIDAR_POINT_CLOUD",
+            "PHOTOGRAMMETRY",
+            "OTHER"
+          ]
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision_or_date": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mime_type": {
+          "type": "string",
+          "minLength": 3
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "review_required",
+            "permitted_operations",
+            "restrictions_reference"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "LICENSE_CONFIRMED",
+                "PERMISSION_GRANTED",
+                "SYNTHETIC_OWNED",
+                "RESTRICTED",
+                "DENIED",
+                "UNKNOWN"
+              ]
+            },
+            "review_required": {
+              "type": "boolean"
+            },
+            "permitted_operations": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "VIEW",
+                  "MEASURE",
+                  "TRANSFORM",
+                  "DERIVE",
+                  "TRAIN",
+                  "REDISTRIBUTE",
+                  "PUBLISH_METADATA"
+                ]
+              }
+            },
+            "restrictions_reference": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "acquisition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "acquired_utc",
+            "acquired_by",
+            "original_preserved"
+          ],
+          "properties": {
+            "method": {
+              "enum": [
+                "DIRECT_OWNER_SUPPLY",
+                "PUBLIC_ARCHIVE",
+                "AUTHORIZED_REPOSITORY",
+                "SYNTHETIC_GENERATION",
+                "SURVEY_CAPTURE",
+                "OTHER"
+              ]
+            },
+            "acquired_utc": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "acquired_by": {
+              "type": "string",
+              "minLength": 1
+            },
+            "original_preserved": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "point2d": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x_px",
+        "y_px"
+      ],
+      "properties": {
+        "x_px": {
+          "type": "number"
+        },
+        "y_px": {
+          "type": "number"
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "unit",
+        "coverage_or_method"
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coverage_or_method": {
+          "type": "string",
+          "minLength": 3
+        }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "view_id",
+        "source_artifact_id",
+        "view_type",
+        "page_index",
+        "pixel_dimensions",
+        "page_rotation_deg",
+        "scan_skew_deg",
+        "coordinate_frame_id",
+        "calibration"
+      ],
+      "properties": {
+        "view_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"
+        },
+        "source_artifact_id": {
+          "type": "string"
+        },
+        "view_type": {
+          "enum": [
+            "GENERAL_ARRANGEMENT",
+            "BODY_PLAN",
+            "SHEER_PLAN",
+            "HALF_BREADTH_PLAN",
+            "LINES_PLAN",
+            "OFFSET_TABLE_VIEW",
+            "OTHER"
+          ]
+        },
+        "page_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pixel_dimensions": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "width",
+            "height"
+          ],
+          "properties": {
+            "width": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "dpi_x": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "dpi_y": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "page_rotation_deg": {
+          "type": "number"
+        },
+        "scan_skew_deg": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "coordinate_frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "units",
+            "anchors",
+            "residual_uncertainty"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "UNCALIBRATED",
+                "SCALE_ONLY",
+                "AFFINE_2D",
+                "PROJECTIVE_2D",
+                "ENGINEERING_DATUM_BOUND",
+                "SYNTHETIC_KNOWN_ANSWER"
+              ]
+            },
+            "units": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "anchors": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "pixel",
+                  "engineering_coordinate",
+                  "uncertainty",
+                  "source_note"
+                ],
+                "properties": {
+                  "pixel": {
+                    "$ref": "#/$defs/point2d"
+                  },
+                  "engineering_coordinate": {
+                    "type": "number"
+                  },
+                  "uncertainty": {
+                    "$ref": "#/$defs/uncertainty"
+                  },
+                  "source_note": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "residual_uncertainty": {
+              "$ref": "#/$defs/uncertainty"
+            }
+          }
+        }
+      }
+    },
+    "constraint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint_id",
+        "kind",
+        "source_artifact_id",
+        "view_id",
+        "source_locator",
+        "value",
+        "unit",
+        "uncertainty",
+        "interpretation_status"
+      ],
+      "properties": {
+        "constraint_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"
+        },
+        "kind": {
+          "enum": [
+            "DIMENSION",
+            "STATION_POSITION",
+            "WATERLINE",
+            "BUTTOCK",
+            "SECTION_CURVE_POINT",
+            "KEEL_LINE",
+            "SHEER_LINE",
+            "STEM_POINT",
+            "STERN_POINT",
+            "DECK_EDGE",
+            "TRANSOM",
+            "ANNOTATION",
+            "MATERIAL_NOTE",
+            "OTHER"
+          ]
+        },
+        "source_artifact_id": {
+          "type": "string"
+        },
+        "view_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": [
+            "number",
+            "string",
+            "null"
+          ]
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "uncertainty": {
+          "$ref": "#/$defs/uncertainty"
+        },
+        "interpretation_status": {
+          "enum": [
+            "DIRECTLY_TRANSCRIBED",
+            "GEOMETRICALLY_CALIBRATED",
+            "INFERRED",
+            "AMBIGUOUS",
+            "CONFLICTED",
+            "SYNTHETIC"
+          ]
+        }
+      }
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conflict_id",
+        "subject",
+        "constraint_ids",
+        "description",
+        "status",
+        "resolution_basis"
+      ],
+      "properties": {
+        "conflict_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9._-]{2,95}$"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "constraint_ids": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "description": {
+          "type": "string",
+          "minLength": 8
+        },
+        "status": {
+          "enum": [
+            "UNRESOLVED",
+            "RESOLVED_BY_AUTHORITY",
+            "RESOLVED_BY_MEASUREMENT",
+            "RESOLVED_BY_REVIEW",
+            "SYNTHETIC_NEGATIVE_CONTROL"
+          ]
+        },
+        "resolution_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "unresolved_region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "region_id",
+        "view_id",
+        "region_type",
+        "bounds_px",
+        "reason",
+        "severity",
+        "must_review"
+      ],
+      "properties": {
+        "region_id": {
+          "type": "string"
+        },
+        "view_id": {
+          "type": "string"
+        },
+        "region_type": {
+          "enum": [
+            "OCCLUDED",
+            "DAMAGED_SCAN",
+            "ANNOTATION_OVERLAP",
+            "MISSING_VIEW",
+            "AMBIGUOUS_LINE",
+            "UNSUPPORTED_STATION",
+            "UNSUPPORTED_GEOMETRY",
+            "CONTRADICTORY_DIMENSIONS",
+            "OUT_OF_DISTRIBUTION"
+          ]
+        },
+        "bounds_px": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "x_min",
+            "y_min",
+            "x_max",
+            "y_max"
+          ],
+          "properties": {
+            "x_min": {
+              "type": "number"
+            },
+            "y_min": {
+              "type": "number"
+            },
+            "x_max": {
+              "type": "number"
+            },
+            "y_max": {
+              "type": "number"
+            }
+          }
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 5
+        },
+        "severity": {
+          "enum": [
+            "INFORMATIONAL",
+            "MATERIAL",
+            "CRITICAL"
+          ]
+        },
+        "must_review": {
+          "type": "boolean"
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "representation",
+        "artifact_locator",
+        "digest",
+        "units",
+        "coordinate_frame_id",
+        "source_artifact_ids",
+        "pipeline",
+        "uncertainty_status",
+        "geometry_admission",
+        "as_built_status"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string"
+        },
+        "representation": {
+          "enum": [
+            "POINT_CLOUD",
+            "SECTION_CURVES",
+            "PARAMETRIC_SURFACE",
+            "NURBS_SURFACE",
+            "BREP",
+            "TRIANGLE_MESH"
+          ]
+        },
+        "artifact_locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "units": {
+          "type": "string",
+          "minLength": 1
+        },
+        "coordinate_frame_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_artifact_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "pipeline": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "method",
+            "version",
+            "configuration_digest"
+          ],
+          "properties": {
+            "method": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "configuration_digest": {
+              "$ref": "#/$defs/digest"
+            }
+          }
+        },
+        "uncertainty_status": {
+          "enum": [
+            "NOT_CHARACTERIZED",
+            "PARTIAL",
+            "CALIBRATED_WITHIN_PROFILE",
+            "UNRESOLVED"
+          ]
+        },
+        "geometry_admission": {
+          "enum": [
+            "NOT_EVALUATED",
+            "INCOMPLETE",
+            "REJECTED",
+            "ADMITTED_WITHIN_DECLARED_PROFILE"
+          ]
+        },
+        "as_built_status": {
+          "const": "NOT_ESTABLISHED_BY_DRAWING_RECONSTRUCTION"
+        }
+      }
+    }
+  }
+}
