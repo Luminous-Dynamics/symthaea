@@ -186,12 +186,12 @@ pub fn audit_rejected_candidates(
         errors.push(AuditError::InvalidRecallTarget);
     }
     if !is_sha256(&plan.accepted_feasible.manifest_sha256) {
-        errors.push(AuditError::InvalidSha256("accepted_feasible.manifest_sha256"));
+        errors.push(AuditError::InvalidSha256(
+            "accepted_feasible.manifest_sha256",
+        ));
     }
     if plan.accepted_feasible.evidence_ref.trim().is_empty() {
-        errors.push(AuditError::EmptyIdentity(
-            "accepted_feasible.evidence_ref",
-        ));
+        errors.push(AuditError::EmptyIdentity("accepted_feasible.evidence_ref"));
     }
     if plan.strata.is_empty() {
         errors.push(AuditError::NoRejectedStrata);
@@ -205,19 +205,13 @@ pub fn audit_rejected_candidates(
             errors.push(AuditError::EmptyIdentity("stratum_id"));
         }
         if !stratum_ids.insert(stratum.stratum_id.clone()) {
-            errors.push(AuditError::DuplicateStratumId(
-                stratum.stratum_id.clone(),
-            ));
+            errors.push(AuditError::DuplicateStratumId(stratum.stratum_id.clone()));
         }
         if !is_sha256(&stratum.stratum_definition_sha256) {
-            errors.push(AuditError::InvalidSha256(
-                "stratum_definition_sha256",
-            ));
+            errors.push(AuditError::InvalidSha256("stratum_definition_sha256"));
         }
         if !is_sha256(&stratum.population_manifest_sha256) {
-            errors.push(AuditError::InvalidSha256(
-                "population_manifest_sha256",
-            ));
+            errors.push(AuditError::InvalidSha256("population_manifest_sha256"));
         }
         if stratum.selection_receipt_ref.trim().is_empty() {
             errors.push(AuditError::EmptyIdentity("selection_receipt_ref"));
@@ -294,9 +288,7 @@ pub fn audit_rejected_candidates(
     let mut previous_accepted: Option<&str> = None;
     for candidate in &plan.accepted_feasible.candidates {
         if candidate.candidate_id.trim().is_empty() {
-            errors.push(AuditError::EmptyIdentity(
-                "accepted_feasible.candidate_id",
-            ));
+            errors.push(AuditError::EmptyIdentity("accepted_feasible.candidate_id"));
         }
         if candidate.evidence_ref.trim().is_empty() {
             errors.push(AuditError::EmptyIdentity(
@@ -479,8 +471,8 @@ mod tests {
         seed: u64,
         outcomes: &[AuditOutcome],
     ) -> Vec<AuditSample> {
-        let ids = deterministic_audit_sample_ids(stratum_id, population, sample_size, seed)
-            .unwrap();
+        let ids =
+            deterministic_audit_sample_ids(stratum_id, population, sample_size, seed).unwrap();
         assert_eq!(ids.len(), outcomes.len());
         ids.into_iter()
             .zip(outcomes)
@@ -493,11 +485,7 @@ mod tests {
             .collect()
     }
 
-    fn stratum(
-        id: &str,
-        population: Vec<String>,
-        samples: Vec<AuditSample>,
-    ) -> RejectStratum {
+    fn stratum(id: &str, population: Vec<String>, samples: Vec<AuditSample>) -> RejectStratum {
         RejectStratum {
             stratum_id: id.to_string(),
             stratum_definition_sha256: digest('a'),
@@ -545,8 +533,9 @@ mod tests {
             0x5eed_f00d_cafe_babe,
             &outcomes,
         );
-        let report = audit_rejected_candidates(&plan(vec![stratum("core", population, samples)], 99))
-            .unwrap();
+        let report =
+            audit_rejected_candidates(&plan(vec![stratum("core", population, samples)], 99))
+                .unwrap();
 
         assert_eq!(report.total_rejected_population, 4);
         assert_eq!(report.total_audited_candidates, 4);
@@ -573,8 +562,9 @@ mod tests {
             0x5eed_f00d_cafe_babe,
             &outcomes,
         );
-        let report = audit_rejected_candidates(&plan(vec![stratum("edge", population, samples)], 100))
-            .unwrap();
+        let report =
+            audit_rejected_candidates(&plan(vec![stratum("edge", population, samples)], 100))
+                .unwrap();
 
         assert_eq!(report.strata[0].potential_false_negatives_in_sample, 4);
         assert_eq!(report.missed_feasible_count_upper_bound, 4);
@@ -583,8 +573,9 @@ mod tests {
     #[test]
     fn empty_audit_cannot_certify_a_high_recall_target() {
         let population = stratum_population("unseen", 100);
-        let report = audit_rejected_candidates(&plan(vec![stratum("unseen", population, vec![])], 100))
-            .unwrap();
+        let report =
+            audit_rejected_candidates(&plan(vec![stratum("unseen", population, vec![])], 100))
+                .unwrap();
 
         assert_eq!(report.total_audited_candidates, 0);
         assert_eq!(report.missed_feasible_count_upper_bound, 100);
@@ -597,42 +588,34 @@ mod tests {
         let population_a = stratum_population("a", 200);
         let population_b = stratum_population("b", 200);
         let outcomes = vec![AuditOutcome::ConfirmedInfeasible; 20];
-        let one_samples = sample_outcomes(
-            "a",
-            &population_a,
-            20,
-            0x5eed_f00d_cafe_babe,
-            &outcomes,
-        );
-        let two_samples = sample_outcomes(
-            "b",
-            &population_b,
-            20,
-            0x5eed_f00d_cafe_babe,
-            &outcomes,
-        );
+        let one_samples = sample_outcomes("a", &population_a, 20, 0x5eed_f00d_cafe_babe, &outcomes);
+        let two_samples = sample_outcomes("b", &population_b, 20, 0x5eed_f00d_cafe_babe, &outcomes);
 
-        let one = audit_rejected_candidates(&plan(
-            vec![stratum("a", population_a, one_samples)],
-            1_000,
-        ))
-        .unwrap();
+        let one =
+            audit_rejected_candidates(&plan(vec![stratum("a", population_a, one_samples)], 1_000))
+                .unwrap();
         let two = audit_rejected_candidates(&plan(
             vec![
-                stratum("a", population_a, sample_outcomes(
+                stratum(
                     "a",
-                    &stratum_population("a", 200),
-                    20,
-                    0x5eed_f00d_cafe_babe,
-                    &outcomes,
-                )),
+                    population_a,
+                    sample_outcomes(
+                        "a",
+                        &stratum_population("a", 200),
+                        20,
+                        0x5eed_f00d_cafe_babe,
+                        &outcomes,
+                    ),
+                ),
                 stratum("b", population_b, two_samples),
             ],
             1_000,
         ))
         .unwrap();
 
-        assert!(two.strata[0].upper_missed_feasible_rate > one.strata[0].upper_missed_feasible_rate);
+        assert!(
+            two.strata[0].upper_missed_feasible_rate > one.strata[0].upper_missed_feasible_rate
+        );
         assert_eq!(
             two.strata[0].per_stratum_error_probability,
             (1.0 - 0.95) / 2.0
@@ -654,11 +637,9 @@ mod tests {
             ],
         );
         samples[0].candidate_id = "core-candidate-9999".to_string();
-        let errors = audit_rejected_candidates(&plan(
-            vec![stratum("core", population, samples)],
-            100,
-        ))
-        .unwrap_err();
+        let errors =
+            audit_rejected_candidates(&plan(vec![stratum("core", population, samples)], 100))
+                .unwrap_err();
 
         assert!(errors.iter().any(|error| matches!(
             error,
@@ -709,11 +690,9 @@ mod tests {
             &[AuditOutcome::Failed],
         );
         samples[0].evidence_ref.clear();
-        let errors = audit_rejected_candidates(&plan(
-            vec![stratum("core", population, samples)],
-            100,
-        ))
-        .unwrap_err();
+        let errors =
+            audit_rejected_candidates(&plan(vec![stratum("core", population, samples)], 100))
+                .unwrap_err();
 
         assert!(errors.contains(&AuditError::EmptyIdentity("sample.evidence_ref")));
     }
