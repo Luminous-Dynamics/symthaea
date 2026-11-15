@@ -17,9 +17,9 @@ The remaining gap is test realism. A collection of static traces is useful but c
 - Observation and durability steps; cancellation request/acknowledgement; stop trigger, policy revision and discharge; effect attempt, commit and terminal reconciliation; process crash/restart; event supersession.
 - Canonical action ordering by virtual time and unique ordinal. Input vector order is not semantic; causal predecessor lists are normalized as sets.
 - Replay report with schedule digest, ordered action records and scheduler dispositions.
-- Fixed-seed SplitMix64 scenario generator.
+- Fixed-seed SplitMix64 delivery/partition generator plus a second generator for both stop/cancel/commit race orders (commit-before-accepted-ack and commit-after-accepted-ack).
 - Delta-debugging shrinker that only accepts a candidate when structural validation still passes and the supplied counterexample predicate still reproduces.
-- Unit tests and Proptest properties authored for determinism and permutation invariance.
+- Fourteen module unit tests and three Proptest properties (256 cases each configured), covering determinism, permutation invariance, receipt shape, clock epoch regression, exact stop action binding, crash/persistence, conflicting reconciliation, and both cancellation/commit race orders.
 
 The scheduler is not the v0.2 safety oracle. It emits reproducible schedule observations and precondition outcomes. Clock regressions and event-time regressions are diagnosed within an exact source clock series; a new epoch starts a new series. Failed/unresolved clock qualifications and semantic unsafe orderings are retained as replay inputs; malformed identity, causal references, or receipt-digest shapes are rejected. The next adapter must translate those into v0.2 owner-qualified inputs and run the matched evaluator ladder. A schedule may intentionally contain unsafe orderings; the scheduler must preserve them rather than silently "repair" them. A local clock regression is an observation about that source clock, not a cross-domain ordering claim.
 
@@ -29,8 +29,11 @@ The scheduler is not the v0.2 safety oracle. It emits reproducible schedule obse
 2. **From wall-clock timestamps to qualified temporal evidence.** Each source clock advances independently; calibration, basis, uncertainty and validity become explicit faultable inputs. No numeric cross-domain comparison is added here.
 3. **From event order to knowledge order.** Production, delivery, first observation and durable recording are distinct. This supports historical replay without allowing a late-arriving fact to rewrite what was knowable at K.
 4. **From retry logic to effect-lineage assurance.** Start, cancel, commit and reconcile are separate events; an unknown result is not silently converted into not-applied.
-5. **From hand-selected negatives to counterexample discovery.** Seeded schedules, delivery permutations and property-preserving shrinking aim to find the smallest causal schedule that still violates an invariant.
-6. **From one aggregate score to a safety/usefulness frontier.** False-safe, false-hold, unresolved, reason-code mismatch and per-fault-family outcomes remain separate.
+5. **From label matching to exact action lineage.** A stop discharge binds the exact trigger and current policy-revision action IDs; substituted or stale references do not inherit a prior discharge.
+6. **From duplicate suppression to contradiction detection.** An exact repeat is idempotent, but a changed cancellation answer or terminal receipt is recorded as a conflict.
+7. **From cancellation intent to commit-race evidence.** Both commit-before-acknowledgement and commit-after-accepted-acknowledgement schedules remain visible as different outcomes.
+8. **From hand-selected negatives to counterexample discovery.** Seeded schedules, delivery permutations and property-preserving shrinking aim to find the smallest causal schedule that still violates an invariant.
+9. **From one aggregate score to a safety/usefulness frontier.** False-safe, false-hold, unresolved, reason-code mismatch and per-fault-family outcomes remain separate.
 
 ## Benchmarks and target gates
 
