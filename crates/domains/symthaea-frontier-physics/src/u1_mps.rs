@@ -3736,6 +3736,42 @@ pub struct U1TeBDLayerResult {
     pub global_l2_bound_qualified: bool,
 }
 
+
+
+/// Rank cap and tolerance for goal-driven TEBD layer compression.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct U1TeBDLayerErrorBudgetPolicy {
+    pub max_bond_dimension: usize,
+    pub tolerance: f64,
+}
+
+/// Per-gate receipt for a propagated layer compression allowance.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDLayerCompressionBudgetReceipt {
+    pub bond_index: usize,
+    pub requested_local_l2_error: f64,
+    pub achieved_local_l2_error: f64,
+    pub exterior_operator_norm_upper_bound: f64,
+    pub downstream_gate_operator_norm_upper_bound: f64,
+    pub propagated_compression_error_upper_bound: f64,
+    pub minimum_required_bond_dimension: usize,
+    pub selected_bond_dimension: usize,
+    pub cap_headroom: usize,
+    pub svd_factorization_passes: usize,
+    pub budget_satisfied: bool,
+}
+
+/// Layer result with compression allowance propagated through all later gates.
+#[derive(Debug, Clone, PartialEq)]
+pub struct U1TeBDLayerBudgetedResult {
+    pub layer: U1TeBDLayerResult,
+    pub compression_budget_l2_error: f64,
+    pub propagated_compression_error_upper_bound: f64,
+    pub compression_budget_satisfied: bool,
+    pub gate_budget_receipts: Vec<U1TeBDLayerCompressionBudgetReceipt>,
+}
+
+
 impl U1TeBDLayer {
     /// Build a parity layer. The gate list is sorted by bond index and validated
     /// for bounds, parity and uniqueness. For a fixed parity, gates are disjoint.
@@ -3808,6 +3844,258 @@ impl U1TeBDLayer {
     ) -> Result<U1TeBDLayerResult, U1MpsError> {
         self.apply_with_ledger(input, policy, U1MpsTruncationLedger::default())
     }
+
+
+    /// Execute using the compression component of an end-to-end error budget.
+    ///
+    /// The local residual target for each gate is divided by the measured
+    /// exterior-map norm and the operator-norm product of all downstream gates.
+    /// Equal propagated shares are then assigned across the layer. This method
+    /// covers compression only; canonicalization, gate/model defects and
+    /// Trotter error remain separate budget channels.
+    ///
+    /// A failed canonical-gauge receipt or a bond cap unable to meet its local
+    /// target causes a typed failure. No implicit normalization is performed.
+    pub fn apply_with_error_budget(
+        &self,
+        input: &ComplexU1Mps,
+        policy: U1TeBDLayerErrorBudgetPolicy,
+        plan: U1MpsErrorBudgetPlan,
+    ) -> Result<U1TeBDLayerBudgetedResult, U1MpsError> {
+        if policy.max_bond_dimension == 0
+            || !policy.tolerance.is_finite()
+            || policy.tolerance <= 0.0
+            || !plan.total_l2_error.is_finite()
+            || plan.total_l2_error <= 0.0
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        let categories = [
+            plan.canonicalization_l2_error,
+            plan.gate_quality_l2_error,
+            plan.hamiltonian_projection_l2_error,
+            plan.compression_l2_error,
+            plan.time_discretization_l2_error,
+            plan.reserved_l2_error,
+        ];
+        if categories
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0)
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        let allocated = categories.iter().sum::<f64>();
+        if !allocated.is_finite()
+            || allocated > plan.total_l2_error * (1.0 + 16.0 * f64::EPSILON)
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        if input.site_count() != self.site_count {
+            return Err(U1MpsError::TeBDLayerSiteCountMismatch {
+                layer_sites: self.site_count,
+                state_sites: input.site_count(),
+            });
+        }
+
+        let gate_count = self.gates.len();
+        if gate_count == 0 {
+            let layer = self.apply(
+                input,
+                U1TwoSiteTruncationPolicy {
+                    max_bond_dimension: policy.max_bond_dimension,
+                    relative_singular_value_cutoff: 0.0,
+                    tolerance: policy.tolerance,
+                },
+            )?;
+            return Ok(U1TeBDLayerBudgetedResult {
+                layer,
+                compression_budget_l2_error: plan.compression_l2_error,
+                propagated_compression_error_upper_bound: 0.0,
+                compression_budget_satisfied: true,
+                gate_budget_receipts: Vec::new(),
+            });
+        }
+
+        // Precompute operator-norm suffix products for error propagation.
+        let mut downstream_norm_products = vec![1.0_f64; gate_count];
+        let mut suffix_norm_product = 1.0_f64;
+        for index in (0..gate_count).rev() {
+            downstream_norm_products[index] = suffix_norm_product;
+            let (gate_norm_upper, _) =
+                gate_quality_error_bounds(&self.gates[index].gate, 1.0)?;
+            suffix_norm_product *= gate_norm_upper;
+            if !suffix_norm_product.is_finite() {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "downstream TEBD gate norm product",
+                ));
+            }
+        }
+
+        let input_norm_squared = input.norm_squared(policy.tolerance)?;
+        let input_total_charge = input.total_charge;
+        let mut state = input.clone();
+        let mut ledger = U1MpsTruncationLedger::default();
+        let mut gate_truncations = Vec::with_capacity(gate_count);
+        let mut canonical_gauge_receipts = Vec::with_capacity(gate_count);
+        let mut gate_receipts = Vec::with_capacity(gate_count);
+        let mut gate_budget_receipts = Vec::with_capacity(gate_count);
+        let mut propagated_compression_error_upper_bound = 0.0_f64;
+
+        for (index, entry) in self.gates.iter().enumerate() {
+            let bond = entry.bond_index;
+            let gauge_receipt = state.canonicalize_for_bond(bond, policy.tolerance)?;
+            if !gauge_receipt.qualifies(policy.tolerance) {
+                let residual = gauge_receipt
+                    .maximum_left_isometry_residual()
+                    .max(gauge_receipt.maximum_right_isometry_residual())
+                    .max(gauge_receipt.factorization_max_residual())
+                    .max(gauge_receipt.state_reconstruction_l2_residual());
+                return Err(U1MpsError::CanonicalGaugeNotQualified {
+                    residual,
+                    tolerance: policy.tolerance,
+                });
+            }
+
+            let exterior_norm_upper =
+                gauge_receipt.exterior_operator_norm_product_upper_bound();
+            let downstream_norm_upper = downstream_norm_products[index];
+            let propagation_factor = exterior_norm_upper * downstream_norm_upper;
+            if !propagation_factor.is_finite() || propagation_factor <= 0.0 {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "TEBD compression budget propagation factor",
+                ));
+            }
+            let requested_local_l2_error =
+                plan.compression_l2_error / (gate_count as f64 * propagation_factor);
+            if !requested_local_l2_error.is_finite() {
+                return Err(U1MpsError::NonFiniteContraction(
+                    "TEBD local compression budget",
+                ));
+            }
+
+            let pair = U1TwoSiteState::from_adjacent_tensors(
+                &state.tensors[bond],
+                &state.tensors[bond + 1],
+                policy.tolerance,
+            )?;
+            let evolved_pair = pair.apply_gate(&entry.gate, policy.tolerance)?;
+            let budgeted_split = evolved_pair.split_with_error_budget(
+                U1TwoSiteErrorBudgetPolicy {
+                    max_bond_dimension: policy.max_bond_dimension,
+                    maximum_local_l2_error: requested_local_l2_error,
+                    tolerance: policy.tolerance,
+                },
+            )?;
+            let truncation = budgeted_split.truncation.clone();
+            let propagated_contribution =
+                budgeted_split.achieved_local_l2_error * propagation_factor;
+            let per_gate_budget = plan.compression_l2_error / gate_count as f64;
+            if !propagated_contribution.is_finite()
+                || propagated_contribution
+                    > per_gate_budget + 32.0 * f64::EPSILON * plan.total_l2_error.max(1.0)
+            {
+                return Err(U1MpsError::InvalidErrorBudget);
+            }
+
+            let prior_global_bound = ledger.global_state_error_bound_upper;
+            let (gate_operator_norm_upper, gate_quality_error_upper_bound) =
+                gate_quality_error_bounds(&entry.gate, gauge_receipt.output_norm_squared)?;
+            let global_projection_error_upper_bound =
+                truncation.reconstruction_l2_residual * exterior_norm_upper;
+            ledger.record_with_canonical_gauge_and_gate(
+                &truncation,
+                &gauge_receipt,
+                &entry.gate,
+                policy.tolerance,
+            )?;
+            let propagated_prior_bound =
+                prior_global_bound.unwrap_or(0.0) * gate_operator_norm_upper;
+            let global_l2_error_contribution = ledger
+                .global_state_error_bound_upper
+                .map(|after| after - propagated_prior_bound);
+            let global_l2_error_bound_after_gate = ledger.global_state_error_bound_upper;
+            let hamiltonian_projection_operator_error_upper_bound =
+                entry.gate.hamiltonian_projection_error_operator_upper_bound();
+            let hamiltonian_projection_error_upper_bound =
+                hamiltonian_projection_operator_error_upper_bound
+                    * gauge_receipt.output_norm_squared.sqrt();
+
+            state.tensors[bond] = truncation.left_tensor.clone();
+            state.tensors[bond + 1] = truncation.right_tensor.clone();
+            state = ComplexU1Mps::new(
+                state.tensors.clone(),
+                input_total_charge,
+                policy.tolerance,
+            )?;
+
+            gate_budget_receipts.push(U1TeBDLayerCompressionBudgetReceipt {
+                bond_index: bond,
+                requested_local_l2_error,
+                achieved_local_l2_error: budgeted_split.achieved_local_l2_error,
+                exterior_operator_norm_upper_bound: exterior_norm_upper,
+                downstream_gate_operator_norm_upper_bound: downstream_norm_upper,
+                propagated_compression_error_upper_bound: propagated_contribution,
+                minimum_required_bond_dimension: budgeted_split.minimum_required_bond_dimension,
+                selected_bond_dimension: budgeted_split.selected_bond_dimension,
+                cap_headroom: budgeted_split.cap_headroom,
+                svd_factorization_passes: budgeted_split.svd_factorization_passes,
+                budget_satisfied: budgeted_split.budget_satisfied,
+            });
+            propagated_compression_error_upper_bound += propagated_contribution;
+
+            canonical_gauge_receipts.push(gauge_receipt.clone());
+            gate_receipts.push(U1TeBDGateReceipt {
+                bond_index: bond,
+                gate_unitarity_residual: entry.gate.unitarity_residual(),
+                gate_charge_conservation_residual: entry.gate.charge_conservation_residual(),
+                gate_quality_error_upper_bound,
+                canonical_gauge: gauge_receipt,
+                truncation: truncation.clone(),
+                local_projection_error_upper_bound: truncation.reconstruction_l2_residual,
+                global_l2_error_contribution,
+                global_l2_error_bound_after_gate,
+                global_projection_error_upper_bound,
+                hamiltonian_projection_operator_error_upper_bound,
+                hamiltonian_projection_error_upper_bound,
+            });
+            gate_truncations.push(truncation);
+        }
+
+        if !propagated_compression_error_upper_bound.is_finite()
+            || propagated_compression_error_upper_bound
+                > plan.compression_l2_error
+                    + 64.0 * f64::EPSILON * plan.total_l2_error.max(1.0)
+        {
+            return Err(U1MpsError::InvalidErrorBudget);
+        }
+        let output_norm_squared = state.norm_squared(policy.tolerance)?;
+        ledger.input_state_fingerprint = Some(state.state_fingerprint());
+        let global_l2_bound_qualified = ledger.global_state_error_bound_qualified;
+        let layer = U1TeBDLayerResult {
+            output_selection_rule_residual: state.selection_rule_residual(),
+            output_total_charge: state.total_charge(),
+            state,
+            parity: self.parity,
+            bond_indices: self.bond_indices(),
+            gate_truncations,
+            canonical_gauge_receipts,
+            gate_receipts,
+            truncation_ledger: ledger,
+            input_norm_squared,
+            output_norm_squared,
+            input_total_charge,
+            global_l2_bound_qualified,
+        };
+
+        Ok(U1TeBDLayerBudgetedResult {
+            layer,
+            compression_budget_l2_error: plan.compression_l2_error,
+            propagated_compression_error_upper_bound,
+            compression_budget_satisfied: true,
+            gate_budget_receipts,
+        })
+    }
+
 
     fn apply_with_ledger(
         &self,
