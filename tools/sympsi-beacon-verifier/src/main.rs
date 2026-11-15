@@ -2,7 +2,27 @@ use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::path::PathBuf;
 
-use sympsi_beacon_verifier::{QuicknetBeaconResponse, verify_quicknet_response};
+use serde::Serialize;
+use sha2::{Digest, Sha256};
+use sympsi_beacon_verifier::{
+    QuicknetBeaconResponse, VerificationReceipt, encode_hex, verify_quicknet_response,
+};
+
+const TOOL_VERSION: &str = env!("CARGO_PKG_VERSION");
+
+#[derive(Serialize)]
+struct RunReceipt {
+    receipt_schema_version: String,
+    tool_version: String,
+    git_head: String,
+    verification: VerificationReceipt,
+}
+
+#[derive(Serialize)]
+struct ReceiptEnvelope {
+    receipt: RunReceipt,
+    receipt_sha256: String,
+}
 
 fn main() {
     if let Err(error) = run() {
@@ -13,6 +33,7 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let mut requested_round: Option<u64> = None;
+    let mut git_head: Option<String> = None;
     let mut input = PathBuf::from("tools/sympsi-beacon-verifier/fixtures/quicknet-round-1000.json");
     let mut output: Option<PathBuf> = None;
 
@@ -30,6 +51,9 @@ fn run() -> Result<(), String> {
                         .map_err(|error| format!("invalid --requested-round: {error}"))?,
                 );
             }
+            "--git-head" => {
+                git_head = Some(next_value(&mut args, "--git-head")?);
+            }
             "--input" => {
                 input = PathBuf::from(next_value(&mut args, "--input")?);
             }
@@ -40,15 +64,33 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let requested_round = requested_round.unwrap_or(1000);
+    let requested_round = requested_round
+        .ok_or_else(|| "missing required --requested-round argument".to_string())?;
+    let git_head = git_head
+        .ok_or_else(|| "missing required --git-head exact-commit-sha argument".to_string())?;
+    validate_git_head(&git_head)?;
+
     let bytes = std::fs::read(&input)
         .map_err(|error| format!("cannot read beacon response {}: {error}", input.display()))?;
     let response: QuicknetBeaconResponse = serde_json::from_slice(&bytes)
         .map_err(|error| format!("strict Quicknet response JSON failed: {error}"))?;
-    let receipt = verify_quicknet_response(requested_round, &response)
+    let verification = verify_quicknet_response(requested_round, &response)
         .map_err(|error| error.to_string())?;
 
-    let mut encoded = serde_json::to_vec_pretty(&receipt)
+    let receipt = RunReceipt {
+        receipt_schema_version: "sympsi.quicknet-run-receipt.v0.1".into(),
+        tool_version: TOOL_VERSION.into(),
+        git_head: git_head.to_ascii_lowercase(),
+        verification,
+    };
+    let body = serde_json::to_vec(&receipt)
+        .map_err(|error| format!("receipt body encoding failed: {error}"))?;
+    let receipt_sha256 = encode_hex(&Sha256::digest(&body));
+    let envelope = ReceiptEnvelope {
+        receipt,
+        receipt_sha256,
+    };
+    let mut encoded = serde_json::to_vec_pretty(&envelope)
         .map_err(|error| format!("receipt JSON encoding failed: {error}"))?;
     encoded.push(b'\n');
 
@@ -63,10 +105,18 @@ fn run() -> Result<(), String> {
         file.sync_all()
             .map_err(|error| format!("cannot sync receipt {}: {error}", path.display()))?;
         println!("receipt_path={}", path.display());
+        println!("receipt_sha256={}", envelope.receipt_sha256);
     } else {
         io::stdout()
             .write_all(&encoded)
             .map_err(|error| format!("cannot write receipt to stdout: {error}"))?;
+    }
+    Ok(())
+}
+
+fn validate_git_head(git_head: &str) -> Result<(), String> {
+    if git_head.len() != 40 || !git_head.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("--git-head must be an exact 40-character hexadecimal commit SHA".into());
     }
     Ok(())
 }
@@ -79,7 +129,8 @@ fn next_value(args: &mut impl Iterator<Item = String>, argument: &str) -> Result
 fn print_help() {
     println!(
         "Offline, pinned Quicknet beacon verifier\n\
-         Optional: --requested-round <u64> --input <relay-response.json> --out <new-path>\n\
+         Required: --requested-round <u64> --git-head <40-char-sha>\n\
+         Optional: --input <relay-response.json> --out <new-path>\n\
          Verifies BLS signature and published randomness against pinned Quicknet.\n\
          Does not prove beacon freshness or response-before-target chronology."
     );
