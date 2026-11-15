@@ -175,14 +175,14 @@ pub fn verify_backend_capability_manifest(
                 format!("capability {:?} appears more than once", evidence.capability),
             );
         }
-        if evidence.status == EvidenceStatus::Pass {
+        if evidence.status == EvidenceStatus::Pass || evidence.status == EvidenceStatus::Fail {
             match &evidence.fixture_manifest_digest_blake3 {
                 Some(value) if is_blake3_digest(value) => {}
                 _ => add_violation(
                     &mut violations,
                     "pass_without_fixture",
                     format!(
-                        "capability {:?} is PASS but has no valid fixture-manifest digest",
+                        "capability {:?} has a PASS/FAIL status but no valid fixture-manifest digest",
                         evidence.capability
                     ),
                 ),
@@ -193,7 +193,7 @@ pub fn verify_backend_capability_manifest(
                     &mut violations,
                     "pass_without_test_report",
                     format!(
-                        "capability {:?} is PASS but has no valid test-report digest",
+                        "capability {:?} has a PASS/FAIL status but no valid test-report digest",
                         evidence.capability
                     ),
                 ),
@@ -453,6 +453,25 @@ mod tests {
             compute_backend_capability_digest(&item.payload).unwrap();
         let error = verify_backend_capability_manifest(&item).unwrap_err();
         assert!(error.iter().any(|issue| issue.code == "pass_without_fixture"));
+        assert!(error
+            .iter()
+            .any(|issue| issue.code == "pass_without_test_report"));
+    }
+
+    #[test]
+    fn failed_capability_without_test_report_is_not_accepted_as_evidence() {
+        let mut item = manifest();
+        let topology = item
+            .payload
+            .evidence
+            .iter_mut()
+            .find(|evidence| evidence.capability == CadCapability::BrepTopologyValidation)
+            .unwrap();
+        topology.status = EvidenceStatus::Fail;
+        topology.test_report_digest_blake3 = None;
+        item.manifest_digest_blake3 =
+            compute_backend_capability_digest(&item.payload).unwrap();
+        let error = verify_backend_capability_manifest(&item).unwrap_err();
         assert!(error
             .iter()
             .any(|issue| issue.code == "pass_without_test_report"));
