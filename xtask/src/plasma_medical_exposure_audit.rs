@@ -106,8 +106,14 @@ fn check_measurement(measurement: &Value) -> Option<Assessment> {
             if !has_number(measurement.get("value")) {
                 return Some(blocked("MEASURED_VALUE_MISSING"));
             }
-            if !nonempty_string(measurement.get("unit")) || !method_present {
+            if !nonempty_string(measurement.get("quantity_id"))
+                || !nonempty_string(measurement.get("unit"))
+                || !method_present
+            {
                 return Some(blocked("MEASUREMENT_METHOD_OR_UNIT_MISSING"));
+            }
+            if !nonempty_string(measurement.get("observed_at")) {
+                return Some(blocked("MEASUREMENT_TIMESTAMP_MISSING"));
             }
             if !is_sha256(raw_digest) {
                 return Some(blocked("MEASUREMENT_RAW_DATA_MISSING"));
@@ -140,6 +146,11 @@ fn check_measurement(measurement: &Value) -> Option<Assessment> {
                     {
                         return Some(blocked("UNCERTAINTY_DECLARATION_INCOMPLETE"));
                     }
+                    if !has_number(uncertainty.and_then(|u| u.get("coverage_factor")))
+                        && !has_number(uncertainty.and_then(|u| u.get("confidence_level")))
+                    {
+                        return Some(blocked("UNCERTAINTY_COVERAGE_NOT_DECLARED"));
+                    }
                 }
                 Some("NOT_QUANTIFIED") => {
                     return Some(blocked("UNCERTAINTY_NOT_QUANTIFIED"));
@@ -154,6 +165,8 @@ fn check_measurement(measurement: &Value) -> Option<Assessment> {
             if !has_number(measurement.get("detection_limit"))
                 || !nonempty_string(measurement.get("unit"))
                 || !method_present
+                || !nonempty_string(measurement.get("quantity_id"))
+                || !nonempty_string(measurement.get("observed_at"))
             {
                 return Some(blocked("DETECTION_LIMIT_RECORD_INCOMPLETE"));
             }
@@ -221,6 +234,21 @@ fn audit_record(record: &Value) -> Assessment {
         return rejected("RECORD_IDENTITY_OR_CLAIM_CEILING_INVALID");
     }
 
+    if !nonempty_string(record.get("record_id")) || !nonempty_string(record.get("indication")) {
+        return rejected("RECORD_IDENTITY_OR_CLAIM_CEILING_INVALID");
+    }
+    if let Some(claims) = record.get("claims").and_then(Value::as_array) {
+        let allowed = [
+            "PHYSICAL_EXPOSURE_RECONSTRUCTABLE",
+            "SPATIAL_UNIFORMITY_SUPPORTED",
+            "BIOLOGICAL_RESPONSE_ASSOCIATED",
+            "CLINICAL_OUTCOME_ASSOCIATED",
+        ];
+        if claims.iter().any(|claim| !claim.as_str().is_some_and(|s| allowed.contains(&s))) {
+            return rejected("CLAIM_TYPE_INVALID");
+        }
+    }
+
     let modality = match get_str(record, "modality") {
         Some("DIRECT_CAP") => "DIRECT_CAP",
         Some("PLASMA_ACTIVATED_LIQUID") => "PLASMA_ACTIVATED_LIQUID",
@@ -250,6 +278,7 @@ fn audit_record(record: &Value) -> Assessment {
     }
     if !nonempty_string(exposure.get("exposure_event_id"))
         || !nonempty_string(exposure.get("event_time"))
+        || !nonempty_string(exposure.get("interface"))
     {
         return blocked("EXPOSURE_EVENT_IDENTITY_INCOMPLETE");
     }
@@ -260,10 +289,10 @@ fn audit_record(record: &Value) -> Assessment {
             None => return blocked("SPATIAL_GEOMETRY_MISSING"),
         };
         if !nonempty_string(geometry.get("coordinate_frame"))
-            || !has_number(geometry.get("target_distance_mm"))
-            || !has_number(geometry.get("treated_area_mm2"))
+            || geometry.get("target_distance_mm").and_then(Value::as_f64).is_none_or(|v| v < 0.0)
+            || geometry.get("treated_area_mm2").and_then(Value::as_f64).is_none_or(|v| v <= 0.0)
             || !nonempty_string(geometry.get("sampling_plan_id"))
-            || !has_number(geometry.get("sample_count"))
+            || geometry.get("sample_count").and_then(Value::as_u64).is_none_or(|v| v == 0)
         {
             return blocked("SPATIAL_GEOMETRY_INCOMPLETE");
         }
@@ -276,9 +305,21 @@ fn audit_record(record: &Value) -> Assessment {
             let summary = exposure.get("spatial_summary");
             if !is_sha256(summary.and_then(|s| get_str(s, "spatial_map_sha256")))
                 || !is_sha256(geometry.get("spatial_map_sha256").and_then(Value::as_str))
-                || !has_number(geometry.get("coverage_fraction"))
+                || geometry.get("coverage_fraction").and_then(Value::as_f64)
+                    .is_none_or(|v| !(0.0..=1.0).contains(&v))
+                || !summary.and_then(|s| s.get("uniformity_claimed")).and_then(Value::as_bool).unwrap_or(false)
+                || !has_number(summary.and_then(|s| s.get("minimum")))
+                || !has_number(summary.and_then(|s| s.get("mean")))
+                || !has_number(summary.and_then(|s| s.get("maximum")))
+                || !nonempty_string(summary.and_then(|s| s.get("unit")))
             {
                 return blocked("SPATIAL_UNIFORMITY_EVIDENCE_INCOMPLETE");
+            }
+            let minimum = summary.and_then(|s| s.get("minimum")).and_then(Value::as_f64);
+            let mean = summary.and_then(|s| s.get("mean")).and_then(Value::as_f64);
+            let maximum = summary.and_then(|s| s.get("maximum")).and_then(Value::as_f64);
+            if minimum.zip(mean).zip(maximum).is_none_or(|((min, avg), max)| min > avg || avg > max) {
+                return blocked("SPATIAL_SUMMARY_ORDER_INVALID");
             }
             if !summary.and_then(|s| s.get("local_peak_reviewed")).and_then(Value::as_bool).unwrap_or(false) {
                 return blocked("LOCAL_PEAK_NOT_REVIEWED");
@@ -302,6 +343,7 @@ fn audit_record(record: &Value) -> Assessment {
             "generation_event_id",
             "generation_source_id",
             "container_material",
+            "container_lot_id",
         ];
         if required.iter().any(|key| !nonempty_string(lineage.get(key)))
             || !has_number(lineage.get("elapsed_minutes_at_application"))
@@ -316,14 +358,27 @@ fn audit_record(record: &Value) -> Assessment {
         {
             return blocked("PAW_STORAGE_LINEAGE_INCOMPLETE");
         }
-        if !has_number(exposure.get("delivery").and_then(|d| d.get("volume_ml")))
-            || !has_number(exposure.get("delivery").and_then(|d| d.get("contact_duration_seconds")))
+        if exposure.get("delivery").and_then(|d| d.get("volume_ml")).and_then(Value::as_f64)
+                .is_none_or(|v| v <= 0.0)
+            || exposure.get("delivery").and_then(|d| d.get("contact_duration_seconds"))
+                .and_then(Value::as_f64).is_none_or(|v| v <= 0.0)
         {
             return blocked("PAW_DELIVERY_RECORD_INCOMPLETE");
         }
         if let Err(problem) = all_measurements(lineage.get("chemistry_observations")) {
             return problem;
         }
+    }
+
+    let biological_context = match record.get("biological_context") {
+        Some(value) => value,
+        None => return blocked("BIOLOGICAL_CONTEXT_MISSING"),
+    };
+    if !nonempty_string(biological_context.get("model_class"))
+        || !nonempty_string(biological_context.get("model_id"))
+        || !nonempty_string(biological_context.get("tissue_or_matrix"))
+    {
+        return blocked("BIOLOGICAL_CONTEXT_INCOMPLETE");
     }
 
     let exposure_id = get_str(exposure, "exposure_event_id");
@@ -337,7 +392,10 @@ fn audit_record(record: &Value) -> Assessment {
             {
                 return blocked("BIOLOGICAL_OBSERVATION_CONTEXT_INCOMPLETE");
             }
-            if let Some(problem) = observation.get("measurement").and_then(check_measurement) {
+            let Some(measurement) = observation.get("measurement") else {
+                return blocked("BIOLOGICAL_MEASUREMENT_MISSING");
+            };
+            if let Some(problem) = check_measurement(measurement) {
                 return problem;
             }
         }
