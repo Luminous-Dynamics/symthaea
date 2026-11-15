@@ -143,30 +143,37 @@ pub struct Rejection {
     pub code: &'static str,
 }
 
+/// Immutable inputs for deriving a target from a verified public beacon.
+///
+/// `verified_randomness` must come from an independently pinned successful
+/// beacon verifier. The context is not evidence of chronology or verification.
+#[derive(Clone, Copy, Debug)]
+pub struct TargetMappingContext<'a> {
+    pub protocol_id: &'a str,
+    pub campaign_id: &'a str,
+    pub trial_id: &'a str,
+    pub chain_hash: &'a [u8; 32],
+    pub scheme_id: &'a str,
+    pub round: u64,
+    pub verified_randomness: &'a [u8; 32],
+}
+
 /// Derive a 4- or 5-way target from *already verified* public beacon randomness.
 ///
 /// This function does not fetch or verify a beacon, authenticate a timestamp,
 /// or prove the response preceded the beacon. Those are separate trust gates.
-/// Its caller must supply the 32-byte output of an independently pinned,
-/// successful beacon verifier.
 pub fn derive_target_index_from_verified_beacon(
     choice_count: usize,
-    protocol_id: &str,
-    campaign_id: &str,
-    trial_id: &str,
-    chain_hash: &[u8; 32],
-    scheme_id: &str,
-    round: u64,
-    verified_randomness: &[u8; 32],
+    context: &TargetMappingContext<'_>,
 ) -> Result<usize, String> {
     if choice_count != 4 && choice_count != 5 {
         return Err("only four-choice and five-choice targets are supported".into());
     }
-    if protocol_id.trim().is_empty()
-        || campaign_id.trim().is_empty()
-        || trial_id.trim().is_empty()
-        || scheme_id.trim().is_empty()
-        || round == 0
+    if context.protocol_id.trim().is_empty()
+        || context.campaign_id.trim().is_empty()
+        || context.trial_id.trim().is_empty()
+        || context.scheme_id.trim().is_empty()
+        || context.round == 0
     {
         return Err("protocol, campaign, trial, scheme and nonzero round are required".into());
     }
@@ -174,16 +181,7 @@ pub fn derive_target_index_from_verified_beacon(
     let threshold = two_to_256_mod(choice_count);
     let mut counter = 0_u32;
     loop {
-        let digest = target_mapping_digest(
-            protocol_id,
-            campaign_id,
-            trial_id,
-            chain_hash,
-            scheme_id,
-            round,
-            verified_randomness,
-            counter,
-        )?;
+        let digest = target_mapping_digest(context, counter)?;
         if !digest_is_below_small_integer(&digest, threshold) {
             return Ok(digest_modulo(&digest, choice_count));
         }
@@ -194,23 +192,17 @@ pub fn derive_target_index_from_verified_beacon(
 }
 
 fn target_mapping_digest(
-    protocol_id: &str,
-    campaign_id: &str,
-    trial_id: &str,
-    chain_hash: &[u8; 32],
-    scheme_id: &str,
-    round: u64,
-    verified_randomness: &[u8; 32],
+    context: &TargetMappingContext<'_>,
     counter: u32,
 ) -> Result<[u8; 32], String> {
-    let mut bytes = b"sympsi.aia.target.v1\0".to_vec();
-    append_length_prefixed(&mut bytes, protocol_id.as_bytes())?;
-    append_length_prefixed(&mut bytes, campaign_id.as_bytes())?;
-    append_length_prefixed(&mut bytes, trial_id.as_bytes())?;
-    append_length_prefixed(&mut bytes, chain_hash)?;
-    append_length_prefixed(&mut bytes, scheme_id.as_bytes())?;
-    bytes.extend_from_slice(&round.to_be_bytes());
-    append_length_prefixed(&mut bytes, verified_randomness)?;
+    let mut bytes = b"sympsi.aia.target.v1\\0".to_vec();
+    append_length_prefixed(&mut bytes, context.protocol_id.as_bytes())?;
+    append_length_prefixed(&mut bytes, context.campaign_id.as_bytes())?;
+    append_length_prefixed(&mut bytes, context.trial_id.as_bytes())?;
+    append_length_prefixed(&mut bytes, context.chain_hash)?;
+    append_length_prefixed(&mut bytes, context.scheme_id.as_bytes())?;
+    bytes.extend_from_slice(&context.round.to_be_bytes());
+    append_length_prefixed(&mut bytes, context.verified_randomness)?;
     bytes.extend_from_slice(&counter.to_be_bytes());
     Ok(Sha256::digest(&bytes).into())
 }
@@ -801,26 +793,17 @@ fn target_mapping_known_answer_vectors() -> bool {
         0x42, 0xde, 0x45, 0x66, 0x18, 0x3e, 0xc5, 0x1c, 0x56, 0xff, 0x3c, 0xd6, 0x03, 0xd9,
         0x30, 0xe5, 0x4f, 0xdd,
     ];
-    let four = derive_target_index_from_verified_beacon(
-        4,
-        "sympsi-aia-01-v0.1",
-        "campaign-0001",
-        "trial-000042",
-        &chain_hash,
-        "bls-unchained-g1-rfc9380",
-        1000,
-        &randomness,
-    );
-    let five = derive_target_index_from_verified_beacon(
-        5,
-        "sympsi-aia-01-v0.1",
-        "campaign-0001",
-        "trial-000042",
-        &chain_hash,
-        "bls-unchained-g1-rfc9380",
-        1000,
-        &randomness,
-    );
+    let context = TargetMappingContext {
+        protocol_id: "sympsi-aia-01-v0.1",
+        campaign_id: "campaign-0001",
+        trial_id: "trial-000042",
+        chain_hash: &chain_hash,
+        scheme_id: "bls-unchained-g1-rfc9380",
+        round: 1000,
+        verified_randomness: &randomness,
+    };
+    let four = derive_target_index_from_verified_beacon(4, &context);
+    let five = derive_target_index_from_verified_beacon(5, &context);
     four == Ok(2) && five == Ok(2)
 }
 
@@ -1271,28 +1254,21 @@ mod tests {
     fn target_mapping_is_domain_and_round_separated() {
         let chain_hash = [0x52_u8; 32];
         let randomness = [0xfe_u8; 32];
-        let first = target_mapping_digest(
-            "protocol-v1",
-            "campaign-1",
-            "trial-1",
-            &chain_hash,
-            "scheme-a",
-            100,
-            &randomness,
-            0,
-        )
-        .unwrap();
-        let second = target_mapping_digest(
-            "protocol-v1",
-            "campaign-1",
-            "trial-1",
-            &chain_hash,
-            "scheme-a",
-            101,
-            &randomness,
-            0,
-        )
-        .unwrap();
+        let first_context = TargetMappingContext {
+            protocol_id: "protocol-v1",
+            campaign_id: "campaign-1",
+            trial_id: "trial-1",
+            chain_hash: &chain_hash,
+            scheme_id: "scheme-a",
+            round: 100,
+            verified_randomness: &randomness,
+        };
+        let second_context = TargetMappingContext {
+            round: 101,
+            ..first_context
+        };
+        let first = target_mapping_digest(&first_context, 0).unwrap();
+        let second = target_mapping_digest(&second_context, 0).unwrap();
         assert_ne!(first, second);
     }
 
