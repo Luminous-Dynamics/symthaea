@@ -359,7 +359,7 @@ fn assess_initial_receipts(
             1,
             first_event_time,
             baseline,
-            std::slice::from_ref(baseline),
+            &[baseline.clone()],
             obligation,
             None,
         )?;
@@ -908,7 +908,7 @@ fn score_restoration_control(
             sequence_len as u64 + 1,
             &decision_cutoff,
             final_state,
-            std::slice::from_ref(final_state),
+            &[final_state.clone()],
             obligation,
             None,
         )?;
