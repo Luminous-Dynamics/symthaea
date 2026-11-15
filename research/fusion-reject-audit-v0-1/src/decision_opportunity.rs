@@ -815,10 +815,13 @@ mod tests {
 
     fn plan() -> DecisionOpportunityPlan {
         let mut base = base_plan();
-        base.strata[0].samples[0].outcome = AuditOutcome::ConfirmedFeasible;
-        base.strata[0].samples[1].outcome = AuditOutcome::ConfirmedInfeasible;
-        base.strata[0].samples[2].outcome = AuditOutcome::ConfirmedInfeasible;
-        base.strata[0].samples[3].outcome = AuditOutcome::ConfirmedInfeasible;
+        for sample in &mut base.strata[0].samples {
+            sample.outcome = if sample.candidate_id == "rejected-0" {
+                AuditOutcome::ConfirmedFeasible
+            } else {
+                AuditOutcome::ConfirmedInfeasible
+            };
+        }
         let rejected_evaluations = base.strata[0]
             .samples
             .iter()
@@ -896,8 +899,19 @@ mod tests {
                 );
             }
         }
-        test_plan.base_plan.strata[0].samples[1].outcome = AuditOutcome::NonConverged;
-        test_plan.base_plan.strata[0].samples[2].outcome = AuditOutcome::ConfirmedInfeasible;
+        let sample_1 = test_plan.base_plan.strata[0]
+            .samples
+            .iter()
+            .position(|sample| sample.candidate_id == "rejected-1")
+            .unwrap();
+        let sample_2 = test_plan.base_plan.strata[0]
+            .samples
+            .iter()
+            .position(|sample| sample.candidate_id == "rejected-2")
+            .unwrap();
+        test_plan.base_plan.strata[0].samples[sample_1].outcome = AuditOutcome::NonConverged;
+        test_plan.base_plan.strata[0].samples[sample_2].outcome =
+            AuditOutcome::ConfirmedInfeasible;
 
         let report = audit_decision_opportunities(&test_plan).unwrap();
         assert_eq!(report.rejected_unresolved_observed, 2);
