@@ -297,22 +297,26 @@ pub fn partial_bytes_from_visible_ranges_v1(
     }
 
     let mut visible_total = 0usize;
+    let mut previous_start = None;
     let mut previous_end = None;
     for range in visible_ranges {
         if range.start >= range.end || range.end > total_len {
             return Err(FieldSelectorError::InvalidVisibleRange);
         }
+        if let Some(start) = previous_start {
+            if range.start < start {
+                return Err(FieldSelectorError::VisibleRangesNotOrdered);
+            }
+        }
         if let Some(end) = previous_end {
             if range.start < end {
                 return Err(FieldSelectorError::VisibleRangesOverlap);
-            }
-            if range.start < end {
-                return Err(FieldSelectorError::VisibleRangesNotOrdered);
             }
         }
         visible_total = visible_total
             .checked_add(range.end - range.start)
             .ok_or(FieldSelectorError::OffsetOverflow)?;
+        previous_start = Some(range.start);
         previous_end = Some(range.end);
     }
 
