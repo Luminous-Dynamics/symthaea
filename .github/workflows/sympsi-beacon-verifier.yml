@@ -1,0 +1,50 @@
+name: SYMPsi Beacon Verifier
+
+on:
+  pull_request:
+    paths:
+      - "tools/sympsi-beacon-verifier/**"
+      - ".github/workflows/sympsi-beacon-verifier.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sympsi-beacon-verifier-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  offline-quicknet-verification:
+    name: Offline pinned Quicknet verification
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Generate isolated dependency lockfile
+        run: cargo generate-lockfile --manifest-path tools/sympsi-beacon-verifier/Cargo.toml
+
+      - name: Format
+        run: cargo fmt --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --all -- --check
+
+      - name: Unit tests
+        run: cargo test --manifest-path tools/sympsi-beacon-verifier/Cargo.toml
+
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --all-targets -- -D warnings
+
+      - name: Upload verifier lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: sympsi-beacon-verifier-lock-${{ github.event.pull_request.head.sha || github.sha }}
+          path: tools/sympsi-beacon-verifier/Cargo.lock
+          if-no-files-found: error
+          retention-days: 90
