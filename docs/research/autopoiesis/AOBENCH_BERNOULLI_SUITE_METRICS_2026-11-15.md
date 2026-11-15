@@ -21,7 +21,7 @@ Recent work such as petri-bench (working draft v0.5) explicitly separates correc
 - **Process qualification:** qualified episodes divided by all attempted episodes, including invalid-oracle episodes.
 - **Resource means:** attempted samples, cost and risk per attempted episode, including failed and unqualified attempts.
 
-Invalid evaluator-oracle episodes remain in process totals but are excluded from truth-conditioned rates. An episode with an unavailable or rejected observation is not coverage-eligible for the confidence-sequence rate.
+Invalid evaluator-oracle episodes remain in process totals but are excluded from truth-conditioned rates. An episode with an unavailable or rejected observation is not coverage-eligible for the confidence-sequence rate. Episodes with zero qualified observations are also excluded from coverage denominators: a vacuously full-width interval with no interim look must not reward an always-abstain policy.
 
 ## Uncertainty
 
