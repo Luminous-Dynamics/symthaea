@@ -64,3 +64,40 @@ These are authored Rust tests. They must be compiled and executed on the exact c
 
 
 The alpha level is per declared alternative. A campaign-level claim that searches across alternatives must separately control family-wise error or use a qualified joint/sequential test; this reference does not do that.
+
+
+## Sequential falsification reference
+
+The sequential module adds predictable Gaussian likelihood-ratio e-processes and a deterministic adaptive-null simulation smoke test (20,000 paths, 100-look maximum horizon). The current exact-head Rust workflow passed 24/24 tests, rustfmt and strict Clippy; 13 tests are sequential-specific. The simulation is a smoke bound, not a formal type-I calibration claim:
+
+- PredictableGaussianEProcess: one predeclared alternative, with a commit-prediction then observe protocol.
+- PredictableGaussianMixture: a fixed, normalized mixture over predeclared alternatives, also using commit then observe.
+- SequentialUpdate / MixtureSequentialUpdate: current and running-maximum log-evidence, an anytime p-value, and the alpha-boundary disposition.
+
+The one-step log likelihood ratio is:
+
+    d_t * y_t / sigma_t^2 - d_t^2 / (2 * sigma_t^2)
+
+The per-step sigma_t is committed before the observation. The convenience constructor supplies a default sigma; commit_prediction_with_sigma and commit_predictions_with_sigma support known action-dependent measurement precision.
+
+The reported anytime p-value uses the running maximum e-value: min(1, exp(-max_log_e_value)). It does not reset when later evidence moves against an alternative. Updates retain alpha, the committed discrepancy, sigma_t, observation/decision identities, component weights and the running-max evidence needed for independent replay.
+
+This is valid under a simple conditional Gaussian null with known, positive sigma_t committed predictably with the discrepancy before each observation. It therefore supports known action-dependent measurement variance. It is not automatically valid for unknown or estimated variance, composite nulls, serial dependence not captured by the conditional model, post-hoc alternative selection or physical trajectories. The commit/observe API enforces local call order but cannot prove absence of out-of-band leakage.
+
+See docs/research/SEQUENTIAL_FALSIFICATION_EPROCESS_V0_2026-11-15.md for assumptions, equations, benchmark controls and the distinction from SLICE and terminal-test induction.
+
+
+## Sequential calibration report
+
+The standalone binary sequential_null_calibration runs a deterministic synthetic operating-characteristic study:
+
+    cargo run --locked --manifest-path research/falsification-power-reference/Cargo.toml --bin sequential_null_calibration
+
+It reports, separately for a fixed-known-variance null, a predictable adaptive-variance null, and a material alternative:
+- path count, horizon, fixed root seed and PRNG version;
+- e-process boundary-crossing rate and 95% Wilson interval;
+- naive repeated fixed-time 5% test crossing rate and 95% Wilson interval;
+- mean look of e-process detection among paths that cross;
+- undetected path count.
+
+The focused GitHub workflow runs this binary and uploads the JSON, source commit identity and SHA-256 receipt. The fixed synthetic campaign uses 20,000 paths and 100 looks per scenario. Its checks are smoke gates for this exact generator: null e-process rates <=6%, and the adaptive-null naive repeated-look rate >10%. These are not universal statistical guarantees, a 5% calibration proof, confidence intervals across generator families, or physical validation. The naive repeated fixed-time test is deliberately invalid under optional stopping and is included only as a negative control.
