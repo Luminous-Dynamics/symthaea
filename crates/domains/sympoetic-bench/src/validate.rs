@@ -121,7 +121,10 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
 }
 
 fn is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
 fn require_nonempty(label: &str, value: &str) -> Result<()> {
