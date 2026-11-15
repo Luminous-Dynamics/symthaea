@@ -19,7 +19,7 @@ The crate is intentionally outside Symthaea's default Cargo workspace. Direct de
 2. Parse into a duplicate-aware JSON representation. Duplicate decoded member names reject before ordinary map parsing.
 3. Reject floating-point and non-safe-integer numeric tokens before canonicalization.
 4. Validate against the checked-in JSON Schema 2020-12 with format assertions enabled.
-5. Run semantic checks the schema cannot express: unique field IDs and pointers, consistent parser/schema profile across same-response fields, typed predicate references, freshness field type, status specification/maturity pairing, HTTPS origin semantics, server identity/origin continuity and source-mode/commitment compatibility.
+5. Run semantic checks the schema cannot express: unique field IDs and pointers, RFC 6901 `~0`/`~1` escape validity, consistent parser/schema profile across same-response fields, typed predicate references, freshness field type, status specification/maturity pairing, HTTPS origin semantics, server identity/origin continuity and source-mode/commitment compatibility.
 6. Canonicalize with RFC 8785 JCS and compute the versioned SHA-256 plan digest.
 
 ## Claim ceiling
