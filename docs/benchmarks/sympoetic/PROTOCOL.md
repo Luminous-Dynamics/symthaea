@@ -22,6 +22,8 @@ The benchmark is motivated by a problem in current evaluation: artifact quality 
 - **RQ7 — Longitudinal adaptation:** Does collaboration improve over repeated sessions without silently converting temporary preferences into permanent user profiles?
 - **RQ8 — Provenance and consent:** Can the system accurately record contribution origins, respect permissions, and propagate withdrawal or revision requests?
 - **RQ9 — Capability amplification:** Does collaboration improve the participant's independent capability, delayed retention, and transfer to new tasks versus matched controls?
+- **RQ10 — Epistemic resilience:** Does the collaboration preserve the distinction between fact, belief, report, inference, and unknown; maintain provenance; and revise confidence appropriately when evidence changes?
+- **RQ11 — Cognitive sovereignty:** Does AI assistance preserve observable human planning, monitoring, first attempts, verification, and reflection rather than substituting for learning-critical reasoning?
 
 ## 3. Constructs and operational measurements
 
@@ -91,7 +93,13 @@ Measure whether a participant becomes more capable independently after collabora
 
 The participant must complete independent assessments without AI hints, tools, or hidden assistance. Test forms, difficulty, time budgets, scoring rubrics, and assistance exposure must be preregistered and matched. Do not infer learning from joint artifact quality, confidence alone, or one immediate post-test. See [Capability Amplification](CAPABILITY_AMPLIFICATION.md) for the full experimental protocol and statistical design.
 
-### 3.11 Burden and efficiency
+### 3.11 Epistemic resilience and metacognitive sensitivity
+
+Measure whether the team preserves claim provenance, distinguishes knowledge from belief, detects contradictory or stale evidence, and updates conclusions without manufacturing certainty. Record human and agent confidence before outcome feedback. Report calibration (Brier score and fixed-bin ECE) separately from metacognitive sensitivity (AUC for confidence discriminating correct from incorrect judgments), plus selective accuracy at a preregistered coverage.
+
+Independently code human planning, first attempt before AI supplies a core step, monitoring, verification of AI-supplied claims, and reflection. Report these process indicators separately; neither AI delegation nor lower usage is inherently better. See [Epistemic Resilience and Metacognition](EPISTEMIC_RESILIENCE_AND_METACOGNITION.md) for perturbations, event definitions, and provisional targets.
+
+### 3.12 Burden and efficiency
 
 Report human time, interaction turns, latency, token and tool costs, interruption rate, cognitive workload, and accessibility friction. Faster is not automatically better if it increases rework or reduces agency.
 
