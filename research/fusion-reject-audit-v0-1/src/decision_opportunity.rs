@@ -713,7 +713,10 @@ fn oriented_value(value: &ObjectiveValue, definition: &ObjectiveDefinition) -> f
     }
 }
 
-pub(crate) fn valid_objective_vector(values: &[ObjectiveValue], definitions: &[ObjectiveDefinition]) -> bool {
+pub(crate) fn valid_objective_vector(
+    values: &[ObjectiveValue],
+    definitions: &[ObjectiveDefinition],
+) -> bool {
     if values.len() != definitions.len() {
         return false;
     }
