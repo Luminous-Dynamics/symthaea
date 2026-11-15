@@ -146,6 +146,17 @@
         "PRODUCT_ACCEPTANCE"
       ],
       "claim_ceiling": "FUTURE_MODEL_GATED_SYNTHETIC_ONLY"
+    },
+    {
+      "product_id": "PROCESS_INTERMEDIATE",
+      "required_capabilities": [
+        "FEEDSTOCK_CHARACTERIZATION",
+        "CONTINUOUS_PROCESSING",
+        "PROCESS_INSTRUMENTATION",
+        "LABORATORY_QA",
+        "MASS_AND_EFFLUENT_BALANCE"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
     }
   ],
   "modules": [
@@ -330,6 +341,32 @@
       ],
       "requires_calibration": true,
       "evidence_state": "SYNTHETIC_PROFILE_ONLY"
+    },
+    {
+      "module_id": "CONTINUOUS-PROCESS-SKID-A",
+      "process_family": "CONTINUOUS_CHEMICAL_PROCESS",
+      "capabilities": [
+        "CONTINUOUS_PROCESSING",
+        "FLOW_AND_REACTION_CONTROL",
+        "PROCESS_INTERLOCKS"
+      ],
+      "required_interfaces": [
+        "FEEDSTOCK_CHARACTERIZATION",
+        "POWER",
+        "THERMAL",
+        "FLUID",
+        "PROCESS_INSTRUMENTATION",
+        "EMERGENCY_ISOLATION",
+        "EFFLUENT_TREATMENT"
+      ],
+      "required_zones": [
+        "PROCESS_HAZARD_CLASSIFIED"
+      ],
+      "required_skills": [
+        "PROCESS_OPERATOR"
+      ],
+      "requires_calibration": true,
+      "evidence_state": "SYNTHETIC_PROFILE_ONLY"
     }
   ],
   "scenario_families": [
@@ -344,7 +381,8 @@
     "PROCESS_FAMILY_RECONFIGURATION",
     "PRODUCT_RETIREMENT_REPAIR_REMANUFACTURE",
     "FACILITY_RELOCATION_OR_MOBILE_DEPLOYMENT",
-    "REMOTE_OR_LUNAR_SEED_FACTORY_BOOTSTRAP"
+    "REMOTE_OR_LUNAR_SEED_FACTORY_BOOTSTRAP",
+    "CONTINUOUS_PROCESS_RESTART_AND_BATCH_RECONCILIATION"
   ],
   "conformance_cases": [
     {
@@ -527,6 +565,27 @@
       "expected_disposition": "REJECT",
       "expected_reason_codes": [
         "HARD_SAFETY_OR_QUALITY_GATE_CANNOT_BE_COMPENSATED"
+      ]
+    },
+    {
+      "case_id": "POS-CONTINUOUS-PROCESS-001",
+      "architecture_id": "HYBRID_LOCAL_PARTNER_NETWORK",
+      "product_id": "PROCESS_INTERMEDIATE",
+      "mutation": "PROCESS_SKID_IN_CLASSIFIED_ZONE; FEEDSTOCK_GRADE; INSTRUMENTATION; MASS_AND_EFFLUENT_BALANCE; LAB_QA_ALL_BOUND",
+      "expected_disposition": "ADMISSIBLE_SYNTHETIC",
+      "expected_reason_codes": [
+        "PROCESS_MODULE_ISOLATED",
+        "PROCESS_OUTPUT_ACCEPTANCE_ROUTE_COMPLETE"
+      ]
+    },
+    {
+      "case_id": "NEG-CHEMICAL-SEGREGATION-001",
+      "architecture_id": "MULTIPURPOSE_MICROFACTORY",
+      "product_id": "PROCESS_INTERMEDIATE",
+      "mutation": "CONTINUOUS_CHEMICAL_SKID_PLACED_IN_UNSEGREGATED_CLEAN_ELECTRONICS_OR_GENERAL_ASSEMBLY_ZONE",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "ENVIRONMENTAL_SEGREGATION_VIOLATION"
       ]
     }
   ],
