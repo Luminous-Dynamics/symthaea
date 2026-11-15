@@ -1,7 +1,7 @@
 # MEL-MR-EVAL-043 — Multi-step edit integrity contract v1
 
 **Date:** 2026-11-15  
-**Status:** Stage 1 and Stage 2 focused qualification passed at exact head `f4ff5f3971f3acc3a8ea4b5e7b61f56c00cbe18d`  
+**Status:** Stage 1 and Stage 2 patch algebra qualified at exact head `fefc148b1dfd1db898f1641dbee2756dbbfe5afc`; two-parent branch-merge extension authored and awaiting exact-head qualification  
 **Issue:** [#12243](https://github.com/Luminous-Dynamics/symthaea/issues/12243)  
 **Stack base:** EVAL-042 [PR #12201](https://github.com/Luminous-Dynamics/symthaea/pull/12201)
 
@@ -30,7 +30,7 @@ The standalone crate is \`tools/mel-music-sequence-integrity-harness\`.
 
 ### Executable controls
 
-Twenty-one unit tests are authored. They cover:
+Forty-three unit tests are authored. Thirty-six passed on exact head `fefc148b1dfd1db898f1641dbee2756dbbfe5afc`; seven new two-parent merge tests are awaiting the current exact-head workflow. The tests cover:
 - exact two-step ancestry and cumulative cost;
 - unauthorized collateral event changes;
 - stale artifact and symbolic-state parents;
@@ -55,26 +55,26 @@ The eight-step example produces a deterministic symbolic session in which each o
 
 ## Stage 2 — operation algebra and collaborative history
 
-The harness now adds deterministic symbolic operation patches with exact before-state preconditions and explicit read/write sets.
+The harness now adds deterministic symbolic operation patches with exact before-state preconditions and event-level write sets derived from canonical patch deltas and exact before-value preconditions.
 
-- **Commutativity:** an operation pair is declared independent only when write/write and read/write intersections are empty and both execution orders yield the same canonical state digest.
-- **Non-commutativity:** same-event writes are not silently serialized; a stale precondition fails and the pair is marked non-commuting.
+- **Commutativity:** disjoint event-write patches are replayed in both orders; a commuting declaration passes only when both orders converge to the same canonical state digest.
+- **Non-commutativity:** divergent same-event writes are not silently serialized; a stale before-value fails and an explicit conflict disposition is required.
 - **Undo/redo:** the operation, before/after state digests and inverse patch are bound into a domain-separated history receipt. Undo is accepted only from the exact after-state; redo only from the exact before-state. Tampering or stale state fails closed.
-- **Branch/merge:** every branch commits to the same base state. The merge plan computes event-level patches, retains both branch IDs, and surfaces conflicting event IDs. The resolver requires exactly one explicit choice for each conflict; it never auto-picks a winner.
+- **Branch/merge:** each parent snapshot commits to the exact common base and its own head. Disjoint writes merge automatically; divergent writes to the same event require exactly one sorted per-event resolution. The receipt records both branch IDs, both parent-state digests, the conflict set, resolutions and merged-state digest. Replay recomputes the merge; digest-only re-sealing of a fabricated result is rejected.
 
 This is a symbolic operation algebra, not yet a complete multi-track DAW or collaborative CRDT. It does, however, create the core contract needed to test reorderability, reversibility and conflict semantics before introducing rendered audio.
 
 ## Exact-head qualification
 
-The focused Melothaea multi-step sequence integrity workflow passed on exact head `f4ff5f3971f3acc3a8ea4b5e7b61f56c00cbe18d` (run 7):
+The focused Melothaea multi-step sequence integrity workflow passed on exact head `fefc148b1dfd1db898f1641dbee2756dbbfe5afc` (run 15):
 
 - Rust 1.96 exact checkout and SHA assertion: passed.
 - Sequence JSON Schema validation: passed.
 - Staged isolated-crate formatting: passed.
-- Standalone compile/tests: **21 passed, 0 failed**.
+- Standalone compile/tests: **36 passed, 0 failed** (sequence ledger, patch algebra, undo/redo and operation-order controls).
 - Deterministic eight-step preservation example: passed.
 - Clippy with warnings denied: passed.
-- Exact source/schema/dependency identity artifact uploaded: `mel-sequence-f4ff5f3971f3acc3a8ea4b5e7b61f56c00cbe18d`.
+- Exact source/schema/dependency identity artifact uploaded: `mel-sequence-fefc148b1dfd1db898f1641dbee2756dbbfe5afc` (SHA-256 `17e4311e58b633d0e27fcf1a8f746b2dd3b9af9d56c44f23e09c56de01b8fe78`). The new branch-merge implementation adds seven further tests; those remain pending until the current exact-head workflow passes.
 
 Formatting is normalized on the staged copy; this is not a claim that committed source text was already rustfmt-clean. Repository-wide CI, Workflow Syntax and PR Governance were skipped by path filters, not passed.
 
@@ -85,7 +85,7 @@ This stage is symbolic MIDI-like event state only. It does not:
 - measure perceptual continuity, groove, timbre, dynamics or human preference;
 - execute real edits or invoke a model, plugin, DAW or external renderer;
 - cryptographically validate the referenced EVAL-042/EVAL-041 receipts (it validates their syntax and distinct identities; upstream verifiers own trust);
-- implement commuting/non-commuting operation permutations, branch/merge or multi-parent lineage DAGs;
+- implement a distributed CRDT, arbitrary DAG history synchronization or a production collaborative DAW merge engine;
 - authorize commit, export, publication or sharing.
 
 The initial artifact digest is treated as an upstream verified identity; binding it to exact bytes is owned by EVAL-035 / EVAL-041. The symbolic state hash proves only the canonical event snapshot supplied to this harness.
@@ -94,7 +94,7 @@ The initial artifact digest is treated as an upstream verified identity; binding
 
 - Zero unauthorized symbolic event changes outside the declared event support on deterministic fixtures.
 - Zero hard-gate false accepts at any step.
-- 100% exact symbolic-state restoration for future undo/redo fixtures.
+- 100% exact symbolic-state restoration on deterministic undo/redo fixtures.
 - 100% canonical convergence for declared commuting operation pairs.
 - 100% explicit conflict outcomes for declared non-commuting pairs.
 - At least 98% per-step hard-obligation success and 85% complete 8-step session acceptance on a preregistered real-audio confirmatory cohort, after power analysis.
