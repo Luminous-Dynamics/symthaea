@@ -51,6 +51,14 @@ pub enum StepGateVerdictV1 {
     Unknown,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SequenceHistoryActionV1 {
+    Apply,
+    Undo,
+    Redo,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct StepHardGatesV1 {
@@ -95,6 +103,11 @@ pub struct SequenceStepObservationV1 {
     pub step_id: String,
     pub operation_id: String,
     pub operation_kind: MusicEditOperationKindV1,
+    pub history_action: SequenceHistoryActionV1,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub undo_target_step_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub redo_target_step_id: Option<String>,
     pub instruction_sha256: String,
     pub source_lineage_sha256: String,
     pub input_artifact_sha256: String,
@@ -183,6 +196,9 @@ pub enum SequenceErrorV1 {
     NoTargetMutation,
     InvalidAttemptAccounting,
     MissingReceiptIdentity,
+    InvalidHistoryTransition,
+    UndoRestoreMismatch,
+    RedoRestoreMismatch,
     ContinuationAfterHardGateFailure,
     OperationIdentityMissing,
     PatchSetNotCanonical,
@@ -220,6 +236,9 @@ impl fmt::Display for SequenceErrorV1 {
             Self::NoTargetMutation => "target edit gate passed but no symbolic event changed",
             Self::InvalidAttemptAccounting => "candidate attempt counters are inconsistent",
             Self::MissingReceiptIdentity => "selection, realization or verification receipt is missing",
+            Self::InvalidHistoryTransition => "undo or redo target is missing, stale, or not the active history edge",
+            Self::UndoRestoreMismatch => "undo does not restore the exact prior artifact and symbolic state",
+            Self::RedoRestoreMismatch => "redo does not restore the exact previously applied artifact and symbolic state",
             Self::ContinuationAfterHardGateFailure => "a later step cannot erase or follow an unresolved hard-gate failure",
             Self::OperationIdentityMissing => "operation identity must be nonempty",
             Self::PatchSetNotCanonical => "event patches or read sets are not sorted and unique",
@@ -362,6 +381,7 @@ pub fn evaluate_sequence_v1(
     let mut rejected_at_step = None;
     let mut reports = Vec::with_capacity(steps.len());
     let mut step_ids = BTreeSet::new();
+    let mut redo_target_index: Option<usize> = None;
     let mut operation_ids = BTreeSet::new();
 
     for (index, step) in steps.iter().enumerate() {
@@ -424,6 +444,62 @@ pub fn evaluate_sequence_v1(
         }
 
         let changed_ids = changed_event_ids(&previous_events, &step.events_after);
+        match step.history_action {
+            SequenceHistoryActionV1::Apply => {
+                if step.undo_target_step_id.is_some() || step.redo_target_step_id.is_some() {
+                    return Err(SequenceErrorV1::InvalidHistoryTransition);
+                }
+                // A new edit after undo creates a new branch and invalidates redo.
+                redo_target_index = None;
+            }
+            SequenceHistoryActionV1::Undo => {
+                if step.redo_target_step_id.is_some() {
+                    return Err(SequenceErrorV1::InvalidHistoryTransition);
+                }
+                let Some(target_id) = step.undo_target_step_id.as_deref() else {
+                    return Err(SequenceErrorV1::InvalidHistoryTransition);
+                };
+                let Some(target_index) = index.checked_sub(1) else {
+                    return Err(SequenceErrorV1::InvalidHistoryTransition);
+                };
+                let target = &steps[target_index];
+                if target.step_id != target_id
+                    || target.history_action != SequenceHistoryActionV1::Apply
+                {
+                    return Err(SequenceErrorV1::InvalidHistoryTransition);
+                }
+                if step.output_artifact_sha256 != target.input_artifact_sha256
+                    || step.output_state_sha256 != target.input_state_sha256
+                {
+                    return Err(SequenceErrorV1::UndoRestoreMismatch);
+                }
+                redo_target_index = Some(target_index);
+            }
+            SequenceHistoryActionV1::Redo => {
+                if step.undo_target_step_id.is_some() {
+                    return Err(SequenceErrorV1::InvalidHistoryTransition);
+                }
+                let Some(target_id) = step.redo_target_step_id.as_deref() else {
+                    return Err(SequenceErrorV1::InvalidHistoryTransition);
+                };
+                let Some(target_index) = redo_target_index else {
+                    return Err(SequenceErrorV1::InvalidHistoryTransition);
+                };
+                let target = &steps[target_index];
+                if target.step_id != target_id
+                    || index == 0
+                    || steps[index - 1].history_action != SequenceHistoryActionV1::Undo
+                {
+                    return Err(SequenceErrorV1::InvalidHistoryTransition);
+                }
+                if step.output_artifact_sha256 != target.output_artifact_sha256
+                    || step.output_state_sha256 != target.output_state_sha256
+                {
+                    return Err(SequenceErrorV1::RedoRestoreMismatch);
+                }
+                redo_target_index = None;
+            }
+        }
         let allowed: BTreeSet<&str> = step.allowed_event_ids.iter().map(String::as_str).collect();
         if changed_ids.iter().any(|id| !allowed.contains(id.as_str())) {
             return Err(SequenceErrorV1::UnauthorizedEventMutation);
@@ -1051,6 +1127,9 @@ mod tests {
             step_id: format!("step-{index}"),
             operation_id: format!("op-{index}"),
             operation_kind: MusicEditOperationKindV1::Replace,
+            history_action: SequenceHistoryActionV1::Apply,
+            undo_target_step_id: None,
+            redo_target_step_id: None,
             instruction_sha256: h(100 + u64::from(index)),
             source_lineage_sha256: h(10),
             input_artifact_sha256: input_artifact,
@@ -1269,6 +1348,79 @@ mod tests {
         assert_eq!(result.events, vec![event("event-a", 62_000), event("event-b", 64_000)]);
         assert_eq!(result.resolved_conflict_event_ids, vec!["event-a"]);
         assert_eq!(result.merge_parent_ids, ["left".to_owned(), "right".to_owned()]);
+    }
+
+    #[test]
+    fn undo_restores_exact_prior_artifact_and_symbolic_state() {
+        let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
+        let edited = vec![event("event-a", 61_000), event("event-b", 64_000)];
+        let apply = step(1, h(11), h(21), &initial, edited.clone(), "event-a", StepGateVerdictV1::Verified);
+        let mut undo = step(2, h(21), h(11), &edited, initial.clone(), "event-a", StepGateVerdictV1::Verified);
+        undo.history_action = SequenceHistoryActionV1::Undo;
+        undo.undo_target_step_id = Some("step-1".to_owned());
+        let result = evaluate_sequence_v1(&request(2, &initial), &initial, &[apply, undo]).unwrap();
+        assert_eq!(result.disposition, SequenceDispositionV1::Accepted);
+        assert_eq!(result.observed_step_count, 2);
+        assert_eq!(result.cumulative_event_mutations, 2);
+    }
+
+    #[test]
+    fn undo_rejects_a_nearby_but_not_exact_restore() {
+        let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
+        let edited = vec![event("event-a", 61_000), event("event-b", 64_000)];
+        let almost_initial = vec![event("event-a", 60_001), event("event-b", 64_000)];
+        let apply = step(1, h(11), h(21), &initial, edited.clone(), "event-a", StepGateVerdictV1::Verified);
+        let mut undo = step(2, h(21), h(11), &edited, almost_initial, "event-a", StepGateVerdictV1::Verified);
+        undo.history_action = SequenceHistoryActionV1::Undo;
+        undo.undo_target_step_id = Some("step-1".to_owned());
+        assert_eq!(
+            evaluate_sequence_v1(&request(2, &initial), &initial, &[apply, undo]),
+            Err(SequenceErrorV1::UndoRestoreMismatch)
+        );
+    }
+
+    #[test]
+    fn redo_restores_exactly_the_previous_edit_after_undo() {
+        let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
+        let edited = vec![event("event-a", 61_000), event("event-b", 64_000)];
+        let apply = step(1, h(11), h(21), &initial, edited.clone(), "event-a", StepGateVerdictV1::Verified);
+        let mut undo = step(2, h(21), h(11), &edited, initial.clone(), "event-a", StepGateVerdictV1::Verified);
+        undo.history_action = SequenceHistoryActionV1::Undo;
+        undo.undo_target_step_id = Some("step-1".to_owned());
+        let mut redo = step(3, h(11), h(21), &initial, edited.clone(), "event-a", StepGateVerdictV1::Verified);
+        redo.history_action = SequenceHistoryActionV1::Redo;
+        redo.redo_target_step_id = Some("step-1".to_owned());
+        let result = evaluate_sequence_v1(&request(4, &initial), &initial, &[apply, undo, redo]).unwrap();
+        assert_eq!(result.disposition, SequenceDispositionV1::Incomplete);
+        assert_eq!(result.observed_step_count, 3);
+        assert_eq!(result.steps[2].changed_event_ids, vec!["event-a".to_owned()]);
+    }
+
+    #[test]
+    fn redo_without_matching_undo_is_rejected() {
+        let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
+        let edited = vec![event("event-a", 61_000), event("event-b", 64_000)];
+        let mut redo = step(1, h(11), h(21), &initial, edited, "event-a", StepGateVerdictV1::Verified);
+        redo.history_action = SequenceHistoryActionV1::Redo;
+        redo.redo_target_step_id = Some("missing-step".to_owned());
+        assert_eq!(
+            evaluate_sequence_v1(&request(1, &initial), &initial, &[redo]),
+            Err(SequenceErrorV1::InvalidHistoryTransition)
+        );
+    }
+
+    #[test]
+    fn new_edit_after_undo_invalidates_redo_target() {
+        let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
+        let edited = vec![event("event-a", 61_000), event("event-b", 64_000)];
+        let alternate = vec![event("event-a", 60_000), event("event-b", 65_000)];
+        let apply = step(1, h(11), h(21), &initial, edited.clone(), "event-a", StepGateVerdictV1::Verified);
+        let mut undo = step(2, h(21), h(11), &edited, initial.clone(), "event-a", StepGateVerdictV1::Verified);
+        undo.history_action = SequenceHistoryActionV1::Undo;
+        undo.undo_target_step_id = Some("step-1".to_owned());
+        let new_edit = step(3, h(11), h(31), &initial, alternate, "event-b", StepGateVerdictV1::Verified);
+        let result = evaluate_sequence_v1(&request(4, &initial), &initial, &[apply, undo, new_edit]).unwrap();
+        assert_eq!(result.disposition, SequenceDispositionV1::Incomplete);
     }
 
     #[test]
