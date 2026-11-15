@@ -18,7 +18,11 @@ It does **not** establish freshness, that the beacon was published at the schedu
 | Trust-root manifest SHA-256 | `8a74f38b67081c9483f2a640fc4ac8d0275318d758a7c6f9cb7b1ffc374485c4` |
 | Test vector | Quicknet round 1000 |
 
-The profile pins scheme ID separately because drand's chain hash does not include the scheme ID. The crate is pinned to `drandite-core = 0.1.0`; this is a prototype dependency, not a statement that the dependency has received an independent cryptographic audit. Dependency license, source provenance, maintenance and cryptographic implementation review remain P0 items in SCI-PSI-003.
+The profile pins scheme ID separately because drand's chain hash does not include the scheme ID. The crate is pinned to `drandite-core = 0.1.0`; this is a prototype dependency, not a statement that the dependency has received an independent cryptographic audit.
+
+The exact-head CI resolved and archived an 84-package Cargo.lock (SHA-256 `17511321f5887225ec313b2e4b0689c24aabf8103a5bf6042167575c6334ff3c`). Cargo metadata reports `drandite-core 0.1.0` as `MIT OR Apache-2.0`, repository `https://codeberg.org/Cupertino/drandite`. Its normal/build tree includes `blst 0.3.17`, `libcrux-sha2 0.0.9`, `libcrux-hacl-rs`, `libcrux-traits`, `libcrux-secrets`, and the `cc` build dependency. The workflow archives the lockfile and both normal/build and dev dependency trees for review.
+
+The SHA-2 primitive's docs describe `libcrux-sha2` as safe Rust compiled from HACL*-verified C, with formal claims for memory safety, functional correctness and secret independence of that algorithmic code. This is not a blanket verification of `drandite-core`, its wrappers, the BLS backend, or the final executable, and it is not a claim of side-channel resistance for the whole program. The BLS backend in this resolved graph is `blst`; no independent audit of it has been completed. Dependency license, source provenance, maintenance and cryptographic implementation review remain P0 items in SCI-PSI-003.
 
 ## Reproduce
 
