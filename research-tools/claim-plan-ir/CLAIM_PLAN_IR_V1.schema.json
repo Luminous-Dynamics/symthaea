@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research-tools/claim-plan-ir/CLAIM_PLAN_IR_V1.schema.json",
   "title": "Symthaea Claim Plan IR v1",
-  "description": "Verifier-authorized plan envelope. This schema validates structure only; it does not authenticate evidence, verify a proof, or grant authority.",
+  "description": "Verifier-authorized plan envelope. This schema validates structure only; it does not authenticate evidence, verify a proof, or grant authority. Privacy profile references bind cumulative-disclosure, presentation-linkability, proof-shape, adaptive-query, budget-enforcement, status-lookup and observer-metadata contracts owned by their named systems.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -15,6 +15,7 @@
     "predicate",
     "request",
     "uniqueness",
+    "privacy",
     "proof",
     "dependencies"
   ],
@@ -30,7 +31,11 @@
     "authority": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["policy_owner", "policy_digest", "evidence_requirements"],
+      "required": [
+        "policy_owner",
+        "policy_digest",
+        "evidence_requirements"
+      ],
       "properties": {
         "policy_owner": {
           "type": "string",
@@ -85,7 +90,11 @@
         "implementation": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name", "release", "source_commit"],
+          "required": [
+            "name",
+            "release",
+            "source_commit"
+          ],
           "properties": {
             "name": {
               "type": "string",
@@ -109,10 +118,19 @@
         "server": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["identity_kind", "identity_value", "trust_root_digest"],
+          "required": [
+            "identity_kind",
+            "identity_value",
+            "trust_root_digest"
+          ],
           "properties": {
             "identity_kind": {
-              "enum": ["dns_name", "spki", "certificate_fingerprint", "provider_profile"]
+              "enum": [
+                "dns_name",
+                "spki",
+                "certificate_fingerprint",
+                "provider_profile"
+              ]
             },
             "identity_value": {
               "type": "string",
@@ -127,7 +145,12 @@
         "request": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["method", "origin", "path_template", "query_policy_digest"],
+          "required": [
+            "method",
+            "origin",
+            "path_template",
+            "query_policy_digest"
+          ],
           "properties": {
             "method": {
               "type": "string",
@@ -151,7 +174,12 @@
         "response": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["ordinal", "direction", "http_profile_id", "http_profile_digest"],
+          "required": [
+            "ordinal",
+            "direction",
+            "http_profile_id",
+            "http_profile_digest"
+          ],
           "properties": {
             "ordinal": {
               "type": "integer",
@@ -174,14 +202,28 @@
         "commitment": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["strategy", "hash_algorithm", "opening_profile_id"],
+          "required": [
+            "strategy",
+            "hash_algorithm",
+            "opening_profile_id"
+          ],
           "properties": {
             "strategy": {
-              "enum": ["custom_range", "http_object", "per_byte", "attestor_value_commitment"]
+              "enum": [
+                "custom_range",
+                "http_object",
+                "per_byte",
+                "attestor_value_commitment"
+              ]
             },
             "hash_algorithm": {
               "type": "string",
-              "enum": ["sha256", "blake3", "rescue", "profile_defined"]
+              "enum": [
+                "sha256",
+                "blake3",
+                "rescue",
+                "profile_defined"
+              ]
             },
             "opening_profile_id": {
               "type": "string",
@@ -244,7 +286,11 @@
     "interpretation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["value_type", "conversion_profile_id", "conversion_profile_digest"],
+      "required": [
+        "value_type",
+        "conversion_profile_id",
+        "conversion_profile_digest"
+      ],
       "properties": {
         "value_type": {
           "enum": [
@@ -287,7 +333,11 @@
     "predicate": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["language", "digest", "ast"],
+      "required": [
+        "language",
+        "digest",
+        "ast"
+      ],
       "properties": {
         "language": {
           "const": "symthaea-claim-predicate/v1"
@@ -426,7 +476,12 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["owner", "dependency_id", "digest", "invalidation_scope"],
+        "required": [
+          "owner",
+          "dependency_id",
+          "digest",
+          "invalidation_scope"
+        ],
         "properties": {
           "owner": {
             "type": "string",
@@ -452,6 +507,76 @@
           }
         }
       }
+    },
+    "privacy": {
+      "type": "object",
+      "description": "References to owner-defined privacy profiles. These references do not implement a budget, establish differential privacy, or prove unlinkability.",
+      "additionalProperties": false,
+      "required": [
+        "disclosure_composition",
+        "presentation_linkability",
+        "proof_shape",
+        "adaptive_query_policy",
+        "budget_enforcement",
+        "status_lookup",
+        "observer_metadata"
+      ],
+      "properties": {
+        "disclosure_composition": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "presentation_linkability": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "proof_shape": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "adaptive_query_policy": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "budget_enforcement": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "owner",
+            "profile_id",
+            "profile_digest",
+            "scope_id",
+            "epoch_ref"
+          ],
+          "properties": {
+            "owner": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "profile_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "profile_digest": {
+              "$ref": "#/$defs/sha256"
+            },
+            "scope_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "epoch_ref": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        "status_lookup": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "observer_metadata": {
+          "$ref": "#/$defs/profile_reference"
+        }
+      }
     }
   },
   "$defs": {
@@ -464,7 +589,9 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind"],
+          "required": [
+            "kind"
+          ],
           "properties": {
             "kind": {
               "const": "claim_value"
@@ -474,26 +601,45 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "value"],
+          "required": [
+            "kind",
+            "value"
+          ],
           "properties": {
             "kind": {
               "const": "literal"
             },
             "value": {
-              "type": ["string", "integer", "boolean"]
+              "type": [
+                "string",
+                "integer",
+                "boolean"
+              ]
             }
           }
         },
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "operator", "left", "right"],
+          "required": [
+            "kind",
+            "operator",
+            "left",
+            "right"
+          ],
           "properties": {
             "kind": {
               "const": "compare"
             },
             "operator": {
-              "enum": ["eq", "neq", "gt", "gte", "lt", "lte"]
+              "enum": [
+                "eq",
+                "neq",
+                "gt",
+                "gte",
+                "lt",
+                "lte"
+              ]
             },
             "left": {
               "$ref": "#/$defs/expression"
@@ -506,10 +652,16 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "children"],
+          "required": [
+            "kind",
+            "children"
+          ],
           "properties": {
             "kind": {
-              "enum": ["all", "any"]
+              "enum": [
+                "all",
+                "any"
+              ]
             },
             "children": {
               "type": "array",
@@ -523,7 +675,10 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["kind", "child"],
+          "required": [
+            "kind",
+            "child"
+          ],
           "properties": {
             "kind": {
               "const": "not"
@@ -534,6 +689,30 @@
           }
         }
       ]
+    },
+    "profile_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "owner",
+        "profile_id",
+        "profile_digest"
+      ],
+      "properties": {
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
     }
   }
 }
