@@ -9,6 +9,7 @@ pub mod rust_syntax;
 pub mod tree_projection;
 pub mod dynamapbench;
 pub mod temporal_replay;
+pub mod workspace_shift;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
