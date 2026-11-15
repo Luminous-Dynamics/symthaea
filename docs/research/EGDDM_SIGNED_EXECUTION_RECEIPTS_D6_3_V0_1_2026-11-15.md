@@ -144,7 +144,30 @@ Do not multiply arbitrary confidence scores across correlated issuers. Distinct 
 
 Prefer offline verification when possible. Cache verified key material, identity bundles, revocation evidence and the latest accepted log checkpoint. A verifier must detect rollback relative to its persisted checkpoint; a freshly supplied old checkpoint cannot silently reset trust state.
 
-## 8. Implementation sequence
+## 8. Cross-field semantic validation
+
+JSON Schema validates field presence, types, enumerations and conditional requirements. It does not by itself establish that the referenced statements, identities, timestamps and digests agree. A verifier must additionally enforce these relations:
+
+| Relation | Required check |
+|---|---|
+| Statement subject | At least one immutable in-toto Statement subject matches the exact artifact digest required by policy. |
+| EGDDM scope | Repository, revision, tree and configuration-world identity resolve to the declared repository snapshot and execution configuration. |
+| Producer role | The producer role matches claim kind; identity-provider and workload identity are trusted for that role. |
+| Execution requirement | Runner and independent-regrade claims carry execution metadata; agent observations and authority decisions do not need synthetic runner metadata. |
+| Standard predicate | Runner/build references SLSA Provenance v1.2; runner or independent-grader test/compatibility references in-toto Test Result v0.1. |
+| Predicate linkage | The external statement digest verifies; its predicate type equals the declared URI; its subject set includes the declared subject digest. |
+| Observation chronology | `started_at <= completed_at <= observed_at <= available_at`. |
+| Authority interval | The authority decision is valid at the operation/observation time, and its permitted scope and operation match the requested action exactly. |
+| Challenge chronology | `issued_at <= started_at` and `completed_at <= expires_at`; the challenge issuer is trusted. |
+| Consume-once | The challenge ID and nonce are atomically consumed once. Duplicate or uncertain consumption fails closed pending reconciliation. |
+| Artifact and tool identity | Source, output, command, test input, runner image, toolchain, harness, isolation and network-policy digests are checked against the actual run. |
+| Supersession | A receipt that is superseded, revoked or contradicted is not treated as current merely because its signature and transparency inclusion remain valid. |
+
+These checks must return separate outcomes. A valid signature cannot compensate for a wrong subject; a correct subject cannot compensate for a revoked authority decision; and a transparency inclusion proof cannot compensate for a false execution claim. Persisted challenge-consumption state and accepted transparency checkpoints are necessary to detect replay and rollback.
+
+The five synthetic Statements under `docs/research/fixtures/` cover runner/test, runner/build, independent-grader/test, agent observation and authority decision. An additional structural audit checked their role mapping, required references, subject-digest linkage and sample timestamp ordering. This is not a cryptographic verification, a formal JSON-Schema conformance run or evidence that a runner executed.
+
+## 9. Implementation sequence
 
 1. Freeze the EGDDM predicate schema, SLSA linkage rules and canonical cross-statement test vectors.
 2. Select and pin an in-toto Statement/DSSE library, a SLSA v1.2 verifier and an in-toto Test Result verifier; avoid hand-written signature-envelope code.
@@ -155,7 +178,7 @@ Prefer offline verification when possible. Cache verified key material, identity
 7. Add key rotation, revocation, expiry, policy updates and persisted checkpoint handling.
 8. Conduct independent security review before using signed receipts as deployment or payment gates.
 
-## 9. Acceptance tests and research targets
+## 10. Acceptance tests and research targets
 
 - Valid statement with correct trusted signer verifies.
 - Any payload, subject, scope, outcome or timestamp mutation breaks signature verification.
@@ -170,6 +193,6 @@ Prefer offline verification when possible. Cache verified key material, identity
 
 Targets are zero acceptance of planted wrong-scope, replay, wrong-role, expired-key, tampered-signature and inconsistent-log controls. Exact denominators, trust roots, policy versions and residual assumptions must accompany every result. These are prospective targets, not current guarantees.
 
-## 10. Claim ceiling
+## 11. Claim ceiling
 
 This branch contains a custom predicate schema and security/interoperability design only. It does not contain a signed receipt, private key, signature verifier, SCITT client, Rekor submission, transparency witness, workload identity integration or executable anti-replay service. No signature authenticity, execution validity, SOTA result or production trust guarantee is claimed.
