@@ -344,7 +344,9 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
         && candidate.profile.minimum_face_area_m2 > 0.0
         && candidate.profile.minimum_enclosed_volume_m3.is_finite()
         && candidate.profile.minimum_enclosed_volume_m3 >= 0.0
-        && !candidate.profile.id.trim().is_empty();
+        && !candidate.profile.id.trim().is_empty()
+        && (candidate.profile.require_closed_surface
+            || candidate.profile.minimum_enclosed_volume_m3 == 0.0);
     if profile_valid {
         push(
             &mut checks,
@@ -354,12 +356,14 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
         );
     } else {
         invalid = true;
-        push(
-            &mut checks,
-            "profile_parameters",
-            CheckStatus::Fail,
-            "profile id or geometric thresholds are invalid",
-        );
+        let detail = if !candidate.profile.require_closed_surface
+            && candidate.profile.minimum_enclosed_volume_m3 > 0.0
+        {
+            "a positive minimum enclosed-volume threshold requires a closed-surface profile"
+        } else {
+            "profile id or geometric thresholds are invalid"
+        };
+        push(&mut checks, "profile_parameters", CheckStatus::Fail, detail);
     }
 
     let finite_vertices = candidate
@@ -894,6 +898,17 @@ mod tests {
         candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Incomparable);
+    }
+
+    #[test]
+    fn open_surface_profile_cannot_require_enclosed_volume() {
+        let mut candidate = tetrahedron();
+        candidate.profile.require_closed_surface = false;
+        let report = admit(&candidate);
+        assert_eq!(report.disposition, Disposition::Invalid);
+        assert!(report.checks.iter().any(|check| {
+            check.code == "profile_parameters" && check.status == CheckStatus::Fail
+        }));
     }
 
     #[test]
