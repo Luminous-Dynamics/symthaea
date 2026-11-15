@@ -69,7 +69,7 @@ The branch adds:
 - CLI command \`development-map-validator revalidation-oracle <scenario.json>\`
 - known-answer output at \`docs/development-map/fixtures/egddm-selective-revalidation-oracle-v0.1.expected.json\`
 
-The command first invokes the D6 trace validator, then computes the oracle metrics. It reports per-epoch and per-arm:
+The command first invokes the D6 trace validator, then computes the oracle metrics. A fixture-test helper recomputes a known D6 receipt digest and has been independently checked against the committed value. It reports per-epoch and per-arm:
 - gold minimum set;
 - agent refreshed set;
 - fresh passing set;
@@ -79,7 +79,7 @@ The command first invokes the D6 trace validator, then computes the oracle metri
 - over/under/set-distance units;
 - oracle savings ceiling, observed refresh fraction, precision and recall.
 
-The module authors 12 tests for the committed known-answer fixture, clean-arm behavior, unnecessary refresh, missing required refresh, fresh failure versus missing refresh, unknown gold obligation, unknown receipt obligation, future source epoch, duplicate active IDs, malformed scenario and claim-ceiling behavior.
+The module authors 13 tests for the committed known-answer fixture, clean-arm behavior, unnecessary refresh, missing required refresh, fresh failure versus missing refresh, unknown gold obligation, unknown receipt obligation, future source epoch, duplicate active IDs, malformed scenario and claim-ceiling behavior.
 
 ## 5. Synthetic known answer
 
