@@ -720,7 +720,7 @@
     {
       "id": "UNIFORMITY_WITHOUT_SPATIAL_MAP",
       "expected_disposition": "BLOCKED",
-      "reason_code": "SPATIAL_EVIDENCE_INCOMPLETE",
+      "reason_code": "SPATIAL_UNIFORMITY_EVIDENCE_INCOMPLETE",
       "record": {
         "schema_version": "0.1.0",
         "programme": "PLASMA-MEDICAL-002",
