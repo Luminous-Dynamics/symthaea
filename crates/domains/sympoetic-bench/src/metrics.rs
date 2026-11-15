@@ -514,10 +514,27 @@ pub fn summarize_confidence(
     let selected_count = ((count as f64 * selective_coverage).ceil() as usize)
         .max(1)
         .min(count);
-    let selected_correct = selective[..selected_count]
+    let cutoff_confidence = selective[selected_count - 1].confidence;
+    let strictly_above = selective
+        .iter()
+        .filter(|item| item.confidence > cutoff_confidence)
+        .collect::<Vec<_>>();
+    let tied_at_cutoff = selective
+        .iter()
+        .filter(|item| item.confidence == cutoff_confidence)
+        .collect::<Vec<_>>();
+    let needed_from_tie = selected_count - strictly_above.len();
+    let correct_above = strictly_above
         .iter()
         .filter(|item| item.correct)
-        .count();
+        .count() as f64;
+    let correct_at_tie = tied_at_cutoff
+        .iter()
+        .filter(|item| item.correct)
+        .count() as f64;
+    // Fractional tie handling makes the result invariant to input ordering.
+    let selected_correct = correct_above
+        + correct_at_tie * needed_from_tie as f64 / tied_at_cutoff.len() as f64;
 
     Ok(ConfidenceSummary {
         observation_count: count,
@@ -527,7 +544,7 @@ pub fn summarize_confidence(
         expected_calibration_error,
         metacognitive_sensitivity_auc,
         selective_coverage: selected_count as f64 / count as f64,
-        selective_accuracy: selected_correct as f64 / selected_count as f64,
+        selective_accuracy: selected_correct / selected_count as f64,
     })
 }
 
@@ -645,6 +662,26 @@ mod tests {
         assert!((summary.selective_accuracy - 1.0).abs() < 1e-12);
         assert!((summary.selective_coverage - 0.5).abs() < 1e-12);
         assert!(summary.brier_score < 0.05);
+    }
+
+    #[test]
+    fn selective_accuracy_is_invariant_to_ordering_of_cutoff_ties() {
+        let first = [
+            ConfidenceObservation { confidence: 0.9, correct: true },
+            ConfidenceObservation { confidence: 0.8, correct: false },
+            ConfidenceObservation { confidence: 0.8, correct: true },
+            ConfidenceObservation { confidence: 0.1, correct: false },
+        ];
+        let reversed_tie_order = [
+            ConfidenceObservation { confidence: 0.9, correct: true },
+            ConfidenceObservation { confidence: 0.8, correct: true },
+            ConfidenceObservation { confidence: 0.8, correct: false },
+            ConfidenceObservation { confidence: 0.1, correct: false },
+        ];
+        let a = summarize_confidence(&first, 5, 0.5).unwrap();
+        let b = summarize_confidence(&reversed_tie_order, 5, 0.5).unwrap();
+        assert!((a.selective_accuracy - 0.75).abs() < 1e-12);
+        assert!((a.selective_accuracy - b.selective_accuracy).abs() < 1e-12);
     }
 
     #[test]
