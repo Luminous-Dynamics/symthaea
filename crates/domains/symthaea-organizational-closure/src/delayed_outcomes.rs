@@ -359,17 +359,14 @@ pub struct DelayedOutcomeReport {
 
 impl DelayedOutcomeReport {
     pub fn is_qualified(&self) -> bool {
-        self.qualification == DelayedOutcomeQualification::Qualified
-            && self.findings.is_empty()
+        self.qualification == DelayedOutcomeQualification::Qualified && self.findings.is_empty()
     }
 
     pub fn all_claims_use_recomputed_sequences(&self) -> bool {
         self.per_query.iter().all(|query| {
             query.reported_effect_interval.is_valid()
-                && query.reported_effect_interval.lower
-                    <= query.recomputed_effect_interval.lower
-                && query.reported_effect_interval.upper
-                    >= query.recomputed_effect_interval.upper
+                && query.reported_effect_interval.lower <= query.recomputed_effect_interval.lower
+                && query.reported_effect_interval.upper >= query.recomputed_effect_interval.upper
         })
     }
 }
@@ -393,11 +390,7 @@ fn push_finding(
 
 /// Normal-mixture boundary used by the ICML 2026 delayed-outcome reference:
 /// sqrt((V + 1/eta2) * (ln(1 + eta2*V) - 2*ln(alpha))).
-pub fn delayed_normal_mixture_boundary(
-    variance_clock: f64,
-    alpha: f64,
-    eta2: f64,
-) -> Option<f64> {
+pub fn delayed_normal_mixture_boundary(variance_clock: f64, alpha: f64, eta2: f64) -> Option<f64> {
     if !variance_clock.is_finite()
         || variance_clock < 0.0
         || !alpha.is_finite()
@@ -705,7 +698,10 @@ pub fn evaluate_delayed_outcomes(
                     "v0 permits at most one reward event per unit and query",
                 );
             }
-            let unit = query.units.iter().find(|unit| unit.unit_id == event.unit_id);
+            let unit = query
+                .units
+                .iter()
+                .find(|unit| unit.unit_id == event.unit_id);
             if unit.is_some_and(|unit| event.event_time < unit.entry_time) {
                 push_finding(
                     &mut findings,
@@ -761,7 +757,10 @@ pub fn evaluate_delayed_outcomes(
                 "reported treatment-effect interval is invalid",
             );
         }
-        if claim_by_query.insert(claim.query_id.as_str(), claim).is_some() {
+        if claim_by_query
+            .insert(claim.query_id.as_str(), claim)
+            .is_some()
+        {
             push_finding(
                 &mut findings,
                 DelayedOutcomeFindingCode::DuplicateQueryClaim,
@@ -838,8 +837,7 @@ pub fn evaluate_delayed_outcomes(
                     Some(unit.evidence.completeness.clone()),
                     format!(
                         "verified event follow-up ends at {}, before selected stop time {}",
-                        unit.observation_complete_through,
-                        stop_time
+                        unit.observation_complete_through, stop_time
                     ),
                 );
             }
@@ -850,13 +848,8 @@ pub fn evaluate_delayed_outcomes(
                 &unit.evidence.isolation,
                 &unit.evidence.completeness,
             ] {
-                let (verified, unavailable) = validate_receipt(
-                    oracle,
-                    receipt_id,
-                    &query.id,
-                    unit.unit_id,
-                    &mut findings,
-                );
+                let (verified, unavailable) =
+                    validate_receipt(oracle, receipt_id, &query.id, unit.unit_id, &mut findings);
                 if !verified {
                     query_unresolved = true;
                     if unavailable {
@@ -1216,11 +1209,19 @@ mod tests {
         DelayedOutcomeRecord::new(id, time, time, reward, format!("measurement-{id}"))
     }
 
-    fn fixture() -> (DelayedOutcomeScenario, DelayedOutcomeOracle, DelayedOutcomeTrace) {
+    fn fixture() -> (
+        DelayedOutcomeScenario,
+        DelayedOutcomeOracle,
+        DelayedOutcomeTrace,
+    ) {
         let query = DelayedQuery::new(
             "q1",
             0.0,
-            vec![unit(1, 0, false, 10), unit(2, 1, true, 10), unit(3, 5, false, 10)],
+            vec![
+                unit(1, 0, false, 10),
+                unit(2, 1, true, 10),
+                unit(3, 5, false, 10),
+            ],
             vec![event(1, 2, 4.0), event(2, 3, 2.0)],
         );
         let scenario = DelayedOutcomeScenario::new(vec![query], 0.05, 1.0);
@@ -1228,22 +1229,40 @@ mod tests {
         potential.insert(
             ("q1".into(), 1),
             DelayedUnitPotentialOutcomes {
-                control: DelayedPotentialEvent::Event { event_time: 2, reward: 4.0 },
-                treatment: DelayedPotentialEvent::Event { event_time: 1, reward: 1.0 },
+                control: DelayedPotentialEvent::Event {
+                    event_time: 2,
+                    reward: 4.0,
+                },
+                treatment: DelayedPotentialEvent::Event {
+                    event_time: 1,
+                    reward: 1.0,
+                },
             },
         );
         potential.insert(
             ("q1".into(), 2),
             DelayedUnitPotentialOutcomes {
-                control: DelayedPotentialEvent::Event { event_time: 4, reward: 5.0 },
-                treatment: DelayedPotentialEvent::Event { event_time: 3, reward: 2.0 },
+                control: DelayedPotentialEvent::Event {
+                    event_time: 4,
+                    reward: 5.0,
+                },
+                treatment: DelayedPotentialEvent::Event {
+                    event_time: 3,
+                    reward: 2.0,
+                },
             },
         );
         potential.insert(
             ("q1".into(), 3),
             DelayedUnitPotentialOutcomes {
-                control: DelayedPotentialEvent::Event { event_time: 8, reward: 7.0 },
-                treatment: DelayedPotentialEvent::Event { event_time: 7, reward: 6.0 },
+                control: DelayedPotentialEvent::Event {
+                    event_time: 8,
+                    reward: 7.0,
+                },
+                treatment: DelayedPotentialEvent::Event {
+                    event_time: 7,
+                    reward: 6.0,
+                },
             },
         );
         let mut receipts = BTreeMap::new();
@@ -1280,7 +1299,12 @@ mod tests {
     fn delayed_ipw_matches_armwise_reference_and_union_bound() {
         let (scenario, oracle, trace) = fixture();
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::Qualified, "{:?}", report.findings);
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::Qualified,
+            "{:?}",
+            report.findings
+        );
         let query = &report.per_query[0];
         assert_eq!(query.entered_unit_count, 2);
         assert_eq!(query.control.observed_event_count, 1);
@@ -1290,7 +1314,10 @@ mod tests {
         assert_eq!(query.control.variance_clock, 32.0);
         assert_eq!(query.treatment.variance_clock, 8.0);
         assert_eq!(query.effect_estimate, -4.0);
-        assert!((query.effect_boundary - (query.control.boundary + query.treatment.boundary)).abs() < 1.0e-12);
+        assert!(
+            (query.effect_boundary - (query.control.boundary + query.treatment.boundary)).abs()
+                < 1.0e-12
+        );
         assert_eq!(query.oracle_true_cumulative_effect, -6.0);
         assert!(query.recomputed_effect_interval.contains(-6.0));
         assert!(report.all_claims_use_recomputed_sequences());
@@ -1307,11 +1334,16 @@ mod tests {
     #[test]
     fn pending_event_is_not_imputed_as_zero_without_a_completeness_receipt() {
         let (mut scenario, oracle, mut trace) = fixture();
-        scenario.queries[0].observed_events.retain(|record| record.unit_id != 2);
+        scenario.queries[0]
+            .observed_events
+            .retain(|record| record.unit_id != 2);
         scenario.queries[0].units[1].observation_complete_through = 1;
         trace.claims[0].stop_time = 4;
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::Inconclusive);
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::Inconclusive
+        );
         assert!(report.findings.iter().any(|finding| {
             finding.code == DelayedOutcomeFindingCode::FollowupIncompleteAtStop
         }));
@@ -1321,28 +1353,52 @@ mod tests {
     #[test]
     fn verified_no_event_by_calendar_time_is_a_valid_zero_cumulative_contribution() {
         let (mut scenario, mut oracle, mut trace) = fixture();
-        scenario.queries[0].observed_events.retain(|record| record.unit_id == 1);
+        scenario.queries[0]
+            .observed_events
+            .retain(|record| record.unit_id == 1);
         scenario.queries[0].units[1].observation_complete_through = 4;
         oracle.potential_outcomes.insert(
             ("q1".into(), 2),
             DelayedUnitPotentialOutcomes {
-                control: DelayedPotentialEvent::Event { event_time: 8, reward: 5.0 },
-                treatment: DelayedPotentialEvent::Event { event_time: 9, reward: 2.0 },
+                control: DelayedPotentialEvent::Event {
+                    event_time: 8,
+                    reward: 5.0,
+                },
+                treatment: DelayedPotentialEvent::Event {
+                    event_time: 9,
+                    reward: 2.0,
+                },
             },
         );
         trace.claims[0].stop_time = 4;
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::Qualified, "{:?}", report.findings);
-        assert_eq!(report.per_query[0].treatment_pending_no_event_by_time_count, 1);
-        assert_eq!(report.per_query[0].treatment.cumulative_reward_estimate, 0.0);
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::Qualified,
+            "{:?}",
+            report.findings
+        );
+        assert_eq!(
+            report.per_query[0].treatment_pending_no_event_by_time_count,
+            1
+        );
+        assert_eq!(
+            report.per_query[0].treatment.cumulative_reward_estimate,
+            0.0
+        );
     }
 
     #[test]
     fn event_that_should_have_arrived_before_verified_watermark_cannot_be_omitted() {
         let (mut scenario, oracle, trace) = fixture();
-        scenario.queries[0].observed_events.retain(|record| record.unit_id != 1);
+        scenario.queries[0]
+            .observed_events
+            .retain(|record| record.unit_id != 1);
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::NotQualified);
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::NotQualified
+        );
         assert!(report.findings.iter().any(|finding| {
             finding.code == DelayedOutcomeFindingCode::MissingEventBeforeVerifiedWatermark
         }));
@@ -1353,7 +1409,10 @@ mod tests {
         let (mut scenario, oracle, trace) = fixture();
         scenario.queries[0].observed_events[0].reported_at = 3;
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::Inconclusive);
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::Inconclusive
+        );
         assert!(report.findings.iter().any(|finding| {
             finding.code == DelayedOutcomeFindingCode::ReportingLagOutsideEventTimeFiltration
         }));
@@ -1365,32 +1424,55 @@ mod tests {
         scenario.queries[0].observed_events.push(event(3, 8, 7.0));
         trace.claims[0].stop_time = 4;
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::NotQualified);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == DelayedOutcomeFindingCode::FutureOutcomeLeakage
-        }));
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::NotQualified
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == DelayedOutcomeFindingCode::FutureOutcomeLeakage })
+        );
     }
 
     #[test]
     fn unavailable_randomization_or_measurement_evidence_is_inconclusive() {
         let (scenario, mut oracle, trace) = fixture();
-        oracle.receipt_dispositions.insert("randomization-1".into(), ExperimentEvidenceStatus::Unavailable);
+        oracle.receipt_dispositions.insert(
+            "randomization-1".into(),
+            ExperimentEvidenceStatus::Unavailable,
+        );
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::Inconclusive);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == DelayedOutcomeFindingCode::EvidenceUnavailable
-        }));
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::Inconclusive
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == DelayedOutcomeFindingCode::EvidenceUnavailable })
+        );
     }
 
     #[test]
     fn rejected_intervention_evidence_blocks_the_query() {
         let (scenario, mut oracle, trace) = fixture();
-        oracle.receipt_dispositions.insert("delivery-2".into(), ExperimentEvidenceStatus::Rejected);
+        oracle
+            .receipt_dispositions
+            .insert("delivery-2".into(), ExperimentEvidenceStatus::Rejected);
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::NotQualified);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == DelayedOutcomeFindingCode::RejectedEvidence
-        }));
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::NotQualified
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == DelayedOutcomeFindingCode::RejectedEvidence })
+        );
     }
 
     #[test]
@@ -1411,7 +1493,9 @@ mod tests {
         second_query.id = "q2".into();
         for unit in &second_query.units {
             let old = oracle.potential_outcomes[&("q1".into(), unit.unit_id)];
-            oracle.potential_outcomes.insert(("q2".into(), unit.unit_id), old);
+            oracle
+                .potential_outcomes
+                .insert(("q2".into(), unit.unit_id), old);
         }
         for unit in &mut second_query.units {
             unit.evidence.randomization = format!("q2-randomization-{}", unit.unit_id);
@@ -1431,7 +1515,9 @@ mod tests {
                 format!("q2-complete-{id}"),
                 format!("q2-measurement-{id}"),
             ] {
-                oracle.receipt_dispositions.insert(receipt, ExperimentEvidenceStatus::Verified);
+                oracle
+                    .receipt_dispositions
+                    .insert(receipt, ExperimentEvidenceStatus::Verified);
             }
         }
         trace.claims.push(DelayedOutcomeClaim::new(
@@ -1441,7 +1527,12 @@ mod tests {
             DelayedRobustDecision::Defer,
         ));
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::Qualified, "{:?}", report.findings);
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::Qualified,
+            "{:?}",
+            report.findings
+        );
         assert_eq!(report.registered_query_count, 2);
         let single = delayed_normal_mixture_boundary(8.0, 0.025, 1.0).unwrap();
         let multi = delayed_normal_mixture_boundary(8.0, 0.0125, 1.0).unwrap();
@@ -1453,10 +1544,16 @@ mod tests {
         let (mut scenario, oracle, trace) = fixture();
         scenario.queries[0].units[0].propensity_treatment = 1.0;
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::NotQualified);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == DelayedOutcomeFindingCode::InvalidPropensity
-        }));
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::NotQualified
+        );
+        assert!(
+            report
+                .findings
+                .iter()
+                .any(|finding| { finding.code == DelayedOutcomeFindingCode::InvalidPropensity })
+        );
     }
 
     #[test]
@@ -1465,12 +1562,19 @@ mod tests {
         scenario.familywise_alpha = 1.0;
         scenario.eta2 = 0.0;
         let report = evaluate_delayed_outcomes(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, DelayedOutcomeQualification::NotQualified);
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == DelayedOutcomeFindingCode::InvalidFamilywiseAlpha
-        }));
-        assert!(report.findings.iter().any(|finding| {
-            finding.code == DelayedOutcomeFindingCode::InvalidMixtureVariance
-        }));
+        assert_eq!(
+            report.qualification,
+            DelayedOutcomeQualification::NotQualified
+        );
+        assert!(
+            report.findings.iter().any(|finding| {
+                finding.code == DelayedOutcomeFindingCode::InvalidFamilywiseAlpha
+            })
+        );
+        assert!(
+            report.findings.iter().any(|finding| {
+                finding.code == DelayedOutcomeFindingCode::InvalidMixtureVariance
+            })
+        );
     }
 }
