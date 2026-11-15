@@ -68,7 +68,7 @@ The alpha level is per declared alternative. A campaign-level claim that searche
 
 ## Sequential falsification reference
 
-The sequential module adds predictable Gaussian likelihood-ratio e-processes:
+The sequential module adds predictable Gaussian likelihood-ratio e-processes and a deterministic adaptive-null simulation smoke test (20,000 paths, 100-look maximum horizon):
 
 - PredictableGaussianEProcess: one predeclared alternative, with a commit-prediction then observe protocol.
 - PredictableGaussianMixture: a fixed, normalized mixture over predeclared alternatives, also using commit then observe.
@@ -76,10 +76,12 @@ The sequential module adds predictable Gaussian likelihood-ratio e-processes:
 
 The one-step log likelihood ratio is:
 
-    d * y / sigma^2 - d^2 / (2 * sigma^2)
+    d_t * y_t / sigma_t^2 - d_t^2 / (2 * sigma_t^2)
+
+The per-step sigma_t is committed before the observation. The convenience constructor supplies a default sigma; commit_prediction_with_sigma and commit_predictions_with_sigma support known action-dependent measurement precision.
 
 The reported anytime p-value uses the running maximum e-value: min(1, exp(-max_log_e_value)). It does not reset when later evidence moves against an alternative.
 
-This is valid only under a simple conditional Gaussian null with known common sigma and a discrepancy committed predictably before the observation. It is not automatically valid for unknown variance, composite nulls, serial dependence, heteroskedasticity, post-hoc alternative selection or physical trajectories. The commit/observe API enforces local call order but cannot prove absence of out-of-band leakage.
+This is valid under a simple conditional Gaussian null with known, positive sigma_t committed predictably with the discrepancy before each observation. It therefore supports known action-dependent measurement variance. It is not automatically valid for unknown or estimated variance, composite nulls, serial dependence not captured by the conditional model, post-hoc alternative selection or physical trajectories. The commit/observe API enforces local call order but cannot prove absence of out-of-band leakage.
 
 See docs/research/SEQUENTIAL_FALSIFICATION_EPROCESS_V0_2026-11-15.md for assumptions, equations, benchmark controls and the distinction from SLICE and terminal-test induction.
