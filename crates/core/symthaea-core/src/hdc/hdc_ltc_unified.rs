@@ -2844,4 +2844,158 @@ mod tests {
         neuron.set_fourier_frequencies(&[5.0, 10.0, 15.0]);
         assert_eq!(neuron.config().fourier_frequencies, vec![5.0, 10.0, 15.0]);
     }
+
+    /// Frozen-parameter scalar gate law check. This is a pure algebraic test:
+    /// it does not claim that the state-dependent HDC-LTC neuron is an exact flow.
+    #[test]
+    fn exponential_rate_gate_is_partition_consistent_but_product_gate_is_not() {
+        let sigma_base = 0.5_f32;
+        let tau = 0.1_f32;
+        let dt = tau;
+        let lambda = -(1.0 - sigma_base).ln() / tau;
+
+        let rate_retention = |step: f32| (-lambda * step).exp();
+        let rate_one = rate_retention(dt);
+        let rate_two = rate_retention(dt / 2.0).powi(2);
+        assert!(
+            (rate_one - rate_two).abs() < 2e-7,
+            "exponential-rate retention must compose: full={rate_one}, halves={rate_two}"
+        );
+
+        let product_retention = |step: f32| {
+            1.0 - sigma_base * (1.0 - (-step / tau).exp())
+        };
+        let product_one = product_retention(dt);
+        let product_two = product_retention(dt / 2.0).powi(2);
+        assert!(
+            (product_one - product_two).abs() > 1e-2,
+            "product candidate is expected to fail frozen-parameter composition: \
+             full={product_one}, halves={product_two}"
+        );
+
+        let rate_sigma_at_zero = 1.0 - (-lambda * 0.0).exp();
+        assert_eq!(rate_sigma_at_zero, 0.0);
+    }
+
+    /// Acceptance regression for the currently known zero-time identity defect.
+    ///
+    /// This is intentionally ignored until a candidate update law is selected.
+    /// The test is compiled with the test target but is not evidence of a pass.
+    #[test]
+    #[ignore = "known source-level failure; enable after a qualified zero-time gate repair"]
+    fn closed_form_zero_dt_preserves_non_equilibrium_neuron_state() {
+        let dimension = 256;
+        let input = ContinuousHV::from_values(vec![-0.5; dimension]);
+
+        for seed in [42_u64, 73_u64] {
+            for activation in [
+                UnifiedActivation::Tanh,
+                UnifiedActivation::Sigmoid,
+                UnifiedActivation::SiLU,
+                UnifiedActivation::Identity,
+            ] {
+                let config = UnifiedConfig {
+                    dimension,
+                    activation,
+                    ..UnifiedConfig::default()
+                };
+                let mut neuron = HdcLtcUnifiedNeuron::new(config, seed);
+                let initial = ContinuousHV::from_values(vec![0.25; dimension]);
+                neuron.set_state(initial.clone());
+
+                let equilibrium = neuron.compute_equilibrium(&input);
+                let separation = initial
+                    .values
+                    .iter()
+                    .zip(equilibrium.values.iter())
+                    .map(|(a, b)| (a - b).powi(2))
+                    .sum::<f32>()
+                    .sqrt();
+                assert!(
+                    separation > 1e-3,
+                    "fixture must begin away from equilibrium, got {separation}"
+                );
+                assert!(
+                    neuron.compute_gating(&input, 0.0) > 0.0,
+                    "fixture must exercise a nonzero current gate"
+                );
+
+                neuron.evolve_closed_form(0.0, &input);
+                assert_eq!(
+                    neuron.state().values,
+                    initial.values,
+                    "zero elapsed time changed state for seed={seed}, activation={activation:?}"
+                );
+            }
+        }
+    }
+
+    /// The fused path shares the current gate and must obey the same identity
+    /// contract as the allocating/scalar closed-form path.
+    #[test]
+    #[ignore = "known source-level failure; enable after a qualified zero-time gate repair"]
+    fn fused_closed_form_zero_dt_preserves_non_equilibrium_neuron_state() {
+        let dimension = 256;
+        let config = UnifiedConfig {
+            dimension,
+            activation: UnifiedActivation::Tanh,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+        let initial = ContinuousHV::from_values(vec![0.25; dimension]);
+        let input = ContinuousHV::from_values(vec![-0.5; dimension]);
+        neuron.set_state(initial.clone());
+
+        neuron.evolve_closed_form_fused(0.0, &input);
+
+        assert_eq!(
+            neuron.state().values,
+            initial.values,
+            "fused zero-time evolution changed the neuron state"
+        );
+    }
+
+    /// Network-level identity regression. Every layer is placed away from its
+    /// equilibrium before a zero-duration update; all neuron states must persist.
+    #[test]
+    #[ignore = "known source-level failure; enable after a qualified zero-time gate repair"]
+    fn network_closed_form_zero_dt_preserves_all_neuron_states() {
+        let dimension = 256;
+        let config = UnifiedNetworkConfig {
+            layer_sizes: vec![2, 2],
+            neuron_config: UnifiedConfig {
+                dimension,
+                ..UnifiedConfig::default()
+            },
+            ..UnifiedNetworkConfig::default()
+        };
+        let mut network = HdcLtcUnifiedNetwork::new(config, 42);
+        let input = ContinuousHV::from_values(vec![-0.5; dimension]);
+
+        let mut expected = Vec::new();
+        for layer_idx in 0..network.n_layers() {
+            let layer = network.layer_mut(layer_idx).unwrap();
+            let mut layer_expected = Vec::new();
+            for (neuron_idx, neuron) in layer.iter_mut().enumerate() {
+                let value = 0.2 + neuron_idx as f32 * 0.05;
+                let state = ContinuousHV::from_values(vec![value; dimension]);
+                neuron.set_state(state.clone());
+                layer_expected.push(state.values);
+            }
+            expected.push(layer_expected);
+        }
+
+        network.evolve_closed_form(0.0, &input);
+
+        for (layer_idx, expected_layer) in expected.iter().enumerate() {
+            for (neuron_idx, expected_state) in expected_layer.iter().enumerate() {
+                assert_eq!(
+                    &network.layer(layer_idx).unwrap()[neuron_idx].state().values,
+                    expected_state,
+                    "zero-time network evolution changed layer={layer_idx}, neuron={neuron_idx}"
+                );
+            }
+        }
+    }
+
 }
