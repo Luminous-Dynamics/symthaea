@@ -5,6 +5,7 @@ on:
     paths:
       - "tools/mel-music-edit-intent-grounding-harness/**"
       - "benchmarks/mel/schemas/music-edit-intent-plan-v1.schema.json"
+      - "benchmarks/mel/schemas/music-source-observation-v1.schema.json"
       - "docs/research/MEL_MR_EVAL_044_INTENT_GROUNDING_V1_2026-11-15.md"
       - ".github/workflows/mel-music-edit-intent-grounding.yml"
   workflow_dispatch:
@@ -37,8 +38,10 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Validate intent-plan schema
-        run: python3 -m json.tool benchmarks/mel/schemas/music-edit-intent-plan-v1.schema.json >/dev/null
+      - name: Validate source-observation and intent-plan schemas
+        run: |
+          python3 -m json.tool benchmarks/mel/schemas/music-source-observation-v1.schema.json >/dev/null
+          python3 -m json.tool benchmarks/mel/schemas/music-edit-intent-plan-v1.schema.json >/dev/null
 
       - name: Stage standalone intent harness outside workspace
         shell: bash
@@ -77,7 +80,8 @@ jobs:
           sha256sum tools/mel-music-edit-intent-grounding-harness/Cargo.toml > "$evidence/manifest.sha256"
           sha256sum tools/mel-music-edit-intent-grounding-harness/src/lib.rs > "$evidence/library.sha256"
           sha256sum tools/mel-music-edit-intent-grounding-harness/examples/grounded_plan.rs > "$evidence/example.sha256"
-          sha256sum benchmarks/mel/schemas/music-edit-intent-plan-v1.schema.json > "$evidence/schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-edit-intent-plan-v1.schema.json > "$evidence/intent-plan-schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-source-observation-v1.schema.json > "$evidence/source-observation-schema.sha256"
           cp "$(dirname "$MEL_INTENT_MANIFEST")/Cargo.lock" "$evidence/Cargo.lock"
           sha256sum "$evidence/Cargo.lock" > "$evidence/Cargo.lock.sha256"
           printf 'exact_head=%s\n' "$MEL_INTENT_REVISION" > "$evidence/source-identities.txt"
