@@ -1,5 +1,4 @@
 {
-  "$schema": "https://luminousdynamics.io/atelier/schemas/reconfigurable-textile-cell-profile-v0.1.0.schema.json",
   "profile_version": "0.1.0",
   "profile_id": "urn:example:atelier:cell:woven-sew-cell-01",
   "revision": 1,
