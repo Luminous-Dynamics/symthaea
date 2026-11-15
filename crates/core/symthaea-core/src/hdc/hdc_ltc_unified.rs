@@ -1786,6 +1786,43 @@ impl NetworkStateSnapshot {
         self.neuron_states.first().map(|hv| hv.values.len())
     }
 
+    #[cfg(test)]
+    fn snapshot_with(state_value: f32, total_time: f64, updates: u64) -> Self {
+        Self {
+            neuron_states: vec![ContinuousHV::from_values(vec![state_value; 4])],
+            layer_outputs: vec![ContinuousHV::from_values(vec![state_value; 4])],
+            neuron_clocks: vec![(total_time, updates)],
+        }
+    }
+
+    /// Compare only the state vectors and cached layer outputs, deliberately
+    /// excluding per-neuron clocks/call counters. A zero-duration transition
+    /// may preserve the mathematical state while still recording an attempted
+    /// update; callers should qualify those bookkeeping semantics separately.
+    pub fn state_values_approx_eq(&self, other: &Self, eps: f32) -> bool {
+        if self.neuron_states.len() != other.neuron_states.len()
+            || self.layer_outputs.len() != other.layer_outputs.len()
+        {
+            return false;
+        }
+        let hv_eq = |a: &ContinuousHV, b: &ContinuousHV| {
+            a.values.len() == b.values.len()
+                && a.values
+                    .iter()
+                    .zip(b.values.iter())
+                    .all(|(x, y)| (x - y).abs() <= eps)
+        };
+        self.neuron_states
+            .iter()
+            .zip(other.neuron_states.iter())
+            .all(|(a, b)| hv_eq(a, b))
+            && self
+                .layer_outputs
+                .iter()
+                .zip(other.layer_outputs.iter())
+                .all(|(a, b)| hv_eq(a, b))
+    }
+
     /// Element-wise approximate equality of two snapshots (states, layer
     /// outputs, and evolution clocks). The formal test surface for
     /// "this operation does not perturb evolution state".
@@ -2212,6 +2249,75 @@ pub struct UnifiedNetworkStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn snapshot_state_comparison_excludes_call_clocks_but_full_comparison_does_not() {
+        let before = NetworkStateSnapshot::snapshot_with(0.25, 1.0, 7);
+        let after_zero_dt = NetworkStateSnapshot::snapshot_with(0.25, 1.0, 8);
+        let after_elapsed_dt = NetworkStateSnapshot::snapshot_with(0.25, 1.1, 8);
+        let after_state_change = NetworkStateSnapshot::snapshot_with(0.3, 1.0, 8);
+
+        assert!(before.state_values_approx_eq(&after_zero_dt, 1e-7));
+        assert!(!before.approx_eq(&after_zero_dt, 1e-7));
+        assert!(!before.approx_eq(&after_elapsed_dt, 1e-7));
+        assert!(!before.state_values_approx_eq(&after_state_change, 1e-7));
+    }
+
+    #[test]
+    fn scalar_tau_neuron_is_equivariant_to_joint_hdc_coordinate_permutation() {
+        let dimension = 128;
+        let config = UnifiedConfig {
+            dimension,
+            ..UnifiedConfig::default()
+        };
+        let mut reference = HdcLtcUnifiedNeuron::new(config.clone(), 0x51A1);
+        let mut permuted = HdcLtcUnifiedNeuron::new(config, 0x51A1);
+
+        // Reversal is a deterministic bijection; every coordinate-bearing
+        // object must use the same map for this basis relabeling.
+        let permutation: Vec<usize> = (0..dimension).rev().collect();
+        let permute_hv = |hv: &ContinuousHV| {
+            ContinuousHV::from_values(
+                permutation
+                    .iter()
+                    .map(|&source| hv.values[source])
+                    .collect(),
+            )
+        };
+
+        let initial = ContinuousHV::random(dimension, 0xA11CE);
+        let input = ContinuousHV::random(dimension, 0xBEEF);
+        reference.set_state(initial.clone());
+        permuted.set_state(permute_hv(&initial));
+
+        permuted.weight_hv = permute_hv(&permuted.weight_hv);
+        permuted.input_mask = permute_hv(&permuted.input_mask);
+        permuted.tau_modulator = permute_hv(&permuted.tau_modulator);
+        permuted.gate_weight = permute_hv(&permuted.gate_weight);
+        permuted.gate_bias = permute_hv(&permuted.gate_bias);
+
+        let permuted_input = permute_hv(&input);
+        reference.evolve_closed_form(0.037, &input);
+        permuted.evolve_closed_form(0.037, &permuted_input);
+
+        let expected = permute_hv(reference.state());
+        let max_error = expected
+            .values
+            .iter()
+            .zip(permuted.state().values.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            max_error < 2e-6,
+            "joint coordinate permutation should commute with scalar-tau evolution; \
+             max absolute error={max_error}"
+        );
+        assert!(
+            (reference.effective_tau(&input) - permuted.effective_tau(&permuted_input)).abs()
+                < 2e-6,
+            "effective scalar tau must be invariant under coordinate relabeling"
+        );
+    }
 
     #[test]
     fn test_unified_neuron_creation() {
@@ -2844,4 +2950,473 @@ mod tests {
         neuron.set_fourier_frequencies(&[5.0, 10.0, 15.0]);
         assert_eq!(neuron.config().fourier_frequencies, vec![5.0, 10.0, 15.0]);
     }
+
+    /// Isolated scalar update-law candidates. These are test-only oracles;
+    /// they do not alter the production neuron or assert full nonlinear flow exactness.
+    #[derive(Debug, Clone, Copy)]
+    enum GateLawCandidate {
+        Current,
+        Product,
+        ExponentialRate,
+        SigmoidRate,
+        Ungated,
+    }
+
+    fn candidate_softplus(x: f32) -> f32 {
+        x.max(0.0) + (-x.abs()).exp().ln_1p()
+    }
+
+    fn candidate_gate_sigma(law: GateLawCandidate, gate_logit: f32, tau: f32, dt: f32) -> f32 {
+        let sigma_base = 1.0 / (1.0 + (-gate_logit).exp());
+        let relaxation = -(-dt / tau).exp_m1();
+        match law {
+            GateLawCandidate::Current => {
+                1.0 - (-dt / tau).exp() * (1.0 - sigma_base)
+            }
+            GateLawCandidate::Product => sigma_base * relaxation,
+            GateLawCandidate::ExponentialRate => {
+                let lambda = candidate_softplus(gate_logit) / tau;
+                -(-lambda * dt).exp_m1()
+            }
+            GateLawCandidate::SigmoidRate => {
+                let lambda = sigma_base / tau;
+                -(-lambda * dt).exp_m1()
+            }
+            GateLawCandidate::Ungated => relaxation,
+        }
+    }
+
+    /// Compare all five scalar laws with frozen equilibrium, gate and tau.
+    /// Rate-modulated and ungated exponential relaxation should form a semigroup.
+    #[test]
+    fn gate_law_candidates_separate_identity_gate_semantics_and_composition() {
+        let gate_logit = 0.0_f32;
+        let sigma_base = 1.0 / (1.0 + (-gate_logit).exp());
+        let tau = 0.1_f32;
+        let dt = tau;
+        let laws = [
+            GateLawCandidate::Current,
+            GateLawCandidate::Product,
+            GateLawCandidate::ExponentialRate,
+            GateLawCandidate::SigmoidRate,
+            GateLawCandidate::Ungated,
+        ];
+
+        let sigma_at_zero: Vec<f32> = laws
+            .iter()
+            .map(|law| candidate_gate_sigma(*law, gate_logit, tau, 0.0))
+            .collect();
+        assert!(sigma_at_zero[0] > 0.0, "current gate is the identity-failing control");
+        assert!(sigma_at_zero[1..].iter().all(|&sigma| sigma == 0.0));
+
+        let rate_at_tau = candidate_gate_sigma(GateLawCandidate::ExponentialRate, gate_logit, tau, tau);
+        assert!(
+            (rate_at_tau - sigma_base).abs() < 2e-7,
+            "softplus-rate mapping must preserve the original gate at dt=tau"
+        );
+        let sigmoid_rate_at_tau =
+            candidate_gate_sigma(GateLawCandidate::SigmoidRate, gate_logit, tau, tau);
+        let expected_sigmoid_rate_at_tau = -(-sigma_base).exp_m1();
+        assert!(
+            (sigmoid_rate_at_tau - expected_sigmoid_rate_at_tau).abs() < 2e-7,
+            "sigmoid-rate mapping must equal 1-exp(-sigma_base) at dt=tau"
+        );
+
+        let retention = |law: GateLawCandidate, step: f32| {
+            1.0 - candidate_gate_sigma(law, gate_logit, tau, step)
+        };
+        for law in laws {
+            let full = retention(law, dt);
+            let halves = retention(law, dt / 2.0).powi(2);
+            let composition_error = (full - halves).abs();
+            match law {
+                GateLawCandidate::ExponentialRate
+                | GateLawCandidate::SigmoidRate
+                | GateLawCandidate::Ungated => assert!(
+                    composition_error < 2e-7,
+                    "{law:?} must compose for frozen parameters: full={full}, halves={halves}"
+                ),
+                GateLawCandidate::Current | GateLawCandidate::Product => assert!(
+                    composition_error > 1e-2,
+                    "{law:?} is expected to fail frozen-parameter composition: \
+                     full={full}, halves={halves}"
+                ),
+            }
+        }
+
+        // All candidates should be monotone over positive time for finite inputs.
+        for law in laws {
+            let mut previous = candidate_gate_sigma(law, gate_logit, tau, 0.0);
+            for step in [1e-5_f32, 1e-4, 1e-3, 1e-2, 0.1, 1.0] {
+                let current = candidate_gate_sigma(law, gate_logit, tau, step);
+                assert!(current >= previous, "{law:?} was not monotone at dt={step}");
+                assert!(current.is_finite() && (0.0..=1.0).contains(&current));
+                previous = current;
+            }
+        }
+
+        // Both rate parameterizations are invariant to a consistent change of time units.
+        for scale in [0.1_f32, 10.0_f32, 1000.0_f32] {
+            for (law, expected) in [
+                (GateLawCandidate::ExponentialRate, rate_at_tau),
+                (GateLawCandidate::SigmoidRate, sigmoid_rate_at_tau),
+            ] {
+                let scaled = candidate_gate_sigma(law, gate_logit, tau * scale, dt * scale);
+                assert!(
+                    (scaled - expected).abs() < 2e-7,
+                    "{law:?} time-unit scaling changed interpolation at scale={scale}"
+                );
+            }
+        }
+
+        let large_logit_rate = candidate_softplus(80.0) / tau;
+        assert!(
+            large_logit_rate.is_finite() && large_logit_rate > 0.0,
+            "softplus rate must remain finite for large positive logits"
+        );
+    }
+
+
+    /// Exercise exponential rate candidates over extreme gate logits and
+    /// elapsed-time scales. This is a scalar numerical qualification, not a
+    /// state-dependent neuron trajectory result.
+    #[test]
+    fn exponential_gate_rates_are_finite_monotone_and_partition_stable() {
+        let tau = 0.07_f32;
+        for gate_logit in [-80.0_f32, -20.0, -5.0, -1.0, 0.0, 1.0, 5.0, 20.0, 80.0] {
+            for law in [
+                GateLawCandidate::ExponentialRate,
+                GateLawCandidate::SigmoidRate,
+                GateLawCandidate::Ungated,
+            ] {
+                let sigma_base = 1.0 / (1.0 + (-gate_logit).exp());
+                let at_tau = candidate_gate_sigma(law, gate_logit, tau, tau);
+                let expected = match law {
+                    GateLawCandidate::ExponentialRate => sigma_base,
+                    GateLawCandidate::SigmoidRate => -(-sigma_base).exp_m1(),
+                    GateLawCandidate::Ungated => -(-1.0_f32).exp_m1(),
+                    _ => unreachable!(),
+                };
+                assert!(
+                    (at_tau - expected).abs() < 2e-6,
+                    "{law:?} gate semantics changed for logit={gate_logit}: \
+                     got={at_tau}, expected={expected}"
+                );
+
+                let mut previous = 0.0_f32;
+                for ratio in [0.0_f32, 1e-6, 1e-4, 0.01, 0.1, 1.0, 10.0, 100.0] {
+                    let sigma = candidate_gate_sigma(law, gate_logit, tau, tau * ratio);
+                    assert!(
+                        sigma.is_finite() && (0.0..=1.0).contains(&sigma),
+                        "{law:?} non-finite/out-of-range sigma for logit={gate_logit}, ratio={ratio}: {sigma}"
+                    );
+                    assert!(
+                        sigma >= previous,
+                        "{law:?} lost monotonicity for logit={gate_logit}, ratio={ratio}"
+                    );
+                    previous = sigma;
+                }
+
+                for ratio in [0.1_f32, 1.0, 10.0] {
+                    let dt = tau * ratio;
+                    let full_retention = 1.0 - candidate_gate_sigma(law, gate_logit, tau, dt);
+                    for parts in [2_i32, 5, 16] {
+                        let part_dt = dt / parts as f32;
+                        let part_retention =
+                            1.0 - candidate_gate_sigma(law, gate_logit, tau, part_dt);
+                        let partitioned = part_retention.powi(parts);
+                        assert!(
+                            (full_retention - partitioned).abs() < 3e-5,
+                            "{law:?} partition error for logit={gate_logit}, \
+                             ratio={ratio}, parts={parts}: full={full_retention}, \
+                             partitioned={partitioned}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// The active scalar-gate neuron should be equivariant to a consistent
+    /// relabeling of hypervector coordinates. Coordinate indices are not
+    /// semantic channels unless an explicit basis/partition says otherwise.
+    #[test]
+    fn scalar_hdc_ltc_dynamics_are_coordinate_permutation_equivariant() {
+        let dimension = 256;
+        let shift = 37;
+        let config = UnifiedConfig {
+            dimension,
+            fourier_frequencies: Vec::new(),
+            ..UnifiedConfig::default()
+        };
+        let values = |phase: f32| {
+            (0..dimension)
+                .map(|i| ((i as f32 + phase) * 0.071).sin() * 0.7)
+                .collect::<Vec<f32>>()
+        };
+        let mut original = HdcLtcUnifiedNeuron::new(config, 901);
+        original.state = ContinuousHV::from_values(values(0.3));
+        original.weight_hv = ContinuousHV::from_values(values(1.1));
+        original.input_mask = ContinuousHV::from_values(values(2.3));
+        original.tau_modulator = ContinuousHV::from_values(values(3.7));
+        original.gate_weight = ContinuousHV::from_values(values(4.9));
+        original.gate_bias = ContinuousHV::from_values(values(5.3));
+
+        let permute = |source: &[f32]| {
+            let mut result = vec![0.0; source.len()];
+            for (index, value) in source.iter().enumerate() {
+                result[(index + shift) % source.len()] = *value;
+            }
+            result
+        };
+        let mut permuted = original.clone();
+        permuted.state = ContinuousHV::from_values(permute(&original.state.values));
+        permuted.weight_hv = ContinuousHV::from_values(permute(&original.weight_hv.values));
+        permuted.input_mask = ContinuousHV::from_values(permute(&original.input_mask.values));
+        permuted.tau_modulator =
+            ContinuousHV::from_values(permute(&original.tau_modulator.values));
+        permuted.gate_weight = ContinuousHV::from_values(permute(&original.gate_weight.values));
+        permuted.gate_bias = ContinuousHV::from_values(permute(&original.gate_bias.values));
+
+        let input = ContinuousHV::from_values(values(7.1));
+        let permuted_input = ContinuousHV::from_values(permute(&input.values));
+        original.evolve_closed_form(0.037, &input);
+        permuted.evolve_closed_form(0.037, &permuted_input);
+
+        let expected = permute(&original.state.values);
+        let max_error = expected
+            .iter()
+            .zip(permuted.state.values.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            max_error < 2e-5,
+            "consistent coordinate permutation changed scalar HDC-LTC dynamics: max error={max_error}"
+        );
+    }
+
+
+    /// The fused/SIMD path uses a rational tanh approximation. Verify its
+    /// output remains within the documented approximation envelope of the
+    /// allocating scalar reference for the same state, parameters and input.
+    #[test]
+    fn fused_closed_form_matches_scalar_reference_within_tanh_approximation_bound() {
+        let dimension = 256;
+        let config = UnifiedConfig {
+            dimension,
+            activation: UnifiedActivation::Tanh,
+            ..UnifiedConfig::default()
+        };
+        let mut scalar = HdcLtcUnifiedNeuron::new(config, 442);
+        let mut fused = scalar.clone();
+        let initial: Vec<f32> = (0..dimension)
+            .map(|i| ((i as f32) * 0.037).sin() * 0.4)
+            .collect();
+        let input_values: Vec<f32> = (0..dimension)
+            .map(|i| ((i as f32 + 9.0) * 0.053).cos() * 0.6)
+            .collect();
+        let initial_hv = ContinuousHV::from_values(initial);
+        let input = ContinuousHV::from_values(input_values);
+        scalar.set_state(initial_hv.clone());
+        fused.set_state(initial_hv);
+
+        scalar.evolve_closed_form(0.037, &input);
+        fused.evolve_closed_form_fused(0.037, &input);
+
+        let max_error = scalar
+            .state()
+            .values
+            .iter()
+            .zip(fused.state().values.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            max_error < 5e-3,
+            "fused/SIMD tanh path exceeded the declared approximation envelope: max error={max_error}"
+        );
+    }
+
+    /// Acceptance regression for the currently known zero-time identity defect.
+    ///
+    /// This is intentionally ignored until a candidate update law is selected.
+    /// The test is compiled with the test target but is not evidence of a pass.
+    #[test]
+    #[ignore = "known source-level failure; enable after a qualified zero-time gate repair"]
+    fn closed_form_zero_dt_preserves_non_equilibrium_neuron_state() {
+        let dimension = 256;
+        let input = ContinuousHV::from_values(vec![-0.5; dimension]);
+
+        for seed in [42_u64, 73_u64] {
+            for activation in [
+                UnifiedActivation::Tanh,
+                UnifiedActivation::Sigmoid,
+                UnifiedActivation::SiLU,
+                UnifiedActivation::Identity,
+            ] {
+                let config = UnifiedConfig {
+                    dimension,
+                    activation,
+                    ..UnifiedConfig::default()
+                };
+                let mut neuron = HdcLtcUnifiedNeuron::new(config, seed);
+                let initial = ContinuousHV::from_values(vec![0.25; dimension]);
+                neuron.set_state(initial.clone());
+
+                let equilibrium = neuron.compute_equilibrium(&input);
+                let separation = initial
+                    .values
+                    .iter()
+                    .zip(equilibrium.values.iter())
+                    .map(|(a, b)| (a - b).powi(2))
+                    .sum::<f32>()
+                    .sqrt();
+                assert!(
+                    separation > 1e-3,
+                    "fixture must begin away from equilibrium, got {separation}"
+                );
+                assert!(
+                    neuron.compute_gating(&input, 0.0) > 0.0,
+                    "fixture must exercise a nonzero current gate"
+                );
+
+                neuron.evolve_closed_form(0.0, &input);
+                assert_eq!(
+                    neuron.state().values,
+                    initial.values,
+                    "zero elapsed time changed state for seed={seed}, activation={activation:?}"
+                );
+            }
+        }
+    }
+
+    /// The fused path shares the current gate and must obey the same identity
+    /// contract as the allocating/scalar closed-form path.
+    #[test]
+    #[ignore = "known source-level failure; enable after a qualified zero-time gate repair"]
+    fn fused_closed_form_zero_dt_preserves_non_equilibrium_neuron_state() {
+        let dimension = 256;
+        let config = UnifiedConfig {
+            dimension,
+            activation: UnifiedActivation::Tanh,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+        let initial = ContinuousHV::from_values(vec![0.25; dimension]);
+        let input = ContinuousHV::from_values(vec![-0.5; dimension]);
+        neuron.set_state(initial.clone());
+
+        neuron.evolve_closed_form_fused(0.0, &input);
+
+        assert_eq!(
+            neuron.state().values,
+            initial.values,
+            "fused zero-time evolution changed the neuron state"
+        );
+    }
+
+    /// Network-level identity regression. Every layer is placed away from its
+    /// equilibrium before a zero-duration update; all neuron states must persist.
+    #[test]
+    #[ignore = "known source-level failure; enable after a qualified zero-time gate repair"]
+    fn network_closed_form_zero_dt_preserves_all_neuron_states() {
+        let dimension = 256;
+        let config = UnifiedNetworkConfig {
+            layer_sizes: vec![2, 2],
+            neuron_config: UnifiedConfig {
+                dimension,
+                ..UnifiedConfig::default()
+            },
+            ..UnifiedNetworkConfig::default()
+        };
+        let mut network = HdcLtcUnifiedNetwork::new(config, 42);
+        let input = ContinuousHV::from_values(vec![-0.5; dimension]);
+
+        let mut expected = Vec::new();
+        for layer_idx in 0..network.n_layers() {
+            let layer = network.layer_mut(layer_idx).unwrap();
+            let mut layer_expected = Vec::new();
+            for (neuron_idx, neuron) in layer.iter_mut().enumerate() {
+                let value = 0.2 + neuron_idx as f32 * 0.05;
+                let state = ContinuousHV::from_values(vec![value; dimension]);
+                neuron.set_state(state.clone());
+                layer_expected.push(state.values);
+            }
+            expected.push(layer_expected);
+        }
+
+        network.evolve_closed_form(0.0, &input);
+
+        for (layer_idx, expected_layer) in expected.iter().enumerate() {
+            for (neuron_idx, expected_state) in expected_layer.iter().enumerate() {
+                assert_eq!(
+                    &network.layer(layer_idx).unwrap()[neuron_idx].state().values,
+                    expected_state,
+                    "zero-time network evolution changed layer={layer_idx}, neuron={neuron_idx}"
+                );
+            }
+        }
+    }
+
+
+    /// Exponential-relaxation reference paths should preserve state at zero dt.
+    /// This is a positive control for the identity regression fixtures.
+    #[test]
+    fn exponential_reference_paths_preserve_zero_dt_state() {
+        let dimension = 256;
+        let config = UnifiedConfig {
+            dimension,
+            ..UnifiedConfig::default()
+        };
+        let initial = ContinuousHV::from_values(vec![0.25; dimension]);
+        let input = ContinuousHV::from_values(vec![-0.5; dimension]);
+
+        let mut exact = HdcLtcUnifiedNeuron::new(config.clone(), 42);
+        exact.set_state(initial.clone());
+        let exact_before = exact.stats();
+        exact.evolve_closed_form_exact(0.0, &input);
+        let exact_after = exact.stats();
+        assert_eq!(exact.state().values, initial.values);
+        assert_eq!(exact_after.total_time, exact_before.total_time);
+        assert_eq!(exact_after.update_count, exact_before.update_count + 1);
+
+        let mut iterative = HdcLtcUnifiedNeuron::new(config, 42);
+        iterative.set_state(initial.clone());
+        let iterative_before = iterative.stats();
+        iterative.evolve_closed_form_iterative(0.0, &input);
+        let iterative_after = iterative.stats();
+        assert_eq!(iterative.state().values, initial.values);
+        assert_eq!(iterative_after.total_time, iterative_before.total_time);
+        assert_eq!(iterative_after.update_count, iterative_before.update_count + 1);
+    }
+
+    /// Right-continuity acceptance regression for the adaptive-gate path.
+    #[test]
+    #[ignore = "known source-level failure; enable after a qualified zero-time gate repair"]
+    fn closed_form_small_positive_dt_tends_to_identity() {
+        let dimension = 256;
+        let config = UnifiedConfig {
+            dimension,
+            ..UnifiedConfig::default()
+        };
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 42);
+        neuron.set_state(ContinuousHV::from_values(vec![0.25; dimension]));
+        let input = ContinuousHV::from_values(vec![-0.5; dimension]);
+        let before = neuron.state().clone();
+
+        neuron.evolve_closed_form(1e-6, &input);
+
+        let change = neuron
+            .state()
+            .values
+            .iter()
+            .zip(before.values.iter())
+            .map(|(a, b)| (a - b).powi(2))
+            .sum::<f32>()
+            .sqrt();
+        assert!(
+            change < 1e-3,
+            "state change must approach zero with dt, got {change}"
+        );
+    }
+
 }

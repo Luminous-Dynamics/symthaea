@@ -1388,4 +1388,51 @@ mod tests {
             "should resize after cooldown"
         );
     }
+
+    /// End-to-end bridge identity regression. The baseline gate is known to
+    /// violate this property, so keep the acceptance test ignored until the
+    /// update law is repaired and the neuron/network gates are qualified.
+    #[test]
+    #[ignore = "known source-level failure; enable after a qualified zero-time gate repair"]
+    fn zero_dt_bridge_step_preserves_live_dynamics_and_output() {
+        let config = HdcLtcBridgeConfig {
+            input_dim: 8,
+            output_dim: 8,
+            layer_sizes: vec![2, 2],
+            hdc_dim: 256,
+            seed: 17,
+            ..Default::default()
+        };
+        let mut bridge = HdcLtcBridge::new(config);
+
+        let warm_input = Array1::from_vec(vec![0.25; 8]);
+        let next_input = Array1::from_vec(vec![-0.4; 8]);
+        bridge.step(&warm_input, 0.05).unwrap();
+
+        let before_state = bridge.snapshot_evolution_state();
+        let before_output = bridge.current_output.clone();
+        let before_steps = bridge.total_steps();
+        let before_neuron = bridge.network.layer(0).unwrap()[0].stats();
+
+        bridge.step(&next_input, 0.0).unwrap();
+
+        let after_state = bridge.snapshot_evolution_state();
+        let after_neuron = bridge.network.layer(0).unwrap()[0].stats();
+
+        assert!(
+            before_state.state_values_approx_eq(&after_state, 1e-7),
+            "zero elapsed time changed bridge neuron states or cached layer outputs"
+        );
+        assert_eq!(
+            bridge.current_output, before_output,
+            "zero elapsed time changed the bridge readout"
+        );
+
+        // A zero-duration call is still an attempted update: accounting may
+        // advance even though physical/evolution time and state values do not.
+        assert_eq!(bridge.total_steps(), before_steps + 1);
+        assert_eq!(after_neuron.update_count, before_neuron.update_count + 1);
+        assert_eq!(after_neuron.total_time, before_neuron.total_time);
+    }
+
 }
