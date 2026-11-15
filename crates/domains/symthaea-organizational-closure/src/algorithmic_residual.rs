@@ -660,13 +660,22 @@ pub fn evaluate_algorithmic_residual(
     }
     if scenario.calibration_selected_baseline_id != oracle.baseline_selection.selected_algorithm_id
         || scenario.calibration_split_digest != oracle.baseline_selection.calibration_split_digest
-        || scenario.evaluation_split_digest != oracle.baseline_selection.evaluation_split_digest {
-        finding(&mut findings, ResidualFindingCode::BaselineSelectionMismatch, None, None,
+        || scenario.evaluation_split_digest != oracle.baseline_selection.evaluation_split_digest
+    {
+        finding(
+            &mut findings,
+            ResidualFindingCode::BaselineSelectionMismatch,
+            None,
+            None,
             "baseline ID or split digests differ from the evaluator's calibration receipt",
         );
     }
     if scenario.algorithm_registry_digest != oracle.baseline_selection.algorithm_registry_digest {
-        finding(&mut findings, ResidualFindingCode::AlgorithmRegistryMismatch, None, None,
+        finding(
+            &mut findings,
+            ResidualFindingCode::AlgorithmRegistryMismatch,
+            None,
+            None,
             "algorithm registry digest differs from the evaluator's frozen receipt",
         );
     }
