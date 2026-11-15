@@ -189,8 +189,12 @@ impl AgentTurnRequest {
         if self.authority.allowed_actions.is_empty() {
             bail!("authority.allowed_actions must not be empty");
         }
+        let mut allowed_action_set = HashSet::new();
         for action in &self.authority.allowed_actions {
             require_member("authority action", action, ALLOWED_ACTIONS)?;
+            if !allowed_action_set.insert(action.as_str()) {
+                bail!("duplicate authority action {action:?}");
+            }
         }
         if self.budget.max_output_tokens == 0 || self.budget.deadline_ms_remaining == 0 {
             bail!("decision budget is exhausted");
@@ -334,6 +338,11 @@ impl AgentProtocolGuard {
             "defer" => {
                 let reason = decision.reason.as_deref().context("defer requires reason")?;
                 require_nonempty("defer reason", reason)?;
+                if decision.blocked_on.is_empty()
+                    || decision.blocked_on.iter().any(|item| item.trim().is_empty())
+                {
+                    bail!("defer requires at least one non-empty blocker");
+                }
                 ensure_no_tool_fields(decision)?;
                 if decision.question.is_some()
                     || decision.why_required.is_some()
