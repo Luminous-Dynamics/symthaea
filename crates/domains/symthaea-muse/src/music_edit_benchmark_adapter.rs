@@ -2061,7 +2061,7 @@ pub fn materialize_verified_pcm_wav_v1(
         return Err(receipt_issues);
     }
     if !matches!(
-        role,
+        &role,
         MusicEditMaterializedArtifactRoleV1::SourceAudio
             | MusicEditMaterializedArtifactRoleV1::TargetAudio
     ) {
@@ -2154,7 +2154,11 @@ pub fn materialize_verified_pcm_wav_v1(
             operation: "audio_metadata_before_read".to_owned(),
         }]
     })?;
-    if !before.is_file() || before.len() == 0 || before.len() > limits.max_artifact_bytes {
+    if !before.is_file()
+        || before.len() == 0
+        || before.len() > limits.max_artifact_bytes
+        || before.len() > limits.max_total_bytes
+    {
         return Err(vec![MusicEditMaterializationIssueV1::ArtifactTooLarge {
             path: artifact.relative_path.clone(),
             observed: before.len(),
@@ -2287,6 +2291,45 @@ mod materialization_tests {
         }
     }
 
+    fn pcm_wav_fixture(sample_rate: u32, channels: u16, samples: &[i16]) -> Vec<u8> {
+        assert!((1..=2).contains(&channels));
+        assert!(samples.len().is_multiple_of(usize::from(channels)));
+        let mut data = Vec::with_capacity(samples.len() * 2);
+        for sample in samples {
+            data.extend_from_slice(&sample.to_le_bytes());
+        }
+        let block_align = channels * 2;
+        let byte_rate = sample_rate * u32::from(block_align);
+        let riff_size = 4 + 8 + 16 + 8 + data.len() as u32;
+        let mut bytes = Vec::with_capacity(8 + riff_size as usize);
+        bytes.extend_from_slice(b"RIFF");
+        bytes.extend_from_slice(&riff_size.to_le_bytes());
+        bytes.extend_from_slice(b"WAVE");
+        bytes.extend_from_slice(b"fmt ");
+        bytes.extend_from_slice(&16_u32.to_le_bytes());
+        bytes.extend_from_slice(&1_u16.to_le_bytes());
+        bytes.extend_from_slice(&channels.to_le_bytes());
+        bytes.extend_from_slice(&sample_rate.to_le_bytes());
+        bytes.extend_from_slice(&byte_rate.to_le_bytes());
+        bytes.extend_from_slice(&block_align.to_le_bytes());
+        bytes.extend_from_slice(&16_u16.to_le_bytes());
+        bytes.extend_from_slice(b"data");
+        bytes.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        bytes.extend_from_slice(&data);
+        bytes
+    }
+
+    fn manifest_map_with_source_wav(
+        root: &TestRoot,
+    ) -> (MusicEditDatasetManifestV1, MusicEditArtifactMapV1, Vec<u8>) {
+        let (mut manifest, artifact_map) = manifest_and_map(root);
+        let wav = pcm_wav_fixture(48_000, 2, &[0, 100, -200, 300, -400, 500]);
+        fs::write(root.0.join("samples/one/source.wav"), &wav).unwrap();
+        manifest.rows[0].source_audio_sha256 =
+            format!("{:x}", Sha256::digest(&wav));
+        (manifest, artifact_map, wav)
+    }
+
     fn manifest_and_map(root: &TestRoot) -> (MusicEditDatasetManifestV1, MusicEditArtifactMapV1) {
         let rights = b"synthetic rights evidence v1";
         let source = b"synthetic source audio bytes";
@@ -2372,6 +2415,154 @@ mod materialization_tests {
             &artifact_map
         )
         .is_empty());
+    }
+
+    #[test]
+    fn exact_materialized_pcm_wav_becomes_opaque_sample_token() {
+        let root = TestRoot::new();
+        let (manifest, artifact_map, wav) = manifest_map_with_source_wav(&root);
+        let receipt = materialize_music_edit_dataset_v1(
+            &root.0,
+            &manifest,
+            &artifact_map,
+            MusicEditMaterializationLimitsV1::default(),
+        ).unwrap();
+        let token = materialize_verified_pcm_wav_v1(
+            &root.0,
+            &receipt,
+            &manifest,
+            &artifact_map,
+            "sample-one",
+            MusicEditMaterializedArtifactRoleV1::SourceAudio,
+            MusicEditMaterializationLimitsV1::default(),
+        ).unwrap();
+        assert_eq!(token.sample_id(), "sample-one");
+        assert_eq!(token.source_lineage_sha256(), manifest.rows[0].source_lineage_sha256);
+        assert_eq!(token.role(), &MusicEditMaterializedArtifactRoleV1::SourceAudio);
+        assert_eq!(token.materialization_receipt_sha256(), receipt.receipt_sha256);
+        assert_eq!(token.container_sha256(), &format!("{:x}", Sha256::digest(&wav)));
+        assert_eq!(token.container_byte_len(), wav.len() as u64);
+        assert_eq!(token.sample_rate_hz(), 48_000);
+        assert_eq!(token.channels(), 2);
+        assert_eq!(token.frame_count(), 3);
+        assert_eq!(token.samples(), &[0, 100, -200, 300, -400, 500]);
+        assert_eq!(
+            token.pcm_sha256(),
+            pcm_samples_sha256_v1(48_000, 2, 3, &[0, 100, -200, 300, -400, 500])
+        );
+        assert!(is_materialization_sha256(token.token_sha256()));
+    }
+
+    #[test]
+    fn bytes_changed_after_materialization_receipt_are_rejected_before_decode() {
+        let root = TestRoot::new();
+        let (manifest, artifact_map, _wav) = manifest_map_with_source_wav(&root);
+        let receipt = materialize_music_edit_dataset_v1(
+            &root.0,
+            &manifest,
+            &artifact_map,
+            MusicEditMaterializationLimitsV1::default(),
+        ).unwrap();
+        let replacement = pcm_wav_fixture(48_000, 2, &[1, 2, 3, 4, 5, 6]);
+        fs::write(root.0.join("samples/one/source.wav"), replacement).unwrap();
+        let result = materialize_verified_pcm_wav_v1(
+            &root.0,
+            &receipt,
+            &manifest,
+            &artifact_map,
+            "sample-one",
+            MusicEditMaterializedArtifactRoleV1::SourceAudio,
+            MusicEditMaterializationLimitsV1::default(),
+        );
+        assert!(matches!(
+            result,
+            Err(issues) if issues.iter().any(|issue| matches!(
+                issue,
+                MusicEditMaterializationIssueV1::DigestMismatch {
+                    role: MusicEditMaterializedArtifactRoleV1::SourceAudio,
+                    ..
+                }
+            ))
+        ));
+    }
+
+    #[test]
+    fn unsupported_role_cannot_be_promoted_to_audio() {
+        let root = TestRoot::new();
+        let (manifest, artifact_map, _wav) = manifest_map_with_source_wav(&root);
+        let receipt = materialize_music_edit_dataset_v1(
+            &root.0,
+            &manifest,
+            &artifact_map,
+            MusicEditMaterializationLimitsV1::default(),
+        ).unwrap();
+        let result = materialize_verified_pcm_wav_v1(
+            &root.0,
+            &receipt,
+            &manifest,
+            &artifact_map,
+            "sample-one",
+            MusicEditMaterializedArtifactRoleV1::Instruction,
+            MusicEditMaterializationLimitsV1::default(),
+        );
+        assert!(matches!(
+            result,
+            Err(issues) if issues.iter().any(|issue| matches!(
+                issue,
+                MusicEditMaterializationIssueV1::AudioArtifactRoleUnsupported {
+                    role: MusicEditMaterializedArtifactRoleV1::Instruction
+                }
+            ))
+        ));
+    }
+
+    #[test]
+    fn pcm_wav_decoder_rejects_bad_riff_length_truncated_data_and_unsupported_codec() {
+        let valid = pcm_wav_fixture(48_000, 1, &[1, -1, 2, -2]);
+        let mut wrong_riff = valid.clone();
+        wrong_riff[4..8].copy_from_slice(&1_u32.to_le_bytes());
+        assert!(matches!(
+            decode_pcm_wav_s16le_v1(&wrong_riff, "fixture.wav"),
+            Err(MusicEditMaterializationIssueV1::InvalidPcmWav { .. })
+        ));
+
+        let truncated = &valid[..valid.len() - 1];
+        assert!(matches!(
+            decode_pcm_wav_s16le_v1(truncated, "fixture.wav"),
+            Err(MusicEditMaterializationIssueV1::InvalidPcmWav { .. })
+        ));
+
+        let mut float_wav = valid.clone();
+        float_wav[20..22].copy_from_slice(&3_u16.to_le_bytes());
+        assert!(matches!(
+            decode_pcm_wav_s16le_v1(&float_wav, "fixture.wav"),
+            Err(MusicEditMaterializationIssueV1::InvalidPcmWav { .. })
+        ));
+    }
+
+    #[test]
+    fn pcm_wav_decoder_rejects_partial_frames_and_duplicate_data_chunks() {
+        let mut valid = pcm_wav_fixture(48_000, 2, &[1, 2, 3, 4]);
+        let data_len_offset = 40;
+        valid[data_len_offset..data_len_offset + 4].copy_from_slice(&6_u32.to_le_bytes());
+        let riff_size = u32::from_le_bytes(valid[4..8].try_into().unwrap()) + 2;
+        valid[4..8].copy_from_slice(&riff_size.to_le_bytes());
+        valid.extend_from_slice(&[9, 0]);
+        assert!(matches!(
+            decode_pcm_wav_s16le_v1(&valid, "fixture.wav"),
+            Err(MusicEditMaterializationIssueV1::InvalidPcmWav { .. })
+        ));
+
+        let mut duplicate = pcm_wav_fixture(48_000, 1, &[1, 2]);
+        duplicate.extend_from_slice(b"data");
+        duplicate.extend_from_slice(&2_u32.to_le_bytes());
+        duplicate.extend_from_slice(&[3, 0]);
+        let riff_size = (duplicate.len() - 8) as u32;
+        duplicate[4..8].copy_from_slice(&riff_size.to_le_bytes());
+        assert!(matches!(
+            decode_pcm_wav_s16le_v1(&duplicate, "fixture.wav"),
+            Err(MusicEditMaterializationIssueV1::InvalidPcmWav { .. })
+        ));
     }
 
     #[test]
