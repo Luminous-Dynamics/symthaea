@@ -881,6 +881,28 @@ mod tests {
     }
 
     #[test]
+    fn tentative_shift_warning_is_a_false_alarm_in_a_sham_episode() {
+        let mut value = fixture_value();
+        value["episodes"][1]["candidate_trace"]["decisions"][0]["shift_disposition"] =
+            json!("possible_shift");
+        let report = score(&value);
+        let result = episode(&report, "sham-load-noise");
+        assert!(!result.detected);
+        assert!(result.false_alarm);
+    }
+
+    #[test]
+    fn detects_critical_unsupported_current_claims_after_latent_event() {
+        let mut value = fixture_value();
+        value["episodes"][0]["candidate_trace"]["decisions"][1]["claimed_current_obligations"] =
+            json!(["api-compat","build-repro","docs-format","release-authority"]);
+        let report = score(&value);
+        let result = episode(&report, "silent-runner-drift");
+        assert!(result.critical_unsupported_current_claims.contains(&"api-compat".to_owned()));
+        assert!(result.critical_unsupported_current_claims.contains(&"build-repro".to_owned()));
+    }
+
+    #[test]
     fn flags_probe_that_requires_additional_authority() {
         let mut value = fixture_value();
         value["episodes"][0]["candidate_view"]["diagnostic_probes"][0]["authorization"] =
