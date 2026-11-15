@@ -1715,6 +1715,97 @@ pub fn project_bitemporal_event(
     })
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptureClockFault {
+    ObserverUnqualified,
+    ObserverExpired,
+    ObserverNotYetValid,
+    ObserverValidityInvalid,
+    StoreUnqualified,
+    StoreExpired,
+    StoreNotYetValid,
+    StoreValidityInvalid,
+}
+
+/// Mutate the exact observer or store mapping in a generated capture history
+/// to produce a named calibration/validity fault. The schedule remains
+/// structurally valid so the replay classifier, not the parser, sees the fault.
+pub fn generate_capture_clock_fault_schedule(
+    seed: u64,
+    fault: CaptureClockFault,
+) -> Result<VirtualSchedule, ReplayError> {
+    let mut schedule = generate_clocked_observation_persistence_schedule(seed)?;
+    let (mapping_id, timestamp_ns, is_observer) = match fault {
+        CaptureClockFault::ObserverUnqualified
+        | CaptureClockFault::ObserverExpired
+        | CaptureClockFault::ObserverNotYetValid
+        | CaptureClockFault::ObserverValidityInvalid => {
+            schedule.actions.iter().find_map(|action| {
+                if let ScheduleAction::EventObserved {
+                    clock_mapping_action_id, observed_at_ns, ..
+                } = &action.action {
+                    Some((clock_mapping_action_id.clone(), *observed_at_ns, true))
+                } else {
+                    None
+                }
+            }).ok_or(ReplayError::MissingClock("observer-clock".to_owned()))?
+        }
+        CaptureClockFault::StoreUnqualified
+        | CaptureClockFault::StoreExpired
+        | CaptureClockFault::StoreNotYetValid
+        | CaptureClockFault::StoreValidityInvalid => {
+            schedule.actions.iter().find_map(|action| {
+                if let ScheduleAction::EventPersisted {
+                    clock_mapping_action_id, persisted_at_ns, ..
+                } = &action.action {
+                    Some((clock_mapping_action_id.clone(), *persisted_at_ns, false))
+                } else {
+                    None
+                }
+            }).ok_or(ReplayError::MissingClock("store-clock".to_owned()))?
+        }
+    };
+    let mapping = schedule.actions.iter_mut()
+        .find(|action| action.action_id == mapping_id)
+        .ok_or(ReplayError::InvalidCausalPredecessor(mapping_id.clone()))?;
+    let ScheduleAction::ClockAdvance {
+        mapping_valid_from_ns, mapping_valid_through_ns, qualification, ..
+    } = &mut mapping.action else {
+        return Err(ReplayError::InvalidCausalPredecessor(mapping_id));
+    };
+
+    match fault {
+        CaptureClockFault::ObserverUnqualified | CaptureClockFault::StoreUnqualified => {
+            *qualification = GateState::Indeterminate;
+        }
+        CaptureClockFault::ObserverExpired | CaptureClockFault::StoreExpired => {
+            *mapping_valid_through_ns = timestamp_ns.saturating_sub(1);
+        }
+        CaptureClockFault::ObserverNotYetValid | CaptureClockFault::StoreNotYetValid => {
+            *mapping_valid_from_ns = timestamp_ns.saturating_add(1);
+        }
+        CaptureClockFault::ObserverValidityInvalid | CaptureClockFault::StoreValidityInvalid => {
+            *mapping_valid_from_ns = mapping_valid_through_ns.saturating_add(1);
+        }
+    }
+
+    schedule.generator_version = GENERATOR_VERSION.to_owned();
+    schedule.scenario_family = format!("capture_clock_fault_{fault:?}").to_ascii_lowercase();
+    debug_assert!(if is_observer {
+        matches!(fault, CaptureClockFault::ObserverUnqualified
+            | CaptureClockFault::ObserverExpired
+            | CaptureClockFault::ObserverNotYetValid
+            | CaptureClockFault::ObserverValidityInvalid)
+    } else {
+        matches!(fault, CaptureClockFault::StoreUnqualified
+            | CaptureClockFault::StoreExpired
+            | CaptureClockFault::StoreNotYetValid
+            | CaptureClockFault::StoreValidityInvalid)
+    });
+    validate_schedule(&schedule)?;
+    Ok(schedule)
+}
+
 /// Generate a deterministic stop/cancellation/effect-commit race. The
 /// attempt starts before the stop trigger; both schedules then contain a
 /// cancellation request, the selected acknowledgement/commit order, an
@@ -2812,6 +2903,32 @@ mod tests {
         assert!(persisted_at > observed_at);
         assert_eq!(report.observed_count, 1);
         assert_eq!(report.persisted_count, 1);
+    }
+
+    #[test]
+    fn observer_and_store_clock_faults_are_all_classified_fail_closed() {
+        let cases = [
+            (CaptureClockFault::ObserverUnqualified, SchedulerDisposition::ClockMappingUnqualified, "observer"),
+            (CaptureClockFault::ObserverExpired, SchedulerDisposition::ClockMappingExpired, "observer"),
+            (CaptureClockFault::ObserverNotYetValid, SchedulerDisposition::ClockMappingNotYetValid, "observer"),
+            (CaptureClockFault::ObserverValidityInvalid, SchedulerDisposition::ClockMappingValidityInvalid, "observer"),
+            (CaptureClockFault::StoreUnqualified, SchedulerDisposition::ClockMappingUnqualified, "store"),
+            (CaptureClockFault::StoreExpired, SchedulerDisposition::ClockMappingExpired, "store"),
+            (CaptureClockFault::StoreNotYetValid, SchedulerDisposition::ClockMappingNotYetValid, "store"),
+            (CaptureClockFault::StoreValidityInvalid, SchedulerDisposition::ClockMappingValidityInvalid, "store"),
+        ];
+        for (fault, expected, domain) in cases {
+            let schedule = generate_capture_clock_fault_schedule(0x2026_1122, fault)
+                .expect("capture clock fault schedule");
+            validate_schedule(&schedule).expect("fault remains structurally valid");
+            let report = replay_virtual_schedule(&schedule).expect("fault replay");
+            let action_disposition = report.records.iter().find_map(|record| match (&record.action, domain) {
+                (ScheduleAction::EventObserved { .. }, "observer") => Some(record.disposition),
+                (ScheduleAction::EventPersisted { .. }, "store") => Some(record.disposition),
+                _ => None,
+            }).expect("target capture action");
+            assert_eq!(action_disposition, expected);
+        }
     }
 
     #[test]
