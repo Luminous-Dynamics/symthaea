@@ -11,7 +11,7 @@ The remaining gap is test realism. A collection of static traces is useful but c
 ## Implemented in this increment
 
 - Versioned schedule contract: schema version, generator version, seed, scenario family and typed action list.
-- Independent virtual time per source clock series, including clock domain, basis descriptor, epoch, scale, unit, offset, uncertainty, calibration validity, receipt reference and qualification state. Each produced event binds back to that exact source clock series.
+- Independent virtual time per source clock series, including clock domain, basis descriptor, epoch, scale, nanosecond unit, offset, uncertainty, calibration validity, receipt reference and qualification state. Each produced event binds back to that exact source clock series; `_ns` fields reject non-nanosecond units.
 - Event production with explicit causal predecessor edges.
 - Deterministic network delivery, duplicate/drop controls, partition and reconnect.
 - Observation and durability steps; cancellation request/acknowledgement; stop trigger, policy revision and discharge; effect attempt, commit and terminal reconciliation; process crash/restart; event supersession.
