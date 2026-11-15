@@ -1472,7 +1472,7 @@ mod tests {
 
     #[test]
     fn overlapping_stop_obligations_are_independently_required() {
-        let attempts = vec![attempt(
+        let mut attempts = vec![attempt(
             "robot-7",
             "attempt-1",
             None,
@@ -1566,6 +1566,151 @@ mod tests {
     }
 
     #[test]
+    fn pre_discharge_unresolved_attempt_cannot_be_hidden_by_global_discharge() {
+        let scope = StopScope::Global;
+        let trigger = "trigger-global".to_owned();
+        let obligation = ScopedStopObligation {
+            obligation_id: "global-obligation".to_owned(),
+            trigger_event_id: trigger.clone(),
+            policy_revision: "policy-v1".to_owned(),
+            scope: scope.clone(),
+            discharge: Some(StopDischargeReceipt {
+                event_id: "discharge-global".to_owned(),
+                obligation_id: "global-obligation".to_owned(),
+                trigger_event_id: trigger,
+                policy_revision: "policy-v1".to_owned(),
+                scope,
+                receipt_ref: "synthetic://global-discharge".to_owned(),
+                receipt_sha256: "b".repeat(64),
+                qualification: GateState::Pass,
+                in_flight_reconciliation: GateState::Pass,
+                in_flight_inventory_frontier_event_id: "inventory-at-discharge".to_owned(),
+                in_flight_attempt_manifest_sha256: "c".repeat(64),
+                trigger_to_discharge_order: EventOrder::Before,
+            }),
+        };
+        let mut attempt = attempt(
+            "robot-a",
+            "attempt-a",
+            None,
+            "start-a",
+            None,
+            None,
+            None,
+        );
+        attempt.stop_discharge_relations.push(AttemptStopDischargeRelation {
+            obligation_id: "global-obligation".to_owned(),
+            discharge_event_id: "discharge-global".to_owned(),
+            attempt_start_event_id: "start-a".to_owned(),
+            discharge_to_start_order: EventOrder::After,
+            terminal_event_id_at_discharge: None,
+            terminal_to_discharge_order: None,
+        });
+        let attempts = vec![attempt];
+        let inventory = attempt_inventory(&attempts, StopScope::Global, GateState::Pass);
+
+        let report = assess_start_under_stop_obligations(
+            "robot-b",
+            &attempts,
+            &inventory,
+            &[obligation],
+        );
+        assert!(!report.start_permitted_by_stop_contract);
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|reason| {
+            reason == "ATTEMPT_UNRESOLVED_AT_STOP_DISCHARGE:attempt-a:global-obligation"
+        }));
+    }
+
+    #[test]
+    fn pre_discharge_terminal_reconciliation_allows_independent_post_discharge_start() {
+        let scope = StopScope::Global;
+        let trigger = "trigger-global".to_owned();
+        let obligation = ScopedStopObligation {
+            obligation_id: "global-obligation".to_owned(),
+            trigger_event_id: trigger.clone(),
+            policy_revision: "policy-v1".to_owned(),
+            scope: scope.clone(),
+            discharge: Some(StopDischargeReceipt {
+                event_id: "discharge-global".to_owned(),
+                obligation_id: "global-obligation".to_owned(),
+                trigger_event_id: trigger,
+                policy_revision: "policy-v1".to_owned(),
+                scope,
+                receipt_ref: "synthetic://global-discharge".to_owned(),
+                receipt_sha256: "b".repeat(64),
+                qualification: GateState::Pass,
+                in_flight_reconciliation: GateState::Pass,
+                in_flight_inventory_frontier_event_id: "inventory-at-discharge".to_owned(),
+                in_flight_attempt_manifest_sha256: "c".repeat(64),
+                trigger_to_discharge_order: EventOrder::Before,
+            }),
+        };
+        let mut attempt = attempt(
+            "robot-a",
+            "attempt-a",
+            None,
+            "start-a",
+            Some(terminal("terminal-a", "start-a", ReconciledOperationOutcome::Applied)),
+            None,
+            None,
+        );
+        attempt.stop_discharge_relations.push(AttemptStopDischargeRelation {
+            obligation_id: "global-obligation".to_owned(),
+            discharge_event_id: "discharge-global".to_owned(),
+            attempt_start_event_id: "start-a".to_owned(),
+            discharge_to_start_order: EventOrder::After,
+            terminal_event_id_at_discharge: Some("terminal-a".to_owned()),
+            terminal_to_discharge_order: Some(EventOrder::Before),
+        });
+        let attempts = vec![attempt];
+        let inventory = attempt_inventory(&attempts, StopScope::Global, GateState::Pass);
+
+        let report = assess_start_under_stop_obligations(
+            "robot-b",
+            &attempts,
+            &inventory,
+            &[obligation],
+        );
+        assert!(report.start_permitted_by_stop_contract);
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+    }
+
+    #[test]
+    fn stop_relation_must_bind_the_exact_discharge_and_attempt_start() {
+        let obligation = scoped_obligation("obligation-a", "robot-a");
+        let mut attempt = attempt(
+            "robot-a",
+            "attempt-a",
+            None,
+            "start-a",
+            None,
+            None,
+            None,
+        );
+        let mut relation = post_discharge_relation(&obligation, "start-a");
+        relation.discharge_event_id = "substituted-discharge".to_owned();
+        attempt.stop_discharge_relations.push(relation);
+        let attempts = vec![attempt];
+        let inventory = attempt_inventory(
+            &attempts,
+            StopScope::LogicalOperations(["robot-a".to_owned()].into_iter().collect()),
+            GateState::Pass,
+        );
+        let report = assess_start_under_stop_obligations(
+            "robot-a",
+            &attempts,
+            &inventory,
+            &[obligation],
+        );
+        assert!(!report.start_permitted_by_stop_contract);
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|reason| {
+            reason == "ATTEMPT_STOP_DISCHARGE_EVENT_BINDING_INVALID:attempt-a:obligation-a"
+        }));
+    }
+
+    #[test]
     fn pending_sibling_attempt_does_not_serialize_a_discharged_global_scope() {
         let sibling = attempt(
             "robot-a",
@@ -1577,7 +1722,6 @@ mod tests {
             None,
         );
         let attempts = vec![sibling];
-        let inventory = attempt_inventory(&attempts, StopScope::Global, GateState::Pass);
 
         let scope = StopScope::Global;
         let trigger = "global-stop-trigger".to_owned();
