@@ -52,7 +52,7 @@ A dependency-free Go reference implementation lives at `tools/sympsi-mapping-ver
 
 Reproduce:
 
-    go test -count=1 -v ./tools/sympsi-mapping-verifier-go/...
+    cd tools/sympsi-mapping-verifier-go && go test -count=1 -v ./...
 
 CI pins Go 1.27.4 for this cross-language check. Agreement between two implementations verifies transcript interoperability for the frozen vectors; it does not verify a real beacon signature, trust root, freshness or response chronology.
 
