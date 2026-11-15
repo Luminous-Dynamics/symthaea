@@ -156,6 +156,62 @@ fn reconcile(call_id: &str) -> ToolObservation {
 }
 
 #[test]
+fn serialized_ask_decision_omits_fields_not_allowed_by_its_schema_variant() {
+    let decision = AgentDecision {
+        protocol_version: "symthaea-agent-bridge/0.1".to_owned(),
+        kind: "agent_decision".to_owned(),
+        run_id: "run-001".to_owned(),
+        turn_id: "turn-001".to_owned(),
+        decision_id: "decision-ask".to_owned(),
+        action: "ask".to_owned(),
+        call_id: None,
+        tool_name: None,
+        arguments: None,
+        idempotency_key: None,
+        purpose: None,
+        evidence_refs: Vec::new(),
+        question: Some("Which maintenance window is approved?".to_owned()),
+        why_required: Some("The service restart requires an approved window.".to_owned()),
+        reason: None,
+        blocked_on: Vec::new(),
+        content: None,
+        limitations: Vec::new(),
+    };
+    let value = serde_json::to_value(&decision).unwrap();
+    let object = value.as_object().unwrap();
+    assert_eq!(object.get("action").and_then(|v| v.as_str()), Some("ask"));
+    assert!(object.get("evidence_refs").is_none());
+    assert!(object.get("call_id").is_none());
+    assert!(object.get("blocked_on").is_none());
+    assert!(object.get("content").is_none());
+}
+
+#[test]
+fn serialized_reconciliation_observation_omits_tool_only_fields() {
+    let observation = reconcile("call-serde");
+    let value = serde_json::to_value(&observation).unwrap();
+    let object = value.as_object().unwrap();
+    assert_eq!(
+        object.get("kind").and_then(|v| v.as_str()),
+        Some("execution_reconciled")
+    );
+    assert!(object.get("run_id").is_some());
+    assert!(object.get("state_digest").is_some());
+    assert!(object.get("tool_name").is_none());
+    assert!(object.get("status").is_none());
+    assert!(object.get("observation_digest").is_none());
+}
+
+#[test]
+fn run_id_mismatch_is_rejected_even_when_turn_id_matches() {
+    let req = request();
+    let mut guard = AgentProtocolGuard::default();
+    let mut decision = final_decision("decision-wrong-run");
+    decision.run_id = "another-run".to_owned();
+    assert!(guard.validate_decision(&req, &decision).is_err());
+}
+
+#[test]
 fn valid_request_and_tool_decision_are_accepted() {
     let req = request();
     req.validate().unwrap();
