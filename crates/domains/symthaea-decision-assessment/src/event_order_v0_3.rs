@@ -2598,7 +2598,7 @@ pub fn project_action_history(
         let start_event_id = start_action.action_id.clone();
         attempt_start_times.insert(attempt_id.clone(), start_time.clone());
         let terminal = terminal_actions.get(&(operation_id.clone(), attempt_id.clone()));
-        let (terminal_record, terminal_time) = if let Some((terminal_action, terminal_time, _assessment)) = terminal {
+        let (terminal_record, terminal_time) = if let Some((terminal_action, terminal_time, assessment)) = terminal {
             let (outcome, receipt_ref, receipt_sha256) = match &terminal_action.action {
                 ScheduleAction::AttemptReconciled { outcome, receipt_ref, receipt_sha256, .. } => {
                     (*outcome, receipt_ref.clone(), receipt_sha256.clone())
@@ -2611,7 +2611,6 @@ pub fn project_action_history(
                 }
                 _ => unreachable!("evidence checked during collection"),
             };
-            let _ = (receipt_ref, receipt_sha256);
             let start_to_terminal = event_order_between(start_time, terminal_time);
             if let Some(committed_times) = commit_times.get(&(operation_id.clone(), attempt_id.clone())) {
                 for committed_time in committed_times {
