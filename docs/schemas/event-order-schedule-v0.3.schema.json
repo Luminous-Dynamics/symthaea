@@ -118,7 +118,7 @@
         {
           "type": "object", "additionalProperties": false,
           "required": ["kind", "operation_id", "attempt_id", "outcome", "receipt_ref", "receipt_sha256"],
-          "properties": { "kind": { "const": "attempt_reconciled" }, "operation_id": { "$ref": "#/$defs/id" }, "attempt_id": { "$ref": "#/$defs/id" }, "outcome": { "enum": ["applied", "not_applied", "unknown"] }, "receipt_ref": { "$ref": "#/$defs/id" }, "receipt_sha256": { "type": "string" } }
+          "properties": { "kind": { "const": "attempt_reconciled" }, "operation_id": { "$ref": "#/$defs/id" }, "attempt_id": { "$ref": "#/$defs/id" }, "outcome": { "enum": ["applied", "not_applied", "unknown"] }, "receipt_ref": { "$ref": "#/$defs/id" }, "receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
         },
         {
           "type": "object", "additionalProperties": false,
