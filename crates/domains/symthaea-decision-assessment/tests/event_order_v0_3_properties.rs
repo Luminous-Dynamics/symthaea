@@ -6,9 +6,9 @@ use symthaea_decision_assessment::event_order_v0_2::{
 };
 use symthaea_decision_assessment::event_order_v0_3::{
     canonical_schedule_bytes, canonical_schedule_sha256, generate_cancellation_commit_race_schedule,
-    generate_clock_mapping_fault_schedule, generate_clocked_observation_persistence_schedule,
+    generate_capture_clock_fault_schedule, generate_clock_mapping_fault_schedule, generate_clocked_observation_persistence_schedule,
     generate_delivery_schedule, project_bitemporal_event, replay_virtual_schedule, validate_schedule,
-    CancellationCommitOrder, ClockMappingFault, SchedulerDisposition, ScheduleAction, VirtualSchedule,
+    CancellationCommitOrder, CaptureClockFault, ClockMappingFault, SchedulerDisposition, ScheduleAction, VirtualSchedule,
 };
 
 fn owner_qualified_resolutions(
@@ -134,6 +134,34 @@ proptest! {
             matches!(record.action, ScheduleAction::EventProduced { .. })
                 && record.disposition == expected
         }));
+    }
+
+    #[test]
+    fn observer_and_store_calibration_faults_never_become_applied(
+        seed in any::<u64>(),
+        fault_tag in 0u8..8,
+    ) {
+        let (fault, expected, target) = match fault_tag {
+            0 => (CaptureClockFault::ObserverUnqualified, SchedulerDisposition::ClockMappingUnqualified, "observer"),
+            1 => (CaptureClockFault::ObserverExpired, SchedulerDisposition::ClockMappingExpired, "observer"),
+            2 => (CaptureClockFault::ObserverNotYetValid, SchedulerDisposition::ClockMappingNotYetValid, "observer"),
+            3 => (CaptureClockFault::ObserverValidityInvalid, SchedulerDisposition::ClockMappingValidityInvalid, "observer"),
+            4 => (CaptureClockFault::StoreUnqualified, SchedulerDisposition::ClockMappingUnqualified, "store"),
+            5 => (CaptureClockFault::StoreExpired, SchedulerDisposition::ClockMappingExpired, "store"),
+            6 => (CaptureClockFault::StoreNotYetValid, SchedulerDisposition::ClockMappingNotYetValid, "store"),
+            _ => (CaptureClockFault::StoreValidityInvalid, SchedulerDisposition::ClockMappingValidityInvalid, "store"),
+        };
+        let schedule = generate_capture_clock_fault_schedule(seed, fault)
+            .expect("capture-clock fault schedule");
+        validate_schedule(&schedule).expect("fault remains structurally valid");
+        let report = replay_virtual_schedule(&schedule).expect("fault replay");
+        let disposition = report.records.iter().find_map(|record| match (&record.action, target) {
+            (ScheduleAction::EventObserved { .. }, "observer") => Some(record.disposition),
+            (ScheduleAction::EventPersisted { .. }, "store") => Some(record.disposition),
+            _ => None,
+        }).expect("capture action");
+        prop_assert_eq!(disposition, expected);
+        prop_assert_ne!(disposition, SchedulerDisposition::Applied);
     }
 
     #[test]
