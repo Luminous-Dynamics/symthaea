@@ -1,4 +1,6 @@
 //! Deterministic, deliberately scoped marine geometry admission.
+
+pub mod section;
 //!
 //! This crate validates a versioned triangle-mesh interchange artifact. It is
 //! not a CAD kernel, hydrostatics solver, self-intersection detector, DFM
