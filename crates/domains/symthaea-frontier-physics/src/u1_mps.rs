@@ -3758,9 +3758,9 @@ impl U1TeBDStrangStepper {
 mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsTensor, U1MpsTruncationLedger,
-        U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStrangStepper,
-        U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState, U1TwoSiteTruncationPolicy,
-        left_isometry_residual, right_isometry_residual,
+        U1TeBDGate, U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
+        U1TeBDStrangStepper, U1TwoSiteGate, U1TwoSiteHamiltonian, U1TwoSiteState,
+        U1TwoSiteTruncationPolicy, left_isometry_residual, right_isometry_residual,
     };
     use num_complex::Complex64;
 
