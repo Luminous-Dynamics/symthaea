@@ -325,6 +325,20 @@ pub struct AttemptTerminalReconciliation {
     pub start_to_terminal_order: EventOrder,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttemptStopDischargeRelation {
+    pub obligation_id: String,
+    pub discharge_event_id: String,
+    pub attempt_start_event_id: String,
+    /// BEFORE means the discharge occurred before this attempt started.
+    /// AFTER means the attempt was already started when discharge was assessed.
+    pub discharge_to_start_order: EventOrder,
+    /// Required only when the attempt started before the discharge.
+    pub terminal_event_id_at_discharge: Option<String>,
+    /// Relation of that exact terminal event to the exact discharge event.
+    pub terminal_to_discharge_order: Option<EventOrder>,
+}
+
 /// Canonical attempt summary reconstructed from owner-qualified observations.
 /// Vectors preserve cardinality evidence so duplicate starts/terminals are
 /// rejected rather than overwritten during map construction.
@@ -334,6 +348,9 @@ pub struct OperationAttemptRecord {
     pub start_event_ids: Vec<String>,
     pub terminal_reconciliation_event_ids: Vec<String>,
     pub terminal_reconciliation: Option<AttemptTerminalReconciliation>,
+    /// For each applicable stop discharge, binds whether this attempt started
+    /// after discharge or was terminally reconciled before discharge.
+    pub stop_discharge_relations: Vec<AttemptStopDischargeRelation>,
     /// Exact predecessor terminal event to which the retry relation applies.
     pub retry_predecessor_terminal_event_id: Option<String>,
     /// Exact current start event to which the retry relation applies.
@@ -593,6 +610,12 @@ pub fn canonical_attempt_manifest_sha256(
             let mut canonical = attempt.clone();
             canonical.start_event_ids.sort();
             canonical.terminal_reconciliation_event_ids.sort();
+            canonical.stop_discharge_relations.sort_by(|left, right| {
+                left.obligation_id
+                    .cmp(&right.obligation_id)
+                    .then(left.discharge_event_id.cmp(&right.discharge_event_id))
+                    .then(left.attempt_start_event_id.cmp(&right.attempt_start_event_id))
+            });
             serde_json::to_string(&canonical)
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -777,6 +800,148 @@ fn attempt_is_reconciled(attempt: &OperationAttemptRecord) -> bool {
     })
 }
 
+fn validate_attempt_stop_discharge_relations(
+    attempts: &[OperationAttemptRecord],
+    obligations: &[ScopedStopObligation],
+) -> (EventTraceDisposition, Vec<String>) {
+    let mut reasons = BTreeSet::new();
+    let mut critical = false;
+    let mut indeterminate = false;
+
+    for attempt in attempts {
+        let mut seen_obligation_ids = BTreeSet::new();
+
+        for relation in &attempt.stop_discharge_relations {
+            if !seen_obligation_ids.insert(relation.obligation_id.clone()) {
+                critical = true;
+                reasons.insert(format!(
+                    "DUPLICATE_ATTEMPT_STOP_RELATION:{}:{}",
+                    attempt.identity.attempt_id, relation.obligation_id
+                ));
+            }
+            let known_applicable = obligations.iter().any(|obligation| {
+                obligation.obligation_id == relation.obligation_id
+                    && obligation.scope.applies_to(&attempt.identity.logical_operation_id)
+            });
+            if !known_applicable {
+                critical = true;
+                reasons.insert(format!(
+                    "ATTEMPT_STOP_RELATION_OUT_OF_SCOPE:{}:{}",
+                    attempt.identity.attempt_id, relation.obligation_id
+                ));
+            }
+        }
+
+        for obligation in obligations.iter().filter(|obligation| {
+            obligation.scope.applies_to(&attempt.identity.logical_operation_id)
+        }) {
+            let Some(discharge) = obligation.discharge.as_ref() else {
+                continue;
+            };
+            let matching = attempt.stop_discharge_relations.iter().find(|relation| {
+                relation.obligation_id == obligation.obligation_id
+            });
+            let Some(relation) = matching else {
+                critical = true;
+                reasons.insert(format!(
+                    "ATTEMPT_STOP_DISCHARGE_RELATION_MISSING:{}:{}",
+                    attempt.identity.attempt_id, obligation.obligation_id
+                ));
+                continue;
+            };
+
+            let exact_start_id = attempt.start_event_ids.first().map(String::as_str);
+            if relation.discharge_event_id != discharge.event_id
+                || relation.attempt_start_event_id.as_str() != exact_start_id.unwrap_or("")
+            {
+                critical = true;
+                reasons.insert(format!(
+                    "ATTEMPT_STOP_DISCHARGE_EVENT_BINDING_INVALID:{}:{}",
+                    attempt.identity.attempt_id, obligation.obligation_id
+                ));
+                continue;
+            }
+
+            match relation.discharge_to_start_order {
+                EventOrder::Before => {
+                    if relation.terminal_event_id_at_discharge.is_some()
+                        || relation.terminal_to_discharge_order.is_some()
+                    {
+                        critical = true;
+                        reasons.insert(format!(
+                            "POST_DISCHARGE_ATTEMPT_HAS_PRE_DISCHARGE_TERMINAL:{}:{}",
+                            attempt.identity.attempt_id, obligation.obligation_id
+                        ));
+                    }
+                }
+                EventOrder::After => {
+                    let Some(terminal) = attempt.terminal_reconciliation.as_ref() else {
+                        critical = true;
+                        reasons.insert(format!(
+                            "ATTEMPT_UNRESOLVED_AT_STOP_DISCHARGE:{}:{}",
+                            attempt.identity.attempt_id, obligation.obligation_id
+                        ));
+                        continue;
+                    };
+                    if relation.terminal_event_id_at_discharge.as_deref()
+                        != Some(terminal.event_id.as_str())
+                        || terminal.start_event_id != relation.attempt_start_event_id
+                        || terminal.qualification != GateState::Pass
+                        || terminal.start_to_terminal_order != EventOrder::Before
+                    {
+                        critical = true;
+                        reasons.insert(format!(
+                            "ATTEMPT_TERMINAL_NOT_BOUND_AT_STOP_DISCHARGE:{}:{}",
+                            attempt.identity.attempt_id, obligation.obligation_id
+                        ));
+                        continue;
+                    }
+                    match relation.terminal_to_discharge_order {
+                        Some(EventOrder::Before) => {}
+                        Some(EventOrder::After | EventOrder::Inconsistent) | None => {
+                            critical = true;
+                            reasons.insert(format!(
+                                "ATTEMPT_TERMINAL_NOT_BEFORE_STOP_DISCHARGE:{}:{}",
+                                attempt.identity.attempt_id, obligation.obligation_id
+                            ));
+                        }
+                        Some(EventOrder::Overlapping | EventOrder::Unknown) => {
+                            indeterminate = true;
+                            reasons.insert(format!(
+                                "ATTEMPT_TERMINAL_ORDER_UNRESOLVED_AT_STOP_DISCHARGE:{}:{}",
+                                attempt.identity.attempt_id, obligation.obligation_id
+                            ));
+                        }
+                    }
+                }
+                EventOrder::Overlapping | EventOrder::Unknown => {
+                    indeterminate = true;
+                    reasons.insert(format!(
+                        "ATTEMPT_STOP_DISCHARGE_START_ORDER_UNRESOLVED:{}:{}",
+                        attempt.identity.attempt_id, obligation.obligation_id
+                    ));
+                }
+                EventOrder::Inconsistent => {
+                    critical = true;
+                    reasons.insert(format!(
+                        "ATTEMPT_STOP_DISCHARGE_START_ORDER_INCONSISTENT:{}:{}",
+                        attempt.identity.attempt_id, obligation.obligation_id
+                    ));
+                }
+            }
+        }
+    }
+
+    let disposition = if critical {
+        EventTraceDisposition::CriticalFailure
+    } else if indeterminate {
+        EventTraceDisposition::Indeterminate
+    } else {
+        EventTraceDisposition::Safe
+    };
+    (disposition, reasons.into_iter().collect())
+}
+
 /// Assess whether a new attempt is eligible under every applicable stop
 /// obligation and the known prior-attempt history. A PASS result is not
 /// authority; it means only that supplied obligations do not prohibit starting.
@@ -952,6 +1117,15 @@ pub fn assess_start_under_stop_obligations(
         }
     }
 
+    let (relation_disposition, relation_reasons) =
+        validate_attempt_stop_discharge_relations(prior_attempts, obligations);
+    reasons.extend(relation_reasons);
+    match relation_disposition {
+        EventTraceDisposition::CriticalFailure => critical = true,
+        EventTraceDisposition::Indeterminate => indeterminate = true,
+        EventTraceDisposition::Safe => {}
+    }
+
     let disposition = if critical {
         EventTraceDisposition::CriticalFailure
     } else if indeterminate {
@@ -1029,9 +1203,24 @@ mod tests {
                 .map(|value| vec![value.event_id.clone()])
                 .unwrap_or_default(),
             terminal_reconciliation: terminal_value,
+            stop_discharge_relations: Vec::new(),
             retry_predecessor_terminal_event_id: retry_terminal_event_id.map(str::to_owned),
             retry_predecessor_start_event_id: retry_of.map(|_| start_id.to_owned()),
             retry_predecessor_terminal_to_start_order: retry_order,
+        }
+    }
+
+    fn post_discharge_relation(
+        obligation: &ScopedStopObligation,
+        attempt_start_event_id: &str,
+    ) -> AttemptStopDischargeRelation {
+        AttemptStopDischargeRelation {
+            obligation_id: obligation.obligation_id.clone(),
+            discharge_event_id: obligation.discharge.as_ref().expect("discharged").event_id.clone(),
+            attempt_start_event_id: attempt_start_event_id.to_owned(),
+            discharge_to_start_order: EventOrder::Before,
+            terminal_event_id_at_discharge: None,
+            terminal_to_discharge_order: None,
         }
     }
 
@@ -1295,6 +1484,7 @@ mod tests {
         let first = scoped_obligation("obligation-a", "robot-7");
         let mut second = scoped_obligation("obligation-b", "robot-7");
         second.discharge = None;
+        attempts[0].stop_discharge_relations.push(post_discharge_relation(&first, "start-1"));
 
         let inventory = attempt_inventory(
             &attempts,
@@ -1412,6 +1602,9 @@ mod tests {
             }),
         };
 
+        let mut attempts = attempts;
+        attempts[0].stop_discharge_relations.push(post_discharge_relation(&obligation, "start-a"));
+        let inventory = attempt_inventory(&attempts, StopScope::Global, GateState::Pass);
         let report = assess_start_under_stop_obligations(
             "robot-b",
             &attempts,

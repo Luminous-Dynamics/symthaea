@@ -164,3 +164,15 @@ An empty attempt list is not proof that no prior attempt exists. A proposed star
 The consumer recomputes a domain-separated, delivery-order-independent attempt-manifest digest, verifies that inventory scope covers the requested logical operation and every applicable stop obligation, and refuses missing, mismatched or incomplete inventories. The digest makes the snapshot reproducible; it does not establish completeness by itself. Owner-native verification supplies completeness and receipt authenticity.
 
 The low-level `validate_attempt_lifecycle` checks the semantics of supplied attempt records. It must not be used alone to infer that an absent record never existed. `assess_start_under_stop_obligations` is the start-eligibility composition and requires the independent inventory qualification. A PASS remains non-authoritative and grants no effect permission.
+
+
+## 13. Per-attempt relation to every applicable discharge
+
+A global in-flight inventory PASS is not enough to classify a later attempt: the evaluator must distinguish an operation that was already running at discharge from one that started afterward. Every supplied attempt in a discharged obligation's scope therefore carries an `AttemptStopDischargeRelation` binding the exact obligation ID, exact discharge event ID and exact attempt-start event ID.
+
+- If discharge is definitely BEFORE attempt start, the attempt is a post-discharge execution and may remain in flight.
+- If attempt start is definitely BEFORE discharge, the exact terminal reconciliation must be qualified PASS, bind that start, and be definitely BEFORE discharge.
+- OVERLAPPING/UNKNOWN ordering blocks as indeterminate; INCONSISTENT ordering is critical.
+- Missing, duplicate, substituted or out-of-scope relations are critical.
+
+This composes with the owner's in-flight inventory receipt: the owner qualifies the complete snapshot at discharge; the per-attempt relations prove how the current snapshot's operations relate to that discharge. It allows independent concurrency after discharge without permitting pre-discharge in-flight work to be hidden by a later snapshot.

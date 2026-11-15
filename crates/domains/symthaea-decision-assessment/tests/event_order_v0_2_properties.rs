@@ -116,6 +116,7 @@ fn make_attempt_chain(length: usize) -> Vec<OperationAttemptRecord> {
                 start_event_ids: vec![start_event_id.clone()],
                 terminal_reconciliation_event_ids: vec![terminal_event_id],
                 terminal_reconciliation: Some(terminal),
+                stop_discharge_relations: Vec::new(),
                 retry_predecessor_terminal_event_id: (index > 0)
                     .then(|| format!("terminal-{}", index - 1)),
                 retry_predecessor_start_event_id: (index > 0).then_some(start_event_id),
