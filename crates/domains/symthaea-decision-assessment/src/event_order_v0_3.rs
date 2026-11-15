@@ -401,7 +401,7 @@ pub fn canonical_schedule_bytes(schedule: &VirtualSchedule) -> Result<Vec<u8>, R
 }
 
 pub fn canonical_schedule_sha256(schedule: &VirtualSchedule) -> Result<String, ReplayError> {
-    Ok(sha256_domain_hex(b"symthaea.event-order.schedule.v0.3\\0", &canonical_schedule_bytes(schedule)?))
+    Ok(sha256_domain_hex(b"symthaea.event-order.schedule.v0.3|", &canonical_schedule_bytes(schedule)?))
 }
 
 /// Replay a schedule in virtual time. The output records schedule intent and
@@ -566,7 +566,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let persisted_count = persisted.len();
     Ok(ReplayReport {
         schedule_sha256,
-        replay_sha256: sha256_domain_hex(b"symthaea.event-order.replay.v0.3\\0", &replay_bytes),
+        replay_sha256: sha256_domain_hex(b"symthaea.event-order.replay.v0.3|", &replay_bytes),
         event_count,
         delivery_count,
         observed_count,
@@ -716,13 +716,28 @@ pub fn generate_delivery_schedule(
             );
         }
     }
+    let reconnect_at = delivery_base + event_count as u64 + 2;
     push_action(
         &mut actions,
         &mut ordinal,
-        delivery_base + event_count as u64 + 2,
+        reconnect_at,
         ScheduleAction::NetworkPartition {
             channel_id: "channel-main".to_owned(),
             partitioned: false,
+        },
+    );
+    // Explicit post-reconnect delivery proves that the scheduler resumes
+    // transport rather than leaving the channel permanently blocked.
+    push_action(
+        &mut actions,
+        &mut ordinal,
+        reconnect_at + 1,
+        ScheduleAction::Delivery {
+            event_id: event_ids[0].clone(),
+            channel_id: "channel-main".to_owned(),
+            recipient_id: "worker-after-reconnect".to_owned(),
+            delivery_id: "delivery-after-reconnect".to_owned(),
+            mode: DeliveryMode::Deliver,
         },
     );
 
@@ -834,6 +849,10 @@ mod tests {
         }));
         assert!(report.records.iter().any(|record| {
             matches!(record.action, ScheduleAction::NetworkPartition { partitioned: false, .. })
+        }));
+        assert!(report.records.iter().any(|record| {
+            record.disposition == SchedulerDisposition::Applied
+                && matches!(&record.action, ScheduleAction::Delivery { recipient_id, .. } if recipient_id == "worker-after-reconnect")
         }));
     }
 
