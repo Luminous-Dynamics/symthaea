@@ -136,7 +136,7 @@ pub struct SectionalCrossCheckReport {
     pub sampled_sections_digest_blake3: String,
     pub geometry_digest_blake3: String,
     pub loft_manifest_digest_blake3: String,
-    pub tolerance_profile_id: String,
+    pub tolerance: SectionalCrossCheckTolerance,
     pub disposition: CrossCheckDisposition,
     pub identity_errors: Vec<String>,
     pub metrics: Vec<MetricComparison>,
@@ -889,7 +889,7 @@ struct CrossCheckDigestIdentity<'a> {
     sampled_sections_digest_blake3: &'a str,
     geometry_digest_blake3: &'a str,
     loft_manifest_digest_blake3: &'a str,
-    tolerance_profile_id: &'a str,
+    tolerance: &'a SectionalCrossCheckTolerance,
     disposition: CrossCheckDisposition,
     identity_errors: &'a [String],
     metrics: &'a [MetricComparison],
@@ -903,12 +903,37 @@ fn report_digest(report: &SectionalCrossCheckReport) -> Result<String, serde_jso
         sampled_sections_digest_blake3: &report.sampled_sections_digest_blake3,
         geometry_digest_blake3: &report.geometry_digest_blake3,
         loft_manifest_digest_blake3: &report.loft_manifest_digest_blake3,
-        tolerance_profile_id: &report.tolerance_profile_id,
+        tolerance: &report.tolerance,
         disposition: report.disposition,
         identity_errors: &report.identity_errors,
         metrics: &report.metrics,
     };
     Ok(blake3::hash(&serde_json::to_vec(&identity)?).to_hex().to_string())
+}
+
+/// Verifies the report digest, including its exact numeric tolerance profile.
+pub fn verify_sectional_cross_check_report_integrity(
+    report: &SectionalCrossCheckReport,
+) -> Result<(), SectionalViolation> {
+    if report.report_schema_version != 1 {
+        return Err(violation(
+            "report_schema",
+            "unsupported sectional cross-check report schema",
+        ));
+    }
+    let actual = report_digest(report).map_err(|error| {
+        violation(
+            "report_digest_serialization",
+            format!("cross-check report cannot be serialized: {error}"),
+        )
+    })?;
+    if !actual.eq_ignore_ascii_case(&report.report_digest_blake3) {
+        return Err(violation(
+            "report_digest",
+            "cross-check report digest does not match the report content",
+        ));
+    }
+    Ok(())
 }
 
 /// Compares the independent sectional reference with the G2c polyhedral result.
@@ -985,6 +1010,9 @@ pub fn compare_with_polyhedral_hydrostatics(
             "sectional or polyhedral result contains a non-finite observable",
         ));
     }
+    if polyhedral.result_schema_version != 1 {
+        identity_errors.push("polyhedral result schema is unsupported".to_owned());
+    }
     if sectional.candidate_id != polyhedral.candidate_id {
         identity_errors.push("candidate IDs differ".to_owned());
     }
@@ -1005,7 +1033,7 @@ pub fn compare_with_polyhedral_hydrostatics(
         sampled_sections_digest_blake3: sectional.sampled_sections_digest_blake3.clone(),
         geometry_digest_blake3: sectional.geometry_digest_blake3.clone(),
         loft_manifest_digest_blake3: sectional.loft_manifest_digest_blake3.clone(),
-        tolerance_profile_id: tolerance.profile_id.clone(),
+        tolerance: tolerance.clone(),
         disposition: CrossCheckDisposition::Incomparable,
         identity_errors,
         metrics: Vec::new(),
