@@ -45,8 +45,8 @@ CONTEXT = Context(
     verified_randomness=RANDOMNESS,
 )
 EXPECTED_DIGEST = bytes.fromhex(
-    "188a87ddf2a369a7f0c08824a3a94299212c345d9dd9a132"
-    "5d96e952c8439f33"
+    "cd4ed4b3a8ab1da6185ea3a535bd6b87b71862f606a9d03c"
+    "c5a388e8b854bde6"
 )
 
 
