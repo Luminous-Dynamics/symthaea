@@ -2264,6 +2264,62 @@ mod tests {
     }
 
     #[test]
+    fn scalar_tau_neuron_is_equivariant_to_joint_hdc_coordinate_permutation() {
+        let dimension = 128;
+        let config = UnifiedConfig {
+            dimension,
+            ..UnifiedConfig::default()
+        };
+        let mut reference = HdcLtcUnifiedNeuron::new(config.clone(), 0x51A1);
+        let mut permuted = HdcLtcUnifiedNeuron::new(config, 0x51A1);
+
+        // Reversal is a deterministic bijection; every coordinate-bearing
+        // object must use the same map for this basis relabeling.
+        let permutation: Vec<usize> = (0..dimension).rev().collect();
+        let permute_hv = |hv: &ContinuousHV| {
+            ContinuousHV::from_values(
+                permutation
+                    .iter()
+                    .map(|&source| hv.values[source])
+                    .collect(),
+            )
+        };
+
+        let initial = ContinuousHV::random(dimension, 0xA11CE);
+        let input = ContinuousHV::random(dimension, 0xBEEF);
+        reference.set_state(initial.clone());
+        permuted.set_state(permute_hv(&initial));
+
+        permuted.weight_hv = permute_hv(&permuted.weight_hv);
+        permuted.input_mask = permute_hv(&permuted.input_mask);
+        permuted.tau_modulator = permute_hv(&permuted.tau_modulator);
+        permuted.gate_weight = permute_hv(&permuted.gate_weight);
+        permuted.gate_bias = permute_hv(&permuted.gate_bias);
+
+        let permuted_input = permute_hv(&input);
+        reference.evolve_closed_form(0.037, &input);
+        permuted.evolve_closed_form(0.037, &permuted_input);
+
+        let expected = permute_hv(reference.state());
+        let max_error = expected
+            .values
+            .iter()
+            .zip(permuted.state().values.iter())
+            .map(|(a, b)| (a - b).abs())
+            .fold(0.0_f32, f32::max);
+        assert!(
+            max_error < 2e-6,
+            "joint coordinate permutation should commute with scalar-tau evolution; \
+             max absolute error={max_error}"
+        );
+        assert!(
+            (reference.effective_tau(&input) - permuted.effective_tau(&permuted_input)).abs()
+                < 2e-6,
+            "effective scalar tau must be invariant under coordinate relabeling"
+        );
+    }
+
+    #[test]
     fn test_unified_neuron_creation() {
         let config = UnifiedConfig::default();
         let neuron = HdcLtcUnifiedNeuron::new(config, 42);
