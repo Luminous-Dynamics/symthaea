@@ -154,6 +154,8 @@ pub struct StructuralCandidateContext {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StructuralProposalIntent {
     pub proposal_id: String,
+    /// Caller-supplied canonical request identity; this module never invents a digest.
+    pub request: ArtifactRef,
     pub context: StructuralCandidateContext,
     pub model_profile: StructuralModelProfile,
     pub model_profile_ref: ArtifactRef,
@@ -167,6 +169,7 @@ pub struct StructuralProposalIntent {
 pub struct StructuralAnalysisProposal {
     pub schema_version: String,
     pub proposal_id: String,
+    pub request: ArtifactRef,
     pub mission: ArtifactRef,
     pub candidate: ArtifactRef,
     pub geometry: ArtifactRef,
@@ -185,6 +188,9 @@ pub struct StructuralAnalysisProposal {
     pub requested_observables: Vec<Observable>,
     pub intended_use: IntendedUse,
     pub material_evidence: MaterialEvidenceState,
+    pub mesh_required: bool,
+    pub mesh: Option<ArtifactRef>,
+    pub comparison_reference: Option<ArtifactRef>,
     pub claim_ceiling: String,
     pub solver_execution_requested: bool,
     pub execution_authorized: bool,
@@ -214,6 +220,7 @@ pub fn emit_structural_proposal(intent: &StructuralProposalIntent) -> Structural
     }
 
     let refs = [
+        &intent.request,
         &intent.context.mission,
         &intent.context.candidate,
         &intent.context.geometry,
@@ -240,10 +247,15 @@ pub fn emit_structural_proposal(intent: &StructuralProposalIntent) -> Structural
         StructuralModelProfile::UniformRadialSpokeV0_1 => "ARTGRAV-RADIAL-SPOKE-REF-V0_1",
         _ => "",
     };
-    if expected_profile_id.is_empty() || intent.model_profile_ref.id != expected_profile_id {
+    if expected_profile_id.is_empty()
+        || intent.model_profile_ref.id != expected_profile_id
+        || intent.model_profile_ref.generation != "0.1.0"
+    {
         reasons.push(ProposalReason::ModelProfileIdentityMismatch);
     }
-    if intent.backend_ref.id != "artgrav-prestress-reference" {
+    if intent.backend_ref.id != "artgrav-prestress-reference"
+        || intent.backend_ref.generation != "0.1.0"
+    {
         reasons.push(ProposalReason::BackendIdentityMismatch);
     }
 
@@ -351,6 +363,7 @@ pub fn emit_structural_proposal(intent: &StructuralProposalIntent) -> Structural
     let proposal = StructuralAnalysisProposal {
         schema_version: SPACE_STRUCT_PROPOSAL_SCHEMA_VERSION.to_owned(),
         proposal_id: intent.proposal_id.clone(),
+        request: intent.request.clone(),
         mission: intent.context.mission.clone(),
         candidate: intent.context.candidate.clone(),
         geometry: intent.context.geometry.clone(),
@@ -369,6 +382,9 @@ pub fn emit_structural_proposal(intent: &StructuralProposalIntent) -> Structural
         requested_observables: intent.requested_observables.clone(),
         intended_use: intent.intended_use,
         material_evidence: intent.context.material_evidence,
+        mesh_required: false,
+        mesh: None,
+        comparison_reference: None,
         claim_ceiling: "SYNTHETIC_REFERENCE_CHECK".to_owned(),
         solver_execution_requested: false,
         execution_authorized: false,
@@ -400,6 +416,7 @@ mod tests {
     fn ring_intent() -> StructuralProposalIntent {
         StructuralProposalIntent {
             proposal_id: "SPACE-STRUCT-RING-PROPOSAL-001".to_owned(),
+            request: reference("SPACE-STRUCT-RING-REQUEST-001", "r1", '9'),
             context: StructuralCandidateContext {
                 mission: reference("MISSION-CISLUNAR-001", "m1", '1'),
                 candidate: reference("AG-RING-CANDIDATE-001", "c1", '2'),
@@ -433,6 +450,10 @@ mod tests {
         assert_eq!(result.disposition, ProposalDisposition::EmittedForSymtropyAdmission);
         let proposal = result.proposal.expect("proposal should be emitted");
         assert_eq!(proposal.model_source_commit, SYMTROPY_PRESTRESS_DRAFT_HEAD);
+        assert_eq!(proposal.request.id, "SPACE-STRUCT-RING-REQUEST-001");
+        assert!(!proposal.mesh_required);
+        assert!(proposal.mesh.is_none());
+        assert!(proposal.comparison_reference.is_none());
         assert_eq!(proposal.model_profile_ref.id, "ARTGRAV-THIN-RING-REF-V0_1");
         assert_eq!(proposal.backend_ref.id, "artgrav-prestress-reference");
         assert_eq!(proposal.claim_ceiling, "SYNTHETIC_REFERENCE_CHECK");
