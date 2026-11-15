@@ -87,3 +87,8 @@ cargo fmt --all -- --check
 ```
 
 These tests are authored but are not qualified as passed until executed at the exact branch head. The event-order reference adds canonical event-trace digest checks, independent ordering reconstruction, delivery-order permutation tests, and malformed-graph/operation-terminal controls.
+
+
+## Event-order benchmark protocol
+
+The full methodology, baselines, metrics and claim boundaries for the distributed stop/effect evaluator are documented in [ENGINEERING_DECISION_EVENT_ORDER_V0_1.md](../../../docs/research/ENGINEERING_DECISION_EVENT_ORDER_V0_1.md). The protocol distinguishes effect-before-trigger from effect-after-trigger, uses five-way partial-order results, requires an independently bound stop-disposition receipt, and treats unknown operation outcomes as pending. The fixture has eleven synthetic traces. The Rust reference suite now has eleven test functions, including receipt-binding, operation chronology and cancellation-order regression controls. These remain authored, not compiled/executed, until exact-head toolchain evidence is recorded.
