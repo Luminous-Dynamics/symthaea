@@ -1,0 +1,198 @@
+{
+  "version": "claim-plan-ir/v1",
+  "plan_id": "synthetic-zar-balance-minimum-v1",
+  "canonicalization": {
+    "profile": "RFC8785-JCS",
+    "hash_algorithm": "SHA-256",
+    "domain_separator": "LUMINOUS/CLAIM-PLAN-IR/V1",
+    "separator_encoding": "single_nul_byte_after_utf8_domain",
+    "duplicate_key_policy": "reject_before_canonicalization",
+    "number_policy": "I-JSON_IEEE754_exact_safe_integers_decimal_as_strings",
+    "unicode_policy": "preserve_as_is_no_normalization"
+  },
+  "authority": {
+    "policy_owner": "synthetic-benefit-policy-owner",
+    "policy_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "evidence_requirements": [
+      "source-session",
+      "issuer-qualification",
+      "credential-status",
+      "policy-currentness"
+    ]
+  },
+  "source": {
+    "trust_profile_id": "TLSN-DELEGATED-BETA1-SYNTHETIC-V1",
+    "protocol_mode": "tlsnotary_delegated_notary",
+    "implementation": {
+      "name": "tlsn",
+      "release": "v0.1.0-beta.1",
+      "source_commit": "40a069565a2eaecbb5e691dbc634be20e8498daf",
+      "build_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "server": {
+      "identity_kind": "dns_name",
+      "identity_value": "synthetic-bank.example",
+      "trust_root_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "request": {
+      "method": "GET",
+      "origin": "https://synthetic-bank.example",
+      "path_template": "/v1/accounts/{opaque_account}/balance",
+      "query_policy_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "response": {
+      "ordinal": 0,
+      "direction": "received",
+      "http_profile_id": "strict-http11-json-v1",
+      "http_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "commitment": {
+      "strategy": "http_object",
+      "hash_algorithm": "blake3",
+      "opening_profile_id": "tlsn-beta1-http-object-opening-v1",
+      "commitment_suite_id": "synthetic-tlsn-http-object-suite-v1",
+      "commitment_suite_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "field": {
+    "parser_profile_id": "strict-http11-json-v1",
+    "parser_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "schema_profile_id": "synthetic-bank-balance-v1",
+    "schema_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "json_pointer": "/available_minor_units",
+    "duplicate_key_policy": "reject",
+    "unicode_policy": "exact_scalar_sequence_no_normalization",
+    "lexical_profile_id": "unsigned-decimal-integer-v1",
+    "lexical_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "interpretation": {
+    "value_type": "unsigned_integer",
+    "unit": "ZAR_minor_units",
+    "currency": "ZAR",
+    "minor_unit_scale": 2,
+    "conversion_profile_id": "integer-minor-units-v1",
+    "conversion_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "predicate": {
+    "language": "symthaea-claim-predicate/v1",
+    "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "ast": {
+      "kind": "compare",
+      "operator": "gte",
+      "left": {
+        "kind": "claim_value"
+      },
+      "right": {
+        "kind": "literal",
+        "value": 100000
+      }
+    }
+  },
+  "request": {
+    "verifier_id": "synthetic-benefit-verifier",
+    "audience": "urn:synthetic:benefit-eligibility",
+    "purpose": "determine-minimum-balance-eligibility",
+    "challenge_ref": "synthetic-challenge-0001",
+    "challenge_nonce_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "request_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "expires_at": "2026-11-16T00:00:00Z"
+  },
+  "uniqueness": {
+    "subject_kind": "entitlement",
+    "scope_id": "synthetic-benefit-2026-Q4",
+    "binding_profile_id": "synthetic-entitlement-subject-v1",
+    "nullifier_profile_id": "mycelix-domain-scoped-nullifier-v1"
+  },
+  "privacy": {
+    "disclosure_composition": {
+      "owner": "Luminous-Dynamics/mycelix#5404",
+      "profile_id": "life-disclosure-composition-v1",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "presentation_linkability": {
+      "owner": "Luminous-Dynamics/mycelix#5401",
+      "profile_id": "life-disclosure-linkability-v1",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "proof_shape": {
+      "owner": "Luminous-Dynamics/mycelix#5411",
+      "profile_id": "life-proof-shape-v1",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "adaptive_query_policy": {
+      "owner": "Luminous-Dynamics/mycelix#5489",
+      "profile_id": "life-transcript-compiler-v1",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "budget_enforcement": {
+      "owner": "Luminous-Dynamics/mycelix#5466",
+      "profile_id": "life-disclosure-budget-v1",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "scope_id": "synthetic-benefit-2026-Q4",
+      "epoch_ref": "synthetic-policy-epoch-1"
+    },
+    "status_lookup": {
+      "owner": "Luminous-Dynamics/mycelix#6272",
+      "profile_id": "vc-status-lookup-private-cache-v1",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "specification": "bitstring-status-list-v1.0",
+      "maturity": "w3c-recommendation",
+      "retrieval_mode": "verifier_cache",
+      "index_assignment": "randomized",
+      "cache_policy": "bounded_ttl",
+      "exposure_channels": [
+        "status_list_url",
+        "fetch_timing",
+        "cache_hit_miss",
+        "response_status"
+      ],
+      "freshness_seconds": 300,
+      "target_minimum_bitstring_bits": 131072
+    },
+    "observer_metadata": {
+      "owner": "Luminous-Dynamics/mycelix#5460",
+      "profile_id": "observer-trace-profile-v1",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  },
+  "proof": {
+    "backend_id": "risc0",
+    "proof_profile_id": "risc0-claim-plan-guest-v1",
+    "program_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "image_id": "synthetic-image-id-not-qualified",
+    "verifier_build_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+    "statement_encoding": "claim-plan-public-statement-v1"
+  },
+  "dependencies": [
+    {
+      "owner": "tlsnotary",
+      "dependency_id": "tlsn-release-and-commitment-profile",
+      "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "invalidation_scope": "source-profile"
+    },
+    {
+      "owner": "policy-owner",
+      "dependency_id": "benefit-policy",
+      "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "invalidation_scope": "claim-policy"
+    },
+    {
+      "owner": "parser-owner",
+      "dependency_id": "strict-http11-json-schema",
+      "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "invalidation_scope": "field-semantics"
+    },
+    {
+      "owner": "proof-owner",
+      "dependency_id": "risc0-guest-image",
+      "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "invalidation_scope": "proof-program"
+    },
+    {
+      "owner": "Mycelix-LISE",
+      "dependency_id": "status-and-evidence-frontier",
+      "digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "invalidation_scope": "claim-currentness"
+    }
+  ]
+}
