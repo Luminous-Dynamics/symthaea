@@ -852,4 +852,105 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.receipt_sha256, second.receipt_sha256);
     }
+
+    #[test]
+    fn abrupt_zero_fill_at_both_edit_edges_fails_boundary_policy() {
+        let source = base_mono();
+        let mut output = source.clone();
+        for frame in 3..9 {
+            output.samples_interleaved_s32[frame] = 0;
+        }
+        let mut request = request_for(&source, &output);
+        for boundary in &mut request.boundaries {
+            boundary.maximum_seam_jump_abs = 15;
+            boundary.maximum_local_step_abs = 15;
+        }
+        let receipt = evaluate_audio_edit_boundary_v1(&request, &source, &output).unwrap();
+        assert!(!receipt.payload.passed);
+        assert!(receipt.payload.boundaries.iter().any(|boundary| !boundary.passed));
+    }
+
+    #[test]
+    fn polarity_inversion_inside_edit_support_fails_boundary_policy() {
+        let source = base_mono();
+        let mut output = source.clone();
+        for frame in 3..9 {
+            output.samples_interleaved_s32[frame] = -source.samples_interleaved_s32[frame];
+        }
+        let mut request = request_for(&source, &output);
+        for boundary in &mut request.boundaries {
+            boundary.maximum_seam_jump_abs = 15;
+            boundary.maximum_slope_delta_abs = 15;
+        }
+        let receipt = evaluate_audio_edit_boundary_v1(&request, &source, &output).unwrap();
+        assert!(!receipt.payload.passed);
+        assert!(receipt.payload.boundaries.iter().any(|boundary| !boundary.passed));
+    }
+
+    #[test]
+    fn one_frame_latency_shift_inside_edit_window_is_detected_at_seam() {
+        let source = base_mono();
+        let mut output = source.clone();
+        for frame in 3..9 {
+            output.samples_interleaved_s32[frame] = source.samples_interleaved_s32[frame - 1];
+        }
+        let mut request = request_for(&source, &output);
+        request.boundaries[1].maximum_seam_jump_abs = 15;
+        let receipt = evaluate_audio_edit_boundary_v1(&request, &source, &output).unwrap();
+        let right = receipt.payload.boundaries.iter()
+            .find(|boundary| boundary.boundary_id == "boundary-right")
+            .unwrap();
+        assert!(!right.passed);
+        assert!(right.channels[0].seam_jump_abs > 15);
+    }
+
+    #[test]
+    fn truncated_output_is_rejected_even_when_its_digest_is_frozen() {
+        let source = base_mono();
+        let mut output = source.clone();
+        output.samples_interleaved_s32.pop();
+        let request = request_for(&source, &output);
+        assert_eq!(
+            evaluate_audio_edit_boundary_v1(&request, &source, &output),
+            Err(AudioBoundaryErrorV1::FrameCountMismatch)
+        );
+    }
+
+    #[test]
+    fn channel_swap_fails_against_frozen_expected_output_bytes() {
+        let mut samples = Vec::new();
+        for frame in 0..12_i32 {
+            samples.push(frame * 10);
+            samples.push(10_000 + frame * 100);
+        }
+        let source = audio(samples, 2);
+        let expected_output = source.clone();
+        let mut request = request_for(&source, &expected_output);
+        request.channel_count = 2;
+
+        let mut swapped = source.clone();
+        for frame in 0..12_usize {
+            swapped.samples_interleaved_s32.swap(frame * 2, frame * 2 + 1);
+        }
+        assert_eq!(
+            evaluate_audio_edit_boundary_v1(&request, &source, &swapped),
+            Err(AudioBoundaryErrorV1::OutputDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn isolated_transient_near_edit_seam_fails_local_step_limit() {
+        let source = base_mono();
+        let mut output = source.clone();
+        output.samples_interleaved_s32[4] = 1_000_000;
+        let mut request = request_for(&source, &output);
+        request.boundaries[0].maximum_local_step_abs = 100;
+        let receipt = evaluate_audio_edit_boundary_v1(&request, &source, &output).unwrap();
+        let left = receipt.payload.boundaries.iter()
+            .find(|boundary| boundary.boundary_id == "boundary-left")
+            .unwrap();
+        assert!(!left.passed);
+        assert!(left.channels[0].maximum_local_step_abs > 100);
+    }
+
 }
