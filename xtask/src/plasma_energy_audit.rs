@@ -1247,6 +1247,482 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
     })
 }
 
+fn has_http_authority(url: &str) -> bool {
+    if url.trim() != url {
+        return false;
+    }
+    let Some(remainder) = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+    else {
+        return false;
+    };
+    let authority = remainder
+        .split(['/', '?', '#'])
+        .next()
+        .unwrap_or_default();
+    !authority.is_empty() && !authority.chars().any(char::is_whitespace)
+}
+
+fn close_f64(actual: f64, expected: f64) -> bool {
+    actual.is_finite()
+        && expected.is_finite()
+        && (actual - expected).abs() <= 1.0e-9 * actual.abs().max(expected.abs()).max(1.0)
+}
+
+fn required_f64(object: &Value, key: &str, context: &str) -> Result<f64> {
+    object
+        .get(key)
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite())
+        .with_context(|| format!("{context}: missing/non-finite numeric field {key}"))
+}
+
+fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: NH3 microwave operating-point pairing");
+    let points = case
+        .get("operating_points")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: operating_points array is missing"))?;
+    ensure!(
+        points.len() == 3,
+        "{context}: expected exactly three separately paired source operating points"
+    );
+
+    let mut point_ids = BTreeSet::new();
+    for point in points {
+        let point_id = point
+            .get("operating_point_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{context}: operating point has no identity"))?;
+        ensure!(
+            point_ids.insert(point_id.to_owned()),
+            "{context}: duplicate operating-point identity {point_id}"
+        );
+    }
+
+    let high_conversion = points
+        .iter()
+        .find(|point| {
+            point.get("operating_point_id").and_then(Value::as_str)
+                == Some("NH3-MW-ATM-HIGH-CONVERSION")
+        })
+        .with_context(|| format!("{context}: missing high-conversion operating point"))?;
+    let high_throughput = points
+        .iter()
+        .find(|point| {
+            point.get("operating_point_id").and_then(Value::as_str)
+                == Some("NH3-MW-ATM-HIGH-THROUGHPUT")
+        })
+        .with_context(|| format!("{context}: missing high-throughput operating point"))?;
+    let high_yield = points
+        .iter()
+        .find(|point| {
+            point.get("operating_point_id").and_then(Value::as_str)
+                == Some("NH3-MW-ATM-HIGH-ENERGY-YIELD")
+        })
+        .with_context(|| format!("{context}: missing high-energy-yield operating point"))?;
+
+    let conversion_lower_bound = required_f64(
+        high_conversion,
+        "ammonia_conversion_lower_bound_fraction",
+        &context,
+    )?;
+    ensure!(
+        close_f64(conversion_lower_bound, 0.99),
+        "{context}: high-conversion point must preserve its >99% lower bound"
+    );
+    ensure!(
+        close_f64(
+            required_f64(
+                high_conversion,
+                "hydrogen_energy_yield_g_H2_per_kWh",
+                &context
+            )?,
+            45.0
+        ),
+        "{context}: >99% conversion point must retain its 45 g/kWh yield"
+    );
+    ensure!(
+        required_f64(high_conversion, "hydrogen_energy_cost_kJ_per_mol", &context)? == 242.0,
+        "{context}: >99% conversion point must retain its 242 kJ/mol energy cost"
+    );
+    ensure!(
+        high_conversion
+            .get("hydrogen_production_rate_g_per_hour")
+            .is_some_and(Value::is_null),
+        "{context}: high-conversion point must not borrow the 150 g/h throughput value"
+    );
+
+    ensure!(
+        close_f64(
+            required_f64(high_throughput, "ammonia_conversion_fraction", &context)?,
+            0.924
+        ),
+        "{context}: 150 g/h point must retain 92.4% conversion"
+    );
+    ensure!(
+        close_f64(
+            required_f64(
+                high_throughput,
+                "hydrogen_energy_yield_g_H2_per_kWh",
+                &context
+            )?,
+            50.0
+        ),
+        "{context}: 150 g/h point must retain its 50 g/kWh energy yield"
+    );
+    ensure!(
+        required_f64(high_throughput, "hydrogen_energy_cost_kJ_per_mol", &context)? == 217.0,
+        "{context}: 150 g/h point must retain its 217 kJ/mol energy cost"
+    );
+    ensure!(
+        high_throughput
+            .get("hydrogen_production_rate_g_per_hour")
+            .and_then(Value::as_f64)
+            .is_some_and(|value| close_f64(value, 150.0)),
+        "{context}: 150 g/h throughput must remain paired with the 92.4% conversion point"
+    );
+
+    ensure!(
+        close_f64(
+            required_f64(high_yield, "ammonia_conversion_fraction", &context)?,
+            0.76
+        ),
+        "{context}: highest-yield point must retain 76% conversion"
+    );
+    ensure!(
+        close_f64(
+            required_f64(high_yield, "hydrogen_energy_yield_g_H2_per_kWh", &context)?,
+            51.0
+        ),
+        "{context}: highest-yield point must retain 51 g/kWh energy yield"
+    );
+    ensure!(
+        required_f64(high_yield, "hydrogen_energy_cost_kJ_per_mol", &context)? == 210.0,
+        "{context}: highest-yield point must retain 210 kJ/mol energy cost"
+    );
+    ensure!(
+        high_yield
+            .get("hydrogen_production_rate_g_per_hour")
+            .is_some_and(Value::is_null),
+        "{context}: highest-yield point must not borrow the 150 g/h throughput value"
+    );
+    Ok(())
+}
+
+fn validate_nh3_energy_yield_check(check: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: NH3 microwave energy-yield derivation");
+    ensure!(
+        check.get("source_case_id").and_then(Value::as_str)
+            == Some("NH3-CRACK-MW-ATM-MECHANISM-2026"),
+        "{context}: source_case_id must point to NH3-CRACK-MW-ATM-MECHANISM-2026"
+    );
+    let inputs = check
+        .get("inputs")
+        .with_context(|| format!("{context}: inputs are missing"))?;
+    let derivation = check
+        .get("derivation")
+        .with_context(|| format!("{context}: derivation is missing"))?;
+
+    let near_complete_yield = required_f64(
+        inputs,
+        "near_complete_conversion_energy_yield_g_H2_per_kWh",
+        &context,
+    )?;
+    let best_yield = required_f64(inputs, "best_energy_yield_g_H2_per_kWh", &context)?;
+    ensure!(
+        near_complete_yield > 0.0 && best_yield > 0.0,
+        "{context}: energy yields must be positive"
+    );
+
+    let expected_near_complete = 1000.0 / near_complete_yield;
+    let expected_best = 1000.0 / best_yield;
+    let expected_reduction = 1.0 - near_complete_yield / best_yield;
+
+    let actual_near_complete = required_f64(
+        derivation,
+        "near_complete_conversion_specific_energy_kWh_per_kg_H2",
+        &context,
+    )?;
+    let actual_best = required_f64(
+        derivation,
+        "best_energy_yield_specific_energy_kWh_per_kg_H2",
+        &context,
+    )?;
+    let actual_intermediate = required_f64(
+        derivation,
+        "intermediate_92_4_percent_specific_energy_kWh_per_kg_H2",
+        &context,
+    )?;
+    let actual_reduction_92_4 = required_f64(
+        derivation,
+        "relative_specific_energy_reduction_at_92_4_percent_conversion",
+        &context,
+    )?;
+    let actual_reduction = required_f64(
+        derivation,
+        "relative_specific_energy_reduction_at_76_percent_conversion",
+        &context,
+    )?;
+
+    let intermediate_yield = required_f64(
+        inputs,
+        "intermediate_92_4_percent_energy_yield_g_H2_per_kWh",
+        &context,
+    )?;
+    ensure!(
+        intermediate_yield > 0.0,
+        "{context}: intermediate energy yield must be positive"
+    );
+    let expected_intermediate = 1000.0 / intermediate_yield;
+    let expected_reduction_92_4 = 1.0 - near_complete_yield / intermediate_yield;
+
+    ensure!(
+        close_f64(actual_near_complete, expected_near_complete),
+        "{context}: near-complete specific-energy derivation does not equal 1000 / reported yield"
+    );
+    ensure!(
+        close_f64(actual_intermediate, expected_intermediate),
+        "{context}: 92.4-percent specific-energy derivation does not equal 1000 / reported yield"
+    );
+    ensure!(
+        close_f64(actual_best, expected_best),
+        "{context}: best-yield specific-energy derivation does not equal 1000 / reported yield"
+    );
+    ensure!(
+        close_f64(actual_reduction_92_4, expected_reduction_92_4),
+        "{context}: 92.4-percent relative specific-energy reduction is inconsistent with the source points"
+    );
+    ensure!(
+        close_f64(actual_reduction, expected_reduction),
+        "{context}: 76-percent relative specific-energy reduction is inconsistent with the source points"
+    );
+    Ok(())
+}
+
+fn co2_configuration<'a>(case: &'a Value, configuration_id: &str) -> Option<&'a Value> {
+    case.get("configurations")?
+        .as_array()?
+        .iter()
+        .find(|configuration| {
+            configuration.get("id").and_then(Value::as_str) == Some(configuration_id)
+        })
+}
+
+fn co2_metric<'a>(configuration: &'a Value, metric_name: &str) -> Option<&'a Value> {
+    configuration
+        .get("observations")?
+        .as_array()?
+        .iter()
+        .find(|observation| observation.get("metric").and_then(Value::as_str) == Some(metric_name))
+}
+
+fn validate_co2_counterflow_operating_points(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: CO2 counterflow operating-point audit");
+    let configurations = case
+        .get("configurations")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: configurations array is missing"))?;
+    ensure!(
+        configurations.len() == 3,
+        "{context}: expected exactly three separately identified source configurations"
+    );
+
+    let mut configuration_ids = BTreeSet::new();
+    for configuration in configurations {
+        let id = configuration
+            .get("id")
+            .and_then(Value::as_str)
+            .filter(|id| !id.trim().is_empty())
+            .with_context(|| format!("{context}: configuration has no non-empty id"))?;
+        ensure!(
+            configuration_ids.insert(id.to_owned()),
+            "{context}: duplicate configuration ID {id}"
+        );
+    }
+
+    let magd = co2_configuration(case, "counterflow-magd-792w")
+        .with_context(|| format!("{context}: missing 792 W MAGD configuration"))?;
+    ensure!(
+        magd.get("electrical_power_w").and_then(Value::as_f64) == Some(792.0),
+        "{context}: MAGD configuration must retain its 792 W operating point"
+    );
+    ensure!(
+        magd.get("gas_flow_slm").and_then(Value::as_f64) == Some(4.0),
+        "{context}: MAGD configuration must retain its 4 slm feed-flow point"
+    );
+    for (metric_name, expected) in [("co2_conversion", 0.236), ("energy_efficiency", 0.251)] {
+        let observation = co2_metric(magd, metric_name)
+            .with_context(|| format!("{context}: 792 W configuration lacks {metric_name}"))?;
+        ensure!(
+            observation
+                .get("value")
+                .and_then(Value::as_f64)
+                .is_some_and(|value| close_f64(value, expected)),
+            "{context}: 792 W {metric_name} does not match its source-pinned operating point"
+        );
+    }
+
+    let low_power = co2_configuration(case, "counterflow-low-power-302w")
+        .with_context(|| format!("{context}: missing separate 302 W configuration"))?;
+    ensure!(
+        low_power.get("electrical_power_w").and_then(Value::as_f64) == Some(302.0),
+        "{context}: low-power configuration must retain its 302 W operating point"
+    );
+    let low_power_efficiency = co2_metric(low_power, "energy_efficiency")
+        .with_context(|| format!("{context}: 302 W configuration lacks energy_efficiency"))?;
+    ensure!(
+        low_power_efficiency
+            .get("value")
+            .and_then(Value::as_f64)
+            .is_some_and(|value| close_f64(value, 0.462)),
+        "{context}: 302 W energy efficiency must remain the source-reported 46.2% point"
+    );
+    let low_power_conversion = co2_metric(low_power, "co2_conversion").with_context(|| {
+        format!("{context}: 302 W configuration must explicitly preserve unknown CO2 conversion")
+    })?;
+    ensure!(
+        low_power_conversion
+            .get("value")
+            .is_some_and(Value::is_null),
+        "{context}: 302 W conversion must remain unknown; do not borrow the 792 W conversion"
+    );
+
+    let sweep =
+        co2_configuration(case, "counterflow-ratio-distance-optimization").with_context(|| {
+            format!("{context}: missing separate ratio/distance optimization record")
+        })?;
+    for (metric_name, expected, expected_unit) in [
+        ("relative_conversion_increase", 2.073, "fractional_increase"),
+        (
+            "relative_energy_efficiency_increase",
+            2.036,
+            "fractional_increase",
+        ),
+    ] {
+        let observation = co2_metric(sweep, metric_name)
+            .with_context(|| format!("{context}: optimization record lacks {metric_name}"))?;
+        ensure!(
+            observation
+                .get("value")
+                .and_then(Value::as_f64)
+                .is_some_and(|value| close_f64(value, expected)),
+            "{context}: {metric_name} does not match the source-reported relative increase"
+        );
+        ensure!(
+            observation.get("unit").and_then(Value::as_str) == Some(expected_unit),
+            "{context}: {metric_name} must remain a relative increase, not an absolute fraction"
+        );
+    }
+    ensure!(
+        sweep
+            .get("observations")
+            .and_then(Value::as_array)
+            .is_some_and(|items| {
+                items.iter().any(|item| {
+                    item.get("metric").and_then(Value::as_str) == Some("counterflow_gas_ratio")
+                        && item.get("value").and_then(Value::as_f64) == Some(2.5)
+                }) && items.iter().any(|item| {
+                    item.get("metric").and_then(Value::as_str) == Some("counterflow_distance")
+                        && item.get("value").and_then(Value::as_f64) == Some(30.0)
+                })
+            }),
+        "{context}: relative-improvement record must retain its 2.5 ratio / 30 mm geometry context"
+    );
+
+    Ok(())
+}
+
+fn validate_nh3_n2_vibrational_transfer_case(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: NH3 N2 vibrational transfer evidence");
+    let state = case
+        .get("state_transfer_evidence")
+        .with_context(|| format!("{context}: state_transfer_evidence is missing"))?;
+    let physical = state
+        .get("physical_observations")
+        .and_then(Value::as_array)
+        .filter(|items| !items.is_empty())
+        .with_context(|| format!("{context}: physical_observations must be a non-empty array"))?;
+    let model = state
+        .get("model_derived_estimates")
+        .and_then(Value::as_array)
+        .filter(|items| !items.is_empty())
+        .with_context(|| format!("{context}: model_derived_estimates must be a non-empty array"))?;
+
+    ensure!(
+        physical.iter().any(|item| {
+            item.get("evidence_class").and_then(Value::as_str)
+                == Some("PUBLISHED_EXPERIMENTAL_CONTROL")
+                && item.get("observation").and_then(Value::as_str)
+                    .is_some_and(|value| value.contains("15N2"))
+        }),
+        "{context}: source must preserve 15N2 attribution as an experimental control"
+    );
+    ensure!(
+        physical.iter().any(|item| {
+            item.get("evidence_class").and_then(Value::as_str)
+                == Some("PUBLISHED_IN_SITU_SPECTROSCOPY")
+                && item.get("observation").and_then(Value::as_str)
+                    .is_some_and(|value| value.to_ascii_lowercase().contains("raman"))
+        }),
+        "{context}: in-situ Raman intermediate observation must remain separate physical evidence"
+    );
+    ensure!(
+        physical.iter().any(|item| {
+            item.get("evidence_class").and_then(Value::as_str)
+                == Some("PUBLISHED_EXPERIMENTAL_PRODUCT_OBSERVATION")
+        }),
+        "{context}: product rate/FE must remain source-classified experimental observations"
+    );
+
+    for (metric, expected) in [
+        ("effective_N2_vibrational_state_temperature", 4300.0),
+        ("N2_population_in_v4_to_v8", 0.118),
+    ] {
+        let entry = model.iter().find(|item| {
+            item.get("metric").and_then(Value::as_str) == Some(metric)
+        }).with_context(|| format!("{context}: missing model-derived metric {metric}"))?;
+        ensure!(
+            entry.get("evidence_class").and_then(Value::as_str) == Some("MODEL_DERIVED"),
+            "{context}: {metric} must remain MODEL_DERIVED, not a physical measurement"
+        );
+        ensure!(
+            entry.get("interface_direct_measurement").and_then(Value::as_bool) == Some(false),
+            "{context}: {metric} cannot claim a direct catalyst-interface measurement"
+        );
+        ensure!(
+            entry.get("value").and_then(Value::as_f64)
+                .is_some_and(|value| close_f64(value, expected)),
+            "{context}: {metric} source-pinned model estimate changed"
+        );
+    }
+
+    let policy = state.get("claim_policy")
+        .with_context(|| format!("{context}: claim_policy is missing"))?;
+    for key in [
+        "model_derived_population_must_not_be_relabelled_physical_measurement",
+        "discharge_exit_population_must_not_be_substituted_for_interface_population",
+        "raman_intermediate_signal_must_not_be_substituted_for_quantitative_state_flux",
+        "isotope_attribution_is_not_equivalent_to_state_resolved_mechanism_proof",
+        "faradaic_efficiency_is_not_equivalent_to_full_system_energy_efficiency",
+    ] {
+        ensure!(
+            policy.get(key).and_then(Value::as_bool) == Some(true),
+            "{context}: missing evidence-separation policy {key}"
+        );
+    }
+    ensure!(
+        state.get("not_established").and_then(Value::as_array).is_some_and(|items| {
+            items.iter().any(|item| item.as_str()
+                .is_some_and(|value| value.contains("catalyst interface")))
+        }),
+        "{context}: missing explicit statement that catalyst-interface state is not established"
+    );
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2362,480 +2838,4 @@ mod tests {
         let error = audit_source_value(&source, "test.json").unwrap_err();
         assert!(error.to_string().contains("valid HTTP(S) source URL"));
     }
-}
-
-fn has_http_authority(url: &str) -> bool {
-    if url.trim() != url {
-        return false;
-    }
-    let Some(remainder) = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))
-    else {
-        return false;
-    };
-    let authority = remainder
-        .split(['/', '?', '#'])
-        .next()
-        .unwrap_or_default();
-    !authority.is_empty() && !authority.chars().any(char::is_whitespace)
-}
-
-fn close_f64(actual: f64, expected: f64) -> bool {
-    actual.is_finite()
-        && expected.is_finite()
-        && (actual - expected).abs() <= 1.0e-9 * actual.abs().max(expected.abs()).max(1.0)
-}
-
-fn required_f64(object: &Value, key: &str, context: &str) -> Result<f64> {
-    object
-        .get(key)
-        .and_then(Value::as_f64)
-        .filter(|value| value.is_finite())
-        .with_context(|| format!("{context}: missing/non-finite numeric field {key}"))
-}
-
-fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()> {
-    let context = format!("{display_name}: NH3 microwave operating-point pairing");
-    let points = case
-        .get("operating_points")
-        .and_then(Value::as_array)
-        .with_context(|| format!("{context}: operating_points array is missing"))?;
-    ensure!(
-        points.len() == 3,
-        "{context}: expected exactly three separately paired source operating points"
-    );
-
-    let mut point_ids = BTreeSet::new();
-    for point in points {
-        let point_id = point
-            .get("operating_point_id")
-            .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-            .with_context(|| format!("{context}: operating point has no identity"))?;
-        ensure!(
-            point_ids.insert(point_id.to_owned()),
-            "{context}: duplicate operating-point identity {point_id}"
-        );
-    }
-
-    let high_conversion = points
-        .iter()
-        .find(|point| {
-            point.get("operating_point_id").and_then(Value::as_str)
-                == Some("NH3-MW-ATM-HIGH-CONVERSION")
-        })
-        .with_context(|| format!("{context}: missing high-conversion operating point"))?;
-    let high_throughput = points
-        .iter()
-        .find(|point| {
-            point.get("operating_point_id").and_then(Value::as_str)
-                == Some("NH3-MW-ATM-HIGH-THROUGHPUT")
-        })
-        .with_context(|| format!("{context}: missing high-throughput operating point"))?;
-    let high_yield = points
-        .iter()
-        .find(|point| {
-            point.get("operating_point_id").and_then(Value::as_str)
-                == Some("NH3-MW-ATM-HIGH-ENERGY-YIELD")
-        })
-        .with_context(|| format!("{context}: missing high-energy-yield operating point"))?;
-
-    let conversion_lower_bound = required_f64(
-        high_conversion,
-        "ammonia_conversion_lower_bound_fraction",
-        &context,
-    )?;
-    ensure!(
-        close_f64(conversion_lower_bound, 0.99),
-        "{context}: high-conversion point must preserve its >99% lower bound"
-    );
-    ensure!(
-        close_f64(
-            required_f64(
-                high_conversion,
-                "hydrogen_energy_yield_g_H2_per_kWh",
-                &context
-            )?,
-            45.0
-        ),
-        "{context}: >99% conversion point must retain its 45 g/kWh yield"
-    );
-    ensure!(
-        required_f64(high_conversion, "hydrogen_energy_cost_kJ_per_mol", &context)? == 242.0,
-        "{context}: >99% conversion point must retain its 242 kJ/mol energy cost"
-    );
-    ensure!(
-        high_conversion
-            .get("hydrogen_production_rate_g_per_hour")
-            .is_some_and(Value::is_null),
-        "{context}: high-conversion point must not borrow the 150 g/h throughput value"
-    );
-
-    ensure!(
-        close_f64(
-            required_f64(high_throughput, "ammonia_conversion_fraction", &context)?,
-            0.924
-        ),
-        "{context}: 150 g/h point must retain 92.4% conversion"
-    );
-    ensure!(
-        close_f64(
-            required_f64(
-                high_throughput,
-                "hydrogen_energy_yield_g_H2_per_kWh",
-                &context
-            )?,
-            50.0
-        ),
-        "{context}: 150 g/h point must retain its 50 g/kWh energy yield"
-    );
-    ensure!(
-        required_f64(high_throughput, "hydrogen_energy_cost_kJ_per_mol", &context)? == 217.0,
-        "{context}: 150 g/h point must retain its 217 kJ/mol energy cost"
-    );
-    ensure!(
-        high_throughput
-            .get("hydrogen_production_rate_g_per_hour")
-            .and_then(Value::as_f64)
-            .is_some_and(|value| close_f64(value, 150.0)),
-        "{context}: 150 g/h throughput must remain paired with the 92.4% conversion point"
-    );
-
-    ensure!(
-        close_f64(
-            required_f64(high_yield, "ammonia_conversion_fraction", &context)?,
-            0.76
-        ),
-        "{context}: highest-yield point must retain 76% conversion"
-    );
-    ensure!(
-        close_f64(
-            required_f64(high_yield, "hydrogen_energy_yield_g_H2_per_kWh", &context)?,
-            51.0
-        ),
-        "{context}: highest-yield point must retain 51 g/kWh energy yield"
-    );
-    ensure!(
-        required_f64(high_yield, "hydrogen_energy_cost_kJ_per_mol", &context)? == 210.0,
-        "{context}: highest-yield point must retain 210 kJ/mol energy cost"
-    );
-    ensure!(
-        high_yield
-            .get("hydrogen_production_rate_g_per_hour")
-            .is_some_and(Value::is_null),
-        "{context}: highest-yield point must not borrow the 150 g/h throughput value"
-    );
-    Ok(())
-}
-
-fn validate_nh3_energy_yield_check(check: &Value, display_name: &str) -> Result<()> {
-    let context = format!("{display_name}: NH3 microwave energy-yield derivation");
-    ensure!(
-        check.get("source_case_id").and_then(Value::as_str)
-            == Some("NH3-CRACK-MW-ATM-MECHANISM-2026"),
-        "{context}: source_case_id must point to NH3-CRACK-MW-ATM-MECHANISM-2026"
-    );
-    let inputs = check
-        .get("inputs")
-        .with_context(|| format!("{context}: inputs are missing"))?;
-    let derivation = check
-        .get("derivation")
-        .with_context(|| format!("{context}: derivation is missing"))?;
-
-    let near_complete_yield = required_f64(
-        inputs,
-        "near_complete_conversion_energy_yield_g_H2_per_kWh",
-        &context,
-    )?;
-    let best_yield = required_f64(inputs, "best_energy_yield_g_H2_per_kWh", &context)?;
-    ensure!(
-        near_complete_yield > 0.0 && best_yield > 0.0,
-        "{context}: energy yields must be positive"
-    );
-
-    let expected_near_complete = 1000.0 / near_complete_yield;
-    let expected_best = 1000.0 / best_yield;
-    let expected_reduction = 1.0 - near_complete_yield / best_yield;
-
-    let actual_near_complete = required_f64(
-        derivation,
-        "near_complete_conversion_specific_energy_kWh_per_kg_H2",
-        &context,
-    )?;
-    let actual_best = required_f64(
-        derivation,
-        "best_energy_yield_specific_energy_kWh_per_kg_H2",
-        &context,
-    )?;
-    let actual_intermediate = required_f64(
-        derivation,
-        "intermediate_92_4_percent_specific_energy_kWh_per_kg_H2",
-        &context,
-    )?;
-    let actual_reduction_92_4 = required_f64(
-        derivation,
-        "relative_specific_energy_reduction_at_92_4_percent_conversion",
-        &context,
-    )?;
-    let actual_reduction = required_f64(
-        derivation,
-        "relative_specific_energy_reduction_at_76_percent_conversion",
-        &context,
-    )?;
-
-    let intermediate_yield = required_f64(
-        inputs,
-        "intermediate_92_4_percent_energy_yield_g_H2_per_kWh",
-        &context,
-    )?;
-    ensure!(
-        intermediate_yield > 0.0,
-        "{context}: intermediate energy yield must be positive"
-    );
-    let expected_intermediate = 1000.0 / intermediate_yield;
-    let expected_reduction_92_4 = 1.0 - near_complete_yield / intermediate_yield;
-
-    ensure!(
-        close_f64(actual_near_complete, expected_near_complete),
-        "{context}: near-complete specific-energy derivation does not equal 1000 / reported yield"
-    );
-    ensure!(
-        close_f64(actual_intermediate, expected_intermediate),
-        "{context}: 92.4-percent specific-energy derivation does not equal 1000 / reported yield"
-    );
-    ensure!(
-        close_f64(actual_best, expected_best),
-        "{context}: best-yield specific-energy derivation does not equal 1000 / reported yield"
-    );
-    ensure!(
-        close_f64(actual_reduction_92_4, expected_reduction_92_4),
-        "{context}: 92.4-percent relative specific-energy reduction is inconsistent with the source points"
-    );
-    ensure!(
-        close_f64(actual_reduction, expected_reduction),
-        "{context}: 76-percent relative specific-energy reduction is inconsistent with the source points"
-    );
-    Ok(())
-}
-
-fn co2_configuration<'a>(case: &'a Value, configuration_id: &str) -> Option<&'a Value> {
-    case.get("configurations")?
-        .as_array()?
-        .iter()
-        .find(|configuration| {
-            configuration.get("id").and_then(Value::as_str) == Some(configuration_id)
-        })
-}
-
-fn co2_metric<'a>(configuration: &'a Value, metric_name: &str) -> Option<&'a Value> {
-    configuration
-        .get("observations")?
-        .as_array()?
-        .iter()
-        .find(|observation| observation.get("metric").and_then(Value::as_str) == Some(metric_name))
-}
-
-fn validate_co2_counterflow_operating_points(case: &Value, display_name: &str) -> Result<()> {
-    let context = format!("{display_name}: CO2 counterflow operating-point audit");
-    let configurations = case
-        .get("configurations")
-        .and_then(Value::as_array)
-        .with_context(|| format!("{context}: configurations array is missing"))?;
-    ensure!(
-        configurations.len() == 3,
-        "{context}: expected exactly three separately identified source configurations"
-    );
-
-    let mut configuration_ids = BTreeSet::new();
-    for configuration in configurations {
-        let id = configuration
-            .get("id")
-            .and_then(Value::as_str)
-            .filter(|id| !id.trim().is_empty())
-            .with_context(|| format!("{context}: configuration has no non-empty id"))?;
-        ensure!(
-            configuration_ids.insert(id.to_owned()),
-            "{context}: duplicate configuration ID {id}"
-        );
-    }
-
-    let magd = co2_configuration(case, "counterflow-magd-792w")
-        .with_context(|| format!("{context}: missing 792 W MAGD configuration"))?;
-    ensure!(
-        magd.get("electrical_power_w").and_then(Value::as_f64) == Some(792.0),
-        "{context}: MAGD configuration must retain its 792 W operating point"
-    );
-    ensure!(
-        magd.get("gas_flow_slm").and_then(Value::as_f64) == Some(4.0),
-        "{context}: MAGD configuration must retain its 4 slm feed-flow point"
-    );
-    for (metric_name, expected) in [("co2_conversion", 0.236), ("energy_efficiency", 0.251)] {
-        let observation = co2_metric(magd, metric_name)
-            .with_context(|| format!("{context}: 792 W configuration lacks {metric_name}"))?;
-        ensure!(
-            observation
-                .get("value")
-                .and_then(Value::as_f64)
-                .is_some_and(|value| close_f64(value, expected)),
-            "{context}: 792 W {metric_name} does not match its source-pinned operating point"
-        );
-    }
-
-    let low_power = co2_configuration(case, "counterflow-low-power-302w")
-        .with_context(|| format!("{context}: missing separate 302 W configuration"))?;
-    ensure!(
-        low_power.get("electrical_power_w").and_then(Value::as_f64) == Some(302.0),
-        "{context}: low-power configuration must retain its 302 W operating point"
-    );
-    let low_power_efficiency = co2_metric(low_power, "energy_efficiency")
-        .with_context(|| format!("{context}: 302 W configuration lacks energy_efficiency"))?;
-    ensure!(
-        low_power_efficiency
-            .get("value")
-            .and_then(Value::as_f64)
-            .is_some_and(|value| close_f64(value, 0.462)),
-        "{context}: 302 W energy efficiency must remain the source-reported 46.2% point"
-    );
-    let low_power_conversion = co2_metric(low_power, "co2_conversion").with_context(|| {
-        format!("{context}: 302 W configuration must explicitly preserve unknown CO2 conversion")
-    })?;
-    ensure!(
-        low_power_conversion
-            .get("value")
-            .is_some_and(Value::is_null),
-        "{context}: 302 W conversion must remain unknown; do not borrow the 792 W conversion"
-    );
-
-    let sweep =
-        co2_configuration(case, "counterflow-ratio-distance-optimization").with_context(|| {
-            format!("{context}: missing separate ratio/distance optimization record")
-        })?;
-    for (metric_name, expected, expected_unit) in [
-        ("relative_conversion_increase", 2.073, "fractional_increase"),
-        (
-            "relative_energy_efficiency_increase",
-            2.036,
-            "fractional_increase",
-        ),
-    ] {
-        let observation = co2_metric(sweep, metric_name)
-            .with_context(|| format!("{context}: optimization record lacks {metric_name}"))?;
-        ensure!(
-            observation
-                .get("value")
-                .and_then(Value::as_f64)
-                .is_some_and(|value| close_f64(value, expected)),
-            "{context}: {metric_name} does not match the source-reported relative increase"
-        );
-        ensure!(
-            observation.get("unit").and_then(Value::as_str) == Some(expected_unit),
-            "{context}: {metric_name} must remain a relative increase, not an absolute fraction"
-        );
-    }
-    ensure!(
-        sweep
-            .get("observations")
-            .and_then(Value::as_array)
-            .is_some_and(|items| {
-                items.iter().any(|item| {
-                    item.get("metric").and_then(Value::as_str) == Some("counterflow_gas_ratio")
-                        && item.get("value").and_then(Value::as_f64) == Some(2.5)
-                }) && items.iter().any(|item| {
-                    item.get("metric").and_then(Value::as_str) == Some("counterflow_distance")
-                        && item.get("value").and_then(Value::as_f64) == Some(30.0)
-                })
-            }),
-        "{context}: relative-improvement record must retain its 2.5 ratio / 30 mm geometry context"
-    );
-
-    Ok(())
-}
-
-fn validate_nh3_n2_vibrational_transfer_case(case: &Value, display_name: &str) -> Result<()> {
-    let context = format!("{display_name}: NH3 N2 vibrational transfer evidence");
-    let state = case
-        .get("state_transfer_evidence")
-        .with_context(|| format!("{context}: state_transfer_evidence is missing"))?;
-    let physical = state
-        .get("physical_observations")
-        .and_then(Value::as_array)
-        .filter(|items| !items.is_empty())
-        .with_context(|| format!("{context}: physical_observations must be a non-empty array"))?;
-    let model = state
-        .get("model_derived_estimates")
-        .and_then(Value::as_array)
-        .filter(|items| !items.is_empty())
-        .with_context(|| format!("{context}: model_derived_estimates must be a non-empty array"))?;
-
-    ensure!(
-        physical.iter().any(|item| {
-            item.get("evidence_class").and_then(Value::as_str)
-                == Some("PUBLISHED_EXPERIMENTAL_CONTROL")
-                && item.get("observation").and_then(Value::as_str)
-                    .is_some_and(|value| value.contains("15N2"))
-        }),
-        "{context}: source must preserve 15N2 attribution as an experimental control"
-    );
-    ensure!(
-        physical.iter().any(|item| {
-            item.get("evidence_class").and_then(Value::as_str)
-                == Some("PUBLISHED_IN_SITU_SPECTROSCOPY")
-                && item.get("observation").and_then(Value::as_str)
-                    .is_some_and(|value| value.to_ascii_lowercase().contains("raman"))
-        }),
-        "{context}: in-situ Raman intermediate observation must remain separate physical evidence"
-    );
-    ensure!(
-        physical.iter().any(|item| {
-            item.get("evidence_class").and_then(Value::as_str)
-                == Some("PUBLISHED_EXPERIMENTAL_PRODUCT_OBSERVATION")
-        }),
-        "{context}: product rate/FE must remain source-classified experimental observations"
-    );
-
-    for (metric, expected) in [
-        ("effective_N2_vibrational_state_temperature", 4300.0),
-        ("N2_population_in_v4_to_v8", 0.118),
-    ] {
-        let entry = model.iter().find(|item| {
-            item.get("metric").and_then(Value::as_str) == Some(metric)
-        }).with_context(|| format!("{context}: missing model-derived metric {metric}"))?;
-        ensure!(
-            entry.get("evidence_class").and_then(Value::as_str) == Some("MODEL_DERIVED"),
-            "{context}: {metric} must remain MODEL_DERIVED, not a physical measurement"
-        );
-        ensure!(
-            entry.get("interface_direct_measurement").and_then(Value::as_bool) == Some(false),
-            "{context}: {metric} cannot claim a direct catalyst-interface measurement"
-        );
-        ensure!(
-            entry.get("value").and_then(Value::as_f64)
-                .is_some_and(|value| close_f64(value, expected)),
-            "{context}: {metric} source-pinned model estimate changed"
-        );
-    }
-
-    let policy = state.get("claim_policy")
-        .with_context(|| format!("{context}: claim_policy is missing"))?;
-    for key in [
-        "model_derived_population_must_not_be_relabelled_physical_measurement",
-        "discharge_exit_population_must_not_be_substituted_for_interface_population",
-        "raman_intermediate_signal_must_not_be_substituted_for_quantitative_state_flux",
-        "isotope_attribution_is_not_equivalent_to_state_resolved_mechanism_proof",
-        "faradaic_efficiency_is_not_equivalent_to_full_system_energy_efficiency",
-    ] {
-        ensure!(
-            policy.get(key).and_then(Value::as_bool) == Some(true),
-            "{context}: missing evidence-separation policy {key}"
-        );
-    }
-    ensure!(
-        state.get("not_established").and_then(Value::as_array).is_some_and(|items| {
-            items.iter().any(|item| item.as_str()
-                .is_some_and(|value| value.contains("catalyst interface")))
-        }),
-        "{context}: missing explicit statement that catalyst-interface state is not established"
-    );
-    Ok(())
 }
