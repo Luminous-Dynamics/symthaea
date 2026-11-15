@@ -23,6 +23,7 @@ use std::collections::{BTreeMap, BTreeSet};
 pub mod algorithmic_residual;
 pub mod anytime_valid;
 pub mod assay;
+pub mod delayed_outcomes;
 pub mod experiment_design;
 pub mod identity;
 pub mod model_refinement;
@@ -49,6 +50,14 @@ pub use anytime_valid::{
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
     ModelId, ModelPairAssessment, evaluate_assay_adequacy,
+};
+pub use delayed_outcomes::{
+    DelayedArmSequence, DelayedDecisionQuality, DelayedEffectInterval, DelayedEvidenceRefs,
+    DelayedOutcomeClaim, DelayedOutcomeFinding, DelayedOutcomeFindingCode, DelayedOutcomeOracle,
+    DelayedOutcomeQualification, DelayedOutcomeRecord, DelayedOutcomeReport,
+    DelayedOutcomeScenario, DelayedOutcomeTrace, DelayedPotentialEvent, DelayedQuery,
+    DelayedQueryReport, DelayedRobustDecision, DelayedUnit, DelayedUnitPotentialOutcomes,
+    delayed_normal_mixture_boundary, evaluate_delayed_outcomes,
 };
 pub use experiment_design::{
     ExperimentBudget, ExperimentEvidenceStatus, ExperimentFinding, ExperimentFindingCode,
