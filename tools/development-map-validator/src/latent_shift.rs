@@ -284,7 +284,9 @@ fn validate_candidate_trace(
     let trace_id = required_str(candidate_trace, "trace_id", "candidate_trace")?;
     let episode_id = required_str(candidate_trace, "episode_id", "candidate_trace")?;
     if episode_id != required_str(candidate_view, "episode_id", "candidate_view")? {
-        return Err("candidate_trace.episode_id does not match candidate_view.episode_id".to_owned());
+        return Err(format!(
+            "candidate trace {trace_id:?} episode_id does not match candidate_view.episode_id"
+        ));
     }
 
     let requests = candidate_trace
@@ -361,12 +363,16 @@ fn validate_candidate_trace(
     }
 
     let mut decisions = Vec::new();
+    let mut decision_ids = BTreeSet::new();
     let mut prior_decision_at: Option<DateTime<FixedOffset>> = None;
     let mut source_overclaims = Vec::new();
 
     for (index, value) in decision_values.iter().enumerate() {
         let label = format!("candidate_trace.decisions[{index}]");
         let decision_id = required_str(value, "decision_id", &label)?.to_owned();
+        if !decision_ids.insert(decision_id.clone()) {
+            return Err(format!("candidate trace {trace_id:?} has duplicate decision_id {decision_id:?}"));
+        }
         let decision_at = parse_time(value, "decision_at", &label)?;
         if let Some(previous) = &prior_decision_at {
             if decision_at <= *previous {
