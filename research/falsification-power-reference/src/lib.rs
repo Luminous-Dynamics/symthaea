@@ -158,8 +158,9 @@ pub fn known_direction_power(
 
 /// Evaluate every declared alternative under the same fixed design size.
 ///
-/// All alternatives must provide one expected residual per observation. This
-/// prevents accidentally comparing alternatives under different budgets.
+/// All alternatives must provide one expected residual per observation in the
+/// same design order. This checks vector lengths only: callers must bind the
+/// same observation IDs, units, sensor basis and acquisition-cost accounting.
 pub fn evaluate_power_envelope(
     alternatives: &[DeclaredAlternative],
     sigma: f64,
