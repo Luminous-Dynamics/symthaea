@@ -2,7 +2,7 @@
 
 **Version:** 0.1  
 **Date:** 2026-11-15  
-**Status:** research protocol plus read-only Rust trace evaluator and synthetic known-answer fixture authored. No compilation, test execution, model rollout, external adjudication or benchmark result is claimed.
+**Status:** research protocol plus read-only Rust trace evaluator, temporal exposure scoring and synthetic known-answer fixture authored. No compilation, test execution, model rollout, external adjudication or benchmark result is claimed.
 
 ## 1. Why this track exists
 
@@ -75,10 +75,11 @@ The v0.1 trace has:
 - active requirements at each epoch;
 - candidate impact predictions;
 - check receipts pinned to source epochs and exact repository/tree/configuration identities;
-- exact checkpoint cutoffs, receipt-observation times and actor-availability times; and
+- exact checkpoint cutoffs, receipt-observation times and actor-availability times;
+- first-visible-checkpoint rules for receipts; and
 - declared revalidation cost units.
 
-The evaluator derives freshness from the last gold impact epoch for each obligation. A receipt from an earlier epoch remains reusable for an unaffected obligation, but becomes stale when a later intervention affects that obligation. A source receipt cannot claim a future epoch or mismatch its own epoch's repository/tree/configuration pins. Receipt observation must not predate its source epoch; observation must precede availability; and availability must be no later than the checkpoint cutoff. This blocks within-epoch and post-checkpoint evidence leakage, not only future-epoch leakage.
+The evaluator derives freshness from the last gold impact epoch for each obligation. A receipt from an earlier epoch remains reusable for an unaffected obligation, but becomes stale when a later intervention affects that obligation. A source receipt cannot claim a future epoch or mismatch its own epoch's repository/tree/configuration pins. Receipt observation must not predate its source epoch; observation must precede availability; and availability must be no later than the checkpoint cutoff. A receipt must also first appear at the earliest checkpoint where it claims to be available. This blocks within-epoch, late-disclosure and post-checkpoint evidence leakage, not only future-epoch leakage.
 
 The scorer reports separate measures:
 - **Retained functionality:** proportion of baseline-passing obligations that remain active and still have fresh passing evidence.
@@ -89,7 +90,41 @@ The scorer reports separate measures:
 - **Revalidation cost and savings:** declared post-baseline cost compared with a full-rerun reference that rechecks every active obligation after each later epoch. Baseline acquisition is excluded from both sides.
 - **Paired success:** both clean and shifted arms preserve prior passing functionality and satisfy all active requirements.
 
-A missing receipt, failed or unknown check, stale critical receipt, or incomplete active requirement cannot be converted into success by a high score elsewhere. The v0.1 digest is a deterministic integrity field, not a signature or proof that a test actually ran.
+### Longitudinal evidence exposure
+
+Terminal correctness is insufficient: an agent may eventually recover while leaving a critical requirement unverified for a long interval. D6 therefore scores each obligation over time.
+
+For every active obligation interval, the evaluator:
+1. starts an interval at initial activation, reactivation or a gold invalidation event;
+2. treats the interval as unverified until a current-scope passing receipt becomes available;
+3. closes the gap when a passing receipt becomes available;
+4. reopens the gap when a later fail/unknown receipt becomes available; and
+5. ends or restarts the interval at removal or the next invalidation.
+
+The time-weighted requirement conformance score is:
+
+\[
+C_{time}=1-\frac{\sum_i U_i}{\sum_i A_i}
+\]
+
+where \(U_i\) is the unverified duration for obligation \(i\), and \(A_i\) is its active duration. A separate critical-only score uses only critical obligations. The report also includes total and critical unverified obligation-seconds, recovery-event count, maximum unverified gap and per-obligation exposure.
+
+The synthetic fixture yields the following hand-derived values:
+
+| Measure | Clean arm | Shifted arm |
+|---|---:|---:|
+| Active obligation-seconds | 1,800 | 2,100 |
+| Unverified obligation-seconds | 120 | 480 |
+| Critical unverified obligation-seconds | 60 | 420 |
+| Time-weighted conformance | 93.33% | 77.14% |
+| Critical time-weighted conformance | 93.33% | 65.00% |
+| Maximum critical evidence gap | 60 s | 180 s |
+
+The shifted arm still reaches 100% terminal conformance. The longitudinal metric reveals that its critical API and audit requirements spent 420 combined seconds unverified during recovery. This prevents a final green snapshot from erasing an earlier evidence gap.
+
+The metric is a benchmark proxy, not a field-validated operational hazard measure. It relies on the scenario's event and receipt timestamps, assumes the gold affected-obligation labels are correct, and does not authenticate execution or actor identity.
+
+A missing receipt, failed or unknown check, stale critical receipt, or incomplete active requirement cannot be converted into terminal success by a high score elsewhere. The v0.1 digest is a deterministic integrity field, not a signature or proof that a test actually ran.
 
 ## 5. Synthetic known-answer case
 
@@ -216,6 +251,7 @@ No cross-paper headline score should be described as a direct apples-to-apples c
 - The local fixture's affected-obligation labels are visible; this is not a blind benchmark.
 - Cost units are declared inputs, not measured wall-clock or infrastructure costs.
 - The scorer is a prototype and has not been compiled or executed in this environment.
+- The longitudinal metric measures time between declared invalidation/activation and evidence-availability events. It does not establish real-world exposure without independently authenticated timestamps and independently witnessed check execution.
 - Epoch-level and timestamp-level availability checks improve leakage controls but do not replace authenticated actor identities, signed execution receipts or independently administered benchmark custody.
 - A dependency graph, even when time-indexed, is not causal evidence. D5 requires intervention design and valid controls.
 - A high continuity score does not authorize deployment or irreversible changes. Authority, safety and execution remain independent gates.
