@@ -99,8 +99,6 @@ pub fn evaluate_transition_adjusted_vmg(
     transition: &Evidence<ManeuverTransitionBound>,
     expected_kind: ManeuverKind,
     planning_horizon_seconds: f64,
-    expected_configuration_digest: [u8; 32],
-    expected_polar_artifact_digest: [u8; 32],
     expected_actuator_model_digest: [u8; 32],
     expected_timebase_id: &str,
 ) -> TransitionEvaluation {
@@ -127,11 +125,11 @@ pub fn evaluate_transition_adjusted_vmg(
         );
     }
 
-    if bound.configuration_digest != expected_configuration_digest
-        || bound.polar_artifact_digest != expected_polar_artifact_digest
+    if bound.configuration_digest != candidate.configuration_digest
+        || bound.polar_artifact_digest != candidate.polar_artifact_digest
         || bound.actuator_model_digest != expected_actuator_model_digest
-        || expected_configuration_digest == [0; 32]
-        || expected_polar_artifact_digest == [0; 32]
+        || candidate.configuration_digest == [0; 32]
+        || candidate.polar_artifact_digest == [0; 32]
         || expected_actuator_model_digest == [0; 32]
     {
         return TransitionEvaluation::blocked(
@@ -263,8 +261,6 @@ mod tests {
             bound,
             kind,
             horizon,
-            CONFIG,
-            POLAR,
             ACTUATOR,
             TIMEBASE,
         )
@@ -428,7 +424,7 @@ mod tests {
             ScalarInterval { lower: -2.0, upper: 1.0 },
         );
         let result = evaluate_transition_adjusted_vmg(
-            &c, &bound, ManeuverKind::Tack, 100.0, CONFIG, POLAR, ACTUATOR, TIMEBASE
+            &c, &bound, ManeuverKind::Tack, 100.0, ACTUATOR, TIMEBASE
         );
         let adjusted = result.result.unwrap();
         assert!((adjusted.effective_ground_vmg_mps.lower + 2.72).abs() < 1e-9);
@@ -467,7 +463,7 @@ mod tests {
         let c = candidate(ScalarInterval { lower: f64::MAX, upper: f64::MAX });
         assert_eq!(
             evaluate_transition_adjusted_vmg(
-                &c, &bound, ManeuverKind::Tack, 50.0, CONFIG, POLAR, ACTUATOR, TIMEBASE
+                &c, &bound, ManeuverKind::Tack, 50.0, ACTUATOR, TIMEBASE
             ).status,
             TransitionEvaluationStatus::NotEvaluated
         );
