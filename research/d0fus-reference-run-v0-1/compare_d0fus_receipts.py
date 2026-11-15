@@ -31,6 +31,7 @@ def main() -> int:
         "run_output_tuple_length",
         "canonical_output_tuple_sha256",
         "core_observables",
+        "power_balance",
     )
     mismatches = {
         field: {"wheel": wheel.get(field), "source": source.get(field)}
@@ -68,6 +69,10 @@ def main() -> int:
         "core_observables": {
             "wheel": wheel.get("core_observables"),
             "source": source.get("core_observables"),
+        },
+        "power_balance": {
+            "wheel": wheel.get("power_balance"),
+            "source": source.get("power_balance"),
         },
         "wheel_source_module_inventory": module_inventory,
         "runtime_versions": {
