@@ -256,10 +256,16 @@ pub fn audit_decision_opportunities(
         for second_index in first_index + 1..plan.incumbent_frontier.len() {
             let first = &plan.incumbent_frontier[first_index];
             let second = &plan.incumbent_frontier[second_index];
-            let first_dominates =
-                epsilon_dominates(&first.objectives, &second.objectives, &plan.objective_definitions);
-            let second_dominates =
-                epsilon_dominates(&second.objectives, &first.objectives, &plan.objective_definitions);
+            let first_dominates = epsilon_dominates(
+                &first.objectives,
+                &second.objectives,
+                &plan.objective_definitions,
+            );
+            let second_dominates = epsilon_dominates(
+                &second.objectives,
+                &first.objectives,
+                &plan.objective_definitions,
+            );
             if first_dominates || second_dominates {
                 errors.push(
                     DecisionOpportunityError::IncumbentFrontierNotEpsilonNondominated {
@@ -303,9 +309,11 @@ pub fn audit_decision_opportunities(
                 AuditOutcome::ConfirmedFeasible | AuditOutcome::ConfirmedInfeasible
             )
         {
-            errors.push(DecisionOpportunityError::OutOfDomainOutcomeMustBeUnresolved(
-                evaluation.candidate_id.clone(),
-            ));
+            errors.push(
+                DecisionOpportunityError::OutOfDomainOutcomeMustBeUnresolved(
+                    evaluation.candidate_id.clone(),
+                ),
+            );
         }
         let needs_objectives = evaluation.reference_outcome == AuditOutcome::ConfirmedFeasible
             && evaluation.within_declared_domain;
@@ -406,13 +414,14 @@ pub fn audit_decision_opportunities(
                     AuditOutcome::ConfirmedFeasible | AuditOutcome::ConfirmedInfeasible
                 )
             {
-                errors.push(DecisionOpportunityError::OutOfDomainOutcomeMustBeUnresolved(
-                    evaluation.candidate_id.clone(),
-                ));
+                errors.push(
+                    DecisionOpportunityError::OutOfDomainOutcomeMustBeUnresolved(
+                        evaluation.candidate_id.clone(),
+                    ),
+                );
             }
-            let needs_objectives =
-                evaluation.reference_outcome == AuditOutcome::ConfirmedFeasible
-                    && evaluation.within_declared_domain;
+            let needs_objectives = evaluation.reference_outcome == AuditOutcome::ConfirmedFeasible
+                && evaluation.within_declared_domain;
             if !evaluation.objectives.is_empty()
                 && !valid_objective_vector(&evaluation.objectives, &plan.objective_definitions)
             {
@@ -436,7 +445,11 @@ pub fn audit_decision_opportunities(
     let mut accepted_no_opportunity = 0_u64;
     let mut accepted_unresolved = 0_u64;
     for evaluation in &plan.accepted_evaluations {
-        match classify_evaluation(evaluation, &plan.incumbent_frontier, &plan.objective_definitions) {
+        match classify_evaluation(
+            evaluation,
+            &plan.incumbent_frontier,
+            &plan.objective_definitions,
+        ) {
             DecisionOpportunityDisposition::ConfirmedOpportunity => accepted_opportunities += 1,
             DecisionOpportunityDisposition::ConfirmedNoOpportunity => {
                 accepted_no_opportunity += 1;
@@ -469,7 +482,11 @@ pub fn audit_decision_opportunities(
         let mut no_opportunities = 0_u64;
         let mut unresolved = 0_u64;
         for evaluation in &supplied.evaluations {
-            match classify_evaluation(evaluation, &plan.incumbent_frontier, &plan.objective_definitions) {
+            match classify_evaluation(
+                evaluation,
+                &plan.incumbent_frontier,
+                &plan.objective_definitions,
+            ) {
                 DecisionOpportunityDisposition::ConfirmedOpportunity => opportunities += 1,
                 DecisionOpportunityDisposition::ConfirmedNoOpportunity => no_opportunities += 1,
                 DecisionOpportunityDisposition::Unresolved => unresolved += 1,
@@ -580,9 +597,7 @@ fn classify_evaluation(
         return DecisionOpportunityDisposition::Unresolved;
     }
     match evaluation.reference_outcome {
-        AuditOutcome::ConfirmedInfeasible => {
-            DecisionOpportunityDisposition::ConfirmedNoOpportunity
-        }
+        AuditOutcome::ConfirmedInfeasible => DecisionOpportunityDisposition::ConfirmedNoOpportunity,
         AuditOutcome::ConfirmedFeasible => {
             if is_epsilon_frontier_extension(
                 &evaluation.candidate_id,
@@ -608,7 +623,10 @@ fn is_epsilon_frontier_extension(
     frontier: &[IncumbentFrontierPoint],
     definitions: &[ObjectiveDefinition],
 ) -> bool {
-    if frontier.iter().any(|point| point.candidate_id == candidate_id) {
+    if frontier
+        .iter()
+        .any(|point| point.candidate_id == candidate_id)
+    {
         return false;
     }
     if frontier
@@ -657,22 +675,18 @@ fn epsilon_dominates(
     second: &[ObjectiveValue],
     definitions: &[ObjectiveDefinition],
 ) -> bool {
-    let no_worse = first
-        .iter()
-        .zip(second)
-        .zip(definitions)
-        .all(|((first_value, second_value), definition)| {
+    let no_worse = first.iter().zip(second).zip(definitions).all(
+        |((first_value, second_value), definition)| {
             oriented_value(first_value, definition)
                 >= oriented_value(second_value, definition) - definition.epsilon
-        });
-    let materially_better = first
-        .iter()
-        .zip(second)
-        .zip(definitions)
-        .any(|((first_value, second_value), definition)| {
+        },
+    );
+    let materially_better = first.iter().zip(second).zip(definitions).any(
+        |((first_value, second_value), definition)| {
             oriented_value(first_value, definition)
                 > oriented_value(second_value, definition) + definition.epsilon
-        });
+        },
+    );
     no_worse && materially_better
 }
 
@@ -683,10 +697,7 @@ fn oriented_value(value: &ObjectiveValue, definition: &ObjectiveDefinition) -> f
     }
 }
 
-fn valid_objective_vector(
-    values: &[ObjectiveValue],
-    definitions: &[ObjectiveDefinition],
-) -> bool {
+fn valid_objective_vector(values: &[ObjectiveValue], definitions: &[ObjectiveDefinition]) -> bool {
     if values.len() != definitions.len() {
         return false;
     }
@@ -728,11 +739,7 @@ mod tests {
         ]
     }
 
-    fn feasible_eval(
-        candidate_id: &str,
-        cost: f64,
-        availability: f64,
-    ) -> DecisionEvaluation {
+    fn feasible_eval(candidate_id: &str, cost: f64, availability: f64) -> DecisionEvaluation {
         DecisionEvaluation {
             candidate_id: candidate_id.to_string(),
             reference_outcome: AuditOutcome::ConfirmedFeasible,
@@ -756,8 +763,14 @@ mod tests {
         }
     }
 
-    fn sample_ids(stratum_id: &str, population: &[String], sample_size: usize, seed: u64) -> Vec<String> {
-        super::super::deterministic_audit_sample_ids(stratum_id, population, sample_size, seed).unwrap()
+    fn sample_ids(
+        stratum_id: &str,
+        population: &[String],
+        sample_size: usize,
+        seed: u64,
+    ) -> Vec<String> {
+        super::super::deterministic_audit_sample_ids(stratum_id, population, sample_size, seed)
+            .unwrap()
     }
 
     fn base_plan() -> RejectAuditPlan {
@@ -922,18 +935,10 @@ mod tests {
         let mut test_plan = plan();
         for evaluation in &mut test_plan.rejected_evaluations[0].evaluations {
             if evaluation.candidate_id == "rejected-1" {
-                *evaluation = non_objective_eval(
-                    "rejected-1",
-                    AuditOutcome::NonConverged,
-                    true,
-                );
+                *evaluation = non_objective_eval("rejected-1", AuditOutcome::NonConverged, true);
             }
             if evaluation.candidate_id == "rejected-2" {
-                *evaluation = non_objective_eval(
-                    "rejected-2",
-                    AuditOutcome::Inconclusive,
-                    false,
-                );
+                *evaluation = non_objective_eval("rejected-2", AuditOutcome::Inconclusive, false);
             }
         }
         let sample_1 = test_plan.base_plan.strata[0]
@@ -957,8 +962,7 @@ mod tests {
     #[test]
     fn a_candidate_epsilon_dominated_by_an_incumbent_is_not_an_opportunity() {
         let mut test_plan = plan();
-        test_plan.rejected_evaluations[0].evaluations[0] =
-            feasible_eval("rejected-0", 150.0, 0.70);
+        test_plan.rejected_evaluations[0].evaluations[0] = feasible_eval("rejected-0", 150.0, 0.70);
         test_plan.base_plan.strata[0].samples[0].outcome = AuditOutcome::ConfirmedFeasible;
         let report = audit_decision_opportunities(&test_plan).unwrap();
         assert_eq!(report.rejected_opportunities_observed, 0);
@@ -979,10 +983,11 @@ mod tests {
         let mut test_plan = plan();
         test_plan.accepted_evaluations[0].objectives.swap(0, 1);
         let errors = audit_decision_opportunities(&test_plan).unwrap_err();
-        assert!(errors.iter().any(|error| matches!(
-            error,
-            DecisionOpportunityError::InvalidObjectiveVector(_)
-        )));
+        assert!(
+            errors
+                .iter()
+                .any(|error| matches!(error, DecisionOpportunityError::InvalidObjectiveVector(_)))
+        );
     }
 
     #[test]
@@ -1062,9 +1067,6 @@ mod tests {
         test_plan.base_plan.strata[0].samples.clear();
         test_plan.rejected_evaluations[0].evaluations.clear();
         let report = audit_decision_opportunities(&test_plan).unwrap();
-        assert_eq!(
-            report.missed_decision_opportunities_upper_bound,
-            4
-        );
+        assert_eq!(report.missed_decision_opportunities_upper_bound, 4);
     }
 }
