@@ -542,6 +542,7 @@ mod tests {
     #[test]
     fn impacted_obligation_requires_post_change_evidence() {
         let mut scenario = fixture();
+        let digest_scenario = scenario.clone();
         let shifted = scenario.arms.iter_mut()
             .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
         let checkpoint = shifted.checkpoints.last_mut().expect("final checkpoint");
@@ -552,7 +553,7 @@ mod tests {
         receipt.revision = source.revision.clone();
         receipt.tree_oid = source.tree_oid.clone();
         receipt.configuration_world_digest = source.configuration_world_digest.clone();
-        receipt.receipt_digest = receipt_digest(&scenario, shifted, receipt).expect("reseal test receipt");
+        receipt.receipt_digest = receipt_digest(&digest_scenario, shifted, receipt).expect("reseal test receipt");
         let report = evaluate_shift_scenario(&scenario).expect("trace remains structurally valid");
         let shifted_score = report.arm_scores.iter()
             .find(|score| score.condition == ArmCondition::Shifted).expect("shifted score");
@@ -599,11 +600,12 @@ mod tests {
     #[test]
     fn duplicate_obligation_receipts_are_rejected() {
         let mut scenario = fixture();
+        let digest_scenario = scenario.clone();
         let clean = scenario.arms.iter_mut()
             .find(|arm| arm.condition == ArmCondition::Clean).expect("clean arm");
         let mut duplicate = clean.checkpoints[0].receipts[0].clone();
         duplicate.receipt_id = "duplicate-receipt".to_owned();
-        duplicate.receipt_digest = receipt_digest(&scenario, clean, &duplicate).expect("reseal");
+        duplicate.receipt_digest = receipt_digest(&digest_scenario, clean, &duplicate).expect("reseal");
         clean.checkpoints[0].receipts.push(duplicate);
         assert!(evaluate_shift_scenario(&scenario).is_err());
     }
