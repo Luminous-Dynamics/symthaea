@@ -1,0 +1,553 @@
+{
+  "schema_version": "multipurpose-factory-capability-corpus/0.1",
+  "study_id": "MULTIPURPOSE-FACTORY-SYNTHETIC-v0.1",
+  "claim_ceiling": "SYNTHETIC_CAPABILITY_AND_RECONFIGURATION_CONFORMANCE_ONLY",
+  "warning": "All module identities, process capabilities, product routes, dispositions and scenario labels are synthetic fixtures. They are not real equipment specifications, production rates, supplier offers, factory costs, safety approvals or manufacturing qualifications.",
+  "authority_partition": {
+    "design_reasoning": "SYMTHAEA_PROPOSAL_ONLY",
+    "process_and_factory_execution": "SYMTROPY_EXISTING_FACTORY_OWNERS",
+    "canonical_process_and_product_qualification": "EXISTING_DOMAIN_OWNERS",
+    "independent_verification": "SEPARATE_VERIFIER",
+    "physical_commissioning": "INDEPENDENT_MEASUREMENT_AND_COMPETENT_REVIEW_REQUIRED",
+    "release_authority": "COMPETENT_HUMAN_AUTHORITY"
+  },
+  "factory_architectures": [
+    {
+      "architecture_id": "DEDICATED_LINE",
+      "description": "Dedicated line optimized for one product family or stable product mix",
+      "main_tradeoff": "High nominal flow with high asset-stranding risk under product evolution"
+    },
+    {
+      "architecture_id": "FUNCTIONAL_JOB_SHOP",
+      "description": "General-purpose work centers scheduled by operation and capability",
+      "main_tradeoff": "Routing flexibility with potentially longer queues and travel"
+    },
+    {
+      "architecture_id": "PRODUCT_FAMILY_U_CELL",
+      "description": "Grouped workcells for related product/operation families",
+      "main_tradeoff": "Short local flow where product families are compatible"
+    },
+    {
+      "architecture_id": "FLEXIBLE_MANUFACTURING_SYSTEM",
+      "description": "Shared automated resources and routing across a defined product envelope",
+      "main_tradeoff": "Requires qualified material handling, routing, control and diagnostics"
+    },
+    {
+      "architecture_id": "RECONFIGURABLE_MANUFACTURING_SYSTEM",
+      "description": "Modular capacity/functionality changes with declared reconfiguration process",
+      "main_tradeoff": "Reconfiguration and qualification burden must be counted"
+    },
+    {
+      "architecture_id": "MULTIPURPOSE_MICROFACTORY",
+      "description": "Small facility with configurable specialist cells and shared support modules",
+      "main_tradeoff": "Limited scale and shared-resource bottlenecks"
+    },
+    {
+      "architecture_id": "DISTRIBUTED_PARTNER_NETWORK",
+      "description": "Multiple qualified specialist or contract production nodes",
+      "main_tradeoff": "Lower owned capital with transport, interface and partner-dependency exposure"
+    },
+    {
+      "architecture_id": "HYBRID_LOCAL_PARTNER_NETWORK",
+      "description": "Core local production/repair cells with specialist outsourced or partner processes",
+      "main_tradeoff": "Balance control and capital with external capability dependence"
+    },
+    {
+      "architecture_id": "MOBILE_CONTAINERIZED_FACTORY",
+      "description": "Transportable modules deployed at remote or temporary sites",
+      "main_tradeoff": "Deployment footprint, environmental utilities and logistics"
+    },
+    {
+      "architecture_id": "STAGED_INDUSTRIAL_SEED_FACTORY",
+      "description": "Phased capability growth where early equipment supports later productive capacity",
+      "main_tradeoff": "Bootstrap dependencies, imported spares and recursive capability closure"
+    }
+  ],
+  "product_families": [
+    {
+      "product_id": "MECHANICAL_BRACKET",
+      "required_capabilities": [
+        "MATERIAL_RECEIPT",
+        "MACHINING_OR_FORMING",
+        "DIMENSIONAL_METROLOGY",
+        "FINAL_INSPECTION"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    },
+    {
+      "product_id": "STRUCTURAL_BUILDING_MODULE",
+      "required_capabilities": [
+        "MATERIAL_RECEIPT",
+        "CUT_OR_FORM",
+        "ASSEMBLY_OR_JOINING",
+        "DIMENSIONAL_METROLOGY",
+        "STRUCTURAL_PRODUCT_ACCEPTANCE"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    },
+    {
+      "product_id": "POWER_ELECTRONICS_ASSEMBLY",
+      "required_capabilities": [
+        "ELECTRONICS_ASSEMBLY",
+        "ESD_CONTROL",
+        "CALIBRATED_ELECTRICAL_TEST",
+        "TRACEABILITY"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    },
+    {
+      "product_id": "TEXTILE_GARMENT",
+      "required_capabilities": [
+        "TEXTILE_CUTTING",
+        "SEWING_OR_JOINING",
+        "GARMENT_INSPECTION",
+        "MATERIAL_LOT_TRACEABILITY"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    },
+    {
+      "product_id": "PUMP_VALVE_MODULE",
+      "required_capabilities": [
+        "MACHINING_OR_FORMING",
+        "ASSEMBLY",
+        "PRESSURE_OR_FLOW_TEST",
+        "DIMENSIONAL_METROLOGY"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    },
+    {
+      "product_id": "ROBOTICS_REPLACEMENT_PART",
+      "required_capabilities": [
+        "MATERIAL_RECEIPT",
+        "MACHINING_OR_ADDITIVE",
+        "DIMENSIONAL_METROLOGY",
+        "CONFIGURATION_TRACEABILITY"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    },
+    {
+      "product_id": "REPAIRED_OR_REMANUFACTURED_UNIT",
+      "required_capabilities": [
+        "RETURN_INSPECTION",
+        "DISASSEMBLY",
+        "REPAIR_OR_REMANUFACTURE",
+        "REQUALIFICATION",
+        "LOT_AND_UNIT_GENEALOGY"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    },
+    {
+      "product_id": "OFF_EARTH_NONPRESSURE_MEMBER",
+      "required_capabilities": [
+        "QUALIFIED_FEEDSTOCK",
+        "PROCESS_CONDITIONED_MATERIAL_PROFILE",
+        "FABRICATION",
+        "METROLOGY",
+        "PRODUCT_ACCEPTANCE"
+      ],
+      "claim_ceiling": "FUTURE_MODEL_GATED_SYNTHETIC_ONLY"
+    }
+  ],
+  "modules": [
+    {
+      "module_id": "ASSEMBLY-CELL-A",
+      "process_family": "DISCRETE_ASSEMBLY",
+      "capabilities": [
+        "MECHANICAL_ASSEMBLY",
+        "FASTENING",
+        "KITTING"
+      ],
+      "required_interfaces": [
+        "POWER",
+        "MATERIAL_FLOW",
+        "TOOLING",
+        "WORKER_SKILL"
+      ],
+      "required_zones": [
+        "GENERAL_ASSEMBLY"
+      ],
+      "required_skills": [
+        "ASSEMBLY_OPERATOR"
+      ],
+      "requires_calibration": false,
+      "evidence_state": "SYNTHETIC_PROFILE_ONLY"
+    },
+    {
+      "module_id": "CNC-CELL-A",
+      "process_family": "SUBTRACTIVE_MACHINING",
+      "capabilities": [
+        "MACHINING_OR_FORMING",
+        "CUTTING",
+        "DRILLING"
+      ],
+      "required_interfaces": [
+        "POWER",
+        "COOLANT",
+        "CHIP_EXTRACTION",
+        "TOOLING",
+        "METROLOGY"
+      ],
+      "required_zones": [
+        "MACHINING_ISOLATED"
+      ],
+      "required_skills": [
+        "CNC_OPERATOR"
+      ],
+      "requires_calibration": true,
+      "evidence_state": "SYNTHETIC_PROFILE_ONLY"
+    },
+    {
+      "module_id": "POLYMER-ADDITIVE-CELL-A",
+      "process_family": "POLYMER_ADDITIVE",
+      "capabilities": [
+        "ADDITIVE_MANUFACTURING"
+      ],
+      "required_interfaces": [
+        "POWER",
+        "MATERIAL_STORAGE",
+        "FUME_EXTRACTION",
+        "FIRE_CONTROL"
+      ],
+      "required_zones": [
+        "ADDITIVE_ISOLATED"
+      ],
+      "required_skills": [
+        "ADDITIVE_PROCESS_OPERATOR"
+      ],
+      "requires_calibration": true,
+      "evidence_state": "SYNTHETIC_PROFILE_ONLY"
+    },
+    {
+      "module_id": "THERMAL-BATCH-CELL-A",
+      "process_family": "THERMAL_BATCH",
+      "capabilities": [
+        "HEAT_TREATMENT",
+        "THERMAL_PROCESSING"
+      ],
+      "required_interfaces": [
+        "POWER_OR_FUEL",
+        "EXHAUST",
+        "THERMAL_CONTAINMENT",
+        "RECIPE_CONTROL"
+      ],
+      "required_zones": [
+        "THERMAL_EXCLUSION"
+      ],
+      "required_skills": [
+        "THERMAL_PROCESS_OPERATOR"
+      ],
+      "requires_calibration": true,
+      "evidence_state": "SYNTHETIC_PROFILE_ONLY"
+    },
+    {
+      "module_id": "HV-TEST-CELL-A",
+      "process_family": "HIGH_VOLTAGE_TEST",
+      "capabilities": [
+        "CALIBRATED_ELECTRICAL_TEST",
+        "POWER_ELECTRONICS_VALIDATION"
+      ],
+      "required_interfaces": [
+        "POWER",
+        "ISOLATION",
+        "INTERLOCKS",
+        "EMERGENCY_STOP",
+        "TEST_METROLOGY"
+      ],
+      "required_zones": [
+        "HV_INTERLOCKED"
+      ],
+      "required_skills": [
+        "HV_AUTHORIZED_OPERATOR"
+      ],
+      "requires_calibration": true,
+      "evidence_state": "SYNTHETIC_PROFILE_ONLY"
+    },
+    {
+      "module_id": "TEXTILE-CELL-A",
+      "process_family": "TEXTILE_CUT_SEW",
+      "capabilities": [
+        "TEXTILE_CUTTING",
+        "SEWING_OR_JOINING",
+        "GARMENT_INSPECTION"
+      ],
+      "required_interfaces": [
+        "POWER",
+        "MATERIAL_FLOW",
+        "FIXTURE",
+        "INSPECTION"
+      ],
+      "required_zones": [
+        "TEXTILE_PRODUCTION"
+      ],
+      "required_skills": [
+        "TEXTILE_OPERATOR"
+      ],
+      "requires_calibration": false,
+      "evidence_state": "SYNTHETIC_PROFILE_ONLY"
+    },
+    {
+      "module_id": "METROLOGY-CELL-A",
+      "process_family": "METROLOGY_INSPECTION",
+      "capabilities": [
+        "DIMENSIONAL_METROLOGY",
+        "CALIBRATED_INSPECTION",
+        "FIRST_ARTICLE_INSPECTION"
+      ],
+      "required_interfaces": [
+        "CALIBRATION_REFERENCE",
+        "ENVIRONMENT_CONTROL",
+        "DATA_IDENTITY"
+      ],
+      "required_zones": [
+        "METROLOGY_CONTROLLED"
+      ],
+      "required_skills": [
+        "QUALIFIED_INSPECTOR"
+      ],
+      "requires_calibration": true,
+      "evidence_state": "SYNTHETIC_PROFILE_ONLY"
+    },
+    {
+      "module_id": "REPAIR-CELL-A",
+      "process_family": "REPAIR_REMANUFACTURE",
+      "capabilities": [
+        "RETURN_INSPECTION",
+        "DISASSEMBLY",
+        "REPAIR_OR_REMANUFACTURE",
+        "REQUALIFICATION"
+      ],
+      "required_interfaces": [
+        "POWER",
+        "TOOLING",
+        "MATERIAL_TRACEABILITY",
+        "INSPECTION"
+      ],
+      "required_zones": [
+        "REPAIR_QUARANTINE"
+      ],
+      "required_skills": [
+        "REPAIR_TECHNICIAN"
+      ],
+      "requires_calibration": true,
+      "evidence_state": "SYNTHETIC_PROFILE_ONLY"
+    }
+  ],
+  "scenario_families": [
+    "STABLE_VOLUME_STABLE_MIX",
+    "DEMAND_STEP_UP_AND_STEP_DOWN",
+    "NEW_PRODUCT_VARIANT_AND_TOOLING",
+    "MACHINE_TOOL_OR_CALIBRATION_FAILURE",
+    "WORKER_SKILL_OR_SHIFT_SHORTAGE",
+    "SUPPLIER_TRANSPORT_STARVATION",
+    "POWER_THERMAL_WATER_UTILITY_OUTAGE",
+    "INSPECTION_HOLD_OR_LOT_QUARANTINE",
+    "PROCESS_FAMILY_RECONFIGURATION",
+    "PRODUCT_RETIREMENT_REPAIR_REMANUFACTURE",
+    "FACILITY_RELOCATION_OR_MOBILE_DEPLOYMENT",
+    "REMOTE_OR_LUNAR_SEED_FACTORY_BOOTSTRAP"
+  ],
+  "conformance_cases": [
+    {
+      "case_id": "POS-HYBRID-MECHANICAL-001",
+      "architecture_id": "HYBRID_LOCAL_PARTNER_NETWORK",
+      "product_id": "MECHANICAL_BRACKET",
+      "mutation": "NONE; REQUIRED_LOCAL_MACHINING_ASSEMBLY_METROLOGY_AND_PARTNER_CAPABILITY_RESOLVE",
+      "expected_disposition": "ADMISSIBLE_SYNTHETIC",
+      "expected_reason_codes": [
+        "CAPABILITY_ENVELOPE_MATCH",
+        "TRACEABILITY_COMPLETE"
+      ]
+    },
+    {
+      "case_id": "POS-DISTRIBUTED-PARTNER-001",
+      "architecture_id": "DISTRIBUTED_PARTNER_NETWORK",
+      "product_id": "PUMP_VALVE_MODULE",
+      "mutation": "PARTNER_CAPABILITY_CURRENT; TRANSPORT_AND_INSPECTION_EVIDENCE_BOUND",
+      "expected_disposition": "ADMISSIBLE_SYNTHETIC",
+      "expected_reason_codes": [
+        "PARTNER_CAPABILITY_RESOLVED",
+        "ACCEPTANCE_ROUTE_COMPLETE"
+      ]
+    },
+    {
+      "case_id": "NEG-UTILITY-INTERFACE-001",
+      "architecture_id": "MULTIPURPOSE_MICROFACTORY",
+      "product_id": "MECHANICAL_BRACKET",
+      "mutation": "CNC_MODULE_ATTACHED_WITHOUT_REQUIRED_COOLANT_OR_CHIP_EXTRACTION",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "UTILITY_INTERFACE_INCOMPLETE"
+      ]
+    },
+    {
+      "case_id": "NEG-ZONE-CONTAMINATION-001",
+      "architecture_id": "MULTIPURPOSE_MICROFACTORY",
+      "product_id": "POWER_ELECTRONICS_ASSEMBLY",
+      "mutation": "CLEAN_ELECTRONICS_ROUTE_SHARES_UNSEGREGATED_ZONE_WITH_MACHINING_OR_DUST_PROCESS",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "ENVIRONMENTAL_SEGREGATION_VIOLATION"
+      ]
+    },
+    {
+      "case_id": "NEG-MISSING-SKILL-001",
+      "architecture_id": "PRODUCT_FAMILY_U_CELL",
+      "product_id": "POWER_ELECTRONICS_ASSEMBLY",
+      "mutation": "REQUIRED_AUTHORIZED_HV_OPERATOR_UNAVAILABLE",
+      "expected_disposition": "NEEDS_EVIDENCE",
+      "expected_reason_codes": [
+        "REQUIRED_SKILL_UNAVAILABLE"
+      ]
+    },
+    {
+      "case_id": "NEG-STALE-CALIBRATION-001",
+      "architecture_id": "FLEXIBLE_MANUFACTURING_SYSTEM",
+      "product_id": "MECHANICAL_BRACKET",
+      "mutation": "METROLOGY_CALIBRATION_EXPIRED",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "CALIBRATION_NOT_CURRENT"
+      ]
+    },
+    {
+      "case_id": "NEG-MATERIAL-ENVELOPE-001",
+      "architecture_id": "RECONFIGURABLE_MANUFACTURING_SYSTEM",
+      "product_id": "STRUCTURAL_BUILDING_MODULE",
+      "mutation": "GENERIC_MATERIAL_NAME_USED_INSTEAD_OF_PROCESS_CONDITIONED_MATERIAL_PROFILE",
+      "expected_disposition": "NEEDS_EVIDENCE",
+      "expected_reason_codes": [
+        "MATERIAL_STATE_UNRESOLVED"
+      ]
+    },
+    {
+      "case_id": "NEG-STALE-RECIPE-001",
+      "architecture_id": "DEDICATED_LINE",
+      "product_id": "TEXTILE_GARMENT",
+      "mutation": "PROCESS_RECIPE_REFERENCES_PRIOR_PRODUCT_REVISION",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "PRODUCT_PROCESS_REVISION_MISMATCH"
+      ]
+    },
+    {
+      "case_id": "NEG-NO-FIRST-ARTICLE-001",
+      "architecture_id": "RECONFIGURABLE_MANUFACTURING_SYSTEM",
+      "product_id": "ROBOTICS_REPLACEMENT_PART",
+      "mutation": "MODULE_MOVED_AND_CONNECTED_BUT_NO_COMMISSIONING_OR_FIRST_ARTICLE_ACCEPTANCE",
+      "expected_disposition": "NOT_RECONFIGURED",
+      "expected_reason_codes": [
+        "FIRST_ARTICLE_NOT_ACCEPTED"
+      ]
+    },
+    {
+      "case_id": "NEG-WIP-LINEAGE-001",
+      "architecture_id": "DISTRIBUTED_PARTNER_NETWORK",
+      "product_id": "REPAIRED_OR_REMANUFACTURED_UNIT",
+      "mutation": "MATERIAL_LOT_AND_UNIT_GENEALOGY_LOST_DURING_PARTNER_TRANSFER",
+      "expected_disposition": "NOT_TRACEABLE",
+      "expected_reason_codes": [
+        "PRODUCT_LOT_LINEAGE_BROKEN"
+      ]
+    },
+    {
+      "case_id": "NEG-TWIN-ONLY-PASS-001",
+      "architecture_id": "FLEXIBLE_MANUFACTURING_SYSTEM",
+      "product_id": "PUMP_VALVE_MODULE",
+      "mutation": "DIGITAL_TWIN_REPORTS_PASS_WHILE_PHYSICAL_PROCESS_OR_INSPECTION_FAILED",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "MODEL_OBSERVATION_CONFLICT"
+      ]
+    },
+    {
+      "case_id": "NEG-HV-INTERLOCK-001",
+      "architecture_id": "MULTIPURPOSE_MICROFACTORY",
+      "product_id": "POWER_ELECTRONICS_ASSEMBLY",
+      "mutation": "HV_TEST_WITHOUT_ISOLATION_INTERLOCK_AND_EMERGENCY_STOP",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "SAFETY_INTERFACE_MISSING"
+      ]
+    },
+    {
+      "case_id": "NEG-PARTNER-CAPACITY-001",
+      "architecture_id": "DISTRIBUTED_PARTNER_NETWORK",
+      "product_id": "STRUCTURAL_BUILDING_MODULE",
+      "mutation": "PARTNER_CAPACITY_CLAIM_WITHOUT_CURRENT_QUALIFIED_CAPACITY_EVIDENCE",
+      "expected_disposition": "NEEDS_EVIDENCE",
+      "expected_reason_codes": [
+        "PARTNER_CAPACITY_UNRESOLVED"
+      ]
+    },
+    {
+      "case_id": "NEG-CAPACITY-DOUBLE-COUNT-001",
+      "architecture_id": "HYBRID_LOCAL_PARTNER_NETWORK",
+      "product_id": "MECHANICAL_BRACKET",
+      "mutation": "SAME_MACHINE_CAPACITY_ALLOCATED_TO_TWO_SIMULTANEOUS_ROUTES",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "RESOURCE_CAPACITY_DOUBLE_COUNTED"
+      ]
+    },
+    {
+      "case_id": "NEG-LOCAL-CONTENT-DEPENDENCY-001",
+      "architecture_id": "STAGED_INDUSTRIAL_SEED_FACTORY",
+      "product_id": "OFF_EARTH_NONPRESSURE_MEMBER",
+      "mutation": "HIGH_LOCAL_MASS_SHARE_BUT_CRITICAL_IMPORTED_CONTROL_OR_SEAL_HAS_NO_RESUPPLY_OR_REPAIR_PATH",
+      "expected_disposition": "NEEDS_EVIDENCE",
+      "expected_reason_codes": [
+        "CRITICAL_IMPORTED_DEPENDENCY_UNRESOLVED"
+      ]
+    },
+    {
+      "case_id": "NEG-RECYCLE-YIELD-001",
+      "architecture_id": "STAGED_INDUSTRIAL_SEED_FACTORY",
+      "product_id": "REPAIRED_OR_REMANUFACTURED_UNIT",
+      "mutation": "RECYCLED_FEEDSTOCK_CREDITED_WITHOUT_YIELD_CONTAMINATION_OR_QUALITY_DEGRADATION",
+      "expected_disposition": "NEEDS_EVIDENCE",
+      "expected_reason_codes": [
+        "RECOVERY_QUALITY_AND_MASS_BALANCE_INCOMPLETE"
+      ]
+    },
+    {
+      "case_id": "NEG-RECONFIG-SAFE-STOP-001",
+      "architecture_id": "MOBILE_CONTAINERIZED_FACTORY",
+      "product_id": "MECHANICAL_BRACKET",
+      "mutation": "MODULE_SWAP_STARTED_WITHOUT_SAFE_STOP_WIP_DISPOSITION_OR_ENERGY_ISOLATION",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "SAFE_RECONFIGURATION_PRECONDITION_MISSING"
+      ]
+    }
+  ],
+  "comparison_policies": [
+    "DEDICATED_LINE_PLANNING",
+    "FUNCTIONAL_JOB_SHOP",
+    "CELLULAR_U_CELL_PLANNING",
+    "FLEXIBLE_MANUFACTURING_SYSTEM",
+    "RECONFIGURABLE_MANUFACTURING_SYSTEM",
+    "DETERMINISTIC_CAPABILITY_CONSTRAINED_SCHEDULER",
+    "HEURISTIC_CHANGEOVER_AND_CELL_BALANCING",
+    "EXACT_MILP_OR_CP_SAT_SMALL_INSTANCE_ORACLE",
+    "ROBUST_SCENARIO_FAMILY_OPTIMIZATION",
+    "DECISION_VALUE_RECONFIGURATION_SELECTION",
+    "DISTRIBUTED_PARTNER_NETWORK"
+  ],
+  "metrics": [
+    "CAPABILITY_COVERAGE_AND_UNKNOWN_COUNT",
+    "LAST_ACCEPTED_TO_FIRST_ACCEPTED_RECONFIGURATION_TIME",
+    "RECONFIGURATION_DOWNTIME_AND_COST_BREAKDOWN",
+    "FIRST_PASS_YIELD_AND_FIRST_ARTICLE_ACCEPTANCE",
+    "ESCAPED_DEFECTS_REWORK_SCRAP_AND_QUARANTINED_WIP",
+    "ACCEPTED_OUTPUT_AND_ORDER_LEAD_TIME",
+    "MACHINE_AND_QUALIFIED_LABOUR_UTILIZATION_SEPARATELY",
+    "RESOURCE_USE_PER_ACCEPTED_OUTPUT_WHERE_SUPPORTED",
+    "DIAGNOSIS_LOCALIZATION_AND_QUALITY_CONTAINMENT",
+    "RECOVERY_TIME_BACKLOG_AND_LOWER_TAIL_SERVICE",
+    "LIFECYCLE_COST_AND_STRANDED_ASSET_EXPOSURE",
+    "WORKER_SKILL_COVERAGE_AND_PROTECTED_SAFETY_CONSTRAINTS",
+    "SUPPLIER_PARTNER_CONCENTRATION_AND_CRITICAL_DEPENDENCIES",
+    "TRACEABILITY_AND_CONFIGURATION_LINEAGE_COMPLETENESS",
+    "OOD_ABSTENTION_PRECISION_RECALL_AND_UNCERTAINTY_COVERAGE"
+  ]
+}
