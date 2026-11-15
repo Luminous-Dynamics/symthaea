@@ -797,3 +797,21 @@ A third machine-readable target, `NH3-PLASMA-SYNTHESIS-FULL-CHAIN-001`, requires
 ## 9.19 Power-to-X biogas reforming stretch target
 
 `BIOGAS-PLASMA-SYNGAS-COST-001` binds the September 2026 biogas-to-syngas source case to a falsifiable challenge: <= EUR 600/t accepted syngas while maintaining >=44% plant efficiency at the same operating point. The target requires matched syngas composition/quality, complete grid-side plant energy, electricity price and capacity-factor scenario, downstream product service and no speculative coproduct credit. It is a research goal, not a result or a direct reuse of the source's separate favourable-cost and baseline-efficiency numbers.
+
+
+## 9.22 Ammonia plasma thermal integration challenge — 2026-11-15
+
+The September 2026 microwave NH3 cracking study (Quiroz Marnef et al., DOI 10.1016/j.ijhydene.2026.156912) reports a coupled fluid / heat-transfer / electromagnetic / chemistry model and identifies heat-balance losses and an insulating sleeve of cold NH3 as an improvement pathway. Its three measured operating points remain distinct:
+- >99% conversion at 45 g H2/kWh, 242 kJ/mol;
+- 92.4% conversion at 150 g H2/h, 50 g/kWh, 217 kJ/mol;
+- 76% conversion at 51 g/kWh, 210 kJ/mol.
+
+### New research target: NH3-THERMAL-INTEGRATION-FULL-CHAIN-001
+
+Target: at least 15% lower **net grid-to-accepted-H2 specific energy** than a paired no-recovery baseline, while achieving >99% NH3 conversion and at least 150 g H2/h at the same operating point, with heat-balance residual no greater than 5% of the declared thermal input or an appropriately tighter uncertainty-supported tolerance.
+
+The target requires matched feed/composition/pressure, product purity and pressure, steady-state duration and duty cycle; measured useful heat at the declared process interface; insulation/recuperator pressure drop, thermal storage, cooling, pumps and all auxiliaries included; no double counting of recirculated heat or reaction enthalpy; and uncertainty/repeat evidence.
+
+This is an intentionally difficult Pareto challenge. The published 150 g/h point is at 92.4% conversion, not >99%; the benchmark refuses to combine those attributes. The target is a research objective, not published performance or a Luminous result.
+
+Four new controls refuse omitted thermal auxiliaries, unmeasured recoverable enthalpy, operating-point mismatch and non-closing/double-counted thermal balances.
