@@ -1174,6 +1174,7 @@ pub fn score_multi_shift_sequence_json(input: &str) -> Result<MultiShiftSequence
     {
         return Err("D6.8 evaluator bundle must be explicitly evaluator-only".to_owned());
     }
+    required_str(&bundle, "claim_ceiling", "bundle")?;
     let candidate_view = bundle
         .get("candidate_view")
         .ok_or_else(|| "candidate_view is required".to_owned())?;
