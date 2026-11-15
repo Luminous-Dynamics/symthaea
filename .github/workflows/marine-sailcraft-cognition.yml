@@ -1,0 +1,52 @@
+name: Marine sailcraft HDC-LTC cognition contract
+
+on:
+  push:
+    branches: ["research/marine-sailcraft-hdc-ltc-v0-1"]
+    paths:
+      - "crates/domains/symthaea-sailcraft-cognition/**"
+      - "crates/domains/symthaea-sailcraft/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/marine-sailcraft-cognition.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "crates/domains/symthaea-sailcraft-cognition/**"
+      - "crates/domains/symthaea-sailcraft/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - ".github/workflows/marine-sailcraft-cognition.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marine-sailcraft-cognition-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Confirm exact source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_commit="$(git rev-parse HEAD)"
+          test "$source_commit" = "${{ github.event.pull_request.head.sha || github.sha }}"
+      - name: Format
+        run: cargo fmt --check -p symthaea-sailcraft-cognition
+      - name: Unit tests
+        run: cargo test --locked -p symthaea-sailcraft-cognition
+      - name: Strict Clippy
+        run: cargo clippy --locked -p symthaea-sailcraft-cognition --all-targets -- -D warnings
