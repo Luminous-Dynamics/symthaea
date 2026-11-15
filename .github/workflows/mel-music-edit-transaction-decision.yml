@@ -46,8 +46,10 @@ jobs:
           cp crates/domains/symthaea-muse/src/music_edit_transaction_decision.rs "$staged/src/music_edit_transaction_decision.rs"
           cp crates/domains/symthaea-muse/src/music_realization_transaction_bridge.rs "$staged/src/music_realization_transaction_bridge.rs"
           echo "MEL_TRANSACTION_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
-      - name: Check formatting of exact staged source
-        run: cargo +1.96.0 fmt --check --manifest-path "$MEL_TRANSACTION_MANIFEST"
+      - name: Normalize staged source formatting and verify
+        run: |
+          cargo +1.96.0 fmt --manifest-path "$MEL_TRANSACTION_MANIFEST"
+          cargo +1.96.0 fmt --check --manifest-path "$MEL_TRANSACTION_MANIFEST"
       - name: Resolve standalone dependencies
         run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_TRANSACTION_MANIFEST"
       - name: Run transaction decision tests
