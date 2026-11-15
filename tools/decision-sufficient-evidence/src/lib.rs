@@ -468,6 +468,24 @@ mod tests {
         }
     }
 
+    #[test] fn public_hand_derived_fixture_matches_evsi_calculation() {
+        let problem: DecisionProblem = serde_json::from_str(include_str!("../../../docs/development-map/fixtures/decision-sufficient-evidence-v0.1.json")).expect("public problem fixture");
+        let expected: Value = serde_json::from_str(include_str!("../../../docs/development-map/fixtures/decision-sufficient-evidence-v0.1.expected.json")).expect("public expected fixture");
+        let report = plan_evidence(&problem).expect("plan");
+        assert_eq!(report.recommendation, expected["recommendation"].as_str().unwrap());
+        assert_eq!(report.selected_evidence_id.as_deref(), expected["selected_evidence_id"].as_str());
+        assert_eq!(report.baseline_action_id, expected["baseline"]["action_id"].as_str().unwrap());
+        assert!((report.baseline_expected_loss - expected["baseline"]["expected_loss"].as_f64().unwrap()).abs() < EPSILON);
+        for (evidence_id, fields) in expected["assessments"].as_object().unwrap() {
+            let actual = report.assessments.iter().find(|item| item.evidence_id == *evidence_id).expect("assessment");
+            assert_eq!(actual.feasible, fields["feasible"].as_bool().unwrap());
+            assert!((actual.expected_loss_after_observation.unwrap() - fields["expected_loss_after_observation"].as_f64().unwrap()).abs() < EPSILON);
+            assert!((actual.gross_evsi.unwrap() - fields["gross_evsi"].as_f64().unwrap()).abs() < EPSILON);
+            assert!((actual.net_evsi.unwrap() - fields["net_evsi"].as_f64().unwrap()).abs() < EPSILON);
+            assert_eq!(actual.pareto_efficient, fields["pareto_efficient"].as_bool().unwrap());
+        }
+    }
+
     #[test] fn perfect_test_has_positive_evsi_and_is_selected() {
         let report = plan_evidence(&problem()).expect("plan");
         assert_eq!(report.baseline_action_id, "hold");
