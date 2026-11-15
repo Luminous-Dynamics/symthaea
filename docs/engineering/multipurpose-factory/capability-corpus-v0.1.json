@@ -518,6 +518,16 @@
       "expected_reason_codes": [
         "SAFE_RECONFIGURATION_PRECONDITION_MISSING"
       ]
+    },
+    {
+      "case_id": "NEG-SCALAR-SAFETY-COMPENSATION-001",
+      "architecture_id": "MULTIPURPOSE_MICROFACTORY",
+      "product_id": "POWER_ELECTRONICS_ASSEMBLY",
+      "mutation": "AGGREGATE_FACTORY_SCORE_REMAINS_HIGH_DESPITE_MISSING_HV_INTERLOCK_OR_FAILED_INSPECTION_GATE",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "HARD_SAFETY_OR_QUALITY_GATE_CANNOT_BE_COMPENSATED"
+      ]
     }
   ],
   "comparison_policies": [
