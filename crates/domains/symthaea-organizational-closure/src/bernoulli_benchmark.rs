@@ -59,6 +59,8 @@ pub struct BernoulliBenchmarkSummary {
     pub episode_count: usize,
     pub oracle_valid_episodes: usize,
     pub oracle_invalid_episodes: usize,
+    pub truth_scoring_eligible_episodes: usize,
+    pub non_evaluable_episodes: usize,
     pub qualified_episodes: usize,
     pub not_qualified_episodes: usize,
     pub inconclusive_episodes: usize,
@@ -92,10 +94,18 @@ fn valid_oracle(report: &BernoulliSequentialReport) -> bool {
         && (-1.0..=1.0).contains(&report.true_effect_for_scoring)
 }
 
+fn valid_scenario(report: &BernoulliSequentialReport) -> bool {
+    !has_finding(report, BernoulliFindingCode::InvalidAlpha)
+        && !has_finding(report, BernoulliFindingCode::InvalidMinimumEffect)
+        && !has_finding(report, BernoulliFindingCode::EmptySampleBudget)
+}
+
+fn truth_scoring_eligible(report: &BernoulliSequentialReport) -> bool {
+    valid_oracle(report) && valid_scenario(report)
+}
+
 fn coverage_eligible(report: &BernoulliSequentialReport) -> bool {
-    valid_oracle(report)
-        && !has_finding(report, BernoulliFindingCode::InvalidAlpha)
-        && report.unqualified_samples == 0
+    truth_scoring_eligible(report) && report.unqualified_samples == 0
 }
 
 /// Summarize a frozen episode batch without collapsing distinct scientific
@@ -111,6 +121,8 @@ pub fn summarize_bernoulli_episodes(
 
     let mut oracle_valid = 0_usize;
     let mut oracle_invalid = 0_usize;
+    let mut truth_scoring_eligible_count = 0_usize;
+    let mut non_evaluable_count = 0_usize;
     let mut qualified = 0_usize;
     let mut not_qualified = 0_usize;
     let mut inconclusive = 0_usize;
@@ -138,9 +150,14 @@ pub fn summarize_bernoulli_episodes(
 
         if !valid_oracle(report) {
             oracle_invalid += 1;
+        } else {
+            oracle_valid += 1;
+        }
+        if !truth_scoring_eligible(report) {
+            non_evaluable_count += 1;
             continue;
         }
-        oracle_valid += 1;
+        truth_scoring_eligible_count += 1;
 
         let is_null = report.true_effect_for_scoring.abs() <= minimum_effect;
         if is_null {
@@ -178,6 +195,8 @@ pub fn summarize_bernoulli_episodes(
         episode_count,
         oracle_valid_episodes: oracle_valid,
         oracle_invalid_episodes: oracle_invalid,
+        truth_scoring_eligible_episodes: truth_scoring_eligible_count,
+        non_evaluable_episodes: non_evaluable_count,
         qualified_episodes: qualified,
         not_qualified_episodes: not_qualified,
         inconclusive_episodes: inconclusive,
@@ -189,7 +208,7 @@ pub fn summarize_bernoulli_episodes(
             qualified_power,
             material_episodes,
         ),
-        correct_claim_rate: RateEstimate::from_counts(correct_claims, oracle_valid),
+        correct_claim_rate: RateEstimate::from_counts(correct_claims, truth_scoring_eligible_count),
         final_interval_coverage: RateEstimate::from_counts(final_coverage, coverage_eligible_count),
         all_look_confidence_sequence_coverage: RateEstimate::from_counts(
             all_look_coverage,
