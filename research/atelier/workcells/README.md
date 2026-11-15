@@ -381,7 +381,7 @@ A June 2026 study used data from 112 Portuguese manufacturers to derive a five-f
 
 ### ReconfigBench
 
-[ATELIER-RECONFIG-001 #12390](https://github.com/Luminous-Dynamics/symthaea/issues/12390) and [draft PR #12390](https://github.com/Luminous-Dynamics/symthaea/pull/12390) introduce a typed module and transition evaluator in the dependency-free operations-research crate.
+[ATELIER-RECONFIG-001 #12390](https://github.com/Luminous-Dynamics/symthaea/issues/12390) and [draft PR #12398](https://github.com/Luminous-Dynamics/symthaea/pull/12398) introduce a typed module and transition evaluator in the dependency-free operations-research crate.
 
 The evaluator checks:
 - exact facility-scoped module identities and qualification validity;
