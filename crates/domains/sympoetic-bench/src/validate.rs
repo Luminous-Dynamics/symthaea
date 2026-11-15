@@ -446,6 +446,53 @@ pub fn validate_trace(
         }
 
         match event.event_type.as_str() {
+            "confidence_assessment" => {
+                if !matches!(event.actor.as_str(), "human" | "agent") {
+                    bail!("confidence_assessment actor must be human or agent");
+                }
+                if event.confidence.is_none() {
+                    bail!("confidence_assessment requires a confidence value");
+                }
+            }
+            "claim_verification" => {
+                if !matches!(event.actor.as_str(), "human" | "agent" | "evaluator") {
+                    bail!("claim_verification actor must be human, agent, or evaluator");
+                }
+                if event.parent_event_ids.is_empty() {
+                    bail!("claim_verification must reference at least one claim or evidence event");
+                }
+            }
+            "source_attribution" => {
+                if event.attribution.is_empty() {
+                    bail!("source_attribution requires at least one attribution record");
+                }
+            }
+            "belief_revision" => {
+                if !matches!(event.actor.as_str(), "human" | "agent") {
+                    bail!("belief_revision actor must be human or agent");
+                }
+                if event.parent_event_ids.is_empty() {
+                    bail!("belief_revision must reference the evidence or claim being revised");
+                }
+            }
+            "contradiction_resolution" => {
+                if event.parent_event_ids.len() < 2 {
+                    bail!("contradiction_resolution requires at least two prior claim/evidence parents");
+                }
+            }
+            "human_planning"
+            | "human_monitoring"
+            | "human_reflection"
+            | "independent_reasoning_attempt" => {
+                if event.actor != "human" {
+                    bail!("human cognitive-process events must identify the human participant as actor");
+                }
+            }
+            "ai_core_step_supplied" => {
+                if event.actor != "agent" {
+                    bail!("ai_core_step_supplied must identify the evaluated agent as actor");
+                }
+            }
             "intervention_decision" => {
                 if event.actor != "agent" {
                     bail!("intervention_decision events must identify the evaluated agent as actor");
