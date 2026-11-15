@@ -272,6 +272,21 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "participant_capability_gain_delta": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 2
+        },
+        "delayed_retention_gain_delta": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 2
+        },
+        "transfer_gain_delta": {
+          "type": "number",
+          "minimum": -2,
+          "maximum": 2
         }
       }
     },
