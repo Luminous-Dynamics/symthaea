@@ -74,7 +74,9 @@
               "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "e68957bb601ba4fa55eca96c0e1adb7cb0ef6b8c949c7bc52b7602ca7b9eeb44"
+              "receipt_digest": "bac71f2fa4b205f3f62417af671a3df1e006b9d19421f0757bb98772d8012177",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
             },
             {
               "receipt_id": "clean-epoch0-build",
@@ -85,10 +87,13 @@
               "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "b8cb3185d6f221eb3ead5492baf272f3acb816fec75519814c25556dc60abb6a"
+              "receipt_digest": "bc5c3e6e1bd3bb4c4d84f277b125c20e91655673f9b41a5cd7467b4f57c885e2",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
             }
           ],
-          "revalidation_cost_units": 0
+          "revalidation_cost_units": 0,
+          "checkpoint_at": "2026-11-15T07:05:00Z"
         },
         {
           "epoch": 1,
@@ -103,7 +108,9 @@
               "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "053a2a9d01478f38cfe70459b227ca605793bf1725cca61f4fa7c17d93fc845a"
+              "receipt_digest": "c76c62895534780b5f2ccf4aee7e812f07626bdc9186ad4f2f7a52929bf4e250",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
             },
             {
               "receipt_id": "clean-epoch1-build",
@@ -114,10 +121,13 @@
               "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "75a15ede0e0a1cf3fa7901b08e8bd95dec5b0fea0ff7d638f1f0c95d0597017c"
+              "receipt_digest": "aa8faf6a2f1f4c34ead203fa797949195418555395e552e53375d8f73de854a7",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
             }
           ],
-          "revalidation_cost_units": 0
+          "revalidation_cost_units": 0,
+          "checkpoint_at": "2026-11-15T07:15:00Z"
         }
       ]
     },
@@ -173,7 +183,9 @@
               "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "13599663a96deb4210c6dac21608f0c61873143862b5eb536b11b82e9c96aff6"
+              "receipt_digest": "3224e7523f44cb2e21fb9cd97d27365e98110a4e3dbe7b4945fad450fd8dd200",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
             },
             {
               "receipt_id": "shifted-epoch0-build",
@@ -184,10 +196,13 @@
               "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "60fc8e54ba6262c0341f60aaa9dcf5989d526ab78795cb03d2cafda77b6a8404"
+              "receipt_digest": "38b87b38ad9005dff8e968aeb26a61f3d211db1ad6ca3f0a1212aede8025b4c4",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
             }
           ],
-          "revalidation_cost_units": 0
+          "revalidation_cost_units": 0,
+          "checkpoint_at": "2026-11-15T07:05:00Z"
         },
         {
           "epoch": 1,
@@ -204,7 +219,9 @@
               "revision": "dddddddddddddddddddddddddddddddddddddddd",
               "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "f5ebc57b9983fc84137a6b5913894c73a15232041737d0275a2925f3a53adaf4"
+              "receipt_digest": "d57028cf1d7d672d75973d83e1d03d75c6e4c4f2139e22c9e95ad2aae9842fde",
+              "observed_at": "2026-11-15T07:12:00Z",
+              "available_at": "2026-11-15T07:13:00Z"
             },
             {
               "receipt_id": "shifted-epoch1-build",
@@ -215,7 +232,9 @@
               "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "212c14714a7006cd31f0dd9eec01a5493af06c75d285d24de6ec337e18b746e4"
+              "receipt_digest": "e3adde987a3507da4bc56c3ab419db776f2fa404978dbd4ce18af01bf2257954",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
             },
             {
               "receipt_id": "shifted-epoch1-audit",
@@ -226,10 +245,13 @@
               "revision": "dddddddddddddddddddddddddddddddddddddddd",
               "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
               "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
-              "receipt_digest": "b81b6e0090606511ed9d0d5ba6905581103c3610b4d2478746d3d5db4a9eb481"
+              "receipt_digest": "321c3f014abe5fb97e652db603378bc81d279468a076e5f89043ff52a137a8e0",
+              "observed_at": "2026-11-15T07:12:00Z",
+              "available_at": "2026-11-15T07:13:00Z"
             }
           ],
-          "revalidation_cost_units": 2
+          "revalidation_cost_units": 2,
+          "checkpoint_at": "2026-11-15T07:15:00Z"
         }
       ]
     }
