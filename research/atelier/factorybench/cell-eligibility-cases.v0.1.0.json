@@ -185,6 +185,20 @@
       "expected_outcome": "Blocked",
       "mutation": "minimum_people=0",
       "reason": "A zero-person skill requirement is invalid and cannot bypass staffing constraints."
+    },
+    {
+      "case_id": "B1-NEG-025",
+      "name": "Forged eligible claim with unknown asset",
+      "expected_outcome": "RejectedByIndependentVerifier",
+      "mutation": "set_report_status=Eligible_after_asset_status_changes_to_Unknown",
+      "reason": "Independent verification must recompute the asset state rather than trust the evaluator's previous result."
+    },
+    {
+      "case_id": "B1-NEG-026",
+      "name": "Forged eligible claim with tampered evidence set",
+      "expected_outcome": "RejectedByIndependentVerifier",
+      "mutation": "remove_one_required_evidence_ref_from_eligible_report",
+      "reason": "The independent verifier must reconstruct the evidence set from the snapshot and reject an incomplete claim."
     }
   ],
   "publication_requirements": [
