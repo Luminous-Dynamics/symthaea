@@ -215,6 +215,7 @@ pub enum ReconfigurationReasonCode {
     AssignmentUnknownOperation,
     AssignmentModuleMissing,
     PortMissing,
+    SelfConnection,
     PortAmbiguous,
     PortInterfaceMismatch,
     PortProtocolMismatch,
@@ -662,6 +663,10 @@ fn validate_connections(
         }
         if !connection_ids.insert(connection.connection_ref.as_str()) {
             findings.add(ReconfigurationReasonCode::DuplicateConnection, ReasonSeverity::Blocked, &connection.connection_ref);
+        }
+        if connection.from_module_ref == connection.to_module_ref {
+            findings.add(ReconfigurationReasonCode::SelfConnection, ReasonSeverity::Blocked, &connection.connection_ref);
+            continue;
         }
 
         let (Some(from_profile), Some(to_profile)) = (
@@ -1251,6 +1256,60 @@ mod tests {
         assert_eq!(report.transition_kind, TransitionKind::NoChange);
         assert_eq!(report.status, PlanStatus::Indeterminate);
         assert!(!report.production_authorized);
+    }
+
+
+    #[test]
+    fn layout_dimension_change_is_physical_even_when_modules_do_not_move() {
+        let (profile, placement) = module("urn:example:module:cut", 0, vec![]);
+        let current = base_config(vec![placement.clone()], vec![]);
+        let mut target = base_config(vec![placement], vec![]);
+        target.width_mm = 4_500;
+        let report = evaluate_reconfiguration(input(Some(&current), &target, &[profile], &[]));
+        assert_eq!(report.transition_kind, TransitionKind::PhysicalReconfiguration);
+        assert!(report.requires_independent_requalification);
+    }
+
+    #[test]
+    fn removed_operation_assignment_is_explicitly_unassigned() {
+        let (profile, placement) = module("urn:example:module:cut", 0, vec![capability("urn:example:capability:cut")]);
+        let operation_ref = "urn:example:operation:cut";
+        let current = base_config(
+            vec![placement.clone()],
+            vec![OperationAssignment { operation_ref: operation_ref.to_owned(), module_ref: "urn:example:module:cut".to_owned() }],
+        );
+        let target = base_config(vec![placement], vec![]);
+        let report = evaluate_reconfiguration(input(Some(&current), &target, &[profile], &[]));
+        assert_eq!(report.transition_kind, TransitionKind::AllocationOnly);
+        assert!(report.actions.iter().any(|action| matches!(action, TransitionAction::UnassignOperation { operation_ref: ref found, .. } if found == operation_ref)));
+    }
+
+    #[test]
+    fn required_port_unconnected_in_complete_target_is_blocked() {
+        let (mut profile, placement) = module("urn:example:module:cut", 0, vec![]);
+        profile.ports = vec![port("out", PortDirection::Output, true)];
+        let target = base_config(vec![placement], vec![]);
+        let report = evaluate_reconfiguration(input(None, &target, &[profile], &[]));
+        assert_eq!(report.status, PlanStatus::Blocked);
+        assert!(report.reasons.iter().any(|r| r.code == ReconfigurationReasonCode::RequiredPortUnconnected));
+    }
+
+    #[test]
+    fn missing_module_for_target_connection_is_blocked_in_complete_target() {
+        let (profile, placement) = module("urn:example:module:cut", 0, vec![]);
+        let mut target = base_config(vec![placement], vec![]);
+        target.connections.push(PortConnection {
+            connection_ref: "urn:example:connection:missing-module".to_owned(),
+            from_module_ref: "urn:example:module:cut".to_owned(),
+            from_port_ref: "not-present".to_owned(),
+            to_module_ref: "urn:example:module:not-installed".to_owned(),
+            to_port_ref: "in".to_owned(),
+            capacity_units: 1,
+            connection_evidence: evidence("urn:example:evidence:connection"),
+        });
+        let report = evaluate_reconfiguration(input(None, &target, &[profile], &[]));
+        assert_eq!(report.status, PlanStatus::Blocked);
+        assert!(report.reasons.iter().any(|r| r.code == ReconfigurationReasonCode::PortMissing));
     }
 
     #[test]
