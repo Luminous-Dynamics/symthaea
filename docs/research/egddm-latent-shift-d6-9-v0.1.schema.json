@@ -355,7 +355,8 @@
         "changed_dimensions",
         "affected_obligations",
         "unaffected_obligations",
-        "correlated_source_groups"
+        "correlated_source_groups",
+        "adjudication_status"
       ],
       "properties": {
         "visibility": {
@@ -404,6 +405,12 @@
         },
         "first_sufficient_observation_available_at": {
           "$ref": "#/$defs/time"
+        },
+        "adjudication_status": {
+          "enum": [
+            "synthetic_known_answer_not_independently_adjudicated",
+            "independently_adjudicated"
+          ]
         }
       }
     },
