@@ -293,8 +293,8 @@ fn invalid_scenario(
     report(ModelRefinementReportInput {
         qualification: ModelRefinementQualification::Inconclusive,
         model_adequacy: ModelAdequacyStatus::Unresolved,
-        consistent_ids: consistent_ids,
-        trace: trace,
+        consistent_ids,
+        trace,
         qualified_trials: 0,
         cost: 0,
         risk: 0,
@@ -304,7 +304,7 @@ fn invalid_scenario(
         model_inadequacy_detected: false,
         safe_defer: false,
         refinement_accepted: false,
-        findings: findings,
+        findings,
     })
 }
 
@@ -654,7 +654,7 @@ pub fn evaluate_model_refinement(
             qualification: ModelRefinementQualification::NotQualified,
             model_adequacy: ModelAdequacyStatus::Unresolved,
             consistent_ids: Vec::new(),
-            trace: trace,
+            trace,
             qualified_trials: qualified_trials.len(),
             cost: total_cost,
             risk: total_risk,
@@ -664,7 +664,7 @@ pub fn evaluate_model_refinement(
             model_inadequacy_detected: false,
             safe_defer: false,
             refinement_accepted: false,
-            findings: findings,
+            findings,
         });
     }
 
@@ -673,7 +673,7 @@ pub fn evaluate_model_refinement(
             qualification: ModelRefinementQualification::Inconclusive,
             model_adequacy: ModelAdequacyStatus::Unresolved,
             consistent_ids: Vec::new(),
-            trace: trace,
+            trace,
             qualified_trials: qualified_trials.len(),
             cost: total_cost,
             risk: total_risk,
@@ -686,7 +686,7 @@ pub fn evaluate_model_refinement(
                 ModelAdequacyDecision::DeferAsUnresolved { .. }
             ),
             refinement_accepted: false,
-            findings: findings,
+            findings,
         });
     }
 
@@ -720,8 +720,8 @@ pub fn evaluate_model_refinement(
                 report(ModelRefinementReportInput {
                     qualification: ModelRefinementQualification::NotQualified,
                     model_adequacy: ModelAdequacyStatus::Falsified,
-                    consistent_ids: consistent_ids,
-                    trace: trace,
+                    consistent_ids,
+                    trace,
                     qualified_trials: qualified_trials.len(),
                     cost: total_cost,
                     risk: total_risk,
@@ -731,7 +731,7 @@ pub fn evaluate_model_refinement(
                     model_inadequacy_detected: true,
                     safe_defer: false,
                     refinement_accepted: false,
-                    findings: findings,
+                    findings,
                 })
             } else {
                 findings.retain(|finding| {
@@ -740,8 +740,8 @@ pub fn evaluate_model_refinement(
                 report(ModelRefinementReportInput {
                     qualification: ModelRefinementQualification::Qualified,
                     model_adequacy: ModelAdequacyStatus::NotFalsified,
-                    consistent_ids: consistent_ids,
-                    trace: trace,
+                    consistent_ids,
+                    trace,
                     qualified_trials: qualified_trials.len(),
                     cost: total_cost,
                     risk: total_risk,
@@ -751,7 +751,7 @@ pub fn evaluate_model_refinement(
                     model_inadequacy_detected: false,
                     safe_defer: false,
                     refinement_accepted: false,
-                    findings: findings,
+                    findings,
                 })
             }
         }
@@ -763,8 +763,8 @@ pub fn evaluate_model_refinement(
                 report(ModelRefinementReportInput {
                     qualification: ModelRefinementQualification::Inconclusive,
                     model_adequacy: ModelAdequacyStatus::Falsified,
-                    consistent_ids: consistent_ids,
-                    trace: trace,
+                    consistent_ids,
+                    trace,
                     qualified_trials: qualified_trials.len(),
                     cost: total_cost,
                     risk: total_risk,
@@ -774,7 +774,7 @@ pub fn evaluate_model_refinement(
                     model_inadequacy_detected: true,
                     safe_defer: true,
                     refinement_accepted: false,
-                    findings: findings,
+                    findings,
                 })
             } else {
                 findings.retain(|finding| {
@@ -790,8 +790,8 @@ pub fn evaluate_model_refinement(
                 report(ModelRefinementReportInput {
                     qualification: ModelRefinementQualification::NotQualified,
                     model_adequacy: ModelAdequacyStatus::NotFalsified,
-                    consistent_ids: consistent_ids,
-                    trace: trace,
+                    consistent_ids,
+                    trace,
                     qualified_trials: qualified_trials.len(),
                     cost: total_cost,
                     risk: total_risk,
@@ -801,7 +801,7 @@ pub fn evaluate_model_refinement(
                     model_inadequacy_detected: false,
                     safe_defer: false,
                     refinement_accepted: false,
-                    findings: findings,
+                    findings,
                 })
             }
         }
@@ -820,8 +820,8 @@ pub fn evaluate_model_refinement(
                 return report(ModelRefinementReportInput {
                     qualification: ModelRefinementQualification::NotQualified,
                     model_adequacy: ModelAdequacyStatus::NotFalsified,
-                    consistent_ids: consistent_ids,
-                    trace: trace,
+                    consistent_ids,
+                    trace,
                     qualified_trials: qualified_trials.len(),
                     cost: total_cost,
                     risk: total_risk,
@@ -831,7 +831,7 @@ pub fn evaluate_model_refinement(
                     model_inadequacy_detected: false,
                     safe_defer: false,
                     refinement_accepted: false,
-                    findings: findings,
+                    findings,
                 });
             }
 
@@ -966,18 +966,18 @@ pub fn evaluate_model_refinement(
                     ModelRefinementQualification::NotQualified
                 },
                 model_adequacy: final_adequacy,
-                consistent_ids: consistent_ids,
-                trace: trace,
+                consistent_ids,
+                trace,
                 qualified_trials: qualified_trials.len(),
                 cost: total_cost,
                 risk: total_risk,
                 validation_count: scenario.validation_probe_ids.len(),
-                validation_predictions: validation_predictions,
-                validation_correct: validation_correct,
+                validation_predictions,
+                validation_correct,
                 model_inadequacy_detected: true,
                 safe_defer: false,
                 refinement_accepted: accepted,
-                findings: findings,
+                findings,
             })
         }
     }
@@ -1105,7 +1105,7 @@ mod tests {
 
     #[test]
     fn an_existing_model_that_fits_the_complete_trace_should_be_retained() {
-        let (mut scenario, mut oracle) = scenario();
+        let (scenario, mut oracle) = scenario();
         oracle.actual_target_class = "old-class-a".into();
         oracle
             .actual_outcomes
@@ -1135,7 +1135,7 @@ mod tests {
 
     #[test]
     fn unnecessary_model_expansion_is_rejected() {
-        let (mut scenario, mut oracle) = scenario();
+        let (scenario, mut oracle) = scenario();
         oracle.actual_target_class = "old-class-a".into();
         oracle
             .actual_outcomes
@@ -1207,7 +1207,7 @@ mod tests {
 
     #[test]
     fn model_falsification_uses_the_complete_trace_not_individual_observations() {
-        let (mut scenario, mut oracle) = scenario();
+        let (scenario, mut oracle) = scenario();
         oracle.actual_target_class = "old-class-a".into();
         oracle
             .actual_outcomes
