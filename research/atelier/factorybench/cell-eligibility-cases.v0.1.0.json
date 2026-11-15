@@ -127,6 +127,20 @@
       "expected_outcome": "Blocked",
       "mutation": "process_qualification_evidence=Revoked",
       "reason": "Revoked evidence cannot continue authorizing a planned operation."
+    },
+    {
+      "case_id": "B1-NEG-017",
+      "name": "Missing independent profile verification",
+      "expected_outcome": "Blocked",
+      "mutation": "clear_independent_verification_evidence_on_complete_snapshot",
+      "reason": "A qualified profile cannot rely solely on self-asserted qualification evidence."
+    },
+    {
+      "case_id": "B1-NEG-018",
+      "name": "Process capability mismatch",
+      "expected_outcome": "Blocked",
+      "mutation": "configuration_process_capability_ref!=operation_process_capability_ref",
+      "reason": "A process configuration must bind the exact process capability requested by the operation."
     }
   ],
   "publication_requirements": [
