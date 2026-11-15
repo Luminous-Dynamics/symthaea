@@ -487,6 +487,44 @@ mod tests {
     }
 
     #[test]
+    fn missing_upstream_applied_action_reference_is_rejected() {
+        let valid = label();
+        let mut observation = fused_input(&valid);
+        observation.receipt.upstream_applied_action_receipt_id = None;
+        observation.receipt.upstream_applied_action_receipt_sha256 = None;
+        observation.receipt.upstream_applied_action_command_id = None;
+        observation.receipt.upstream_applied_action_tick = None;
+        observation.receipt.receipt_sha256 = crate::digest_receipt(&observation.receipt);
+        assert_eq!(
+            validate_applied_action_training_label(&observation, &valid).unwrap_err(),
+            TrainingLabelError::MissingAppliedActionReference
+        );
+    }
+
+    #[test]
+    fn observation_receipt_must_remain_internally_consistent() {
+        let valid = label();
+        let mut observation = fused_input(&valid);
+        observation.receipt.upstream_clock_id = "tampered-clock".into();
+        assert_eq!(
+            validate_applied_action_training_label(&observation, &valid).unwrap_err(),
+            TrainingLabelError::ObservationReceiptMismatch
+        );
+    }
+
+    #[test]
+    fn empty_training_source_identity_is_rejected() {
+        let mut value = label();
+        value.source_identity.clear();
+        value.receipt_sha256 = value.calculated_receipt_sha256();
+        let observation = fused_input(&value);
+        assert_eq!(
+            validate_applied_action_training_label(&observation, &value).unwrap_err(),
+            TrainingLabelError::MissingIdentity
+        );
+    }
+
+    #[test]
     fn unknown_source_or_privilege_is_not_admitted() {
         let mut value = label();
         let observation = fused_input(&value);
