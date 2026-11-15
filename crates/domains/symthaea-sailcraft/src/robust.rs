@@ -91,7 +91,10 @@ pub struct CurrentUncertainty {
 /// craft. Configuration equality prevents cross-craft reuse.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PolarErrorBound {
+    /// Digest of the error-bound artifact itself.
     pub source_artifact_digest: [u8; 32],
+    /// Exact polar artifact to which this error bound applies.
+    pub polar_artifact_digest: [u8; 32],
     pub configuration_digest: [u8; 32],
     pub maximum_absolute_speed_error_mps: Option<f64>,
 }
@@ -303,8 +306,10 @@ fn uniquely_dominant_tack(
     starboard_max_possible_vmg: Option<f64>,
 ) -> Option<TackSide> {
     match (port_best, starboard_best) {
-        (Some(_), None) => Some(TackSide::Port),
-        (None, Some(_)) => Some(TackSide::Starboard),
+        // An absent alternative is not evidence that it is physically
+        // inferior; it may be excluded by incomplete scope or uncertainty.
+        // Claim a unique best tack only when both sides were compared.
+        (Some(_), None) | (None, Some(_)) => None,
         (Some(port), Some(starboard)) => {
             if starboard_max_possible_vmg.is_some_and(|upper| {
                 robustly_exceeds(port.ground_velocity_made_good_mps.lower, upper)
@@ -410,6 +415,7 @@ pub fn evaluate_robust_route_candidates(
 
     if request.configuration_digest != polar.configuration_digest
         || request.polar_error.configuration_digest != polar.configuration_digest
+        || request.polar_error.polar_artifact_digest != polar.source_artifact_digest
     {
         return RobustRouteEvaluation::blocked(
             RobustPlanStatus::OutOfScope,
@@ -520,6 +526,12 @@ pub fn evaluate_robust_route_candidates(
             );
         }
         let signed_centre_twa = signed_angle_deg(wind.from_direction.center_deg, heading_deg);
+        // Do not attach a port/starboard label if the wind-direction set
+        // reaches the dead-downwind boundary. That boundary changes the
+        // tack/gybe side even when the absolute TWA remains outside no-go.
+        if signed_centre_twa.abs() + wind.from_direction.half_width_deg >= 180.0 {
+            continue;
+        }
         let tack_side = if signed_centre_twa > 0.0 {
             TackSide::Starboard
         } else if signed_centre_twa < 0.0 && signed_centre_twa > -180.0 {
@@ -679,6 +691,7 @@ mod tests {
             target_bearing: fresh(0.0),
             polar_error: PolarErrorBound {
                 source_artifact_digest: [0xd8; 32],
+                polar_artifact_digest: [0xb6; 32],
                 configuration_digest: CONFIG,
                 maximum_absolute_speed_error_mps: Some(0.0),
             },
@@ -928,6 +941,46 @@ mod tests {
         input.polar_error.configuration_digest = [0x33; 32];
         let result = evaluate_robust_route_candidates(&polar(), input);
         assert_eq!(result.status, RobustPlanStatus::OutOfScope);
+    }
+
+    #[test]
+    fn polar_error_bound_must_bind_the_exact_polar_artifact() {
+        let mut input = request();
+        input.polar_error.polar_artifact_digest = [0x44; 32];
+        let result = evaluate_robust_route_candidates(&polar(), input);
+        assert_eq!(result.status, RobustPlanStatus::OutOfScope);
+        assert!(result.candidates.is_empty());
+    }
+
+    #[test]
+    fn downwind_boundary_uncertainty_does_not_receive_a_false_tack_label() {
+        let mut input = request();
+        input.wind.value.as_mut().unwrap().from_direction.half_width_deg = 5.0;
+        let result = evaluate_robust_route_candidates(&polar(), input);
+        assert!(result.candidates.iter().all(|candidate| {
+            candidate.true_wind_angle_deg.upper < 180.0
+        }));
+    }
+
+    #[test]
+    fn one_available_tack_does_not_imply_a_unique_best_tack() {
+        let candidate = RobustCourseCandidate {
+            heading_deg: 45.0,
+            tack_side: TackSide::Port,
+            true_wind_angle_deg: ScalarInterval { lower: 45.0, upper: 55.0 },
+            boat_speed_mps: ScalarInterval { lower: 2.0, upper: 3.0 },
+            boat_velocity_made_good_mps: ScalarInterval { lower: 1.0, upper: 2.0 },
+            current_velocity_made_good_mps: ScalarInterval { lower: -0.1, upper: 0.1 },
+            ground_velocity_made_good_mps: ScalarInterval { lower: 0.9, upper: 2.1 },
+        };
+        assert_eq!(
+            uniquely_dominant_tack(Some(candidate), None, Some(2.1), None),
+            None
+        );
+        assert_eq!(
+            uniquely_dominant_tack(None, Some(candidate), None, Some(2.1)),
+            None
+        );
     }
 
     #[test]
