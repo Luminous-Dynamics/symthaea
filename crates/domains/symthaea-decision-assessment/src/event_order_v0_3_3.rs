@@ -723,6 +723,10 @@ pub fn assess_snapshot_chain(
         .collect();
 
     for binding in &selection.stop_discharges {
+        if !binding.scope.applies_to(&selection.logical_operation_id) {
+            merge_disposition(&mut disposition, EventTraceDisposition::CriticalFailure);
+            reasons.insert(format!("STOP_DISCHARGE_SCOPE_NOT_APPLICABLE_TO_DECISION:{}", binding.obligation_id));
+        }
         if binding.obligation_id.trim().is_empty()
             || binding.policy_revision.trim().is_empty()
             || !binding.scope.is_well_formed()
@@ -761,6 +765,7 @@ pub fn assess_snapshot_chain(
                 Some(event)
                     if event.kind == expected_kind
                         && event.envelope.occurred_at.as_ref() == Some(expected_time)
+                        && event.scope.as_ref() == Some(&binding.scope)
                         && (expected_kind != SnapshotHistoryEventKind::StopPolicyRevision
                             || event.policy_revision.as_deref() == Some(binding.policy_revision.as_str())) => {}
                 _ => {
