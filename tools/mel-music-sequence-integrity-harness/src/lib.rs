@@ -2099,3 +2099,473 @@ mod reversibility_tests {
         assert!(verify_symbolic_undo_redo_v1(&initial, &deletion).is_ok());
     }
 }
+
+
+
+// ---- Stage 2b: explicit two-parent symbolic branch merge receipts ----
+
+pub const SYMBOLIC_BRANCH_MERGE_SCHEMA_V1: &str = "mel-music-symbolic-branch-merge-v1";
+const SYMBOLIC_BRANCH_MERGE_DOMAIN_V1: &[u8] =
+    b"luminous.mel.music-symbolic-branch-merge.v1";
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "choice", rename_all = "snake_case")]
+pub enum SymbolicBranchMergeChoiceV1 {
+    TakeLeft,
+    TakeRight,
+    UseExplicit {
+        event: Option<MusicalEventV1>,
+        resolution_sha256: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SymbolicBranchConflictResolutionV1 {
+    pub event_id: String,
+    pub choice: SymbolicBranchMergeChoiceV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SymbolicBranchSnapshotV1 {
+    pub branch_id: String,
+    pub base_state_sha256: String,
+    pub head_state_sha256: String,
+    pub events: Vec<MusicalEventV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SymbolicBranchMergeReceiptV1 {
+    pub schema_version: String,
+    pub merge_id: String,
+    pub base_state_sha256: String,
+    pub left_branch_id: String,
+    pub left_parent_state_sha256: String,
+    pub right_branch_id: String,
+    pub right_parent_state_sha256: String,
+    pub conflicting_event_ids: Vec<String>,
+    pub resolutions: Vec<SymbolicBranchConflictResolutionV1>,
+    pub merged_state_sha256: String,
+    pub merged_events: Vec<MusicalEventV1>,
+    pub receipt_sha256: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+struct SymbolicBranchMergeReceiptPayloadV1 {
+    schema_version: String,
+    merge_id: String,
+    base_state_sha256: String,
+    left_branch_id: String,
+    left_parent_state_sha256: String,
+    right_branch_id: String,
+    right_parent_state_sha256: String,
+    conflicting_event_ids: Vec<String>,
+    resolutions: Vec<SymbolicBranchConflictResolutionV1>,
+    merged_state_sha256: String,
+    merged_events: Vec<MusicalEventV1>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SymbolicBranchMergeErrorV1 {
+    InvalidIdentity,
+    InvalidDigest,
+    BranchRootMismatch,
+    BranchHeadMismatch,
+    NonCanonicalResolutionOrder,
+    DuplicateResolution,
+    ConflictResolutionSetMismatch,
+    ConflictResolutionEventMismatch,
+    InvalidResolutionReceipt,
+    MergeReceiptMismatch,
+}
+
+impl fmt::Display for SymbolicBranchMergeErrorV1 {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::InvalidIdentity => "branch and merge identities must be nonempty and distinct",
+            Self::InvalidDigest => "a branch merge digest is malformed",
+            Self::BranchRootMismatch => "both branches must descend from the frozen base state",
+            Self::BranchHeadMismatch => "branch head digest does not match its canonical event snapshot",
+            Self::NonCanonicalResolutionOrder => "conflict resolutions must be sorted by event ID",
+            Self::DuplicateResolution => "a conflicting event has more than one resolution",
+            Self::ConflictResolutionSetMismatch => "resolutions must cover exactly the conflicting event IDs",
+            Self::ConflictResolutionEventMismatch => "explicit resolution event identity differs from its conflict ID",
+            Self::InvalidResolutionReceipt => "explicit conflict resolution lacks a valid decision digest",
+            Self::MergeReceiptMismatch => "replayed two-parent merge differs from the supplied receipt",
+        })
+    }
+}
+impl std::error::Error for SymbolicBranchMergeErrorV1 {}
+
+fn symbolic_branch_merge_payload_digest_v1(
+    payload: &SymbolicBranchMergeReceiptPayloadV1,
+) -> Result<String, SymbolicBranchMergeErrorV1> {
+    let bytes = serde_json::to_vec(payload)
+        .map_err(|_| SymbolicBranchMergeErrorV1::InvalidIdentity)?;
+    let mut hasher = Sha256::new();
+    hasher.update(SYMBOLIC_BRANCH_MERGE_DOMAIN_V1);
+    hasher.update([0]);
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn branch_event_map(
+    events: &[MusicalEventV1],
+) -> Result<BTreeMap<String, MusicalEventV1>, SymbolicBranchMergeErrorV1> {
+    symbolic_state_sha256_v1(events)
+        .map_err(|_| SymbolicBranchMergeErrorV1::BranchHeadMismatch)?;
+    Ok(events
+        .iter()
+        .cloned()
+        .map(|event| (event.event_id.clone(), event))
+        .collect())
+}
+
+fn branch_merge_payload_v1(
+    receipt: &SymbolicBranchMergeReceiptV1,
+) -> SymbolicBranchMergeReceiptPayloadV1 {
+    SymbolicBranchMergeReceiptPayloadV1 {
+        schema_version: receipt.schema_version.clone(),
+        merge_id: receipt.merge_id.clone(),
+        base_state_sha256: receipt.base_state_sha256.clone(),
+        left_branch_id: receipt.left_branch_id.clone(),
+        left_parent_state_sha256: receipt.left_parent_state_sha256.clone(),
+        right_branch_id: receipt.right_branch_id.clone(),
+        right_parent_state_sha256: receipt.right_parent_state_sha256.clone(),
+        conflicting_event_ids: receipt.conflicting_event_ids.clone(),
+        resolutions: receipt.resolutions.clone(),
+        merged_state_sha256: receipt.merged_state_sha256.clone(),
+        merged_events: receipt.merged_events.clone(),
+    }
+}
+
+/// Merge two snapshots descended from one exact base. Disjoint edits are
+/// merged automatically. Divergent writes to the same event require exactly
+/// one explicit resolution; the receipt commits both parent heads.
+pub fn merge_symbolic_branches_v1(
+    base_events: &[MusicalEventV1],
+    left: &SymbolicBranchSnapshotV1,
+    right: &SymbolicBranchSnapshotV1,
+    resolutions: &[SymbolicBranchConflictResolutionV1],
+    merge_id: &str,
+) -> Result<SymbolicBranchMergeReceiptV1, SymbolicBranchMergeErrorV1> {
+    if merge_id.trim().is_empty()
+        || left.branch_id.trim().is_empty()
+        || right.branch_id.trim().is_empty()
+        || left.branch_id == right.branch_id
+    {
+        return Err(SymbolicBranchMergeErrorV1::InvalidIdentity);
+    }
+
+    let base_sha = symbolic_state_sha256_v1(base_events)
+        .map_err(|_| SymbolicBranchMergeErrorV1::BranchHeadMismatch)?;
+    let base = branch_event_map(base_events)?;
+    let left_events = branch_event_map(&left.events)?;
+    let right_events = branch_event_map(&right.events)?;
+
+    if left.base_state_sha256 != base_sha || right.base_state_sha256 != base_sha {
+        return Err(SymbolicBranchMergeErrorV1::BranchRootMismatch);
+    }
+    if left.head_state_sha256 != symbolic_state_sha256_v1(&left.events)
+        .map_err(|_| SymbolicBranchMergeErrorV1::BranchHeadMismatch)?
+        || right.head_state_sha256 != symbolic_state_sha256_v1(&right.events)
+            .map_err(|_| SymbolicBranchMergeErrorV1::BranchHeadMismatch)?
+    {
+        return Err(SymbolicBranchMergeErrorV1::BranchHeadMismatch);
+    }
+
+    let mut all_ids = BTreeSet::new();
+    all_ids.extend(base.keys().cloned());
+    all_ids.extend(left_events.keys().cloned());
+    all_ids.extend(right_events.keys().cloned());
+
+    let mut conflict_ids = Vec::new();
+    for id in &all_ids {
+        let base_value = base.get(id);
+        let left_value = left_events.get(id);
+        let right_value = right_events.get(id);
+        if left_value != base_value
+            && right_value != base_value
+            && left_value != right_value
+        {
+            conflict_ids.push(id.clone());
+        }
+    }
+
+    let mut previous: Option<&str> = None;
+    let mut resolution_map = BTreeMap::new();
+    for resolution in resolutions {
+        if resolution.event_id.trim().is_empty() {
+            return Err(SymbolicBranchMergeErrorV1::InvalidIdentity);
+        }
+        if let Some(prior) = previous {
+            if prior == resolution.event_id {
+                return Err(SymbolicBranchMergeErrorV1::DuplicateResolution);
+            }
+            if prior > resolution.event_id.as_str() {
+                return Err(SymbolicBranchMergeErrorV1::NonCanonicalResolutionOrder);
+            }
+        }
+        previous = Some(&resolution.event_id);
+        if let SymbolicBranchMergeChoiceV1::UseExplicit {
+            event,
+            resolution_sha256,
+        } = &resolution.choice
+        {
+            if !valid_sha256(resolution_sha256) {
+                return Err(SymbolicBranchMergeErrorV1::InvalidResolutionReceipt);
+            }
+            if event.as_ref().is_some_and(|value| value.event_id != resolution.event_id) {
+                return Err(SymbolicBranchMergeErrorV1::ConflictResolutionEventMismatch);
+            }
+        }
+        resolution_map.insert(resolution.event_id.as_str(), &resolution.choice);
+    }
+
+    let expected_conflicts: BTreeSet<&str> =
+        conflict_ids.iter().map(String::as_str).collect();
+    let supplied_conflicts: BTreeSet<&str> =
+        resolutions.iter().map(|item| item.event_id.as_str()).collect();
+    if expected_conflicts != supplied_conflicts {
+        return Err(SymbolicBranchMergeErrorV1::ConflictResolutionSetMismatch);
+    }
+
+    let mut merged = BTreeMap::<String, MusicalEventV1>::new();
+    for id in all_ids {
+        let base_value = base.get(&id);
+        let left_value = left_events.get(&id);
+        let right_value = right_events.get(&id);
+        let selected: Option<MusicalEventV1> =
+            if left_value == right_value {
+                left_value.cloned()
+            } else if left_value == base_value {
+                right_value.cloned()
+            } else if right_value == base_value {
+                left_value.cloned()
+            } else {
+                let choice = resolution_map
+                    .get(id.as_str())
+                    .ok_or(SymbolicBranchMergeErrorV1::ConflictResolutionSetMismatch)?;
+                match choice {
+                    SymbolicBranchMergeChoiceV1::TakeLeft => left_value.cloned(),
+                    SymbolicBranchMergeChoiceV1::TakeRight => right_value.cloned(),
+                    SymbolicBranchMergeChoiceV1::UseExplicit { event, .. } => event.clone(),
+                }
+            };
+        if let Some(event) = selected {
+            if event.event_id != id {
+                return Err(SymbolicBranchMergeErrorV1::ConflictResolutionEventMismatch);
+            }
+            merged.insert(id, event);
+        }
+    }
+
+    let merged_events: Vec<MusicalEventV1> = merged.into_values().collect();
+    let merged_state_sha256 = symbolic_state_sha256_v1(&merged_events)
+        .map_err(|_| SymbolicBranchMergeErrorV1::BranchHeadMismatch)?;
+
+    let mut receipt = SymbolicBranchMergeReceiptV1 {
+        schema_version: SYMBOLIC_BRANCH_MERGE_SCHEMA_V1.to_owned(),
+        merge_id: merge_id.to_owned(),
+        base_state_sha256: base_sha,
+        left_branch_id: left.branch_id.clone(),
+        left_parent_state_sha256: left.head_state_sha256.clone(),
+        right_branch_id: right.branch_id.clone(),
+        right_parent_state_sha256: right.head_state_sha256.clone(),
+        conflicting_event_ids: conflict_ids,
+        resolutions: resolutions.to_vec(),
+        merged_state_sha256,
+        merged_events,
+        receipt_sha256: String::new(),
+    };
+    receipt.receipt_sha256 = symbolic_branch_merge_payload_digest_v1(
+        &branch_merge_payload_v1(&receipt),
+    )?;
+    Ok(receipt)
+}
+
+/// Replay both parent snapshots and all conflict resolutions. A digest over a
+/// fabricated merged state alone is insufficient.
+pub fn verify_symbolic_branch_merge_v1(
+    base_events: &[MusicalEventV1],
+    left: &SymbolicBranchSnapshotV1,
+    right: &SymbolicBranchSnapshotV1,
+    receipt: &SymbolicBranchMergeReceiptV1,
+) -> Result<(), SymbolicBranchMergeErrorV1> {
+    let replayed = merge_symbolic_branches_v1(
+        base_events,
+        left,
+        right,
+        &receipt.resolutions,
+        &receipt.merge_id,
+    )?;
+    if &replayed != receipt {
+        return Err(SymbolicBranchMergeErrorV1::MergeReceiptMismatch);
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod branch_merge_tests {
+    use super::*;
+
+    fn event(id: &str, pitch: i32) -> MusicalEventV1 {
+        MusicalEventV1 {
+            event_id: id.to_owned(),
+            part_id: "piano".to_owned(),
+            onset_ticks: 0,
+            duration_ticks: 480,
+            pitch_millist: pitch,
+            velocity: 88,
+            program: 0,
+        }
+    }
+
+    fn snapshot(
+        branch_id: &str,
+        base: &[MusicalEventV1],
+        events: Vec<MusicalEventV1>,
+    ) -> SymbolicBranchSnapshotV1 {
+        SymbolicBranchSnapshotV1 {
+            branch_id: branch_id.to_owned(),
+            base_state_sha256: symbolic_state_sha256_v1(base).unwrap(),
+            head_state_sha256: symbolic_state_sha256_v1(&events).unwrap(),
+            events,
+        }
+    }
+
+    #[test]
+    fn disjoint_branch_edits_merge_automatically_and_commit_both_parents() {
+        let base = vec![event("a", 60_000), event("b", 64_000), event("c", 67_000)];
+        let left = snapshot("left", &base, vec![event("a", 61_000), event("b", 64_000), event("c", 67_000)]);
+        let right = snapshot("right", &base, vec![event("a", 60_000), event("b", 65_000), event("c", 67_000)]);
+        let receipt = merge_symbolic_branches_v1(&base, &left, &right, &[], "merge-disjoint").unwrap();
+        assert_eq!(receipt.left_branch_id, "left");
+        assert_eq!(receipt.right_branch_id, "right");
+        assert_eq!(receipt.left_parent_state_sha256, left.head_state_sha256);
+        assert_eq!(receipt.right_parent_state_sha256, right.head_state_sha256);
+        assert!(receipt.conflicting_event_ids.is_empty());
+        assert_eq!(receipt.merged_events, vec![event("a", 61_000), event("b", 65_000), event("c", 67_000)]);
+        verify_symbolic_branch_merge_v1(&base, &left, &right, &receipt).unwrap();
+    }
+
+    #[test]
+    fn divergent_same_event_writes_require_one_explicit_resolution() {
+        let base = vec![event("a", 60_000), event("b", 64_000)];
+        let left = snapshot("left", &base, vec![event("a", 61_000), event("b", 64_000)]);
+        let right = snapshot("right", &base, vec![event("a", 62_000), event("b", 64_000)]);
+        assert_eq!(
+            merge_symbolic_branches_v1(&base, &left, &right, &[], "merge-conflict"),
+            Err(SymbolicBranchMergeErrorV1::ConflictResolutionSetMismatch)
+        );
+        let resolutions = vec![SymbolicBranchConflictResolutionV1 {
+            event_id: "a".to_owned(),
+            choice: SymbolicBranchMergeChoiceV1::TakeRight,
+        }];
+        let receipt = merge_symbolic_branches_v1(&base, &left, &right, &resolutions, "merge-conflict").unwrap();
+        assert_eq!(receipt.conflicting_event_ids, vec!["a".to_owned()]);
+        assert_eq!(receipt.merged_events[0], event("a", 62_000));
+        verify_symbolic_branch_merge_v1(&base, &left, &right, &receipt).unwrap();
+    }
+
+    #[test]
+    fn explicit_manual_merge_is_bound_to_resolution_digest_and_event_identity() {
+        let base = vec![event("a", 60_000)];
+        let left = snapshot("left", &base, vec![event("a", 61_000)]);
+        let right = snapshot("right", &base, vec![event("a", 63_000)]);
+        let resolutions = vec![SymbolicBranchConflictResolutionV1 {
+            event_id: "a".to_owned(),
+            choice: SymbolicBranchMergeChoiceV1::UseExplicit {
+                event: Some(event("a", 62_000)),
+                resolution_sha256: format!("{:064x}", 9),
+            },
+        }];
+        let receipt = merge_symbolic_branches_v1(&base, &left, &right, &resolutions, "merge-manual").unwrap();
+        assert_eq!(receipt.merged_events, vec![event("a", 62_000)]);
+        verify_symbolic_branch_merge_v1(&base, &left, &right, &receipt).unwrap();
+
+        let invalid = vec![SymbolicBranchConflictResolutionV1 {
+            event_id: "a".to_owned(),
+            choice: SymbolicBranchMergeChoiceV1::UseExplicit {
+                event: Some(event("wrong-id", 62_000)),
+                resolution_sha256: format!("{:064x}", 9),
+            },
+        }];
+        assert_eq!(
+            merge_symbolic_branches_v1(&base, &left, &right, &invalid, "merge-manual"),
+            Err(SymbolicBranchMergeErrorV1::ConflictResolutionEventMismatch)
+        );
+    }
+
+    #[test]
+    fn duplicate_or_extra_conflict_resolutions_are_rejected() {
+        let base = vec![event("a", 60_000)];
+        let left = snapshot("left", &base, vec![event("a", 61_000)]);
+        let right = snapshot("right", &base, vec![event("a", 62_000)]);
+        let resolution = SymbolicBranchConflictResolutionV1 {
+            event_id: "a".to_owned(),
+            choice: SymbolicBranchMergeChoiceV1::TakeLeft,
+        };
+        assert_eq!(
+            merge_symbolic_branches_v1(&base, &left, &right, &[resolution.clone(), resolution.clone()], "merge-dup"),
+            Err(SymbolicBranchMergeErrorV1::DuplicateResolution)
+        );
+        let extra = vec![
+            resolution,
+            SymbolicBranchConflictResolutionV1 {
+                event_id: "z".to_owned(),
+                choice: SymbolicBranchMergeChoiceV1::TakeRight,
+            },
+        ];
+        assert_eq!(
+            merge_symbolic_branches_v1(&base, &left, &right, &extra, "merge-extra"),
+            Err(SymbolicBranchMergeErrorV1::ConflictResolutionSetMismatch)
+        );
+    }
+
+    #[test]
+    fn stale_parent_roots_and_head_digests_fail_closed() {
+        let base = vec![event("a", 60_000)];
+        let left = snapshot("left", &base, vec![event("a", 61_000)]);
+        let right = snapshot("right", &base, vec![event("a", 60_000)]);
+        let mut stale_root = right.clone();
+        stale_root.base_state_sha256 = format!("{:064x}", 7);
+        assert_eq!(
+            merge_symbolic_branches_v1(&base, &left, &stale_root, &[], "merge-stale"),
+            Err(SymbolicBranchMergeErrorV1::BranchRootMismatch)
+        );
+        let mut stale_head = right.clone();
+        stale_head.head_state_sha256 = format!("{:064x}", 8);
+        assert_eq!(
+            merge_symbolic_branches_v1(&base, &left, &stale_head, &[], "merge-stale"),
+            Err(SymbolicBranchMergeErrorV1::BranchHeadMismatch)
+        );
+    }
+
+    #[test]
+    fn merge_receipt_replay_rejects_a_fabricated_state_even_when_rehashed() {
+        let base = vec![event("a", 60_000), event("b", 64_000)];
+        let left = snapshot("left", &base, vec![event("a", 61_000), event("b", 64_000)]);
+        let right = snapshot("right", &base, vec![event("a", 60_000), event("b", 65_000)]);
+        let mut receipt = merge_symbolic_branches_v1(&base, &left, &right, &[], "merge-replay").unwrap();
+        receipt.merged_events[0] = event("a", 62_000);
+        receipt.merged_state_sha256 = symbolic_state_sha256_v1(&receipt.merged_events).unwrap();
+        receipt.receipt_sha256 = symbolic_branch_merge_payload_digest_v1(&branch_merge_payload_v1(&receipt)).unwrap();
+        assert_eq!(
+            verify_symbolic_branch_merge_v1(&base, &left, &right, &receipt),
+            Err(SymbolicBranchMergeErrorV1::MergeReceiptMismatch)
+        );
+    }
+
+    #[test]
+    fn identical_branch_writes_are_not_reported_as_conflicts() {
+        let base = vec![event("a", 60_000)];
+        let left = snapshot("left", &base, vec![event("a", 61_000)]);
+        let right = snapshot("right", &base, vec![event("a", 61_000)]);
+        let receipt = merge_symbolic_branches_v1(&base, &left, &right, &[], "merge-same-write").unwrap();
+        assert!(receipt.conflicting_event_ids.is_empty());
+        assert_eq!(receipt.merged_events, vec![event("a", 61_000)]);
+    }
+}
