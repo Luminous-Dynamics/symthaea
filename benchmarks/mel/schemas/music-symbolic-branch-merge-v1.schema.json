@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-music-symbolic-branch-merge-v1.schema.json",
+  "title": "Melothaea Symbolic Two-Parent Branch Merge v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "merge_id",
+    "base_state_sha256",
+    "left_branch_id",
+    "left_parent_state_sha256",
+    "right_branch_id",
+    "right_parent_state_sha256",
+    "conflicting_event_ids",
+    "resolutions",
+    "merged_state_sha256",
+    "merged_events",
+    "receipt_sha256"
+  ],
+  "properties": {
+    "schema_version": { "const": "mel-music-symbolic-branch-merge-v1" },
+    "merge_id": { "type": "string", "minLength": 1 },
+    "base_state_sha256": { "$ref": "#/$defs/sha256" },
+    "left_branch_id": { "type": "string", "minLength": 1 },
+    "left_parent_state_sha256": { "$ref": "#/$defs/sha256" },
+    "right_branch_id": { "type": "string", "minLength": 1 },
+    "right_parent_state_sha256": { "$ref": "#/$defs/sha256" },
+    "conflicting_event_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "resolutions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/resolution" }
+    },
+    "merged_state_sha256": { "$ref": "#/$defs/sha256" },
+    "merged_events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/event" }
+    },
+    "receipt_sha256": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id", "part_id", "onset_ticks", "duration_ticks",
+        "pitch_millist", "velocity", "program"
+      ],
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1 },
+        "part_id": { "type": "string", "minLength": 1 },
+        "onset_ticks": { "type": "integer", "minimum": 0 },
+        "duration_ticks": { "type": "integer", "minimum": 1 },
+        "pitch_millist": { "type": "integer" },
+        "velocity": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "program": { "type": "integer", "minimum": 0, "maximum": 127 }
+      }
+    },
+    "choice": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["choice"],
+          "properties": { "choice": { "const": "take_left" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["choice"],
+          "properties": { "choice": { "const": "take_right" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["choice", "event", "resolution_sha256"],
+          "properties": {
+            "choice": { "const": "use_explicit" },
+            "event": {
+              "oneOf": [
+                { "$ref": "#/$defs/event" },
+                { "type": "null" }
+              ]
+            },
+            "resolution_sha256": { "$ref": "#/$defs/sha256" }
+          }
+        }
+      ]
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "choice"],
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1 },
+        "choice": { "$ref": "#/$defs/choice" }
+      }
+    }
+  }
+}
