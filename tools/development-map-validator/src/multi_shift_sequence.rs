@@ -1108,6 +1108,32 @@ mod tests {
     }
 
     #[test]
+    fn rejects_reused_receipt_with_forged_current_context_for_old_source_epoch() {
+        let mut value = fixture_value();
+        let fresh = value["candidate_traces"][0]["checkpoints"][1]["fresh_receipts"]
+            .as_array_mut().expect("fresh receipts");
+        let index = fresh.iter().position(|receipt| {
+            receipt["obligation_id"].as_str() == Some("build-repro")
+        }).expect("epoch-two build receipt");
+        let mut forged = fresh.remove(index);
+        forged["source_epoch"] = json!(1);
+        forged["context"] = value["candidate_view"]["interventions"][1]["after"].clone();
+        value["candidate_traces"][0]["checkpoints"][1]["reused_receipts"]
+            .as_array_mut().expect("reused receipts")
+            .push(forged);
+
+        let report = report_for(&value);
+        let result = trace(&report, "conformant-sequence");
+        assert!(result.epochs[1].false_resurrection_obligations.contains(&"build-repro".to_owned()));
+        assert!(result.epochs[1].missing_required_revalidation_obligations.contains(&"build-repro".to_owned()));
+        assert!(result.epochs[1].unsupported_current_claims.contains(&"build-repro".to_owned()));
+        assert!(result.epochs[1].invalid_reuse_receipts.iter().any(|receipt| {
+            receipt.obligation_id == "build-repro"
+                && receipt.reasons.contains(&"receipt_source_context_mismatch:runner_image_digest".to_owned())
+        }));
+    }
+
+    #[test]
     fn detects_future_available_evidence_claimed_current() {
         let mut value = fixture_value();
         value["candidate_traces"][0]["checkpoints"][0]["fresh_receipts"][0]["available_at"] =
