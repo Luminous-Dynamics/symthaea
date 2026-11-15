@@ -60,3 +60,9 @@ The `bernoulli_sequential` module adds a two-arm Bernoulli pilot with a time-uni
 The confidence sequence allocates alpha/2 to each arm and spends each arm's error budget across qualified sample counts in proportion to 1/n^2. It is valid only for iid Bernoulli observations with predictable allocation and qualified sampling. Any unavailable or rejected evidence blocks a qualified conclusion; the module does not authenticate the receipts themselves.
 
 This is not a general causal estimator, does not establish statistical power from a single episode, and does not cover drift, interference, outcome-dependent missingness, noncompliance estimands or multiple endpoints. Run the package's independent locked-workspace format, check, test and Clippy commands before treating the implementation as validated.
+
+## Suite-level stochastic metrics
+
+The `bernoulli_benchmark` module aggregates frozen per-episode reports without combining distinct scientific outcomes into one score. It reports null false-positive rate, qualified power on materially non-null episodes, final and all-interim-look coverage, claim accuracy, process qualification, and mean attempted samples/cost/risk. Proportions include 95% Wilson score intervals; invalid-oracle episodes remain in process totals but are excluded from truth-conditioned rates.
+
+These are episode-level summaries. Generator-family clustering and independent Monte Carlo runs are still required for confirmatory claims; Wilson intervals do not correct for clustered episodes or benchmark leakage.
