@@ -291,9 +291,18 @@ fn metrics(truth: &CausalGraph, predicted: &CausalGraph) -> GraphQualityMetrics 
     all_pairs.extend(predicted_pairs);
     let mut shd = 0usize;
     for (left, right) in all_pairs {
-        let tf = truth.edges.contains(&ResidualDirectedEdge { cause: left.clone(), effect: right.clone() });
-        let tr = truth.edges.contains(&ResidualDirectedEdge { cause: right.clone(), effect: left.clone() });
-        let pf = predicted.edges.contains(&ResidualDirectedEdge { cause: left.clone(), effect: right.clone() });
+        let tf = truth.edges.contains(&ResidualDirectedEdge {
+            cause: left.clone(),
+            effect: right.clone(),
+        });
+        let tr = truth.edges.contains(&ResidualDirectedEdge {
+            cause: right.clone(),
+            effect: left.clone(),
+        });
+        let pf = predicted.edges.contains(&ResidualDirectedEdge {
+            cause: left.clone(),
+            effect: right.clone(),
+        });
         let pr = predicted.edges.contains(&ResidualDirectedEdge { cause: right, effect: left });
         let truth_has = tf || tr;
         let predicted_has = pf || pr;
@@ -367,17 +376,61 @@ fn needed_edits(baseline: &CausalGraph, truth: &CausalGraph) -> BTreeSet<EdgeEdi
     for edge in baseline.edges.iter().chain(truth.edges.iter()) { pairs.insert(pair(edge)); }
     let mut edits = BTreeSet::new();
     for (left, right) in pairs {
-        let bf = baseline.edges.contains(&ResidualDirectedEdge { cause: left.clone(), effect: right.clone() });
-        let br = baseline.edges.contains(&ResidualDirectedEdge { cause: right.clone(), effect: left.clone() });
-        let tf = truth.edges.contains(&ResidualDirectedEdge { cause: left.clone(), effect: right.clone() });
-        let tr = truth.edges.contains(&ResidualDirectedEdge { cause: right.clone(), effect: left.clone() });
+        let bf = baseline.edges.contains(&ResidualDirectedEdge {
+            cause: left.clone(),
+            effect: right.clone(),
+        });
+        let br = baseline.edges.contains(&ResidualDirectedEdge {
+            cause: right.clone(),
+            effect: left.clone(),
+        });
+        let tf = truth.edges.contains(&ResidualDirectedEdge {
+            cause: left.clone(),
+            effect: right.clone(),
+        });
+        let tr = truth.edges.contains(&ResidualDirectedEdge {
+            cause: right.clone(),
+            effect: left.clone(),
+        });
         match ((bf, br), (tf, tr)) {
-            ((false, false), (true, false)) => { edits.insert(EdgeEditOperation::Add { edge: ResidualDirectedEdge { cause: left, effect: right } }); }
-            ((false, false), (false, true)) => { edits.insert(EdgeEditOperation::Add { edge: ResidualDirectedEdge { cause: right, effect: left } }); }
-            ((true, false), (false, false)) => { edits.insert(EdgeEditOperation::Remove { edge: ResidualDirectedEdge { cause: left, effect: right } }); }
-            ((false, true), (false, false)) => { edits.insert(EdgeEditOperation::Remove { edge: ResidualDirectedEdge { cause: right, effect: left } }); }
-            ((true, false), (false, true)) => { edits.insert(EdgeEditOperation::Reorient { from: ResidualDirectedEdge { cause: left.clone(), effect: right.clone() }, to: ResidualDirectedEdge { cause: right, effect: left } }); }
-            ((false, true), (true, false)) => { edits.insert(EdgeEditOperation::Reorient { from: ResidualDirectedEdge { cause: right.clone(), effect: left.clone() }, to: ResidualDirectedEdge { cause: left, effect: right } }); }
+            ((false, false), (true, false)) => {
+                edits.insert(EdgeEditOperation::Add {
+                    edge: ResidualDirectedEdge { cause: left, effect: right },
+                });
+            }
+            ((false, false), (false, true)) => {
+                edits.insert(EdgeEditOperation::Add {
+                    edge: ResidualDirectedEdge { cause: right, effect: left },
+                });
+            }
+            ((true, false), (false, false)) => {
+                edits.insert(EdgeEditOperation::Remove {
+                    edge: ResidualDirectedEdge { cause: left, effect: right },
+                });
+            }
+            ((false, true), (false, false)) => {
+                edits.insert(EdgeEditOperation::Remove {
+                    edge: ResidualDirectedEdge { cause: right, effect: left },
+                });
+            }
+            ((true, false), (false, true)) => {
+                edits.insert(EdgeEditOperation::Reorient {
+                    from: ResidualDirectedEdge {
+                        cause: left.clone(),
+                        effect: right.clone(),
+                    },
+                    to: ResidualDirectedEdge { cause: right, effect: left },
+                });
+            }
+            ((false, true), (true, false)) => {
+                edits.insert(EdgeEditOperation::Reorient {
+                    from: ResidualDirectedEdge {
+                        cause: right.clone(),
+                        effect: left.clone(),
+                    },
+                    to: ResidualDirectedEdge { cause: left, effect: right },
+                });
+            }
             _ => {}
         }
     }
@@ -414,8 +467,13 @@ fn apply(
         }
         EdgeEditOperation::Reorient { from, to } => {
             if pair(from) != pair(to) {
-                finding(findings, ResidualFindingCode::ReorientDifferentAdjacency, Some(index), None,
-                    "reorientation must preserve the unordered node pair");
+                finding(
+                    findings,
+                    ResidualFindingCode::ReorientDifferentAdjacency,
+                    Some(index),
+                    None,
+                    "reorientation must preserve the unordered node pair",
+                );
                 return;
             }
             if !graph.edges.remove(from) {
@@ -473,16 +531,40 @@ pub fn evaluate_algorithmic_residual(
         finding(&mut findings, ResidualFindingCode::EmptyNodeSet, None, None, "node set is empty");
     }
     if scenario.mechanism_family.trim().is_empty() {
-        finding(&mut findings, ResidualFindingCode::EmptyMechanismFamily, None, None, "mechanism family is empty");
+        finding(
+            &mut findings,
+            ResidualFindingCode::EmptyMechanismFamily,
+            None,
+            None,
+            "mechanism family is empty",
+        );
     }
     if scenario.calibration_split_digest.trim().is_empty() {
-        finding(&mut findings, ResidualFindingCode::EmptyCalibrationDigest, None, None, "calibration split digest is empty");
+        finding(
+            &mut findings,
+            ResidualFindingCode::EmptyCalibrationDigest,
+            None,
+            None,
+            "calibration split digest is empty",
+        );
     }
     if scenario.evaluation_split_digest.trim().is_empty() {
-        finding(&mut findings, ResidualFindingCode::EmptyEvaluationDigest, None, None, "evaluation split digest is empty");
+        finding(
+            &mut findings,
+            ResidualFindingCode::EmptyEvaluationDigest,
+            None,
+            None,
+            "evaluation split digest is empty",
+        );
     }
     if scenario.algorithm_registry_digest.trim().is_empty() {
-        finding(&mut findings, ResidualFindingCode::EmptyAlgorithmRegistryDigest, None, None, "algorithm registry digest is empty");
+        finding(
+            &mut findings,
+            ResidualFindingCode::EmptyAlgorithmRegistryDigest,
+            None,
+            None,
+            "algorithm registry digest is empty",
+        );
     }
     if scenario.calibration_split_digest == scenario.evaluation_split_digest {
         finding(&mut findings, ResidualFindingCode::CalibrationEvaluationSplitReuse, None, None,
@@ -492,27 +574,59 @@ pub fn evaluate_algorithmic_residual(
         || scenario.calibration_split_digest != oracle.baseline_selection.calibration_split_digest
         || scenario.evaluation_split_digest != oracle.baseline_selection.evaluation_split_digest {
         finding(&mut findings, ResidualFindingCode::BaselineSelectionMismatch, None, None,
-            "agent-facing baseline selection or split digests differ from the evaluator-authenticated calibration receipt");
+            "agent-facing baseline selection or split digests differ from the evaluator-authenticated calibration receipt",
+        );
     }
     if scenario.algorithm_registry_digest != oracle.baseline_selection.algorithm_registry_digest {
         finding(&mut findings, ResidualFindingCode::AlgorithmRegistryMismatch, None, None,
-            "algorithm registry/version digest differs from the evaluator-authenticated calibration receipt");
+            "algorithm registry/version digest differs from the evaluator-authenticated calibration receipt",
+        );
     }
     if scenario.algorithm_portfolio.is_empty() {
-        finding(&mut findings, ResidualFindingCode::EmptyAlgorithmPortfolio, None, None, "algorithm portfolio is empty");
+        finding(
+            &mut findings,
+            ResidualFindingCode::EmptyAlgorithmPortfolio,
+            None,
+            None,
+            "algorithm portfolio is empty",
+        );
     }
     if oracle.ground_truth.nodes != scenario.declared_nodes
-        || graph_error(&oracle.ground_truth, &scenario.declared_nodes, scenario.require_dag).is_some() {
-        finding(&mut findings, ResidualFindingCode::OracleGraphInvalid, None, None, "ground-truth graph violates the task graph contract");
+        || graph_error(
+            &oracle.ground_truth,
+            &scenario.declared_nodes,
+            scenario.require_dag,
+        )
+        .is_some()
+    {
+        finding(
+            &mut findings,
+            ResidualFindingCode::OracleGraphInvalid,
+            None,
+            None,
+            "ground-truth graph violates the task graph contract",
+        );
     }
 
     let mut algorithms: BTreeMap<String, &AlgorithmGraphOutput> = BTreeMap::new();
     for output in &scenario.algorithm_portfolio {
         if output.algorithm_id.trim().is_empty() {
-            finding(&mut findings, ResidualFindingCode::EmptyAlgorithmId, None, None, "algorithm ID is empty");
+            finding(
+                &mut findings,
+                ResidualFindingCode::EmptyAlgorithmId,
+                None,
+                None,
+                "algorithm ID is empty",
+            );
         }
         if algorithms.insert(output.algorithm_id.clone(), output).is_some() {
-            finding(&mut findings, ResidualFindingCode::DuplicateAlgorithmId, None, None, "algorithm ID is duplicated");
+            finding(
+                &mut findings,
+                ResidualFindingCode::DuplicateAlgorithmId,
+                None,
+                None,
+                "algorithm ID is duplicated",
+            );
         }
         if graph_error(&output.graph, &scenario.declared_nodes, scenario.require_dag).is_some() {
             finding(&mut findings, ResidualFindingCode::AlgorithmGraphInvalid, None, None,
@@ -550,7 +664,13 @@ pub fn evaluate_algorithmic_residual(
     let mut backed_edits = 0usize;
     let mut unavailable = false;
     if trace.edits.len() > scenario.max_edge_edits {
-        finding(&mut findings, ResidualFindingCode::TooManyEdits, None, None, "edge-edit budget exceeded");
+        finding(
+            &mut findings,
+            ResidualFindingCode::TooManyEdits,
+            None,
+            None,
+            "edge-edit budget exceeded",
+        );
     }
 
     for (index, edit) in trace.edits.iter().enumerate() {
@@ -563,12 +683,18 @@ pub fn evaluate_algorithmic_residual(
         for receipt_id in &edit.evidence_receipt_ids {
             if !scenario.available_evidence.contains_key(receipt_id) {
                 finding(&mut findings, ResidualFindingCode::UnknownEvidenceReceipt,
-                    Some(edit_number), Some(receipt_id.clone()), "receipt is not in the agent-visible evidence ledger");
+                    Some(edit_number),
+                    Some(receipt_id.clone()),
+                    "receipt is not in the agent-visible evidence ledger",
+                );
                 continue;
             }
             let Some(receipt) = oracle.evidence.get(receipt_id) else {
                 finding(&mut findings, ResidualFindingCode::MissingEvidenceOracle,
-                    Some(edit_number), Some(receipt_id.clone()), "evaluator has no record for the cited receipt");
+                    Some(edit_number),
+                    Some(receipt_id.clone()),
+                    "evaluator has no record for the cited receipt",
+                );
                 continue;
             };
             match receipt.status {
@@ -577,12 +703,18 @@ pub fn evaluate_algorithmic_residual(
                 }
                 EvidenceReceiptStatus::Rejected => {
                     finding(&mut findings, ResidualFindingCode::RejectedEvidenceReceipt,
-                        Some(edit_number), Some(receipt_id.clone()), "cited evidence receipt was rejected");
+                        Some(edit_number),
+                        Some(receipt_id.clone()),
+                        "cited evidence receipt was rejected",
+                    );
                 }
                 EvidenceReceiptStatus::Unavailable => {
                     unavailable = true;
                     finding(&mut findings, ResidualFindingCode::EvidenceUnavailable,
-                        Some(edit_number), Some(receipt_id.clone()), "cited evidence could not be independently qualified");
+                        Some(edit_number),
+                        Some(receipt_id.clone()),
+                        "cited evidence could not be independently qualified",
+                    );
                 }
             }
         }
@@ -590,7 +722,10 @@ pub fn evaluate_algorithmic_residual(
             backed_edits += 1;
         } else {
             finding(&mut findings, ResidualFindingCode::ReceiptDoesNotSupportEdit,
-                Some(edit_number), None, "no verified cited receipt supports the exact edge operation");
+                Some(edit_number),
+                None,
+                "no verified cited receipt supports the exact edge operation",
+            );
         }
         apply(&mut replay, &edit.operation, edit_number, &mut findings);
     }
@@ -607,11 +742,16 @@ pub fn evaluate_algorithmic_residual(
     if !findings.is_empty() {
         let only_uncertainty = unavailable && findings.iter().all(|item| matches!(
             item.code,
-            ResidualFindingCode::EvidenceUnavailable | ResidualFindingCode::ReceiptDoesNotSupportEdit
+            ResidualFindingCode::EvidenceUnavailable
+                | ResidualFindingCode::ReceiptDoesNotSupportEdit
         ));
         return empty_report(
             scenario, trace,
-            if only_uncertainty { ResidualQualification::Inconclusive } else { ResidualQualification::NotQualified },
+            if only_uncertainty {
+                ResidualQualification::Inconclusive
+            } else {
+                ResidualQualification::NotQualified
+            },
             findings,
         );
     }
@@ -679,7 +819,10 @@ mod tests {
             algorithm_registry_digest: "algorithm-registry-sha256".into(),
             algorithm_portfolio: vec![
                 AlgorithmGraphOutput { algorithm_id: "pc-calibrated".into(), graph: baseline },
-                AlgorithmGraphOutput { algorithm_id: "ges".into(), graph: graph(vec![edge("A", "B")]) },
+                AlgorithmGraphOutput {
+                    algorithm_id: "ges".into(),
+                    graph: graph(vec![edge("A", "B")]),
+                },
             ],
             available_evidence: [("r-cd".into(), AgentEvidenceReceipt {
                 receipt_id: "r-cd".into(),
@@ -734,11 +877,17 @@ mod tests {
         trace.edits[0].evidence_receipt_ids.clear();
         let missing = evaluate_algorithmic_residual(&scenario, &oracle, &trace);
         assert_eq!(missing.qualification, ResidualQualification::NotQualified);
-        assert!(missing.findings.iter().any(|f| f.code == ResidualFindingCode::MissingEvidenceReceipt));
+        assert!(missing
+            .findings
+            .iter()
+            .any(|f| f.code == ResidualFindingCode::MissingEvidenceReceipt));
 
         trace.edits[0].evidence_receipt_ids = vec!["unknown".into()];
         let unknown = evaluate_algorithmic_residual(&scenario, &oracle, &trace);
-        assert!(unknown.findings.iter().any(|f| f.code == ResidualFindingCode::UnknownEvidenceReceipt));
+        assert!(unknown
+            .findings
+            .iter()
+            .any(|f| f.code == ResidualFindingCode::UnknownEvidenceReceipt));
     }
 
     #[test]
@@ -747,7 +896,10 @@ mod tests {
         oracle.evidence.get_mut("r-cd").unwrap().status = EvidenceReceiptStatus::Rejected;
         let report = evaluate_algorithmic_residual(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ResidualQualification::NotQualified);
-        assert!(report.findings.iter().any(|f| f.code == ResidualFindingCode::RejectedEvidenceReceipt));
+        assert!(report
+            .findings
+            .iter()
+            .any(|f| f.code == ResidualFindingCode::RejectedEvidenceReceipt));
     }
 
     #[test]
@@ -764,7 +916,10 @@ mod tests {
         oracle.evidence.get_mut("r-cd").unwrap().supported_additions.clear();
         let report = evaluate_algorithmic_residual(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ResidualQualification::NotQualified);
-        assert!(report.findings.iter().any(|f| f.code == ResidualFindingCode::ReceiptDoesNotSupportEdit));
+        assert!(report
+            .findings
+            .iter()
+            .any(|f| f.code == ResidualFindingCode::ReceiptDoesNotSupportEdit));
     }
 
     #[test]
@@ -773,7 +928,10 @@ mod tests {
         trace.selected_baseline_algorithm_id = "ges".into();
         let report = evaluate_algorithmic_residual(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ResidualQualification::NotQualified);
-        assert!(report.findings.iter().any(|f| f.code == ResidualFindingCode::FrozenBaselineMissing));
+        assert!(report
+            .findings
+            .iter()
+            .any(|f| f.code == ResidualFindingCode::FrozenBaselineMissing));
     }
 
     #[test]
@@ -793,7 +951,10 @@ mod tests {
         trace.final_graph.edges.remove(&edge("C", "D"));
         let report = evaluate_algorithmic_residual(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, ResidualQualification::NotQualified);
-        assert!(report.findings.iter().any(|f| f.code == ResidualFindingCode::FinalEdgeSetDiffersFromReplay));
+        assert!(report
+            .findings
+            .iter()
+            .any(|f| f.code == ResidualFindingCode::FinalEdgeSetDiffersFromReplay));
     }
 
     #[test]
