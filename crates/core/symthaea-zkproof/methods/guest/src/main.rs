@@ -6,7 +6,8 @@
 
 use risc0_zkvm::guest::env;
 use symthaea_zkproof_core::{
-    BalanceProofInput, BalanceProofOutput, EvolutionInput, EvolutionOutput,
+    BalanceProofInput, BalanceProofOutput, BalanceProofRequestBoundInputV1,
+    BalanceProofRequestBoundOutputV1, EvolutionInput, EvolutionOutput,
 };
 
 risc0_zkvm::guest::entry!(main);
@@ -14,12 +15,14 @@ risc0_zkvm::guest::entry!(main);
 fn main() {
     // Tag-dispatched entry point:
     //   tag 0 = consciousness attestation (EvolutionInput → EvolutionOutput)
-    //   tag 1 = balance proof            (BalanceProofInput → BalanceProofOutput)
+    //   tag 1 = legacy balance proof     (BalanceProofInput → BalanceProofOutput)
+    //   tag 2 = request-bound balance proof (BalanceProofRequestBoundInputV1 → BalanceProofRequestBoundOutputV1)
     let tag: u8 = env::read();
 
     match tag {
         0 => run_consciousness_attestation(),
         1 => run_balance_proof(),
+        2 => run_request_bound_balance_proof_v1(),
         _ => panic!("unknown guest program tag"),
     }
 }
@@ -67,6 +70,27 @@ fn run_balance_proof() {
         sufficient: input.balance >= input.required_minimum,
         required_minimum: input.required_minimum,
         nonce: input.nonce,
+    };
+
+    env::commit(&output);
+}
+
+
+/// Tag 2: request-bound balance predicate.
+///
+/// This binds the public request context to the journal, but does NOT verify
+/// the referenced issuer statement, prove that the private balance opens a
+/// source commitment, issue/consume the challenge, or establish authority.
+fn run_request_bound_balance_proof_v1() {
+    let input: BalanceProofRequestBoundInputV1 = env::read();
+
+    // Malformed request contexts are not eligible for a positive receipt.
+    assert!(input.request.validate().is_ok());
+
+    let output = BalanceProofRequestBoundOutputV1 {
+        sufficient: input.balance >= input.request.required_minimum,
+        required_minimum: input.request.required_minimum,
+        request_digest: input.request.canonical_digest(),
     };
 
     env::commit(&output);
