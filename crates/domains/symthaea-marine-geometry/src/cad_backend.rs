@@ -11,7 +11,7 @@ use crate::cad_exchange::{
 
 const CAPABILITY_SCHEMA_VERSION: u32 = 1;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum CadCapability {
     StepAp214Import,
