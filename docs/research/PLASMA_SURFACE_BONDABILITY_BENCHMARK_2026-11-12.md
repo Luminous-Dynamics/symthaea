@@ -188,3 +188,16 @@ Eleven Rust unit tests are authored for fixture replay, bondability-window calcu
 The source-specific polymer observations and their claim ceilings are recorded separately from the synthetic evaluator fixture in `data/research/plasma_surface_reference_cases_v0_1.json`.
 
 The register contains four source records and eight negative controls. It preserves the 2026 PET-G / PP / HIPS / PVC argon–nitrogen comparison, its ISO 4587 method and small immediate-bond sample limits; the 2026 LDPE/HDPE barrier-property trade-off; and review-level context on adhesion aging and industrial scale-up. Every source case explicitly records `luminous_reproduction=false`. Reported literature results are not copied into the synthetic fixture and cannot be mistaken for Luminous measurements.
+
+
+## 2026 exact PP / adhesive and treatment-window results — 15 November
+
+The source register now includes the additional PP/Loctite EA 9466 result from Péczi-Kovács & Kókai (2026):
+- N2-treated PP / Loctite EA 9466: 11.6 ± 0.7 MPa vs untreated 0.5 ± 0.1 MPa; WCA 17° vs 94°; substrate failure observed.
+- For the same PP but a different adhesive (Soudal Fix All Flexi), N2 produced 0.3 ± 0.05 MPa at 17° WCA, while Ar produced 0.8 MPa at 60° WCA.
+- The same source found N2 surface burning first visible for PP at 500 mm/min and for PVC/HIPS at 250 mm/min; visible damage occurred for all tested polymers below 250 mm/min. These damaged process conditions were excluded from lap-shear testing.
+- Argon produced no visible damage in its tested process window.
+
+Method limits remain important: three specimens per treatment category; immediate bonding; 24 h clamp cure; ISO 4587 single-lap geometry with 12.5 mm overlap and 10 mm/s crosshead speed; bondline thickness not measured; substrate temperature not measured directly. The reported 529 ± 1 W discharge power is not wall-plug-to-accepted-bonded-area energy.
+
+**Design consequence:** the optimization must search a joint feasible region of bond strength, surface integrity, adhesive compatibility, throughput and full-system energy. Minimizing contact angle or maximizing nominal bond strength alone is not the objective. Every adhesive/material system remains a separate service profile.
