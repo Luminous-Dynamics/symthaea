@@ -1,27 +1,23 @@
-name: Marine sailcraft P0 contract
+name: Marine sailcraft robust route P1 contract
 
 on:
   push:
-    branches: ["research/marine-sail-autonomy-v0-1"]
+    branches: ["research/marine-sail-robust-route-v0-1"]
     paths:
       - "crates/domains/symthaea-sailcraft/**"
       - ".github/workflows/marine-sailcraft-p0.yml"
-      - "Cargo.toml"
-      - "Cargo.lock"
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
     paths:
       - "crates/domains/symthaea-sailcraft/**"
       - ".github/workflows/marine-sailcraft-p0.yml"
-      - "Cargo.toml"
-      - "Cargo.lock"
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: marine-sailcraft-p0-${{ github.event.pull_request.number || github.ref }}
+  group: marine-sailcraft-robust-p1-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -46,30 +42,19 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/sailcraft-p0"
-          cat > "$RUNNER_TEMP/sailcraft-p0/Cargo.toml" <<EOF
+          mkdir -p "$RUNNER_TEMP/sailcraft-robust-p1"
+          cat > "$RUNNER_TEMP/sailcraft-robust-p1/Cargo.toml" <<EOF
           [package]
-          name = "symthaea-sailcraft-p0-validation"
+          name = "symthaea-sailcraft-robust-p1-validation"
           version = "0.1.0"
           edition = "2024"
 
           [lib]
           path = "$GITHUB_WORKSPACE/crates/domains/symthaea-sailcraft/src/lib.rs"
           EOF
-      - name: Apply canonical rustfmt to sailcraft kernel for repair handoff
-        run: rustfmt --edition 2024 crates/domains/symthaea-sailcraft/src/lib.rs
-      - name: Package formatted sailcraft kernel
-        run: |
-          set -euo pipefail
-          tar -czf "$RUNNER_TEMP/symthaea-sailcraft-formatted.tar.gz" crates/domains/symthaea-sailcraft/src/lib.rs
-      - name: Upload formatted sailcraft source
-        uses: actions/upload-artifact@v4
-        with:
-          name: symthaea-sailcraft-rustfmt-${{ github.sha }}
-          path: ${{ runner.temp }}/symthaea-sailcraft-formatted.tar.gz
-          if-no-files-found: error
-          retention-days: 1
-      - name: Unit tests in isolated manifest
-        run: cargo test --manifest-path "$RUNNER_TEMP/sailcraft-p0/Cargo.toml" --all-targets
-      - name: Strict Clippy in isolated manifest
-        run: cargo clippy --manifest-path "$RUNNER_TEMP/sailcraft-p0/Cargo.toml" --all-targets -- -D warnings
+      - name: Check canonical Rust formatting
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-sailcraft/src/lib.rs crates/domains/symthaea-sailcraft/src/robust.rs
+      - name: Run isolated P0 and robust-route Rust tests
+        run: cargo test --manifest-path "$RUNNER_TEMP/sailcraft-robust-p1/Cargo.toml" --all-targets
+      - name: Run strict Clippy for isolated P0 and robust-route kernel
+        run: cargo clippy --manifest-path "$RUNNER_TEMP/sailcraft-robust-p1/Cargo.toml" --all-targets -- -D warnings
