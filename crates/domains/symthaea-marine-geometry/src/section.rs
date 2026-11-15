@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::CoordinateFrame;
 
-use blake3;
 
 const SECTION_SCHEMA_VERSION: u32 = 1;
 const ENDPOINT_TOLERANCE: f64 = 1.0e-12;
