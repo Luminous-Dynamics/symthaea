@@ -19,7 +19,7 @@ pub struct Scenario {
     pub consent_scope: ConsentScope,
     pub human_rubric: Vec<HumanRubric>,
     pub duration_minutes: u32,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
 }
 
@@ -29,7 +29,7 @@ pub struct ScenarioEvent {
     pub event_id: String,
     pub event_kind: String,
     pub instruction: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub after_turn: Option<u32>,
 }
 
@@ -65,7 +65,7 @@ pub struct Trace {
     pub schema_version: String,
     pub run_id: String,
     pub scenario_id: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trace_digest: Option<String>,
     pub events: Vec<TraceEvent>,
 }
@@ -82,21 +82,21 @@ pub struct TraceEvent {
     pub payload_digest: String,
     pub payload_storage: String,
     pub consent_scope: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artifact_digest_before: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub artifact_digest_after: Option<String>,
     pub external_side_effect: bool,
     pub reversible: bool,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub confidence: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_execution: Option<ToolExecution>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution: Vec<Attribution>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotation: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reconciled_status: Option<String>,
 }
 
@@ -105,11 +105,11 @@ pub struct TraceEvent {
 pub struct ToolExecution {
     pub tool_name: String,
     pub status: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub idempotency_key: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub precondition_digest: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub postcondition_digest: Option<String>,
 }
 
@@ -120,7 +120,7 @@ pub struct Attribution {
     pub contribution_type: String,
     pub artifact_ref: String,
     pub attribution_confidence: f64,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub permission_ref: Option<String>,
 }
 
@@ -138,7 +138,7 @@ pub struct Scorecard {
     pub provenance: ProvenanceInfo,
     pub scores: Scores,
     pub hard_gates: HardGates,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub notes: Option<String>,
 }
 
@@ -148,10 +148,10 @@ pub struct SystemInfo {
     pub system_name: String,
     pub model_snapshot: String,
     pub adapter_revision: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt_digest: Option<String>,
     pub memory_policy: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools_enabled: Vec<String>,
 }
 
@@ -163,11 +163,11 @@ pub struct ExecutionInfo {
     pub latency_seconds: f64,
     pub human_time_minutes: f64,
     pub interaction_turns: u64,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_tokens: Option<u64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_tokens: Option<u64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cost_usd: Option<f64>,
 }
 
@@ -178,44 +178,44 @@ pub struct ProvenanceInfo {
     pub trace_sha256: String,
     pub artifact_sha256: String,
     pub scorer_revision: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub environment_digest: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub consented_trace_uri: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Scores {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_quality: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub constraint_satisfaction: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub participant_agency_mean: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agency_delta_sd_vs_reference: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub common_ground_accuracy: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub repair_success_rate: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution_precision: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution_recall: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub attribution_f1: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub quality_matched_diversity_ratio: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expert_rater_agreement: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub synergy_delta: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collaboration_gap: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub partner_order_sensitivity: Option<f64>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handoff_recovery_rate: Option<f64>,
 }
 
@@ -227,10 +227,10 @@ pub struct HardGates {
     pub consent_violation_count: u64,
     pub fabricated_attribution_count: u64,
     pub hidden_side_effect_count: u64,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub unresolved_unknown_outcome_count: u64,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reconciliation_bypass_count: u64,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure_event_ids: Vec<String>,
 }
