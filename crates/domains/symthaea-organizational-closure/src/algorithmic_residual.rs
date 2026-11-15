@@ -5,21 +5,27 @@
 //! graph truth. This module scores/audits edits; it does not discover edges
 //! or authenticate the external producer of an evidence receipt.
 
-use crate::partial_identification::DirectedCausalEdge;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResidualDirectedEdge {
+    pub cause: String,
+    pub effect: String,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CausalGraph {
     pub nodes: BTreeSet<String>,
-    pub edges: BTreeSet<DirectedCausalEdge>,
+    pub edges: BTreeSet<ResidualDirectedEdge>,
 }
 
 impl CausalGraph {
     pub fn new(
         nodes: impl IntoIterator<Item = String>,
-        edges: impl IntoIterator<Item = DirectedCausalEdge>,
+        edges: impl IntoIterator<Item = ResidualDirectedEdge>,
     ) -> Self {
         Self { nodes: nodes.into_iter().collect(), edges: edges.into_iter().collect() }
     }
@@ -81,8 +87,8 @@ pub enum EvidenceReceiptStatus {
 pub struct EvidenceReceiptOracle {
     pub receipt_id: String,
     pub status: EvidenceReceiptStatus,
-    pub supported_additions: BTreeSet<DirectedCausalEdge>,
-    pub supported_removals: BTreeSet<DirectedCausalEdge>,
+    pub supported_additions: BTreeSet<ResidualDirectedEdge>,
+    pub supported_removals: BTreeSet<ResidualDirectedEdge>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -94,9 +100,9 @@ pub struct ResidualDiscoveryOracle {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(tag = "operation", rename_all = "snake_case", deny_unknown_fields)]
 pub enum EdgeEditOperation {
-    Add { edge: DirectedCausalEdge },
-    Remove { edge: DirectedCausalEdge },
-    Reorient { from: DirectedCausalEdge, to: DirectedCausalEdge },
+    Add { edge: ResidualDirectedEdge },
+    Remove { edge: ResidualDirectedEdge },
+    Reorient { from: ResidualDirectedEdge, to: ResidualDirectedEdge },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -227,7 +233,7 @@ fn finding(
     findings.push(ResidualFinding { code, edit_index, receipt_id, detail: detail.into() });
 }
 
-fn pair(edge: &DirectedCausalEdge) -> (String, String) {
+fn pair(edge: &ResidualDirectedEdge) -> (String, String) {
     if edge.cause <= edge.effect {
         (edge.cause.clone(), edge.effect.clone())
     } else {
@@ -264,10 +270,10 @@ fn metrics(truth: &CausalGraph, predicted: &CausalGraph) -> GraphQualityMetrics 
     all_pairs.extend(predicted_pairs);
     let mut shd = 0usize;
     for (left, right) in all_pairs {
-        let tf = truth.edges.contains(&DirectedCausalEdge { cause: left.clone(), effect: right.clone() });
-        let tr = truth.edges.contains(&DirectedCausalEdge { cause: right.clone(), effect: left.clone() });
-        let pf = predicted.edges.contains(&DirectedCausalEdge { cause: left.clone(), effect: right.clone() });
-        let pr = predicted.edges.contains(&DirectedCausalEdge { cause: right, effect: left });
+        let tf = truth.edges.contains(&ResidualDirectedEdge { cause: left.clone(), effect: right.clone() });
+        let tr = truth.edges.contains(&ResidualDirectedEdge { cause: right.clone(), effect: left.clone() });
+        let pf = predicted.edges.contains(&ResidualDirectedEdge { cause: left.clone(), effect: right.clone() });
+        let pr = predicted.edges.contains(&ResidualDirectedEdge { cause: right, effect: left });
         let truth_has = tf || tr;
         let predicted_has = pf || pr;
         let orientation_matches = (tf && pf) || (tr && pr);
@@ -340,17 +346,17 @@ fn needed_edits(baseline: &CausalGraph, truth: &CausalGraph) -> BTreeSet<EdgeEdi
     for edge in baseline.edges.iter().chain(truth.edges.iter()) { pairs.insert(pair(edge)); }
     let mut edits = BTreeSet::new();
     for (left, right) in pairs {
-        let bf = baseline.edges.contains(&DirectedCausalEdge { cause: left.clone(), effect: right.clone() });
-        let br = baseline.edges.contains(&DirectedCausalEdge { cause: right.clone(), effect: left.clone() });
-        let tf = truth.edges.contains(&DirectedCausalEdge { cause: left.clone(), effect: right.clone() });
-        let tr = truth.edges.contains(&DirectedCausalEdge { cause: right.clone(), effect: left.clone() });
+        let bf = baseline.edges.contains(&ResidualDirectedEdge { cause: left.clone(), effect: right.clone() });
+        let br = baseline.edges.contains(&ResidualDirectedEdge { cause: right.clone(), effect: left.clone() });
+        let tf = truth.edges.contains(&ResidualDirectedEdge { cause: left.clone(), effect: right.clone() });
+        let tr = truth.edges.contains(&ResidualDirectedEdge { cause: right.clone(), effect: left.clone() });
         match ((bf, br), (tf, tr)) {
-            ((false, false), (true, false)) => { edits.insert(EdgeEditOperation::Add { edge: DirectedCausalEdge { cause: left, effect: right } }); }
-            ((false, false), (false, true)) => { edits.insert(EdgeEditOperation::Add { edge: DirectedCausalEdge { cause: right, effect: left } }); }
-            ((true, false), (false, false)) => { edits.insert(EdgeEditOperation::Remove { edge: DirectedCausalEdge { cause: left, effect: right } }); }
-            ((false, true), (false, false)) => { edits.insert(EdgeEditOperation::Remove { edge: DirectedCausalEdge { cause: right, effect: left } }); }
-            ((true, false), (false, true)) => { edits.insert(EdgeEditOperation::Reorient { from: DirectedCausalEdge { cause: left.clone(), effect: right.clone() }, to: DirectedCausalEdge { cause: right, effect: left } }); }
-            ((false, true), (true, false)) => { edits.insert(EdgeEditOperation::Reorient { from: DirectedCausalEdge { cause: right.clone(), effect: left.clone() }, to: DirectedCausalEdge { cause: left, effect: right } }); }
+            ((false, false), (true, false)) => { edits.insert(EdgeEditOperation::Add { edge: ResidualDirectedEdge { cause: left, effect: right } }); }
+            ((false, false), (false, true)) => { edits.insert(EdgeEditOperation::Add { edge: ResidualDirectedEdge { cause: right, effect: left } }); }
+            ((true, false), (false, false)) => { edits.insert(EdgeEditOperation::Remove { edge: ResidualDirectedEdge { cause: left, effect: right } }); }
+            ((false, true), (false, false)) => { edits.insert(EdgeEditOperation::Remove { edge: ResidualDirectedEdge { cause: right, effect: left } }); }
+            ((true, false), (false, true)) => { edits.insert(EdgeEditOperation::Reorient { from: ResidualDirectedEdge { cause: left.clone(), effect: right.clone() }, to: ResidualDirectedEdge { cause: right, effect: left } }); }
+            ((false, true), (true, false)) => { edits.insert(EdgeEditOperation::Reorient { from: ResidualDirectedEdge { cause: right.clone(), effect: left.clone() }, to: ResidualDirectedEdge { cause: left, effect: right } }); }
             _ => {}
         }
     }
@@ -574,9 +580,9 @@ pub fn evaluate_algorithmic_residual(
     let needed = needed_edits(&baseline.graph, &oracle.ground_truth);
     let correct_edits = trace.edits.iter().filter(|edit| needed.contains(&edit.operation)).count();
 
-    let all_algorithm_edges: BTreeSet<DirectedCausalEdge> = scenario.algorithm_portfolio.iter()
+    let all_algorithm_edges: BTreeSet<ResidualDirectedEdge> = scenario.algorithm_portfolio.iter()
         .flat_map(|output| output.graph.edges.iter().cloned()).collect();
-    let novel_truth: BTreeSet<DirectedCausalEdge> = oracle.ground_truth.edges
+    let novel_truth: BTreeSet<ResidualDirectedEdge> = oracle.ground_truth.edges
         .difference(&all_algorithm_edges).cloned().collect();
     let novel_recovered = trace.final_graph.edges.intersection(&novel_truth).count();
 
@@ -610,11 +616,11 @@ pub fn evaluate_algorithmic_residual(
 mod tests {
     use super::*;
 
-    fn edge(cause: &str, effect: &str) -> DirectedCausalEdge {
-        DirectedCausalEdge { cause: cause.into(), effect: effect.into() }
+    fn edge(cause: &str, effect: &str) -> ResidualDirectedEdge {
+        ResidualDirectedEdge { cause: cause.into(), effect: effect.into() }
     }
 
-    fn graph(edges: Vec<DirectedCausalEdge>) -> CausalGraph {
+    fn graph(edges: Vec<ResidualDirectedEdge>) -> CausalGraph {
         CausalGraph::new(["A", "B", "C", "D"].into_iter().map(str::to_owned), edges)
     }
 
