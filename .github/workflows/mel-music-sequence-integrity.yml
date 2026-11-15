@@ -5,6 +5,8 @@ on:
     paths:
       - "tools/mel-music-sequence-integrity-harness/**"
       - "benchmarks/mel/schemas/music-edit-sequence-v1.schema.json"
+      - "docs/research/MEL_MR_EVAL_043_MULTI_STEP_EDIT_INTEGRITY_V1_2026-11-15.md"
+      - "docs/research/MEL_COMPETITIVE_RESEARCH_HARMONY_AND_SESSION_EDITING_V1_2026-11-15.md"
       - ".github/workflows/mel-music-sequence-integrity.yml"
   workflow_dispatch:
 
