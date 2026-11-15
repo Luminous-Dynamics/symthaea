@@ -58,6 +58,7 @@ pub struct ProcessConfigurationSnapshot {
     pub asset_refs: Vec<String>,
     pub tooling_refs: Vec<String>,
     pub inspection_plan_ref: String,
+    pub inspection_plan_evidence: EvidenceRecord,
     pub qualification_evidence: EvidenceRecord,
 }
 
@@ -287,6 +288,7 @@ pub fn evaluate_cell_eligibility(
         out.add(EligibilityReasonCode::InspectionPlanMismatch, EligibilitySeverity::Blocked, &config.configuration_ref);
     }
     out.check_evidence(&config.qualification_evidence, at);
+    out.check_evidence(&config.inspection_plan_evidence, at);
 
     if config.asset_refs.is_empty() {
         out.add(EligibilityReasonCode::AssetMissing, EligibilitySeverity::Indeterminate, &config.configuration_ref);
@@ -561,6 +563,7 @@ mod tests {
                 asset_refs: vec!["urn:example:asset:sewing-machine-01".to_owned()],
                 tooling_refs: vec!["urn:example:tooling:folder-01".to_owned()],
                 inspection_plan_ref: "urn:example:inspection:seam-check:r1".to_owned(),
+                inspection_plan_evidence: evidence("urn:example:evidence:inspection-plan"),
                 qualification_evidence: evidence("urn:example:evidence:process-qualification"),
             }],
             skill_qualifications: vec![SkillQualificationSnapshot {
@@ -685,6 +688,23 @@ mod tests {
         let report = evaluate_cell_eligibility(&requirement(), &cell);
         assert_eq!(report.status, EligibilityStatus::Indeterminate);
         assert!(has_code(&report, EligibilityReasonCode::EvidenceValidityUnknown));
+    }
+
+
+    #[test]
+    fn duplicate_configuration_reference_is_blocked_and_order_independent() {
+        let req = requirement();
+        let mut cell = qualified_cell();
+        let mut duplicate = cell.process_configurations[0].clone();
+        duplicate.pattern_revision_ref = "urn:example:pattern:conflicting-r9".to_owned();
+        cell.process_configurations.push(duplicate);
+        let first = evaluate_cell_eligibility(&req, &cell);
+        assert_eq!(first.status, EligibilityStatus::Blocked);
+        assert!(has_code(&first, EligibilityReasonCode::DuplicateResolvedReference));
+
+        cell.process_configurations.reverse();
+        let second = evaluate_cell_eligibility(&req, &cell);
+        assert_eq!(first, second);
     }
 
     #[test]
