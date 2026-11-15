@@ -193,3 +193,12 @@ The source models plasma-based biogas-to-syngas pathways and downstream Fischerâ
 This is a techno-economic model, not a physical plant demonstration or observed product price. The 44% figure is a study-specific plant-pathway efficiency, not plasma coupling efficiency. Cost competitiveness must be evaluated under the same accepted syngas composition, feedstock and electricity boundary, capacity factor, power price, location, CAPEX/OPEX, maintenance and downstream product pathway.
 
 The merged source corpus has 32 cases / 36 negative controls / 5 derived checks. It preserves this branch's six microplasma cases in addition to the three 2026 cases added from the main plasma-energy source-register lineage.
+
+
+## 9.16 Liquid-metal blanket MHD: SAM/NekRS/ALEX benchmark reference â€” 2026-11-15
+
+Hua et al., *MHD capabilities in SAM and NekRS for fusion liquid metal blanket applications*, Fusion Engineering and Design (September 2026), DOI https://doi.org/10.1016/j.fusengdes.2026.115888.
+
+This paper provides a source-pinned comparison of reduced-order SAM MHD modelling, high-fidelity NekRS MHD CFD, analytical duct references, and ALEX measurements for conducting square and round ducts under applied magnetic fields. Insulating-duct validation is explicitly future work.
+
+This strengthens [PLASMA-MHD-BENCH-001 #11733](https://github.com/Luminous-Dynamics/symthaea/issues/11733). It does not establish whole blanket performance. A valid reproduction must keep model/solver/experiment outputs distinct and pin wall conductivity, geometry, field profile, Hartmann/Reynolds/interaction parameters, boundary conditions and measurement uncertainty.
