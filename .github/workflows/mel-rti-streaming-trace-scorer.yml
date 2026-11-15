@@ -1,0 +1,96 @@
+name: Melothaea streaming turn-taking trace scorer
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-rti-streaming-trace-scorer/**"
+      - "benchmarks/mel/schemas/rti-stream-trace-v1.schema.json"
+      - ".github/workflows/mel-rti-streaming-trace-scorer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  streaming-trace-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MEL_RTI_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Validate trace schema
+        run: python3 -m json.tool benchmarks/mel/schemas/rti-stream-trace-v1.schema.json >/dev/null
+
+      - name: Stage standalone scorer outside root workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-rti-streaming-trace-scorer"
+          mkdir -p "$staged/src" "$staged/examples"
+          cp tools/mel-rti-streaming-trace-scorer/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-rti-streaming-trace-scorer/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-rti-streaming-trace-scorer/examples/run_streaming_trace.rs "$staged/examples/run_streaming_trace.rs"
+          echo "MEL_RTI_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+
+      - name: Normalize staged formatting and verify
+        run: |
+          cargo +1.96.0 fmt --manifest-path "$MEL_RTI_MANIFEST"
+          cargo +1.96.0 fmt --check --manifest-path "$MEL_RTI_MANIFEST"
+
+      - name: Resolve standalone dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_RTI_MANIFEST"
+
+      - name: Run streaming trace scorer tests
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_RTI_MANIFEST"
+
+      - name: Run report replay in two fresh processes
+        run: |
+          set -euo pipefail
+          cargo +1.96.0 run --locked --manifest-path "$MEL_RTI_MANIFEST" --example run_streaming_trace > "$RUNNER_TEMP/stream-trace-a.json"
+          cargo +1.96.0 run --locked --manifest-path "$MEL_RTI_MANIFEST" --example run_streaming_trace > "$RUNNER_TEMP/stream-trace-b.json"
+          cmp "$RUNNER_TEMP/stream-trace-a.json" "$RUNNER_TEMP/stream-trace-b.json"
+          python3 -m json.tool "$RUNNER_TEMP/stream-trace-a.json" >/dev/null
+
+      - name: Run Clippy with warnings denied
+        run: cargo +1.96.0 clippy --locked --manifest-path "$MEL_RTI_MANIFEST" --all-targets -- -D warnings
+
+      - name: Record exact source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-rti-stream-evidence"
+          mkdir -p "$evidence"
+          sha256sum tools/mel-rti-streaming-trace-scorer/Cargo.toml > "$evidence/manifest.sha256"
+          sha256sum tools/mel-rti-streaming-trace-scorer/src/lib.rs > "$evidence/library.sha256"
+          sha256sum tools/mel-rti-streaming-trace-scorer/examples/run_streaming_trace.rs > "$evidence/example.sha256"
+          sha256sum benchmarks/mel/schemas/rti-stream-trace-v1.schema.json > "$evidence/schema.sha256"
+          cp "$(dirname "$MEL_RTI_MANIFEST")/Cargo.lock" "$evidence/Cargo.lock"
+          sha256sum "$evidence/Cargo.lock" > "$evidence/Cargo.lock.sha256"
+          cp "$RUNNER_TEMP/stream-trace-a.json" "$evidence/report.json"
+          printf 'exact_head=%s\n' "$MEL_RTI_REVISION" > "$evidence/source-identities.txt"
+
+      - name: Upload streaming trace evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-rti-stream-trace-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-rti-stream-evidence/
+          if-no-files-found: error
+          retention-days: 90

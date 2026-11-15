@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-rti-stream-trace-v1.schema.json",
+  "title": "Melothaea Streaming Musical Turn-Taking Trace v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request", "chunks", "truth", "predictions"],
+  "properties": {
+    "request": { "$ref": "#/$defs/request" },
+    "chunks": { "type": "array", "minItems": 1, "maxItems": 100000, "items": { "$ref": "#/$defs/chunk" } },
+    "truth": { "type": "array", "minItems": 1, "maxItems": 100000, "items": { "$ref": "#/$defs/truth" } },
+    "predictions": { "type": "array", "minItems": 1, "maxItems": 100000, "items": { "$ref": "#/$defs/prediction" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "action": { "enum": ["wait", "respond", "continue", "yield"] },
+    "decision": { "enum": ["wait", "respond", "continue", "yield", "parse_failure"] },
+    "request": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema_version", "session_id", "source_audio_sha256", "task_manifest_sha256",
+        "annotation_policy_sha256", "immutable_policy_identity_sha256", "runner_build_sha256",
+        "initial_policy_state_sha256", "sample_rate_hz", "channels", "total_frames",
+        "expected_chunk_count", "seed"
+      ],
+      "properties": {
+        "schema_version": { "const": "mel-rti-stream-session-v1" },
+        "session_id": { "type": "string", "minLength": 1 },
+        "source_audio_sha256": { "$ref": "#/$defs/sha256" },
+        "task_manifest_sha256": { "$ref": "#/$defs/sha256" },
+        "annotation_policy_sha256": { "$ref": "#/$defs/sha256" },
+        "immutable_policy_identity_sha256": { "$ref": "#/$defs/sha256" },
+        "runner_build_sha256": { "$ref": "#/$defs/sha256" },
+        "initial_policy_state_sha256": { "$ref": "#/$defs/sha256" },
+        "sample_rate_hz": { "type": "integer", "minimum": 8000, "maximum": 192000 },
+        "channels": { "enum": [1, 2] },
+        "total_frames": { "type": "integer", "minimum": 1 },
+        "expected_chunk_count": { "type": "integer", "minimum": 1, "maximum": 100000 },
+        "seed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "chunk": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "chunk_index", "chunk_id", "start_frame", "end_frame"],
+      "properties": {
+        "schema_version": { "const": "mel-rti-stream-chunk-v1" },
+        "chunk_index": { "type": "integer", "minimum": 0 },
+        "chunk_id": { "type": "string", "minLength": 1 },
+        "start_frame": { "type": "integer", "minimum": 0 },
+        "end_frame": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "window": {
+      "type": "object", "additionalProperties": false,
+      "required": ["start_frame", "end_frame"],
+      "properties": {
+        "start_frame": { "type": "integer", "minimum": 0 },
+        "end_frame": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "truth": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "chunk_index", "chunk_id", "valid_actions"],
+      "properties": {
+        "schema_version": { "const": "mel-rti-stream-truth-v1" },
+        "chunk_index": { "type": "integer", "minimum": 0 },
+        "chunk_id": { "type": "string", "minLength": 1 },
+        "valid_actions": { "type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": { "$ref": "#/$defs/action" } },
+        "effect_target_frame": { "type": "integer", "minimum": 0 },
+        "effect_window": { "$ref": "#/$defs/window" }
+      }
+    },
+    "prediction": {
+      "type": "object", "additionalProperties": false,
+      "required": [
+        "schema_version", "chunk_index", "chunk_id", "decision", "observed_through_frame",
+        "chunk_received_at_ns", "decision_at_ns", "input_prefix_sha256",
+        "pre_state_sha256", "post_state_sha256", "immutable_policy_identity_sha256",
+        "runner_build_sha256"
+      ],
+      "properties": {
+        "schema_version": { "const": "mel-rti-stream-prediction-v1" },
+        "chunk_index": { "type": "integer", "minimum": 0 },
+        "chunk_id": { "type": "string", "minLength": 1 },
+        "decision": { "$ref": "#/$defs/decision" },
+        "observed_through_frame": { "type": "integer", "minimum": 0 },
+        "chunk_received_at_ns": { "type": "integer", "minimum": 0 },
+        "decision_at_ns": { "type": "integer", "minimum": 0 },
+        "effect_at_ns": { "type": "integer", "minimum": 0 },
+        "effect_frame": { "type": "integer", "minimum": 0 },
+        "input_prefix_sha256": { "$ref": "#/$defs/sha256" },
+        "pre_state_sha256": { "$ref": "#/$defs/sha256" },
+        "post_state_sha256": { "$ref": "#/$defs/sha256" },
+        "immutable_policy_identity_sha256": { "$ref": "#/$defs/sha256" },
+        "runner_build_sha256": { "$ref": "#/$defs/sha256" },
+        "parse_failure_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}
