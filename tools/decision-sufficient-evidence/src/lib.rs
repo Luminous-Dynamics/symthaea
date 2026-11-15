@@ -300,7 +300,7 @@ fn assess_option(
             .map(|(hypothesis, likelihood)| hypothesis.prior_probability * likelihood)
             .collect();
         let probability: f64 = unnormalized.iter().sum();
-        if probability <= EPSILON {
+        if probability == 0.0 {
             outcome_probabilities.push(OutcomeProbability {
                 outcome_id: outcome.outcome_id.clone(),
                 probability: 0.0,
@@ -532,6 +532,23 @@ mod tests {
         let report = plan_evidence(&input).expect("plan report");
         assert!(!report.assessments[0].feasible);
         assert!(report.assessments[0].rejection_reasons.iter().any(|reason| reason.starts_with("invalid_observation_model:")));
+    }
+
+    #[test] fn rare_nonzero_observation_probability_is_not_treated_as_impossible() {
+        let rare = 1e-12;
+        let mut input = problem();
+        input.hypotheses[0].prior_probability = 1.0 - rare;
+        input.hypotheses[1].prior_probability = rare;
+        input.actions[0].loss_by_hypothesis = vec![0.0, 1e12];
+        input.actions[1].loss_by_hypothesis = vec![1.0, 1.0];
+        input.evidence_options = vec![input.evidence_options[0].clone()];
+        input.evidence_options[0].acquisition_cost_utility = 0.0;
+        let report = plan_evidence(&input).expect("rare event plan");
+        let failure = report.assessments[0].outcome_probabilities.iter()
+            .find(|outcome| outcome.outcome_id == "fail").unwrap();
+        assert!(failure.probability > 0.0);
+        assert!((failure.probability - rare).abs() < 1e-18);
+        assert_eq!(failure.posterior, vec![0.0, 1.0]);
     }
 
     #[test] fn invalid_prior_distribution_is_rejected() {
