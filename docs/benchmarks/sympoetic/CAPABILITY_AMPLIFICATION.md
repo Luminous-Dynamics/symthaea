@@ -95,7 +95,23 @@ Do not infer durable learning from a good joint artifact or one immediate post-t
 - Do not use the evaluated AI as the sole author, tutor, judge, or source of ground truth.
 - Give participants a right to stop, correct, or withdraw, and do not silently retain learning profiles beyond the approved scope.
 
-## 7. Provisional research targets
+## 7. Distributional capability amplification
+
+A pooled positive treatment effect can hide a subgroup that experiences no benefit or loses independent capability. The confirmatory design should therefore preregister baseline task-capability strata (for example, low, middle, and high baseline score bands) before examining post-test outcomes.
+
+For each stratum, report separately:
+
+- Participant counts and attrition in each condition.
+- Treatment-control difference-in-differences in independent capability gain with a participant-level bootstrap interval.
+- Rate of negative individual gains in the collaboration and control arms.
+- Delayed retention and transfer contrasts, where the stratum has adequate data.
+- Missingness, assistance dose, time, and assessment-form equivalence.
+
+The Rust function `summarize_capability_amplification_by_stratum` accepts pseudonymous participant records with a preregistered baseline stratum and either `collaborative` or `control` condition. It returns a separate gain estimate and confidence interval for each stratum, plus the negative-gain rates for both arms. It rejects duplicate participant IDs and strata with fewer than two participants in either arm instead of silently merging or imputing them.
+
+Strata are based on baseline task performance, not inferred demographic identity or sensitive traits. Their cut points must be fixed before outcomes; report multiple comparisons and treat subgroup effects as exploratory unless the study is powered and preregistered for them.
+
+## 8. Provisional research targets
 
 These are hypotheses and design targets, not validated universal standards or achieved results:
 
@@ -111,7 +127,7 @@ These are hypotheses and design targets, not validated universal standards or ac
 
 The study must be powered from pilot variance and the declared smallest effect of interest. Do not select sample size or thresholds after observing confirmatory results.
 
-## 8. Coalition attribution: who contributed to a joint capability?
+## 9. Coalition attribution: who contributed to a joint capability?
 
 For multi-person or multi-agent collaboration, exact Shapley attribution can describe how a coalition's value is allocated across contributors when every coalition outcome is identifiable.
 
@@ -128,11 +144,11 @@ The Rust implementation `exact_shapley_values` accepts the complete table of (2^
 
 For larger teams, a sampled Shapley estimator may be added as a separate versioned metric with its sampling error and replay budget reported. Coalition effects are not assumed additive.
 
-## 9. Seed scenario
+## 10. Seed scenarios
 
-`SP-LEA-001` in `SEED_CORPUS.v0.1.jsonl` is a development-only scenario using fictional water-distribution diagnosis. It contains a baseline, a scaffolded collaboration phase, an independent post-test, a delayed retention check, and a transfer task. Its purpose is to test the harness and rubric—not to claim that any system has already improved human capability.
+`SP-LEA-001` in `SEED_CORPUS.v0.1.jsonl` is a development-only scenario using fictional water-distribution diagnosis. It contains a baseline, a scaffolded collaboration phase, an independent post-test, a delayed retention check, and a transfer task. `SP-EQU-001` extends this to preregistered baseline-capability strata and negative-gain reporting by condition. Its purpose is to test the harness and rubric—not to claim that any system has already improved human capability.
 
-## 10. Reporting
+## 11. Reporting
 
 A capability-amplification report should include:
 
