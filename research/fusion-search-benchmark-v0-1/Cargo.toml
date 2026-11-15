@@ -1,0 +1,9 @@
+[package]
+name = "fusion-search-benchmark"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+publish = false
+description = "Synthetic exhaustive benchmark for fusion engineering candidate screening"
+
+[workspace]
