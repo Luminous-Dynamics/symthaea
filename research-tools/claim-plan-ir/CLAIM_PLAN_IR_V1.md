@@ -54,6 +54,8 @@ Ownership remains split:
 - Symthaea #12269: issuer/source and verifier-request binding.
 - Mycelix #6230 / #6245 / #6251 / #6219: PPAC composition, source profile, domain-scoped uniqueness, and LISE requalification.
 - Mycelix #5401 / #5404 / #5405 / #5411 / #5466 / #5468: cross-session linkability, cumulative disclosure inference, proof-shape correlation, and federated disclosure-budget conservation. CPIR references these owners rather than implementing a duplicate privacy ledger.
+- Mycelix #5489: compile and optimize the full multi-round presentation transcript, rather than evaluating each presentation independently.
+- Mycelix #5477: distinguish record-, person-, group- and relational-graph privacy units; per-person controls must not be misrepresented as household/cooperative protection.
 - Xenia: session authentication and exact human consent/action capabilities.
 - The domain authority owner: whether a qualified claim may authorize a particular effect.
 
@@ -137,11 +139,26 @@ A commitment salt is not a uniqueness subject. Freshly reissued commitments must
 
 The IR specifies a nullifier derivation profile reference and scope, not a new nullifier engine. Mycelix's existing owner and consume-once boundary remains authoritative.
 
-### 4.7 Adaptive disclosure and observer-visible privacy
+### 4.7 Credential-status lookup privacy and freshness
+
+A randomized or unlinkable credential proof does not hide a status lookup that exposes a stable list URL, entry ID, status index, fetch cadence, cache behavior, update time or response class. The current W3C status-list maturity must be part of the profile identity:
+
+- W3C Bitstring Status List v1.0 is a Recommendation (15 May 2025).
+- W3C Bitstring Status List v1.1 is a Working Draft (11 November 2026), not a Recommendation. Its privacy guidance discusses global identifiers such as `id`, `statusListIndex` and `statusListCredential`, list-size/population effects, verifier caching, CDNs, decoys, monitoring and status-message correlation/alteration.
+
+The CPIR `privacy.status_lookup` profile therefore binds exact specification version and maturity, retrieval mode, index allocation, cache policy, observer-visible channels, freshness interval and anti-rollback requirement. A proposed target of 131,072 bits is an explicit profile parameter informed by v1.1's privacy discussion; it is not a blanket anonymity guarantee or an assertion about every deployment.
+
+Caching/CDN can reduce issuer-visible fetch correlation, but also create stale-status and rollback risk. Status privacy and revocation freshness must be measured together. A cache hit from an old list must never be treated as current merely because the cache is faster.
+
+Mycelix #6272 owns the status-list lookup correlation benchmark. It compares direct fetch, verifier cache, CDN, proxy and batched profiles, with status-index, identifier, timing, cache, update-cadence and response-class observer channels. CPIR only binds its owner-qualified profile. It does not implement a new status service.
+
+### 4.8 Adaptive disclosure and observer-visible privacy
 
 A zero-knowledge predicate result can still leak the private value through repeated queries. For example, repeated verifier-authorized threshold checks `x >= t` can binary-search a bounded amount or age, even when every individual response reveals only one bit. Fresh challenges prevent replay; they do not prevent inference from an adaptive sequence.
 
 The plan therefore references, but does not reimplement, the relevant Mycelix-owned privacy profiles:
+- **Multi-round transcript optimization** — Mycelix #5489 evaluates candidate-set intersections over complete presentation sequences, with task-answer preservation and a global tail floor. A per-presentation privacy result is not a transcript privacy result.
+- **Relational/group privacy** — Mycelix #5477 differentiates record, person, group and relational-graph adjacency. Per-person disclosure controls do not imply household/cooperative protection.
 - **Cumulative disclosure composition** — Mycelix #5404 / benchmark #5405 measures candidate-set reduction and inference after a sequence of minimized outputs.
 - **Cross-session / recipient linkability** — #5401 measures content, identifier, proof, envelope and behavioral correlation.
 - **Proof-shape correlation** — #5411 measures statement-count, revealed-index, schema/profile and structural fingerprints even when proof bytes are fresh.
@@ -156,7 +173,7 @@ Do not label abstract disclosure-risk units as differential-privacy epsilon/delt
 
 Benchmark privacy as a vector: candidate-set reduction/inference accuracy by query depth; reconstruction success for adaptive predicates; cross-verifier linkability; proof-shape correlation; status-fetch correlation; observer-visible timing/size/error differences; and budget overspend under concurrency/replay. Preserve task utility across controls—denying optional disclosure must not silently change the required task result.
 
-### 4.8 Proof and qualification identity
+### 4.9 Proof and qualification identity
 
 The proof contract fixes:
 - backend and proof-format profile;
@@ -169,7 +186,7 @@ The verifier must check the expected program identity from trusted configuration
 
 The output is a proof/qualification receipt candidate bound to the plan digest. It is not consent or action authority.
 
-### 4.9 LISE dependency manifest
+### 4.10 LISE dependency manifest
 
 The compiler emits owner-qualified dependencies for at least:
 - source TLS release/profile and server identity trust root;
@@ -184,20 +201,22 @@ Dependencies must carry owner identity and change semantics. LISE determines whi
 
 ## 5. Canonical encoding and digest
 
-Version 1 proposes RFC 8785 JSON Canonicalization Scheme (JCS) for the plan envelope, with these additional admission constraints:
+Version 1 proposes RFC 8785 JSON Canonicalization Scheme (JCS) for the plan envelope. JCS builds on the I-JSON subset and ECMAScript primitive serialization; the input must satisfy these constraints:
 
-1. Reject duplicate JSON member names before canonicalization.
-2. Reject unknown critical members and unsupported enum values.
-3. Disallow floating-point values in policy or claim semantics; encode exact integers as bounded integers and decimals as grammar-constrained strings or integer minor units.
-4. Do not Unicode-normalize identifiers implicitly. Any normalization must be an explicit field-level profile.
+1. Reject duplicate JSON member names **before** conversion to an ordinary map/object or canonicalization. A lossy parse that keeps only the last duplicate is not an acceptable preflight.
+2. Reject unknown critical members and unsupported enum values. The v1 schema uses closed object shapes; extension points require a future version.
+3. JCS numbers must be representable as IEEE 754 binary64 values. For integer semantics, v1 further restricts numeric literals to the exact safe-integer range (±(2^53−1)); larger integers and precise decimals are strings with a typed conversion profile. Floating-point business values are not admitted.
+4. Preserve Unicode strings as-is; JCS does not perform Unicode normalization. Any normalization must be an explicit field-level profile and must not be introduced by a serializer.
 5. Require lowercase hexadecimal for fixed-width digests and validate exact digest length for the declared algorithm.
 6. Keep the plan digest outside the canonicalized object to avoid self-reference.
+7. Validate URI/HTTPS-origin semantics, cross-field version/maturity consistency, source-mode/commitment compatibility and typed predicate semantics in an explicit semantic preflight. JSON Schema shape validation alone does not establish these relations.
+8. Use a validator that asserts JSON Schema formats; some validators treat `format` as annotation unless format assertion is enabled.
 
 Proposed digest:
 
 ```text
 plan_digest = SHA-256(
-  "LUMINOUS/CLAIM-PLAN-IR/V1\0" || JCS(plan)
+  UTF8("LUMINOUS/CLAIM-PLAN-IR/V1") || 0x00 || JCS(plan)
 )
 ```
 
@@ -276,7 +295,20 @@ Benchmark plan compilation separately from TLS, proving and institutional decisi
 
 For an eventual matched system benchmark, report source/session time, notary/TEE work, opening verification, parser semantics, proof generation/verification, nullifier consumption, LISE qualification and time-to-qualified-private-decision separately. Keep assurance properties as a vector/Pareto frontier. Never trade a weaker witness model or more disclosure for a faster headline number without showing that trade-off.
 
-## 10. Implementation sequence
+## 10. Initial fixture corpus
+
+The standalone fixture directory now contains:
+- one synthetic ZAR balance plan positive fixture;
+- unsafe integer literal (JCS/I-JSON admission);
+- status specification / maturity mismatch;
+- URL path substituted into the HTTPS origin;
+- missing status anti-rollback requirement;
+- duplicate JSON member name in a raw pre-canonicalization fixture;
+- a machine-readable manifest describing the expected rejection stage.
+
+The fixtures are structural/semantic test inputs only. They contain zero digests and synthetic profile IDs, so they do not represent a valid cryptographic trust profile, issued credential, source session, or proof. The duplicate-member fixture must be rejected by the raw JSON admission parser before a normal JSON object is formed.
+
+## 11. Implementation sequence
 
 1. Review this schema and threat model against #12301, #12328, #12373 and Mycelix #6230.
 2. Add independent canonicalization and schema conformance fixtures.
@@ -286,16 +318,17 @@ For an eventual matched system benchmark, report source/session time, notary/TEE
 6. Emit the LISE dependency manifest and verify targeted invalidation.
 7. Integrate Xenia consent and domain action only after Mycelix independently qualifies the claim.
 
-## 11. Current external baseline notes
+## 12. Current external baseline notes
 
 - TLSNotary v0.1.0-beta.1 was announced on 2026-11-14 and is the current integration candidate in the related research issues; it is a prerelease, not a production qualification.
+- W3C Bitstring Status List v1.1 is a Working Draft published 2026-11-11; v1.0 remains the Recommendation. The v1.1 draft explicitly discusses global identifier/index correlation, small-list population effects, verifier caching/CDNs, decoy distinguishability and status-message correlation. CPIR status profiles must encode maturity rather than silently promoting a Working Draft to a Recommendation. Source: https://www.w3.org/TR/2026/WD-vc-bitstring-status-list-1.1-20261111/.
 - TLSNotary's official Beta.1 benchmark (published 2026-11-14) uses a 1 KiB request / 2 KiB response. Reported MPC native proving times are 13.35 s (cable), 3.43 s (fiber), 9.63 s (mobile 5G); MPC browser/WASM is 14.15 s, 4.17 s, 10.45 s. Proxy native is 1.30 s, 0.83 s, 1.29 s; proxy browser/WASM is 1.57 s, 1.12 s, 1.55 s. MPC comparisons are against alpha.15; proxy comparisons are against a separate May 2026 report. The benchmark uses Azure Standard_F8als_v6 / AMD EPYC 9004, 8 vCPU, 16 GB RAM, Debian 12, with 10 measured samples and 3 warmups per point. It reports 30.08 MB total MPC traffic and 0.60 MB verifier-to-prover traffic in the default run. The official post says its measurements prove statements over the entire server response; do not call them selected-field ZK proof timings or compare proxy and MPC as equal trust profiles. TLS 1.3 is listed as a priority for a subsequent release, not a Beta.1 capability. Source: https://tlsnotary.org/blog/beta1-performance-next-steps/
 - Scribe's paper reports policy-only STARK proving from 6 ms to 346 ms, verification from 0.4 ms to 9.7 ms, and proof sizes from 32.1 KiB to 77.8 KiB for repeated 16-bit threshold checks. The reported experiment uses an Apple M4 Pro / 24 GB system and small sample counts (10 STARK repetitions). It separately reports a TLSNotary workflow average of 856 ms proving and 749 ms verification. These workloads and trust assumptions are not matched to TLSNotary Beta.1 or this system; use them as independent reference points, not a leaderboard. Source: https://doi.org/10.1007/s12083-026-02246-2
 - Before declaring SOTA superiority, reproduce each competitor's exact release, protocol mode, request/response bytes, parser, predicate, hardware/network profile and disclosure policy. Report source-session, proof generation, verification, parser, uniqueness consumption, LISE and final decision latency separately. A lower local proof time cannot compensate for a weaker witness assumption, more plaintext exposure, or an easier claim.
 - TLSNotary's commit strategies include custom ranges, HTTP objects and per-byte commitments. HTTP-object commitment is the documented default trade-off; each additional range costs storage linearly (the current documentation estimates about 250 bytes of additional Secret artefact per BLAKE3 range).
 - Scribe (published 2026-09-02) combines TLS provenance, an attestation-node signature on a salted commitment, a transparent STARK policy proof, application-scoped spend tags, a Merkle spent-tag aggregator and Falcon-signed root publication. It explicitly assumes honest attestation-node provenance behavior; fresh salts can create distinct commitments; a signed root does not independently constrain a correct append-only transition. These are separate benchmark dimensions, not reasons to discount the system's stated theorem.
 
-## 12. Claim ceiling
+## 13. Claim ceiling
 
 A future qualified implementation may establish that a verifier-authorized, versioned predicate was evaluated over a value opened from a specific TLS-authenticated transcript range, under a specified source mode, parser/schema/conversion profile, request/audience/purpose and proof-program identity, with explicit qualification dependencies.
 
