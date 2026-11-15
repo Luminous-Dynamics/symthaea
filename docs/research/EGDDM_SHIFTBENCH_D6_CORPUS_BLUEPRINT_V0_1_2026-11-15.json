@@ -1,0 +1,425 @@
+{
+  "schema_version": "0.1.0",
+  "status": "proposed_corpus_blueprint_not_a_collected_dataset",
+  "benchmark_id": "EGDDM-ShiftBench-D6",
+  "dated": "2026-11-15",
+  "task_design": {
+    "matched_arms": [
+      "clean",
+      "shifted"
+    ],
+    "intervention_positions": [
+      {
+        "position_id": "early",
+        "fraction_of_planned_work": 0.15,
+        "definition": "Intervention occurs after initial orientation and baseline evidence, before substantial implementation."
+      },
+      {
+        "position_id": "middle",
+        "fraction_of_planned_work": 0.5,
+        "definition": "Intervention occurs after meaningful implementation and at least one intermediate verification cycle."
+      },
+      {
+        "position_id": "late",
+        "fraction_of_planned_work": 0.85,
+        "definition": "Intervention occurs near completion, after substantial prior work has accumulated."
+      }
+    ],
+    "intervention_families": [
+      {
+        "family_id": "requirement_addition",
+        "change_surface": "A new user, security, compatibility or operational requirement becomes active mid-task.",
+        "gold_impact": "Independently adjudicated obligations whose acceptance contract changes or is newly introduced.",
+        "negative_control": "Add explanatory prose that does not alter any acceptance criterion.",
+        "expected_recovery": "Update the active requirement set, identify newly affected obligations, acquire scoped evidence and retain unaffected receipts.",
+        "critical_risk": "New critical obligation omitted or falsely treated as already verified."
+      },
+      {
+        "family_id": "requirement_removal_or_deprecation",
+        "change_surface": "A requirement is removed, narrowed or replaced by a newer requirement.",
+        "gold_impact": "Obligations made inactive, replaced or still active under revised semantics.",
+        "negative_control": "A deprecated label changes but the normative requirement remains in force.",
+        "expected_recovery": "Stop spending effort on obsolete obligations without discarding still-active constraints; preserve a supersession link.",
+        "critical_risk": "Old requirement treated as current or still-active requirement silently dropped."
+      },
+      {
+        "family_id": "dependency_api_break",
+        "change_surface": "Dependency version or API contract changes incompatibly while work is in progress.",
+        "gold_impact": "Consumers, contracts, tests and deployment obligations that rely on the changed API.",
+        "negative_control": "An unrelated dependency is upgraded with no path to the affected contract.",
+        "expected_recovery": "Invalidate dependent evidence, refresh impacted contracts and preserve unrelated build/test evidence when exact scope supports reuse.",
+        "critical_risk": "Stale pass reused for a changed interface or unsafe broad invalidation."
+      },
+      {
+        "family_id": "toolchain_upgrade",
+        "change_surface": "Compiler, linker, package manager, build system or test-runner version changes.",
+        "gold_impact": "Checks whose execution semantics or artifacts depend on the changed toolchain.",
+        "negative_control": "Documentation-only version string update with no executable toolchain change.",
+        "expected_recovery": "Pin the new toolchain world, identify affected evidence and rerun only checks whose validity depends on it.",
+        "critical_risk": "Results from an old compiler/test runner represented as current."
+      },
+      {
+        "family_id": "configuration_world_drift",
+        "change_surface": "Feature flags, environment variables, deployment configuration or configuration secrets rotate.",
+        "gold_impact": "Obligations whose semantics or runtime behaviour depend on changed configuration.",
+        "negative_control": "An unused setting changes outside every active dependency path.",
+        "expected_recovery": "Create a new configuration-world identity and invalidate evidence that depends on it.",
+        "critical_risk": "Evidence from a different configuration world reused."
+      },
+      {
+        "family_id": "runtime_external_state",
+        "change_surface": "Runtime state or an external service changes independently of repository source.",
+        "gold_impact": "Runtime, integration and service-level obligations affected by the observed state change.",
+        "negative_control": "An external status update unrelated to the exercised service contract.",
+        "expected_recovery": "Separate source correctness from environment-dependent observations and reacquire live evidence where needed.",
+        "critical_risk": "A historical runtime pass is treated as proof of current external availability."
+      },
+      {
+        "family_id": "session_tool_identity",
+        "change_surface": "Agent session, tool implementation, credentials or execution context is replaced.",
+        "gold_impact": "Evidence whose validity is bound to the prior tool, identity, credentials or session state.",
+        "negative_control": "A display-only session label changes without execution identity change.",
+        "expected_recovery": "Reconcile session state, re-establish authorized identity and distrust receipts bound to invalidated execution context.",
+        "critical_risk": "Tool/session-bound evidence or permissions silently carried into a different context."
+      },
+      {
+        "family_id": "authority_policy_change",
+        "change_surface": "Authority, scope, approval, policy or delegation is revoked or narrowed.",
+        "gold_impact": "Actions and evidence acquisition paths no longer permitted under the active policy.",
+        "negative_control": "An unrelated policy section is edited without changing the relevant authority boundary.",
+        "expected_recovery": "Fail closed, stop newly unauthorized actions and obtain fresh authority evidence; EVSI cannot override the hard gate.",
+        "critical_risk": "Unauthorized irreversible action after a revocation."
+      },
+      {
+        "family_id": "evidence_invalidation_contradiction",
+        "change_surface": "A source observation is retracted, superseded, challenged or contradicted by later evidence.",
+        "gold_impact": "Claims whose source receipt is invalidated or whose confidence/epistemic status must change.",
+        "negative_control": "A duplicate observation agrees with and does not supersede the original source.",
+        "expected_recovery": "Preserve history, mark the assertion stale/disputed, acquire discriminating evidence or abstain.",
+        "critical_risk": "Contradicted or revoked evidence remains represented as current fact."
+      },
+      {
+        "family_id": "test_oracle_revision",
+        "change_surface": "Tests, grading criteria, acceptance oracle or fixture contracts are corrected or expanded.",
+        "gold_impact": "Obligations whose validity depends on the changed test/oracle definition.",
+        "negative_control": "Test formatting/refactoring that preserves executable semantics.",
+        "expected_recovery": "Version the oracle and regrade in a pristine environment; prevent candidate edits from altering grader truth.",
+        "critical_risk": "A self-modified or stale oracle determines a false pass."
+      },
+      {
+        "family_id": "common_cause_environment",
+        "change_surface": "A shared image, base library, network dependency, infrastructure or time service changes several components at once.",
+        "gold_impact": "All obligations shown by independently curated causal/scope adjudication to share the changed environmental dependency.",
+        "negative_control": "A component-local change with no common-cause exposure.",
+        "expected_recovery": "Avoid treating correlated failures as independent; update common-cause cut sets and revalidate affected obligations together.",
+        "critical_risk": "Underestimating correlated failures or falsely attributing them to individual changes."
+      },
+      {
+        "family_id": "cross_repository_contract",
+        "change_surface": "A schema, API, message protocol, data contract or service version changes in a neighbouring repository.",
+        "gold_impact": "Consumer obligations across repository boundaries pinned to the changed contract version.",
+        "negative_control": "An adjacent repository changes an unrelated module without changing the shared contract.",
+        "expected_recovery": "Reconcile cross-repository identities, version the contract and qualify consumers against the exact compatible pair.",
+        "critical_risk": "A locally passing repository is incompatible with the deployed neighbour."
+      }
+    ],
+    "family_position_cells": [
+      {
+        "cell_id": "requirement_addition__early",
+        "family_id": "requirement_addition",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "requirement_addition__middle",
+        "family_id": "requirement_addition",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "requirement_addition__late",
+        "family_id": "requirement_addition",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "requirement_removal_or_deprecation__early",
+        "family_id": "requirement_removal_or_deprecation",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "requirement_removal_or_deprecation__middle",
+        "family_id": "requirement_removal_or_deprecation",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "requirement_removal_or_deprecation__late",
+        "family_id": "requirement_removal_or_deprecation",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "dependency_api_break__early",
+        "family_id": "dependency_api_break",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "dependency_api_break__middle",
+        "family_id": "dependency_api_break",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "dependency_api_break__late",
+        "family_id": "dependency_api_break",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "toolchain_upgrade__early",
+        "family_id": "toolchain_upgrade",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "toolchain_upgrade__middle",
+        "family_id": "toolchain_upgrade",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "toolchain_upgrade__late",
+        "family_id": "toolchain_upgrade",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "configuration_world_drift__early",
+        "family_id": "configuration_world_drift",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "configuration_world_drift__middle",
+        "family_id": "configuration_world_drift",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "configuration_world_drift__late",
+        "family_id": "configuration_world_drift",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "runtime_external_state__early",
+        "family_id": "runtime_external_state",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "runtime_external_state__middle",
+        "family_id": "runtime_external_state",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "runtime_external_state__late",
+        "family_id": "runtime_external_state",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "session_tool_identity__early",
+        "family_id": "session_tool_identity",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "session_tool_identity__middle",
+        "family_id": "session_tool_identity",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "session_tool_identity__late",
+        "family_id": "session_tool_identity",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "authority_policy_change__early",
+        "family_id": "authority_policy_change",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "authority_policy_change__middle",
+        "family_id": "authority_policy_change",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "authority_policy_change__late",
+        "family_id": "authority_policy_change",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "evidence_invalidation_contradiction__early",
+        "family_id": "evidence_invalidation_contradiction",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "evidence_invalidation_contradiction__middle",
+        "family_id": "evidence_invalidation_contradiction",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "evidence_invalidation_contradiction__late",
+        "family_id": "evidence_invalidation_contradiction",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "test_oracle_revision__early",
+        "family_id": "test_oracle_revision",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "test_oracle_revision__middle",
+        "family_id": "test_oracle_revision",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "test_oracle_revision__late",
+        "family_id": "test_oracle_revision",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "common_cause_environment__early",
+        "family_id": "common_cause_environment",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "common_cause_environment__middle",
+        "family_id": "common_cause_environment",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "common_cause_environment__late",
+        "family_id": "common_cause_environment",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "cross_repository_contract__early",
+        "family_id": "cross_repository_contract",
+        "position_id": "early",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "cross_repository_contract__middle",
+        "family_id": "cross_repository_contract",
+        "position_id": "middle",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      },
+      {
+        "cell_id": "cross_repository_contract__late",
+        "family_id": "cross_repository_contract",
+        "position_id": "late",
+        "target_independent_task_seeds": 10,
+        "target_matched_pairs": 10
+      }
+    ],
+    "target_seed_count_per_cell": 10,
+    "target_matched_scenario_pairs": 360,
+    "trajectories_per_matched_pair": 2,
+    "target_trajectories_per_model_per_trial": 720,
+    "independent_trials_target": 3,
+    "model_harness_families_target": 3
+  },
+  "required_controls": [
+    "reference_solution_passes",
+    "empty_or_noop_solution_fails",
+    "gold_impact_labels_hidden_from_candidates",
+    "grader_credentials_external_to_candidate_workspace",
+    "T0_T1_information_cutoffs",
+    "locked_network_except_model_endpoint",
+    "immutable_task_images",
+    "pristine_regrade",
+    "positive_negative_sham_and_common_cause_controls",
+    "receipt_observation_and_availability_cutoffs",
+    "independent_human_adjudication"
+  ],
+  "scorecards": [
+    "terminal_retained_functionality",
+    "terminal_active_requirement_conformance",
+    "time_weighted_requirement_conformance",
+    "critical_time_weighted_conformance",
+    "critical_unverified_obligation_seconds",
+    "maximum_critical_unverified_gap_seconds",
+    "stale_receipt_acceptance",
+    "impact_precision_recall",
+    "paired_shifted_success",
+    "revalidation_cost_at_matched_critical_coverage",
+    "pass_all_repeated_trial_reliability",
+    "compute_tokens_latency_retries_and_reviewer_time"
+  ],
+  "baselines": [
+    "full_rerun",
+    "reset_and_restart",
+    "conversation_only_memory",
+    "static_dependency_traversal",
+    "D2_temporal_replay_only",
+    "D2_plus_D3_EVSI",
+    "full_EGDDM",
+    "expert_maintainer"
+  ],
+  "claim_ceiling": "This is a corpus design proposal. It does not establish that task seeds have been collected, labels independently adjudicated, model trials run, or EGDDM improvements demonstrated."
+}
