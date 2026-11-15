@@ -4098,6 +4098,75 @@ mod tests {
     }
 
     #[test]
+    fn retry_requires_exact_qualified_not_applied_predecessor() {
+        for (outcome, expected) in [
+            (ReconciliationOutcome::NotApplied, SchedulerDisposition::Applied),
+            (ReconciliationOutcome::Applied, SchedulerDisposition::PreconditionViolation),
+            (ReconciliationOutcome::Unknown, SchedulerDisposition::PreconditionViolation),
+        ] {
+            let mut schedule = generate_delivery_schedule(0x2026_1125, 1).expect("base schedule");
+            let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+            let operation_id = "retry-op".to_owned();
+            let predecessor_id = "attempt-1".to_owned();
+            let retry_id = "attempt-2".to_owned();
+            let start_action_id = format!("action-{ordinal:06}");
+            push_action(
+                &mut schedule.actions,
+                &mut ordinal,
+                20_000,
+                ScheduleAction::EffectAttempted {
+                    operation_id: operation_id.clone(),
+                    attempt_id: predecessor_id.clone(),
+                },
+            );
+            if let Some(start) = schedule.actions.iter_mut().find(|item| item.action_id == start_action_id) {
+                start.evidence = Some(ActionEvidence::AttemptStart { retry_of_attempt_id: None });
+            }
+            push_action(
+                &mut schedule.actions,
+                &mut ordinal,
+                20_001,
+                ScheduleAction::AttemptReconciled {
+                    operation_id: operation_id.clone(),
+                    attempt_id: predecessor_id.clone(),
+                    outcome,
+                    receipt_ref: "synthetic://retry-predecessor-terminal".to_owned(),
+                    receipt_sha256: "a".repeat(64),
+                },
+            );
+            if let Some(terminal) = schedule.actions.iter_mut().find(|item| {
+                matches!(&item.action, ScheduleAction::AttemptReconciled { attempt_id, .. } if attempt_id == &predecessor_id)
+            }) {
+                terminal.evidence = Some(ActionEvidence::TerminalReconciliation {
+                    exact_start_action_id: start_action_id.clone(),
+                    qualification: GateState::Pass,
+                });
+            }
+            let retry_action_id = format!("action-{ordinal:06}");
+            push_action(
+                &mut schedule.actions,
+                &mut ordinal,
+                20_002,
+                ScheduleAction::EffectAttempted {
+                    operation_id,
+                    attempt_id: retry_id.clone(),
+                },
+            );
+            if let Some(retry) = schedule.actions.iter_mut().find(|item| item.action_id == retry_action_id) {
+                retry.evidence = Some(ActionEvidence::AttemptStart {
+                    retry_of_attempt_id: Some(predecessor_id.clone()),
+                });
+            }
+            validate_schedule(&schedule).expect("retry schedule is structurally valid");
+            let replay = replay_virtual_schedule(&schedule).expect("retry replay");
+            let retry_record = replay.records.iter().find(|record| {
+                record.action_id == retry_action_id
+            }).expect("retry action record");
+            assert_eq!(retry_record.disposition, expected, "outcome {outcome:?}");
+        }
+    }
+
+    #[test]
     fn action_history_projection_composes_attempt_stop_and_complete_inventory() {
         let (schedule, resolutions, receipts, expected_manifest) = action_history_fixture();
         validate_schedule(&schedule).expect("valid action-history fixture");
