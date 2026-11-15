@@ -10,7 +10,15 @@
     {
       "id": "COWLEY-2026-FLUORINE-PLASMA-REGOLITH",
       "title": "Fluorine plasma processing of lunar regolith simulant for lunar in-situ resource production",
-      "authors": ["Aidan Cowley", "Rajani K. Vijayaraghavan", "Niall McGearalt", "Sean Kelly", "Patrick McNally", "Beth Lomax", "Brian Tanner"],
+      "authors": [
+        "Aidan Cowley",
+        "Rajani K. Vijayaraghavan",
+        "Niall McGearalt",
+        "Sean Kelly",
+        "Patrick McNally",
+        "Beth Lomax",
+        "Brian Tanner"
+      ],
       "venue": "Planetary and Space Science",
       "volume": 282,
       "article": "106337",
@@ -18,8 +26,14 @@
       "doi": "10.1016/j.pss.2026.106337",
       "url": "https://doi.org/10.1016/j.pss.2026.106337",
       "evidence_class": "published_experimental_qualitative_demonstration",
-      "feedstocks": ["EAC-1a mare simulant", "LHS highland simulant"],
-      "process_gases_as_reported": ["SF6", "C4F8"],
+      "feedstocks": [
+        "EAC-1a mare simulant",
+        "LHS highland simulant"
+      ],
+      "process_gases_as_reported": [
+        "SF6",
+        "C4F8"
+      ],
       "reported_observations": [
         "OES reports oxygen-containing and CO-related signatures in the respective source cases",
         "XPS identifies fluorine on processed surfaces",
@@ -38,15 +52,31 @@
     {
       "id": "JAGGERNAUTH-2026-FLUORINATED-PLASMA-IMPACT",
       "title": "Impact of oxygen extraction from lunar regolith simulant using fluorinated plasma processes",
-      "authors": ["Aneeta Jaggernauth", "Sean Kelly", "Brian K. Tanner", "Robert O'Connor", "Aidan Cowley", "Rajani K. Vijayaraghavan"],
+      "authors": [
+        "Aneeta Jaggernauth",
+        "Sean Kelly",
+        "Brian K. Tanner",
+        "Robert O'Connor",
+        "Aidan Cowley",
+        "Rajani K. Vijayaraghavan"
+      ],
       "venue": "Scientific Reports",
       "publication_date": "2026-09-02",
       "doi": "10.1038/s41598-026-67891-2",
       "url": "https://doi.org/10.1038/s41598-026-67891-2",
       "evidence_class": "published_experimental_observation",
-      "feedstocks": ["lunar mare simulant"],
-      "process_gases_as_reported": ["SF6", "C4F8"],
-      "diagnostics": ["EDS", "XRD", "XPS"],
+      "feedstocks": [
+        "lunar mare simulant"
+      ],
+      "process_gases_as_reported": [
+        "SF6",
+        "C4F8"
+      ],
+      "diagnostics": [
+        "EDS",
+        "XRD",
+        "XPS"
+      ],
       "reported_observations": [
         "The article reports measurable O2, CO and CO2 gas extraction observations",
         "SF6 treatment is reported to react predominantly with the anorthosite component in the tested mare simulant",
@@ -90,7 +120,14 @@
     {
       "id": "ROBINOT-2026-SOLAR-VACUUM-PYROLYSIS",
       "title": "Quantification of oxygen production from solar pyrolysis of lunar regolith",
-      "authors": ["Jack Robinot", "Sylvain Rodat", "Stéphane Abanades", "Eric Bêche", "Alexis Paillet", "Aidan Cowley"],
+      "authors": [
+        "Jack Robinot",
+        "Sylvain Rodat",
+        "Stéphane Abanades",
+        "Eric Bêche",
+        "Alexis Paillet",
+        "Aidan Cowley"
+      ],
       "venue": "Advances in Space Research",
       "volume": 77,
       "issue": 6,
@@ -98,7 +135,9 @@
       "doi": "10.1016/j.asr.2026.02.003",
       "url": "https://doi.org/10.1016/j.asr.2026.02.003",
       "evidence_class": "published_experimental_and_modelled_research",
-      "feedstocks": ["EAC-1 lunar simulant"],
+      "feedstocks": [
+        "EAC-1 lunar simulant"
+      ],
       "reported_values": {
         "oxygen_extraction_mass_yield_percent_of_simulant": 1.05,
         "fraction_of_total_simulant_oxygen_mass_recovered_percent": 2.47
@@ -113,6 +152,68 @@
         "complete matched life-cycle equipment and maintenance burden"
       ],
       "claim_ceiling": "source-reported EAC-1 experimental yield and modelling; not matched plasma-system comparison"
+    },
+    {
+      "id": "SUZUKI-2026-VACUUM-MODEL-MINERAL-OXYGEN",
+      "title": "Vacuum-induced oxygen extraction from Fe-bearing model minerals: implications for lunar regolith processing",
+      "authors": [
+        "Masanori Suzuki",
+        "Yuji Sato",
+        "Yoshiaki Morisada",
+        "Yasuhiro Aoki",
+        "Masahiro Tsukamoto",
+        "Soshu Kirihara",
+        "Hidetoshi Fujii"
+      ],
+      "venue": "Scientific Reports",
+      "publication_date": "2026-09-15",
+      "doi": "10.1038/s41598-026-70347-2",
+      "url": "https://doi.org/10.1038/s41598-026-70347-2",
+      "evidence_class": "published_model_mineral_experiment_and_thermodynamic_prediction",
+      "feedstocks": [
+        "hematite model-mineral pellet",
+        "fayalite model-mineral pellet"
+      ],
+      "reported_values": {
+        "hematite_pellet_mass_g": 1,
+        "hematite_test_temperature_c": 1200,
+        "total_pressure_atm": 1e-8,
+        "oxygen_removed_g": 0.03
+      },
+      "reported_observations": [
+        "Ground-based experiments verified oxygen gas emission from iron-bearing model minerals under low pressure",
+        "A 1 g hematite pellet was fully reduced to magnetite and 0.03 g oxygen was removed at 1200 C and 1e-8 atm total pressure",
+        "The paper thermodynamically predicts oxygen release from model lunar regolith composition at 1050–1300 C and 1e-15 atm through SiO2 and FeO reduction"
+      ],
+      "not_established_by_source_summary": [
+        "oxygen yield from a lunar regolith simulant in the physical experiment",
+        "accepted purified O2 product rate or purity",
+        "complete grid-side energy and auxiliary boundary",
+        "process throughput, equipment lifetime or lunar operating performance"
+      ],
+      "claim_ceiling": "model-mineral proof-of-concept plus thermodynamic regolith prediction; not a physical regolith-simulant process benchmark"
+    },
+    {
+      "id": "ACTA-ASTRO-2026-LUNAR-OXYGEN-EXTRACTION-PURIFICATION-REVIEW",
+      "title": "From extraction to purification: A comprehensive review of oxygen production from lunar regolith for ISRU",
+      "venue": "Acta Astronautica",
+      "volume": 248,
+      "pages": "159-184",
+      "publication_date": "2026-11",
+      "doi": "10.1016/j.actaastro.2026.05.063",
+      "url": "https://doi.org/10.1016/j.actaastro.2026.05.063",
+      "evidence_class": "peer_reviewed_review_article",
+      "reported_observations": [
+        "Reviews eight representative oxygen extraction methods including fluorination and molten regolith electrolysis",
+        "Reviews downstream high-purity oxygen approaches including cryogenic distillation, pressure swing adsorption, membranes and electrochemical oxygen pumps",
+        "Frames oxygen production as extraction plus purification and lunar supply integration"
+      ],
+      "not_established_by_source_summary": [
+        "new physical performance data for a specific process",
+        "matched system energy or cost ranking across extraction routes",
+        "qualification of any one purification chain for a specific lunar plant"
+      ],
+      "claim_ceiling": "technology review and process-chain synthesis; not a new experimental performance point"
     }
   ],
   "required_future_fields": [
