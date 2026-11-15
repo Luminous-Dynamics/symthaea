@@ -396,9 +396,9 @@ mod tests {
     }
 
     #[test]
-    fn critical_value_matches_two_sided_five_percent_test() {
+    fn critical_value_matches_one_sided_five_percent_test() {
         let result = known_direction_power(&[0.1], 0.15, 0.05).unwrap();
-        assert!((result.critical_value - 1.959_963_984_54).abs() < 1.0e-7);
+        assert!((result.critical_value - 1.644_853_626_95).abs() < 1.0e-7);
     }
 
     #[test]
