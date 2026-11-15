@@ -1,14 +1,9 @@
 use fusion_decision_compiler_contract::plant_service_gate::{
-    D0FUS_3_2_0_ITER_SCHEMA_REF, D0FUS_3_2_0_ITER_SCHEMA_SHA256,
-    PowerBalanceProfile, PowerBalanceRun, PowerObservable, PowerTermEvidence,
-    evaluate_plant_power_balance,
+    D0FUS_3_2_0_ITER_SCHEMA_REF, D0FUS_3_2_0_ITER_SCHEMA_SHA256, PowerBalanceProfile,
+    PowerBalanceRun, PowerObservable, PowerTermEvidence, evaluate_plant_power_balance,
 };
 
-fn term(
-    observable: PowerObservable,
-    value_mw: f64,
-    tuple_index: usize,
-) -> PowerTermEvidence {
+fn term(observable: PowerObservable, value_mw: f64, tuple_index: usize) -> PowerTermEvidence {
     PowerTermEvidence {
         observable,
         value_mw,
@@ -41,7 +36,8 @@ fn main() {
         solver_id: "D0FUS".to_string(),
         solver_revision: "a682c3511dc189b2a4cdd6f4b8bc545d3cdb8924".to_string(),
         candidate_revision: "D0FUS-ITER-reference-deck-v3.2.0".to_string(),
-        output_sha256: "59d59114ba7ecbcf873ea386c6f27495611b24464d02101acd68f3c79ca305e7".to_string(),
+        output_sha256: "59d59114ba7ecbcf873ea386c6f27495611b24464d02101acd68f3c79ca305e7"
+            .to_string(),
         schema_ref: D0FUS_3_2_0_ITER_SCHEMA_REF.to_string(),
         schema_sha256: D0FUS_3_2_0_ITER_SCHEMA_SHA256.to_string(),
         service_boundary_ref: profile.service_boundary_ref.clone(),
@@ -97,15 +93,14 @@ fn main() {
         "normalized_balance_residual={:.12}",
         report.normalized_balance_residual.unwrap_or(f64::NAN)
     );
-    println!(
-        "claim_ceiling={}",
-        report.claim_ceiling
-    );
+    println!("claim_ceiling={}", report.claim_ceiling);
     println!(
         "SCOPE: actual pinned D0FUS ITER model output replay fixture; negative net export is not plant qualification or physical validation"
     );
 
-    if report.disposition != fusion_decision_compiler_contract::plant_service_gate::PowerBalanceDisposition::NetImport {
+    if report.disposition
+        != fusion_decision_compiler_contract::plant_service_gate::PowerBalanceDisposition::NetImport
+    {
         eprintln!("D0FUS ITER reference must remain NetImport under the declared service boundary");
         std::process::exit(1);
     }
