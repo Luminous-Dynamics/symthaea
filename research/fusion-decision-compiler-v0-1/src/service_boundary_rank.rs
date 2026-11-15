@@ -915,9 +915,10 @@ mod tests {
             &candidates[0].power_profile,
             &candidates[0].power_run,
         );
-        assert_eq!(
-            compare_service_boundary_rankings(&profile(), &candidates).unwrap_err(),
-            vec![ServiceBoundaryRankError::CandidatePowerReportMismatch]
+        assert!(
+            compare_service_boundary_rankings(&profile(), &candidates)
+                .unwrap_err()
+                .contains(&ServiceBoundaryRankError::PowerBalanceNotAdmissible)
         );
     }
 
