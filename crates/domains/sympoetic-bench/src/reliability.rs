@@ -39,7 +39,7 @@ pub fn cohens_kappa_nominal(
             continue;
         };
         jointly_rated += 1;
-        observed_agreements += usize::from(a == b);
+        observed_agreements += (a == b) as usize;
         *a_counts.entry(a).or_default() += 1;
         *b_counts.entry(b).or_default() += 1;
     }
