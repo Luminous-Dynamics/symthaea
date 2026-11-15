@@ -107,7 +107,7 @@ The input freezes:
 
 The simultaneous familywise bound count is C × (S + 1), where C is the number of rejected strata and S the number of frozen scenarios: one union bound for every stratum plus one bound for every scenario/stratum pair. A single Bonferroni allocation is applied across all bounds. Scenario-wise results and the union therefore receive simultaneous coverage at the declared familywise confidence level; they are not separate uncorrected 95% intervals.
 
-Out-of-domain, failed, non-converged, unsupported, inconclusive and missing scenario evaluations remain unresolved. Missing/changed scenarios, frontiers, objectives, primary receipts or sample order are refused or require a new campaign. The report carries the exact scenario, objective, opportunity-rule, universe, accepted-population, frontier, stratum and selection-receipt identities.
+Out-of-domain, failed, non-converged, unsupported, inconclusive and missing scenario evaluations remain unresolved. Missing/changed scenarios, frontiers, objectives, primary receipts or sample order are refused or require a new campaign. The report carries the exact scenario, objective, opportunity-rule, universe, accepted-population, frontier, stratum and selection-receipt identities. It also preserves an ordered run/evidence-reference entry for every accepted and sampled candidate/scenario evaluation, plus the sampling algorithm and confidence-bound method identifiers.
 
 ### Scope limits
 
@@ -117,7 +117,7 @@ Out-of-domain, failed, non-converged, unsupported, inconclusive and missing scen
 - The audit consumes exact declared scenario results; it does not run PROCESS, D0FUS, FUSE.jl or a physical solver.
 - Synthetic examples verify the software contract only.
 
-The module adds 15 authored Rust tests covering nominal/stress opportunities, union classification, missing/reordered scenario bundles, primary outcome/evidence binding, out-of-domain refusal, frontier validity, objective units/order, sample identity, simultaneous alpha allocation and zero-sample conservatism. The scenario runner exercises a synthetic two-scenario family. These are authored contract tests and synthetic outputs, not physical validation.
+The module adds 15 authored Rust tests covering nominal/stress opportunities, union classification, missing/reordered scenario bundles, primary outcome/evidence binding, out-of-domain refusal, frontier validity, objective units/order, sample identity, simultaneous alpha allocation and zero-sample conservatism. The scenario runner exercises a synthetic two-scenario family. Its example intentionally includes a candidate that extends the frontier only under stress and an unresolved out-of-domain result. These are authored contract tests and synthetic outputs, not physical validation.
 
 
 ## Run
