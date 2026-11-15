@@ -102,12 +102,12 @@ pub fn summarize_interventions(records: &[InterventionRecord]) -> Result<Interve
     for (index, record) in records.iter().enumerate() {
         if record.unnecessary && record.appropriate {
             bail!(
-            "intervention record {index}: an unnecessary intervention cannot be adjudicated appropriate"
+            "record {index}: an unnecessary intervention cannot be appropriate"
         );
         }
         if record.critical_missed && !record.critical_opportunity {
             bail!(
-            "intervention record {index}: a missed critical intervention requires a critical opportunity"
+            "record {index}: a missed critical intervention requires an opportunity"
         );
         }
         if record.appropriate {
@@ -125,7 +125,7 @@ pub fn summarize_interventions(records: &[InterventionRecord]) -> Result<Interve
         if let Some(regret) = record.counterfactual_regret {
             if !regret.is_finite() || !(0.0..=1.0).contains(&regret) {
                 bail!(
-                    "intervention record {index}: counterfactual regret must be finite and in [0, 1]"
+                    "record {index}: counterfactual regret must be finite and in [0, 1]"
                 );
             }
             regret_sum += regret;
@@ -248,7 +248,7 @@ pub fn participant_capability_amplification(
         || control_pre.len() < 2
     {
         bail!(
-            "capability amplification requires matched pre/post scores and at least two participants per arm"
+            "capability amplification needs matched scores and two participants per arm"
         );
     }
     if draws < 1_000 {
@@ -604,7 +604,7 @@ pub fn summarize_cognitive_process(
     for (index, observation) in observations.iter().enumerate() {
         if observation.human_verified_ai_step && !observation.ai_supplied_core_step {
             bail!(
-                "cognitive process observation {index}: verification requires an AI-supplied core step"
+                "process observation {index}: verification requires an AI-supplied step"
             );
         }
         planned += observation.human_planned as usize;
