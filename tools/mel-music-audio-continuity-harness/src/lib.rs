@@ -257,6 +257,7 @@ pub enum AudioContinuityErrorV1 {
     NoAudioMutation,
     OffSupportMutation,
     ContinuationAfterBlockedStep,
+    ReportReplayMismatch,
     SerializationFailure,
 }
 
@@ -282,6 +283,7 @@ impl fmt::Display for AudioContinuityErrorV1 {
             Self::NoAudioMutation => "an edit step did not change any PCM sample",
             Self::OffSupportMutation => "one or more PCM samples changed outside declared edit and transition support",
             Self::ContinuationAfterBlockedStep => "a later edit cannot launder a failed or unknown audio gate",
+            Self::ReportReplayMismatch => "supplied audio continuity report differs from deterministic replay",
             Self::SerializationFailure => "canonical evidence serialization failed",
         })
     }
@@ -822,6 +824,21 @@ pub fn evaluate_audio_sequence_v1(
     })
 }
 
+/// Recompute the entire audio-session report from the frozen request,
+/// original PCM and submitted steps. A matching self-hash alone is not enough.
+pub fn verify_audio_sequence_report_v1(
+    request: &AudioSequenceRequestV1,
+    source: &PcmAudioArtifactV1,
+    steps: &[AudioSequenceStepV1],
+    supplied: &AudioSequenceEvaluationV1,
+) -> Result<(), AudioContinuityErrorV1> {
+    let replayed = evaluate_audio_sequence_v1(request, source, steps)?;
+    if &replayed != supplied {
+        return Err(AudioContinuityErrorV1::ReportReplayMismatch);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1040,6 +1057,23 @@ mod tests {
         assert_eq!(
             evaluate_audio_sequence_v1(&frozen, &original, &[changed]),
             Err(AudioContinuityErrorV1::OperationPlanMismatch)
+        );
+    }
+
+    #[test]
+    fn report_verification_replays_request_plan_measurements_and_decision() {
+        let original = source(128, 1);
+        let window = FrameWindowV1 { start_frame: 40, end_frame: 64 };
+        let steps = vec![step(1, &original, edited(&original, window, 200), window)];
+        let frozen_request = request(&original, 1, &steps);
+        let report = evaluate_audio_sequence_v1(&frozen_request, &original, &steps).unwrap();
+        verify_audio_sequence_report_v1(&frozen_request, &original, &steps, &report).unwrap();
+
+        let mut altered = report.clone();
+        altered.steps[0].boundary_policy.maximum_jump_delta_samples = Some(0);
+        assert_eq!(
+            verify_audio_sequence_report_v1(&frozen_request, &original, &steps, &altered),
+            Err(AudioContinuityErrorV1::ReportReplayMismatch)
         );
     }
 
