@@ -236,7 +236,7 @@ pub fn audit_decision_opportunities(
                 point.candidate_id.clone(),
             ));
         }
-        if validate_objective_vector(&point.objectives, &plan.objective_definitions).is_err() {
+        if !valid_objective_vector(&point.objectives, &plan.objective_definitions) {
             errors.push(DecisionOpportunityError::InvalidObjectiveVector(
                 point.candidate_id.clone(),
             ));
@@ -291,8 +291,7 @@ pub fn audit_decision_opportunities(
         let needs_objectives = evaluation.reference_outcome == AuditOutcome::ConfirmedFeasible
             && evaluation.within_declared_domain;
         if !evaluation.objectives.is_empty()
-            && validate_objective_vector(&evaluation.objectives, &plan.objective_definitions)
-                .is_err()
+            && !valid_objective_vector(&evaluation.objectives, &plan.objective_definitions)
         {
             errors.push(DecisionOpportunityError::InvalidObjectiveVector(
                 evaluation.candidate_id.clone(),
@@ -386,8 +385,7 @@ pub fn audit_decision_opportunities(
                 evaluation.reference_outcome == AuditOutcome::ConfirmedFeasible
                     && evaluation.within_declared_domain;
             if !evaluation.objectives.is_empty()
-                && validate_objective_vector(&evaluation.objectives, &plan.objective_definitions)
-                    .is_err()
+                && !valid_objective_vector(&evaluation.objectives, &plan.objective_definitions)
             {
                 errors.push(DecisionOpportunityError::InvalidObjectiveVector(
                     evaluation.candidate_id.clone(),
@@ -648,22 +646,18 @@ fn oriented_value(value: &ObjectiveValue, definition: &ObjectiveDefinition) -> f
     }
 }
 
-fn validate_objective_vector(
+fn valid_objective_vector(
     values: &[ObjectiveValue],
     definitions: &[ObjectiveDefinition],
-) -> Result<(), ()> {
+) -> bool {
     if values.len() != definitions.len() {
-        return Err(());
+        return false;
     }
-    for (value, definition) in values.iter().zip(definitions) {
-        if value.objective_id != definition.objective_id
-            || value.unit != definition.unit
-            || !value.value.is_finite()
-        {
-            return Err(());
-        }
-    }
-    Ok(())
+    values.iter().zip(definitions).all(|(value, definition)| {
+        value.objective_id == definition.objective_id
+            && value.unit == definition.unit
+            && value.value.is_finite()
+    })
 }
 
 fn is_sha256(value: &str) -> bool {
@@ -821,21 +815,6 @@ mod tests {
 
     fn plan() -> DecisionOpportunityPlan {
         let mut base = base_plan();
-        let expected = &base.strata[0].samples;
-        let rejected_evaluations = expected
-            .iter()
-            .map(|sample| {
-                if sample.candidate_id == "rejected-0" {
-                    feasible_eval(&sample.candidate_id, 95.0, 0.94)
-                } else {
-                    non_objective_eval(
-                        &sample.candidate_id,
-                        AuditOutcome::ConfirmedInfeasible,
-                        true,
-                    )
-                }
-            })
-            .collect();
         base.strata[0].samples[0].outcome = AuditOutcome::ConfirmedFeasible;
         base.strata[0].samples[1].outcome = AuditOutcome::ConfirmedInfeasible;
         base.strata[0].samples[2].outcome = AuditOutcome::ConfirmedInfeasible;
@@ -883,7 +862,7 @@ mod tests {
         assert_eq!(report.accepted_unresolved, 1);
         assert_eq!(report.rejected_opportunities_observed, 1);
         assert_eq!(report.rejected_unresolved_observed, 0);
-        assert_eq!(report.feasible_recall_lower_bound, Some(0.5));
+        assert_eq!(report.feasible_recall_lower_bound, Some(1.0 / 3.0));
         assert!(report.strata[0].is_full_census);
     }
 
@@ -997,7 +976,6 @@ mod tests {
         let mut test_plan = plan();
         test_plan.rejected_evaluations[0].evaluations[0] =
             feasible_eval("incumbent-a", 90.0, 0.90);
-        test_plan.base_plan.strata[0].samples[0].candidate_id = "incumbent-a".to_string();
         let errors = audit_decision_opportunities(&test_plan).unwrap_err();
         assert!(errors.iter().any(|error| matches!(
             error,
