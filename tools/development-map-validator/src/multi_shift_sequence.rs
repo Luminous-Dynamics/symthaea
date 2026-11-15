@@ -96,7 +96,6 @@ struct Obligation {
 
 #[derive(Debug, Clone)]
 struct ReceiptAssessment {
-    obligation_id: String,
     outcome: String,
     reasons: Vec<String>,
     context_mismatch_dimensions: Vec<String>,
@@ -288,7 +287,6 @@ fn assess_receipt(
     reasons.dedup();
 
     Ok(ReceiptAssessment {
-        obligation_id,
         outcome,
         reasons,
         context_mismatch_dimensions,
