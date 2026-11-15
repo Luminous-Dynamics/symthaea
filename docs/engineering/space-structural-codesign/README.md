@@ -136,6 +136,25 @@ References an exact receipt and candidate/model generation. It keeps numerical r
 
 These are semantic handoff contracts. They must reuse the existing repositories' canonical IDs, digests, evidence registries, unit and frame systems rather than creating competing ontologies or registries.
 
+### 4.1 Dry-run proposal emitter (initial executable slice)
+
+The `symthaea-engineering` facade exports `space_structural_codesign`, a pure proposal emitter. It does not optimize, solve, execute, contact Symtropy, or authorize a design.
+
+V0.1 can emit only:
+- `ThinRotatingRingV0_1` using the exact Symtropy ring model-profile reference;
+- `UniformRadialSpokeV0_1` using the exact Symtropy spoke model-profile reference.
+
+The emitted proposal binds caller-supplied request, mission, candidate, geometry, material, process-batch (when present), load-case, frame, model-profile and backend references. It pins the reviewed draft Symtropy source commit `540fe6d2fc2fd99daa5277cbc2fe768db722cda9`, declares draft maturity/claim ceiling, and sets solver execution, execution authority, design-release authority and mesh use to false.
+
+The emitter abstains on unsupported profiles/physics/observables, malformed identities, profile/backend substitution, non-synthetic use of the draft profile, generic/unresolved material evidence, and off-Earth batch properties not admitted by a qualified material profile. It never invents artifact digests: the canonical artifact owner must supply them and the Symtropy receiver must independently resolve/check them.
+
+Implementation and wire artefacts:
+- `crates/domains/symthaea-engineering/src/space_structural_codesign.rs`
+- `proposal-v0.1.schema.json`
+- `proposal-example-ring-v0.1.json`
+
+The module has 13 focused unit tests. The synthetic example is a wire-shape fixture, not a habitat design or material recommendation. Compilation and test status must be read from exact PR-head CI; this authoring check does not claim a Rust pass.
+
 ## 5. Initial candidate families
 
 The first synthetic campaign includes:
