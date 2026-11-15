@@ -338,6 +338,43 @@
           },
           "independent_verifier_refs": {
             "minItems": 1
+          },
+          "layout_context": {
+            "required": [
+              "facility_layout_ref",
+              "layout_revision_ref",
+              "coordinate_frame_ref"
+            ]
+          },
+          "equipment": {
+            "items": {
+              "properties": {
+                "operational_status": {
+                  "const": "available"
+                },
+                "calibration_evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          "process_configurations": {
+            "items": {
+              "properties": {
+                "qualification_evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          "operator_requirements": {
+            "items": {
+              "properties": {
+                "qualification_evidence_refs": {
+                  "minItems": 1
+                }
+              }
+            }
           }
         }
       }
