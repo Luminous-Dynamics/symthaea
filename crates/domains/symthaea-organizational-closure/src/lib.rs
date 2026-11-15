@@ -39,12 +39,11 @@ pub use algorithmic_residual::{
 };
 pub use anytime_valid::{
     AnytimeValidCausalClaim, AnytimeValidCausalOracle, AnytimeValidCausalReport,
-    AnytimeValidCausalScenario, AnytimeValidDecision, AnytimeValidDecisionQuality,
-    AnytimeValidEvidenceOracle, AnytimeValidEvidenceReceipt, AnytimeValidFinding,
-    AnytimeValidFindingCode, AnytimeValidPolicy, AnytimeValidQualification,
-    AnytimeValidQueryReport, CausalEffectInterval, RandomizedArm,
-    SequentialCausalObservation, SequentialCausalQuery, AnytimeValidCausalTrace,
-    evaluate_anytime_valid_causal_effects, hoeffding_alpha_spending_radius,
+    AnytimeValidCausalScenario, AnytimeValidCausalTrace, AnytimeValidDecision,
+    AnytimeValidDecisionQuality, AnytimeValidEvidenceOracle, AnytimeValidEvidenceReceipt,
+    AnytimeValidFinding, AnytimeValidFindingCode, AnytimeValidPolicy, AnytimeValidQualification,
+    AnytimeValidQueryReport, CausalEffectInterval, RandomizedArm, SequentialCausalObservation,
+    SequentialCausalQuery, evaluate_anytime_valid_causal_effects, hoeffding_alpha_spending_radius,
 };
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
