@@ -14,9 +14,9 @@
 //! that a relay/witness/clock is independent. Those are separate protocol
 //! gates owned by the SYMPsi custody layer.
 
+use drandite_core::Timeline;
 use drandite_core::any::{AnyVerifier, SchemeId};
 use drandite_core::types::{ChainHash, GenesisSeed, Period, Round, UnixTimestamp};
-use drandite_core::Timeline;
 
 /// Out-of-band Quicknet trust root. Do not populate these values from the same
 /// untrusted relay response whose signature is being verified.
@@ -120,8 +120,7 @@ pub fn verify_quicknet_beacon(
 fn pinned_timeline() -> Timeline {
     Timeline::new(
         UnixTimestamp::from_secs(quicknet::GENESIS_UNIX_SECONDS),
-        Period::from_secs(quicknet::PERIOD_SECONDS)
-            .expect("pinned Quicknet period is nonzero"),
+        Period::from_secs(quicknet::PERIOD_SECONDS).expect("pinned Quicknet period is nonzero"),
     )
 }
 
@@ -150,8 +149,7 @@ mod tests {
 
     #[test]
     fn published_quicknet_round_1000_signature_verifies() {
-        let verified =
-            verify_quicknet_beacon(1000, 1000, &ROUND_1000_SIGNATURE).unwrap();
+        let verified = verify_quicknet_beacon(1000, 1000, &ROUND_1000_SIGNATURE).unwrap();
         assert_eq!(verified.round(), 1000);
         assert_eq!(verified.randomness(), &ROUND_1000_RANDOMNESS);
         assert_eq!(verified.chain_hash(), &quicknet::CHAIN_HASH);
@@ -216,8 +214,7 @@ mod tests {
     fn freshness_and_commitment_chronology_are_not_implied_by_verification() {
         // A historical round still verifies. The verifier intentionally has
         // no clock and makes no claim about when this signature was released.
-        let verified =
-            verify_quicknet_beacon(1000, 1000, &ROUND_1000_SIGNATURE).unwrap();
+        let verified = verify_quicknet_beacon(1000, 1000, &ROUND_1000_SIGNATURE).unwrap();
         assert_eq!(verified.scheduled_unix_seconds(), 1_692_806_364);
     }
 }
