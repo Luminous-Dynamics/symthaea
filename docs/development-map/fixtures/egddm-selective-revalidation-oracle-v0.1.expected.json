@@ -20,8 +20,8 @@
           "over_revalidation_units": 0,
           "under_revalidation_units": 0,
           "selection_set_distance_units": 0,
-          "oracle_lower_bound_savings_fraction": 1,
-          "agent_observed_refresh_fraction": 0,
+          "oracle_lower_bound_savings_fraction": 1.0,
+          "agent_observed_refresh_fraction": 0.0,
           "revalidation_precision": null,
           "revalidation_recall": null
         }
@@ -32,8 +32,8 @@
       "total_over_revalidation_units": 0,
       "total_under_revalidation_units": 0,
       "total_selection_set_distance_units": 0,
-      "oracle_lower_bound_savings_fraction": 1,
-      "agent_observed_refresh_fraction": 0,
+      "oracle_lower_bound_savings_fraction": 1.0,
+      "agent_observed_refresh_fraction": 0.0,
       "aggregate_revalidation_precision": null,
       "aggregate_revalidation_recall": null,
       "claim_ceiling": "Count-based lower bound from supplied evaluator-side impact labels. Assumes one equal-cost revalidation unit per active obligation; does not authenticate gold labels, execute checks, measure heterogeneous real check costs, or prove safe reuse."
@@ -68,7 +68,7 @@
           "selection_set_distance_units": 0,
           "oracle_lower_bound_savings_fraction": 0.33333333333333337,
           "agent_observed_refresh_fraction": 0.6666666666666666,
-          "revalidation_precision": 1,
+          "revalidation_precision": 1.0,
           "revalidation_recall": 1
         }
       ],
@@ -80,8 +80,8 @@
       "total_selection_set_distance_units": 0,
       "oracle_lower_bound_savings_fraction": 0.33333333333333337,
       "agent_observed_refresh_fraction": 0.6666666666666666,
-      "aggregate_revalidation_precision": 1,
-      "aggregate_revalidation_recall": 1,
+      "aggregate_revalidation_precision": 1.0,
+      "aggregate_revalidation_recall": 1.0,
       "claim_ceiling": "Count-based lower bound from supplied evaluator-side impact labels. Assumes one equal-cost revalidation unit per active obligation; does not authenticate gold labels, execute checks, measure heterogeneous real check costs, or prove safe reuse."
     }
   ],
