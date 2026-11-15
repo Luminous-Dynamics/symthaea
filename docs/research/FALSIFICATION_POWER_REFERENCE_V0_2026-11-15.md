@@ -19,9 +19,9 @@ The matched-filter noncentrality is:
 
     lambda = sqrt(sum_i (d_i / sigma)^2)
 
-For a two-sided level-alpha normal test, let c = Phi_inverse(1 - alpha/2). The best-case power against this fixed discrepancy direction is:
+For a one-sided level-alpha normal likelihood-ratio test aligned with the known discrepancy direction, let c = Phi_inverse(1 - alpha). The best-case power against this fixed alternative is:
 
-    power = Phi(-c - lambda) + 1 - Phi(c - lambda)
+    power = 1 - Phi(c - lambda)
 
 The Rust crate implements the normal quantile and CDF without external dependencies. It also computes the minimum replicate count for a constant known residual.
 
@@ -99,3 +99,6 @@ These are qualification targets, not achieved results.
 4. Add estimated-parameter and correlated-noise strata only as separate model families with their own calibration.
 5. Connect to #12205 only through an explicit stochastic-power disposition; retain its current deterministic response-table contract.
 6. Carry a qualified underpowered disposition into Mycelix provenance and ensure Sol-Atlas cannot silently upgrade it to a validated engineering claim.
+
+
+The alpha level is per declared alternative. A campaign-level claim that searches across alternatives must separately control family-wise error or use a qualified joint/sequential test; this reference does not do that.
