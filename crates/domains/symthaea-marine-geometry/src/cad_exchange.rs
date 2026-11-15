@@ -34,8 +34,10 @@ pub enum RepresentationKind {
 #[serde(rename_all = "kebab-case")]
 pub enum StepSchemaEdition {
     Ap214,
-    Ap242_2025_Edition4,
-    Ap242_Edition5CommitteeDraft,
+    #[serde(rename = "ap242-2025-edition-4")]
+    Ap2422025Edition4,
+    #[serde(rename = "ap242-edition-5-committee-draft")]
+    Ap242Edition5CommitteeDraft,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -283,7 +285,7 @@ pub fn verify_translation_receipt(
         );
     }
 
-    if payload.step_schema_edition != StepSchemaEdition::Ap242_2025_Edition4 {
+    if payload.step_schema_edition != StepSchemaEdition::Ap2422025Edition4 {
         add_violation(
             &mut violations,
             "step_schema_edition",
@@ -585,7 +587,7 @@ mod tests {
     #[test]
     fn ap242_edition_five_draft_is_not_treated_as_released_edition_four() {
         let mut item = receipt();
-        item.payload.step_schema_edition = StepSchemaEdition::Ap242_Edition5CommitteeDraft;
+        item.payload.step_schema_edition = StepSchemaEdition::Ap242Edition5CommitteeDraft;
         item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
         let error = verify_translation_receipt(&item).unwrap_err();
         assert!(error.iter().any(|issue| issue.code == "step_schema_edition"));
