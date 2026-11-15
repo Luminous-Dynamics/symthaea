@@ -11,7 +11,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 pub const SOURCE_OBSERVATION_SCHEMA_V1: &str = "mel-music-source-observation-v1";
@@ -237,7 +237,9 @@ pub enum IntentPlanIssueV1 {
     DuplicateOccurrenceId,
     InvalidOccurrence,
     UnknownEventReference,
+    EventOutsideOccurrenceWindow,
     UnknownAnchorReference,
+    OccurrenceOutsideAnchor,
     NonCanonicalReferenceOrder,
     ObservationDigestMismatch,
     SourceBindingMismatch,
@@ -274,7 +276,9 @@ impl fmt::Display for IntentPlanIssueV1 {
             Self::DuplicateOccurrenceId => "occurrence IDs must be unique",
             Self::InvalidOccurrence => "a source occurrence has invalid interval or identity",
             Self::UnknownEventReference => "an occurrence references an event absent from the source",
+            Self::EventOutsideOccurrenceWindow => "a referenced event falls outside its occurrence interval",
             Self::UnknownAnchorReference => "an occurrence references an anchor absent from the source",
+            Self::OccurrenceOutsideAnchor => "an occurrence falls outside a referenced temporal anchor",
             Self::NonCanonicalReferenceOrder => "event and anchor references must be sorted and unique",
             Self::ObservationDigestMismatch => "source observation commitment does not match its contents",
             Self::SourceBindingMismatch => "plan is bound to a different source observation",
@@ -375,6 +379,10 @@ pub fn validate_source_observation_v1(
         previous_event = Some(&event.event_id);
     }
 
+    let event_map: BTreeMap<&str, &SourceEventV1> = observation.events.iter()
+        .map(|event| (event.event_id.as_str(), event))
+        .collect();
+
     if observation.anchors.len() > MAX_SOURCE_ANCHORS_V1 {
         return Err(IntentPlanIssueV1::InvalidAnchor);
     }
@@ -423,13 +431,20 @@ pub fn validate_source_observation_v1(
             return Err(IntentPlanIssueV1::NonCanonicalReferenceOrder);
         }
         for event_id in &occurrence.event_ids {
-            if !event_ids.contains(event_id.as_str()) {
-                return Err(IntentPlanIssueV1::UnknownEventReference);
+            let event = event_map.get(event_id.as_str())
+                .ok_or(IntentPlanIssueV1::UnknownEventReference)?;
+            let event_end = event.onset_ticks.checked_add(event.duration_ticks)
+                .ok_or(IntentPlanIssueV1::InvalidEvent)?;
+            if event.onset_ticks < occurrence.start_tick || event_end > occurrence.end_tick {
+                return Err(IntentPlanIssueV1::EventOutsideOccurrenceWindow);
             }
         }
         for anchor_id in &occurrence.anchor_ids {
-            if !anchor_ids.contains(anchor_id.as_str()) {
-                return Err(IntentPlanIssueV1::UnknownAnchorReference);
+            let anchor = observation.anchors.iter()
+                .find(|anchor| anchor.anchor_id == *anchor_id)
+                .ok_or(IntentPlanIssueV1::UnknownAnchorReference)?;
+            if occurrence.start_tick < anchor.start_tick || occurrence.end_tick > anchor.end_tick {
+                return Err(IntentPlanIssueV1::OccurrenceOutsideAnchor);
             }
         }
         previous_occurrence = Some(&occurrence.occurrence_id);
@@ -1186,6 +1201,22 @@ mod tests {
         let mut altered = plan;
         altered.selected_occurrence_ids = vec!["guitar-entry-1".to_owned()];
         assert_ne!(first, intent_plan_commitment_v1(&altered).unwrap());
+    }
+
+    #[test]
+    fn occurrence_must_contain_every_referenced_event() {
+        let mut observation = source();
+        observation.occurrences[1].start_tick = 4_200;
+        observation = seal_source_observation_v1(observation).unwrap_err();
+        assert_eq!(observation, IntentPlanIssueV1::EventOutsideOccurrenceWindow);
+    }
+
+    #[test]
+    fn occurrence_must_be_contained_by_each_declared_anchor() {
+        let mut observation = source();
+        observation.occurrences[1].anchor_ids = vec!["chorus-1".to_owned()];
+        let result = seal_source_observation_v1(observation);
+        assert_eq!(result, Err(IntentPlanIssueV1::OccurrenceOutsideAnchor));
     }
 
     #[test]
