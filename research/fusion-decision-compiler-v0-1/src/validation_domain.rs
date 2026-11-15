@@ -120,7 +120,10 @@ pub enum ValidationDomainError {
     EmptyIdentity(String),
     InvalidSha256(&'static str),
     DuplicateEpisode(String),
-    DuplicateDomainValue { field: &'static str, value: String },
+    DuplicateDomainValue {
+        field: &'static str,
+        value: String,
+    },
     DuplicateCalibrationRecord(String),
     UnsupportedModelUse,
     ModelRevisionMismatch,
@@ -170,7 +173,11 @@ pub fn validate_validation_domain(
 
     validate_identity(&plan.model_revision, "model_revision", &mut errors);
     validate_identity(&plan.domain.domain_id, "domain_id", &mut errors);
-    validate_identity(&plan.domain.model_revision, "domain.model_revision", &mut errors);
+    validate_identity(
+        &plan.domain.model_revision,
+        "domain.model_revision",
+        &mut errors,
+    );
     validate_identity(&plan.domain.regime_id, "domain.regime_id", &mut errors);
 
     if plan.model_revision != plan.domain.model_revision {
@@ -217,11 +224,7 @@ pub fn validate_validation_domain(
     for record in &plan.calibration {
         validate_identity(&record.record_id, "calibration.record_id", &mut errors);
         validate_identity(&record.dataset_id, "calibration.dataset_id", &mut errors);
-        validate_identity(
-            &record.regime_id,
-            "calibration.regime_id",
-            &mut errors,
-        );
+        validate_identity(&record.regime_id, "calibration.regime_id", &mut errors);
         validate_identity(
             &record.preprocessing_fit_id,
             "preprocessing_fit_id",
@@ -271,12 +274,7 @@ pub fn validate_validation_domain(
         ));
     }
 
-    validate_observation(
-        &plan.test_stand,
-        &plan.domain,
-        "test_stand",
-        &mut errors,
-    );
+    validate_observation(&plan.test_stand, &plan.domain, "test_stand", &mut errors);
     validate_observation(
         &plan.blind_holdout.observation,
         &plan.domain,
@@ -302,10 +300,7 @@ pub fn validate_validation_domain(
     }
     if !plan.blind_holdout.exposure.is_unexposed() {
         for (exposed, field) in [
-            (
-                plan.blind_holdout.exposure.used_for_training,
-                "training",
-            ),
+            (plan.blind_holdout.exposure.used_for_training, "training"),
             (
                 plan.blind_holdout.exposure.used_for_normalization_fit,
                 "normalization_fit",
@@ -315,11 +310,15 @@ pub fn validate_validation_domain(
                 "feature_selection",
             ),
             (
-                plan.blind_holdout.exposure.used_for_hyperparameter_selection,
+                plan.blind_holdout
+                    .exposure
+                    .used_for_hyperparameter_selection,
                 "hyperparameter_selection",
             ),
             (
-                plan.blind_holdout.exposure.used_for_model_or_policy_selection,
+                plan.blind_holdout
+                    .exposure
+                    .used_for_model_or_policy_selection,
                 "model_or_policy_selection",
             ),
             (
@@ -489,11 +488,7 @@ fn validate_observation(
             "measurement_uncertainty_ref",
         ),
     ] {
-        validate_identity(
-            value,
-            &format!("{role}.{field}"),
-            errors,
-        );
+        validate_identity(value, &format!("{role}.{field}"), errors);
     }
 
     validate_digest(
@@ -522,7 +517,10 @@ fn validate_observation(
             dimension: "geometry",
         });
     }
-    if !domain.allowed_facility_ids.contains(&observation.facility_id) {
+    if !domain
+        .allowed_facility_ids
+        .contains(&observation.facility_id)
+    {
         errors.push(ValidationDomainError::OutOfDomain {
             record_id: observation.record_id.clone(),
             dimension: "facility",
@@ -590,21 +588,13 @@ fn validate_episode_ids(
     }
 }
 
-fn validate_identity(
-    value: &str,
-    field: &str,
-    errors: &mut Vec<ValidationDomainError>,
-) {
+fn validate_identity(value: &str, field: &str, errors: &mut Vec<ValidationDomainError>) {
     if value.trim().is_empty() {
         errors.push(ValidationDomainError::EmptyIdentity(field.to_string()));
     }
 }
 
-fn validate_digest(
-    value: &str,
-    field: &'static str,
-    errors: &mut Vec<ValidationDomainError>,
-) {
+fn validate_digest(value: &str, field: &'static str, errors: &mut Vec<ValidationDomainError>) {
     if !super::is_sha256(value) {
         errors.push(ValidationDomainError::InvalidSha256(field));
     }
@@ -665,10 +655,7 @@ mod tests {
                 domain_id: "tokamak-model-domain-v1".into(),
                 model_revision: "model-r4".into(),
                 regime_id: "tokamak-regime".into(),
-                supported_uses: vec![
-                    ModelUse::SingleStepPrediction,
-                    ModelUse::OpenLoopRollout,
-                ],
+                supported_uses: vec![ModelUse::SingleStepPrediction, ModelUse::OpenLoopRollout],
                 allowed_geometry_sha256: vec![digest('b')],
                 allowed_facility_ids: vec!["facility-a".into(), "facility-b".into()],
                 allowed_case_ids: vec!["case-a".into(), "case-b".into()],
@@ -707,10 +694,7 @@ mod tests {
         }
     }
 
-    fn has_error(
-        errors: &[ValidationDomainError],
-        expected: ValidationDomainError,
-    ) -> bool {
+    fn has_error(errors: &[ValidationDomainError], expected: ValidationDomainError) -> bool {
         errors.contains(&expected)
     }
 
@@ -774,10 +758,11 @@ mod tests {
         let mut source = plan();
         source.blind_holdout.observation.dataset_id = "calibration-dataset".into();
         let errors = validate_validation_domain(&source).unwrap_err();
-        assert!(errors.iter().any(|error| matches!(
-            error,
-            ValidationDomainError::ReusedDatasetIdentity { .. }
-        )));
+        assert!(
+            errors
+                .iter()
+                .any(|error| matches!(error, ValidationDomainError::ReusedDatasetIdentity { .. }))
+        );
     }
 
     #[test]
@@ -786,16 +771,20 @@ mod tests {
         source.blind_holdout.observation.source_artifact_sha256 =
             source.calibration[0].source_artifact_sha256.clone();
         let errors = validate_validation_domain(&source).unwrap_err();
-        assert!(errors.iter().any(|error| matches!(
-            error,
-            ValidationDomainError::ReusedArtifactIdentity { .. }
-        )));
+        assert!(
+            errors
+                .iter()
+                .any(|error| matches!(error, ValidationDomainError::ReusedArtifactIdentity { .. }))
+        );
     }
 
     #[test]
     fn holdout_exposed_to_model_selection_is_rejected() {
         let mut source = plan();
-        source.blind_holdout.exposure.used_for_model_or_policy_selection = true;
+        source
+            .blind_holdout
+            .exposure
+            .used_for_model_or_policy_selection = true;
         let errors = validate_validation_domain(&source).unwrap_err();
         assert!(has_error(
             &errors,
@@ -820,11 +809,17 @@ mod tests {
     #[test]
     fn missing_measurement_uncertainty_is_rejected_as_incomplete_provenance() {
         let mut source = plan();
-        source.blind_holdout.observation.measurement_uncertainty_ref.clear();
+        source
+            .blind_holdout
+            .observation
+            .measurement_uncertainty_ref
+            .clear();
         let errors = validate_validation_domain(&source).unwrap_err();
         assert!(has_error(
             &errors,
-            ValidationDomainError::EmptyIdentity("blind_holdout.measurement_uncertainty_ref".into())
+            ValidationDomainError::EmptyIdentity(
+                "blind_holdout.measurement_uncertainty_ref".into()
+            )
         ));
     }
 
@@ -867,8 +862,7 @@ mod tests {
     #[test]
     fn reused_episode_between_test_stand_and_holdout_is_rejected() {
         let mut source = plan();
-        source.blind_holdout.observation.episode_ids =
-            source.test_stand.episode_ids.clone();
+        source.blind_holdout.observation.episode_ids = source.test_stand.episode_ids.clone();
         let errors = validate_validation_domain(&source).unwrap_err();
         assert!(errors.iter().any(|error| matches!(
             error,
@@ -897,7 +891,11 @@ mod tests {
                 continue;
             }
             let fields: Vec<&str> = line.split('|').collect();
-            assert_eq!(fields.len(), 3, "malformed validation-domain fixture: {line}");
+            assert_eq!(
+                fields.len(),
+                3,
+                "malformed validation-domain fixture: {line}"
+            );
             let [case_id, expected, mutation] = [fields[0], fields[1], fields[2]];
             let mut source = plan();
 
@@ -928,13 +926,20 @@ mod tests {
                     source.blind_holdout.exposure.used_for_training = true;
                 }
                 "holdout_selection_leak" => {
-                    source.blind_holdout.exposure.used_for_model_or_policy_selection = true;
+                    source
+                        .blind_holdout
+                        .exposure
+                        .used_for_model_or_policy_selection = true;
                 }
                 "synthetic_test_stand" => {
                     source.test_stand.evidence_class = EvidenceClass::ModelOutput;
                 }
                 "missing_uncertainty" => {
-                    source.blind_holdout.observation.measurement_uncertainty_ref.clear();
+                    source
+                        .blind_holdout
+                        .observation
+                        .measurement_uncertainty_ref
+                        .clear();
                 }
                 "geometry_outside_domain" => {
                     source.blind_holdout.observation.geometry_sha256 = digest('e');
@@ -960,11 +965,16 @@ mod tests {
             } else {
                 "REJECT"
             };
-            assert_eq!(actual, expected, "validation-domain case {case_id}/{mutation}");
+            assert_eq!(
+                actual, expected,
+                "validation-domain case {case_id}/{mutation}"
+            );
             checked += 1;
         }
 
-        assert_eq!(checked, 16, "all frozen validation-domain cases must execute");
+        assert_eq!(
+            checked, 16,
+            "all frozen validation-domain cases must execute"
+        );
     }
-
 }
