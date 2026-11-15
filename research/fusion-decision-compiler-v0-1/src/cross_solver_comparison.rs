@@ -489,10 +489,7 @@ fn compare_pair_identity(
         push_once(diagnostics, ComparisonDiagnostic::DifferentGeometry);
     }
     if first.service_boundary_ref != second.service_boundary_ref {
-        push_once(
-            diagnostics,
-            ComparisonDiagnostic::DifferentServiceBoundary,
-        );
+        push_once(diagnostics, ComparisonDiagnostic::DifferentServiceBoundary);
     }
     if first.observable_id != second.observable_id {
         push_once(diagnostics, ComparisonDiagnostic::DifferentObservable);
@@ -510,10 +507,7 @@ fn compare_pair_identity(
         push_once(diagnostics, ComparisonDiagnostic::DifferentFrame);
     }
     if first.sign_convention_ref != second.sign_convention_ref {
-        push_once(
-            diagnostics,
-            ComparisonDiagnostic::DifferentSignConvention,
-        );
+        push_once(diagnostics, ComparisonDiagnostic::DifferentSignConvention);
     }
     if first.time_basis_ref != second.time_basis_ref {
         push_once(diagnostics, ComparisonDiagnostic::DifferentTimeBasis);
