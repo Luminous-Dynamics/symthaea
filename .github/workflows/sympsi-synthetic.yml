@@ -36,6 +36,9 @@ jobs:
       - name: Unit tests
         run: cargo test --manifest-path tools/sympsi-synthetic-harness/Cargo.toml
 
+      - name: Independent Python target-mapping reference
+        run: python3 tools/sympsi-synthetic-harness/tests/target_mapping_reference.py
+
       - name: Clippy
         run: cargo clippy --manifest-path tools/sympsi-synthetic-harness/Cargo.toml --all-targets -- -D warnings
 
