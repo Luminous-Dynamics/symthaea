@@ -38,6 +38,7 @@ pub struct VirtualSchedule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ActionEvidence {
     AttemptStart {
         retry_of_attempt_id: Option<String>,
@@ -83,9 +84,9 @@ pub struct ScheduledAction {
     pub action_id: String,
     pub at_ns: u64,
     pub ordinal: u64,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub owner_time_ref: Option<ActionClockTimeReference>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub evidence: Option<ActionEvidence>,
     pub action: ScheduleAction,
 }
