@@ -297,6 +297,215 @@
                 "intervention_action"
               ]
             }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "confidence_assessment"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "required": [
+                "confidence"
+              ],
+              "properties": {
+                "actor": {
+                  "enum": [
+                    "human",
+                    "agent"
+                  ]
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "claim_verification"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "enum": [
+                    "human",
+                    "agent",
+                    "evaluator"
+                  ]
+                },
+                "parent_event_ids": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "source_attribution"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "attribution": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "belief_revision"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "enum": [
+                    "human",
+                    "agent"
+                  ]
+                },
+                "parent_event_ids": {
+                  "minItems": 1
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "contradiction_resolution"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "parent_event_ids": {
+                  "minItems": 2
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "human_planning"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "const": "human"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "human_monitoring"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "const": "human"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "human_reflection"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "const": "human"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "independent_reasoning_attempt"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "const": "human"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "ai_core_step_supplied"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "actor": {
+                  "const": "agent"
+                }
+              }
+            }
           }
         ]
       }
