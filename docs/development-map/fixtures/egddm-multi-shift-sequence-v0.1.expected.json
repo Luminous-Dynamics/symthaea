@@ -49,7 +49,9 @@
           "required_revalidation_units": 3,
           "fresh_revalidation_units": 3,
           "over_revalidation_units": 0,
-          "under_revalidation_units": 0
+          "under_revalidation_units": 0,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
         },
         {
           "epoch": 2,
@@ -95,7 +97,9 @@
           "required_revalidation_units": 3,
           "fresh_revalidation_units": 3,
           "over_revalidation_units": 0,
-          "under_revalidation_units": 0
+          "under_revalidation_units": 0,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
         },
         {
           "epoch": 3,
@@ -144,7 +148,9 @@
           "required_revalidation_units": 4,
           "fresh_revalidation_units": 4,
           "over_revalidation_units": 0,
-          "under_revalidation_units": 0
+          "under_revalidation_units": 0,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
         }
       ],
       "total_required_revalidation_units": 10,
@@ -157,7 +163,9 @@
       "total_future_evidence_leakages": 0,
       "total_unsupported_current_claims": 0,
       "total_direct_dependency_only_impact_labels": 0,
-      "total_gold_only_impact_labels": 0
+      "total_gold_only_impact_labels": 0,
+      "total_unclaimed_active_obligations": 0,
+      "total_critical_unclaimed_obligations": 0
     },
     {
       "trace_id": "false-resurrection-sequence",
@@ -206,7 +214,9 @@
           "required_revalidation_units": 3,
           "fresh_revalidation_units": 3,
           "over_revalidation_units": 0,
-          "under_revalidation_units": 0
+          "under_revalidation_units": 0,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
         },
         {
           "epoch": 2,
@@ -252,7 +262,9 @@
           "required_revalidation_units": 3,
           "fresh_revalidation_units": 3,
           "over_revalidation_units": 0,
-          "under_revalidation_units": 0
+          "under_revalidation_units": 0,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
         },
         {
           "epoch": 3,
@@ -318,7 +330,9 @@
           "required_revalidation_units": 4,
           "fresh_revalidation_units": 3,
           "over_revalidation_units": 0,
-          "under_revalidation_units": 1
+          "under_revalidation_units": 1,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
         }
       ],
       "total_required_revalidation_units": 10,
@@ -331,7 +345,9 @@
       "total_future_evidence_leakages": 0,
       "total_unsupported_current_claims": 1,
       "total_direct_dependency_only_impact_labels": 0,
-      "total_gold_only_impact_labels": 0
+      "total_gold_only_impact_labels": 0,
+      "total_unclaimed_active_obligations": 0,
+      "total_critical_unclaimed_obligations": 0
     }
   ],
   "restoration_control": {
