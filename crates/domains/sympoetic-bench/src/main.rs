@@ -55,6 +55,7 @@ struct ScorecardReceipt<'a> {
     run_id: &'a str,
     scenario_id: &'a str,
     hard_gates_pass: bool,
+    metric_evidence_count: usize,
 }
 
 fn main() -> Result<()> {
@@ -95,6 +96,7 @@ fn main() -> Result<()> {
                 run_id: &scorecard.run_id,
                 scenario_id: &scorecard.scenario_id,
                 hard_gates_pass: scorecard.hard_gates.pass,
+                metric_evidence_count: scorecard.metric_evidence.len(),
             };
             println!("{}", serde_json::to_string_pretty(&receipt)?);
         }
