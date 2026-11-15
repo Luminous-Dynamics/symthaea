@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-tlsn-risc0-probe-methods"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+build = "build.rs"
+
+[dependencies]
+symthaea-tlsn-risc0-probe-core = { path = "../shared" }
+
+[build-dependencies]
+risc0-build = "=3.0.6"
+
+[package.metadata.risc0]
+methods = ["guest"]
