@@ -103,6 +103,7 @@ pub struct ObservableDependenceAssessment {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DependencyValidationError {
     EmptyRunId,
+    DuplicateRunIdentity(String),
     EmptyOutputObservable,
     DuplicateOutputObservable(String),
     EmptyCompleteObservable,
@@ -137,6 +138,13 @@ pub fn compare_observable_dependencies(
 ) -> Result<Vec<ObservableDependenceAssessment>, Vec<DependencyValidationError>> {
     let mut errors = validate_manifest(first);
     errors.extend(validate_manifest(second));
+
+    if first.run_id == second.run_id {
+        errors.push(DependencyValidationError::DuplicateRunIdentity(
+            first.run_id.clone(),
+        ));
+    }
+    errors.extend(validate_cross_manifest_kinds(first, second));
 
     if requested_observables.is_empty() {
         errors.push(DependencyValidationError::EmptyRequestedObservables);
@@ -320,6 +328,42 @@ fn validate_manifest(
     errors
 }
 
+fn validate_cross_manifest_kinds(
+    first: &RunDependencyManifest,
+    second: &RunDependencyManifest,
+) -> Vec<DependencyValidationError> {
+    let mut errors = Vec::new();
+    for left in &first.dependencies {
+        for right in &second.dependencies {
+            if left.observable_id != right.observable_id {
+                continue;
+            }
+            let same_node = left.dependency.node_id == right.dependency.node_id;
+            let same_payload = left.dependency.content_sha256.is_some()
+                && right.dependency.content_sha256.is_some()
+                && left
+                    .dependency
+                    .content_sha256
+                    .as_deref()
+                    .zip(right.dependency.content_sha256.as_deref())
+                    .is_some_and(|(a, b)| a.eq_ignore_ascii_case(b));
+            if (same_node || same_payload) && left.dependency.kind != right.dependency.kind {
+                errors.push(DependencyValidationError::ConflictingDependencyKind(
+                    if same_node {
+                        left.dependency.node_id.clone()
+                    } else {
+                        format!(
+                            "payload:{}",
+                            left.dependency.content_sha256.as_deref().unwrap_or_default()
+                        )
+                    },
+                ));
+            }
+        }
+    }
+    errors
+}
+
 fn dependencies_for<'a>(
     manifest: &'a RunDependencyManifest,
     observable_id: &str,
@@ -345,7 +389,12 @@ fn find_shared_dependencies(
             let match_basis = if left_ref.node_id == right_ref.node_id {
                 Some(DependencyMatchBasis::SameNodeLineage)
             } else if left_ref.content_sha256.is_some()
-                && left_ref.content_sha256 == right_ref.content_sha256
+                && right_ref.content_sha256.is_some()
+                && left_ref
+                    .content_sha256
+                    .as_deref()
+                    .zip(right_ref.content_sha256.as_deref())
+                    .is_some_and(|(a, b)| a.eq_ignore_ascii_case(b))
             {
                 Some(DependencyMatchBasis::SameContentDigest)
             } else {
@@ -675,7 +724,7 @@ mod tests {
 
     #[test]
     fn duplicate_bindings_and_malformed_digests_are_rejected() {
-        let mut item = binding(
+        let item = binding(
             "psi",
             dependency(
                 "dataset-a",
@@ -702,7 +751,6 @@ mod tests {
             error,
             DependencyValidationError::DuplicateDependencyBinding { .. }
         )));
-        item.dependency.content_sha256 = None;
     }
 
     #[test]
