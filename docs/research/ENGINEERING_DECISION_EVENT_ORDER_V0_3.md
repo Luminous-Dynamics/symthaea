@@ -11,7 +11,7 @@ The remaining gap is test realism. A collection of static traces is useful but c
 ## Implemented in this increment
 
 - Versioned schedule contract: schema version, generator version, seed, scenario family and typed action list.
-- Independent virtual time per source clock domain, including basis descriptor, epoch, scale, unit, offset, uncertainty, calibration validity, receipt reference and qualification state.
+- Independent virtual time per source clock series, including clock domain, basis descriptor, epoch, scale, unit, offset, uncertainty, calibration validity, receipt reference and qualification state. Each produced event binds back to that exact source clock series.
 - Event production with explicit causal predecessor edges.
 - Deterministic network delivery, duplicate/drop controls, partition and reconnect.
 - Observation and durability steps; cancellation request/acknowledgement; stop trigger, policy revision and discharge; effect attempt, commit and terminal reconciliation; process crash/restart; event supersession.
@@ -21,7 +21,7 @@ The remaining gap is test realism. A collection of static traces is useful but c
 - Delta-debugging shrinker that only accepts a candidate when structural validation still passes and the supplied counterexample predicate still reproduces.
 - Unit tests and Proptest properties authored for determinism and permutation invariance.
 
-The scheduler is not the v0.2 safety oracle. It emits reproducible schedule observations and precondition outcomes. Clock regressions, failed/unresolved clock qualifications, and semantic unsafe orderings are retained as replay inputs; malformed identity, causal references, or receipt-digest shapes are rejected. The next adapter must translate those into v0.2 owner-qualified inputs and run the matched evaluator ladder. A schedule may intentionally contain unsafe orderings; the scheduler must preserve them rather than silently "repair" them. A local clock regression is an observation about that source clock, not a cross-domain ordering claim.
+The scheduler is not the v0.2 safety oracle. It emits reproducible schedule observations and precondition outcomes. Clock regressions and event-time regressions are diagnosed within an exact source clock series; a new epoch starts a new series. Failed/unresolved clock qualifications and semantic unsafe orderings are retained as replay inputs; malformed identity, causal references, or receipt-digest shapes are rejected. The next adapter must translate those into v0.2 owner-qualified inputs and run the matched evaluator ladder. A schedule may intentionally contain unsafe orderings; the scheduler must preserve them rather than silently "repair" them. A local clock regression is an observation about that source clock, not a cross-domain ordering claim.
 
 ## Paradigm shifts
 
