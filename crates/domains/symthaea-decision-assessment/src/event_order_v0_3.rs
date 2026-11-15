@@ -1216,6 +1216,117 @@ pub fn generate_delivery_schedule(
     Ok(schedule)
 }
 
+/// Generate one event with independent source, observer and durable-store
+/// clock series. Simulator action time is only the replay scheduler; the
+/// observed and persisted timestamps are carried from their own clock domains.
+pub fn generate_clocked_observation_persistence_schedule(
+    seed: u64,
+) -> Result<VirtualSchedule, ReplayError> {
+    let mut schedule = generate_delivery_schedule(seed, 4)?;
+    let mut ordinal = schedule.actions.iter().map(|action| action.ordinal).max().unwrap_or(0) + 1;
+    let start_at = schedule.actions.iter().map(|action| action.at_ns).max().unwrap_or(0) + 1;
+    let event_id = "event-000000".to_owned();
+    let observer_id = "worker-after-reconnect".to_owned();
+    let store_id = "durable-store-0".to_owned();
+    let observed_at_ns = 1_000 + (seed % 1_000);
+    let persisted_at_ns = observed_at_ns + 200;
+
+    let observer_clock_domain = format!("observer-clock-{seed:016x}");
+    let observer_basis_id = format!("observer-basis-{seed:016x}");
+    let observer_mapping_action_id = format!("action-{ordinal:06}");
+    push_action(
+        &mut schedule.actions,
+        &mut ordinal,
+        start_at,
+        ScheduleAction::ClockAdvance {
+            clock_domain: observer_clock_domain.clone(),
+            basis_id: observer_basis_id.clone(),
+            epoch: "observer-epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            local_tick_ns: 100_000,
+            offset_ns: 0,
+            uncertainty_ns: 25,
+            calibration_id: format!("observer-cal-{seed:016x}"),
+            mapping_valid_from_ns: 0,
+            mapping_valid_through_ns: 100_000,
+            mapping_receipt_ref: format!("synthetic://observer-clock/{seed:016x}"),
+            mapping_receipt_sha256: "a".repeat(64),
+            qualification: GateState::Pass,
+        },
+    );
+
+    let store_clock_domain = format!("store-clock-{seed:016x}");
+    let store_basis_id = format!("store-basis-{seed:016x}");
+    let store_mapping_action_id = format!("action-{ordinal:06}");
+    push_action(
+        &mut schedule.actions,
+        &mut ordinal,
+        start_at + 1,
+        ScheduleAction::ClockAdvance {
+            clock_domain: store_clock_domain.clone(),
+            basis_id: store_basis_id.clone(),
+            epoch: "store-epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            local_tick_ns: 100_000,
+            offset_ns: 0,
+            uncertainty_ns: 10,
+            calibration_id: format!("store-cal-{seed:016x}"),
+            mapping_valid_from_ns: 0,
+            mapping_valid_through_ns: 100_000,
+            mapping_receipt_ref: format!("synthetic://store-clock/{seed:016x}"),
+            mapping_receipt_sha256: "b".repeat(64),
+            qualification: GateState::Pass,
+        },
+    );
+
+    push_action(
+        &mut schedule.actions,
+        &mut ordinal,
+        start_at + 2,
+        ScheduleAction::EventObserved {
+            event_id: event_id.clone(),
+            observer_id: observer_id.clone(),
+            clock_domain: observer_clock_domain,
+            basis_id: observer_basis_id,
+            epoch: "observer-epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            clock_mapping_action_id: observer_mapping_action_id,
+            observed_at_ns,
+            observation_receipt_ref: format!("synthetic://observation/{seed:016x}"),
+            observation_receipt_sha256: "c".repeat(64),
+            qualification: GateState::Pass,
+        },
+    );
+    push_action(
+        &mut schedule.actions,
+        &mut ordinal,
+        start_at + 3,
+        ScheduleAction::EventPersisted {
+            event_id,
+            observer_id,
+            store_id,
+            clock_domain: store_clock_domain,
+            basis_id: store_basis_id,
+            epoch: "store-epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            clock_mapping_action_id: store_mapping_action_id,
+            persisted_at_ns,
+            persistence_receipt_ref: format!("synthetic://durable-persistence/{seed:016x}"),
+            persistence_receipt_sha256: "d".repeat(64),
+            qualification: GateState::Pass,
+        },
+    );
+
+    schedule.generator_version = "symthaea.event-order-generator.v0.3.2".to_owned();
+    schedule.scenario_family = "independent_observer_and_store_clock_evidence".to_owned();
+    validate_schedule(&schedule)?;
+    Ok(schedule)
+}
+
 /// Generate a deterministic stop/cancellation/effect-commit race. The
 /// attempt starts before the stop trigger; both schedules then contain a
 /// cancellation request, the selected acknowledgement/commit order, an
@@ -1823,6 +1934,40 @@ mod tests {
             SchedulerDisposition::Duplicate,
             SchedulerDisposition::ConflictingReconciliation,
         ]);
+    }
+
+    #[test]
+    fn observer_and_store_timestamps_use_independent_qualified_clock_series() {
+        let schedule = generate_clocked_observation_persistence_schedule(0x2026_1115)
+            .expect("clocked bitemporal schedule");
+        validate_schedule(&schedule).expect("valid schedule");
+        let report = replay_virtual_schedule(&schedule).expect("replay");
+        let observed = report.records.iter().find(|record| {
+            matches!(record.action, ScheduleAction::EventObserved { .. })
+        }).expect("observation record");
+        let persisted = report.records.iter().find(|record| {
+            matches!(record.action, ScheduleAction::EventPersisted { .. })
+        }).expect("persistence record");
+        assert_eq!(observed.disposition, SchedulerDisposition::Applied);
+        assert_eq!(persisted.disposition, SchedulerDisposition::Applied);
+        let (observed_domain, observed_at) = match &observed.action {
+            ScheduleAction::EventObserved { clock_domain, observed_at_ns, .. } => {
+                (clock_domain, *observed_at_ns)
+            }
+            _ => unreachable!("filtered observation record"),
+        };
+        let (store_domain, persisted_at) = match &persisted.action {
+            ScheduleAction::EventPersisted { clock_domain, persisted_at_ns, .. } => {
+                (clock_domain, *persisted_at_ns)
+            }
+            _ => unreachable!("filtered persistence record"),
+        };
+        assert_ne!(observed_domain, store_domain);
+        assert_ne!(observed.at_ns, observed_at);
+        assert_ne!(persisted.at_ns, persisted_at);
+        assert!(persisted_at > observed_at);
+        assert_eq!(report.observed_count, 1);
+        assert_eq!(report.persisted_count, 1);
     }
 
     #[test]
