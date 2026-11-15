@@ -72,6 +72,7 @@ const baseScope = { kind: "logical", ids: ["op-a"] };
 const widenedScope = { kind: "logical", ids: ["op-a", "op-b"] };
 let cases = 0;
 let historicalDischargeFalseRejects = 0;
+let validHistoricalDischarges = 0;
 let staleDischargeFalseAccepts = 0;
 let finalPolicyFalseSafes = 0;
 let scopeNarrowingFalseAccepts = 0;
@@ -132,8 +133,14 @@ for (let i = 0; i < 100_000; i += 1) {
   let expectedFinal = null;
   for (const action of ordered) {
     if (action.kind === "revision") {
-      if (scopeCovers(action.scope, baseScope)) expectedCurrent = action;
-      else scopeNarrowingFalseAccepts += 0;
+      if (scopeCovers(action.scope, baseScope)) {
+        expectedCurrent = action;
+      } else {
+        const seenRevision = actual.historicalDischarges.find(item => item.actionId === action.actionId);
+        if (seenRevision?.accepted || actual.currentPolicyActionId === action.actionId) {
+          scopeNarrowingFalseAccepts += 1;
+        }
+      }
     } else if (action.kind === "discharge") {
       const valid = action.triggerActionId === "trigger"
         && action.policyActionId === expectedCurrent.actionId
@@ -144,6 +151,7 @@ for (let i = 0; i < 100_000; i += 1) {
         && action.attestationBeforeDischarge
         && action.policyBeforeDischarge;
       const seen = actual.historicalDischarges.find(item => item.actionId === action.actionId);
+      if (valid) validHistoricalDischarges += 1;
       if (valid && !seen?.accepted) historicalDischargeFalseRejects += 1;
       if (!valid && seen?.accepted) staleDischargeFalseAccepts += 1;
       if (valid) expectedFinal = { actionId: action.actionId, policyActionId: expectedCurrent.actionId };
@@ -161,6 +169,7 @@ for (let i = 0; i < 100_000; i += 1) {
   cases += 1;
 }
 
+assert.ok(validHistoricalDischarges > 0);
 assert.equal(historicalDischargeFalseRejects, 0);
 assert.equal(staleDischargeFalseAccepts, 0);
 assert.equal(finalPolicyFalseSafes, 0);
@@ -172,6 +181,7 @@ console.log(JSON.stringify({
   runtime: "Node.js",
   seed: "0x4c554d49",
   policy_history_cases: cases,
+  valid_historical_discharges: validHistoricalDischarges,
   historical_discharge_false_rejects: historicalDischargeFalseRejects,
   stale_or_substituted_discharge_false_accepts: staleDischargeFalseAccepts,
   final_policy_false_safes: finalPolicyFalseSafes,
