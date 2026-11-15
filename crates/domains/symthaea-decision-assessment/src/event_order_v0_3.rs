@@ -19,7 +19,7 @@ use crate::event_order_v0_2::{
 };
 
 pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3";
-pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.1";
+pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.2";
 pub const MAX_GENERATED_EVENTS: usize = 4_096;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1324,7 +1324,7 @@ pub fn generate_clocked_observation_persistence_schedule(
         },
     );
 
-    schedule.generator_version = "symthaea.event-order-generator.v0.3.2".to_owned();
+    schedule.generator_version = GENERATOR_VERSION.to_owned();
     schedule.scenario_family = "independent_observer_and_store_clock_evidence".to_owned();
     validate_schedule(&schedule)?;
     Ok(schedule)
@@ -1468,6 +1468,19 @@ pub fn project_bitemporal_event(
         } else {
             projection_failure(ProjectionFault::Critical("DURABLE_RECORD_CARDINALITY_INVALID"))
         });
+    }
+
+    let replay = replay_virtual_schedule(schedule)?;
+    for (action, reason) in [
+        (&observations[0], "OBSERVATION_NOT_ADMISSIBLE_IN_REPLAY"),
+        (&persistence_records[0], "DURABLE_RECORD_NOT_ADMISSIBLE_IN_REPLAY"),
+    ] {
+        let disposition = replay.records.iter()
+            .find(|record| record.action_id == action.action_id)
+            .map(|record| record.disposition);
+        if disposition != Some(SchedulerDisposition::Applied) {
+            return Ok(projection_failure(ProjectionFault::Indeterminate(reason)));
+        }
     }
 
     let observed_time = match &observations[0].action {
