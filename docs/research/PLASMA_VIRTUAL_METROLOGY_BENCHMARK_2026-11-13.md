@@ -187,3 +187,19 @@ These sources sharpen our SOTA comparison:
 - compare predictive value against current alarm limits and QC policy, not against random guessing alone.
 
 The 2026 reviews establish that virtual metrology itself is not novel. The narrow research opportunity is its validation for atmospheric surface treatment, where a qualified model must predict bond/coating outcomes from exact material and process context under independently verified holdout and metrology conditions.
+
+
+## 2026 five-polymer source challenge — 15 November 2026
+
+The synthetic contract now includes three specific source-inspired adversarial cases from Péczi-Kovács & Kókai (2026), DOI 10.1007/s44245-026-00396-4:
+- a nitrogen PP treatment with 17° water contact angle but a low 0.3 MPa bond label for a different adhesive system;
+- an argon PP treatment with 60° contact angle but a higher 0.8 MPa bond label for that same alternate adhesive system;
+- a nitrogen over-treatment case with an 11.6 MPa bond label but visible surface damage.
+
+These are **synthetic contract values chosen to preserve the direction of the published examples**, not measurements copied into the virtual-metrology dataset or Luminous experimental data. The evaluator blocks both adhesive-system transfers from the frozen PP/adhesive domain and rejects observed substrate damage even when the predicted bond-strength threshold is met.
+
+This closes two important model shortcuts:
+1. a low contact angle cannot override missing exact adhesive/material support;
+2. a high bond-strength prediction cannot override a declared substrate-integrity failure.
+
+The fixture now contains 19 scenarios (1 PASS, 7 REJECTED, 11 BLOCKED). The source evaluator has three additional tests.
