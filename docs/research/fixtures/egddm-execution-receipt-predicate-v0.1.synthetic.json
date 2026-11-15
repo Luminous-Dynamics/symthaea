@@ -61,7 +61,18 @@
       "value": "5555555555555555555555555555555555555555555555555555555555555555"
     },
     "workflow_run_id": "synthetic-run-0001",
-    "workflow_attempt": 1
+    "workflow_attempt": 1,
+    "slsa_provenance": {
+      "statement_digest": {
+        "algorithm": "sha256",
+        "value": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "predicate_type": "https://slsa.dev/provenance/v1",
+      "subject_digest": {
+        "algorithm": "sha256",
+        "value": "6666666666666666666666666666666666666666666666666666666666666666"
+      }
+    }
   },
   "observation": {
     "started_at": "2026-11-15T08:00:00Z",
