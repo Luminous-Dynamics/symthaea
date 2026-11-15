@@ -86,7 +86,7 @@ pub enum ObservationAdmission {
     CriticalEvidenceIncomplete,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ChannelEvidenceState {
     pub channel: &'static str,
     pub state: EvidenceState,
