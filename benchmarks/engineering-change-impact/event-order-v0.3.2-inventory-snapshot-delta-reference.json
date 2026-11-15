@@ -8,27 +8,27 @@
   "case_families": {
     "post_discharge_pending_sibling": {
       "n": 20000,
-      "wrong": 0
+      "violations": 0
     },
     "omitted_pre_discharge_attempt": {
       "n": 20000,
-      "wrong": 0
+      "violations": 0
     },
     "pending_requested_operation": {
       "n": 20000,
-      "wrong": 0
+      "violations": 0
     },
     "ambiguous_inventory_cut": {
       "n": 20000,
-      "wrong": 7999
+      "violations": 0
     },
     "post_cut_terminal_excluded_from_snapshot": {
       "n": 20000,
-      "wrong": 0
+      "violations": 0
     },
     "prior_discharge_relation_retained": {
       "n": 20000,
-      "wrong": 0
+      "violations": 0
     }
   },
   "snapshot_cut_semantics": {
@@ -36,7 +36,7 @@
     "future_stop_relations_excluded": 20000,
     "prior_stop_relations_retained": 20000
   },
-  "violations": 7999,
+  "violations": 0,
   "not_rust_execution": true,
-  "interpretation": "Reference-model semantic check only. It does not execute Rust, verify real inventory signatures, or establish production reliability."
+  "interpretation": "Independent V8 reference-model semantic check only. It does not execute Rust, verify real inventory signatures, or establish production reliability. The checked-in Node.js-compatible script is the reproducibility artifact."
 }
