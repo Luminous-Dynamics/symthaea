@@ -204,6 +204,7 @@ pub enum SchedulerDisposition {
     ClockMappingExpired,
     ClockMappingNotYetValid,
     ClockMappingValidityInvalid,
+    ClockTimestampBeyondQualifiedTick,
     ObservationUnqualified,
     PersistenceUnqualified,
     ConflictingObservation,
@@ -540,6 +541,8 @@ fn classify_clock_mapping(
         Some(SchedulerDisposition::ClockMappingValidityInvalid)
     } else if timestamp_ns < mapping.valid_from_ns {
         Some(SchedulerDisposition::ClockMappingNotYetValid)
+    } else if timestamp_ns > mapping.local_tick_ns {
+        Some(SchedulerDisposition::ClockTimestampBeyondQualifiedTick)
     } else if timestamp_ns > mapping.valid_through_ns {
         Some(SchedulerDisposition::ClockMappingExpired)
     } else {
@@ -2146,7 +2149,7 @@ mod tests {
             mapping_valid_through_ns: 60,
             mapping_receipt_ref: "synthetic://mapping/backwards".to_owned(),
             mapping_receipt_sha256: "d".repeat(64),
-            qualification: GateState::Indeterminate,
+            qualification: GateState::Pass,
         });
         push_action(&mut schedule.actions, &mut ordinal, t + 1, ScheduleAction::EventProduced {
             event_id: "event-backwards".to_owned(),
