@@ -3,9 +3,8 @@ use fusion_decision_compiler_contract::plant_service_gate::{
     evaluate_plant_power_balance,
 };
 use fusion_decision_compiler_contract::robust_net_export::{
-    ModelFormValidity, NetExportBoundMethod, NetExportEvidenceClass,
-    NetExportLowerBoundReceipt, RobustNetExportDisposition, RobustNetExportProfile,
-    evaluate_robust_net_export,
+    ModelFormValidity, NetExportBoundMethod, NetExportEvidenceClass, NetExportLowerBoundReceipt,
+    RobustNetExportDisposition, RobustNetExportProfile, evaluate_robust_net_export,
 };
 
 fn sha(character: char) -> String {
@@ -122,13 +121,8 @@ fn main() {
             evidence_ref: "synthetic-net-lower-bound-evidence".to_string(),
         };
 
-        let report = evaluate_robust_net_export(
-            &profile,
-            &run,
-            &point,
-            &robust_profile,
-            Some(&receipt),
-        );
+        let report =
+            evaluate_robust_net_export(&profile, &run, &point, &robust_profile, Some(&receipt));
         println!(
             "lower_bound_mwe={lower_bound:.3},point_estimate_mwe={:.3},reserve_mwe={:.3},coverage={:.3},disposition={:?}",
             report.point_estimate_net_mwe.unwrap_or(f64::NAN),
