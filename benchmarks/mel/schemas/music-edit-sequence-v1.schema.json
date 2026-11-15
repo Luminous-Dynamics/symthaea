@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-music-edit-sequence-v1.schema.json",
+  "title": "Melothaea Multi-step Edit Sequence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["request", "initial_events", "steps"],
+  "properties": {
+    "request": { "$ref": "#/$defs/request" },
+    "initial_events": { "type": "array", "items": { "$ref": "#/$defs/event" } },
+    "steps": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "verdict": { "enum": ["verified", "rejected", "unknown"] },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "session_id", "source_lineage_sha256",
+        "initial_artifact_sha256", "initial_state_sha256",
+        "operation_plan_sha256", "expected_step_count"
+      ],
+      "properties": {
+        "schema_version": { "const": "mel-music-edit-sequence-request-v1" },
+        "session_id": { "type": "string", "minLength": 1 },
+        "source_lineage_sha256": { "$ref": "#/$defs/sha256" },
+        "initial_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "initial_state_sha256": { "$ref": "#/$defs/sha256" },
+        "operation_plan_sha256": { "$ref": "#/$defs/sha256" },
+        "expected_step_count": { "enum": [1, 2, 4, 8] }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id", "part_id", "onset_ticks", "duration_ticks",
+        "pitch_millist", "velocity", "program"
+      ],
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1 },
+        "part_id": { "type": "string", "minLength": 1 },
+        "onset_ticks": { "type": "integer", "minimum": 0 },
+        "duration_ticks": { "type": "integer", "minimum": 1 },
+        "pitch_millist": { "type": "integer" },
+        "velocity": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "program": { "type": "integer", "minimum": 0, "maximum": 127 }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_edit", "protected_preservation", "rights_admission",
+        "integrity", "source_lineage", "realization_evidence"
+      ],
+      "properties": {
+        "target_edit": { "$ref": "#/$defs/verdict" },
+        "protected_preservation": { "$ref": "#/$defs/verdict" },
+        "rights_admission": { "$ref": "#/$defs/verdict" },
+        "integrity": { "$ref": "#/$defs/verdict" },
+        "source_lineage": { "$ref": "#/$defs/verdict" },
+        "realization_evidence": { "$ref": "#/$defs/verdict" }
+      }
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version", "sequence", "step_id", "operation_id",
+        "operation_kind", "history_action", "instruction_sha256", "source_lineage_sha256",
+        "input_artifact_sha256", "output_artifact_sha256",
+        "input_state_sha256", "output_state_sha256",
+        "selection_receipt_sha256", "realization_receipt_sha256",
+        "verification_report_sha256", "allowed_event_ids", "events_after",
+        "hard_gates", "candidate_attempt_count", "failed_candidate_attempt_count",
+        "render_call_count", "retry_count", "manual_intervention_count"
+      ],
+      "properties": {
+        "schema_version": { "const": "mel-music-edit-sequence-step-v1" },
+        "sequence": { "type": "integer", "minimum": 1, "maximum": 8 },
+        "step_id": { "type": "string", "minLength": 1 },
+        "operation_id": { "type": "string", "minLength": 1 },
+        "operation_kind": { "enum": ["add", "remove", "replace", "volume", "tempo", "arrangement", "other"] },
+        "history_action": { "enum": ["apply", "undo", "redo"] },
+        "undo_target_step_id": { "type": "string", "minLength": 1 },
+        "redo_target_step_id": { "type": "string", "minLength": 1 },
+        "instruction_sha256": { "$ref": "#/$defs/sha256" },
+        "source_lineage_sha256": { "$ref": "#/$defs/sha256" },
+        "input_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "output_artifact_sha256": { "$ref": "#/$defs/sha256" },
+        "input_state_sha256": { "$ref": "#/$defs/sha256" },
+        "output_state_sha256": { "$ref": "#/$defs/sha256" },
+        "selection_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "realization_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "verification_report_sha256": { "$ref": "#/$defs/sha256" },
+        "allowed_event_ids": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "events_after": { "type": "array", "items": { "$ref": "#/$defs/event" } },
+        "hard_gates": { "$ref": "#/$defs/gates" },
+        "candidate_attempt_count": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "failed_candidate_attempt_count": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "render_call_count": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "retry_count": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "manual_intervention_count": { "type": "integer", "minimum": 0, "maximum": 65535 }
+      }
+    }
+  }
+}

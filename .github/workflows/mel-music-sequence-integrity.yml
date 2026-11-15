@@ -1,0 +1,104 @@
+name: Melothaea multi-step sequence integrity
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-music-sequence-integrity-harness/**"
+      - "benchmarks/mel/schemas/music-edit-sequence-v1.schema.json"
+      - "benchmarks/mel/schemas/music-symbolic-patch-v1.schema.json"
+      - "benchmarks/mel/schemas/music-symbolic-branch-merge-v1.schema.json"
+      - "docs/research/MEL_MR_EVAL_043_MULTI_STEP_EDIT_INTEGRITY_V1_2026-11-15.md"
+      - "docs/research/MEL_COMPETITIVE_RESEARCH_HARMONY_AND_SESSION_EDITING_V1_2026-11-15.md"
+      - ".github/workflows/mel-music-sequence-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sequence-integrity-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MEL_SEQUENCE_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Validate sequence and symbolic operation schemas
+        run: |
+          python3 -m json.tool benchmarks/mel/schemas/music-edit-sequence-v1.schema.json >/dev/null
+          python3 -m json.tool benchmarks/mel/schemas/music-symbolic-patch-v1.schema.json >/dev/null
+          python3 -m json.tool benchmarks/mel/schemas/music-symbolic-branch-merge-v1.schema.json >/dev/null
+
+      - name: Stage standalone sequence harness outside workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-music-sequence-integrity-harness"
+          mkdir -p "$staged/src" "$staged/examples"
+          cp tools/mel-music-sequence-integrity-harness/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-music-sequence-integrity-harness/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-music-sequence-integrity-harness/examples/eight_step_session.rs "$staged/examples/eight_step_session.rs"
+          cp tools/mel-music-sequence-integrity-harness/examples/reversibility_and_commutativity.rs "$staged/examples/reversibility_and_commutativity.rs"
+          echo "MEL_SEQUENCE_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+
+      - name: Normalize staged formatting and check
+        run: |
+          cargo +1.96.0 fmt --manifest-path "$MEL_SEQUENCE_MANIFEST"
+          cargo +1.96.0 fmt --check --manifest-path "$MEL_SEQUENCE_MANIFEST"
+
+      - name: Resolve standalone lockfile
+        run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_SEQUENCE_MANIFEST"
+
+      - name: Run exact sequence contract tests
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_SEQUENCE_MANIFEST"
+
+      - name: Run deterministic eight-step preservation fixture
+        run: cargo +1.96.0 run --locked --manifest-path "$MEL_SEQUENCE_MANIFEST" --example eight_step_session
+
+      - name: Run reversible operation and commutativity controls
+        run: cargo +1.96.0 run --locked --manifest-path "$MEL_SEQUENCE_MANIFEST" --example reversibility_and_commutativity
+
+      - name: Run Clippy with warnings denied
+        run: cargo +1.96.0 clippy --locked --manifest-path "$MEL_SEQUENCE_MANIFEST" --all-targets -- -D warnings
+
+      - name: Record exact source and dependency identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-sequence-evidence"
+          mkdir -p "$evidence"
+          sha256sum tools/mel-music-sequence-integrity-harness/Cargo.toml > "$evidence/manifest.sha256"
+          sha256sum tools/mel-music-sequence-integrity-harness/src/lib.rs > "$evidence/library.sha256"
+          sha256sum tools/mel-music-sequence-integrity-harness/examples/eight_step_session.rs > "$evidence/example.sha256"
+          sha256sum tools/mel-music-sequence-integrity-harness/examples/reversibility_and_commutativity.rs > "$evidence/reversibility-example.sha256"
+          sha256sum benchmarks/mel/schemas/music-edit-sequence-v1.schema.json > "$evidence/schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-symbolic-patch-v1.schema.json > "$evidence/symbolic-patch-schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-symbolic-branch-merge-v1.schema.json > "$evidence/symbolic-branch-merge-schema.sha256"
+          sha256sum "$(dirname "$MEL_SEQUENCE_MANIFEST")/Cargo.lock" > "$evidence/Cargo.lock.sha256"
+          cp "$(dirname "$MEL_SEQUENCE_MANIFEST")/Cargo.lock" "$evidence/Cargo.lock"
+          printf 'exact_head=%s\n' "$MEL_SEQUENCE_REVISION" > "$evidence/source-identities.txt"
+
+      - name: Upload sequence qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-sequence-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-sequence-evidence/
+          if-no-files-found: error
+          retention-days: 90

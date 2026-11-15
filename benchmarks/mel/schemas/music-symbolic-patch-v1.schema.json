@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-music-symbolic-patch-v1.schema.json",
+  "title": "Melothaea Symbolic Edit Patch v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "patch_id", "session_base_state_sha256", "changes"],
+  "properties": {
+    "schema_version": { "const": "mel-music-symbolic-patch-v1" },
+    "patch_id": { "type": "string", "minLength": 1 },
+    "session_base_state_sha256": { "$ref": "#/$defs/sha256" },
+    "changes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/change" }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "part_id", "onset_ticks", "duration_ticks", "pitch_millist", "velocity", "program"],
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1 },
+        "part_id": { "type": "string", "minLength": 1 },
+        "onset_ticks": { "type": "integer", "minimum": 0 },
+        "duration_ticks": { "type": "integer", "minimum": 1 },
+        "pitch_millist": { "type": "integer" },
+        "velocity": { "type": "integer", "minimum": 0, "maximum": 127 },
+        "program": { "type": "integer", "minimum": 0, "maximum": 127 }
+      }
+    },
+    "change": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["event_id", "before", "after"],
+      "properties": {
+        "event_id": { "type": "string", "minLength": 1 },
+        "before": { "oneOf": [{ "$ref": "#/$defs/event" }, { "type": "null" }] },
+        "after": { "oneOf": [{ "$ref": "#/$defs/event" }, { "type": "null" }] }
+      },
+      "not": {
+        "properties": { "before": { "type": "null" }, "after": { "type": "null" } },
+        "required": ["before", "after"]
+      }
+    }
+  }
+}
