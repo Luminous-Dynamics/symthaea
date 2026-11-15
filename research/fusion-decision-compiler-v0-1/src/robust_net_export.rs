@@ -985,13 +985,8 @@ mod tests {
         profile.reserve_threshold_inclusive = false;
         let run = power_run();
         let point = evaluate_plant_power_balance(&profile, &run);
-        let report = evaluate_robust_net_export(
-            &profile,
-            &run,
-            &point,
-            &robust_profile(),
-            Some(&receipt),
-        );
+        let report =
+            evaluate_robust_net_export(&profile, &run, &point, &robust_profile(), Some(&receipt));
         assert_eq!(
             report.disposition,
             RobustNetExportDisposition::RobustlyBelowReserve
@@ -1021,13 +1016,8 @@ mod tests {
         let mut receipt = lower_bound(-20.0);
         receipt.run_id = run.run_id.clone();
         receipt.output_sha256 = run.output_sha256.clone();
-        let report = evaluate_robust_net_export(
-            &profile,
-            &run,
-            &point,
-            &robust_profile(),
-            Some(&receipt),
-        );
+        let report =
+            evaluate_robust_net_export(&profile, &run, &point, &robust_profile(), Some(&receipt));
         assert_eq!(
             report.disposition,
             RobustNetExportDisposition::RobustlyBelowReserve
