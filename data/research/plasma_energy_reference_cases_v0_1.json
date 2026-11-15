@@ -196,11 +196,28 @@
       ],
       "comparison_status": "REACTOR_LEVEL_NOT_FULL_CHAIN",
       "blockers": [
-        "Area-normalized product rate and Faradaic efficiency are not full-chain kWh/kg NH3.",
-        "Upstream plasma electricity, NOx/intermediate transport, water/electrolyte, separation and durability require accounting.",
-        "The reported 15N2 controls support nitrogen-source attribution but do not establish plant-scale economics."
+        "Area-normalized ammonia rate and electrochemical Faradaic efficiency are not full-chain g NH3/kWh.",
+        "The plasma source electricity, electrochemical electricity, power conditioning, gas handling, water/electrolyte, product separation, purification, drying, compression and standby loads must be metered together.",
+        "The 2026 roadmap's 0.3–3 g NH3/kWh plasma-synthesis range and 127 g NH3/kWh Haber-Bosch comparison are source-reported values with an explicit omitted-H2-production energy caveat; do not treat the comparison as full-chain matched.",
+        "The study's isotope/on-off controls support nitrogen-source attribution, not industrial reliability, lifetime or economic readiness.",
+        "No Luminous reproduction, plant efficiency or commercial output is claimed."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "configuration": {
+        "architecture": "integrated plasma-electrolysis membrane-electrode assembly",
+        "discharge": "microstructured nonthermal surface discharge coupled to gas-diffusion cathode",
+        "catalyst_screened_count": 14,
+        "best_reported_catalyst": "Ag",
+        "operating_conditions": "atmospheric pressure and room temperature",
+        "electrochemical_potential_v_vs_rhe": -0.54,
+        "attribution_controls": [
+          "plasma/electrolysis on-off controls",
+          "15N2 isotope labeling"
+        ],
+        "modeled_vibrational_state_temperature_k": 4300,
+        "modeled_n2_vibrational_population_v4_to_v8_fraction": 0.118
+      },
+      "source_conclusion": "The integrated plasma-electrolysis membrane-electrode assembly uses a microstructured nonthermal surface discharge to vibrationally excite N2 near a gas-diffusion cathode. Across 14 screened metals, silver gave 7.7 ± 0.8 nmol NH3 s−1 cm−2 and 86 ± 14% electrochemical Faradaic efficiency at −0.54 V vs RHE, atmospheric pressure and room temperature. Plasma/electrolysis on-off controls and 15N2 labeling support attribution to supplied nitrogen. The source reports modeling and in situ spectroscopy that support vibrational-state engineering, but does not supply a complete plant-level energy yield or lifetime."
     },
     {
       "case_id": "METHANE-PYROLYSIS-HEATING-REVIEW-2026",
@@ -1749,6 +1766,50 @@
         "realized_revenue_evidence": false,
         "no_credit_baseline_required": true
       }
+    },
+    {
+      "case_id": "NH3-PLASMA-SYNTHESIS-ENERGY-ROADMAP-2026",
+      "lane": "AMMONIA_SYNTHESIS",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "title": "Large-Scale Applications of Plasma Technologies: Progresses and Challenges",
+        "publisher": "High Voltage",
+        "publication_date": "2026-09-30",
+        "volume": "11",
+        "issue": "5",
+        "pages": "1524-1582",
+        "doi": "10.1049/hve2.70241",
+        "url": "https://doi.org/10.1049/hve2.70241"
+      },
+      "observations": [
+        {
+          "metric": "plasma_ammonia_energy_yield_min",
+          "value": 0.3,
+          "qualifier": "review-reported range for plasma-assisted ammonia synthesis; H2 production energy is not included in the cross-route comparison",
+          "unit": "g_NH3/kWh"
+        },
+        {
+          "metric": "plasma_ammonia_energy_yield_max",
+          "value": 3,
+          "qualifier": "review-reported range for plasma-assisted ammonia synthesis; not a full-chain plant metric",
+          "unit": "g_NH3/kWh"
+        },
+        {
+          "metric": "haber_bosch_ammonia_energy_yield",
+          "value": 127,
+          "qualifier": "review-reported conventional Haber-Bosch comparator; hydrogen production-energy boundary is not included in the stated comparison",
+          "unit": "g_NH3/kWh"
+        }
+      ],
+      "source_conclusion": "The 2026 roadmap reports plasma-assisted ammonia synthesis energy yields around 0.3–3 g NH3/kWh compared with approximately 127 g NH3/kWh for conventional Haber-Bosch. It explicitly notes that the comparison omits the energy required to produce hydrogen, so the apparent plasma comparison is not a matched full-chain energy result. The review identifies yield, energy efficiency, selectivity and catalyst/plasma mechanism understanding as persistent scale-up barriers.",
+      "comparison_status": "REVIEW_REPORTED_ENERGY_RANGE_NOT_FULL_CHAIN_COMPARISON",
+      "blockers": [
+        "The source comparison explicitly omits hydrogen production energy; no full-chain superiority claim is admissible.",
+        "Plasma synthesis and Haber-Bosch must be compared at the same functional unit, product purity/pressure, feedstock and full upstream hydrogen/electricity boundary.",
+        "The review range aggregates unlike discharge types, catalysts and system boundaries; it is not a single representative reactor point.",
+        "Do not substitute electrochemical Faradaic efficiency or area-normalized rate for grid-to-accepted-ammonia energy yield."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -1996,6 +2057,21 @@
       "control_id": "NC-036",
       "condition": "Apply avoided-product carbon-black credits below the source's reported 50–55% methane-conversion range or without a qualified displaced reference product and market-capacity constraint.",
       "expected_disposition": "BLOCKED_COPRODUCT_COUNTERFACTUAL_NOT_QUALIFIED"
+    },
+    {
+      "control_id": "NC-NH3-SYNTH-001",
+      "condition": "Compare the 0.3–3 g NH3/kWh plasma-synthesis review range with the 127 g NH3/kWh Haber-Bosch value as a matched plant result without including hydrogen production energy and harmonizing the complete boundary.",
+      "expected_disposition": "NOT_COMPARABLE_INCOMPLETE_HYDROGEN_ENERGY_BOUNDARY"
+    },
+    {
+      "control_id": "NC-NH3-SYNTH-002",
+      "condition": "Promote the JACS plasma-electrolysis study's 86 ± 14% electrochemical Faradaic efficiency into full-process grid-to-ammonia energy efficiency.",
+      "expected_disposition": "REJECT_METRIC_SCOPE_MISMATCH"
+    },
+    {
+      "control_id": "NC-NH3-SYNTH-003",
+      "condition": "Promote 7.7 ± 0.8 nmol NH3 s−1 cm−2 at the laboratory cell area to industrial throughput, lifecycle durability or plant economics without area scale-up, uptime and complete metering.",
+      "expected_disposition": "REJECT_SCALE_AND_BOUNDARY_EXTRAPOLATION"
     }
   ],
   "derived_reference_checks": [
