@@ -13,9 +13,9 @@ use symthaea_decision_assessment::{
 use symthaea_decision_assessment::event_order_v0_2::{
     AttemptIdentity, AttemptTerminalReconciliation, EventTimeIntervalNs,
     OperationAttemptRecord, QualifiedEventTime, TimeBasisDescriptor, EventTimeUnit,
-    ScopedStopObligation, StopDischargeReceipt, StopScope,
-    assess_start_under_stop_obligations, compare_qualified_event_times,
-    validate_attempt_lifecycle,
+    AttemptHistoryInventory, ScopedStopObligation, StopDischargeReceipt, StopScope,
+    assess_start_under_stop_obligations, canonical_attempt_manifest_sha256,
+    compare_qualified_event_times, validate_attempt_lifecycle,
 };
 
 fn qualified_time(
@@ -36,8 +36,8 @@ fn qualified_time(
         mapping_receipt_ref: format!("synthetic://clock-map/{domain}"),
         mapping_receipt_sha256: "a".repeat(64),
         mapping_qualification: GateState::Pass,
-        mapping_valid_from_unix_ns: valid_from_ns,
-        mapping_valid_through_unix_ns: valid_through_ns,
+        mapping_valid_from_ns: valid_from_ns,
+        mapping_valid_through_ns: valid_through_ns,
         max_interval_width_ns: 100_000,
         interval: EventTimeIntervalNs {
             earliest_ns,
@@ -73,6 +73,24 @@ fn scoped_obligation(id: usize, logical_operation_id: &str, discharged: bool) ->
         policy_revision: "policy-v1".to_owned(),
         scope,
         discharge,
+    }
+}
+
+fn attempt_inventory(
+    attempts: &[OperationAttemptRecord],
+    scope: StopScope,
+) -> AttemptHistoryInventory {
+    AttemptHistoryInventory {
+        inventory_frontier_event_id: "inventory-frontier-generated".to_owned(),
+        attempt_manifest_sha256: canonical_attempt_manifest_sha256(attempts).expect("attempt digest"),
+        receipt_ref: "synthetic://attempt-inventory/generated".to_owned(),
+        receipt_sha256: "d".repeat(64),
+        scope,
+        identity: GateState::Pass,
+        digest_integrity: GateState::Pass,
+        authenticity: GateState::Pass,
+        scope_qualification: GateState::Pass,
+        completeness: GateState::Pass,
     }
 }
 
@@ -269,9 +287,14 @@ proptest! {
         let obligations = (0..obligation_count)
             .map(|index| scoped_obligation(index, "robot-17", index != missing))
             .collect::<Vec<_>>();
+        let inventory = attempt_inventory(
+            &[],
+            StopScope::LogicalOperations(["robot-17".to_owned()].into_iter().collect()),
+        );
         let forward = assess_start_under_stop_obligations(
             "robot-17",
             &[],
+            &inventory,
             &obligations,
         );
         prop_assert!(!forward.start_permitted_by_stop_contract);
@@ -286,6 +309,7 @@ proptest! {
         let reverse = assess_start_under_stop_obligations(
             "robot-17",
             &[],
+            &inventory,
             &reversed,
         );
         prop_assert_eq!(forward, reverse);

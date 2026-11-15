@@ -155,3 +155,12 @@ The properties complement the named unit cases; they do not simulate a real netw
 
 
 The generated property target now also checks that an old occurrence timestamp cannot make late evidence available at K, and that one missing discharge blocks a start under any number of applicable overlapping obligations regardless of delivery order.
+
+
+## 12. Attempt-history completeness at start time
+
+An empty attempt list is not proof that no prior attempt exists. A proposed start therefore requires an owner-qualified `AttemptHistoryInventory` binding the exact inventory frontier event ID, canonical digest of the supplied attempt records, receipt reference and digest, inventory scope, and independent identity, digest-integrity, authenticity, scope and completeness qualifications.
+
+The consumer recomputes a domain-separated, delivery-order-independent attempt-manifest digest, verifies that inventory scope covers the requested logical operation and every applicable stop obligation, and refuses missing, mismatched or incomplete inventories. The digest makes the snapshot reproducible; it does not establish completeness by itself. Owner-native verification supplies completeness and receipt authenticity.
+
+The low-level `validate_attempt_lifecycle` checks the semantics of supplied attempt records. It must not be used alone to infer that an absent record never existed. `assess_start_under_stop_obligations` is the start-eligibility composition and requires the independent inventory qualification. A PASS remains non-authoritative and grants no effect permission.

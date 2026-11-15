@@ -11,6 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::{EventOrder, EventTraceDisposition, GateState, ReconciledOperationOutcome};
 
@@ -47,8 +48,8 @@ pub struct QualifiedClockMapping {
     pub mapping_receipt_ref: String,
     pub mapping_receipt_sha256: String,
     pub qualification: GateState,
-    pub valid_from_unix_ns: i64,
-    pub valid_through_unix_ns: i64,
+    pub valid_from_ns: i64,
+    pub valid_through_ns: i64,
     /// Maximum full interval width accepted for this mapping, not a point error.
     pub max_interval_width_ns: u64,
 }
@@ -62,8 +63,8 @@ pub struct QualifiedEventTime {
     pub mapping_receipt_ref: String,
     pub mapping_receipt_sha256: String,
     pub mapping_qualification: GateState,
-    pub mapping_valid_from_unix_ns: i64,
-    pub mapping_valid_through_unix_ns: i64,
+    pub mapping_valid_from_ns: i64,
+    pub mapping_valid_through_ns: i64,
     pub max_interval_width_ns: u64,
     pub interval: EventTimeIntervalNs,
 }
@@ -79,8 +80,8 @@ impl QualifiedClockMapping {
             mapping_receipt_ref: self.mapping_receipt_ref.clone(),
             mapping_receipt_sha256: self.mapping_receipt_sha256.clone(),
             mapping_qualification: self.qualification,
-            mapping_valid_from_unix_ns: self.valid_from_unix_ns,
-            mapping_valid_through_unix_ns: self.valid_through_unix_ns,
+            mapping_valid_from_ns: self.valid_from_ns,
+            mapping_valid_through_ns: self.valid_through_ns,
             max_interval_width_ns: self.max_interval_width_ns,
             interval,
         }
@@ -117,12 +118,12 @@ fn validate_qualified_time(
         reasons.insert(format!("CLOCK_INTERVAL_REVERSED:{side}"));
         valid = false;
     }
-    if value.mapping_valid_from_unix_ns > value.mapping_valid_through_unix_ns {
+    if value.mapping_valid_from_ns > value.mapping_valid_through_ns {
         reasons.insert(format!("CLOCK_MAPPING_VALIDITY_INTERVAL_INVALID:{side}"));
         valid = false;
     }
-    if value.interval.earliest_ns < value.mapping_valid_from_unix_ns
-        || value.interval.latest_ns > value.mapping_valid_through_unix_ns
+    if value.interval.earliest_ns < value.mapping_valid_from_ns
+        || value.interval.latest_ns > value.mapping_valid_through_ns
     {
         reasons.insert(format!("CLOCK_MAPPING_OUTSIDE_VALIDITY:{side}"));
         valid = false;
@@ -569,6 +570,42 @@ pub fn validate_attempt_lifecycle(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AttemptHistoryInventory {
+    pub inventory_frontier_event_id: String,
+    pub attempt_manifest_sha256: String,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub scope: StopScope,
+    pub identity: GateState,
+    pub digest_integrity: GateState,
+    pub authenticity: GateState,
+    pub scope_qualification: GateState,
+    pub completeness: GateState,
+}
+
+/// Domain-separated commitment to an attempt set, invariant under delivery order.
+pub fn canonical_attempt_manifest_sha256(
+    attempts: &[OperationAttemptRecord],
+) -> Result<String, serde_json::Error> {
+    let mut serialized_records = attempts
+        .iter()
+        .map(|attempt| {
+            let mut canonical = attempt.clone();
+            canonical.start_event_ids.sort();
+            canonical.terminal_reconciliation_event_ids.sort();
+            serde_json::to_string(&canonical)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    serialized_records.sort();
+    let projection = serde_json::to_vec(&(
+        "symthaea.engineering-decision.attempt-manifest.v0.2",
+        serialized_records,
+    ))?;
+    let digest = Sha256::digest(&projection);
+    Ok(digest.iter().map(|byte| format!("{byte:02x}")).collect())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "logical_operation_ids", rename_all = "snake_case")]
 pub enum StopScope {
     Global,
@@ -591,6 +628,104 @@ impl StopScope {
             Self::LogicalOperations(ids) => ids.contains(logical_operation_id),
         }
     }
+}
+
+fn scope_covers(candidate: &StopScope, required: &StopScope) -> bool {
+    match (candidate, required) {
+        (StopScope::Global, _) => true,
+        (StopScope::LogicalOperations(_), StopScope::Global) => false,
+        (StopScope::LogicalOperations(candidate), StopScope::LogicalOperations(required)) => {
+            required.is_subset(candidate)
+        }
+    }
+}
+
+fn validate_attempt_inventory(
+    attempts: &[OperationAttemptRecord],
+    inventory: &AttemptHistoryInventory,
+    logical_operation_id: &str,
+    obligations: &[ScopedStopObligation],
+) -> (EventTraceDisposition, Vec<String>) {
+    let mut reasons = BTreeSet::new();
+    let mut critical = false;
+    let mut indeterminate = false;
+
+    if inventory.inventory_frontier_event_id.trim().is_empty()
+        || inventory.receipt_ref.trim().is_empty()
+        || !is_sha256_hex(&inventory.receipt_sha256)
+        || !is_sha256_hex(&inventory.attempt_manifest_sha256)
+        || !inventory.scope.is_well_formed()
+    {
+        critical = true;
+        reasons.insert("ATTEMPT_INVENTORY_BINDING_INVALID".to_owned());
+    }
+
+    for (name, state) in [
+        ("IDENTITY", inventory.identity),
+        ("DIGEST_INTEGRITY", inventory.digest_integrity),
+        ("AUTHENTICITY", inventory.authenticity),
+        ("SCOPE", inventory.scope_qualification),
+        ("COMPLETENESS", inventory.completeness),
+    ] {
+        match state {
+            GateState::Pass => {}
+            GateState::Fail => {
+                critical = true;
+                reasons.insert(format!("ATTEMPT_INVENTORY_{name}_FAILED"));
+            }
+            GateState::Indeterminate | GateState::NotApplicable => {
+                indeterminate = true;
+                reasons.insert(format!("ATTEMPT_INVENTORY_{name}_UNRESOLVED"));
+            }
+        }
+    }
+
+    match canonical_attempt_manifest_sha256(attempts) {
+        Ok(digest) if digest == inventory.attempt_manifest_sha256 => {}
+        Ok(_) => {
+            critical = true;
+            reasons.insert("ATTEMPT_INVENTORY_MANIFEST_DIGEST_MISMATCH".to_owned());
+        }
+        Err(_) => {
+            critical = true;
+            reasons.insert("ATTEMPT_INVENTORY_MANIFEST_SERIALIZATION_FAILED".to_owned());
+        }
+    }
+
+    let current_scope = StopScope::LogicalOperations(
+        [logical_operation_id.to_owned()].into_iter().collect(),
+    );
+    if !scope_covers(&inventory.scope, &current_scope) {
+        indeterminate = true;
+        reasons.insert("ATTEMPT_INVENTORY_SCOPE_DOES_NOT_COVER_START".to_owned());
+    }
+    for obligation in obligations {
+        if obligation.scope.is_well_formed()
+            && obligation.scope.applies_to(logical_operation_id)
+            && !scope_covers(&inventory.scope, &obligation.scope)
+        {
+            indeterminate = true;
+            reasons.insert(format!(
+                "ATTEMPT_INVENTORY_SCOPE_DOES_NOT_COVER_OBLIGATION:{}",
+                obligation.obligation_id
+            ));
+        }
+    }
+    if attempts.iter().any(|attempt| {
+        !inventory.scope.applies_to(&attempt.identity.logical_operation_id)
+    }) {
+        critical = true;
+        reasons.insert("ATTEMPT_INVENTORY_CONTAINS_OUT_OF_SCOPE_RECORD".to_owned());
+    }
+
+    let disposition = if critical {
+        EventTraceDisposition::CriticalFailure
+    } else if indeterminate {
+        EventTraceDisposition::Indeterminate
+    } else {
+        EventTraceDisposition::Safe
+    };
+    (disposition, reasons.into_iter().collect())
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -648,6 +783,7 @@ fn attempt_is_reconciled(attempt: &OperationAttemptRecord) -> bool {
 pub fn assess_start_under_stop_obligations(
     logical_operation_id: &str,
     prior_attempts: &[OperationAttemptRecord],
+    inventory: &AttemptHistoryInventory,
     obligations: &[ScopedStopObligation],
 ) -> StartGateReport {
     let mut reasons = BTreeSet::new();
@@ -674,6 +810,19 @@ pub fn assess_start_under_stop_obligations(
         })
         .cloned()
         .collect::<Vec<_>>();
+    let (inventory_disposition, inventory_reasons) = validate_attempt_inventory(
+        prior_attempts,
+        inventory,
+        logical_operation_id,
+        obligations,
+    );
+    reasons.extend(inventory_reasons);
+    match inventory_disposition {
+        EventTraceDisposition::CriticalFailure => critical = true,
+        EventTraceDisposition::Indeterminate => indeterminate = true,
+        EventTraceDisposition::Safe => {}
+    }
+
     let attempts_report = validate_attempt_lifecycle(&relevant_prior_attempts);
     match attempts_report.disposition {
         EventTraceDisposition::CriticalFailure => {
@@ -700,17 +849,21 @@ pub fn assess_start_under_stop_obligations(
 
     let mut seen_obligation_ids = BTreeSet::new();
     for obligation in obligations {
-        if obligation.obligation_id.trim().is_empty()
-            || obligation.trigger_event_id.trim().is_empty()
-            || obligation.policy_revision.trim().is_empty()
-            || !obligation.scope.is_well_formed()
-            || !seen_obligation_ids.insert(obligation.obligation_id.clone())
-        {
+        if !obligation.scope.is_well_formed() {
             critical = true;
-            reasons.insert("STOP_OBLIGATION_ID_SCOPE_OR_POLICY_INVALID".to_owned());
+            reasons.insert("STOP_OBLIGATION_SCOPE_INVALID".to_owned());
             continue;
         }
         if !obligation.scope.applies_to(logical_operation_id) {
+            continue;
+        }
+        if obligation.obligation_id.trim().is_empty()
+            || obligation.trigger_event_id.trim().is_empty()
+            || obligation.policy_revision.trim().is_empty()
+            || !seen_obligation_ids.insert(obligation.obligation_id.clone())
+        {
+            critical = true;
+            reasons.insert("STOP_OBLIGATION_ID_OR_POLICY_INVALID".to_owned());
             continue;
         }
         applicable.insert(obligation.obligation_id.clone());
@@ -828,8 +981,8 @@ mod tests {
             mapping_receipt_ref: format!("synthetic://clock-map/{domain}"),
             mapping_receipt_sha256: "a".repeat(64),
             mapping_qualification: GateState::Pass,
-            mapping_valid_from_unix_ns: 0,
-            mapping_valid_through_unix_ns: 10_000,
+            mapping_valid_from_ns: 0,
+            mapping_valid_through_ns: 10_000,
             max_interval_width_ns: 1_000,
             interval: EventTimeIntervalNs {
                 earliest_ns: earliest,
@@ -879,6 +1032,25 @@ mod tests {
         }
     }
 
+    fn attempt_inventory(
+        attempts: &[OperationAttemptRecord],
+        scope: StopScope,
+        completeness: GateState,
+    ) -> AttemptHistoryInventory {
+        AttemptHistoryInventory {
+            inventory_frontier_event_id: "inventory-frontier-k".to_owned(),
+            attempt_manifest_sha256: canonical_attempt_manifest_sha256(attempts).expect("attempt digest"),
+            receipt_ref: "synthetic://attempt-inventory/receipt".to_owned(),
+            receipt_sha256: "d".repeat(64),
+            scope,
+            identity: GateState::Pass,
+            digest_integrity: GateState::Pass,
+            authenticity: GateState::Pass,
+            scope_qualification: GateState::Pass,
+            completeness,
+        }
+    }
+
     fn scoped_obligation(id: &str, logical: &str) -> ScopedStopObligation {
         let scope = StopScope::LogicalOperations([logical.to_owned()].into_iter().collect());
         let trigger = format!("trigger-{id}");
@@ -922,7 +1094,7 @@ mod tests {
 
     #[test]
     fn time_basis_requires_epoch_and_scale_identity() {
-        let mut first = qualified_time("clock-a", "basis", 10, 20);
+        let first = qualified_time("clock-a", "basis", 10, 20);
         let mut second = qualified_time("clock-b", "basis", 30, 40);
         second.time_basis.epoch = "different-epoch".to_owned();
         assert_eq!(
@@ -935,7 +1107,6 @@ mod tests {
             compare_qualified_event_times(&first, &second).order,
             EventOrder::Unknown
         );
-        first.time_basis.scale = "UTC".to_owned();
     }
 
     #[test]
@@ -963,7 +1134,7 @@ mod tests {
         );
 
         let mut expired = qualified_time("clock-a", "basis", 10, 20);
-        expired.mapping_valid_through_unix_ns = 15;
+        expired.mapping_valid_through_ns = 15;
         assert_eq!(
             compare_qualified_event_times(&expired, &qualified_time("clock-b", "basis", 30, 40)).order,
             EventOrder::Inconsistent
@@ -1122,7 +1293,12 @@ mod tests {
         let mut second = scoped_obligation("obligation-b", "robot-7");
         second.discharge = None;
 
-        let report = assess_start_under_stop_obligations("robot-7", &attempts, &[first.clone(), second]);
+        let inventory = attempt_inventory(
+            &attempts,
+            StopScope::LogicalOperations(["robot-7".to_owned()].into_iter().collect()),
+            GateState::Pass,
+        );
+        let report = assess_start_under_stop_obligations("robot-7", &attempts, &inventory, &[first.clone(), second]);
         assert!(!report.start_permitted_by_stop_contract);
         assert_eq!(report.disposition, EventTraceDisposition::Indeterminate);
         assert_eq!(report.applicable_obligation_ids, vec!["obligation-a".to_owned(), "obligation-b".to_owned()]);
@@ -1132,7 +1308,12 @@ mod tests {
     fn stop_discharge_requires_owner_qualification_of_the_in_flight_inventory() {
         let mut obligation = scoped_obligation("obligation-a", "robot-7");
         obligation.discharge.as_mut().unwrap().in_flight_reconciliation = GateState::Fail;
-        let report = assess_start_under_stop_obligations("robot-7", &[], &[obligation]);
+        let inventory = attempt_inventory(
+            &[],
+            StopScope::LogicalOperations(["robot-7".to_owned()].into_iter().collect()),
+            GateState::Pass,
+        );
+        let report = assess_start_under_stop_obligations("robot-7", &[], &inventory, &[obligation]);
         assert!(!report.start_permitted_by_stop_contract);
         assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
         assert!(report.reason_codes.iter().any(|reason| {
@@ -1141,10 +1322,63 @@ mod tests {
     }
 
     #[test]
+    fn missing_attempt_inventory_completeness_never_treats_absence_as_safe() {
+        let obligation = scoped_obligation("obligation-a", "robot-7");
+        let inventory = attempt_inventory(
+            &[],
+            StopScope::LogicalOperations(["robot-7".to_owned()].into_iter().collect()),
+            GateState::Indeterminate,
+        );
+        let report = assess_start_under_stop_obligations(
+            "robot-7",
+            &[],
+            &inventory,
+            &[obligation],
+        );
+        assert!(!report.start_permitted_by_stop_contract);
+        assert_eq!(report.disposition, EventTraceDisposition::Indeterminate);
+        assert!(report.reason_codes.iter().any(|reason| {
+            reason == "ATTEMPT_INVENTORY_COMPLETENESS_UNRESOLVED"
+        }));
+    }
+
+    #[test]
+    fn attempt_manifest_digest_is_invariant_under_record_delivery_order() {
+        let attempts = vec![
+            attempt(
+                "pump-1",
+                "b",
+                None,
+                "start-b",
+                Some(terminal("term-b", "start-b", ReconciledOperationOutcome::NotApplied)),
+                None,
+                None,
+            ),
+            attempt(
+                "pump-2",
+                "a",
+                None,
+                "start-a",
+                Some(terminal("term-a", "start-a", ReconciledOperationOutcome::NotApplied)),
+                None,
+                None,
+            ),
+        ];
+        let mut reversed = attempts.clone();
+        reversed.reverse();
+        assert_eq!(
+            canonical_attempt_manifest_sha256(&attempts).unwrap(),
+            canonical_attempt_manifest_sha256(&reversed).unwrap()
+        );
+    }
+
+    #[test]
     fn unrelated_pending_attempt_does_not_block_an_unrelated_scoped_start() {
         let unrelated = attempt("robot-9", "attempt-pending", None, "start-pending", None, None);
         let obligation = scoped_obligation("obligation-a", "robot-7");
-        let report = assess_start_under_stop_obligations("robot-8", &[unrelated], &[obligation]);
+        let attempts = vec![unrelated];
+        let inventory = attempt_inventory(&attempts, StopScope::Global, GateState::Pass);
+        let report = assess_start_under_stop_obligations("robot-8", &attempts, &inventory, &[obligation]);
         assert!(report.start_permitted_by_stop_contract);
         assert_eq!(report.disposition, EventTraceDisposition::Safe);
     }
@@ -1152,7 +1386,8 @@ mod tests {
     #[test]
     fn unrelated_operation_is_not_captured_by_a_scoped_stop_obligation() {
         let obligation = scoped_obligation("obligation-a", "robot-7");
-        let report = assess_start_under_stop_obligations("robot-8", &[], &[obligation]);
+        let inventory = attempt_inventory(&[], StopScope::Global, GateState::Pass);
+        let report = assess_start_under_stop_obligations("robot-8", &[], &inventory, &[obligation]);
         assert!(report.start_permitted_by_stop_contract);
         assert_eq!(report.disposition, EventTraceDisposition::Safe);
         assert!(report.applicable_obligation_ids.is_empty());
@@ -1163,7 +1398,12 @@ mod tests {
         let mut obligation = scoped_obligation("obligation-a", "robot-7");
         obligation.discharge.as_mut().unwrap().in_flight_attempt_manifest_sha256 =
             "not-a-digest".to_owned();
-        let report = assess_start_under_stop_obligations("robot-7", &[], &[obligation]);
+        let inventory = attempt_inventory(
+            &[],
+            StopScope::LogicalOperations(["robot-7".to_owned()].into_iter().collect()),
+            GateState::Pass,
+        );
+        let report = assess_start_under_stop_obligations("robot-7", &[], &inventory, &[obligation]);
         assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
         assert!(report.reason_codes.iter().any(|reason| {
             reason == "STOP_DISCHARGE_RECEIPT_OR_INVENTORY_BINDING_INVALID:obligation-a"
@@ -1175,7 +1415,12 @@ mod tests {
         let mut first = scoped_obligation("obligation-a", "robot-7");
         let second = scoped_obligation("obligation-b", "robot-7");
         first.discharge.as_mut().unwrap().obligation_id = "obligation-b".to_owned();
-        let report = assess_start_under_stop_obligations("robot-7", &[], &[first, second]);
+        let inventory = attempt_inventory(
+            &[],
+            StopScope::LogicalOperations(["robot-7".to_owned()].into_iter().collect()),
+            GateState::Pass,
+        );
+        let report = assess_start_under_stop_obligations("robot-7", &[], &inventory, &[first, second]);
         assert!(!report.start_permitted_by_stop_contract);
         assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
         assert!(report.reason_codes.iter().any(|reason| {
