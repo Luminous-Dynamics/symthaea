@@ -40,3 +40,6 @@ jobs:
 
       - name: Run synthetic audit example
         run: cargo run --manifest-path research/fusion-reject-audit-v0-1/Cargo.toml --bin audit_rejected_candidates
+
+      - name: Run synthetic decision-opportunity example
+        run: cargo run --manifest-path research/fusion-reject-audit-v0-1/Cargo.toml --bin audit_decision_opportunities
