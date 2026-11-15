@@ -25,10 +25,7 @@ pub enum SequentialError {
     DuplicateObservationId(String),
     PredictionAlreadyPending,
     NoPredictionPending,
-    ObservationIdMismatch {
-        expected: String,
-        actual: String,
-    },
+    ObservationIdMismatch { expected: String, actual: String },
     DecisionDigestMismatch,
     NonFiniteDiscrepancy,
     NonFiniteObservation,
@@ -37,10 +34,7 @@ pub enum SequentialError {
     DuplicateAlternativeId(String),
     InvalidAlternativeWeight,
     AlternativeWeightsMustSumToOne,
-    AlternativeCountMismatch {
-        expected: usize,
-        actual: usize,
-    },
+    AlternativeCountMismatch { expected: usize, actual: usize },
     NumericalOverflow,
     ObservationCountOverflow,
 }
@@ -49,27 +43,52 @@ impl fmt::Display for SequentialError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidSigma => write!(f, "sigma must be finite and strictly positive"),
-            Self::InvalidAlpha => write!(f, "alpha must be finite and strictly between zero and one"),
+            Self::InvalidAlpha => {
+                write!(f, "alpha must be finite and strictly between zero and one")
+            }
             Self::EmptyObservationId => write!(f, "observation ID must not be empty"),
             Self::EmptyDecisionDigest => write!(f, "decision digest must not be empty"),
-            Self::DuplicateObservationId(id) => write!(f, "observation ID was already consumed: {id}"),
-            Self::PredictionAlreadyPending => write!(f, "a prediction is already pending an observation"),
-            Self::NoPredictionPending => write!(f, "an observation cannot be scored before a prediction is committed"),
-            Self::ObservationIdMismatch { expected, actual } => {
-                write!(f, "observation ID mismatch: expected {expected}, received {actual}")
+            Self::DuplicateObservationId(id) => {
+                write!(f, "observation ID was already consumed: {id}")
             }
-            Self::DecisionDigestMismatch => write!(f, "observation decision digest differs from the committed prediction"),
+            Self::PredictionAlreadyPending => {
+                write!(f, "a prediction is already pending an observation")
+            }
+            Self::NoPredictionPending => write!(
+                f,
+                "an observation cannot be scored before a prediction is committed"
+            ),
+            Self::ObservationIdMismatch { expected, actual } => {
+                write!(
+                    f,
+                    "observation ID mismatch: expected {expected}, received {actual}"
+                )
+            }
+            Self::DecisionDigestMismatch => write!(
+                f,
+                "observation decision digest differs from the committed prediction"
+            ),
             Self::NonFiniteDiscrepancy => write!(f, "predicted discrepancy must be finite"),
             Self::NonFiniteObservation => write!(f, "observed residual must be finite"),
             Self::EmptyAlternativeSet => write!(f, "alternative set must not be empty"),
             Self::EmptyAlternativeId => write!(f, "alternative ID must not be empty"),
             Self::DuplicateAlternativeId(id) => write!(f, "duplicate alternative ID: {id}"),
-            Self::InvalidAlternativeWeight => write!(f, "alternative weights must be finite and strictly positive"),
-            Self::AlternativeWeightsMustSumToOne => write!(f, "fixed alternative weights must sum to one"),
+            Self::InvalidAlternativeWeight => write!(
+                f,
+                "alternative weights must be finite and strictly positive"
+            ),
+            Self::AlternativeWeightsMustSumToOne => {
+                write!(f, "fixed alternative weights must sum to one")
+            },
             Self::AlternativeCountMismatch { expected, actual } => {
-                write!(f, "received {actual} alternative predictions; expected {expected}")
+                write!(
+                    f,
+                    "received {actual} alternative predictions; expected {expected}"
+                )
             }
-            Self::NumericalOverflow => write!(f, "likelihood-ratio update exceeded finite f64 range"),
+            Self::NumericalOverflow => {
+                write!(f, "likelihood-ratio update exceeded finite f64 range")
+            }
             Self::ObservationCountOverflow => write!(f, "observation counter overflow"),
         }
     }
@@ -264,11 +283,8 @@ impl PredictableGaussianEProcess {
             return Err(SequentialError::DecisionDigestMismatch);
         }
 
-        let increment = likelihood_ratio_increment(
-            pending.residuals[0],
-            observed_residual,
-            self.sigma,
-        )?;
+        let increment =
+            likelihood_ratio_increment(pending.residuals[0], observed_residual, self.sigma)?;
         let next_log_e_value = self.log_e_value + increment;
         if !next_log_e_value.is_finite() {
             return Err(SequentialError::NumericalOverflow);
@@ -282,7 +298,10 @@ impl PredictableGaussianEProcess {
         let anytime_p = anytime_p_value(next_maximum);
         let crossed = next_maximum >= alpha_boundary;
 
-        let pending = self.pending.take().expect("pending prediction was checked above");
+        let pending = self
+            .pending
+            .take()
+            .expect("pending prediction was checked above");
         self.consumed_observation_ids
             .insert(pending.observation_id.clone());
         self.log_e_value = next_log_e_value;
@@ -482,11 +501,13 @@ impl PredictableGaussianMixture {
             .iter()
             .zip(self.weights.iter().copied())
             .zip(self.component_log_e_values.iter().copied())
-            .map(|((alternative, weight), log_e_value)| MixtureComponentUpdate {
-                id: alternative.id.clone(),
-                weight,
-                log_e_value,
-            })
+            .map(
+                |((alternative, weight), log_e_value)| MixtureComponentUpdate {
+                    id: alternative.id.clone(),
+                    weight,
+                    log_e_value,
+                },
+            )
             .collect();
 
         Ok(MixtureSequentialUpdate {
@@ -507,11 +528,13 @@ impl PredictableGaussianMixture {
 }
 
 fn log_sum_exp(values: &[f64]) -> f64 {
-    let maximum = values
-        .iter()
-        .copied()
-        .fold(f64::NEG_INFINITY, f64::max);
-    maximum + values.iter().map(|value| (value - maximum).exp()).sum::<f64>().ln()
+    let maximum = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    maximum
+        + values
+            .iter()
+            .map(|value| (value - maximum).exp())
+            .sum::<f64>()
+            .ln()
 }
 
 #[cfg(test)]
@@ -524,9 +547,7 @@ mod tests {
         process
             .commit_prediction("obs-1", "sha256:decision-1", 0.24)
             .unwrap();
-        let result = process
-            .observe("obs-1", "sha256:decision-1", 0.20)
-            .unwrap();
+        let result = process.observe("obs-1", "sha256:decision-1", 0.20).unwrap();
         assert!((result.log_e_value - 0.853_333_333_333_333_3).abs() < 1.0e-12);
         assert_eq!(result.observations, 1);
     }
@@ -557,9 +578,7 @@ mod tests {
         );
         assert_eq!(process.observations, 0);
         assert!(process.has_pending_prediction());
-        let valid = process
-            .observe("obs-1", "sha256:decision-1", 0.20)
-            .unwrap();
+        let valid = process.observe("obs-1", "sha256:decision-1", 0.20).unwrap();
         assert_eq!(valid.observations, 1);
     }
 
@@ -582,9 +601,7 @@ mod tests {
         process
             .commit_prediction("obs-1", "sha256:decision-1", 0.24)
             .unwrap();
-        let first = process
-            .observe("obs-1", "sha256:decision-1", 0.50)
-            .unwrap();
+        let first = process.observe("obs-1", "sha256:decision-1", 0.50).unwrap();
         assert!(first.crossed_alpha_boundary);
         assert!(first.anytime_p_value <= 0.05);
 
@@ -606,16 +623,12 @@ mod tests {
         process
             .commit_prediction("obs-1", "sha256:decision-1", 0.10)
             .unwrap();
-        let first = process
-            .observe("obs-1", "sha256:decision-1", 0.20)
-            .unwrap();
+        let first = process.observe("obs-1", "sha256:decision-1", 0.20).unwrap();
         let next_discrepancy = if first.log_e_value > 0.0 { 0.20 } else { -0.20 };
         process
             .commit_prediction("obs-2", "sha256:decision-2", next_discrepancy)
             .unwrap();
-        let second = process
-            .observe("obs-2", "sha256:decision-2", 0.25)
-            .unwrap();
+        let second = process.observe("obs-2", "sha256:decision-2", 0.25).unwrap();
         assert_eq!(second.observations, 2);
         assert!(second.log_e_value.is_finite());
     }
@@ -654,9 +667,7 @@ mod tests {
         mixture
             .commit_predictions("obs-1", "sha256:decision-1", &[0.20, -0.20])
             .unwrap();
-        let result = mixture
-            .observe("obs-1", "sha256:decision-1", 0.30)
-            .unwrap();
+        let result = mixture.observe("obs-1", "sha256:decision-1", 0.30).unwrap();
         let expected = (0.5_f64 * 0.16_f64.exp() + 0.5_f64 * (-0.32_f64).exp()).ln();
         assert!((result.log_e_value - expected).abs() < 1.0e-12);
         assert_eq!(result.components.len(), 2);
