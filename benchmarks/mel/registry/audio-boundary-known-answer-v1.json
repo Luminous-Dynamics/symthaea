@@ -1,0 +1,56 @@
+{
+  "request": {
+    "schema_version": "mel-audio-boundary-request-v1",
+    "operation_id": "replace-hit-001",
+    "source_lineage_sha256": "0000000000000000000000000000000000000000000000000000000000000001",
+    "operation_plan_sha256": "0000000000000000000000000000000000000000000000000000000000000002",
+    "source_pcm_sha256": "b68f4e6f24414de25a733e53acccf35611d2b9e6654002021ea068c9b2ded2c9",
+    "expected_output_pcm_sha256": "1d2f1acfdd5b2d96ac545cbfa7930c9eac9a9146b7485632d847739f711eddc6",
+    "sample_rate_hz": 48000,
+    "channel_count": 1,
+    "frame_count": 12,
+    "edit_windows": [
+      { "start_frame": 3, "end_frame": 9 }
+    ],
+    "protected_regions": [
+      {
+        "region_id": "protected-head",
+        "start_frame": 0,
+        "end_frame": 3,
+        "expected_region_sha256": "69f96a83bb95a8b04829ebce34cc387b9f6eacca1bff19515f64e1cfcde06ac1"
+      }
+    ],
+    "boundaries": [
+      {
+        "boundary_id": "boundary-left",
+        "boundary_frame": 3,
+        "left_window_frames": 2,
+        "right_window_frames": 2,
+        "maximum_seam_jump_abs": 1000,
+        "maximum_slope_delta_abs": 1000,
+        "maximum_local_step_abs": 1000,
+        "maximum_rms_ratio_deviation_ppm": 1000000
+      },
+      {
+        "boundary_id": "boundary-right",
+        "boundary_frame": 9,
+        "left_window_frames": 2,
+        "right_window_frames": 2,
+        "maximum_seam_jump_abs": 1000,
+        "maximum_slope_delta_abs": 1000,
+        "maximum_local_step_abs": 1000,
+        "maximum_rms_ratio_deviation_ppm": 1000000
+      }
+    ]
+  },
+  "source": {
+    "sample_rate_hz": 48000,
+    "channel_count": 1,
+    "samples_interleaved_s32": [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110]
+  },
+  "output": {
+    "sample_rate_hz": 48000,
+    "channel_count": 1,
+    "samples_interleaved_s32": [0, 10, 20, 30, 45, 50, 60, 75, 80, 90, 100, 110]
+  }
+}
