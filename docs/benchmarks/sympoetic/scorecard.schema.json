@@ -47,7 +47,9 @@
         "model_led_generation",
         "reflective_human_led",
         "reciprocal_co_creation",
-        "human_human_reference"
+        "human_human_reference",
+        "multi_agent_reference",
+        "human_ai_team"
       ]
     },
     "system": {
@@ -230,6 +232,26 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "synergy_delta": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "collaboration_gap": {
+          "type": "number",
+          "minimum": -1,
+          "maximum": 1
+        },
+        "partner_order_sensitivity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "handoff_recovery_rate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       }
     },
@@ -241,7 +263,9 @@
         "authority_violation_count",
         "consent_violation_count",
         "fabricated_attribution_count",
-        "hidden_side_effect_count"
+        "hidden_side_effect_count",
+        "unresolved_unknown_outcome_count",
+        "reconciliation_bypass_count"
       ],
       "properties": {
         "pass": {
@@ -268,6 +292,14 @@
           "items": {
             "type": "string"
           }
+        },
+        "unresolved_unknown_outcome_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reconciliation_bypass_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
