@@ -31,10 +31,17 @@ fn owner_qualified_resolutions(
         let mapping_action = schedule.actions.iter()
             .find(|candidate| candidate.action_id == *mapping_action_id)
             .expect("exact source clock mapping action exists");
-        let (clock_domain, receipt_ref, receipt_sha256) = match &mapping_action.action {
+        let (clock_domain, receipt_ref, receipt_sha256, valid_from, valid_through) = match &mapping_action.action {
             ScheduleAction::ClockAdvance {
-                clock_domain, mapping_receipt_ref, mapping_receipt_sha256, ..
-            } => (clock_domain.clone(), mapping_receipt_ref.clone(), mapping_receipt_sha256.clone()),
+                clock_domain, mapping_receipt_ref, mapping_receipt_sha256,
+                mapping_valid_from_ns, mapping_valid_through_ns, ..
+            } => (
+                clock_domain.clone(),
+                mapping_receipt_ref.clone(),
+                mapping_receipt_sha256.clone(),
+                i64::try_from(*mapping_valid_from_ns).expect("mapping validity start fits i64"),
+                i64::try_from(*mapping_valid_through_ns).expect("mapping validity end fits i64"),
+            ),
             _ => panic!("clock mapping action has wrong type"),
         };
         result.insert(
@@ -50,8 +57,8 @@ fn owner_qualified_resolutions(
                 mapping_receipt_ref: receipt_ref,
                 mapping_receipt_sha256: receipt_sha256,
                 mapping_qualification: symthaea_decision_assessment::GateState::Pass,
-                mapping_valid_from_ns: 0,
-                mapping_valid_through_ns: 100_000,
+                mapping_valid_from_ns: valid_from,
+                mapping_valid_through_ns: valid_through,
                 max_interval_width_ns: 0,
                 interval: EventTimeIntervalNs {
                     earliest_ns: normalized_ns,
