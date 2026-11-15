@@ -2072,6 +2072,26 @@
       "control_id": "NC-NH3-SYNTH-003",
       "condition": "Promote 7.7 ± 0.8 nmol NH3 s−1 cm−2 at the laboratory cell area to industrial throughput, lifecycle durability or plant economics without area scale-up, uptime and complete metering.",
       "expected_disposition": "REJECT_SCALE_AND_BOUNDARY_EXTRAPOLATION"
+    },
+    {
+      "control_id": "NC-054",
+      "condition": "Claim a grid-to-H2 energy improvement from reduced reactor electrical input while omitting the heat exchanger, insulation, pumps, pressure-drop, cooling or other thermal integration auxiliaries.",
+      "expected_disposition": "BLOCKED_INCOMPLETE_GRID_TO_PRODUCT_BOUNDARY"
+    },
+    {
+      "control_id": "NC-055",
+      "condition": "Count theoretical recoverable exhaust enthalpy as delivered useful heat without metered capture, useful temperature level, interface identity and thermal-loss accounting.",
+      "expected_disposition": "REJECT_UNMEASURED_RECOVERED_HEAT"
+    },
+    {
+      "control_id": "NC-056",
+      "condition": "Compare thermal-integrated and no-recovery runs at different ammonia conversion, hydrogen production rate, accepted purity or duty cycle and attribute the difference to heat recovery.",
+      "expected_disposition": "NOT_COMPARABLE_OPERATING_POINT_MISMATCH"
+    },
+    {
+      "control_id": "NC-057",
+      "condition": "Count recirculated/recovered heat and reaction enthalpy twice, or accept a heat balance outside the declared uncertainty/tolerance.",
+      "expected_disposition": "REJECT_THERMAL_BALANCE_NONCLOSURE"
     }
   ],
   "derived_reference_checks": [
@@ -2240,6 +2260,34 @@
         "unqualified_coproduct_credit_forbidden": true
       },
       "rationale": "The 2026 300 MW plasma-biogas-reforming TEA reports about EUR 840/t syngas and about 44% plant efficiency, with modeled cases below EUR 600/t under favourable renewable-electricity assumptions. The stretch target requires the cost and plant-efficiency thresholds to hold together under the same matched service and full plant boundary."
+    },
+    {
+      "target_id": "NH3-THERMAL-INTEGRATION-FULL-CHAIN-001",
+      "lane": "AMMONIA_CRACKING_THERMAL_INTEGRATION",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "NH3-CRACK-MW-ATM-MECHANISM-2026"
+      ],
+      "metric_thresholds": {
+        "ammonia_conversion_min_fraction": 0.99,
+        "accepted_h2_production_rate_min_g_per_hour": 150,
+        "net_grid_specific_energy_reduction_min_fraction": 0.15,
+        "heat_balance_abs_residual_fraction_max": 0.05,
+        "all_thresholds_must_hold_at_same_operating_point": true
+      },
+      "claim_guards": {
+        "paired_no_recovery_baseline_same_feed_and_operating_point_required": true,
+        "full_grid_to_accepted_h2_boundary_required": true,
+        "recovered_heat_must_be_measured_and_useful_at_declared_process_interface": true,
+        "insulation_or_recuperator_pressure_drop_and_all_auxiliaries_included": true,
+        "thermal_storage_and_heat_exchanger_losses_included": true,
+        "no_double_counting_of_recirculated_heat_or_reaction_enthalpy": true,
+        "thermal_energy_balance_must_close_with_uncertainty": true,
+        "product_purity_pressure_and_delivery_contract_unchanged": true,
+        "duty_cycle_and_steady_state_duration_matched": true,
+        "comparison_must_report_measurement_uncertainty_and_grouped_repeats": true
+      },
+      "rationale": "The September 2026 microwave NH3 study identifies heat-balance losses and an insulating sleeve of cold NH3 as an improvement pathway. This target tests whether integrated thermal management can reduce net grid-to-accepted-H2 specific energy by at least 15% while retaining >99% conversion and at least 150 g/h in the same operating point. It is a stretch target; the cited 150 g/h paper point is 92.4% conversion, so all three target attributes must be demonstrated together rather than borrowed across source points."
     }
   ]
 }
