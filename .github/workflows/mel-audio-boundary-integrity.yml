@@ -1,0 +1,95 @@
+name: Melothaea audio boundary integrity
+
+on:
+  pull_request:
+    paths:
+      - "tools/mel-audio-boundary-integrity-harness/**"
+      - "benchmarks/mel/schemas/audio-boundary-request-v1.schema.json"
+      - "benchmarks/mel/registry/audio-boundary-known-answer-v1.json"
+      - ".github/workflows/mel-audio-boundary-integrity.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audio-boundary-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MEL_AUDIO_BOUNDARY_REVISION=$actual" >> "$GITHUB_ENV"
+
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Validate schema and frozen PCM fixture
+        run: |
+          python3 -m json.tool benchmarks/mel/schemas/audio-boundary-request-v1.schema.json >/dev/null
+          python3 -m json.tool benchmarks/mel/registry/audio-boundary-known-answer-v1.json >/dev/null
+
+      - name: Stage standalone audio-boundary harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-audio-boundary-integrity-harness"
+          mkdir -p "$staged/src" "$staged/examples" "$staged/fixtures"
+          cp tools/mel-audio-boundary-integrity-harness/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-audio-boundary-integrity-harness/src/lib.rs "$staged/src/lib.rs"
+          cp tools/mel-audio-boundary-integrity-harness/examples/validate_fixture.rs "$staged/examples/validate_fixture.rs"
+          cp benchmarks/mel/registry/audio-boundary-known-answer-v1.json "$staged/fixtures/"
+          echo "MEL_AUDIO_BOUNDARY_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+
+      - name: Normalize and check staged formatting
+        run: |
+          cargo +1.96.0 fmt --manifest-path "$MEL_AUDIO_BOUNDARY_MANIFEST"
+          cargo +1.96.0 fmt --check --manifest-path "$MEL_AUDIO_BOUNDARY_MANIFEST"
+
+      - name: Resolve standalone dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_AUDIO_BOUNDARY_MANIFEST"
+
+      - name: Run PCM boundary contract tests
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_AUDIO_BOUNDARY_MANIFEST"
+
+      - name: Validate known-answer PCM boundary fixture
+        run: cargo +1.96.0 run --locked --manifest-path "$MEL_AUDIO_BOUNDARY_MANIFEST" --example validate_fixture
+
+      - name: Run strict Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path "$MEL_AUDIO_BOUNDARY_MANIFEST" --all-targets -- -D warnings
+
+      - name: Record exact source and dependency identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-audio-boundary-evidence"
+          mkdir -p "$evidence"
+          sha256sum tools/mel-audio-boundary-integrity-harness/Cargo.toml > "$evidence/manifest.sha256"
+          sha256sum tools/mel-audio-boundary-integrity-harness/src/lib.rs > "$evidence/library.sha256"
+          sha256sum tools/mel-audio-boundary-integrity-harness/examples/validate_fixture.rs > "$evidence/example.sha256"
+          sha256sum benchmarks/mel/schemas/audio-boundary-request-v1.schema.json > "$evidence/schema.sha256"
+          sha256sum benchmarks/mel/registry/audio-boundary-known-answer-v1.json > "$evidence/fixture.sha256"
+          cp "$(dirname "$MEL_AUDIO_BOUNDARY_MANIFEST")/Cargo.lock" "$evidence/Cargo.lock"
+          sha256sum "$evidence/Cargo.lock" > "$evidence/Cargo.lock.sha256"
+          printf 'exact_head=%s\n' "$MEL_AUDIO_BOUNDARY_REVISION" > "$evidence/source-identities.txt"
+
+      - name: Upload audio-boundary qualification evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-audio-boundary-\${{ github.event.pull_request.head.sha || github.sha }}
+          path: \${{ runner.temp }}/mel-audio-boundary-evidence/
+          if-no-files-found: error
+          retention-days: 90
