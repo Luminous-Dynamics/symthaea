@@ -177,7 +177,8 @@
         "epoch",
         "predicted_affected_obligation_ids",
         "receipts",
-        "revalidation_cost_units"
+        "revalidation_cost_units",
+        "checkpoint_at"
       ],
       "properties": {
         "epoch": {
@@ -201,6 +202,10 @@
         "revalidation_cost_units": {
           "type": "number",
           "minimum": 0
+        },
+        "checkpoint_at": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     },
@@ -213,6 +218,8 @@
         "check_id",
         "outcome",
         "source_epoch",
+        "observed_at",
+        "available_at",
         "revision",
         "tree_oid",
         "configuration_world_digest",
@@ -257,6 +264,14 @@
         "receipt_digest": {
           "type": "string",
           "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "available_at": {
+          "type": "string",
+          "format": "date-time"
         }
       }
     }
