@@ -5819,6 +5819,69 @@ mod tests {
     }
 
     #[test]
+    fn global_stop_allows_a_pending_sibling_started_after_discharge_and_inventory_cut() {
+        let (mut schedule, mut resolutions, receipts, expected_manifest) = action_history_fixture();
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let mapping_id = push_test_clock_mapping(
+            &mut schedule.actions,
+            &mut ordinal,
+            13,
+            150,
+        );
+        let sibling_start_id = push_clocked_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            14,
+            ScheduleAction::EffectAttempted {
+                operation_id: "robot-2".to_owned(),
+                attempt_id: "attempt-sibling".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 150,
+            },
+            ActionEvidence::AttemptStart {
+                retry_of_attempt_id: None,
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 150),
+            qualified_resolution_from_fixture(
+                &schedule.actions,
+                &mapping_id,
+                150,
+                1_250,
+            ),
+        );
+        let report = project_action_history(
+            &schedule,
+            "robot-1",
+            &resolutions,
+            &receipts,
+        ).expect("post-discharge sibling projection");
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+        assert_eq!(report.inventory.as_ref().map(|inventory| {
+            inventory.attempt_manifest_sha256.as_str()
+        }), Some(expected_manifest.as_str()));
+        assert_eq!(report.attempts.len(), 2);
+        assert_eq!(report.attempt_lifecycle.disposition, EventTraceDisposition::Indeterminate);
+        assert!(report.attempts.iter().any(|attempt| {
+            attempt.identity.attempt_id == "attempt-sibling"
+                && attempt.start_event_ids == vec![sibling_start_id.clone()]
+                && attempt.terminal_reconciliation.is_none()
+                && attempt.stop_discharge_relations.iter().any(|relation| {
+                    relation.obligation_id == "global-stop-1"
+                        && relation.discharge_to_start_order == EventOrder::Before
+                        && relation.terminal_event_id_at_discharge.is_none()
+                })
+        }));
+        assert!(report.start_gate.as_ref().is_some_and(|gate| {
+            gate.disposition == EventTraceDisposition::Safe
+                && gate.start_permitted_by_stop_contract
+        }));
+    }
+
+    #[test]
     fn action_history_projection_composes_attempt_stop_and_complete_inventory() {
         let (schedule, resolutions, receipts, expected_manifest) = action_history_fixture();
         validate_schedule(&schedule).expect("valid action-history fixture");
