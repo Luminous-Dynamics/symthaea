@@ -176,13 +176,28 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
 
     if candidate.candidate_id.trim().is_empty() {
         invalid = true;
-        push(&mut checks, "candidate_id", CheckStatus::Fail, "candidate_id is empty");
+        push(
+            &mut checks,
+            "candidate_id",
+            CheckStatus::Fail,
+            "candidate_id is empty",
+        );
     } else {
-        push(&mut checks, "candidate_id", CheckStatus::Pass, "candidate_id is present");
+        push(
+            &mut checks,
+            "candidate_id",
+            CheckStatus::Pass,
+            "candidate_id is present",
+        );
     }
 
     if candidate.schema_version == SCHEMA_VERSION {
-        push(&mut checks, "schema_version", CheckStatus::Pass, "schema version 1");
+        push(
+            &mut checks,
+            "schema_version",
+            CheckStatus::Pass,
+            "schema version 1",
+        );
     } else {
         incomparable = true;
         push(
@@ -221,23 +236,52 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
         && candidate.profile.minimum_enclosed_volume_m3 >= 0.0
         && !candidate.profile.id.trim().is_empty();
     if profile_valid {
-        push(&mut checks, "profile_parameters", CheckStatus::Pass, "profile parameters are finite and within supported ranges");
+        push(
+            &mut checks,
+            "profile_parameters",
+            CheckStatus::Pass,
+            "profile parameters are finite and within supported ranges",
+        );
     } else {
         invalid = true;
-        push(&mut checks, "profile_parameters", CheckStatus::Fail, "profile id or geometric thresholds are invalid");
+        push(
+            &mut checks,
+            "profile_parameters",
+            CheckStatus::Fail,
+            "profile id or geometric thresholds are invalid",
+        );
     }
 
-    let finite_vertices = candidate.geometry.vertices.iter().all(|v| v.iter().all(|x| x.is_finite()));
+    let finite_vertices = candidate
+        .geometry
+        .vertices
+        .iter()
+        .all(|v| v.iter().all(|x| x.is_finite()));
     if finite_vertices {
-        push(&mut checks, "finite_coordinates", CheckStatus::Pass, "all vertex coordinates are finite");
+        push(
+            &mut checks,
+            "finite_coordinates",
+            CheckStatus::Pass,
+            "all vertex coordinates are finite",
+        );
     } else {
         invalid = true;
-        push(&mut checks, "finite_coordinates", CheckStatus::Fail, "one or more vertex coordinates are non-finite");
+        push(
+            &mut checks,
+            "finite_coordinates",
+            CheckStatus::Fail,
+            "one or more vertex coordinates are non-finite",
+        );
     }
 
     match compute_geometry_digest(&candidate.geometry) {
         Ok(actual) if actual.eq_ignore_ascii_case(&candidate.geometry_digest_blake3) => {
-            push(&mut checks, "geometry_digest", CheckStatus::Pass, "geometry digest matches normalized geometry");
+            push(
+                &mut checks,
+                "geometry_digest",
+                CheckStatus::Pass,
+                "geometry digest matches normalized geometry",
+            );
         }
         Ok(actual) => {
             invalid = true;
@@ -286,7 +330,11 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
             duplicate_faces += 1;
         }
 
-        let area = triangle_area(vertices[a as usize], vertices[b as usize], vertices[c as usize]);
+        let area = triangle_area(
+            vertices[a as usize],
+            vertices[b as usize],
+            vertices[c as usize],
+        );
         if !area.is_finite() || area < candidate.profile.minimum_face_area_m2 {
             degenerate_faces += 1;
         }
@@ -302,24 +350,57 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
     }
 
     if indices_valid {
-        push(&mut checks, "face_indices", CheckStatus::Pass, format!("{} non-empty faces reference valid, distinct vertices", faces.len()));
+        push(
+            &mut checks,
+            "face_indices",
+            CheckStatus::Pass,
+            format!(
+                "{} non-empty faces reference valid, distinct vertices",
+                faces.len()
+            ),
+        );
     } else {
         invalid = true;
-        push(&mut checks, "face_indices", CheckStatus::Fail, "faces are empty or contain out-of-range/repeated vertex indices");
+        push(
+            &mut checks,
+            "face_indices",
+            CheckStatus::Fail,
+            "faces are empty or contain out-of-range/repeated vertex indices",
+        );
     }
 
     if duplicate_faces == 0 {
-        push(&mut checks, "duplicate_faces", CheckStatus::Pass, "no duplicate triangles");
+        push(
+            &mut checks,
+            "duplicate_faces",
+            CheckStatus::Pass,
+            "no duplicate triangles",
+        );
     } else {
         invalid = true;
-        push(&mut checks, "duplicate_faces", CheckStatus::Fail, format!("{duplicate_faces} duplicate triangles"));
+        push(
+            &mut checks,
+            "duplicate_faces",
+            CheckStatus::Fail,
+            format!("{duplicate_faces} duplicate triangles"),
+        );
     }
 
     if degenerate_faces == 0 {
-        push(&mut checks, "non_degenerate_faces", CheckStatus::Pass, "all triangle areas meet the profile threshold");
+        push(
+            &mut checks,
+            "non_degenerate_faces",
+            CheckStatus::Pass,
+            "all triangle areas meet the profile threshold",
+        );
     } else {
         invalid = true;
-        push(&mut checks, "non_degenerate_faces", CheckStatus::Fail, format!("{degenerate_faces} degenerate or below-threshold triangles"));
+        push(
+            &mut checks,
+            "non_degenerate_faces",
+            CheckStatus::Fail,
+            format!("{degenerate_faces} degenerate or below-threshold triangles"),
+        );
     }
 
     let boundary_edges = edges.values().filter(|dirs| dirs.len() == 1).count();
@@ -330,28 +411,63 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
         .count();
 
     if non_manifold_edges == 0 {
-        push(&mut checks, "edge_manifoldness", CheckStatus::Pass, "no edge is incident to more than two faces");
+        push(
+            &mut checks,
+            "edge_manifoldness",
+            CheckStatus::Pass,
+            "no edge is incident to more than two faces",
+        );
     } else {
         invalid = true;
-        push(&mut checks, "edge_manifoldness", CheckStatus::Fail, format!("{non_manifold_edges} non-manifold edges"));
+        push(
+            &mut checks,
+            "edge_manifoldness",
+            CheckStatus::Fail,
+            format!("{non_manifold_edges} non-manifold edges"),
+        );
     }
 
     if inconsistent_winding_edges == 0 {
-        push(&mut checks, "consistent_winding", CheckStatus::Pass, "shared edges have opposing directed incidence");
+        push(
+            &mut checks,
+            "consistent_winding",
+            CheckStatus::Pass,
+            "shared edges have opposing directed incidence",
+        );
     } else {
         invalid = true;
-        push(&mut checks, "consistent_winding", CheckStatus::Fail, format!("{inconsistent_winding_edges} shared edges have inconsistent winding"));
+        push(
+            &mut checks,
+            "consistent_winding",
+            CheckStatus::Fail,
+            format!("{inconsistent_winding_edges} shared edges have inconsistent winding"),
+        );
     }
 
     if candidate.profile.require_closed_surface {
         if boundary_edges == 0 && !faces.is_empty() {
-            push(&mut checks, "closed_surface", CheckStatus::Pass, "no boundary edges detected");
+            push(
+                &mut checks,
+                "closed_surface",
+                CheckStatus::Pass,
+                "no boundary edges detected",
+            );
         } else {
             invalid = true;
-            push(&mut checks, "closed_surface", CheckStatus::Fail, format!("{boundary_edges} boundary edges detected"));
+            push(
+                &mut checks,
+                "closed_surface",
+                CheckStatus::Fail,
+                format!("{boundary_edges} boundary edges detected"),
+            );
         }
     } else {
-        push(&mut checks, "closed_surface", CheckStatus::NotRequired, "profile does not require a closed surface");
+        push(
+            &mut checks,
+            "closed_surface",
+            CheckStatus::NotRequired,
+            "profile does not require a closed surface",
+        );
     }
 
     let volume = if indices_valid && finite_vertices && !faces.is_empty() {
@@ -374,28 +490,83 @@ pub fn admit(candidate: &CandidateInput) -> AdmissionReport {
     if volume_evaluable {
         match volume {
             Some(value) if value > 0.0 => {
-                push(&mut checks, "positive_signed_volume", CheckStatus::Pass, format!("signed volume is {value:.12e} m^3 in the declared right-handed frame"));
+                push(
+                    &mut checks,
+                    "positive_signed_volume",
+                    CheckStatus::Pass,
+                    format!(
+                        "signed volume is {value:.12e} m^3 in the declared right-handed frame"
+                    ),
+                );
                 if value >= candidate.profile.minimum_enclosed_volume_m3 {
-                    push(&mut checks, "minimum_enclosed_volume", CheckStatus::Pass, format!("signed volume meets the profile minimum of {:.12e} m^3", candidate.profile.minimum_enclosed_volume_m3));
+                    push(
+                        &mut checks,
+                        "minimum_enclosed_volume",
+                        CheckStatus::Pass,
+                        format!(
+                            "signed volume meets the profile minimum of {:.12e} m^3",
+                            candidate.profile.minimum_enclosed_volume_m3
+                        ),
+                    );
                 } else {
                     blocked = true;
-                    push(&mut checks, "minimum_enclosed_volume", CheckStatus::Fail, format!("signed volume {value:.12e} m^3 is below the profile minimum {:.12e} m^3", candidate.profile.minimum_enclosed_volume_m3));
+                    push(
+                        &mut checks,
+                        "minimum_enclosed_volume",
+                        CheckStatus::Fail,
+                        format!(
+                            "signed volume {value:.12e} m^3 is below the profile minimum {:.12e} m^3",
+                            candidate.profile.minimum_enclosed_volume_m3
+                        ),
+                    );
                 }
             }
             Some(value) => {
                 invalid = true;
-                push(&mut checks, "positive_signed_volume", CheckStatus::Fail, format!("signed volume must be positive in the declared right-handed frame; observed {value:.12e} m^3"));
-                push(&mut checks, "minimum_enclosed_volume", CheckStatus::NotEvaluated, "requires a positive, closed, consistently oriented surface");
+                push(
+                    &mut checks,
+                    "positive_signed_volume",
+                    CheckStatus::Fail,
+                    format!(
+                        "signed volume must be positive in the declared right-handed frame; observed {value:.12e} m^3"
+                    ),
+                );
+                push(
+                    &mut checks,
+                    "minimum_enclosed_volume",
+                    CheckStatus::NotEvaluated,
+                    "requires a positive, closed, consistently oriented surface",
+                );
             }
             None => {
                 invalid = true;
-                push(&mut checks, "positive_signed_volume", CheckStatus::Fail, "signed volume could not be calculated as a finite value");
-                push(&mut checks, "minimum_enclosed_volume", CheckStatus::NotEvaluated, "requires a finite signed volume");
+                push(
+                    &mut checks,
+                    "positive_signed_volume",
+                    CheckStatus::Fail,
+                    "signed volume could not be calculated as a finite value",
+                );
+                push(
+                    &mut checks,
+                    "minimum_enclosed_volume",
+                    CheckStatus::NotEvaluated,
+                    "requires a finite signed volume",
+                );
             }
         }
     } else {
-        push(&mut checks, "positive_signed_volume", CheckStatus::NotEvaluated, "requires a closed, valid, consistently oriented surface in a supported frame");
-        push(&mut checks, "minimum_enclosed_volume", CheckStatus::NotEvaluated, "requires a valid signed-volume result");
+        push(
+            &mut checks,
+            "positive_signed_volume",
+            CheckStatus::NotEvaluated,
+            "requires a closed, valid, consistently oriented surface in a supported frame",
+        );
+        push(
+            &mut checks,
+            "minimum_enclosed_volume",
+            CheckStatus::NotEvaluated,
+            "requires a valid signed-volume result",
+        );
     }
 
     for required in &candidate.profile.additional_required_checks {
@@ -490,7 +661,8 @@ mod tests {
     fn open_surface_is_rejected_when_closure_is_required() {
         let mut candidate = tetrahedron();
         candidate.geometry.faces.pop();
-        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate.geometry_digest_blake3 =
+            compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
         assert!(report.metrics.boundary_edge_count > 0);
@@ -502,10 +674,13 @@ mod tests {
         for face in &mut candidate.geometry.faces {
             face.swap(1, 2);
         }
-        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate.geometry_digest_blake3 =
+            compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
-        assert!(report.checks.iter().any(|c| c.code == "positive_signed_volume" && c.status == CheckStatus::Fail));
+        assert!(report.checks.iter().any(|c| {
+            c.code == "positive_signed_volume" && c.status == CheckStatus::Fail
+        }));
     }
 
     #[test]
@@ -514,13 +689,18 @@ mod tests {
         candidate.geometry.vertices[1][0] = 1.25;
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Invalid);
-        assert!(report.checks.iter().any(|c| c.code == "geometry_digest" && c.status == CheckStatus::Fail));
+        assert!(report.checks.iter().any(|c| {
+            c.code == "geometry_digest" && c.status == CheckStatus::Fail
+        }));
     }
 
     #[test]
     fn unsupported_required_check_forces_incomplete() {
         let mut candidate = tetrahedron();
-        candidate.profile.additional_required_checks.push("self_intersection_free".into());
+        candidate
+            .profile
+            .additional_required_checks
+            .push("self_intersection_free".into());
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Incomplete);
         assert!(report.checks.iter().any(|c| c.status == CheckStatus::Unknown));
@@ -530,7 +710,8 @@ mod tests {
     fn non_metric_units_are_incomparable_not_converted() {
         let mut candidate = tetrahedron();
         candidate.geometry.units = "ft".into();
-        candidate.geometry_digest_blake3 = compute_geometry_digest(&candidate.geometry).unwrap();
+        candidate.geometry_digest_blake3 =
+            compute_geometry_digest(&candidate.geometry).unwrap();
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Incomparable);
     }
@@ -541,6 +722,48 @@ mod tests {
         candidate.profile.minimum_enclosed_volume_m3 = 0.2;
         let report = admit(&candidate);
         assert_eq!(report.disposition, Disposition::Blocked);
+    }
+
+    #[test]
+    fn repeated_vertex_index_is_rejected() {
+        let mut candidate = tetrahedron();
+        candidate.geometry.faces.push([0, 0, 1]);
+        candidate.geometry_digest_blake3 =
+            compute_geometry_digest(&candidate.geometry).unwrap();
+        let report = admit(&candidate);
+        assert_eq!(report.disposition, Disposition::Invalid);
+    }
+
+    #[test]
+    fn out_of_range_vertex_index_is_rejected() {
+        let mut candidate = tetrahedron();
+        candidate.geometry.faces.push([0, 1, 99]);
+        candidate.geometry_digest_blake3 =
+            compute_geometry_digest(&candidate.geometry).unwrap();
+        let report = admit(&candidate);
+        assert_eq!(report.disposition, Disposition::Invalid);
+    }
+
+    #[test]
+    fn duplicate_triangle_is_rejected() {
+        let mut candidate = tetrahedron();
+        candidate.geometry.faces.push([0, 2, 1]);
+        candidate.geometry_digest_blake3 =
+            compute_geometry_digest(&candidate.geometry).unwrap();
+        let report = admit(&candidate);
+        assert_eq!(report.disposition, Disposition::Invalid);
+        assert!(report.metrics.duplicate_face_count > 0);
+    }
+
+    #[test]
+    fn non_finite_vertex_is_rejected() {
+        let mut candidate = tetrahedron();
+        candidate.geometry.vertices[0][0] = f64::NAN;
+        let report = admit(&candidate);
+        assert_eq!(report.disposition, Disposition::Invalid);
+        assert!(report.checks.iter().any(|c| {
+            c.code == "finite_coordinates" && c.status == CheckStatus::Fail
+        }));
     }
 
     #[test]
