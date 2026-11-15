@@ -510,7 +510,7 @@ mod tests {
     fn jcs_uses_utf16_code_unit_order_for_object_keys() {
         // UTF-16 sorts U+1F600 (D83D DE00) before U+E000; UTF-8 byte
         // ordering and Rust's scalar-value ordering produce the opposite.
-        let raw = r#"{"\\uE000":"bmp","\\uD83D\\uDE00":"astral"}"#;
+        let raw = r#"{"\uE000":"bmp","\uD83D\uDE00":"astral"}"#;
         let strict = parse_strict(raw).expect("valid JCS input");
         let canonical =
             serde_json_canonicalizer::to_string(&strict).expect("canonicalize with JCS");
