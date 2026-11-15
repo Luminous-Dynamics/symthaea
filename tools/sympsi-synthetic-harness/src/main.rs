@@ -14,9 +14,7 @@ fn main() {
 fn run() -> Result<(), String> {
     let mut profile: Option<String> = None;
     let mut git_head: Option<String> = None;
-    let mut manifest = PathBuf::from(
-        "tools/sympsi-synthetic-harness/fixtures/manifest-v0.1.json",
-    );
+    let mut manifest = PathBuf::from("tools/sympsi-synthetic-harness/fixtures/manifest-v0.1.json");
     let mut output: Option<PathBuf> = None;
 
     let mut args = std::env::args().skip(1);
@@ -42,12 +40,10 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let profile = profile.ok_or_else(|| {
-        "missing required --profile four-choice|five-choice argument".to_string()
-    })?;
-    let git_head = git_head.ok_or_else(|| {
-        "missing required --git-head exact-commit-sha argument".to_string()
-    })?;
+    let profile = profile
+        .ok_or_else(|| "missing required --profile four-choice|five-choice argument".to_string())?;
+    let git_head = git_head
+        .ok_or_else(|| "missing required --git-head exact-commit-sha argument".to_string())?;
     let manifest_bytes = std::fs::read(&manifest)
         .map_err(|error| format!("cannot read manifest {}: {error}", manifest.display()))?;
 
@@ -68,7 +64,10 @@ fn run() -> Result<(), String> {
             .map_err(|error| format!("cannot sync receipt {}: {error}", path.display()))?;
         println!("receipt_path={}", path.display());
         println!("receipt_sha256={}", receipt.receipt_sha256);
-        println!("all_controls_passed={}", receipt.receipt.all_controls_passed);
+        println!(
+            "all_controls_passed={}",
+            receipt.receipt.all_controls_passed
+        );
         if !receipt.receipt.all_controls_passed {
             return Err("one or more synthetic qualification controls failed".into());
         }
@@ -83,10 +82,7 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn next_value(
-    args: &mut impl Iterator<Item = String>,
-    argument: &str,
-) -> Result<String, String> {
+fn next_value(args: &mut impl Iterator<Item = String>, argument: &str) -> Result<String, String> {
     args.next()
         .ok_or_else(|| format!("missing value after {argument}"))
 }
