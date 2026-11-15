@@ -3077,6 +3077,66 @@ mod tests {
     }
 
 
+    /// Exercise exponential rate candidates over extreme gate logits and
+    /// elapsed-time scales. This is a scalar numerical qualification, not a
+    /// state-dependent neuron trajectory result.
+    #[test]
+    fn exponential_gate_rates_are_finite_monotone_and_partition_stable() {
+        let tau = 0.07_f32;
+        for gate_logit in [-80.0_f32, -20.0, -5.0, -1.0, 0.0, 1.0, 5.0, 20.0, 80.0] {
+            for law in [
+                GateLawCandidate::ExponentialRate,
+                GateLawCandidate::SigmoidRate,
+                GateLawCandidate::Ungated,
+            ] {
+                let sigma_base = 1.0 / (1.0 + (-gate_logit).exp());
+                let at_tau = candidate_gate_sigma(law, gate_logit, tau, tau);
+                let expected = match law {
+                    GateLawCandidate::ExponentialRate => sigma_base,
+                    GateLawCandidate::SigmoidRate => -(-sigma_base).exp_m1(),
+                    GateLawCandidate::Ungated => -(-1.0_f32).exp_m1(),
+                    _ => unreachable!(),
+                };
+                assert!(
+                    (at_tau - expected).abs() < 2e-6,
+                    "{law:?} gate semantics changed for logit={gate_logit}: \
+                     got={at_tau}, expected={expected}"
+                );
+
+                let mut previous = 0.0_f32;
+                for ratio in [0.0_f32, 1e-6, 1e-4, 0.01, 0.1, 1.0, 10.0, 100.0] {
+                    let sigma = candidate_gate_sigma(law, gate_logit, tau, tau * ratio);
+                    assert!(
+                        sigma.is_finite() && (0.0..=1.0).contains(&sigma),
+                        "{law:?} non-finite/out-of-range sigma for logit={gate_logit}, ratio={ratio}: {sigma}"
+                    );
+                    assert!(
+                        sigma >= previous,
+                        "{law:?} lost monotonicity for logit={gate_logit}, ratio={ratio}"
+                    );
+                    previous = sigma;
+                }
+
+                for ratio in [0.1_f32, 1.0, 10.0] {
+                    let dt = tau * ratio;
+                    let full_retention = 1.0 - candidate_gate_sigma(law, gate_logit, tau, dt);
+                    for parts in [2_i32, 5, 16] {
+                        let part_dt = dt / parts as f32;
+                        let part_retention =
+                            1.0 - candidate_gate_sigma(law, gate_logit, tau, part_dt);
+                        let partitioned = part_retention.powi(parts);
+                        assert!(
+                            (full_retention - partitioned).abs() < 3e-5,
+                            "{law:?} partition error for logit={gate_logit}, \
+                             ratio={ratio}, parts={parts}: full={full_retention}, \
+                             partitioned={partitioned}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     /// The active scalar-gate neuron should be equivariant to a consistent
     /// relabeling of hypervector coordinates. Coordinate indices are not
     /// semantic channels unless an explicit basis/partition says otherwise.
