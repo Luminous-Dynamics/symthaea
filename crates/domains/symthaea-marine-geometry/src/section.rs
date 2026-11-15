@@ -344,10 +344,12 @@ pub fn generate_sections(
             }
         }
 
-        let sheer = station
-            .control_points
-            .last()
-            .expect("validated sections have at least two controls");
+        let Some(sheer) = station.control_points.last() else {
+            return Err(vec![SectionViolation {
+                code: "section_control_count".into(),
+                detail: format!("station {station_index} lost its required control points"),
+            }]);
+        };
         points.push([
             x_m,
             local_half_beam_m * sheer.breadth_fraction,
