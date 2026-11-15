@@ -806,9 +806,15 @@ fn target_mapping_known_answer_vectors() -> bool {
         round: 1000,
         verified_randomness: &randomness,
     };
+    let expected_digest = [
+        0xcd, 0x4e, 0xd4, 0xb3, 0xa8, 0xab, 0x1d, 0xa6, 0x18, 0x5e, 0xa3, 0xa5, 0x35, 0xbd, 0x6b,
+        0x87, 0xb7, 0x18, 0x62, 0xf6, 0x06, 0xa9, 0xd0, 0x3c, 0xc5, 0xa3, 0x88, 0xe8, 0xb8, 0x54,
+        0xbd, 0xe6,
+    ];
+    let actual_digest = target_mapping_digest(&context, 0);
     let four = derive_target_index_from_verified_beacon(4, &context);
     let five = derive_target_index_from_verified_beacon(5, &context);
-    four == Ok(2) && five == Ok(2)
+    actual_digest == Ok(expected_digest) && four == Ok(2) && five == Ok(2)
 }
 
 fn target_order_permutation_recomputes(choices: usize, seed: u64, profile: &str) -> bool {
@@ -1245,6 +1251,24 @@ mod tests {
     #[test]
     fn target_mapping_matches_independent_four_and_five_choice_vectors() {
         assert!(target_mapping_known_answer_vectors());
+    }
+
+    #[test]
+    fn target_mapping_rejects_unsupported_choice_count() {
+        let chain_hash = [0x52_u8; 32];
+        let randomness = [0xfe_u8; 32];
+        let commitment = [0x01_u8; 32];
+        let context = TargetMappingContext {
+            protocol_id: "protocol-v1",
+            campaign_id: "campaign-1",
+            trial_id: "trial-1",
+            chain_hash: &chain_hash,
+            scheme_id: "scheme-a",
+            response_commitment: &commitment,
+            round: 1,
+            verified_randomness: &randomness,
+        };
+        assert!(derive_target_index_from_verified_beacon(3, &context).is_err());
     }
 
     #[test]
