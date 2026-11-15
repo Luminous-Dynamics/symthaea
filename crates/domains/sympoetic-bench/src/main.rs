@@ -77,7 +77,7 @@ fn main() -> Result<()> {
             println!("{}", serde_json::to_string_pretty(&receipt)?);
             if receipt.unresolved_unknown_outcome_count != 0 {
                 bail!(
-                    "trace is structurally valid but incomplete: an unknown tool outcome remains unreconciled"
+                    "trace is incomplete: an unknown tool outcome remains unreconciled"
                 );
             }
         }
