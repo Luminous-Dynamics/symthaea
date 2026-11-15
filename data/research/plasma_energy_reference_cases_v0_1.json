@@ -2198,6 +2198,27 @@
         "currency_year_and_functional_unit_must_match": true
       },
       "rationale": "The combined stretch envelope challenges the 2026 review's separate shock-wave cost/conversion point and microwave conversion/selectivity point. It is a deliberate target for a new Pareto frontier, not a reported existing result."
+    },
+    {
+      "target_id": "NH3-PLASMA-SYNTHESIS-FULL-CHAIN-001",
+      "lane": "AMMONIA_SYNTHESIS",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026",
+        "NH3-PLASMA-SYNTHESIS-ENERGY-ROADMAP-2026"
+      ],
+      "metric_thresholds": {
+        "ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh": 3,
+        "all_thresholds_must_hold_at_same_operating_point": true
+      },
+      "claim_guards": {
+        "hydrogen_generation_energy_included": true,
+        "plasma_and_electrolysis_electricity_included": true,
+        "gas_feed_and_product_separation_energy_included": true,
+        "accepted_nh3_product_purity_and_pressure_contract_required": true,
+        "matched_haber_bosch_baseline_includes_hydrogen_energy": true
+      },
+      "rationale": "The current review's 0.3–3 g NH3/kWh plasma range is not a matched full-chain comparison because hydrogen-production energy is omitted. The challenge is to reach at least 3 g accepted NH3/kWh after including H2 generation, plasma, electrolysis, gas handling and product separation, then compare with Haber-Bosch under the same boundary."
     }
   ]
 }
