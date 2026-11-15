@@ -24,6 +24,12 @@ The G3a contract is under development for [issue #12376](https://github.com/Lumi
 
 The initial qualification profile accepts released ISO 10303-242:2025 Edition 4; it does not silently promote AP214 or the Edition 5 committee draft. Full-external-hull semantics require explicit deck/freeboard representation and an exact B-rep target. G2b displacement-volume shells remain a distinct semantic class.
 
+Verify a receipt from the workspace root:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-cad-receipt-verify -- translation-receipt.json
+
+Exit codes: 0 = qualified within the declared profile; 1 = not qualified/incomplete; 2 = CLI, I/O or parse error.
+
 The contract is not a STEP parser/writer or CAD kernel. It validates receipt completeness and consistency; real file conversion and independent B-rep validation belong to later G3b/G3c backend adapters.
 
 See [CAD_INTEROP_PROTOCOL.md](./CAD_INTEROP_PROTOCOL.md) for the standard/version policy, representation semantics, validation metrics, negative controls and cross-kernel benchmark sequence.
