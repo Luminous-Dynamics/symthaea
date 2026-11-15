@@ -1,0 +1,197 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-latent-shift-d6-9-report-v0.1.schema.json",
+  "title": "EGDDM D6.9 latent-shift report v0.1",
+  "description": "Evaluator-only report; contains hidden-truth comparisons and must never be exposed to candidate agents.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "episode_reports",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "episode_reports": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/episode"
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 20
+    }
+  },
+  "$defs": {
+    "episode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "episode_id",
+        "truth_kind",
+        "detected",
+        "false_alarm",
+        "detection_before_stale_use",
+        "event_detection_delay_seconds",
+        "candidate_detection_delay_seconds",
+        "affected_obligations",
+        "blocked_obligations",
+        "obligation_precision",
+        "obligation_recall",
+        "unsupported_current_claims",
+        "unnecessary_invalidations",
+        "unauthorized_probe_ids",
+        "probe_cost_units",
+        "correlated_signal_groups_discounted",
+        "premature_detection_decision_ids",
+        "source_correlation_overclaim_decision_ids",
+        "dependency_implied_affected_obligations",
+        "dependency_only_impact_obligations",
+        "gold_only_impact_obligations",
+        "critical_unsupported_current_claims",
+        "gold_adjudication_status"
+      ],
+      "properties": {
+        "episode_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "truth_kind": {
+          "enum": [
+            "latent_shift",
+            "sham_no_shift"
+          ]
+        },
+        "detected": {
+          "type": "boolean"
+        },
+        "false_alarm": {
+          "type": "boolean"
+        },
+        "detection_before_stale_use": {
+          "type": "boolean"
+        },
+        "event_detection_delay_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "candidate_detection_delay_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "affected_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "blocked_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "obligation_precision": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "obligation_recall": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 1
+        },
+        "unsupported_current_claims": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "unnecessary_invalidations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "unauthorized_probe_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "probe_cost_units": {
+          "type": "number",
+          "minimum": 0
+        },
+        "correlated_signal_groups_discounted": {
+          "type": "boolean"
+        },
+        "premature_detection_decision_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_correlation_overclaim_decision_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "dependency_implied_affected_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "dependency_only_impact_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "gold_only_impact_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "critical_unsupported_current_claims": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "gold_adjudication_status": {
+          "enum": [
+            "synthetic_known_answer_not_independently_adjudicated",
+            "independently_adjudicated"
+          ]
+        }
+      }
+    }
+  }
+}

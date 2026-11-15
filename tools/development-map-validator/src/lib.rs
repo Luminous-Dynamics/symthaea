@@ -12,6 +12,7 @@ pub mod temporal_replay;
 pub mod workspace_shift;
 pub mod selective_revalidation;
 pub mod multi_shift_sequence;
+pub mod latent_shift;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 

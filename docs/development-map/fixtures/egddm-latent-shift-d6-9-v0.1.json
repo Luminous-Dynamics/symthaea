@@ -1,0 +1,369 @@
+{
+  "bundle_id": "egddm-d6-9-latent-shift-known-answer-001",
+  "bundle_visibility": "evaluator_only_never_candidate_visible",
+  "episodes": [
+    {
+      "candidate_view": {
+        "episode_id": "silent-runner-drift",
+        "observations": [
+          {
+            "observation_id": "obs-runner-baseline",
+            "available_at": "2026-11-15T09:58:01Z",
+            "observed_at": "2026-11-15T09:58:00Z",
+            "source_family": "runner-attestation",
+            "signal_kind": "baseline",
+            "value": "runner fingerprint r1",
+            "upstream_source_id": "runner-root-1"
+          },
+          {
+            "observation_id": "obs-latency-spike",
+            "available_at": "2026-11-15T10:02:05Z",
+            "observed_at": "2026-11-15T10:02:00Z",
+            "source_family": "build-telemetry",
+            "signal_kind": "symptom",
+            "value": "build p95 latency 3.2x baseline",
+            "upstream_source_id": "build-telemetry-root"
+          },
+          {
+            "observation_id": "obs-cache-miss-spike",
+            "available_at": "2026-11-15T10:02:10Z",
+            "observed_at": "2026-11-15T10:02:03Z",
+            "source_family": "build-telemetry",
+            "signal_kind": "symptom",
+            "value": "cache miss rate 2.8x baseline",
+            "upstream_source_id": "build-telemetry-root"
+          }
+        ],
+        "obligations": [
+          {
+            "obligation_id": "build-repro",
+            "critical": true,
+            "dependency_dimensions": [
+              "source_tree",
+              "runner_image",
+              "toolchain"
+            ],
+            "baseline_receipt_id": "receipt:build0"
+          },
+          {
+            "obligation_id": "api-compat",
+            "critical": true,
+            "dependency_dimensions": [
+              "source_tree",
+              "runner_image",
+              "toolchain",
+              "api_contract"
+            ],
+            "baseline_receipt_id": "receipt:api0"
+          },
+          {
+            "obligation_id": "release-authority",
+            "critical": true,
+            "dependency_dimensions": [
+              "policy",
+              "issuer"
+            ],
+            "baseline_receipt_id": "receipt:authority0"
+          },
+          {
+            "obligation_id": "docs-format",
+            "critical": false,
+            "dependency_dimensions": [
+              "docs_contract"
+            ],
+            "baseline_receipt_id": "receipt:docs0"
+          }
+        ],
+        "diagnostic_probes": [
+          {
+            "probe_id": "runner-identity-read",
+            "scope": "read runner fingerprint",
+            "authorization": "read_only_authorized",
+            "source_family": "runner-attestation",
+            "cost_units": 2,
+            "expected_latency_seconds": 45,
+            "target_impact": "none"
+          }
+        ],
+        "initial_validity_claims": [
+          "build-repro",
+          "api-compat",
+          "release-authority",
+          "docs-format"
+        ]
+      },
+      "candidate_trace": {
+        "trace_id": "agent-latent-runner-drift",
+        "episode_id": "silent-runner-drift",
+        "probe_requests": [
+          {
+            "probe_id": "runner-identity-read",
+            "requested_at": "2026-11-15T10:03:00Z",
+            "response_observation_id": "obs-runner-r2"
+          }
+        ],
+        "decisions": [
+          {
+            "decision_id": "decision-uncertain",
+            "decision_at": "2026-11-15T10:02:30Z",
+            "shift_disposition": "possible_shift",
+            "suspected_cause_families": [
+              "runner_or_build_environment"
+            ],
+            "claimed_current_obligations": [
+              "release-authority",
+              "docs-format"
+            ],
+            "blocked_obligations": [
+              "build-repro",
+              "api-compat"
+            ],
+            "uses_prior_evidence": true,
+            "observation_ids_used": [
+              "obs-latency-spike",
+              "obs-cache-miss-spike"
+            ],
+            "claimed_independent_source_count": 1
+          },
+          {
+            "decision_id": "decision-detected",
+            "decision_at": "2026-11-15T10:04:10Z",
+            "shift_disposition": "shift_detected",
+            "suspected_cause_families": [
+              "runner_image"
+            ],
+            "claimed_current_obligations": [
+              "release-authority",
+              "docs-format"
+            ],
+            "blocked_obligations": [
+              "build-repro",
+              "api-compat"
+            ],
+            "uses_prior_evidence": true,
+            "observation_ids_used": [
+              "obs-latency-spike",
+              "obs-cache-miss-spike",
+              "obs-runner-r2"
+            ],
+            "claimed_independent_source_count": 2
+          }
+        ],
+        "probe_responses": [
+          {
+            "observation_id": "obs-runner-r2",
+            "available_at": "2026-11-15T10:04:00Z",
+            "observed_at": "2026-11-15T10:03:55Z",
+            "source_family": "runner-attestation",
+            "signal_kind": "probe_result",
+            "value": "runner fingerprint r2",
+            "upstream_source_id": "runner-root-2"
+          }
+        ]
+      },
+      "gold_overlay": {
+        "visibility": "evaluator_only",
+        "truth_kind": "latent_shift",
+        "hidden_event_time": "2026-11-15T10:01:00Z",
+        "changed_dimensions": [
+          "runner_image"
+        ],
+        "affected_obligations": [
+          "api-compat",
+          "build-repro"
+        ],
+        "unaffected_obligations": [
+          "docs-format",
+          "release-authority"
+        ],
+        "correlated_source_groups": [
+          [
+            "obs-latency-spike",
+            "obs-cache-miss-spike"
+          ]
+        ],
+        "first_sufficient_observation_available_at": "2026-11-15T10:04:00Z",
+        "adjudication_status": "synthetic_known_answer_not_independently_adjudicated"
+      },
+      "expected_summary": {
+        "detected": true,
+        "false_alarm": false,
+        "detection_before_stale_use": true,
+        "affected_precision": 1,
+        "affected_recall": 1,
+        "unsupported_current_claims": [],
+        "unnecessary_invalidations": [],
+        "probe_cost_units": 2
+      }
+    },
+    {
+      "candidate_view": {
+        "episode_id": "sham-load-noise",
+        "observations": [
+          {
+            "observation_id": "obs-sham-runner-baseline",
+            "available_at": "2026-11-15T09:58:01Z",
+            "observed_at": "2026-11-15T09:58:00Z",
+            "source_family": "runner-attestation",
+            "signal_kind": "baseline",
+            "value": "runner fingerprint r1",
+            "upstream_source_id": "runner-root-1"
+          },
+          {
+            "observation_id": "obs-sham-latency-spike",
+            "available_at": "2026-11-15T10:02:05Z",
+            "observed_at": "2026-11-15T10:02:00Z",
+            "source_family": "build-telemetry",
+            "signal_kind": "symptom",
+            "value": "build p95 latency 3.0x baseline",
+            "upstream_source_id": "build-telemetry-root"
+          },
+          {
+            "observation_id": "obs-sham-cache-miss-spike",
+            "available_at": "2026-11-15T10:02:10Z",
+            "observed_at": "2026-11-15T10:02:03Z",
+            "source_family": "build-telemetry",
+            "signal_kind": "symptom",
+            "value": "cache miss rate 2.7x baseline",
+            "upstream_source_id": "build-telemetry-root"
+          }
+        ],
+        "obligations": [
+          {
+            "obligation_id": "build-repro",
+            "critical": true,
+            "dependency_dimensions": [
+              "source_tree",
+              "runner_image",
+              "toolchain"
+            ],
+            "baseline_receipt_id": "receipt:build0"
+          },
+          {
+            "obligation_id": "api-compat",
+            "critical": true,
+            "dependency_dimensions": [
+              "source_tree",
+              "runner_image",
+              "toolchain",
+              "api_contract"
+            ],
+            "baseline_receipt_id": "receipt:api0"
+          },
+          {
+            "obligation_id": "release-authority",
+            "critical": true,
+            "dependency_dimensions": [
+              "policy",
+              "issuer"
+            ],
+            "baseline_receipt_id": "receipt:authority0"
+          },
+          {
+            "obligation_id": "docs-format",
+            "critical": false,
+            "dependency_dimensions": [
+              "docs_contract"
+            ],
+            "baseline_receipt_id": "receipt:docs0"
+          }
+        ],
+        "diagnostic_probes": [
+          {
+            "probe_id": "runner-identity-read",
+            "scope": "read runner fingerprint",
+            "authorization": "read_only_authorized",
+            "source_family": "runner-attestation",
+            "cost_units": 2,
+            "expected_latency_seconds": 45,
+            "target_impact": "none"
+          }
+        ],
+        "initial_validity_claims": [
+          "build-repro",
+          "api-compat",
+          "release-authority",
+          "docs-format"
+        ]
+      },
+      "candidate_trace": {
+        "trace_id": "agent-sham-no-shift",
+        "episode_id": "sham-load-noise",
+        "probe_requests": [
+          {
+            "probe_id": "runner-identity-read",
+            "requested_at": "2026-11-15T10:03:00Z",
+            "response_observation_id": "obs-runner-r1"
+          }
+        ],
+        "decisions": [
+          {
+            "decision_id": "decision-no-shift",
+            "decision_at": "2026-11-15T10:04:10Z",
+            "shift_disposition": "no_shift",
+            "suspected_cause_families": [
+              "transient_load_or_noise"
+            ],
+            "claimed_current_obligations": [
+              "build-repro",
+              "api-compat",
+              "release-authority",
+              "docs-format"
+            ],
+            "blocked_obligations": [],
+            "uses_prior_evidence": true,
+            "observation_ids_used": [
+              "obs-sham-latency-spike",
+              "obs-sham-cache-miss-spike",
+              "obs-runner-r1"
+            ],
+            "claimed_independent_source_count": 2
+          }
+        ],
+        "probe_responses": [
+          {
+            "observation_id": "obs-runner-r1",
+            "available_at": "2026-11-15T10:04:00Z",
+            "observed_at": "2026-11-15T10:03:55Z",
+            "source_family": "runner-attestation",
+            "signal_kind": "probe_result",
+            "value": "runner fingerprint r1",
+            "upstream_source_id": "runner-root-1"
+          }
+        ]
+      },
+      "gold_overlay": {
+        "visibility": "evaluator_only",
+        "truth_kind": "sham_no_shift",
+        "hidden_event_time": "2026-11-15T10:01:00Z",
+        "changed_dimensions": [],
+        "affected_obligations": [],
+        "unaffected_obligations": [
+          "build-repro",
+          "api-compat",
+          "release-authority",
+          "docs-format"
+        ],
+        "correlated_source_groups": [
+          [
+            "obs-sham-latency-spike",
+            "obs-sham-cache-miss-spike"
+          ]
+        ],
+        "first_sufficient_observation_available_at": "2026-11-15T10:04:00Z",
+        "adjudication_status": "synthetic_known_answer_not_independently_adjudicated"
+      },
+      "expected_summary": {
+        "detected": false,
+        "false_alarm": false,
+        "detection_before_stale_use": true,
+        "affected_precision": null,
+        "affected_recall": null,
+        "unsupported_current_claims": [],
+        "unnecessary_invalidations": [],
+        "probe_cost_units": 2
+      }
+    }
+  ],
+  "claim_ceiling": "Synthetic candidate-observation and evaluator-truth separation example. It demonstrates a known-answer silent-runner-shift vs sham-signal distinction only; no detector, model performance, independent gold adjudication, measured cost, or production monitoring guarantee is established."
+}

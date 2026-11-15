@@ -1,0 +1,67 @@
+{
+  "episode_reports": [
+    {
+      "episode_id": "silent-runner-drift",
+      "truth_kind": "latent_shift",
+      "detected": true,
+      "false_alarm": false,
+      "detection_before_stale_use": true,
+      "premature_detection_decision_ids": [],
+      "event_detection_delay_seconds": 190,
+      "candidate_detection_delay_seconds": 125,
+      "affected_obligations": [
+        "api-compat",
+        "build-repro"
+      ],
+      "blocked_obligations": [
+        "api-compat",
+        "build-repro"
+      ],
+      "obligation_precision": 1,
+      "obligation_recall": 1,
+      "unsupported_current_claims": [],
+      "unnecessary_invalidations": [],
+      "unauthorized_probe_ids": [],
+      "probe_cost_units": 2,
+      "source_correlation_overclaim_decision_ids": [],
+      "correlated_signal_groups_discounted": true,
+      "dependency_implied_affected_obligations": [
+        "api-compat",
+        "build-repro"
+      ],
+      "dependency_only_impact_obligations": [],
+      "gold_only_impact_obligations": [],
+      "critical_unsupported_current_claims": [],
+      "gold_adjudication_status": "synthetic_known_answer_not_independently_adjudicated"
+    },
+    {
+      "episode_id": "sham-load-noise",
+      "truth_kind": "sham_no_shift",
+      "detected": false,
+      "false_alarm": false,
+      "detection_before_stale_use": true,
+      "premature_detection_decision_ids": [],
+      "event_detection_delay_seconds": null,
+      "candidate_detection_delay_seconds": null,
+      "affected_obligations": [],
+      "blocked_obligations": [],
+      "obligation_precision": null,
+      "obligation_recall": null,
+      "unsupported_current_claims": [],
+      "unnecessary_invalidations": [],
+      "unauthorized_probe_ids": [],
+      "probe_cost_units": 2,
+      "source_correlation_overclaim_decision_ids": [],
+      "correlated_signal_groups_discounted": true,
+      "dependency_implied_affected_obligations": [
+        "api-compat",
+        "build-repro"
+      ],
+      "dependency_only_impact_obligations": [],
+      "gold_only_impact_obligations": [],
+      "critical_unsupported_current_claims": [],
+      "gold_adjudication_status": "synthetic_known_answer_not_independently_adjudicated"
+    }
+  ],
+  "claim_ceiling": "Deterministic scoring of supplied candidate-visible observations and evaluator-side latent-shift labels. Does not authenticate observation producers, independently adjudicate hidden truth, implement a detector or probe planner, or establish production monitoring reliability."
+}
