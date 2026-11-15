@@ -24,6 +24,8 @@
 
 | OHAI persistent human-AI teams (Frontiers, Oct 2026) | Distinguishes system configuration, enacted collective functioning, and multi-task collective intelligence over repeated cycles | Theoretical framework with a staged empirical programme; direct longitudinal team evidence remains limited | Add versioned team-cycle receipts, state continuity, membership/authority changes, consent-scoped memory, and a separate evidential threshold for CI claims |
 
+For concrete release gates, pilot targets, and external comparison requirements, see the [Competitive Benchmark Targets](sympoetic/COMPETITIVE_BENCHMARK_TARGETS.md) protocol.
+
 ## 2. Findings that shape our design
 
 The 2026 common-ground benchmark formalizes shared assumptions, goals, situation awareness, joint action and repair as core conditions for collaboration. This is a strong reference for SympoeticBench's common-ground and repair tasks.
