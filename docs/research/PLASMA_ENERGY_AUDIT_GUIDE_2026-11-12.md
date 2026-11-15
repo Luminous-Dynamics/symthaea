@@ -326,3 +326,12 @@ The fifth machine-readable target, `NH3-THERMAL-INTEGRATION-FULL-CHAIN-001`, bin
 The Rust audit requires all thresholds at the same point and validates the paired baseline, full-grid boundary, measured useful heat, exchanger/insulation pressure drop and auxiliary loads, thermal storage losses, no double counting of heat/reaction enthalpy, thermal closure with uncertainty, unchanged product contract, matched duty cycle, and grouped uncertainty-supported repeats.
 
 Four new tests check the valid target and reject a missing no-double-count guard, a reduction below the 15% floor, and a target that allows metrics to come from different operating points. This benchmark is a research objective and does not assert that the paper's 150 g/h point also achieved >99% conversion.
+
+
+## 9.24 N2 vibrational-state transfer and catalyst-interface evidence audit
+
+The merged manifest now contains 41 source cases / 64 negative controls / 5 derived checks / 6 research targets. The new case-level audit for `NH3-PLASMA-ELECTROCATALYSIS-JACS-2026` requires source-separated physical controls, Raman and product observations, and preserves the reported 4,300 K / 11.8% values as model-derived only.
+
+The six-target corpus includes `NH3-PLASMA-N2V-TRANSFER-CAUSAL-001`; its target validator requires a state-resolved catalyst-interface measurement or independently qualified measurement operator, discharge-to-interface transfer uncertainty, isotope attribution, matched thermal/electrical controls and full plant boundary.
+
+The Rust audit module now has 55 authored tests. The latest run on the earlier 55-test revision exposed one valid-target test-fixture omission; the production validator was retained and the fixture guard routing corrected. The corrected exact-head workflow is queued; no pass is claimed until it completes.
