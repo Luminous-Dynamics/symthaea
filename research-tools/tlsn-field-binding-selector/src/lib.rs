@@ -127,6 +127,14 @@ pub enum FieldSelectorError {
     SelectedValueNotString,
     #[error("the undisclosed range is not exactly the selected JSON string contents")]
     HiddenRangeNotSelectedField,
+    #[error("an authenticated visible range is empty or out of bounds")]
+    InvalidVisibleRange,
+    #[error("authenticated visible ranges are not sorted by offset")]
+    VisibleRangesNotOrdered,
+    #[error("authenticated visible ranges overlap")]
+    VisibleRangesOverlap,
+    #[error("packed authenticated bytes do not equal the total visible range length")]
+    VisibleBytesLengthMismatch,
 }
 
 #[derive(Debug)]
@@ -267,6 +275,67 @@ pub fn select_json_field_v1(
         value_kind: selected_kind,
         body_range,
     })
+}
+
+/// Build a disclosure view from authenticated visible transcript ranges.
+///
+/// `visible_ranges` must be the exact, sorted, non-overlapping authenticated
+/// ranges returned by a separately verified TLSNotary transcript opening.
+/// `packed_visible_bytes` must concatenate those ranges in that same order.
+/// Every byte not covered by a supplied range remains `None` (undisclosed).
+///
+/// This helper does not authenticate either argument. A caller must not pass
+/// raw prover-supplied ranges/bytes here before TLSNotary proof verification.
+pub fn partial_bytes_from_visible_ranges_v1(
+    total_len: usize,
+    visible_ranges: &[Range<usize>],
+    packed_visible_bytes: &[u8],
+    limits: FieldSelectorLimits,
+) -> Result<Vec<Option<u8>>, FieldSelectorError> {
+    if total_len > limits.max_document_bytes {
+        return Err(FieldSelectorError::DocumentTooLarge);
+    }
+
+    let mut visible_total = 0usize;
+    let mut previous_end = None;
+    for range in visible_ranges {
+        if range.start >= range.end || range.end > total_len {
+            return Err(FieldSelectorError::InvalidVisibleRange);
+        }
+        if let Some(end) = previous_end {
+            if range.start < end {
+                return Err(FieldSelectorError::VisibleRangesOverlap);
+            }
+            if range.start < end {
+                return Err(FieldSelectorError::VisibleRangesNotOrdered);
+            }
+        }
+        visible_total = visible_total
+            .checked_add(range.end - range.start)
+            .ok_or(FieldSelectorError::OffsetOverflow)?;
+        previous_end = Some(range.end);
+    }
+
+    if visible_total != packed_visible_bytes.len() {
+        return Err(FieldSelectorError::VisibleBytesLengthMismatch);
+    }
+
+    let mut partial = vec![None; total_len];
+    let mut packed_offset = 0usize;
+    for range in visible_ranges {
+        let range_len = range.end - range.start;
+        let packed_end = packed_offset
+            .checked_add(range_len)
+            .ok_or(FieldSelectorError::OffsetOverflow)?;
+        let source = packed_visible_bytes
+            .get(packed_offset..packed_end)
+            .ok_or(FieldSelectorError::VisibleBytesLengthMismatch)?;
+        for (target, byte) in partial[range.clone()].iter_mut().zip(source.iter()) {
+            *target = Some(*byte);
+        }
+        packed_offset = packed_end;
+    }
+    Ok(partial)
 }
 
 /// Result of binding one hidden string's contents to a verifier-selected JSON Pointer.
@@ -628,6 +697,62 @@ mod tests {
         assert_eq!(selected_bytes(document, &composed), br#""composed""#);
         assert_eq!(selected_bytes(document, &decomposed), br#""decomposed""#);
         assert_ne!(composed.body_range, decomposed.body_range);
+    }
+
+    #[test]
+    fn reconstructs_sparse_visible_ranges_without_filling_hidden_gap() {
+        let original = b"abcDEFghi";
+        let partial = partial_bytes_from_visible_ranges_v1(
+            original.len(), &[0..3, 6..9], b"abcghi", FieldSelectorLimits::default(),
+        ).unwrap();
+        assert_eq!(&partial[..3], &[Some(b'a'), Some(b'b'), Some(b'c')]);
+        assert_eq!(&partial[3..6], &[None, None, None]);
+        assert_eq!(&partial[6..], &[Some(b'g'), Some(b'h'), Some(b'i')]);
+    }
+
+    #[test]
+    fn sparse_ranges_feed_hidden_field_binding() {
+        let body = br#"{"dob":"1985-03-12","age":40}"#;
+        let field = select_json_field_v1(body, "/dob", FieldSelectorLimits::default()).unwrap();
+        let hidden = (field.body_range.start + 1)..(field.body_range.end - 1);
+        let mut ranges = Vec::new();
+        if hidden.start > 0 { ranges.push(0..hidden.start); }
+        if hidden.end < body.len() { ranges.push(hidden.end..body.len()); }
+        let packed = ranges.iter().flat_map(|range| body[range.clone()].iter().copied()).collect::<Vec<_>>();
+        let partial = partial_bytes_from_visible_ranges_v1(body.len(), &ranges, &packed, FieldSelectorLimits::default()).unwrap();
+        let binding = bind_single_hidden_string_field_v1(&partial, "/dob", FieldSelectorLimits::default()).unwrap();
+        assert_eq!(binding.hidden_content_range, hidden);
+    }
+
+    #[test]
+    fn sparse_range_adapter_rejects_empty_range() {
+        assert_eq!(partial_bytes_from_visible_ranges_v1(4, &[1..1], b"", FieldSelectorLimits::default()), Err(FieldSelectorError::InvalidVisibleRange));
+    }
+
+    #[test]
+    fn sparse_range_adapter_rejects_out_of_bounds_range() {
+        assert_eq!(partial_bytes_from_visible_ranges_v1(4, &[1..5], b"abcd", FieldSelectorLimits::default()), Err(FieldSelectorError::InvalidVisibleRange));
+    }
+
+    #[test]
+    fn sparse_range_adapter_rejects_overlapping_ranges() {
+        assert_eq!(partial_bytes_from_visible_ranges_v1(6, &[0..4, 3..6], b"abcdefg", FieldSelectorLimits::default()), Err(FieldSelectorError::VisibleRangesOverlap));
+    }
+
+    #[test]
+    fn sparse_range_adapter_rejects_unsorted_ranges() {
+        assert_eq!(partial_bytes_from_visible_ranges_v1(6, &[3..6, 0..2], b"abcde", FieldSelectorLimits::default()), Err(FieldSelectorError::VisibleRangesNotOrdered));
+    }
+
+    #[test]
+    fn sparse_range_adapter_rejects_packed_length_mismatch() {
+        assert_eq!(partial_bytes_from_visible_ranges_v1(6, &[0..2, 4..6], b"abc", FieldSelectorLimits::default()), Err(FieldSelectorError::VisibleBytesLengthMismatch));
+    }
+
+    #[test]
+    fn sparse_range_adapter_enforces_total_length_limit() {
+        let limits = FieldSelectorLimits { max_document_bytes: 2, ..FieldSelectorLimits::default() };
+        assert_eq!(partial_bytes_from_visible_ranges_v1(3, &[], b"", limits), Err(FieldSelectorError::DocumentTooLarge));
     }
 
     #[test]
