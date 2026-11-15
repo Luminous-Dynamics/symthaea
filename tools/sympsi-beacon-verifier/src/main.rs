@@ -13,7 +13,9 @@ fn main() {
 fn run() -> Result<(), String> {
     let mut arguments = env::args().skip(1);
     if arguments.len() == 0 || arguments.len() > 2 {
-        return Err("usage: sympsi-beacon-verifier <round> <signature-hex-file> (exactly 48 bytes)".into());
+        return Err(
+            "usage: sympsi-beacon-verifier <round> <signature-hex-file> (exactly 48 bytes)".into(),
+        );
     }
 
     let requested_round = arguments
