@@ -187,27 +187,65 @@ pub fn validate_trajectory(
         }
 
         let mut change_ids = HashSet::new();
+        let mut change_targets = HashSet::new();
         for change in &cycle.changes {
             require_nonempty("change_id", &change.change_id)?;
             require_nonempty("change actor", &change.actor_principal_id)?;
             require_nonempty("change subject", &change.subject_principal_id)?;
             require_member("change_type", &change.change_type, CHANGE_TYPES)?;
             if !change_ids.insert(change.change_id.as_str()) {
-                bail!("cycle {} contains duplicate change_id {:?}", cycle.cycle_index, change.change_id);
+                bail!(
+                    "cycle {} contains duplicate change_id {:?}",
+                    cycle.cycle_index,
+                    change.change_id
+                );
             }
-            let actor_exists = cycle
+            if !change_targets.insert((change.change_type.as_str(), change.subject_principal_id.as_str())) {
+                bail!(
+                    "cycle {} contains duplicate {:?} events for subject {:?}",
+                    cycle.cycle_index,
+                    change.change_type,
+                    change.subject_principal_id
+                );
+            }
+
+            let actor = cycle
                 .members
                 .iter()
-                .any(|member| member.principal_id == change.actor_principal_id)
-                || previous_members
-                    .iter()
-                    .any(|member: &TeamMember| member.principal_id == change.actor_principal_id);
-            if !actor_exists {
+                .chain(previous_members.iter())
+                .find(|member: &&TeamMember| member.principal_id == change.actor_principal_id)
+                .with_context(|| {
+                    format!(
+                        "cycle {} change actor {:?} is not in the before/after roster",
+                        cycle.cycle_index,
+                        change.actor_principal_id
+                    )
+                })?;
+            if actor.participant_type != "human" {
                 bail!(
-                    "cycle {} change actor {:?} is not in the before/after roster",
+                    "cycle {} configuration change {:?} must be authorized by a human team member",
                     cycle.cycle_index,
-                    change.actor_principal_id
+                    change.change_id
                 );
+            }
+
+            if change.change_type == "memory_policy_changed" {
+                if change.subject_principal_id != trajectory.team_id {
+                    bail!("memory_policy_changed must target the team_id");
+                }
+            } else {
+                let subject_exists = cycle
+                    .members
+                    .iter()
+                    .chain(previous_members.iter())
+                    .any(|member| member.principal_id == change.subject_principal_id);
+                if !subject_exists {
+                    bail!(
+                        "cycle {} change subject {:?} is not in the before/after roster",
+                        cycle.cycle_index,
+                        change.subject_principal_id
+                    );
+                }
             }
         }
 
