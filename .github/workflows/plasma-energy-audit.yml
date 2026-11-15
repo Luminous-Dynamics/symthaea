@@ -36,15 +36,8 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-      - name: Format audit module and export exact Rust 1.96 output
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustfmt --edition 2024 xtask/src/plasma_energy_audit.rs
-          echo "PLASMA_AUDIT_RUSTFMT_BEGIN"
-          base64 -w0 xtask/src/plasma_energy_audit.rs
-          echo
-          echo "PLASMA_AUDIT_RUSTFMT_END"
+      - name: Format check of the exact audit module
+        run: rustfmt --edition 2024 --check xtask/src/plasma_energy_audit.rs
       - name: Prepare isolated xtask audit harness
         shell: bash
         run: |
@@ -85,9 +78,11 @@ jobs:
               xtask::plasma_energy_audit::print_report(&report, true)
           }
           EOF
+      - name: Resolve isolated harness lockfile offline
+        run: cargo generate-lockfile --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --offline
       - name: Unit tests for the exact xtask audit module
-        run: cargo test --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --locked
+        run: cargo test --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --locked --offline
       - name: Strict Clippy for the exact xtask audit module
-        run: cargo clippy --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --all-targets --locked -- -D warnings
+        run: cargo clippy --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --all-targets --locked --offline -- -D warnings
       - name: Audit frozen plasma and thermal source corpora
-        run: cargo run --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --locked
+        run: cargo run --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --locked --offline
