@@ -182,13 +182,22 @@ Composition requires `r(t+s) = r(t) r(s)`. Under continuity and `r(0)=1`, the sc
 
 \[r(\Delta t)=e^{-\lambda\Delta t},\qquad \sigma(\Delta t)=1-e^{-\lambda\Delta t}.\]
 
-One way to preserve the interpretation of `sigma_base` as the interpolation fraction at `dt = tau` is to define a rate:
+One way to preserve the interpretation of \`sigma_base\` as the interpolation fraction at \`dt = tau\` is to define a rate:
 
-\[\lambda=-\frac{\ln(1-\sigma_{\mathrm{base}})}{\tau},\qquad
-\sigma_{\mathrm{rate}}(\Delta t)=1-e^{-\lambda\Delta t}
-=1-(1-\sigma_{\mathrm{base}})^{\Delta t/\tau}.\]
+\\[\\lambda=-\\frac{\\ln(1-\\sigma_{\\mathrm{base}})}{\\tau},\\qquad
+\\sigma_{\\mathrm{rate}}(\\Delta t)=1-e^{-\\lambda\\Delta t}
+=1-(1-\\sigma_{\\mathrm{base}})^{\\Delta t/\\tau}.\\]
 
-This yields zero-time identity and exact interval-partition consistency **for the frozen-equilibrium scalar interpolation model**. A numerically stable implementation would use `ln_1p(-sigma_base)` and `-expm1(-lambda * dt)`, and should parameterize or clamp the rate so floating-point sigmoid saturation at exactly one cannot create an infinite rate.
+Let \`a = gate_activation * gating_steepness\`. Since \`sigma_base = sigmoid(a)\`, the identity \`-ln(1 - sigmoid(a)) = softplus(a)\` gives a better numerical implementation:
+
+\`\`\`rust
+let rate = stable_softplus(gate_activation * gating_steepness) / tau;
+let sigma = -(-rate * dt).exp_m1();
+\`\`\`
+
+Use a stable \`softplus(a) = max(a, 0) + ln1p(exp(-abs(a)))\` implementation. This avoids materializing a sigmoid that may round to exactly 1.0 before taking the logarithm of its complement. \`expm1\` preserves precision for small positive intervals. The mapping gives \`sigma(dt = tau) = sigma_base\` (up to rounding) and \`sigma(0) = 0\`.
+
+This yields zero-time identity and exact interval-partition consistency **for the frozen-equilibrium scalar interpolation model**. It does not establish exact flow for the state-dependent neuron.
 
 A scalar calculation illustrates why the distinction matters. With `sigma_base = 0.5` and `dt = tau`, the product candidate `sigma = sigma_base * (1 - exp(-dt/tau))` has retention `0.6839397` for one full step, but `0.6452352` for two half-steps. The partition discrepancy is about `0.0387045`. The exponential-rate mapping has matching retention for the one-step and two-half-step calculations (up to floating-point rounding). These are algebraic toy calculations, not Symthaea runtime measurements.
 
