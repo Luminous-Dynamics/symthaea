@@ -443,9 +443,18 @@ mod tests {
     }
 
     #[test]
-    fn oee_detects_performance_scaling_overflow() {
+    fn oee_rejects_extreme_performance_before_scaling() {
         assert_eq!(
             calculate_oee("asset", u64::MAX, 1, u64::MAX, u64::MAX, 1),
+            Err(KpiError::PerformanceAboveOneHundredPercent)
+        );
+    }
+
+
+    #[test]
+    fn internal_ratio_rejects_u128_scaling_overflow() {
+        assert_eq!(
+            ratio_ppm_u128(u128::MAX, 1),
             Err(KpiError::ArithmeticOverflow)
         );
     }
