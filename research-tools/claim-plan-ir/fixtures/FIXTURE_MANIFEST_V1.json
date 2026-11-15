@@ -16,8 +16,8 @@
   "negative": [
     {
       "path": "negative/unsafe_integer_literal.json",
-      "expected": "reject-json-schema",
-      "reason": "JCS/I-JSON exact-integer limit exceeded; large integers must be typed decimal strings."
+      "expected": "reject-raw-json-admission-before-schema",
+      "reason": "The strict parser rejects integers outside the JCS exact safe-integer range before a generic JSON value or canonicalizer can round or reinterpret them."
     },
     {
       "path": "negative/status_version_maturity_mismatch.json",
