@@ -88,9 +88,10 @@ A module name such as "CNC", "additive", "assembly" or "heat treatment" is not a
 
 The companion `capability-corpus-v0.1.json` defines:
 - 10 architecture families;
-- 8 heterogeneous product families;
-- 12 operating/disruption scenario families;
-- 16 hostile admission/reconfiguration cases;
+- 9 heterogeneous product families, including a synthetic continuous-process intermediate;
+- 9 process-module profiles, including a continuous chemical-process skid;
+- 13 operating/disruption scenario families;
+- 20 conformance cases: 3 positive synthetic cases and 17 hostile/negative cases;
 - 11 comparison policies;
 - 15 metrics kept separate.
 
