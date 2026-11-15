@@ -348,7 +348,7 @@ pub fn evaluate_cell_eligibility(
         || !is_sha256_hex(&requirement.required_parameter_digest_sha256)
     {
         out.add(EligibilityReasonCode::InvalidConfigurationDigest, EligibilitySeverity::Blocked, &config.configuration_ref);
-    } else if config.parameter_digest_sha256 != requirement.required_parameter_digest_sha256 {
+    } else if !config.parameter_digest_sha256.eq_ignore_ascii_case(&requirement.required_parameter_digest_sha256) {
         out.add(EligibilityReasonCode::ConfigurationDigestMismatch, EligibilitySeverity::Blocked, &config.configuration_ref);
     }
     if !config.operation_refs.contains(&requirement.operation_ref) {
