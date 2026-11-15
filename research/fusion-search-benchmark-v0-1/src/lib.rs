@@ -120,9 +120,8 @@ fn low_fidelity_margin(candidate: Candidate) -> i32 {
 
 pub fn reference_result(scenario: Scenario, candidate: Candidate) -> ReferenceResult {
     let ordinary_feasible = manhattan_distance(candidate) <= FEASIBLE_RADIUS;
-    let rare_island = scenario == Scenario::RareFeasibleIsland
-        && candidate.x == 61
-        && candidate.y == 61;
+    let rare_island =
+        scenario == Scenario::RareFeasibleIsland && candidate.x == 61 && candidate.y == 61;
     let feasible = ordinary_feasible || rare_island;
 
     let (service_a, service_b) = if rare_island {
@@ -225,8 +224,7 @@ fn ratio(numerator: usize, denominator: usize) -> Option<f64> {
 pub fn summarize(records: &[CandidateRecord], reference_labels_exhaustive: bool) -> Scorecard {
     let identities: BTreeSet<u32> = records.iter().map(|record| record.candidate.id).collect();
     let candidate_universe_coverage = identities.len() as f64 / CANDIDATE_COUNT as f64;
-    let exact_reference_metrics =
-        reference_labels_exhaustive && is_complete_universe(records);
+    let exact_reference_metrics = reference_labels_exhaustive && is_complete_universe(records);
 
     let screened_candidates = records
         .iter()
@@ -251,9 +249,7 @@ pub fn summarize(records: &[CandidateRecord], reference_labels_exhaustive: bool)
 
     let retained_feasible = records
         .iter()
-        .filter(|record| {
-            record.reference.feasible && record.analytical == Disposition::Passed
-        })
+        .filter(|record| record.reference.feasible && record.analytical == Disposition::Passed)
         .count();
     let retained_frontier = frontier
         .iter()
@@ -271,9 +267,7 @@ pub fn summarize(records: &[CandidateRecord], reference_labels_exhaustive: bool)
         .max();
     let best_observed_sum = records
         .iter()
-        .filter(|record| {
-            record.reference.feasible && record.high_fidelity == Disposition::Passed
-        })
+        .filter(|record| record.reference.feasible && record.high_fidelity == Disposition::Passed)
         .map(|record| record.reference.objective_sum())
         .max();
 
@@ -305,7 +299,9 @@ pub fn summarize(records: &[CandidateRecord], reference_labels_exhaustive: bool)
             None
         },
         best_objective_regret: if exact_reference_metrics {
-            best_reference_sum.zip(best_observed_sum).map(|(best, found)| best - found)
+            best_reference_sum
+                .zip(best_observed_sum)
+                .map(|(best, found)| best - found)
         } else {
             None
         },
