@@ -2,6 +2,10 @@
 
 Deterministic candidate manifests and a deliberately narrow Rust geometry-admission adapter for the MARINE-GEOMETRY-MANIFOLD-001 programme (#12302).
 
+## Research benchmark protocol
+
+The matched external comparison, metrics, uncertainty policy, target ladder, and implementation sequence are specified in [BENCHMARK_PROTOCOL.md](./BENCHMARK_PROTOCOL.md). It is a frozen research protocol and target set, not a claim that the current crate generates hulls or has achieved hydrodynamic performance.
+
 ## Current scope: G0/G1 slice
 
 This first implementation accepts a versioned JSON triangle mesh and checks:
