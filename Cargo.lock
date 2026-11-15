@@ -18756,6 +18756,7 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]
@@ -19243,6 +19244,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-marine-geometry"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "symthaea-markov"
 version = "0.1.0"
 dependencies = [
@@ -19257,15 +19267,6 @@ dependencies = [
  "serde",
  "serde_json",
  "symthaea-core",
-]
-
-[[package]]
-name = "symthaea-marine-geometry"
-version = "0.1.0"
-dependencies = [
- "blake3",
- "serde",
- "serde_json",
 ]
 
 [[package]]
