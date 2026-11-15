@@ -1,0 +1,390 @@
+{
+  "schema_version": "space-structural-codesign-cases/0.1",
+  "study_id": "SPACE-STRUCT-CODESIGN-SYNTHETIC-v0.1",
+  "claim_ceiling": "SYNTHETIC_CONFORMANCE_ONLY",
+  "source_repositories": [
+    "Luminous-Dynamics/symthaea",
+    "Luminous-Dynamics/symtropy"
+  ],
+  "warning": "All candidate identifiers and case dispositions are synthetic contract fixtures. No dimensions, load values, material properties, stress results, safety margins, mission costs, or flight/habitat recommendations are asserted.",
+  "authority_partition": {
+    "candidate_generation": "SYMTHAEA_PROPOSAL_ONLY",
+    "physics_execution": "SYMTROPY_OR_ALLOWLISTED_EXTERNAL_BACKEND",
+    "independent_verification": "SEPARATE_VERIFIER",
+    "physical_validation": "EXTERNAL_MEASUREMENT_REQUIRED",
+    "design_release": "HUMAN_COMPETENT_AUTHORITY_REQUIRED"
+  },
+  "admissibility_order": [
+    "IDENTITY",
+    "INPUT_SEMANTICS",
+    "MATERIAL_APPLICABILITY",
+    "MODEL_APPLICABILITY",
+    "EXECUTION_AND_CONVERGENCE",
+    "INDEPENDENT_COMPARISON",
+    "DECISION_ELIGIBILITY"
+  ],
+  "candidates": [
+    {
+      "candidate_id": "AG-RING-REF-001",
+      "family": "ROTATING_THIN_RING",
+      "context": "CISLUNAR_ARTIFICIAL_GRAVITY_HABITAT",
+      "geometry_subject": "SYNTHETIC_RING_GEOMETRY_A",
+      "material_subject": "SYNTHETIC_ISOTROPIC_MATERIAL_PROFILE_A",
+      "manufacturing_profile": "NOT_BOUND",
+      "load_profile": "STEADY_UNIFORM_ROTATION_ONLY",
+      "proposed_model": "SYMTROPY_THIN_RING_ANALYTICAL_V0_1",
+      "evidence_status": "DRAFT_ANALYTICAL_REFERENCE",
+      "expected_disposition": "ADMISSIBLE_RESTRICTED",
+      "permitted_use": "EQUATION_REFERENCE_SCREEN_ONLY",
+      "prohibited_claims": [
+        "HABITAT_STRENGTH",
+        "FLEXIBLE_MODE",
+        "BUCKLING",
+        "FATIGUE",
+        "JOINT_STRENGTH",
+        "PRESSURE_INTEGRITY",
+        "FLIGHT_QUALIFICATION"
+      ]
+    },
+    {
+      "candidate_id": "AG-SPOKE-REF-001",
+      "family": "UNIFORM_RADIAL_SPOKE",
+      "context": "CISLUNAR_ARTIFICIAL_GRAVITY_HABITAT",
+      "geometry_subject": "SYNTHETIC_RADIAL_SPOKE_A",
+      "material_subject": "SYNTHETIC_ISOTROPIC_MATERIAL_PROFILE_A",
+      "manufacturing_profile": "NOT_BOUND",
+      "load_profile": "STEADY_SELF_CENTRIFUGAL_LOAD_ONLY",
+      "proposed_model": "SYMTROPY_RADIAL_SPOKE_ANALYTICAL_V0_1",
+      "evidence_status": "DRAFT_ANALYTICAL_REFERENCE",
+      "expected_disposition": "ADMISSIBLE_RESTRICTED",
+      "permitted_use": "EQUATION_REFERENCE_SCREEN_ONLY",
+      "prohibited_claims": [
+        "RING_SPOKE_LOAD_SHARING",
+        "HUB_COMPLIANCE",
+        "FLEXIBLE_MODE",
+        "BUCKLING",
+        "FATIGUE",
+        "JOINT_STRENGTH",
+        "FLIGHT_QUALIFICATION"
+      ]
+    },
+    {
+      "candidate_id": "AG-RING-SPOKE-COUPLED-001",
+      "family": "RING_SPOKE_ASSEMBLY",
+      "context": "CISLUNAR_ARTIFICIAL_GRAVITY_HABITAT",
+      "geometry_subject": "SYNTHETIC_RING_SPOKE_ASSEMBLY_A",
+      "material_subject": "SYNTHETIC_MATERIAL_PROFILE_SET_A",
+      "manufacturing_profile": "NOT_BOUND",
+      "load_profile": "ROTATION_PLUS_ASSEMBLY_LOADS",
+      "proposed_model": "NO_ADMITTED_ASSEMBLY_MODEL",
+      "evidence_status": "MODEL_NOT_ADMITTED",
+      "expected_disposition": "OUT_OF_DOMAIN",
+      "permitted_use": "ARCHITECTURE_HYPOTHESIS_ONLY",
+      "prohibited_claims": [
+        "STRESS_DISTRIBUTION",
+        "LOAD_SHARING",
+        "STRUCTURAL_MASS_OPTIMUM",
+        "SAFETY",
+        "FLIGHT_QUALIFICATION"
+      ]
+    },
+    {
+      "candidate_id": "AG-SEGMENTED-JOINT-001",
+      "family": "SEGMENTED_ROTATING_RING",
+      "context": "CISLUNAR_ARTIFICIAL_GRAVITY_HABITAT",
+      "geometry_subject": "SYNTHETIC_SEGMENTED_RING_A",
+      "material_subject": "SYNTHETIC_MATERIAL_PROFILE_SET_A",
+      "manufacturing_profile": "SEGMENT_ASSEMBLY_PROFILE_UNQUALIFIED",
+      "load_profile": "ROTATION_AND_JOINT_TRANSFER",
+      "proposed_model": "NO_ADMITTED_JOINT_COMPLIANCE_MODEL",
+      "evidence_status": "JOINT_PROPERTIES_MISSING",
+      "expected_disposition": "NEEDS_EVIDENCE",
+      "permitted_use": "DESIGN_VARIABLE_DECLARATION_ONLY",
+      "prohibited_claims": [
+        "JOINT_STIFFNESS",
+        "JOINT_STRENGTH",
+        "FATIGUE_LIFE",
+        "STRUCTURAL_ACCEPTANCE"
+      ]
+    },
+    {
+      "candidate_id": "AG-COUNTER-ROTOR-001",
+      "family": "COUNTER_ROTATING_HABITAT",
+      "context": "CISLUNAR_ARTIFICIAL_GRAVITY_HABITAT",
+      "geometry_subject": "SYNTHETIC_PAIRED_ROTOR_A",
+      "material_subject": "SYNTHETIC_MATERIAL_PROFILE_SET_A",
+      "manufacturing_profile": "NOT_BOUND",
+      "load_profile": "ROTOR_DYNAMICS_BEARING_AND_TRANSIENT_LOADS",
+      "proposed_model": "RIGID_BODY_KINEMATICS_ONLY",
+      "evidence_status": "FLEXIBLE_DYNAMICS_NOT_ADMITTED",
+      "expected_disposition": "OUT_OF_DOMAIN",
+      "permitted_use": "ANGULAR_MOMENTUM_BOOKKEEPING_ONLY",
+      "prohibited_claims": [
+        "BEARING_LOAD",
+        "FLEXIBLE_MODE",
+        "DYNAMIC_STABILITY",
+        "STRUCTURAL_SAFETY"
+      ]
+    },
+    {
+      "candidate_id": "ORBITAL-TRUSS-2D-001",
+      "family": "PLANAR_PIN_JOINTED_TRUSS",
+      "context": "UNCREWED_ORBITAL_SHIPYARD_MODULE",
+      "geometry_subject": "SYNTHETIC_PLANAR_TRUSS_A",
+      "material_subject": "SYNTHETIC_MATERIAL_PROFILE_A",
+      "manufacturing_profile": "NOT_BOUND",
+      "load_profile": "PLANAR_NODAL_STATIC_LOADS",
+      "proposed_model": "SYTHAEA_DETERMINATE_2D_TRUSS_REFERENCE",
+      "evidence_status": "LEGACY_REFERENCE_PENDING_CHECKED_FACADE_QUALIFICATION",
+      "expected_disposition": "NEEDS_QUALIFICATION",
+      "permitted_use": "SYNTHETIC_REFERENCE_CASE_ONLY",
+      "prohibited_claims": [
+        "3D_TRUSS",
+        "FRAME_BENDING",
+        "INDETERMINATE_STRUCTURE",
+        "DYNAMIC_RESPONSE",
+        "AS_BUILT_ACCEPTANCE"
+      ]
+    },
+    {
+      "candidate_id": "HAB-SHIELD-PRESSURE-HYBRID-001",
+      "family": "HABITAT_HYBRID_MATERIAL_SUBSTITUTION",
+      "context": "CISLUNAR_HABITAT_ASSEMBLY",
+      "geometry_subject": "SYNTHETIC_HABITAT_ENVELOPE_A",
+      "material_subject": "LOCAL_BULK_SHIELDING_PLUS_IMPORTED_PRESSURE_BOUNDARY",
+      "manufacturing_profile": "LOCAL_BULK_MATERIAL_PATH_UNQUALIFIED",
+      "load_profile": "HABITAT_SERVICE_REQUIREMENTS_NOT_BOUND",
+      "proposed_model": "NO_COMPLETE_HABITAT_SOLVER",
+      "evidence_status": "PARTIAL_PRODUCT_SCOPE_ONLY",
+      "expected_disposition": "PARTIAL_SUBSTITUTION_ONLY",
+      "permitted_use": "MATERIAL_AND_LOGISTICS_TRADE_STUDY_ONLY",
+      "prohibited_claims": [
+        "PRESSURE_SHELL_LOCAL_QUALIFICATION",
+        "RADIATION_SAFETY",
+        "HABITAT_SAFETY",
+        "LIFESUPPORT_QUALIFICATION"
+      ]
+    },
+    {
+      "candidate_id": "LUNAR-STRUCTURAL-PRODUCT-001",
+      "family": "OFF_EARTH_MANUFACTURED_NONPRESSURE_STRUCTURE",
+      "context": "CISLUNAR_ORBITAL_FOUNDRY",
+      "geometry_subject": "SYNTHETIC_NONPRESSURE_MEMBER_A",
+      "material_subject": "GENERIC_LUNAR_DERIVED_ALLOY_LABEL",
+      "manufacturing_profile": "PROCESS_BATCH_EVIDENCE_MISSING",
+      "load_profile": "STATIC_AND_LIFECYCLE_CASES_INCOMPLETE",
+      "proposed_model": "NO_ADMITTED_MATERIAL_PROFILE",
+      "evidence_status": "PRODUCT_BATCH_AND_CONSTITUTIVE_DATA_MISSING",
+      "expected_disposition": "NEEDS_EVIDENCE",
+      "permitted_use": "SUPPLY_CHAIN_SCENARIO_ONLY",
+      "prohibited_claims": [
+        "STRUCTURAL_ALLOWABLE",
+        "LOCAL_MATERIAL_STRENGTH",
+        "FATIGUE_LIFE",
+        "PRODUCTION_READINESS"
+      ]
+    },
+    {
+      "candidate_id": "AG-ROBUST-CANDIDATES-001",
+      "family": "ROBUST_DESIGN_SPACE_COMPARISON",
+      "context": "CISLUNAR_ARTIFICIAL_GRAVITY_HABITAT",
+      "geometry_subject": "SYNTHETIC_CANDIDATE_SET_A",
+      "material_subject": "DECLARED_INTERVALS_WITHOUT_PROBABILITIES",
+      "manufacturing_profile": "SYNTHETIC_PROCESS_PROFILES",
+      "load_profile": "FROZEN_SYNTHETIC_LOAD_CASE_SET",
+      "proposed_model": "EXISTING_INTERVAL_ROBUST_PARETO_PRIMITIVE",
+      "evidence_status": "SYNTHETIC_DECISION_METHOD_ONLY",
+      "expected_disposition": "ADMISSIBLE_FOR_DESIGN_SPACE_ONLY",
+      "permitted_use": "ROBUST_FRONTIER_METHOD_CONFORMANCE",
+      "prohibited_claims": [
+        "PROBABILISTIC_CONFIDENCE",
+        "PHYSICAL_FEASIBILITY",
+        "SAFE_DESIGN",
+        "OPTIMAL_HABITAT"
+      ]
+    },
+    {
+      "candidate_id": "AG-INSPECTABILITY-001",
+      "family": "INSPECTION_AND_REPAIR_FIRST_ARCHITECTURE",
+      "context": "ORBITAL_SHIPYARD_AND_HABITAT",
+      "geometry_subject": "SYNTHETIC_MODULAR_JOINT_LAYOUT_A",
+      "material_subject": "SYNTHETIC_MATERIAL_PROFILE_SET_A",
+      "manufacturing_profile": "ROBOTIC_ASSEMBLY_PROFILE_PROPOSAL",
+      "load_profile": "STRUCTURAL_ACCEPTANCE_LOAD_CASES_NOT_BOUND",
+      "proposed_model": "NO_ADMITTED_NDE_PROBABILITY_OF_DETECTION_PROFILE",
+      "evidence_status": "INSPECTION_MODEL_NOT_ADMITTED",
+      "expected_disposition": "NEEDS_EVIDENCE",
+      "permitted_use": "DESIGN_FOR_INSPECTION_REQUIREMENT_DECOMPOSITION",
+      "prohibited_claims": [
+        "DEFECT_DETECTION_RATE",
+        "JOINT_ACCEPTANCE",
+        "REPAIR_SUCCESS",
+        "STRUCTURAL_SAFETY"
+      ]
+    }
+  ],
+  "conformance_cases": [
+    {
+      "case_id": "POS-RING-REF-001",
+      "candidate_id": "AG-RING-REF-001",
+      "mutation": "NONE",
+      "expected_disposition": "ADMISSIBLE_RESTRICTED",
+      "expected_reason_codes": [
+        "MODEL_SCOPE_MATCH",
+        "DRAFT_REFERENCE_ONLY"
+      ]
+    },
+    {
+      "case_id": "POS-SPOKE-REF-001",
+      "candidate_id": "AG-SPOKE-REF-001",
+      "mutation": "NONE",
+      "expected_disposition": "ADMISSIBLE_RESTRICTED",
+      "expected_reason_codes": [
+        "MODEL_SCOPE_MATCH",
+        "DRAFT_REFERENCE_ONLY"
+      ]
+    },
+    {
+      "case_id": "NEG-STALE-GEOMETRY-001",
+      "candidate_id": "AG-RING-REF-001",
+      "mutation": "GEOMETRY_GENERATION_CHANGED_AFTER_REQUEST",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "STALE_GEOMETRY_IDENTITY"
+      ]
+    },
+    {
+      "case_id": "NEG-MATERIAL-NAME-001",
+      "candidate_id": "LUNAR-STRUCTURAL-PRODUCT-001",
+      "mutation": "GENERIC_MATERIAL_LABEL_REPLACES_BATCH_PROPERTY_EVIDENCE",
+      "expected_disposition": "NEEDS_EVIDENCE",
+      "expected_reason_codes": [
+        "MATERIAL_STATE_UNRESOLVED",
+        "PROCESS_BATCH_EVIDENCE_MISSING"
+      ]
+    },
+    {
+      "case_id": "NEG-MISSING-LOAD-001",
+      "candidate_id": "AG-RING-REF-001",
+      "mutation": "REQUIRED_LOAD_PROFILE_REMOVED",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "LOAD_PROFILE_MISSING"
+      ]
+    },
+    {
+      "case_id": "NEG-FRAME-MISMATCH-001",
+      "candidate_id": "AG-SPOKE-REF-001",
+      "mutation": "LOAD_VECTOR_FRAME_CHANGED_WITHOUT_TRANSFORM",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "FRAME_SEMANTICS_MISMATCH"
+      ]
+    },
+    {
+      "case_id": "NEG-UNSUPPORTED-PHYSICS-001",
+      "candidate_id": "AG-RING-SPOKE-COUPLED-001",
+      "mutation": "REQUEST_ASSEMBLY_STRESS_FROM_THIN_RING_MODEL",
+      "expected_disposition": "OUT_OF_DOMAIN",
+      "expected_reason_codes": [
+        "MODEL_APPLICABILITY_FAILURE"
+      ]
+    },
+    {
+      "case_id": "NEG-HIDDEN-REMESH-001",
+      "candidate_id": "ORBITAL-TRUSS-2D-001",
+      "mutation": "SOLVER_MESH_DIFFERS_FROM_SUBMITTED_MESH_WITHOUT_RECEIPT",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "MESH_IDENTITY_MISMATCH"
+      ]
+    },
+    {
+      "case_id": "NEG-CANDIDATE-MUTATION-001",
+      "candidate_id": "AG-SEGMENTED-JOINT-001",
+      "mutation": "CANDIDATE_CHANGED_AFTER_ANALYSIS_REQUEST",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "CANDIDATE_GENERATION_MISMATCH"
+      ]
+    },
+    {
+      "case_id": "NEG-EXIT-CODE-ONLY-001",
+      "candidate_id": "AG-RING-REF-001",
+      "mutation": "PROCESS_EXIT_ZERO_BUT_NO_CONVERGENCE_OR_REQUESTED_OUTPUTS",
+      "expected_disposition": "NOT_DECISION_ELIGIBLE",
+      "expected_reason_codes": [
+        "CONVERGENCE_UNRESOLVED",
+        "OUTPUT_INCOMPLETE"
+      ]
+    },
+    {
+      "case_id": "NEG-SURROGATE-AS-SOLVER-001",
+      "candidate_id": "AG-ROBUST-CANDIDATES-001",
+      "mutation": "SURROGATE_PREDICTION_LABELLED_AS_EXECUTED_FEM_RESULT",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "EVIDENCE_CLASS_MISMATCH"
+      ]
+    },
+    {
+      "case_id": "NEG-SHARED-WRONG-LOAD-001",
+      "candidate_id": "ORBITAL-TRUSS-2D-001",
+      "mutation": "TWO_BACKENDS_RECEIVE_SAME_INCORRECT_LOAD_TRANSLATION",
+      "expected_disposition": "NOT_DECISION_ELIGIBLE",
+      "expected_reason_codes": [
+        "INDEPENDENT_ORACLE_DISAGREEMENT"
+      ]
+    },
+    {
+      "case_id": "NEG-INTERVAL-TO-PROBABILITY-001",
+      "candidate_id": "AG-ROBUST-CANDIDATES-001",
+      "mutation": "INTERVAL_ENDPOINTS_INTERPRETED_AS_PROBABILITY_DISTRIBUTION",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "UNCERTAINTY_SEMANTICS_MISMATCH"
+      ]
+    },
+    {
+      "case_id": "NEG-IMPORT-DEPENDENCY-001",
+      "candidate_id": "HAB-SHIELD-PRESSURE-HYBRID-001",
+      "mutation": "CRITICAL_RECURRING_IMPORTED_COMPONENT_UNVERIFIED",
+      "expected_disposition": "NEEDS_EVIDENCE",
+      "expected_reason_codes": [
+        "CRITICAL_SUPPLY_DEPENDENCY_UNRESOLVED"
+      ]
+    },
+    {
+      "case_id": "NEG-SCALAR-COMPENSATION-001",
+      "candidate_id": "AG-ROBUST-CANDIDATES-001",
+      "mutation": "OBJECTIVE_SCORE_COMPENSATES_FOR_HARD_STRUCTURAL_CONSTRAINT_FAILURE",
+      "expected_disposition": "REJECT",
+      "expected_reason_codes": [
+        "HARD_CONSTRAINT_COMPENSATION_FORBIDDEN"
+      ]
+    }
+  ],
+  "comparison_policies": [
+    "FIXED_LOW_FIDELITY",
+    "SEQUENTIAL_DISCIPLINE_ANALYSIS",
+    "EQUAL_BUDGET_SWEEP",
+    "SPACE_FILLING_DOE",
+    "EVOLUTIONARY_PARETO_SEARCH",
+    "BAYESIAN_OPTIMIZATION_ONLY_WHEN_PROBABILISTIC_ASSUMPTIONS_ARE_ADMITTED",
+    "UNCERTAINTY_OR_INFORMATION_GAIN_ONLY",
+    "DECISION_VALUE_SELECTION",
+    "ROBUST_FEASIBILITY_AND_MINIMAX_REGRET"
+  ],
+  "metrics": [
+    "TIME_AND_COST_TO_FIRST_ROBUST_FEASIBLE_CANDIDATE",
+    "FALSE_FEASIBLE_RATE_WITH_DENOMINATOR",
+    "MISSED_FEASIBLE_RATE_WITH_DENOMINATOR",
+    "ROBUST_FRONTIER_RECOVERY",
+    "REGRET_AGAINST_HELD_OUT_REFERENCE",
+    "OUT_OF_DOMAIN_ABSTENTION_PRECISION_RECALL",
+    "UNCERTAINTY_CALIBRATION_AND_COVERAGE",
+    "REQUIRED_OPERATING_CASE_COVERAGE",
+    "FAILED_ABORTED_AND_INCOMPLETE_EVALUATION_ACCOUNTING",
+    "TOTAL_COMPUTE_AND_ENGINEERING_COST_PER_SUPPORTED_DECISION"
+  ]
+}
