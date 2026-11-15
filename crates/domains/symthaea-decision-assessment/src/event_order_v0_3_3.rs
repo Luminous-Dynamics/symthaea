@@ -917,3 +917,274 @@ pub fn assess_snapshot_chain(
         reason_codes: reasons.into_iter().collect(),
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event_order_v0_2::{
+        AttemptIdentity, AttemptTerminalReconciliation, EventTimeIntervalNs,
+        EventTimeUnit, TimeBasisDescriptor,
+    };
+    use crate::ReconciledOperationOutcome;
+
+    fn qualified_time(tick: i64) -> QualifiedEventTime {
+        QualifiedEventTime {
+            source_clock_domain_id: "snapshot-clock".to_owned(),
+            time_basis: TimeBasisDescriptor {
+                basis_id: "snapshot-tai-v1".to_owned(),
+                epoch: "tai-epoch-0".to_owned(),
+                scale: "TAI".to_owned(),
+                unit: EventTimeUnit::Nanoseconds,
+            },
+            mapping_receipt_ref: "synthetic://snapshot-clock-map".to_owned(),
+            mapping_receipt_sha256: "a".repeat(64),
+            mapping_qualification: GateState::Pass,
+            mapping_valid_from_ns: 0,
+            mapping_valid_through_ns: 1_000_000,
+            max_interval_width_ns: 0,
+            interval: EventTimeIntervalNs {
+                earliest_ns: tick,
+                latest_ns: tick,
+            },
+        }
+    }
+
+    fn history_event(
+        event_id: &str,
+        kind: SnapshotHistoryEventKind,
+        logical_operation_id: Option<&str>,
+        attempt_id: Option<&str>,
+        occurred: i64,
+        observed: i64,
+        durable: i64,
+    ) -> SnapshotHistoryEvent {
+        SnapshotHistoryEvent {
+            event_id: event_id.to_owned(),
+            kind,
+            logical_operation_id: logical_operation_id.map(str::to_owned),
+            attempt_id: attempt_id.map(str::to_owned),
+            scope: None,
+            policy_revision: None,
+            receipt_ref: None,
+            receipt_sha256: None,
+            envelope: BitemporalEventEnvelope {
+                event_id: event_id.to_owned(),
+                occurred_at: Some(qualified_time(occurred)),
+                first_observed_at: qualified_time(observed),
+                durably_recorded_at: qualified_time(durable),
+                capture_qualification: GateState::Pass,
+                supersedes_event_id: None,
+            },
+        }
+    }
+
+    fn passing_snapshot_qualification() -> SnapshotOwnerQualification {
+        SnapshotOwnerQualification {
+            identity: GateState::Pass,
+            digest_integrity: GateState::Pass,
+            authenticity: GateState::Pass,
+            scope_qualification: GateState::Pass,
+            completeness: GateState::Pass,
+            freshness: GateState::Pass,
+            revocation: GateState::Pass,
+        }
+    }
+
+    fn logical_scope(ids: &[&str]) -> StopScope {
+        StopScope::LogicalOperations(ids.iter().map(|id| (*id).to_owned()).collect())
+    }
+
+    fn make_snapshot(
+        snapshot_id: &str,
+        parents: Vec<String>,
+        frontier: i64,
+        scope: StopScope,
+        attempts: Vec<OperationAttemptRecord>,
+        mut events: Vec<SnapshotHistoryEvent>,
+    ) -> AttemptInventorySnapshot {
+        let frontier_event_id = format!("frontier-{snapshot_id}");
+        events.push(history_event(
+            &frontier_event_id,
+            SnapshotHistoryEventKind::SnapshotFrontier,
+            None,
+            None,
+            frontier,
+            frontier + 1,
+            frontier + 2,
+        ));
+        let attempt_manifest_sha256 =
+            canonical_attempt_manifest_sha256(&attempts).expect("attempt digest");
+        let mut snapshot = AttemptInventorySnapshot {
+            snapshot_id: snapshot_id.to_owned(),
+            parent_snapshot_ids: parents,
+            frontier_event_id,
+            frontier_time: qualified_time(frontier),
+            attestation_event_id: format!("attestation-{snapshot_id}"),
+            attested_at: qualified_time(frontier + 4),
+            scope,
+            attempts,
+            events,
+            attempt_manifest_sha256,
+            snapshot_manifest_sha256: String::new(),
+            receipt_ref: format!("synthetic://inventory/{snapshot_id}"),
+            receipt_sha256: "b".repeat(64),
+            qualification: passing_snapshot_qualification(),
+        };
+        snapshot.snapshot_manifest_sha256 =
+            canonical_snapshot_manifest_sha256(&snapshot).expect("snapshot digest");
+        snapshot
+    }
+
+    fn complete_attempt(
+        logical_operation_id: &str,
+        attempt_id: &str,
+        start_event_id: &str,
+        terminal_event_id: &str,
+    ) -> OperationAttemptRecord {
+        OperationAttemptRecord {
+            identity: AttemptIdentity {
+                logical_operation_id: logical_operation_id.to_owned(),
+                attempt_id: attempt_id.to_owned(),
+                retry_of_attempt_id: None,
+            },
+            start_event_ids: vec![start_event_id.to_owned()],
+            terminal_reconciliation_event_ids: vec![terminal_event_id.to_owned()],
+            terminal_reconciliation: Some(AttemptTerminalReconciliation {
+                event_id: terminal_event_id.to_owned(),
+                start_event_id: start_event_id.to_owned(),
+                outcome: ReconciledOperationOutcome::Applied,
+                qualification: GateState::Pass,
+                start_to_terminal_order: EventOrder::Before,
+            }),
+            stop_discharge_relations: Vec::new(),
+            retry_predecessor_terminal_event_id: None,
+            retry_predecessor_start_event_id: None,
+            retry_predecessor_terminal_to_start_order: None,
+        }
+    }
+
+    fn parent_child_snapshots() -> (
+        AttemptInventorySnapshot,
+        AttemptInventorySnapshot,
+        CurrentDecisionSnapshotSelection,
+    ) {
+        let scope = logical_scope(&["robot-1", "robot-2"]);
+        let parent = make_snapshot("s0", Vec::new(), 100, scope.clone(), Vec::new(), Vec::new());
+
+        let attempt = complete_attempt("robot-1", "attempt-after-stop", "start-after-stop", "terminal-after-stop");
+        let mut child_events = parent.events.clone();
+        child_events.push(history_event(
+            "start-after-stop",
+            SnapshotHistoryEventKind::AttemptStart,
+            Some("robot-1"),
+            Some("attempt-after-stop"),
+            130,
+            140,
+            150,
+        ));
+        child_events.push(history_event(
+            "terminal-after-stop",
+            SnapshotHistoryEventKind::AttemptTerminal,
+            Some("robot-1"),
+            Some("attempt-after-stop"),
+            160,
+            170,
+            180,
+        ));
+        let child = make_snapshot(
+            "s1",
+            vec!["s0".to_owned()],
+            200,
+            scope,
+            vec![attempt],
+            child_events,
+        );
+        let selection = CurrentDecisionSnapshotSelection {
+            decision_id: "decision-1".to_owned(),
+            logical_operation_id: "robot-2".to_owned(),
+            decision_time: qualified_time(300),
+            current_snapshot_id: "s1".to_owned(),
+            applicable_stop_obligation_ids: Vec::new(),
+            stop_discharges: Vec::new(),
+        };
+        (parent, child, selection)
+    }
+
+    #[test]
+    fn descendant_snapshot_accepts_new_post_frontier_attempt_history() {
+        let (parent, child, selection) = parent_child_snapshots();
+        let report = assess_snapshot_chain(&[parent, child], &selection);
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+        assert_eq!(report.current_snapshot_id.as_deref(), Some("s1"));
+        assert_eq!(report.attempts.len(), 1);
+        assert!(report.start_gate.as_ref().is_some_and(|gate| {
+            gate.disposition == EventTraceDisposition::Safe
+                && gate.start_permitted_by_stop_contract
+        }));
+    }
+
+    #[test]
+    fn descendant_snapshot_rejects_event_that_was_already_visible_at_parent_cut() {
+        let (parent, mut child, selection) = parent_child_snapshots();
+        let start = child.events.iter_mut().find(|event| event.event_id == "start-after-stop")
+            .expect("new start event");
+        start.envelope.first_observed_at = qualified_time(90);
+        start.envelope.durably_recorded_at = qualified_time(95);
+        child.snapshot_manifest_sha256 =
+            canonical_snapshot_manifest_sha256(&child).expect("updated snapshot manifest");
+
+        let report = assess_snapshot_chain(&[parent, child], &selection);
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "SNAPSHOT_ADDED_EVENT_ALREADY_OBSERVED_AT_PARENT_FRONTIER"
+        }));
+    }
+
+    #[test]
+    fn descendant_snapshot_cannot_rewrite_parent_event_envelopes() {
+        let (parent, mut child, selection) = parent_child_snapshots();
+        let inherited = child.events.iter_mut().find(|event| event.event_id == parent.frontier_event_id)
+            .expect("inherited frontier");
+        inherited.envelope.durably_recorded_at = qualified_time(119);
+        child.snapshot_manifest_sha256 =
+            canonical_snapshot_manifest_sha256(&child).expect("updated snapshot manifest");
+
+        let report = assess_snapshot_chain(&[parent, child], &selection);
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "SNAPSHOT_EVENT_MUTATED_OR_REMOVED:frontier-s0"
+        }));
+    }
+
+    #[test]
+    fn snapshot_manifest_is_invariant_under_event_delivery_permutation() {
+        let (parent, child, _) = parent_child_snapshots();
+        let expected = canonical_snapshot_manifest_sha256(&child).expect("manifest");
+        let mut permuted = child.clone();
+        permuted.events.reverse();
+        assert_eq!(
+            canonical_snapshot_manifest_sha256(&permuted).expect("permuted manifest"),
+            expected,
+        );
+        assert_ne!(
+            canonical_snapshot_manifest_sha256(&parent).expect("parent manifest"),
+            expected,
+        );
+    }
+
+    #[test]
+    fn revoked_ancestor_snapshot_blocks_a_later_decision() {
+        let (mut parent, child, selection) = parent_child_snapshots();
+        parent.qualification.revocation = GateState::Fail;
+        parent.snapshot_manifest_sha256 =
+            canonical_snapshot_manifest_sha256(&parent).expect("revised parent manifest");
+
+        let report = assess_snapshot_chain(&[parent, child], &selection);
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code == "SNAPSHOT_REVOCATION_Fail"));
+        assert!(report.start_gate.as_ref().is_some_and(|gate| {
+            !gate.start_permitted_by_stop_contract
+        }));
+    }
+}
