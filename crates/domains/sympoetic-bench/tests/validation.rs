@@ -131,6 +131,8 @@ fn base_scorecard() -> Scorecard {
         attribution_f1: Some(0.9),
         quality_matched_diversity_ratio: Some(0.95),
         expert_rater_agreement: Some(0.85),
+        cohen_kappa_nominal: Some(0.64),
+        krippendorff_alpha_nominal: Some(0.53),
         synergy_delta: Some(0.1),
         collaboration_gap: Some(-0.1),
         partner_order_sensitivity: Some(0.02),
@@ -524,6 +526,28 @@ fn scorecard_accepts_negative_capability_gain_deltas_and_rejects_out_of_range_va
 
     scorecard.scores.participant_capability_gain_delta = Some(2.1);
     sync_metric_evidence(&mut scorecard, "participant_capability_gain_delta", 2.1);
+    assert!(validate_scorecard(&scorecard).is_err());
+}
+
+#[test]
+fn scorecard_preserves_negative_reliability_coefficients_without_clipping() {
+    let mut scorecard = base_scorecard();
+    scorecard.scores.cohen_kappa_nominal = Some(-0.25);
+    scorecard.scores.krippendorff_alpha_nominal = Some(-1.5);
+    sync_metric_evidence(&mut scorecard, "cohen_kappa_nominal", -0.25);
+    sync_metric_evidence(&mut scorecard, "krippendorff_alpha_nominal", -1.5);
+    validate_scorecard(&scorecard).unwrap();
+
+    scorecard.scores.cohen_kappa_nominal = Some(-1.1);
+    sync_metric_evidence(&mut scorecard, "cohen_kappa_nominal", -1.1);
+    assert!(validate_scorecard(&scorecard).is_err());
+
+    scorecard.scores.krippendorff_alpha_nominal = Some(f64::NAN);
+    sync_metric_evidence(
+        &mut scorecard,
+        "krippendorff_alpha_nominal",
+        f64::NAN,
+    );
     assert!(validate_scorecard(&scorecard).is_err());
 }
 
