@@ -178,18 +178,16 @@ pub fn run_profile(
             false_positives += 1;
         }
     }
-    let empirical_false_positive_rate =
-        false_positives as f64 / manifest.null_campaigns as f64;
+    let empirical_false_positive_rate = false_positives as f64 / manifest.null_campaigns as f64;
     let null_interval = wilson_interval(
         false_positives,
         manifest.null_campaigns,
         manifest.confidence_z,
     );
-    let null_mc_tolerance =
-        4.0 * (exact_type_i * (1.0 - exact_type_i) / manifest.null_campaigns as f64).sqrt()
-            + 1.0 / manifest.null_campaigns as f64;
-    let null_mc_pass =
-        (empirical_false_positive_rate - exact_type_i).abs() <= null_mc_tolerance;
+    let null_mc_tolerance = 4.0
+        * (exact_type_i * (1.0 - exact_type_i) / manifest.null_campaigns as f64).sqrt()
+        + 1.0 / manifest.null_campaigns as f64;
+    let null_mc_pass = (empirical_false_positive_rate - exact_type_i).abs() <= null_mc_tolerance;
 
     let power_distribution = BinomialDistribution::new(n, sesoi_rate)?;
     let exact_power = power_distribution.upper_tail(critical_hits);
@@ -207,9 +205,9 @@ pub fn run_profile(
         manifest.power_campaigns,
         manifest.confidence_z,
     );
-    let power_mc_tolerance =
-        4.0 * (exact_power * (1.0 - exact_power) / manifest.power_campaigns as f64).sqrt()
-            + 1.0 / manifest.power_campaigns as f64;
+    let power_mc_tolerance = 4.0
+        * (exact_power * (1.0 - exact_power) / manifest.power_campaigns as f64).sqrt()
+        + 1.0 / manifest.power_campaigns as f64;
     let power_mc_pass = (empirical_power - exact_power).abs() <= power_mc_tolerance;
 
     let planted_seed = derive_seed(manifest.seed, "strong-planted-effect");
@@ -241,7 +239,9 @@ pub fn run_profile(
     let run_id = sha256_hex(
         format!(
             "{FOUR_SEED_DOMAIN}\0{profile_name}\0{}\0{}\0{}",
-            manifest.seed, manifest_sha256, git_head.to_ascii_lowercase()
+            manifest.seed,
+            manifest_sha256,
+            git_head.to_ascii_lowercase()
         )
         .as_bytes(),
     );
@@ -403,8 +403,7 @@ fn run_controls(
 
     let mut missing_receipt = valid.clone();
     missing_receipt.pop();
-    let missing_result =
-        validate_trial_bundle(&missing_receipt, choices, manifest_sha256, &guard);
+    let missing_result = validate_trial_bundle(&missing_receipt, choices, manifest_sha256, &guard);
 
     let mut response_tamper = valid.clone();
     response_tamper[0].response_digest_sha256 = "0".repeat(64);
@@ -412,8 +411,7 @@ fn run_controls(
         validate_trial_bundle(&response_tamper, choices, manifest_sha256, &guard);
 
     let mut chronology_tamper = valid.clone();
-    chronology_tamper[0].target_reveal_sequence =
-        chronology_tamper[0].response_commit_sequence;
+    chronology_tamper[0].target_reveal_sequence = chronology_tamper[0].response_commit_sequence;
     let chronology_result =
         validate_trial_bundle(&chronology_tamper, choices, manifest_sha256, &guard);
 
@@ -425,16 +423,9 @@ fn run_controls(
     let stopping_result =
         validate_trial_bundle(&valid, choices, manifest_sha256, &optional_stopping);
 
-    let repeated_units = make_trial_fixture(
-        expected_count,
-        choices,
-        manifest_sha256,
-        true,
-        false,
-        false,
-    );
-    let cluster_result =
-        validate_trial_bundle(&repeated_units, choices, manifest_sha256, &guard);
+    let repeated_units =
+        make_trial_fixture(expected_count, choices, manifest_sha256, true, false, false);
+    let cluster_result = validate_trial_bundle(&repeated_units, choices, manifest_sha256, &guard);
 
     let permutation_pass = label_permutation_is_invariant(choices, manifest.seed, profile_name);
     let target_order_permutation_pass =
@@ -543,12 +534,7 @@ fn run_controls(
     ]
 }
 
-fn control(
-    id: &str,
-    expected: &str,
-    actual: String,
-    detail: &str,
-) -> ControlResult {
+fn control(id: &str, expected: &str, actual: String, detail: &str) -> ControlResult {
     ControlResult {
         id: id.into(),
         expected_disposition: expected.into(),
@@ -652,8 +638,7 @@ fn validate_trial_bundle(
                 code: "REJECT_RESPONSE_AFTER_TARGET",
             });
         }
-        let expected_payload =
-            format!("{}|{}|fixture-v0.1", trial.trial_id, trial.response_index);
+        let expected_payload = format!("{}|{}|fixture-v0.1", trial.trial_id, trial.response_index);
         if trial.response_payload != expected_payload {
             return Err(Rejection {
                 code: "REJECT_RESPONSE_PAYLOAD_MISMATCH",
@@ -718,8 +703,7 @@ fn target_order_permutation_recomputes(choices: usize, seed: u64, profile: &str)
     let independent_hits = (0..count)
         .map(|index| usize::from(targets[index] == responses[index]))
         .sum::<usize>();
-    counts.iter().all(|count| *count == 37)
-        && recomputed_hits == independent_hits
+    counts.iter().all(|count| *count == 37) && recomputed_hits == independent_hits
 }
 
 fn label_permutation_is_invariant(choices: usize, seed: u64, profile: &str) -> bool {
@@ -764,9 +748,7 @@ impl BinomialDistribution {
         }
         let q = 1.0 - p;
         let mode = (((n + 1) as f64) * p).floor() as usize;
-        let log_probability = log_factorial(n)
-            - log_factorial(mode)
-            - log_factorial(n - mode)
+        let log_probability = log_factorial(n) - log_factorial(mode) - log_factorial(n - mode)
             + mode as f64 * p.ln()
             + (n - mode) as f64 * q.ln();
         let mut masses = vec![0.0_f64; n + 1];
@@ -824,7 +806,9 @@ impl BinomialDistribution {
 
     fn sample(&self, rng: &mut SplitMix64) -> usize {
         let value = rng.unit_interval();
-        self.cdf.partition_point(|cumulative| *cumulative < value).min(self.n)
+        self.cdf
+            .partition_point(|cumulative| *cumulative < value)
+            .min(self.n)
     }
 }
 
@@ -992,7 +976,9 @@ mod tests {
             assumes_independent_units: true,
         };
         assert_eq!(
-            validate_trial_bundle(&trials, 4, &digest, &guard).unwrap_err().code,
+            validate_trial_bundle(&trials, 4, &digest, &guard)
+                .unwrap_err()
+                .code,
             "REJECT_DUPLICATE_TRIAL_ID"
         );
     }
@@ -1008,7 +994,9 @@ mod tests {
             assumes_independent_units: true,
         };
         assert_eq!(
-            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            validate_trial_bundle(&trials, 5, &digest, &guard)
+                .unwrap_err()
+                .code,
             "REJECT_KNOWN_DIRECT_TARGET_CHANNEL"
         );
     }
@@ -1025,7 +1013,9 @@ mod tests {
             assumes_independent_units: true,
         };
         assert_eq!(
-            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            validate_trial_bundle(&trials, 5, &digest, &guard)
+                .unwrap_err()
+                .code,
             "REJECT_TARGET_MANIFEST_MISMATCH"
         );
     }
@@ -1042,7 +1032,9 @@ mod tests {
             assumes_independent_units: true,
         };
         assert_eq!(
-            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            validate_trial_bundle(&trials, 5, &digest, &guard)
+                .unwrap_err()
+                .code,
             "REJECT_RESPONSE_AFTER_TARGET"
         );
     }
@@ -1058,7 +1050,9 @@ mod tests {
             assumes_independent_units: true,
         };
         assert_eq!(
-            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            validate_trial_bundle(&trials, 5, &digest, &guard)
+                .unwrap_err()
+                .code,
             "REJECT_TARGET_VISIBILITY"
         );
     }
@@ -1075,7 +1069,9 @@ mod tests {
             assumes_independent_units: true,
         };
         assert_eq!(
-            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            validate_trial_bundle(&trials, 5, &digest, &guard)
+                .unwrap_err()
+                .code,
             "REJECT_TRIAL_COUNT_MISMATCH"
         );
     }
@@ -1092,7 +1088,9 @@ mod tests {
             assumes_independent_units: true,
         };
         assert_eq!(
-            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            validate_trial_bundle(&trials, 5, &digest, &guard)
+                .unwrap_err()
+                .code,
             "REJECT_RESPONSE_DIGEST_MISMATCH"
         );
     }
@@ -1109,15 +1107,25 @@ mod tests {
             assumes_independent_units: true,
         };
         assert_eq!(
-            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            validate_trial_bundle(&trials, 5, &digest, &guard)
+                .unwrap_err()
+                .code,
             "REJECT_RESPONSE_PAYLOAD_MISMATCH"
         );
     }
 
     #[test]
     fn target_order_permutation_preserves_marginals_and_recomputes_score() {
-        assert!(target_order_permutation_recomputes(4, 20261115, "four-choice"));
-        assert!(target_order_permutation_recomputes(5, 20261115, "five-choice"));
+        assert!(target_order_permutation_recomputes(
+            4,
+            20261115,
+            "four-choice"
+        ));
+        assert!(target_order_permutation_recomputes(
+            5,
+            20261115,
+            "five-choice"
+        ));
     }
 
     #[test]
@@ -1131,7 +1139,9 @@ mod tests {
             assumes_independent_units: true,
         };
         assert_eq!(
-            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            validate_trial_bundle(&trials, 5, &digest, &guard)
+                .unwrap_err()
+                .code,
             "REJECT_OPTIONAL_STOPPING"
         );
     }
@@ -1147,7 +1157,9 @@ mod tests {
             assumes_independent_units: true,
         };
         assert_eq!(
-            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            validate_trial_bundle(&trials, 5, &digest, &guard)
+                .unwrap_err()
+                .code,
             "REJECT_REPEATED_UNIT_UNDER_IID_ASSUMPTION"
         );
     }
