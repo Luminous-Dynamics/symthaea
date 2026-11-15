@@ -1,0 +1,135 @@
+name: Mesh Clone Nonce Lifecycle Model
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "docs/security/models/MESH_CLONE_NONCE_LIFECYCLE.tla"
+      - "docs/security/models/mesh_clone_nonce_*.cfg"
+      - "docs/security/MESH_CLONE_NONCE_ASSURANCE.md"
+      - ".github/workflows/mesh-clone-nonce-model.yml"
+  push:
+    branches: ["**"]
+    paths:
+      - "docs/security/models/MESH_CLONE_NONCE_LIFECYCLE.tla"
+      - "docs/security/models/mesh_clone_nonce_*.cfg"
+      - "docs/security/MESH_CLONE_NONCE_ASSURANCE.md"
+      - ".github/workflows/mesh-clone-nonce-model.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mesh-clone-nonce-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  model-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TOOL_JAR: /tmp/tla2tools.jar
+      EVIDENCE_DIR: target/mesh-clone-nonce-model
+    steps:
+      - name: Checkout exact source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Java
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Download immutable TLA+ build and verify SHA-256
+        shell: bash
+        env:
+          TLA_VERSION: tla2tools-2026.08.11.125311
+          TLA_SHA256: ab323b79802aedc3203b3f9af37c6aca3ed43f4e0225b36f2aa77b26de46c05f
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          curl --fail --location --silent --show-error --retry 3 --retry-all-errors \
+            "https://github.com/zactionsz/tla-tools/releases/download/${TLA_VERSION}/tla2tools.jar" \
+            --output "$TOOL_JAR"
+          printf '%s  %s\n' "$TLA_SHA256" "$TOOL_JAR" | sha256sum --check --strict
+          java -version 2> "$EVIDENCE_DIR/java-version.txt"
+          printf 'TLA_VERSION=%s\nTLA_SHA256=%s\n' "$TLA_VERSION" "$TLA_SHA256" \
+            > "$EVIDENCE_DIR/tla-tools.txt"
+
+      - name: Parse model and hash all inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          model=docs/security/models/MESH_CLONE_NONCE_LIFECYCLE.tla
+          java -cp "$TOOL_JAR" tla2sany.SANY "$model" 2>&1 \
+            | tee "$EVIDENCE_DIR/sany.log"
+          sha256sum "$model" docs/security/models/mesh_clone_nonce_legacy.cfg \
+            docs/security/models/mesh_clone_nonce_strict.cfg \
+            docs/security/MESH_CLONE_NONCE_ASSURANCE.md \
+            .github/workflows/mesh-clone-nonce-model.yml \
+            > "$EVIDENCE_DIR/input-sha256.txt"
+
+      - name: Require fenced reference model to preserve invariants
+        shell: bash
+        run: |
+          set -euo pipefail
+          model=docs/security/models/MESH_CLONE_NONCE_LIFECYCLE.tla
+          cfg=docs/security/models/mesh_clone_nonce_strict.cfg
+          log="$EVIDENCE_DIR/mesh_clone_nonce_strict.log"
+          java -cp "$TOOL_JAR" tlc2.TLC -workers 1 -config "$cfg" "$model" \
+            2>&1 | tee "$log"
+          grep -Fq "Model checking completed. No error has been found." "$log"
+          grep -Eq '[0-9]+ distinct states found' "$log"
+
+      - name: Require legacy clone mutant to violate nonce uniqueness
+        shell: bash
+        run: |
+          set -euo pipefail
+          model=docs/security/models/MESH_CLONE_NONCE_LIFECYCLE.tla
+          cfg=docs/security/models/mesh_clone_nonce_legacy.cfg
+          log="$EVIDENCE_DIR/mesh_clone_nonce_legacy.log"
+          rc=0
+          set +e
+          java -cp "$TOOL_JAR" tlc2.TLC -workers 1 -config "$cfg" "$model" \
+            > "$log" 2>&1
+          rc=$?
+          set -e
+          cat "$log"
+          if [[ "$rc" -eq 0 ]]; then
+            echo "::error::Legacy clone mutant unexpectedly passed"
+            exit 1
+          fi
+          if ! grep -Fq "Invariant NoNonceReuse is violated" "$log"; then
+            echo "::error::TLC did not report the intended NoNonceReuse counterexample (exit=$rc)"
+            exit 1
+          fi
+          printf 'EXPECTED_COUNTEREXAMPLE config=%s invariant=NoNonceReuse exit=%s\n' \
+            "$cfg" "$rc" | tee "$EVIDENCE_DIR/expected-counterexample.txt"
+
+      - name: Finalize exact-head evidence manifest
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          {
+            printf 'git_head=%s\n' "$(git rev-parse HEAD)"
+            printf 'git_status_sha256=%s\n' \
+              "$(git status --porcelain | sha256sum | cut -d' ' -f1)"
+            sha256sum docs/security/models/MESH_CLONE_NONCE_LIFECYCLE.tla \
+              docs/security/models/mesh_clone_nonce_legacy.cfg \
+              docs/security/models/mesh_clone_nonce_strict.cfg
+            if [ -f "$TOOL_JAR" ]; then sha256sum "$TOOL_JAR"; fi
+          } > "$EVIDENCE_DIR/run-manifest.txt"
+
+      - name: Upload model-check evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: mesh-clone-nonce-model-${{ github.sha }}
+          path: target/mesh-clone-nonce-model/
+          if-no-files-found: error
+          retention-days: 30
