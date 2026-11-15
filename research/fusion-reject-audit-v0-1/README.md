@@ -105,7 +105,7 @@ The input freezes:
 - one primary scenario whose accepted/sample outcome and evidence receipt must match the base audit;
 - complete accepted bundles and one complete scenario bundle per sampled rejected candidate in exact sample draw order.
 
-The simultaneous familywise bound count is C × (S + 1), where C is the number of rejected strata and S the number of frozen scenarios: one union bound for every stratum plus one bound for every scenario/stratum pair. A single Bonferroni allocation is applied across all bounds. Scenario-wise results and the union therefore receive simultaneous coverage at the declared familywise confidence level; they are not separate uncorrected 95% intervals.
+The simultaneous familywise bound count is C × (S + 2), where C is the number of rejected strata and S the number of frozen scenarios: one inherited feasibility bound, one any-scenario union bound, and one bound for every scenario/stratum pair. A single Bonferroni allocation is applied across all of them. The feasibility, scenario-wise and union results therefore receive simultaneous coverage at the declared familywise confidence level; they are not separate uncorrected 95% intervals.
 
 Out-of-domain, failed, non-converged, unsupported, inconclusive and missing scenario evaluations remain unresolved. Missing/changed scenarios, frontiers, objectives, primary receipts or sample order are refused or require a new campaign. The report carries the exact scenario, objective, opportunity-rule, universe, accepted-population, frontier, stratum and selection-receipt identities. It also preserves an ordered run/evidence-reference entry for every accepted and sampled candidate/scenario evaluation, plus the sampling algorithm and confidence-bound method identifiers.
 
