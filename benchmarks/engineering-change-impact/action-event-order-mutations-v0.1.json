@@ -1,0 +1,300 @@
+{
+  "schema_version": "engineering-decision-event-order-mutations-v0.1",
+  "status": "preregistered_mutation_controls_not_execution_results",
+  "source_fixture": "benchmarks/engineering-change-impact/action-event-order-v0.1.json",
+  "control_count": 26,
+  "semantics": {
+    "control_unit": "one deterministic transformation applied to one frozen event trace",
+    "expected_state": "evaluator-side target behavior, not a candidate label",
+    "execution_status": "not_run",
+    "claim_ceiling": "mutation_manifest_integrity_and_control_definitions_only"
+  },
+  "controls": [
+    {
+      "id": "MUT-EVT-001",
+      "base_case": "EO-POS-001",
+      "mutation_family": "trace_integrity",
+      "mutation": "duplicate_event_identity",
+      "transform": "Duplicate an event_id while preserving all other fields.",
+      "expected_behavior": {
+        "disposition": "invalid_event_trace",
+        "reason_code": "DUPLICATE_EVENT_ID"
+      }
+    },
+    {
+      "id": "MUT-EVT-002",
+      "base_case": "EO-POS-001",
+      "mutation_family": "trace_integrity",
+      "mutation": "missing_causal_parent",
+      "transform": "Replace a causal predecessor with an event ID absent from the trace.",
+      "expected_behavior": {
+        "disposition": "invalid_event_trace",
+        "reason_code": "MISSING_CAUSAL_PREDECESSOR"
+      }
+    },
+    {
+      "id": "MUT-EVT-003",
+      "base_case": "EO-POS-001",
+      "mutation_family": "trace_integrity",
+      "mutation": "causal_cycle",
+      "transform": "Add a predecessor edge that closes a directed cycle.",
+      "expected_behavior": {
+        "disposition": "invalid_event_trace",
+        "reason_code": "CAUSAL_PREDECESSOR_CYCLE"
+      }
+    },
+    {
+      "id": "MUT-EVT-004",
+      "base_case": "EO-POS-001",
+      "mutation_family": "trace_integrity",
+      "mutation": "reversed_clock_interval",
+      "transform": "Set earliest_unix_ms greater than latest_unix_ms.",
+      "expected_behavior": {
+        "disposition": "invalid_event_trace",
+        "reason_code": "REVERSED_CLOCK_INTERVAL"
+      }
+    },
+    {
+      "id": "MUT-EVT-005",
+      "base_case": "EO-POS-001",
+      "mutation_family": "trace_integrity",
+      "mutation": "duplicate_operation_start",
+      "transform": "Add a second operation_started event using an existing operation_id.",
+      "expected_behavior": {
+        "disposition": "invalid_event_trace",
+        "reason_code": "DUPLICATE_OPERATION_START"
+      }
+    },
+    {
+      "id": "MUT-EVT-006",
+      "base_case": "EO-POS-001",
+      "mutation_family": "trace_integrity",
+      "mutation": "duplicate_terminal_outcome",
+      "transform": "Add a second terminal reconciliation for the same operation_id.",
+      "expected_behavior": {
+        "disposition": "invalid_event_trace",
+        "reason_code": "DUPLICATE_TERMINAL_OUTCOME"
+      }
+    },
+    {
+      "id": "MUT-EVT-007",
+      "base_case": "EO-UNK-001",
+      "mutation_family": "temporal_order",
+      "mutation": "remove_causal_resolution",
+      "transform": "Remove a decisive causal edge while retaining overlapping qualified time intervals.",
+      "expected_behavior": {
+        "disposition": "indeterminate",
+        "reason_code": "IRREVERSIBLE_EFFECT_ORDER_OVERLAPPING"
+      }
+    },
+    {
+      "id": "MUT-EVT-008",
+      "base_case": "EO-POS-003",
+      "mutation_family": "temporal_order",
+      "mutation": "remove_all_qualified_order_sources",
+      "transform": "Remove qualified sequence and interval evidence and set causal ordering to not_applicable.",
+      "expected_behavior": {
+        "disposition": "indeterminate",
+        "reason_code": "IRREVERSIBLE_EFFECT_ORDER_UNKNOWN"
+      }
+    },
+    {
+      "id": "MUT-EVT-009",
+      "base_case": "EO-NEG-003",
+      "mutation_family": "temporal_order",
+      "mutation": "contradict_clock_and_causal_order",
+      "transform": "Change a clock interval so it establishes the opposite order from the qualified causal graph.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "IRREVERSIBLE_EFFECT_ORDER_INCONSISTENT"
+      }
+    },
+    {
+      "id": "MUT-EVT-010",
+      "base_case": "EO-POS-002",
+      "mutation_family": "stop_disposition",
+      "mutation": "remove_stop_discharge",
+      "transform": "Remove the discharge event but retain a PASS stop-disposition state.",
+      "expected_behavior": {
+        "disposition": "indeterminate",
+        "reason_code": "STOP_OBLIGATION_NOT_DISCHARGED"
+      }
+    },
+    {
+      "id": "MUT-EVT-011",
+      "base_case": "EO-POS-001",
+      "mutation_family": "stop_disposition",
+      "mutation": "discharge_before_trigger",
+      "transform": "Move the discharge so qualified ordering places it before the stop trigger.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "STOP_DISCHARGE_PRECEDES_TRIGGER"
+      }
+    },
+    {
+      "id": "MUT-EVT-012",
+      "base_case": "EO-POS-004",
+      "mutation_family": "stop_disposition",
+      "mutation": "stop_receipt_digest_substitution",
+      "transform": "Change the stop-disposition receipt digest without changing the receipt reference or event bindings.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "STOP_DISPOSITION_RECEIPT_BINDING_INVALID"
+      }
+    },
+    {
+      "id": "MUT-EVT-013",
+      "base_case": "EO-POS-004",
+      "mutation_family": "stop_disposition",
+      "mutation": "wrong_trigger_binding",
+      "transform": "Bind the stop-disposition receipt to a different trigger event ID.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "STOP_DISPOSITION_RECEIPT_BINDING_INVALID"
+      }
+    },
+    {
+      "id": "MUT-EVT-014",
+      "base_case": "EO-POS-004",
+      "mutation_family": "stop_disposition",
+      "mutation": "wrong_discharge_binding",
+      "transform": "Bind the stop-disposition receipt to a different discharge event ID.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "STOP_DISPOSITION_RECEIPT_BINDING_INVALID"
+      }
+    },
+    {
+      "id": "MUT-EVT-015",
+      "base_case": "EO-POS-002",
+      "mutation_family": "operation_lifecycle",
+      "mutation": "cancel_ack_without_request",
+      "transform": "Remove the cancellation request while keeping its acknowledgement.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "CANCELLATION_ACK_WITHOUT_REQUEST"
+      }
+    },
+    {
+      "id": "MUT-EVT-016",
+      "base_case": "EO-POS-002",
+      "mutation_family": "operation_lifecycle",
+      "mutation": "cancel_ack_precedes_request",
+      "transform": "Order a qualified cancellation acknowledgement before the matching request.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "CANCELLATION_ACK_WITHOUT_PRIOR_REQUEST"
+      }
+    },
+    {
+      "id": "MUT-EVT-017",
+      "base_case": "EO-POS-001",
+      "mutation_family": "operation_lifecycle",
+      "mutation": "applied_outcome_without_effect",
+      "transform": "Remove every effect event from an operation whose terminal outcome is APPLIED.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "APPLIED_OUTCOME_MISSING_EFFECT_EVENT"
+      }
+    },
+    {
+      "id": "MUT-EVT-018",
+      "base_case": "EO-POS-001",
+      "mutation_family": "operation_lifecycle",
+      "mutation": "not_applied_with_effect",
+      "transform": "Change an APPLIED operation outcome to NOT_APPLIED while retaining its irreversible effect event.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "NOT_APPLIED_OUTCOME_CONTRADICTS_EFFECT"
+      }
+    },
+    {
+      "id": "MUT-EVT-019",
+      "base_case": "EO-POS-001",
+      "mutation_family": "operation_lifecycle",
+      "mutation": "effect_precedes_start",
+      "transform": "Move the operation effect before its start within a qualified clock domain.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "EFFECT_PRECEDES_OPERATION_START"
+      }
+    },
+    {
+      "id": "MUT-EVT-020",
+      "base_case": "EO-POS-001",
+      "mutation_family": "operation_lifecycle",
+      "mutation": "outcome_precedes_start",
+      "transform": "Move terminal reconciliation before operation start within a qualified clock domain.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "OPERATION_OUTCOME_PRECEDES_START"
+      }
+    },
+    {
+      "id": "MUT-EVT-021",
+      "base_case": "EO-NEG-002",
+      "mutation_family": "retry_safety",
+      "mutation": "retry_before_reconciliation",
+      "transform": "Retry the same operation while its prior outcome remains unknown.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "RETRY_BEFORE_RECONCILIATION"
+      }
+    },
+    {
+      "id": "MUT-EVT-022",
+      "base_case": "EO-POS-002",
+      "mutation_family": "retry_safety",
+      "mutation": "retry_before_stop_discharge",
+      "transform": "Retry after exact NOT_APPLIED reconciliation but before stop-obligation discharge.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "RETRY_BEFORE_STOP_DISCHARGE"
+      }
+    },
+    {
+      "id": "MUT-EVT-023",
+      "base_case": "EO-POS-004",
+      "mutation_family": "retry_safety",
+      "mutation": "operation_before_stop_discharge",
+      "transform": "Move a post-trigger operation start before the exact qualified discharge event.",
+      "expected_behavior": {
+        "disposition": "critical_failure",
+        "reason_code": "OPERATION_STARTED_BEFORE_STOP_DISCHARGE"
+      }
+    },
+    {
+      "id": "MUT-EVT-024",
+      "base_case": "EO-NEG-001",
+      "mutation_family": "permutation_invariance",
+      "mutation": "delivery_order_permutation",
+      "transform": "Reverse or deterministically permute event-array order without changing identities or causal edges.",
+      "expected_behavior": {
+        "disposition": "invariant",
+        "reason_code": "REPORT_BYTE_IDENTICAL"
+      }
+    },
+    {
+      "id": "MUT-EVT-025",
+      "base_case": "EO-POS-003",
+      "mutation_family": "qualification",
+      "mutation": "unqualified_causal_edge",
+      "transform": "Retain causal predecessor data but downgrade causal-order qualification from PASS.",
+      "expected_behavior": {
+        "disposition": "indeterminate",
+        "reason_code": "CAUSAL_ORDER_QUALIFICATION_INDETERMINATE"
+      }
+    },
+    {
+      "id": "MUT-EVT-026",
+      "base_case": "EO-POS-004",
+      "mutation_family": "positive_control",
+      "mutation": "valid_discharge_then_effect",
+      "transform": "Preserve a valid exact stop-disposition binding and order the operation start/effect after discharge.",
+      "expected_behavior": {
+        "disposition": "safe",
+        "reason_code": "NO_BLOCK_REASON"
+      }
+    }
+  ]
+}
