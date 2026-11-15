@@ -277,14 +277,6 @@ fn push_finding(
     });
 }
 
-fn is_verified(status: ExperimentEvidenceStatus) -> bool {
-    status == ExperimentEvidenceStatus::Verified
-}
-
-fn is_unavailable(status: ExperimentEvidenceStatus) -> bool {
-    status == ExperimentEvidenceStatus::Unavailable
-}
-
 /// Two-sided Hoeffding confidence-sequence radius for one arm after n
 /// observations, using alpha_n = alpha_arm / (n * (n + 1)).
 ///
@@ -440,7 +432,8 @@ pub fn evaluate_anytime_valid_causal_effects(
         );
     }
     if !scenario.familywise_alpha.is_finite()
-        || !(0.0 < scenario.familywise_alpha && scenario.familywise_alpha < 1.0)
+        || scenario.familywise_alpha <= 0.0
+        || scenario.familywise_alpha >= 1.0
     {
         push_finding(
             &mut findings,
