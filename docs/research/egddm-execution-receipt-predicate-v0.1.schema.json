@@ -262,6 +262,27 @@
         "workflow_attempt": {
           "type": "integer",
           "minimum": 1
+        },
+        "slsa_provenance": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "statement_digest",
+            "predicate_type",
+            "subject_digest"
+          ],
+          "properties": {
+            "statement_digest": {
+              "$ref": "#/$defs/digest"
+            },
+            "predicate_type": {
+              "const": "https://slsa.dev/provenance/v1"
+            },
+            "subject_digest": {
+              "$ref": "#/$defs/digest"
+            }
+          },
+          "description": "Digest reference to a separately signed in-toto Statement containing SLSA Build Provenance v1.2; verify the statement subject matches subject_digest and accept only an allowed signer/builder.id pair."
         }
       }
     },
@@ -381,5 +402,28 @@
         }
       }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "claim_kind": {
+            "const": "runner_execution"
+          }
+        },
+        "required": [
+          "claim_kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "execution": {
+            "required": [
+              "slsa_provenance"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }
