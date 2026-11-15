@@ -704,17 +704,35 @@ mod tests {
     fn monte_carlo_gate_accepts_sampling_variation_without_double_counting_wilson_uncertainty() {
         // At p=0.005 and 10,000 campaigns, 60/10,000 is about 1.42 Monte
         // Carlo standard errors above nominal and must remain acceptable.
-        let borderline = make_fpr(60, 10_000, 0.005, 2.5758293035489004, ExpectedDisposition::Controlled);
+        let borderline = make_fpr(
+            60,
+            10_000,
+            0.005,
+            2.5758293035489004,
+            ExpectedDisposition::Controlled,
+        );
         assert!(borderline.passed_expected_disposition);
 
         // 120/10,000 is far beyond the preregistered four-SE tolerance.
-        let inflated = make_fpr(120, 10_000, 0.005, 2.5758293035489004, ExpectedDisposition::Controlled);
+        let inflated = make_fpr(
+            120,
+            10_000,
+            0.005,
+            2.5758293035489004,
+            ExpectedDisposition::Controlled,
+        );
         assert!(!inflated.passed_expected_disposition);
     }
 
     #[test]
     fn corrected_controlled_rate_gate_accepts_five_choice_observed_seed_variation() {
-        let sixty_two = make_fpr(62, 10_000, 0.005, 2.5758293035489004, ExpectedDisposition::Controlled);
+        let sixty_two = make_fpr(
+            62,
+            10_000,
+            0.005,
+            2.5758293035489004,
+            ExpectedDisposition::Controlled,
+        );
         assert!(sixty_two.passed_expected_disposition);
         assert!(sixty_two.wilson_99.upper > 0.005);
     }
