@@ -1,0 +1,74 @@
+name: Melothaea budgeted edit transaction decisions
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-muse/src/music_edit_transaction_decision.rs"
+      - "crates/domains/symthaea-muse/src/lib.rs"
+      - "tools/mel-music-edit-transaction-harness/**"
+      - ".github/workflows/mel-music-edit-transaction-decision.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  transaction-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Verify exact pull request head
+        shell: bash
+        run: |
+          set -euo pipefail
+          actual="$(git rev-parse HEAD)"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          test "$actual" = "$expected"
+          echo "MEL_TRANSACTION_REVISION=$actual" >> "$GITHUB_ENV"
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Stage standalone transaction harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          staged="$RUNNER_TEMP/mel-music-edit-transaction-harness"
+          mkdir -p "$staged/src"
+          cp tools/mel-music-edit-transaction-harness/Cargo.toml "$staged/Cargo.toml"
+          cp tools/mel-music-edit-transaction-harness/src/lib.rs "$staged/src/lib.rs"
+          cp crates/domains/symthaea-muse/src/music_edit_transaction_decision.rs "$staged/src/music_edit_transaction_decision.rs"
+          echo "MEL_TRANSACTION_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
+      - name: Check formatting of exact staged source
+        run: cargo +1.96.0 fmt --check --manifest-path "$MEL_TRANSACTION_MANIFEST"
+      - name: Resolve standalone dependencies
+        run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_TRANSACTION_MANIFEST"
+      - name: Run transaction decision tests
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_TRANSACTION_MANIFEST"
+      - name: Run transaction harness Clippy
+        run: cargo +1.96.0 clippy --locked --manifest-path "$MEL_TRANSACTION_MANIFEST" --all-targets -- -D warnings
+      - name: Record exact source identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/mel-transaction-evidence"
+          mkdir -p "$evidence"
+          sha256sum crates/domains/symthaea-muse/src/music_edit_transaction_decision.rs > "$evidence/production-module.sha256"
+          sha256sum tools/mel-music-edit-transaction-harness/Cargo.toml > "$evidence/harness-manifest.sha256"
+          sha256sum tools/mel-music-edit-transaction-harness/src/lib.rs > "$evidence/harness-lib.sha256"
+          sha256sum "$MEL_TRANSACTION_MANIFEST" > "$evidence/staged-manifest.sha256"
+          cp "$(dirname "$MEL_TRANSACTION_MANIFEST")/Cargo.lock" "$evidence/Cargo.lock"
+          sha256sum "$evidence/Cargo.lock" > "$evidence/Cargo.lock.sha256"
+          printf 'exact_head=%s\n' "$MEL_TRANSACTION_REVISION" > "$evidence/source-identities.txt"
+      - name: Upload transaction evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: mel-transaction-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-transaction-evidence/
+          if-no-files-found: error
+          retention-days: 90
