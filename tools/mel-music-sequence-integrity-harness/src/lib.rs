@@ -974,6 +974,10 @@ pub fn assess_operation_pair_v1(
     {
         return Err(SymbolicPatchErrorV1::InvalidPatch);
     }
+    // Preflight each operation alone. A malformed patch with stale before-values
+    // is not an order conflict and must not be mislabeled as non-commutativity.
+    apply_symbolic_edit_patch_v1(initial_events, left, &base_sha)?;
+    apply_symbolic_edit_patch_v1(initial_events, right, &base_sha)?;
 
     let left_then_right = apply_symbolic_edit_patch_v1(initial_events, left, &base_sha)
         .and_then(|state| apply_symbolic_edit_patch_v1(&state, right, &base_sha));
@@ -1205,6 +1209,29 @@ mod reversibility_tests {
                 Some(OperationConflictResolutionV1::Abort),
             ),
             Err(SymbolicPatchErrorV1::DeclaredNonCommutativityUnsubstantiated)
+        );
+    }
+
+    #[test]
+    fn invalid_individual_patch_is_not_mislabeled_as_order_conflict() {
+        let initial = vec![event("a", 60_000)];
+        let malformed = patch("malformed", &initial, vec![MusicalEventDeltaV1 {
+            event_id: "a".to_owned(),
+            before: Some(event("a", 59_000)),
+            after: Some(event("a", 62_000)),
+        }]);
+        let valid = patch("valid", &initial, vec![MusicalEventDeltaV1 {
+            event_id: "a".to_owned(),
+            before: Some(event("a", 60_000)),
+            after: Some(event("a", 61_000)),
+        }]);
+        assert_eq!(
+            assess_operation_pair_v1(
+                &initial, &malformed, &valid,
+                DeclaredOperationRelationV1::NonCommuting,
+                Some(OperationConflictResolutionV1::Abort),
+            ),
+            Err(SymbolicPatchErrorV1::ExpectedBeforeValueMismatch)
         );
     }
 
