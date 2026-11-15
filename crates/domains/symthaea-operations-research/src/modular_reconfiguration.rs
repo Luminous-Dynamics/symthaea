@@ -165,6 +165,10 @@ pub enum TransitionAction {
         from_module_ref: Option<String>,
         to_module_ref: String,
     },
+    UnassignOperation {
+        operation_ref: String,
+        from_module_ref: String,
+    },
     ReviewLayout,
     CommissionAndIndependentlyRequalify,
 }
@@ -189,6 +193,8 @@ pub enum ReconfigurationReasonCode {
     DuplicateOperationAssignment,
     DuplicateConnection,
     DuplicatePortReference,
+    CurrentConfigurationIncomplete,
+    CurrentConfigurationAmbiguous,
     ConfigurationFacilityMismatch,
     ModuleProfileMissing,
     ModuleProfileAmbiguous,
@@ -384,8 +390,29 @@ pub fn evaluate_reconfiguration(input: ReconfigurationInput<'_>) -> Reconfigurat
         findings.add(ReconfigurationReasonCode::ModuleProfileMissing, ReasonSeverity::Indeterminate, &target.configuration_ref);
     }
     if let Some(current) = input.current {
+        if current.resolution != SnapshotResolution::Complete {
+            findings.add(ReconfigurationReasonCode::CurrentConfigurationIncomplete, ReasonSeverity::Indeterminate, &current.configuration_ref);
+        }
         if current.facility_ref != target.facility_ref {
             findings.add(ReconfigurationReasonCode::ConfigurationFacilityMismatch, ReasonSeverity::Blocked, &target.configuration_ref);
+        }
+        let mut module_ids = BTreeSet::new();
+        for placement in &current.placements {
+            if !module_ids.insert(placement.module_ref.as_str()) {
+                findings.add(ReconfigurationReasonCode::CurrentConfigurationAmbiguous, ReasonSeverity::Blocked, &placement.module_ref);
+            }
+        }
+        let mut connection_ids = BTreeSet::new();
+        for connection in &current.connections {
+            if !connection_ids.insert(connection.connection_ref.as_str()) {
+                findings.add(ReconfigurationReasonCode::CurrentConfigurationAmbiguous, ReasonSeverity::Blocked, &connection.connection_ref);
+            }
+        }
+        let mut operation_ids = BTreeSet::new();
+        for assignment in &current.assignments {
+            if !operation_ids.insert(assignment.operation_ref.as_str()) {
+                findings.add(ReconfigurationReasonCode::CurrentConfigurationAmbiguous, ReasonSeverity::Blocked, &assignment.operation_ref);
+            }
         }
     }
 
@@ -694,12 +721,23 @@ fn validate_connections(
             {
                 findings.add(ReconfigurationReasonCode::PortCapacityExceeded, ReasonSeverity::Blocked, &connection.connection_ref);
             }
-            let from_usage = port_usage.entry((connection.from_module_ref.clone(), connection.from_port_ref.clone())).or_insert((0, 0));
-            from_usage.0 = from_usage.0.saturating_add(1);
-            from_usage.1 = from_usage.1.saturating_add(connection.capacity_units);
-            let to_usage = port_usage.entry((connection.to_module_ref.clone(), connection.to_port_ref.clone())).or_insert((0, 0));
-            to_usage.0 = to_usage.0.saturating_add(1);
-            to_usage.1 = to_usage.1.saturating_add(connection.capacity_units);
+            for key in [
+                (connection.from_module_ref.clone(), connection.from_port_ref.clone()),
+                (connection.to_module_ref.clone(), connection.to_port_ref.clone()),
+            ] {
+                let usage = port_usage.entry(key).or_insert((0, 0));
+                match (usage.0.checked_add(1), usage.1.checked_add(connection.capacity_units)) {
+                    (Some(count), Some(capacity)) => {
+                        usage.0 = count;
+                        usage.1 = capacity;
+                    }
+                    _ => findings.add(
+                        ReconfigurationReasonCode::PortCapacityExceeded,
+                        ReasonSeverity::Blocked,
+                        &connection.connection_ref,
+                    ),
+                }
+            }
         }
 
         findings.check_evidence(
@@ -715,7 +753,7 @@ fn validate_connections(
             let key = ((*module_ref).to_owned(), port.port_ref.clone());
             let (count, capacity) = port_usage.get(&key).copied().unwrap_or((0, 0));
             if port.required_peer && count == 0 {
-                findings.add(ReconfigurationReasonCode::RequiredPortUnconnected, ReasonSeverity::Indeterminate, &format!("{module_ref}:{}", port.port_ref));
+                findings.add(ReconfigurationReasonCode::RequiredPortUnconnected, missing_severity(target.resolution), &format!("{module_ref}:{}", port.port_ref));
             }
             if count > port.max_connections || capacity > port.max_capacity_units {
                 findings.add(ReconfigurationReasonCode::PortConnectionCountExceeded, ReasonSeverity::Blocked, &format!("{module_ref}:{}", port.port_ref));
@@ -868,11 +906,26 @@ fn derive_transition(current: Option<&CellConfiguration>, target: &CellConfigura
             });
         }
     }
+    for (operation_ref, module_ref) in &current_assignments {
+        if !target_assignments.contains_key(operation_ref) {
+            actions.insert(TransitionAction::UnassignOperation {
+                operation_ref: (*operation_ref).to_owned(),
+                from_module_ref: (*module_ref).to_owned(),
+            });
+        }
+    }
 
     let physical_change = current.facility_ref != target.facility_ref
         || current.layout_revision_ref != target.layout_revision_ref
         || current.coordinate_frame_ref != target.coordinate_frame_ref
-        || actions.iter().any(|action| !matches!(action, TransitionAction::ReassignOperation { .. }));
+        || current.width_mm != target.width_mm
+        || current.depth_mm != target.depth_mm
+        || current.geometry_basis != target.geometry_basis
+        || current.keepouts != target.keepouts
+        || actions.iter().any(|action| !matches!(
+            action,
+            TransitionAction::ReassignOperation { .. } | TransitionAction::UnassignOperation { .. }
+        ));
     if physical_change {
         actions.insert(TransitionAction::ReviewLayout);
         actions.insert(TransitionAction::CommissionAndIndependentlyRequalify);
