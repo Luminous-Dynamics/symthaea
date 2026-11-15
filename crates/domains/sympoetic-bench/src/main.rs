@@ -5,6 +5,9 @@ use clap::{Parser, Subcommand};
 use serde::Serialize;
 use sympoetic_bench::{
     Scorecard, Trace,
+    metrics::{
+        StratifiedCapabilityObservation, summarize_capability_amplification_by_stratum,
+    },
     trajectory::{TeamTrajectory, validate_trajectory},
     validate::{sha256_hex, validate_corpus, validate_scorecard, validate_trace},
 };
@@ -40,6 +43,15 @@ enum Command {
     ValidateTrajectory {
         #[arg(long)]
         input: PathBuf,
+    },
+    /// Summarize independent learning gain and negative-gain rates by baseline stratum.
+    SummarizeCapabilityStrata {
+        #[arg(long)]
+        input: PathBuf,
+        #[arg(long, default_value_t = 2_000)]
+        draws: usize,
+        #[arg(long, default_value_t = 42)]
+        seed: u64,
     },
     /// Print the SHA-256 digest of an artifact without changing it.
     Digest {
@@ -109,6 +121,23 @@ fn main() -> Result<()> {
                 })?;
             let receipt = validate_trajectory(&trajectory, &bytes)?;
             println!("{}", serde_json::to_string_pretty(&receipt)?);
+        }
+        Command::SummarizeCapabilityStrata { input, draws, seed } => {
+            let bytes = fs::read(&input)
+                .with_context(|| format!("could not read {}", input.display()))?;
+            let observations: Vec<StratifiedCapabilityObservation> =
+                serde_json::from_slice(&bytes).with_context(|| {
+                    format!(
+                        "{} is not a valid stratified capability observation array",
+                        input.display()
+                    )
+                })?;
+            let summary = summarize_capability_amplification_by_stratum(
+                &observations,
+                draws,
+                seed,
+            )?;
+            println!("{}", serde_json::to_string_pretty(&summary)?);
         }
         Command::Digest { input } => {
             let bytes = fs::read(&input)
