@@ -829,6 +829,63 @@ mod tests {
         }
     }
 
+    const FIXTURE_LEDGER: &str = include_str!("../../../docs/development-map/fixtures/temporal-event-ledger-v0.1.json");
+    const FIXTURE_EXPECTED: &str = include_str!("../../../docs/development-map/fixtures/temporal-event-ledger-v0.1.expected.json");
+
+    fn assert_public_fixture(query_text: &str, key: &str) {
+        let ledger: EventLedger = serde_json::from_str(FIXTURE_LEDGER).expect("fixture ledger");
+        let query: ReplayQuery = serde_json::from_str(query_text).expect("fixture query");
+        let expected_root: Value = serde_json::from_str(FIXTURE_EXPECTED).expect("fixture expected states");
+        let actual = replay_ledger(&ledger, &query).expect("candidate replay");
+        let expected = &expected_root["queries"][key];
+
+        let actual_included: Vec<String> = actual.included_event_ids.clone();
+        let expected_included: Vec<String> = serde_json::from_value(expected["included_event_ids"].clone()).unwrap();
+        assert_eq!(actual_included, expected_included);
+        let actual_excluded: HashSet<String> = actual.excluded_events.iter().map(|item| item.event_id.clone()).collect();
+        let expected_excluded: HashSet<String> = serde_json::from_value(expected["excluded_event_ids"].clone()).unwrap();
+        assert_eq!(actual_excluded, expected_excluded);
+
+        let expected_facts = expected["facts"].as_object().unwrap();
+        assert_eq!(actual.facts.len(), expected_facts.len());
+        for (event_id, expected_fact) in expected_facts {
+            let actual_fact = actual.facts.iter().find(|fact| fact.assertion_event_id == *event_id).expect("expected fact");
+            if let Some(value) = expected_fact.get("lifecycle") {
+                assert_eq!(serde_json::to_value(&actual_fact.lifecycle).unwrap(), *value);
+            }
+            if let Some(value) = expected_fact.get("effective_at_query") {
+                assert_eq!(actual_fact.effective_at_query, value.as_bool().unwrap());
+            }
+            if let Some(value) = expected_fact.get("temporally_admissible") {
+                assert_eq!(actual_fact.temporally_admissible, value.as_bool().unwrap());
+            }
+            if let Some(value) = expected_fact.get("payload") {
+                assert_eq!(actual_fact.payload, *value);
+            }
+        }
+        assert_eq!(actual.proposals.len(), expected["proposals"].as_array().unwrap().len());
+        assert_eq!(actual.verified_ledger_head_hash, expected_root["expected_ledger"]["head_hash"].as_str().unwrap());
+    }
+
+    #[test] fn public_actor_knowledge_fixture_matches_candidate_replay() {
+        assert_public_fixture(
+            include_str!("../../../docs/development-map/fixtures/temporal-replay-actor-knowledge-v0.1.json"),
+            "temporal-replay-actor-knowledge-v0.1.json",
+        );
+    }
+    #[test] fn public_ledger_as_of_fixture_matches_candidate_replay() {
+        assert_public_fixture(
+            include_str!("../../../docs/development-map/fixtures/temporal-replay-ledger-as-of-v0.1.json"),
+            "temporal-replay-ledger-as-of-v0.1.json",
+        );
+    }
+    #[test] fn public_retrospective_fixture_matches_candidate_replay() {
+        assert_public_fixture(
+            include_str!("../../../docs/development-map/fixtures/temporal-replay-restated-v0.1.json"),
+            "temporal-replay-restated-v0.1.json",
+        );
+    }
+
     #[test] fn valid_hash_chain_is_accepted() { assert!(validate_ledger(&sample_ledger()).valid); }
     #[test] fn append_event_assigns_identity_sequence_and_hash_atomically() {
         let mut ledger = sample_ledger();
