@@ -40,7 +40,8 @@
         "conceptual_pluralism",
         "repair",
         "consent_governance",
-        "longitudinal_adaptation"
+        "longitudinal_adaptation",
+        "partner_coordination"
       ]
     },
     "difficulty": {
@@ -101,7 +102,9 @@
               "constraint_conflict",
               "correction",
               "handoff",
-              "reflection"
+              "reflection",
+              "role_assignment",
+              "role_change"
             ]
           },
           "instruction": {
@@ -183,7 +186,9 @@
           "model_led_generation",
           "reflective_human_led",
           "reciprocal_co_creation",
-          "human_human_reference"
+          "human_human_reference",
+          "multi_agent_reference",
+          "human_ai_team"
         ]
       }
     },
