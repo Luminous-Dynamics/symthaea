@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:marine-performance-drift-candidate:0.1.0",
+  "title": "Marine performance drift candidate output",
+  "description": "Candidate-visible predictions only. Evaluator truth and expected labels are forbidden.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "corpus_id",
+    "candidate_id",
+    "candidate_version",
+    "predictions",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "corpus_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidate_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "predictions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "decision_time_utc",
+          "disposition",
+          "cause",
+          "supporting_evidence_ids"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision_time_utc": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "disposition": {
+            "enum": [
+              "DRIFT_DETECTED",
+              "NO_DRIFT_DETECTED",
+              "INDETERMINATE",
+              "OUT_OF_DOMAIN"
+            ]
+          },
+          "cause": {
+            "enum": [
+              "none",
+              "biofouling",
+              "weather_or_environment",
+              "propulsor_damage_or_blockage",
+              "biofouling_cleaned"
+            ]
+          },
+          "supporting_evidence_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 8
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

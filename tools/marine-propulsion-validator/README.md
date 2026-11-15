@@ -373,3 +373,33 @@ The v0.1.0 corpus is intentionally synthetic. Its expected audit disposition is
 INCOMPLETE even when all structural and temporal checks are satisfied. This does not
 train a performance model, identify biofouling, validate hydrodynamics, or establish
 cleaning efficacy or vessel performance.
+
+
+## Independent candidate scoring for performance drift
+
+Run the candidate scorer against the frozen seven-case synthetic corpus:
+
+~~~sh
+cargo run --bin marine-performance-drift-evaluator -- \
+  ../../docs/research/marine/fixtures/synthetic-marine-performance-drift-v0.1.0.json \
+  ../../docs/research/marine/marine-performance-drift-candidate-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-marine-performance-drift-candidate-v0.1.0.json
+~~~
+
+The candidate-output file is separate from evaluator-only challenge truth. The evaluator
+requires one result per case at the exact terminal decision time, resolves cited evidence
+against the final decision snapshot, and requires cause-specific evidence types. It reports
+per-case dispositions, a confusion matrix, coverage/selective accuracy, attribution precision,
+unsupported attributions, and false biofouling attributions.
+
+Run the adversarial negative control to verify that weather, propulsor, sensor, and mixed
+cases falsely labelled as biofouling are rejected:
+
+~~~sh
+cargo run --bin marine-performance-drift-evaluator -- \
+  ../../docs/research/marine/fixtures/synthetic-marine-performance-drift-v0.1.0.json \
+  ../../docs/research/marine/marine-performance-drift-candidate-v0.1.0.schema.json \
+  ../../docs/research/marine/fixtures/synthetic-marine-performance-drift-candidate-negative-v0.1.0.json
+~~~
+
+Both outcomes are synthetic contract tests, not vessel-performance or model-accuracy claims.

@@ -77,3 +77,7 @@ path = "src/bin/marine_acoustic_timebase_binding_audit.rs"
 [[bin]]
 name = "marine-performance-drift-audit"
 path = "src/bin/marine_performance_drift_audit.rs"
+
+[[bin]]
+name = "marine-performance-drift-evaluator"
+path = "src/bin/marine_performance_drift_evaluator.rs"

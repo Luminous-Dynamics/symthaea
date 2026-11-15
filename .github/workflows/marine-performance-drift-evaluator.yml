@@ -1,0 +1,85 @@
+name: Marine Performance Drift Candidate Evaluator
+
+on:
+  pull_request:
+    branches:
+      - research/marine-waps-co-design-20261110
+    paths:
+      - "tools/marine-propulsion-validator/Cargo.toml"
+      - "tools/marine-propulsion-validator/src/bin/marine_performance_drift_evaluator.rs"
+      - "docs/research/marine/marine-performance-drift-candidate-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-marine-performance-drift-candidate-*.json"
+      - ".github/workflows/marine-performance-drift-evaluator.yml"
+  push:
+    branches:
+      - research/marine-performance-drift-evaluator-20261115
+    paths:
+      - "tools/marine-propulsion-validator/Cargo.toml"
+      - "tools/marine-propulsion-validator/src/bin/marine_performance_drift_evaluator.rs"
+      - "docs/research/marine/marine-performance-drift-candidate-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-marine-performance-drift-candidate-*.json"
+      - ".github/workflows/marine-performance-drift-evaluator.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: marine-drift-evaluator-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: Exact-head candidate scoring and negative controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Generate lockfile for pinned standalone dependencies
+        run: cargo generate-lockfile --manifest-path tools/marine-propulsion-validator/Cargo.toml
+
+      - name: Format check for the new evaluator source only
+        run: rustfmt --edition 2024 --check tools/marine-propulsion-validator/src/bin/marine_performance_drift_evaluator.rs
+
+      - name: Unit tests for evidence and abstention semantics
+        run: cargo test --manifest-path tools/marine-propulsion-validator/Cargo.toml --locked --bin marine-performance-drift-evaluator
+
+      - name: Positive known-answer candidate is scored without false fouling
+        run: |
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-performance-drift-evaluator -- \
+            docs/research/marine/fixtures/synthetic-marine-performance-drift-v0.1.0.json \
+            docs/research/marine/marine-performance-drift-candidate-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-performance-drift-candidate-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-drift-positive.json"
+          cat "$RUNNER_TEMP/marine-drift-positive.json"
+          jq -e '.evaluation_contract == "VALID" and .candidate_outcome == "ACCEPTED_SYNTHETIC_SMOKE" and .case_count == 7 and .correct_dispositions == 7 and .supported_correct_attributions == 4 and .unsupported_attributions == 0 and .false_biofouling_attributions == 0 and .abstained_count == 2' "$RUNNER_TEMP/marine-drift-positive.json"
+
+      - name: Adversarial candidate is rejected for false biofouling attribution
+        run: |
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin marine-performance-drift-evaluator -- \
+            docs/research/marine/fixtures/synthetic-marine-performance-drift-v0.1.0.json \
+            docs/research/marine/marine-performance-drift-candidate-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-marine-performance-drift-candidate-negative-v0.1.0.json \
+            > "$RUNNER_TEMP/marine-drift-negative.json"
+          cat "$RUNNER_TEMP/marine-drift-negative.json"
+          jq -e '.evaluation_contract == "VALID" and .candidate_outcome == "REJECTED" and .false_biofouling_attributions == 4 and .unsupported_attributions == 4' "$RUNNER_TEMP/marine-drift-negative.json"
+
+      - name: Preserve evaluator receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marine-drift-evaluator-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/marine-drift-positive.json
+            ${{ runner.temp }}/marine-drift-negative.json

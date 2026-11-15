@@ -1,0 +1,71 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "MARINE-PERFORMANCE-DRIFT-SYNTHETIC-0001",
+  "candidate_id": "synthetic-known-answer-candidate",
+  "candidate_version": "0.1.0",
+  "predictions": [
+    {
+      "case_id": "STABLE-REFERENCE-001",
+      "decision_time_utc": "2026-01-02T08:10:00Z",
+      "disposition": "NO_DRIFT_DETECTED",
+      "cause": "none",
+      "supporting_evidence_ids": []
+    },
+    {
+      "case_id": "WEATHER-SHIFT-001",
+      "decision_time_utc": "2026-01-02T08:10:00Z",
+      "disposition": "NO_DRIFT_DETECTED",
+      "cause": "weather_or_environment",
+      "supporting_evidence_ids": [
+        "WX-OBS-02"
+      ]
+    },
+    {
+      "case_id": "FOULING-DRIFT-001",
+      "decision_time_utc": "2026-01-02T08:10:00Z",
+      "disposition": "DRIFT_DETECTED",
+      "cause": "biofouling",
+      "supporting_evidence_ids": [
+        "HULL-INSP-02"
+      ]
+    },
+    {
+      "case_id": "POST-CLEAN-RECOVERY-001",
+      "decision_time_utc": "2026-01-03T08:10:00Z",
+      "disposition": "NO_DRIFT_DETECTED",
+      "cause": "biofouling_cleaned",
+      "supporting_evidence_ids": [
+        "CLEAN-01",
+        "HULL-INSP-03"
+      ]
+    },
+    {
+      "case_id": "PROPULSOR-DAMAGE-001",
+      "decision_time_utc": "2026-01-02T08:10:00Z",
+      "disposition": "DRIFT_DETECTED",
+      "cause": "propulsor_damage_or_blockage",
+      "supporting_evidence_ids": [
+        "PUMP-INSP-02"
+      ]
+    },
+    {
+      "case_id": "SENSOR-DRIFT-001",
+      "decision_time_utc": "2026-01-02T08:10:00Z",
+      "disposition": "INDETERMINATE",
+      "cause": "none",
+      "supporting_evidence_ids": []
+    },
+    {
+      "case_id": "MIXED-UNIDENTIFIED-001",
+      "decision_time_utc": "2026-01-02T08:10:00Z",
+      "disposition": "INDETERMINATE",
+      "cause": "none",
+      "supporting_evidence_ids": []
+    }
+  ],
+  "limitations": [
+    "Synthetic known-answer output only; not produced by a trained detector.",
+    "The challenge truth is evaluator-only and is not included in this candidate output.",
+    "No real-vessel diagnostic accuracy, hydrodynamic validity, safety, or maintenance authority is claimed."
+  ]
+}
