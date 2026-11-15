@@ -1408,7 +1408,7 @@ mod tests {
             checked += 1;
         }
 
-        assert_eq!(checked, 25, "all frozen FECOMP-0 cases must execute");
+        assert_eq!(checked, 26, "all frozen FECOMP-0 cases must execute");
     }
 
     #[test]
