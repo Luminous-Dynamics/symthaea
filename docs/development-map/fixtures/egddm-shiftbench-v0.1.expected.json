@@ -19,7 +19,8 @@
       "time_weighted_requirement_conformance": 0.9333333333333333,
       "critical_time_weighted_conformance": 0.9333333333333333,
       "recovery_event_count": 2,
-      "max_unverified_gap_seconds": 60
+      "max_unverified_gap_seconds": 60,
+      "max_critical_unverified_gap_seconds": 60
     },
     "shifted": {
       "retained_functionality": 1,
@@ -40,7 +41,8 @@
       "time_weighted_requirement_conformance": 0.7714285714285715,
       "critical_time_weighted_conformance": 0.65,
       "recovery_event_count": 4,
-      "max_unverified_gap_seconds": 180
+      "max_unverified_gap_seconds": 180,
+      "max_critical_unverified_gap_seconds": 180
     },
     "paired_success": true,
     "retained_functionality_delta": 0,
