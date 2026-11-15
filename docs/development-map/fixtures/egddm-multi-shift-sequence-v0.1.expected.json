@@ -1,0 +1,373 @@
+{
+  "scenario_id": "egddm-multishift-hysteresis-001",
+  "gold_adjudication_status": "synthetic_known_answer_not_independently_adjudicated",
+  "trace_reports": [
+    {
+      "trace_id": "conformant-sequence",
+      "epochs": [
+        {
+          "epoch": 1,
+          "event_id": "shift-1-api-and-audit",
+          "decision_cutoff": "2026-11-15T10:01:00Z",
+          "required_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "direct_dependency_implied_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "direct_dependency_only_impact_obligations": [],
+          "gold_only_impact_obligations": [],
+          "fresh_revalidated_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "fresh_passing_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "reused_current_obligations": [
+            "docs-format",
+            "release-authority"
+          ],
+          "missing_required_revalidation_obligations": [],
+          "required_without_fresh_pass_obligations": [],
+          "unnecessary_revalidation_obligations": [],
+          "false_resurrection_obligations": [],
+          "stale_carryover_obligations": [],
+          "receipt_source_context_mismatch_obligations": [],
+          "future_evidence_leakage_obligations": [],
+          "unsupported_current_claims": [],
+          "invalid_fresh_receipts": [],
+          "invalid_reuse_receipts": [],
+          "critical_false_resurrection_count": 0,
+          "required_revalidation_units": 3,
+          "fresh_revalidation_units": 3,
+          "over_revalidation_units": 0,
+          "under_revalidation_units": 0,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
+        },
+        {
+          "epoch": 2,
+          "event_id": "shift-2-runner-image",
+          "decision_cutoff": "2026-11-15T10:04:00Z",
+          "required_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "direct_dependency_implied_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "direct_dependency_only_impact_obligations": [],
+          "gold_only_impact_obligations": [],
+          "fresh_revalidated_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "fresh_passing_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "reused_current_obligations": [
+            "docs-format",
+            "release-authority"
+          ],
+          "missing_required_revalidation_obligations": [],
+          "required_without_fresh_pass_obligations": [],
+          "unnecessary_revalidation_obligations": [],
+          "false_resurrection_obligations": [],
+          "stale_carryover_obligations": [],
+          "receipt_source_context_mismatch_obligations": [],
+          "future_evidence_leakage_obligations": [],
+          "unsupported_current_claims": [],
+          "invalid_fresh_receipts": [],
+          "invalid_reuse_receipts": [],
+          "critical_false_resurrection_count": 0,
+          "required_revalidation_units": 3,
+          "fresh_revalidation_units": 3,
+          "over_revalidation_units": 0,
+          "under_revalidation_units": 0,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
+        },
+        {
+          "epoch": 3,
+          "event_id": "shift-3-rollback-and-authority-rotation",
+          "decision_cutoff": "2026-11-15T10:08:00Z",
+          "required_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro",
+            "release-authority"
+          ],
+          "direct_dependency_implied_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro",
+            "release-authority"
+          ],
+          "direct_dependency_only_impact_obligations": [],
+          "gold_only_impact_obligations": [],
+          "fresh_revalidated_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro",
+            "release-authority"
+          ],
+          "fresh_passing_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro",
+            "release-authority"
+          ],
+          "reused_current_obligations": [
+            "docs-format"
+          ],
+          "missing_required_revalidation_obligations": [],
+          "required_without_fresh_pass_obligations": [],
+          "unnecessary_revalidation_obligations": [],
+          "false_resurrection_obligations": [],
+          "stale_carryover_obligations": [],
+          "receipt_source_context_mismatch_obligations": [],
+          "future_evidence_leakage_obligations": [],
+          "unsupported_current_claims": [],
+          "invalid_fresh_receipts": [],
+          "invalid_reuse_receipts": [],
+          "critical_false_resurrection_count": 0,
+          "required_revalidation_units": 4,
+          "fresh_revalidation_units": 4,
+          "over_revalidation_units": 0,
+          "under_revalidation_units": 0,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
+        }
+      ],
+      "total_required_revalidation_units": 10,
+      "total_fresh_revalidation_units": 10,
+      "total_over_revalidation_units": 0,
+      "total_under_revalidation_units": 0,
+      "total_false_resurrections": 0,
+      "total_critical_false_resurrections": 0,
+      "total_stale_carryovers": 0,
+      "total_future_evidence_leakages": 0,
+      "total_unsupported_current_claims": 0,
+      "total_direct_dependency_only_impact_labels": 0,
+      "total_gold_only_impact_labels": 0,
+      "total_unclaimed_active_obligations": 0,
+      "total_critical_unclaimed_obligations": 0
+    },
+    {
+      "trace_id": "false-resurrection-sequence",
+      "epochs": [
+        {
+          "epoch": 1,
+          "event_id": "shift-1-api-and-audit",
+          "decision_cutoff": "2026-11-15T10:01:00Z",
+          "required_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "direct_dependency_implied_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "direct_dependency_only_impact_obligations": [],
+          "gold_only_impact_obligations": [],
+          "fresh_revalidated_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "fresh_passing_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "reused_current_obligations": [
+            "docs-format",
+            "release-authority"
+          ],
+          "missing_required_revalidation_obligations": [],
+          "required_without_fresh_pass_obligations": [],
+          "unnecessary_revalidation_obligations": [],
+          "false_resurrection_obligations": [],
+          "stale_carryover_obligations": [],
+          "receipt_source_context_mismatch_obligations": [],
+          "future_evidence_leakage_obligations": [],
+          "unsupported_current_claims": [],
+          "invalid_fresh_receipts": [],
+          "invalid_reuse_receipts": [],
+          "critical_false_resurrection_count": 0,
+          "required_revalidation_units": 3,
+          "fresh_revalidation_units": 3,
+          "over_revalidation_units": 0,
+          "under_revalidation_units": 0,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
+        },
+        {
+          "epoch": 2,
+          "event_id": "shift-2-runner-image",
+          "decision_cutoff": "2026-11-15T10:04:00Z",
+          "required_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "direct_dependency_implied_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "direct_dependency_only_impact_obligations": [],
+          "gold_only_impact_obligations": [],
+          "fresh_revalidated_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "fresh_passing_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "reused_current_obligations": [
+            "docs-format",
+            "release-authority"
+          ],
+          "missing_required_revalidation_obligations": [],
+          "required_without_fresh_pass_obligations": [],
+          "unnecessary_revalidation_obligations": [],
+          "false_resurrection_obligations": [],
+          "stale_carryover_obligations": [],
+          "receipt_source_context_mismatch_obligations": [],
+          "future_evidence_leakage_obligations": [],
+          "unsupported_current_claims": [],
+          "invalid_fresh_receipts": [],
+          "invalid_reuse_receipts": [],
+          "critical_false_resurrection_count": 0,
+          "required_revalidation_units": 3,
+          "fresh_revalidation_units": 3,
+          "over_revalidation_units": 0,
+          "under_revalidation_units": 0,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
+        },
+        {
+          "epoch": 3,
+          "event_id": "shift-3-rollback-and-authority-rotation",
+          "decision_cutoff": "2026-11-15T10:08:00Z",
+          "required_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro",
+            "release-authority"
+          ],
+          "direct_dependency_implied_revalidation_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro",
+            "release-authority"
+          ],
+          "direct_dependency_only_impact_obligations": [],
+          "gold_only_impact_obligations": [],
+          "fresh_revalidated_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "fresh_passing_obligations": [
+            "api-compat",
+            "audit-logging",
+            "build-repro"
+          ],
+          "reused_current_obligations": [
+            "docs-format"
+          ],
+          "missing_required_revalidation_obligations": [
+            "release-authority"
+          ],
+          "required_without_fresh_pass_obligations": [
+            "release-authority"
+          ],
+          "unnecessary_revalidation_obligations": [],
+          "false_resurrection_obligations": [
+            "release-authority"
+          ],
+          "stale_carryover_obligations": [
+            "release-authority"
+          ],
+          "receipt_source_context_mismatch_obligations": [],
+          "future_evidence_leakage_obligations": [],
+          "unsupported_current_claims": [
+            "release-authority"
+          ],
+          "invalid_fresh_receipts": [],
+          "invalid_reuse_receipts": [
+            {
+              "obligation_id": "release-authority",
+              "receipt_kind": "reused",
+              "reasons": [
+                "context_mismatch:issuer_key_digest",
+                "context_mismatch:policy_digest"
+              ]
+            }
+          ],
+          "critical_false_resurrection_count": 1,
+          "required_revalidation_units": 4,
+          "fresh_revalidation_units": 3,
+          "over_revalidation_units": 0,
+          "under_revalidation_units": 1,
+          "unclaimed_active_obligations": [],
+          "critical_unclaimed_obligations": []
+        }
+      ],
+      "total_required_revalidation_units": 10,
+      "total_fresh_revalidation_units": 9,
+      "total_over_revalidation_units": 0,
+      "total_under_revalidation_units": 1,
+      "total_false_resurrections": 1,
+      "total_critical_false_resurrections": 1,
+      "total_stale_carryovers": 1,
+      "total_future_evidence_leakages": 0,
+      "total_unsupported_current_claims": 1,
+      "total_direct_dependency_only_impact_labels": 0,
+      "total_gold_only_impact_labels": 0,
+      "total_unclaimed_active_obligations": 0,
+      "total_critical_unclaimed_obligations": 0
+    }
+  ],
+  "restoration_control": {
+    "control_id": "full-identity-restoration",
+    "active_obligations": [
+      "api-compat",
+      "build-repro",
+      "docs-format",
+      "release-authority"
+    ],
+    "valid_reused_obligations": [
+      "api-compat",
+      "build-repro",
+      "docs-format",
+      "release-authority"
+    ],
+    "required_revalidation_obligations": [],
+    "false_resurrection_obligations": [],
+    "invalid_reuse_receipts": [],
+    "false_resurrection_count": 0
+  },
+  "claim_ceiling": "Deterministic evaluation of supplied multi-shift traces against evaluator-side impact labels and declared receipt dependency/time semantics. Does not authenticate execution or authority, independently adjudicate gold labels, prove causal completeness, or establish agent performance."
+}

@@ -1,0 +1,473 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-multi-shift-sequence-report-v0.1.schema.json",
+  "title": "EGDDM multi-shift sequence report v0.1",
+  "description": "Read-only evaluator output. Contains gold-label comparisons and must never be exposed to candidate agents.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "gold_adjudication_status",
+    "trace_reports",
+    "restoration_control",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gold_adjudication_status": {
+      "enum": [
+        "synthetic_known_answer_not_independently_adjudicated",
+        "independently_adjudicated"
+      ]
+    },
+    "trace_reports": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/trace"
+      }
+    },
+    "restoration_control": {
+      "$ref": "#/$defs/restoration"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 20
+    }
+  },
+  "$defs": {
+    "epoch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "epoch",
+        "event_id",
+        "decision_cutoff",
+        "required_revalidation_obligations",
+        "direct_dependency_implied_revalidation_obligations",
+        "direct_dependency_only_impact_obligations",
+        "gold_only_impact_obligations",
+        "fresh_revalidated_obligations",
+        "fresh_passing_obligations",
+        "reused_current_obligations",
+        "missing_required_revalidation_obligations",
+        "required_without_fresh_pass_obligations",
+        "unnecessary_revalidation_obligations",
+        "false_resurrection_obligations",
+        "stale_carryover_obligations",
+        "future_evidence_leakage_obligations",
+        "unsupported_current_claims",
+        "invalid_fresh_receipts",
+        "invalid_reuse_receipts",
+        "critical_false_resurrection_count",
+        "required_revalidation_units",
+        "fresh_revalidation_units",
+        "over_revalidation_units",
+        "under_revalidation_units",
+        "receipt_source_context_mismatch_obligations",
+        "unclaimed_active_obligations",
+        "critical_unclaimed_obligations"
+      ],
+      "properties": {
+        "epoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_cutoff": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "required_revalidation_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "gold_only_impact_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fresh_revalidated_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "fresh_passing_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reused_current_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "missing_required_revalidation_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required_without_fresh_pass_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "unnecessary_revalidation_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "false_resurrection_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "stale_carryover_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "future_evidence_leakage_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "unsupported_current_claims": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "invalid_fresh_receipts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "obligation_id",
+              "receipt_kind",
+              "reasons"
+            ],
+            "properties": {
+              "obligation_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "receipt_kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "invalid_reuse_receipts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "obligation_id",
+              "receipt_kind",
+              "reasons"
+            ],
+            "properties": {
+              "obligation_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "receipt_kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "critical_false_resurrection_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fresh_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "over_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "under_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "direct_dependency_implied_revalidation_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "direct_dependency_only_impact_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "receipt_source_context_mismatch_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "unclaimed_active_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "critical_unclaimed_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trace_id",
+        "epochs",
+        "total_required_revalidation_units",
+        "total_fresh_revalidation_units",
+        "total_over_revalidation_units",
+        "total_under_revalidation_units",
+        "total_false_resurrections",
+        "total_critical_false_resurrections",
+        "total_stale_carryovers",
+        "total_future_evidence_leakages",
+        "total_unsupported_current_claims",
+        "total_direct_dependency_only_impact_labels",
+        "total_gold_only_impact_labels",
+        "total_unclaimed_active_obligations",
+        "total_critical_unclaimed_obligations"
+      ],
+      "properties": {
+        "trace_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "epochs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/epoch"
+          }
+        },
+        "total_required_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_fresh_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_over_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_under_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_false_resurrections": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_critical_false_resurrections": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_stale_carryovers": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_future_evidence_leakages": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_unsupported_current_claims": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_gold_only_impact_labels": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_direct_dependency_only_impact_labels": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_unclaimed_active_obligations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_critical_unclaimed_obligations": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "restoration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "control_id",
+        "active_obligations",
+        "valid_reused_obligations",
+        "required_revalidation_obligations",
+        "false_resurrection_obligations",
+        "invalid_reuse_receipts",
+        "false_resurrection_count"
+      ],
+      "properties": {
+        "control_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "active_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "valid_reused_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required_revalidation_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "false_resurrection_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "invalid_reuse_receipts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "obligation_id",
+              "receipt_kind",
+              "reasons"
+            ],
+            "properties": {
+              "obligation_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "receipt_kind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "reasons": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "false_resurrection_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

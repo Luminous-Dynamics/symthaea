@@ -1,0 +1,500 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-multi-shift-sequence-v0.1.schema.json",
+  "title": "EGDDM multi-shift evaluator bundle v0.1",
+  "description": "Evaluator-only synthetic bundle. candidate_view is the only candidate-visible projection; gold_overlay, candidate_traces, controls, and expected_summary must remain evaluator-side.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundle_id",
+    "bundle_visibility",
+    "candidate_view",
+    "gold_overlay",
+    "candidate_traces",
+    "restoration_control",
+    "expected_summary",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_visibility": {
+      "const": "evaluator_only_never_candidate_visible"
+    },
+    "candidate_view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "baseline",
+        "obligations",
+        "initial_receipts",
+        "interventions"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "baseline": {
+          "$ref": "#/$defs/state"
+        },
+        "obligations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/obligation"
+          }
+        },
+        "initial_receipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receipt"
+          }
+        },
+        "interventions": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/intervention"
+          }
+        }
+      }
+    },
+    "gold_overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visibility",
+        "required_revalidation_by_epoch",
+        "adjudication_status"
+      ],
+      "properties": {
+        "visibility": {
+          "const": "evaluator_only"
+        },
+        "adjudication_status": {
+          "const": "synthetic_known_answer_not_independently_adjudicated"
+        },
+        "required_revalidation_by_epoch": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gold_epoch"
+          }
+        }
+      }
+    },
+    "candidate_traces": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/candidate_trace"
+      }
+    },
+    "restoration_control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "control_id",
+        "final_state",
+        "decision_cutoff",
+        "receipt_validity_window_open",
+        "reused_receipts",
+        "reuse_policy",
+        "expected_required_revalidation",
+        "expected_false_resurrection_count",
+        "active_obligation_ids"
+      ],
+      "properties": {
+        "control_id": {
+          "type": "string"
+        },
+        "final_state": {
+          "$ref": "#/$defs/state"
+        },
+        "reuse_policy": {
+          "const": "permitted_only_when_all_declared_identity_and_validity_dimensions_match"
+        },
+        "expected_required_revalidation": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "expected_false_resurrection_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "decision_cutoff": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "receipt_validity_window_open": {
+          "const": true
+        },
+        "reused_receipts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/receipt"
+          }
+        },
+        "active_obligation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "expected_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conformant_trace",
+        "false_resurrection_trace",
+        "restoration_control"
+      ],
+      "properties": {
+        "conformant_trace": {
+          "$ref": "#/$defs/trace_summary"
+        },
+        "false_resurrection_trace": {
+          "$ref": "#/$defs/trace_summary"
+        },
+        "restoration_control": {
+          "$ref": "#/$defs/trace_summary"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 20
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_tree_digest",
+        "runner_image_digest",
+        "toolchain_digest",
+        "policy_digest",
+        "issuer_key_digest",
+        "api_contract_digest",
+        "docs_contract_digest"
+      ],
+      "properties": {
+        "source_tree_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "runner_image_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "toolchain_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "issuer_key_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "api_contract_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "docs_contract_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "obligation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligation_id",
+        "critical",
+        "introduced_epoch",
+        "dependency_dimensions"
+      ],
+      "properties": {
+        "obligation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "critical": {
+          "type": "boolean"
+        },
+        "introduced_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "dependency_dimensions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "source_tree_digest",
+              "runner_image_digest",
+              "toolchain_digest",
+              "policy_digest",
+              "issuer_key_digest",
+              "api_contract_digest",
+              "docs_contract_digest"
+            ]
+          }
+        }
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "obligation_id",
+        "source_epoch",
+        "outcome",
+        "context",
+        "observed_at",
+        "available_at",
+        "valid_until"
+      ],
+      "properties": {
+        "obligation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_epoch": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "outcome": {
+          "enum": [
+            "pass",
+            "fail",
+            "unknown"
+          ]
+        },
+        "context": {
+          "$ref": "#/$defs/state"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "available_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "valid_until": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "intervention": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "sequence_index",
+        "event_kind",
+        "event_time",
+        "available_at",
+        "before",
+        "after",
+        "newly_introduced_obligations"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequence_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_kind": {
+          "enum": [
+            "requirement_change",
+            "shared_runner_change",
+            "source_rollback_and_authority_rotation",
+            "sham",
+            "no_op",
+            "other"
+          ]
+        },
+        "event_time": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "available_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "before": {
+          "$ref": "#/$defs/state"
+        },
+        "after": {
+          "$ref": "#/$defs/state"
+        },
+        "newly_introduced_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "gold_epoch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "epoch",
+        "required_revalidation_obligations",
+        "reason_by_obligation"
+      ],
+      "properties": {
+        "epoch": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "required_revalidation_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "reason_by_obligation": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "obligation_id",
+              "reason"
+            ],
+            "properties": {
+              "obligation_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "candidate_trace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trace_id",
+        "checkpoints"
+      ],
+      "properties": {
+        "trace_id": {
+          "type": "string"
+        },
+        "checkpoints": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "epoch",
+              "decision_cutoff",
+              "fresh_receipts",
+              "reused_receipts",
+              "declared_current_obligations"
+            ],
+            "properties": {
+              "epoch": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "decision_cutoff": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "reused_receipts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/receipt"
+                }
+              },
+              "declared_current_obligations": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "fresh_receipts": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/receipt"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "trace_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_revalidation_units",
+        "fresh_revalidation_units",
+        "missing_required_obligations",
+        "false_resurrection_obligations",
+        "unnecessary_revalidation_units"
+      ],
+      "properties": {
+        "required_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fresh_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "missing_required_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "false_resurrection_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "unnecessary_revalidation_units": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
