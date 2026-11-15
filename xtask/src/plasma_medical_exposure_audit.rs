@@ -89,7 +89,9 @@ fn rejected(reason_code: &'static str) -> Assessment {
 }
 
 fn check_measurement(measurement: &Value) -> Option<Assessment> {
-    let status = get_str(measurement, "status")?;
+    let Some(status) = get_str(measurement, "status") else {
+        return Some(blocked("MEASUREMENT_STATUS_MISSING"));
+    };
     let method_present = nonempty_string(measurement.get("method_id"));
     let raw_digest = get_str(measurement, "raw_data_sha256");
 
@@ -169,7 +171,13 @@ fn check_measurement(measurement: &Value) -> Option<Assessment> {
             }
             return Some(blocked("BELOW_LIMIT_NOT_QUANTIFIED_AS_MEASURED_DOSE"));
         }
-        "UNKNOWN" | "NOT_MEASURED" | "NOT_APPLICABLE" | "WITHHELD" => {
+        "UNKNOWN" => {
+            if measurement.get("value").is_some() {
+                return Some(rejected("UNKNOWN_VALUE_MUST_NOT_BE_ZERO"));
+            }
+            return Some(blocked("OBSERVATION_NOT_MEASURED"));
+        }
+        "NOT_MEASURED" | "NOT_APPLICABLE" | "WITHHELD" => {
             if measurement.get("value").is_some() {
                 return Some(rejected("NON_MEASURED_STATUS_CANNOT_CARRY_VALUE"));
             }
@@ -269,9 +277,11 @@ fn audit_record(record: &Value) -> Assessment {
             if !is_sha256(summary.and_then(|s| get_str(s, "spatial_map_sha256")))
                 || !is_sha256(geometry.get("spatial_map_sha256").and_then(Value::as_str))
                 || !has_number(geometry.get("coverage_fraction"))
-                || !summary.and_then(|s| s.get("local_peak_reviewed")).and_then(Value::as_bool).unwrap_or(false)
             {
                 return blocked("SPATIAL_UNIFORMITY_EVIDENCE_INCOMPLETE");
+            }
+            if !summary.and_then(|s| s.get("local_peak_reviewed")).and_then(Value::as_bool).unwrap_or(false) {
+                return blocked("LOCAL_PEAK_NOT_REVIEWED");
             }
         }
         if exposure.get("spatial_summary").and_then(|s| s.get("uniformity_claimed"))
