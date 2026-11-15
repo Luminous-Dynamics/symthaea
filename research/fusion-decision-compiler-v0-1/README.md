@@ -65,6 +65,35 @@ The initial 15 authored tests cover matched outputs, descriptive-only and covari
 
 The graph helper returns the changed nodes and their full transitive downstream closure. Cycles are tolerated and traversal is deterministic. This is a structural impact calculation, not automatic revocation of an external certificate or authority decision.
 
+
+## Plant-service net-electric power-balance gate
+
+The `plant_service_gate` module separates physics feasibility from delivered electric service. It requires five source-linked terms from one exact run: gross electric generation, variable recirculation, fixed recirculation, total recirculation and reported net electric output.
+
+It checks two independent identities:
+```text
+total_recirculated = variable_recirculated + fixed_recirculated
+net_electric = gross_electric - variable_recirculated - fixed_recirculated
+```
+
+Only after both residuals meet the declared tolerance does it compare net export with an explicit reserve. Negative net electricity is `NetImport`, zero is `NoNetExport`, and a positive result below the required reserve is `NetExportBelowReserve`. Missing loads are not imputed as zero.
+
+The D0FUS 3.2.0 ITER adapter freezes the exact upstream 165-value RUN tuple (167 `GlobalConfig` fields) and the following indexes: `P_elec` 25, `P_e_gross` 153, `P_recirc_var` 160, `P_recirc_fix` 161 and `P_recirculated` 162. Its source schema manifest has a SHA-256 identity. The pinned D0FUS run is a regression fixture: it has positive plasma Q and positive gross electricity but negative net electricity. See [D0FUS exact-run PR #12314](https://github.com/Luminous-Dynamics/symthaea/pull/12314) and [plant-service gate PR #12345](https://github.com/Luminous-Dynamics/symthaea/pull/12345).
+
+The module's authored tests cover schema length/indexes, negative-net D0FUS disposition, positive export, reserve policy, independent residuals, missing/duplicate/non-finite terms, and mismatched schema/unit/boundary/time/sign. Its PASS ceiling is deterministic case-level power-balance semantics only, not solver physics or commercial plant qualification.
+
+## Q_ENG versus Pareto lifetime plant-service audit
+
+The `pareto_tradeoff` module compares an externally normalized Q_ENG scalar with a complete source-bound objective vector. It does not reconstruct the paper-specific Engineering Burden Index formula or claim to reproduce the paper's numerical rankings.
+
+The September 2026 Q_ENG paper defines the scalar as operational availability divided by a dimensionless Engineering Burden Index (EBI). Because the ratio is monotone in availability and EBI, a candidate that is at least as good on both of those inputs cannot be ranked lower by Q_ENG. The meaningful limitation is omitted dimensions: the scalar can conceal trade-offs against lifetime net electricity, whole-life cost, planned/unplanned downtime and uncertainty width. A scalar preference between Pareto-incomparable candidates is not universal superiority.
+
+The comparison profile freezes service boundary, plant-life horizon, cost/currency/discount basis, the upstream EBI normalization and the uncertainty-coverage method. The objective vector maximizes lifetime net MWh and availability, and minimizes whole-life cost, planned/unplanned downtime, EBI and comparable net-export interval width. Missing dimensions, mixed profiles and hard-gate blocked/unknown candidates are not silently ranked.
+
+The synthetic `audit_pareto_tradeoff` runner demonstrates Q_ENG preferring one design while the objective vector shows lower lifetime net energy and higher whole-life cost; the two designs are Pareto-incomparable. A third candidate dominates both. The runner is a known-answer contract fixture, not a reproduction of the published Q_ENG concept study.
+
+External comparator: “An availability-centric Q-metrics framework for assessing fusion power-plant engineering viability,” *Fusion Engineering and Design* (September 2026), DOI 10.1016/j.fusengdes.2026.115874. The paper's underlying data are available on request, so source data and normalization details are prerequisites to reproducing its actual rankings. PROCESS remains the system-code owner for its component-lifetime and availability calculations.
+
 ## Run locally
 
 From this directory:
@@ -80,7 +109,7 @@ cargo run --manifest-path Cargo.toml --bin audit_pareto_tradeoff
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
-The independent compiler corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current compiler corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 32 authored Rust unit tests, including one that applies all 26 compiler corpus mutations to the actual compiler. The observable-dependence module adds 11 authored tests for per-output dependency overlap, source aliases, incomplete inventories, conflicting identities and deterministic ordering. The candidate-funnel module adds 16 authored tests for full stage matrices, missing/duplicate records, skip reasons, pipeline transitions, explicit audit overrides, failure/non-convergence and exact-vs-partial recall. The validation-domain module adds 16 authored tests for calibration/test/holdout separation, source and episode overlap, leakage, measurement class, metrology provenance, model revision and domain applicability; it also executes all 16 frozen split-integrity cases. The cross-solver comparison module adds 15 authored tests for matched-case output admission, normalization identity, run-status refusal, dependency disclosure, and covariance-receipt binding. Total authored Rust test declarations across the current five source modules: 90. These are authored test cases, not executed test results.
+The independent compiler corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current compiler corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 32 authored Rust unit tests, including one that applies all 26 compiler corpus mutations to the actual compiler. The observable-dependence module adds 11 authored tests for per-output dependency overlap, source aliases, incomplete inventories, conflicting identities and deterministic ordering. The candidate-funnel module adds 16 authored tests for full stage matrices, missing/duplicate records, skip reasons, pipeline transitions, explicit audit overrides, failure/non-convergence and exact-vs-partial recall. The validation-domain module adds 16 authored tests for calibration/test/holdout separation, source and episode overlap, leakage, measurement class, metrology provenance, model revision and domain applicability; it also executes all 16 frozen split-integrity cases. The cross-solver comparison module adds 15 authored tests for matched-case output admission, normalization identity, run-status refusal, dependency disclosure, and covariance-receipt binding. Across the original five FECOMP modules there are 90 authored Rust test declarations. The independent net-electric service gate adds 19, and the Q_ENG/Pareto trade-off audit adds 20, for 129 authored test declarations in these seven modules. These are authored test cases, not executed test results.
 
 The separate validation-domain inventory binary checks fixture structure without calling the split validator. Its 16 synthetic cases contain 3 expected acceptances and 13 expected refusals.
 
