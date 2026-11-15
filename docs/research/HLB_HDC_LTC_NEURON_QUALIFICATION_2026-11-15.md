@@ -326,6 +326,11 @@ Generate deterministic systems with known numerical reference trajectories, incl
 - gaps spanning several time constants;
 - controlled regime changes and missing observations.
 
+- time-unit metamorphic controls: rescale all event times and \`tau\) by the same positive factor and inversely rescale configured Fourier frequencies; equivalent dimensionless inputs should produce equivalent trajectories while all values remain inside declared time-constant clamps;
+- irregular input-path semantics: compare zero-order hold with piecewise-linear interpolation only when both interval endpoints are causally available; never let an offline smoother or future observation leak into an earlier prediction;
+- distinguish an explicitly observed unchanged value, a missing observation, a delayed observation, and a sensor outage. They are not interchangeable input values.
+
+
 Report:
 
 - relative trajectory error against a converged high-accuracy numerical reference;
