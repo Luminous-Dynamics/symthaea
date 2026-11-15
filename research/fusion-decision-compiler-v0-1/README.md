@@ -53,7 +53,7 @@ cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
-The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 31 authored Rust unit tests, including one that applies all 26 corpus mutations to the actual compiler and checks each disposition. The new candidate-funnel module adds 13 authored tests for complete stage matrices, missing/duplicate candidate records, skip reasons, ordinary pipeline transitions, explicit audit overrides, failure/non-convergence accounting and exact-vs-partial reference-label coverage. Total authored Rust test declarations across the two source files: 44. These are authored test cases, not executed test results.
+The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 31 authored Rust unit tests, including one that applies all 26 corpus mutations to the actual compiler and checks each disposition. The new candidate-funnel module adds 16 authored tests for complete stage matrices, missing/duplicate candidate records, skip reasons, ordinary pipeline transitions, explicit audit overrides, failure/non-convergence accounting and exact-vs-partial reference-label coverage. Total authored Rust test declarations across the two source files: 47. These are authored test cases, not executed test results.
 
 ## Claim ceiling
 
