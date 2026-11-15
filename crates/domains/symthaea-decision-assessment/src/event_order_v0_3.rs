@@ -1093,7 +1093,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                         continue;
                     }
                 };
-                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_assessments) {
+                let assessment = match receipt_assessment_for_action(&action.action_id, &receipt_ref, &receipt_sha256, receipt_assessments) {
                     Ok(value) => value,
                     Err(ProjectionFault::Indeterminate(code)) => {
                         indeterminate = true;
@@ -2102,8 +2102,11 @@ pub fn generate_capture_clock_fault_schedule(
     Ok(schedule)
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OwnerReceiptAssessment {
+    /// Exact immutable receipt identity the owner verifier actually checked.
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
     pub identity: GateState,
     pub digest_integrity: GateState,
     pub authenticity: GateState,
@@ -2198,13 +2201,20 @@ fn action_owner_time(
     )
 }
 
-fn receipt_assessment_for_action<'a>(
+fn receipt_assessment_for_action(
     action_id: &str,
-    assessments: &'a BTreeMap<String, OwnerReceiptAssessment>,
+    expected_receipt_ref: &str,
+    expected_receipt_sha256: &str,
+    assessments: &BTreeMap<String, OwnerReceiptAssessment>,
 ) -> Result<OwnerReceiptAssessment, ProjectionFault> {
     let assessment = assessments.get(action_id)
-        .copied()
+        .cloned()
         .ok_or(ProjectionFault::Indeterminate("OWNER_RECEIPT_ASSESSMENT_MISSING"))?;
+    if assessment.receipt_ref != expected_receipt_ref
+        || assessment.receipt_sha256 != expected_receipt_sha256
+    {
+        return Err(ProjectionFault::Critical("OWNER_RECEIPT_IDENTITY_BINDING_MISMATCH"));
+    }
     match assessment.receipt_qualification() {
         GateState::Pass => Ok(assessment),
         GateState::Fail => Err(ProjectionFault::Critical("OWNER_RECEIPT_QUALIFICATION_FAILED")),
@@ -2343,7 +2353,7 @@ pub fn project_action_history(
                     reasons.insert(format!("TERMINAL_START_ACTION_BINDING_MISMATCH:{attempt_id}"));
                     continue;
                 }
-                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_assessments) {
+                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_ref, receipt_sha256, receipt_assessments) {
                     Ok(value) => value,
                     Err(ProjectionFault::Indeterminate(code)) => {
                         indeterminate = true;
@@ -2413,7 +2423,7 @@ pub fn project_action_history(
                         continue;
                     }
                 };
-                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_assessments) {
+                let assessment = match receipt_assessment_for_action(&action.action_id, &receipt_ref, &receipt_sha256, receipt_assessments) {
                     Ok(value) => value,
                     Err(ProjectionFault::Indeterminate(code)) => {
                         indeterminate = true;
@@ -2564,7 +2574,7 @@ pub fn project_action_history(
                         continue;
                     }
                 };
-                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_assessments) {
+                let assessment = match receipt_assessment_for_action(&action.action_id, &receipt_ref, &receipt_sha256, receipt_assessments) {
                     Ok(value) => value,
                     Err(ProjectionFault::Indeterminate(code)) => {
                         indeterminate = true;
@@ -2619,7 +2629,7 @@ pub fn project_action_history(
                     reasons.insert(format!("STOP_POLICY_REVISION_WITHOUT_TRIGGER:{obligation_id}"));
                     continue;
                 };
-                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_assessments) {
+                let assessment = match receipt_assessment_for_action(&action.action_id, &receipt_ref, &receipt_sha256, receipt_assessments) {
                     Ok(value) => value,
                     Err(ProjectionFault::Indeterminate(code)) => {
                         indeterminate = true;
@@ -2706,7 +2716,7 @@ pub fn project_action_history(
                     reasons.insert("ATTEMPT_INVENTORY_EVIDENCE_BINDING_MISMATCH".to_owned());
                     continue;
                 }
-                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_assessments) {
+                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_ref, receipt_sha256, receipt_assessments) {
                     Ok(value) => value,
                     Err(ProjectionFault::Indeterminate(code)) => {
                         indeterminate = true;
@@ -2803,7 +2813,7 @@ pub fn project_action_history(
             reasons.insert(format!("STOP_DISCHARGE_INVENTORY_ATTESTATION_NOT_UNIQUE:{obligation_id}"));
             continue;
         }
-        let assessment = match receipt_assessment_for_action(&action.action_id, receipt_assessments) {
+        let assessment = match receipt_assessment_for_action(&action.action_id, receipt_ref, receipt_sha256, receipt_assessments) {
             Ok(value) => value,
             Err(ProjectionFault::Indeterminate(code)) => {
                 indeterminate = true;
@@ -3329,8 +3339,10 @@ mod tests {
         action_id
     }
 
-    fn passing_owner_receipt() -> OwnerReceiptAssessment {
+    fn passing_owner_receipt(receipt_ref: &str, receipt_sha256: &str) -> OwnerReceiptAssessment {
         OwnerReceiptAssessment {
+            receipt_ref: receipt_ref.to_owned(),
+            receipt_sha256: receipt_sha256.to_owned(),
             identity: GateState::Pass,
             digest_integrity: GateState::Pass,
             authenticity: GateState::Pass,
@@ -3400,7 +3412,7 @@ mod tests {
             (commit_mapping.clone(), 110),
             qualified_resolution_from_fixture(&actions, &commit_mapping, 110, 1_050),
         );
-        receipts.insert(commit_action_id, passing_owner_receipt());
+        receipts.insert(commit_action_id, passing_owner_receipt("synthetic://effect-commit/1", &"b".repeat(64)));
 
         let terminal_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 5, 120);
         let terminal_action_id = push_clocked_action(
@@ -3427,7 +3439,7 @@ mod tests {
             (terminal_mapping.clone(), 120),
             qualified_resolution_from_fixture(&actions, &terminal_mapping, 120, 1_100),
         );
-        receipts.insert(terminal_action_id.clone(), passing_owner_receipt());
+        receipts.insert(terminal_action_id.clone(), passing_owner_receipt("synthetic://terminal/1", &"c".repeat(64)));
 
         let trigger_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 7, 130);
         let trigger_action_id = push_clocked_action(
@@ -3452,11 +3464,11 @@ mod tests {
             (trigger_mapping.clone(), 130),
             qualified_resolution_from_fixture(&actions, &trigger_mapping, 130, 1_150),
         );
-        receipts.insert(trigger_action_id.clone(), passing_owner_receipt());
+        receipts.insert(trigger_action_id.clone(), passing_owner_receipt("synthetic://stop-trigger/1", &"d".repeat(64)));
 
         let inventory_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 9, 135);
         let inventory_frontier = "event-000003".to_owned();
-        let discharge_action_id = format!("action-{:06}", ordinal + 2);
+        let discharge_action_id = format!("action-{:06}", ordinal + 1);
         let mut expected_attempt = OperationAttemptRecord {
             identity: AttemptIdentity {
                 logical_operation_id: operation_id.clone(),
@@ -3514,7 +3526,7 @@ mod tests {
             (inventory_mapping.clone(), 135),
             qualified_resolution_from_fixture(&actions, &inventory_mapping, 135, 1_175),
         );
-        receipts.insert(inventory_action_id, passing_owner_receipt());
+        receipts.insert(inventory_action_id, passing_owner_receipt("synthetic://inventory-attestation/1", &"e".repeat(64)));
 
         let discharge_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 11, 140);
         let discharge_action_id_actual = push_clocked_action(
@@ -3544,7 +3556,7 @@ mod tests {
             (discharge_mapping.clone(), 140),
             qualified_resolution_from_fixture(&actions, &discharge_mapping, 140, 1_200),
         );
-        receipts.insert(discharge_action_id_actual, passing_owner_receipt());
+        receipts.insert(discharge_action_id_actual, passing_owner_receipt("synthetic://stop-discharge/1", &"f".repeat(64)));
 
         let schedule = VirtualSchedule {
             schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
@@ -4335,7 +4347,7 @@ mod tests {
             (mapping_id.clone(), 150),
             qualified_resolution_from_fixture(&actions, &mapping_id, 150, 1_050),
         );
-        receipts.insert(acknowledgement_action_id, passing_owner_receipt());
+        receipts.insert(acknowledgement_action_id, passing_owner_receipt("synthetic://cancel-ack-only", &"1".repeat(64)));
         let schedule = VirtualSchedule {
             schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
             generator_version: GENERATOR_VERSION.to_owned(),
