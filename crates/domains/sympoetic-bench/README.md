@@ -1,6 +1,6 @@
 # sympoetic-bench
 
-Rust validation and measurement core for SympoeticBench v0.1.
+Rust validation and measurement core for SympoeticBench v0.1, including a proposal-only agent decision protocol guard.
 
 This package is intentionally small and deterministic. It does not call a model, run a human-subject study, or assign creativity scores from an LLM judge. It validates benchmark inputs and evidence records, and exposes metrics whose assumptions are explicit. The development corpus includes partner coordination and adaptive intervention scenarios.
 
@@ -31,6 +31,9 @@ cargo run -p sympoetic-bench -- digest --input path/to/artifact
 - Raw/consented content references cannot be stored under `none` or `revoked` consent scope.
 - A tool result with an unknown outcome blocks subsequent tool invocation until an independently observed reconciliation event references it and includes a digest of the reconciled state.
 - A state-changing tool result with an observed success/failure must include a postcondition digest.
+- Agent decisions are checked against the current run/turn, role-filtered tool catalogue, granted action set, and remaining tool budget.
+- Every proposed tool call must receive its matching observation before another decision is accepted.
+- An unknown tool outcome blocks the agent decision loop until a matching, independently observed reconciliation event arrives.
 - Scorecard dimensions are range-checked; attribution F1 must agree with precision and recall.
 - Hard-gate failures are non-compensatory. A scorecard cannot mark hard gates as passing while any failure counter is non-zero.
 
@@ -39,6 +42,10 @@ cargo run -p sympoetic-bench -- digest --input path/to/artifact
 - File and payload digests use SHA-256 over the exact file or payload bytes supplied by the recorder.
 - `trace_digest`, when present, is SHA-256 over the trace JSON parsed into a `serde_json::Value`, with the `trace_digest` key removed, then serialized by `serde_json` (deterministic map-key ordering). This is the v0.1 canonicalization rule; it is not claimed to be RFC 8785.
 - Scenario, trace, artifact, prompt, and environment digests in a scorecard identify the exact inputs used. The scorer revision must identify the scoring implementation.
+
+## Agent decision bridge
+
+The typed protocol contract lives in `agent_protocol.rs`; the normative schemas and design are in `docs/benchmarks/agent-bridge/` and `docs/benchmarks/AGENT_DECISION_PROTOCOL.md`. `AgentProtocolGuard` validates proposals and observations but deliberately does not execute tools. The benchmark adapter remains the authority boundary.
 
 ## Metrics
 
@@ -54,6 +61,7 @@ cargo run -p sympoetic-bench -- digest --input path/to/artifact
 This is a first executable core, not a complete human-AI benchmark runner. It does not yet provide:
 
 - A model adapter or live agent orchestration.
+- The new `agent_turn` protocol is not yet wired into the Symthaea service daemon; this crate validates the contract only.
 - Human-subject recruitment, survey delivery, consent management UI, or data retention infrastructure.
 - Blind expert artifact rating or inter-rater reliability calculations.
 - Full task-level hierarchical models or multi-level cluster bootstrap.
