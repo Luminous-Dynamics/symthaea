@@ -151,6 +151,13 @@ pub enum DeliveryMode {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+pub enum CancellationCommitOrder {
+    CommitBeforeAcknowledgement,
+    CommitAfterAcknowledgement,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum ReconciliationOutcome {
     Applied,
     NotApplied,
@@ -169,6 +176,8 @@ pub enum SchedulerDisposition {
     EventTimeRegression,
     ConflictingAcknowledgement,
     ConflictingReconciliation,
+    AcceptedCancellationAfterCommit,
+    CommitAfterAcceptedCancellation,
     PreconditionViolation,
 }
 
@@ -584,8 +593,12 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                         SchedulerDisposition::ConflictingAcknowledgement
                     }
                 } else {
-                    cancel_acknowledgements.insert(key, *accepted);
-                    SchedulerDisposition::Applied
+                    cancel_acknowledgements.insert(key.clone(), *accepted);
+                    if *accepted && committed_attempts.contains(&key) {
+                        SchedulerDisposition::AcceptedCancellationAfterCommit
+                    } else {
+                        SchedulerDisposition::Applied
+                    }
                 }
             }
             ScheduleAction::StopTriggered { obligation_id, policy_revision } => {
@@ -634,10 +647,12 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
             }
             ScheduleAction::EffectCommitted { operation_id, attempt_id, .. } => {
                 let key = (operation_id.clone(), attempt_id.clone());
-                if attempts.contains(&key) && committed_attempts.insert(key) {
-                    SchedulerDisposition::Applied
-                } else {
+                if !attempts.contains(&key) || !committed_attempts.insert(key.clone()) {
                     SchedulerDisposition::PreconditionViolation
+                } else if cancel_acknowledgements.get(&key) == Some(&true) {
+                    SchedulerDisposition::CommitAfterAcceptedCancellation
+                } else {
+                    SchedulerDisposition::Applied
                 }
             }
             ScheduleAction::AttemptReconciled {
@@ -879,6 +894,144 @@ pub fn generate_delivery_schedule(
     };
     validate_schedule(&schedule)?;
     Ok(schedule)
+}
+
+/// Generate a deterministic stop/cancellation/effect-commit race. The
+/// attempt starts before the stop trigger; both schedules then contain a
+/// cancellation request, the selected acknowledgement/commit order, an
+/// explicit terminal reconciliation and an exact stop discharge. A commit
+/// after an accepted cancellation (or an accepted cancellation after commit)
+/// is preserved as a conflict disposition rather than hidden.
+pub fn generate_cancellation_commit_race_schedule(
+    seed: u64,
+    order: CancellationCommitOrder,
+) -> VirtualSchedule {
+    let mut actions = Vec::new();
+    let mut ordinal = 0_u64;
+    let operation_id = format!("operation-{seed:016x}");
+    let attempt_id = format!("attempt-{seed:016x}");
+    let obligation_id = format!("stop-{seed:016x}");
+    let trigger_action_id = format!("action-{ordinal:06}");
+    push_action(
+        &mut actions,
+        &mut ordinal,
+        1,
+        ScheduleAction::EffectAttempted {
+            operation_id: operation_id.clone(),
+            attempt_id: attempt_id.clone(),
+        },
+    );
+    let trigger_action_id = format!("action-{ordinal:06}");
+    push_action(
+        &mut actions,
+        &mut ordinal,
+        2,
+        ScheduleAction::StopTriggered {
+            obligation_id: obligation_id.clone(),
+            policy_revision: "policy-v1".to_owned(),
+        },
+    );
+    push_action(
+        &mut actions,
+        &mut ordinal,
+        3,
+        ScheduleAction::CancellationRequested {
+            operation_id: operation_id.clone(),
+            attempt_id: attempt_id.clone(),
+        },
+    );
+
+    let mut push_commit = || {
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::EffectCommitted {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                effect_id: format!("effect-{seed:016x}"),
+            },
+        );
+    };
+    let mut push_ack = || {
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::CancellationAcknowledged {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                accepted: true,
+            },
+        );
+    };
+    match order {
+        CancellationCommitOrder::CommitBeforeAcknowledgement => {
+            push_commit();
+            push_action(
+                &mut actions,
+                &mut ordinal,
+                5,
+                ScheduleAction::CancellationAcknowledged {
+                    operation_id: operation_id.clone(),
+                    attempt_id: attempt_id.clone(),
+                    accepted: true,
+                },
+            );
+        }
+        CancellationCommitOrder::CommitAfterAcknowledgement => {
+            push_ack();
+            push_action(
+                &mut actions,
+                &mut ordinal,
+                5,
+                ScheduleAction::EffectCommitted {
+                    operation_id: operation_id.clone(),
+                    attempt_id: attempt_id.clone(),
+                    effect_id: format!("effect-{seed:016x}"),
+                },
+            );
+        }
+    }
+    push_action(
+        &mut actions,
+        &mut ordinal,
+        6,
+        ScheduleAction::AttemptReconciled {
+            operation_id,
+            attempt_id,
+            outcome: ReconciliationOutcome::Applied,
+            receipt_ref: format!("synthetic://attempt-reconciliation/{seed:016x}"),
+            receipt_sha256: "f".repeat(64),
+        },
+    );
+    push_action(
+        &mut actions,
+        &mut ordinal,
+        7,
+        ScheduleAction::StopDischarged {
+            obligation_id,
+            trigger_action_id,
+            policy_revision_action_id: trigger_action_id,
+            policy_revision: "policy-v1".to_owned(),
+            receipt_ref: format!("synthetic://stop-discharge/{seed:016x}"),
+            receipt_sha256: "e".repeat(64),
+        },
+    );
+    VirtualSchedule {
+        schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+        generator_version: GENERATOR_VERSION.to_owned(),
+        seed,
+        scenario_family: match order {
+            CancellationCommitOrder::CommitBeforeAcknowledgement => {
+                "stop_cancel_commit_before_acknowledgement".to_owned()
+            }
+            CancellationCommitOrder::CommitAfterAcknowledgement => {
+                "stop_cancel_commit_after_acknowledgement".to_owned()
+            }
+        },
+        actions,
+    }
 }
 
 /// Deterministic delta-debugging reducer. It removes chunks of actions only
@@ -1249,6 +1402,43 @@ mod tests {
             SchedulerDisposition::Duplicate,
             SchedulerDisposition::ConflictingReconciliation,
         ]);
+    }
+
+    #[test]
+    fn cancellation_commit_race_generator_exposes_both_orders() {
+        let before_ack = generate_cancellation_commit_race_schedule(
+            0x2026_1115,
+            CancellationCommitOrder::CommitBeforeAcknowledgement,
+        );
+        let after_ack = generate_cancellation_commit_race_schedule(
+            0x2026_1115,
+            CancellationCommitOrder::CommitAfterAcknowledgement,
+        );
+        validate_schedule(&before_ack).expect("valid commit-before-ack schedule");
+        validate_schedule(&after_ack).expect("valid commit-after-ack schedule");
+        let before = replay_virtual_schedule(&before_ack).expect("before-ack replay");
+        let after = replay_virtual_schedule(&after_ack).expect("after-ack replay");
+        assert!(before.records.iter().any(|record| {
+            record.disposition == SchedulerDisposition::AcceptedCancellationAfterCommit
+        }));
+        assert!(after.records.iter().any(|record| {
+            record.disposition == SchedulerDisposition::CommitAfterAcceptedCancellation
+        }));
+        assert!(before.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::StopDischarged { .. })
+                && record.disposition == SchedulerDisposition::Applied
+        }));
+        assert!(after.records.iter().any(|record| {
+            matches!(record.action, ScheduleAction::StopDischarged { .. })
+                && record.disposition == SchedulerDisposition::Applied
+        }));
+        assert_eq!(
+            canonical_schedule_sha256(&before_ack),
+            canonical_schedule_sha256(&generate_cancellation_commit_race_schedule(
+                0x2026_1115,
+                CancellationCommitOrder::CommitBeforeAcknowledgement,
+            )),
+        );
     }
 
     #[test]
