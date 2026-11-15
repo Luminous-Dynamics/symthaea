@@ -88,7 +88,8 @@
               "artifact_revised",
               "evaluator_annotation",
               "session_end",
-              "execution_reconciled"
+              "execution_reconciled",
+              "intervention_decision"
             ]
           },
           "parent_event_ids": {
@@ -231,6 +232,19 @@
           "reconciliation_state_digest": {
             "type": "string",
             "pattern": "^[a-f0-9]{64}$"
+          },
+          "intervention_action": {
+            "enum": [
+              "ask",
+              "suggest",
+              "challenge",
+              "delegate",
+              "synthesize",
+              "preserve_divergence",
+              "defer",
+              "proceed",
+              "step_back"
+            ]
           }
         },
         "allOf": [
@@ -249,6 +263,23 @@
               "required": [
                 "reconciled_status",
                 "reconciliation_state_digest"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "event_type": {
+                  "const": "intervention_decision"
+                }
+              },
+              "required": [
+                "event_type"
+              ]
+            },
+            "then": {
+              "required": [
+                "intervention_action"
               ]
             }
           }
