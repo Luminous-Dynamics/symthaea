@@ -1711,6 +1711,30 @@ mod tests {
     }
 
     #[test]
+    fn attempt_manifest_digest_is_invariant_under_stop_relation_delivery_order() {
+        let obligation_a = scoped_obligation("obligation-a", "robot-a");
+        let obligation_b = scoped_obligation("obligation-b", "robot-a");
+        let mut attempt = attempt(
+            "robot-a",
+            "attempt-a",
+            None,
+            "start-a",
+            None,
+            None,
+            None,
+        );
+        attempt.stop_discharge_relations = vec![
+            post_discharge_relation(&obligation_a, "start-a"),
+            post_discharge_relation(&obligation_b, "start-a"),
+        ];
+        let forward = canonical_attempt_manifest_sha256(&[attempt.clone()]).unwrap();
+
+        attempt.stop_discharge_relations.reverse();
+        let reversed = canonical_attempt_manifest_sha256(&[attempt]).unwrap();
+        assert_eq!(forward, reversed);
+    }
+
+    #[test]
     fn pending_sibling_attempt_does_not_serialize_a_discharged_global_scope() {
         let sibling = attempt(
             "robot-a",
