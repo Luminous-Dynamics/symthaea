@@ -64,18 +64,24 @@ fn main() -> Result<()> {
             let bytes = fs::read(&input)
                 .with_context(|| format!("could not read {}", input.display()))?;
             let trace: Trace = serde_json::from_slice(&bytes)
-                .with_context(|| format!("{} is not a valid trace JSON document", input.display()))?;
+                .with_context(|| {
+                    format!("{} is not a valid trace JSON document", input.display())
+                })?;
             let receipt = validate_trace(&trace, &bytes)?;
             println!("{}", serde_json::to_string_pretty(&receipt)?);
             if receipt.unresolved_unknown_outcome_count != 0 {
-                bail!("trace is structurally valid but incomplete: an unknown tool outcome remains unreconciled");
+                bail!(
+                    "trace is structurally valid but incomplete: an unknown tool outcome remains unreconciled"
+                );
             }
         }
         Command::ValidateScorecard { input } => {
             let bytes = fs::read(&input)
                 .with_context(|| format!("could not read {}", input.display()))?;
             let scorecard: Scorecard = serde_json::from_slice(&bytes)
-                .with_context(|| format!("{} is not a valid scorecard JSON document", input.display()))?;
+                .with_context(|| {
+                    format!("{} is not a valid scorecard JSON document", input.display())
+                })?;
             validate_scorecard(&scorecard)?;
             let receipt = ScorecardReceipt {
                 status: "pass",
