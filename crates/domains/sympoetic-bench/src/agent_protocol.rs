@@ -285,7 +285,10 @@ impl AgentProtocolGuard {
                     .tool_name
                     .as_deref()
                     .context("tool_call requires tool_name")?;
-                let arguments = decision.arguments.as_ref().context("tool_call requires arguments")?;
+                let arguments = decision
+                    .arguments
+                    .as_ref()
+                    .context("tool_call requires arguments")?;
                 let idempotency_key = decision
                     .idempotency_key
                     .as_deref()
@@ -410,7 +413,10 @@ impl AgentProtocolGuard {
                 if observation.tool_name.as_deref() != Some(pending.tool_name.as_str()) {
                     bail!("tool observation tool_name does not match the pending call");
                 }
-                let status = observation.status.as_deref().context("tool observation requires status")?;
+                let status = observation
+                    .status
+                    .as_deref()
+                    .context("tool observation requires status")?;
                 require_member("tool observation status", status, OBSERVATION_STATUSES)?;
                 let digest = observation
                     .observation_digest
@@ -424,7 +430,10 @@ impl AgentProtocolGuard {
                     require_sha256("postcondition_digest", postcondition)?;
                 }
                 let external_side_effect = observation.external_side_effect.unwrap_or(false);
-                if external_side_effect && status != "unknown" && observation.postcondition_digest.is_none() {
+                if external_side_effect
+                    && status != "unknown"
+                    && observation.postcondition_digest.is_none()
+                {
                     bail!("observed external side effect requires postcondition_digest");
                 }
                 if status == "unknown" && observation.postcondition_digest.is_some() {
