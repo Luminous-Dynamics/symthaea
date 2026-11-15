@@ -728,3 +728,47 @@ This is a useful DBD technology comparator but not a direct leaderboard point ag
 A 2026 coaxial dielectric-barrier-discharge experiment was added as a separate feed/product lane: *Direct synthesis of syngas from humidified CO2 using a coaxial dielectric barrier discharge plasma reactor*, RSC Advances 16 (2026), DOI https://doi.org/10.1039/D5YA00293A.
 
 The source reports 4.5–23.3% energy efficiency and H2/CO molar ratios of 0.1–0.2 across humidified CO2/H2O conditions. A pure-CO2 condition is separately reported at 13.3% energy efficiency with predominantly CO. These are not warm-arc dry CO-only quench points. H2/CO ratio is not CO2 conversion or CO selectivity. The case is retained as NOT_COMPARABLE until feed, product and energy boundaries are harmonized.
+
+
+## 9.16 Methane-pyrolysis challenge set — 2026-11-15
+
+Three recent sources now form a deliberately adversarial benchmark rather than a pro-plasma narrative.
+
+### 2026 direct-heating multi-objective review
+
+Azadmehr et al., *A comprehensive review of direct-heating modalities for low-emission hydrogen production via methane pyrolysis*, Journal of Analytical and Applied Pyrolysis 196 (June 2026), DOI https://doi.org/10.1016/j.jaap.2026.107776.
+
+This review curates 156 experimental data sets from 26 peer-reviewed sources and compares microwave, plasma, resistive/combustion and shock-wave heating across LCOH, methane conversion and hydrogen selectivity. The paper reports shock-wave heating near 92% conversion at about USD 0.70/kg H2 when cost and conversion are prioritized; microwave near 91% conversion, 99% selectivity and USD 1.09/kg H2 when selectivity is also prioritized. Plasma and resistive/combustion configurations are reported outside the Pareto front in the studied corpus/weightings.
+
+This is a review-level, dataset-derived Pareto result, not a theorem about every plasma reactor or future process. The underlying 156-row data and inclusion/normalization choices must be reconstructed before claiming an independent replication.
+
+### Arc-plasma methane pyrolysis process TEA
+
+Xu, Sun and Elgowainy, *Modeling and techno-economic analysis of methane pyrolysis via arc plasma for hydrogen and carbon black production*, International Journal of Hydrogen Energy 221 (27 March 2026), DOI https://doi.org/10.1016/j.ijhydene.2026.154181.
+
+The Aspen Plus / discounted-cash-flow model uses approximately 52 kMT H2/year and nearly USD 1 billion total capital. It reports 39 kWh/kg H2 without on-site power generation and 32 kWh/kg H2 with on-site power generation. Its modeled minimum selling price is USD 1.10–1.36/kg H2 (2023 dollars), with black-carbon sales offsetting electricity costs.
+
+This is a process model and TEA, not a commissioned plant or observed product price. The carbon-black market price and grade are major assumptions. The on-site generation case cannot be compared directly with a purchased-grid or reactor-only meter.
+
+### Harmonized methane-pyrolysis LCA and total cost
+
+*When does methane pyrolysis become competitive? A life-cycle and total cost assessment of hydrogen pathways*, International Journal of Hydrogen Energy 229 (28 April 2026), DOI https://doi.org/10.1016/j.ijhydene.2026.154768.
+
+The study harmonizes a 1 kg H2 plant-gate functional unit at 200 bar, cradle-to-gate supply/conversion/PSA/compression, ReCiPe 2016 impacts and monetized environmental endpoints. It reports median total costs of USD 6.6/kg for SMR, USD 10.8/kg for methane pyrolysis without carbon credit and USD 4.8/kg with avoided-product carbon-black credit. The reported methane-pyrolysis GWP is about 12.6 kg CO2e/kg H2 without credit and approaches 5.1 kg CO2e/kg with credit. The modeled carbon-credit advantage erodes below about 50–55% methane conversion.
+
+This "total cost" includes monetized damages and is not plain LCOH or the same metric as the arc-plasma paper's minimum selling price. Avoided-product credit is a counterfactual displacement assumption, not automatic revenue.
+
+### Paradigm shift: coproduct evidence before coproduct economics
+
+A carbon coproduct only counts when the benchmark establishes, in order:
+1. gross theoretical carbon yield from stoichiometry;
+2. captured and weighed carbon mass with uncertainty;
+3. carbon grade/phase/morphology/ash/surface properties and contaminant limits;
+4. accepted product specification and independent qualification;
+5. buyer/offtake and realistic market-capacity envelope;
+6. actual displaced product and allocation/avoided-product counterfactual;
+7. net value after collection, finishing, packaging, transport, QA and sales costs.
+
+Until those gates pass, the evaluator must show a no-credit case and may not let speculative carbon-black value make hydrogen appear cost-competitive.
+
+The benchmark must preserve distinct quantities: reactor energy, wall-plug energy, on-site power-generation boundary, PSA/compression load, methane conversion, H2 selectivity, carbon collection yield, carbon grade and product-level accepted output. Pareto comparisons should be repeated under no-credit, allocation and qualified avoided-product-credit policies, with sensitivity intervals for electricity, methane leakage and carbon price.
