@@ -2,7 +2,7 @@
 
 **Version:** 0.1  
 **Date:** 2026-11-15  
-**Status:** interoperability/security design and custom in-toto predicate schema authored. No signature verifier, transparency-service client, workload identity integration, live receipt or key-management implementation is claimed.
+**Status:** interoperability/security design, custom in-toto predicate schema, independent expected-context policy schema, and an initial Rust semantic verifier are authored. The verifier is not cryptographic and has not yet been compiled or executed.
 
 ## 1. Why D6 needs another trust layer
 
@@ -167,6 +167,28 @@ These checks must return separate outcomes. A valid signature cannot compensate 
 
 The five synthetic Statements under `docs/research/fixtures/` cover runner/test, runner/build, independent-grader/test, agent observation and authority decision. An additional structural audit checked their role mapping, required references, subject-digest linkage and sample timestamp ordering. This is not a cryptographic verification, a formal JSON-Schema conformance run or evidence that a runner executed.
 
+### Executable semantic-verifier increment
+
+The branch now adds `tools/development-map-validator/src/execution_receipt.rs` and the CLI command:
+
+```text
+development-map-validator execution-receipt <statement.json> <expected-context.json>
+```
+
+The second input is independent policy, not a scope inferred from the receipt. The typed policy binds the exact repository, revision, tree, configuration digest, complete subject-digest set, obligation, check, claim kind, producer workload identity, identity provider, authority-policy digest, and optional required outcome. Unknown policy fields are rejected by the Rust type. The JSON contract is in `egddm-execution-receipt-verifier-policy-v0.1.schema.json`; a synthetic expected-context fixture accompanies the runner/test statement.
+
+The first verifier increment checks:
+- in-toto Statement/v1 and exact EGDDM predicate type;
+- producer-role/claim-kind consistency and non-empty workload identity fields;
+- exact expected scope, subjects, obligation, check, claim kind, producer identity, identity provider and authority-policy digest;
+- conditional runner/grader execution metadata, SLSA Build Provenance reference for runner/build, and in-toto Test Result reference for runner or independent-grader test/compatibility;
+- linked predicate-type and subject-digest consistency;
+- observation ordering, authority validity interval, challenge chronology, and `single_use=true`.
+
+The verifier is intentionally bounded. It does **not** retrieve and hash the referenced SLSA/Test Result Statements, verify DSSE signatures, authenticate a workload identity, verify the authority service's signature or policy semantics, consult a SCITT/Rekor log, or atomically consume a challenge. A present `single_use=true` field is not replay protection. Its successful result means only that the unsigned statement passed these local semantic checks against the supplied expected-context policy.
+
+The module authors one positive test over all five sample claim classes plus negative tests for scope, role, identity, subject, linked predicate, chronology, authority, challenge and missing-execution failures. These tests are authored, not compiled or run in this environment. The CLI emits a claim ceiling and never labels a receipt cryptographically trusted.
+
 ## 9. Implementation sequence
 
 1. Freeze the EGDDM predicate schema, SLSA linkage rules and canonical cross-statement test vectors.
@@ -197,4 +219,4 @@ Targets are zero acceptance of planted wrong-scope, replay, wrong-role, expired-
 
 ## 11. Claim ceiling
 
-This branch contains a custom predicate schema and security/interoperability design only. It does not contain a signed receipt, private key, signature verifier, SCITT client, Rekor submission, transparency witness, workload identity integration or executable anti-replay service. No signature authenticity, execution validity, SOTA result or production trust guarantee is claimed.
+This branch contains a custom predicate schema, expected-context policy schema, security/interoperability design, and an initial Rust semantic/scope verifier. It does not contain a signed receipt, private key, cryptographic signature verifier, SCITT client, Rekor submission, transparency witness, authenticated workload identity integration or executable consume-once anti-replay service. Referenced SLSA/Test Result statements are not fetched or verified. No signature authenticity, execution validity, benchmark result, SOTA result or production trust guarantee is claimed.
