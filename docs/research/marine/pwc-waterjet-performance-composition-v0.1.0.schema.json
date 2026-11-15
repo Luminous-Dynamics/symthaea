@@ -1,0 +1,582 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:pwc-waterjet-performance-composition:0.1.0",
+  "title": "Matched propulsion and waterjet system performance composition",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "record_status",
+    "test_path",
+    "comparison_tolerances",
+    "propulsion_test",
+    "station_flux_test",
+    "waterjet_system_test",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "case_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "record_status": {
+      "const": "synthetic"
+    },
+    "test_path": {
+      "enum": [
+        "composite_independent_tests",
+        "integrated_waterjet_system_test"
+      ]
+    },
+    "comparison_tolerances": {
+      "$ref": "#/$defs/tolerances"
+    },
+    "propulsion_test": {
+      "$ref": "#/$defs/propulsion_test"
+    },
+    "station_flux_test": {
+      "$ref": "#/$defs/station_flux_test"
+    },
+    "inlet_duct_test": {
+      "$ref": "#/$defs/inlet_duct_test"
+    },
+    "pump_loop_test": {
+      "$ref": "#/$defs/pump_loop_test"
+    },
+    "waterjet_system_test": {
+      "$ref": "#/$defs/waterjet_system_test"
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "test_path": {
+            "const": "composite_independent_tests"
+          }
+        },
+        "required": [
+          "test_path"
+        ]
+      },
+      "then": {
+        "required": [
+          "inlet_duct_test",
+          "pump_loop_test"
+        ],
+        "properties": {
+          "waterjet_system_test": {
+            "required": [
+              "impeller_shaft_power_w",
+              "effective_pump_power_w",
+              "pump_total_head_rise_m",
+              "nozzle_loss_coefficient_zeta57",
+              "installation_efficiency_eta_inst"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "test_path": {
+            "const": "integrated_waterjet_system_test"
+          }
+        },
+        "required": [
+          "test_path"
+        ]
+      },
+      "then": {
+        "properties": {
+          "waterjet_system_test": {
+            "required": [
+              "impeller_shaft_power_w",
+              "effective_pump_power_w"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "measurement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "value",
+        "lower",
+        "upper",
+        "unit"
+      ],
+      "properties": {
+        "value": {
+          "type": "number"
+        },
+        "lower": {
+          "type": "number"
+        },
+        "upper": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string"
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "craft_configuration_sha256",
+        "pump_configuration_sha256",
+        "scale_context_id",
+        "craft_speed_mps",
+        "flow_rate_m3_s",
+        "nvr",
+        "water_density_kg_m3",
+        "water_temperature_c"
+      ],
+      "properties": {
+        "craft_configuration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "pump_configuration_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "scale_context_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "craft_speed_mps": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "m/s"
+            }
+          }
+        },
+        "flow_rate_m3_s": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "m3/s"
+            }
+          }
+        },
+        "nvr": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "1"
+            }
+          }
+        },
+        "water_density_kg_m3": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "kg/m3"
+            }
+          }
+        },
+        "water_temperature_c": {
+          "$ref": "#/$defs/measurement",
+          "properties": {
+            "unit": {
+              "const": "degC"
+            }
+          }
+        }
+      }
+    },
+    "stage_common": {
+      "type": "object",
+      "required": [
+        "source_record_id",
+        "source_record_sha256",
+        "method_id",
+        "condition",
+        "measurement_window",
+        "calibration_reference",
+        "timebase_reference"
+      ],
+      "properties": {
+        "source_record_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_record_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "method_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "condition": {
+          "$ref": "#/$defs/condition"
+        },
+        "measurement_window": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start_utc",
+            "end_utc"
+          ],
+          "properties": {
+            "start_utc": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "end_utc": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "calibration_reference": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timebase_reference": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "propulsion_test": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/stage_common"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "interaction_terms"
+          ],
+          "properties": {
+            "source_record_id": true,
+            "source_record_sha256": true,
+            "method_id": true,
+            "condition": true,
+            "measurement_window": true,
+            "calibration_reference": true,
+            "timebase_reference": true,
+            "interaction_terms": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "one_minus_thrust_deduction",
+                "eta_eI",
+                "eta_mI",
+                "nvr_method_reference"
+              ],
+              "properties": {
+                "one_minus_thrust_deduction": {
+                  "$ref": "#/$defs/measurement",
+                  "properties": {
+                    "unit": {
+                      "const": "1"
+                    }
+                  }
+                },
+                "eta_eI": {
+                  "$ref": "#/$defs/measurement",
+                  "properties": {
+                    "unit": {
+                      "const": "1"
+                    }
+                  }
+                },
+                "eta_mI": {
+                  "$ref": "#/$defs/measurement",
+                  "properties": {
+                    "unit": {
+                      "const": "1"
+                    }
+                  }
+                },
+                "nvr_method_reference": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "station_flux_test": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/stage_common"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "integrated_station_1_flow_m3_s",
+            "integrated_station_7_flow_m3_s",
+            "energy_flux_e1_w",
+            "energy_flux_e7_w",
+            "effective_jet_system_power_p_jse_w"
+          ],
+          "properties": {
+            "source_record_id": true,
+            "source_record_sha256": true,
+            "method_id": true,
+            "condition": true,
+            "measurement_window": true,
+            "calibration_reference": true,
+            "timebase_reference": true,
+            "integrated_station_1_flow_m3_s": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "m3/s"
+                }
+              }
+            },
+            "integrated_station_7_flow_m3_s": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "m3/s"
+                }
+              }
+            },
+            "energy_flux_e1_w": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "W"
+                }
+              }
+            },
+            "energy_flux_e7_w": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "W"
+                }
+              }
+            },
+            "effective_jet_system_power_p_jse_w": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "W"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "inlet_duct_test": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/stage_common"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "energy_flux_e0_w",
+            "energy_flux_e1_w",
+            "energy_flux_e3_w"
+          ],
+          "properties": {
+            "source_record_id": true,
+            "source_record_sha256": true,
+            "method_id": true,
+            "condition": true,
+            "measurement_window": true,
+            "calibration_reference": true,
+            "timebase_reference": true,
+            "energy_flux_e0_w": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "W"
+                }
+              }
+            },
+            "energy_flux_e1_w": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "W"
+                }
+              }
+            },
+            "energy_flux_e3_w": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "W"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "pump_loop_test": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/stage_common"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "free_stream_pump_efficiency_eta_p0"
+          ],
+          "properties": {
+            "source_record_id": true,
+            "source_record_sha256": true,
+            "method_id": true,
+            "condition": true,
+            "measurement_window": true,
+            "calibration_reference": true,
+            "timebase_reference": true,
+            "free_stream_pump_efficiency_eta_p0": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "1"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "waterjet_system_test": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/stage_common"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "impeller_shaft_power_w",
+            "effective_pump_power_w"
+          ],
+          "properties": {
+            "source_record_id": true,
+            "source_record_sha256": true,
+            "method_id": true,
+            "condition": true,
+            "measurement_window": true,
+            "calibration_reference": true,
+            "timebase_reference": true,
+            "impeller_shaft_power_w": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "W"
+                }
+              }
+            },
+            "effective_pump_power_w": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "W"
+                }
+              }
+            },
+            "pump_total_head_rise_m": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "m"
+                }
+              }
+            },
+            "nozzle_loss_coefficient_zeta57": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "1"
+                }
+              }
+            },
+            "installation_efficiency_eta_inst": {
+              "$ref": "#/$defs/measurement",
+              "properties": {
+                "unit": {
+                  "const": "1"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "tolerances": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "flow_rate_abs_m3_s",
+        "craft_speed_abs_m_s",
+        "nvr_abs",
+        "density_abs_kg_m3",
+        "temperature_abs_c",
+        "power_abs_w",
+        "efficiency_abs"
+      ],
+      "properties": {
+        "flow_rate_abs_m3_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "craft_speed_abs_m_s": {
+          "type": "number",
+          "minimum": 0
+        },
+        "nvr_abs": {
+          "type": "number",
+          "minimum": 0
+        },
+        "density_abs_kg_m3": {
+          "type": "number",
+          "minimum": 0
+        },
+        "temperature_abs_c": {
+          "type": "number",
+          "minimum": 0
+        },
+        "power_abs_w": {
+          "type": "number",
+          "minimum": 0
+        },
+        "efficiency_abs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.5
+        }
+      }
+    }
+  }
+}
