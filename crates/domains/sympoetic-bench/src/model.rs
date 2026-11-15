@@ -235,6 +235,34 @@ pub struct Scores {
     pub delayed_retention_gain_delta: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transfer_gain_delta: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_confidence_brier_score: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_expected_calibration_error: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_metacognitive_sensitivity_auc: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_selective_accuracy_at_80pct_coverage: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participant_confidence_brier_score: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participant_expected_calibration_error: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participant_metacognitive_sensitivity_auc: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participant_selective_accuracy_at_80pct_coverage: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_planning_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_first_attempt_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_monitoring_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_reflection_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai_core_step_substitution_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub human_verification_rate: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
