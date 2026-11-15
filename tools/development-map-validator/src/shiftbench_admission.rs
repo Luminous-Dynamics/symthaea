@@ -74,6 +74,24 @@ fn digest_field(value: &Value, path: &[&str], label: &str, report: &mut Admissio
     }
 }
 
+
+fn check_object_keys(
+    value: &Value,
+    allowed: &[&str],
+    label: &str,
+    report: &mut AdmissionReport,
+) {
+    let Some(object) = value.as_object() else {
+        report.error(label, "must be an object");
+        return;
+    };
+    for key in object.keys() {
+        if !allowed.contains(&key.as_str()) {
+            report.error(label, format!("unknown field {key:?}"));
+        }
+    }
+}
+
 const FAMILIES: &[&str] = &[
     "requirement_addition_or_reinterpretation",
     "requirement_removal_or_narrowing",
@@ -93,6 +111,58 @@ pub fn validate_shiftbench_admission_json(input: &str) -> Result<AdmissionReport
     let manifest: Value = serde_json::from_str(input)
         .map_err(|error| format!("admission manifest JSON parse failed: {error}"))?;
     let mut report = AdmissionReport::new();
+
+    check_object_keys(
+        &manifest,
+        &[
+            "schema_version", "fixture_kind", "task_id", "scenario_pair_id",
+            "intervention", "task_seed_digest", "task_bundle_digest",
+            "acceptance_contract_digest", "repository_snapshot", "two_sided_validity",
+            "blind_reconstruction", "isolation", "gold_custody",
+        ],
+        "$",
+        &mut report,
+    );
+    if !["synthetic", "curated"].contains(&str_at(&manifest, &["fixture_kind"]).unwrap_or("")) {
+        report.error("fixture_kind", "must be synthetic or curated");
+    }
+    check_object_keys(&manifest["intervention"], &["family", "position", "control_class"], "intervention", &mut report);
+    check_object_keys(
+        &manifest["repository_snapshot"],
+        &["repository_full_name", "revision_oid", "tree_oid", "configuration_world_digest"],
+        "repository_snapshot",
+        &mut report,
+    );
+    check_object_keys(&manifest["two_sided_validity"], &["reference_patch", "empty_patch_control"], "two_sided_validity", &mut report);
+    for (field, label) in [
+        ("reference_patch", "two_sided_validity.reference_patch"),
+        ("empty_patch_control", "two_sided_validity.empty_patch_control"),
+    ] {
+        check_object_keys(
+            &manifest["two_sided_validity"][field],
+            &["patch_digest", "result", "clean_regrade", "grader_environment_digest", "evidence_digest"],
+            label,
+            &mut report,
+        );
+    }
+    check_object_keys(
+        &manifest["blind_reconstruction"],
+        &["completed", "primary_author_id", "adjudicator_ids", "disagreement_resolved"],
+        "blind_reconstruction",
+        &mut report,
+    );
+    check_object_keys(
+        &manifest["isolation"],
+        &["runner_image_digest", "network_policy_digest", "model_endpoint_only", "candidate_evaluator_separated", "pristine_regrade", "candidate_can_read_gold"],
+        "isolation",
+        &mut report,
+    );
+    check_object_keys(
+        &manifest["gold_custody"],
+        &["gold_label_manifest_digest", "custodian_id", "candidate_readable", "evaluator_readable", "labels_separate_from_candidate_bundle"],
+        "gold_custody",
+        &mut report,
+    );
 
     if str_at(&manifest, &["schema_version"]) != Some(VERSION) {
         report.error("schema_version", "expected 0.1.0");
@@ -250,6 +320,20 @@ mod tests {
     fn accepts_complete_two_sided_blind_and_custody_manifest() {
         let report = validate_shiftbench_admission_json(VALID).unwrap();
         assert!(report.valid, "{:?}", report.diagnostics);
+    }
+
+    #[test]
+    fn rejects_unknown_manifest_fields() {
+        let mut v: Value = serde_json::from_str(VALID).unwrap();
+        v["isolation"]["unreviewed_override"] = json!(true);
+        assert!(!check(&v).valid);
+    }
+
+    #[test]
+    fn rejects_unknown_fixture_kind() {
+        let mut v: Value = serde_json::from_str(VALID).unwrap();
+        v["fixture_kind"] = json!("unreviewed");
+        assert!(!check(&v).valid);
     }
 
     #[test]
