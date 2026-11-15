@@ -785,6 +785,7 @@ mod tests {
     #[test]
     fn event_boundary_must_split_the_power_schedule() {
         let mut plan = overlapping_planned_plan();
+        plan.power_segments[1].end_second = 400;
         plan.power_segments.remove(2);
         let report = evaluate_lifecycle_service_budget(&plan);
         assert_eq!(
