@@ -13,13 +13,9 @@ fn main() {
         .map(|index| format!("rejected-candidate-{index:05}"))
         .collect();
     let sample_size = 1_000;
-    let selected = deterministic_audit_sample_ids(
-        "all-rejected",
-        &rejected_population,
-        sample_size,
-        seed,
-    )
-    .expect("frozen audit sample must be valid");
+    let selected =
+        deterministic_audit_sample_ids("all-rejected", &rejected_population, sample_size, seed)
+            .expect("frozen audit sample must be valid");
     let samples = selected
         .into_iter()
         .enumerate()
@@ -86,13 +82,15 @@ fn main() {
         Ok(report) => {
             println!("method={}", report.bound_method);
             println!("sampling={}", report.sampling_algorithm);
-            println!("familywise_confidence={:.3}", report.familywise_confidence_level);
+            println!(
+                "familywise_confidence={:.3}",
+                report.familywise_confidence_level
+            );
             println!("frozen_candidates={}", report.frozen_candidate_count);
             println!("accepted_candidates={}", report.accepted_candidate_count);
             println!(
                 "accepted_feasible={},accepted_unresolved={}",
-                report.accepted_confirmed_feasible_count,
-                report.accepted_unresolved_count
+                report.accepted_confirmed_feasible_count, report.accepted_unresolved_count
             );
             println!("rejected_population={}", report.total_rejected_population);
             println!("audited_candidates={}", report.total_audited_candidates);
