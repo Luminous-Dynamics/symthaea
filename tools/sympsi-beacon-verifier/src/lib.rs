@@ -43,7 +43,7 @@ pub mod quicknet {
         0x5d, 0x3e,
     ];
     pub const GENESIS_UNIX_SECONDS: i64 = 1_692_803_367;
-    pub const PERIOD_SECONDS: u64 = 3;
+    pub const PERIOD_SECONDS: u32 = 3;
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -108,7 +108,7 @@ pub fn verify_quicknet_beacon(
         .verify(round, signature, None)
         .map_err(|_| VerificationError::SignatureInvalid)?;
 
-    let randomness: [u8; 32] = *verified.randomness.get();
+    let randomness: [u8; 32] = verified.randomness.get();
     Ok(VerifiedQuicknetBeacon {
         round: requested_round,
         randomness,
