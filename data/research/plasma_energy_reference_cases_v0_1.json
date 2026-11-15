@@ -953,6 +953,115 @@
         "Gas, resistance and plasma have different atmospheres and thermal histories; property differences are not a direct energy-efficiency ranking."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-CRACK-MW-ATM-MECHANISM-2026",
+      "lane": "AMMONIA_CRACKING",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT_WITH_COUPLED_MULTIPHYSICS_MODEL",
+      "source": {
+        "title": "Microwave plasma-based NH3 decomposition: Reaching optimum performance by understanding the mechanisms",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2026-09-03",
+        "volume": "265",
+        "article_number": "156912",
+        "doi": "10.1016/j.ijhydene.2026.156912",
+        "url": "https://doi.org/10.1016/j.ijhydene.2026.156912"
+      },
+      "configuration": {
+        "plasma_type": "atmospheric-pressure microwave plasma",
+        "feedstock": "pure NH3",
+        "model": "2D-axisymmetric fully coupled model of fluid dynamics, heat transfer, electromagnetic waves and chemical reactions",
+        "output_species": "H2"
+      },
+      "observations": [
+        {
+          "metric": "ammonia_conversion",
+          "value": 0.99,
+          "qualifier": "near-complete conversion; source reports above 99% for the high-conversion operating point",
+          "unit": "fraction"
+        },
+        {
+          "metric": "hydrogen_energy_yield",
+          "value": 45,
+          "qualifier": "reported for the near-complete conversion operating point",
+          "unit": "g_H2/kWh_electric"
+        },
+        {
+          "metric": "hydrogen_production_rate",
+          "value": 150,
+          "qualifier": "reported hydrogen production rate for the near-complete conversion operating point",
+          "unit": "g_H2/hour"
+        },
+        {
+          "metric": "ammonia_conversion",
+          "value": 0.76,
+          "qualifier": "operating point associated with the highest reported hydrogen energy yield; not the near-complete conversion point",
+          "unit": "fraction"
+        },
+        {
+          "metric": "hydrogen_energy_yield",
+          "value": 51,
+          "qualifier": "highest reported hydrogen energy yield at the 76% conversion operating point",
+          "unit": "g_H2/kWh_electric"
+        }
+      ],
+      "source_conclusion": "The study reports above 99% NH3 conversion at an H2 energy yield of 45 g/kWh and a production rate of 150 g/h. Its highest energy yield is 51 g/kWh at 76% NH3 conversion. It develops a 2D-axisymmetric coupled multiphysics/chemistry model to investigate the mechanism and process performance.",
+      "comparison_status": "SOURCE_SPECIFIC_TWO_OPERATING_POINTS_NOT_MATCHED_TO_OTHER_STUDIES",
+      "blockers": [
+        "The highest energy-yield operating point (76% conversion) is not the near-complete conversion point (>99%); preserve them as separate Pareto points.",
+        "The reported energy yield must be traced to its exact electrical meter boundary and must not be assumed to be complete wall-plug-to-purified-H2 performance.",
+        "Product separation, purification, compression, cooling, auxiliaries, startup, downtime and lifetime remain to be reconciled.",
+        "The atmospheric pure-NH3 reactor differs from the 2025 atmospheric NH3/N2 torch and the 2025 reduced-pressure pure-NH3 reactor; no direct ranking is permitted.",
+        "The coupled model is source-reported model evidence, not a Luminous simulation or independent validation."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-CRACK-WARM-RANS-TURBULENCE-2026",
+      "lane": "AMMONIA_CRACKING_MODEL_FORM_AND_TRANSPORT",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY_WITH_EXPERIMENTAL_COMPARISON",
+      "source": {
+        "title": "Effect of turbulent transport on plasma-based NH3 cracking into H2: Insights from a RANS computational fluid dynamics model",
+        "publisher": "Energy Conversion and Management",
+        "publication_date": "2026-09-15",
+        "volume": "364",
+        "article_number": "121741",
+        "doi": "10.1016/j.enconman.2026.121741",
+        "url": "https://doi.org/10.1016/j.enconman.2026.121741"
+      },
+      "configuration": {
+        "reactor_type": "warm gliding-arc plasmatron",
+        "model": "2D-axisymmetric coupled gas-flow dynamics, heating, chemical kinetics, species transport and current conservation, using 3D flow-field input",
+        "validation": "source reports agreement with experiments over a range of flow rates and currents"
+      },
+      "observations": [
+        {
+          "metric": "turbulence_effect_on_nh3_conversion",
+          "value": "detrimental",
+          "qualifier": "source-reported model result; do not interpret as a universal rule for every plasma regime or geometry",
+          "unit": "qualitative"
+        },
+        {
+          "metric": "hot_afterglow_suppression",
+          "value": true,
+          "qualifier": "model attributes lower conversion to suppression of the hot afterglow that supports additional NH3 conversion",
+          "unit": "boolean"
+        },
+        {
+          "metric": "energy_cost_effect",
+          "value": "increased",
+          "qualifier": "source-reported direction of change when turbulent transport suppresses the hot afterglow",
+          "unit": "qualitative"
+        }
+      ],
+      "source_conclusion": "The coupled RANS/chemistry study reports good agreement with experiments over a range of flow rates and currents. It finds that turbulence reduces NH3 conversion and increases energy cost in the studied warm-plasma process by suppressing the hot afterglow. This differs from behaviour reported for some other plasma chemistries, including CO2 splitting and NOx formation.",
+      "comparison_status": "MODEL_FORM_AND_TRANSPORT_INSIGHT_NOT_A_STANDALONE_PERFORMANCE_POINT",
+      "blockers": [
+        "This is a numerical/model-form study, not a new independent production-performance measurement.",
+        "Its result is specific to the studied warm-plasma reactor and operating envelope; do not generalize to microwave plasma, RF CCP, cold plasma or fusion plasma.",
+        "The design implication must be evaluated with matched geometry, residence-time, energy and product boundaries before claiming process improvement."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -1070,6 +1179,26 @@
       "control_id": "NC-HTTES-005",
       "condition": "Pool dried and pre-fired MWP ceramic specimens into one averaged outcome without stratifying specimen history.",
       "expected_disposition": "REJECT_EXPERIMENTAL_DESIGN_MISMATCH"
+    },
+    {
+      "control_id": "NC-024",
+      "condition": "Pool the 2026 51 g/kWh H2 energy-yield point at 76% NH3 conversion with the separate >99% conversion point and report one combined efficiency/conversion pair.",
+      "expected_disposition": "REJECT_OPERATING_POINT_MISMATCH"
+    },
+    {
+      "control_id": "NC-025",
+      "condition": "Treat the 2026 45 g/kWh at >99% conversion or 51 g/kWh at 76% conversion as complete wall-plug-to-purified-H2 performance without verifying the exact meter and downstream boundary.",
+      "expected_disposition": "BLOCKED_INCOMPLETE_PRODUCT_AND_ENERGY_BOUNDARY"
+    },
+    {
+      "control_id": "NC-026",
+      "condition": "Assume that increased turbulence always improves plasma conversion or mass transfer, transferring CO2/NOx findings into warm-plasma NH3 cracking despite the 2026 NH3 RANS/chemistry result.",
+      "expected_disposition": "REJECT_MODEL_REGIME_AND_CHEMISTRY_TRANSFER"
+    },
+    {
+      "control_id": "NC-027",
+      "condition": "Treat the 2026 RANS/chemistry model's experimentally compared predictions as a new physical Luminous result or as independent experimental measurement.",
+      "expected_disposition": "REJECT_EVIDENCE_CLASS_MISMATCH"
     }
   ],
   "derived_reference_checks": [
@@ -1124,6 +1253,22 @@
         "net_recovered_fraction_of_incident": 48.55072463768116
       },
       "interpretation": "Using the paper's rounded reported power values, suppressor-grid power is subtracted from gross recovered power. The derived net is 67 W and approximately 48.55% of 138 W, consistent with the paper's rounded 48% report. This is a check of the stated TMX test boundary, not a whole-plant or fusion-born energy efficiency.",
+      "luminous_measurement": false
+    },
+    {
+      "check_id": "NH3-MW-ENERGY-YIELD-TO-SPECIFIC-ENERGY-2026",
+      "source_case_id": "NH3-CRACK-MW-ATM-MECHANISM-2026",
+      "evidence_class": "DERIVED_ARITHMETIC_FROM_PUBLISHED_HYDROGEN_ENERGY_YIELD",
+      "inputs": {
+        "near_complete_conversion_energy_yield_g_H2_per_kWh": 45,
+        "best_energy_yield_g_H2_per_kWh": 51
+      },
+      "derivation": {
+        "near_complete_conversion_specific_energy_kWh_per_kg_H2": 22.22222222222222,
+        "best_energy_yield_specific_energy_kWh_per_kg_H2": 19.607843137254903,
+        "relative_specific_energy_reduction_at_76_percent_conversion": 0.11764705882352944
+      },
+      "interpretation": "The reciprocal of the reported specific H2 energy yield gives approximately 22.22 kWh/kg H2 at the >99% conversion point and 19.61 kWh/kg H2 at the 76% conversion point. The latter uses about 11.8% less energy per kg H2 on this source's reported basis, but it is a different conversion point. Neither value is assumed to be a complete wall-plug-to-purified-H2 boundary. These two points form a source-specific energy-yield/conversion trade-off and must be retained as separate Pareto points, not collapsed into a single optimum.",
       "luminous_measurement": false
     }
   ]
