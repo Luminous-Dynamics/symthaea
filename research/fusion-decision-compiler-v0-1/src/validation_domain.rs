@@ -117,7 +117,7 @@ pub struct ValidationDomainAudit {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValidationDomainError {
-    EmptyIdentity(&'static str),
+    EmptyIdentity(String),
     InvalidSha256(&'static str),
     DuplicateEpisode(String),
     DuplicateCalibrationRecord(String),
@@ -589,11 +589,11 @@ fn validate_episode_ids(
 
 fn validate_identity(
     value: &str,
-    field: &'static str,
+    field: &str,
     errors: &mut Vec<ValidationDomainError>,
 ) {
     if value.trim().is_empty() {
-        errors.push(ValidationDomainError::EmptyIdentity(field));
+        errors.push(ValidationDomainError::EmptyIdentity(field.to_string()));
     }
 }
 
@@ -821,7 +821,7 @@ mod tests {
         let errors = validate_validation_domain(&source).unwrap_err();
         assert!(has_error(
             &errors,
-            ValidationDomainError::EmptyIdentity("blind_holdout.measurement_uncertainty_ref")
+            ValidationDomainError::EmptyIdentity("blind_holdout.measurement_uncertainty_ref".into())
         ));
     }
 
