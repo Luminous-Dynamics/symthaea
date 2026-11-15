@@ -1,0 +1,42 @@
+name: Fusion rejected-candidate audit contract
+
+on:
+  pull_request:
+    paths:
+      - "research/fusion-reject-audit-v0-1/**"
+      - ".github/workflows/fusion-reject-audit.yml"
+  push:
+    branches:
+      - main
+      - research/fusion-reject-audit-v0-1
+    paths:
+      - "research/fusion-reject-audit-v0-1/**"
+      - ".github/workflows/fusion-reject-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+
+      - name: Install stable Rust and quality tools
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Format check
+        run: cargo fmt --manifest-path research/fusion-reject-audit-v0-1/Cargo.toml -- --check
+
+      - name: Unit tests
+        run: cargo test --manifest-path research/fusion-reject-audit-v0-1/Cargo.toml
+
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path research/fusion-reject-audit-v0-1/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run synthetic audit example
+        run: cargo run --manifest-path research/fusion-reject-audit-v0-1/Cargo.toml --bin audit_rejected_candidates
