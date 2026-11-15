@@ -184,6 +184,12 @@ Use repeated sessions to evaluate adaptation, memory governance, preference chan
 - Publish model snapshot, prompt and harness digests, resource budgets, seeds, and scenario release.
 - No single composite score in v0.1. Report a multidimensional scorecard and a separate hard-gate panel.
 
+### 7.1 Inter-rater reliability
+
+For nominal labels, report Cohen's kappa for two-rater slices and Krippendorff's alpha when there are multiple raters or missing annotations. Preserve negative coefficients; do not clip worse-than-chance agreement to zero. Report the number of raters, units, missingness, and an uncertainty estimate where sample size permits. If expected disagreement is zero or there are no pairable annotations, report the coefficient as unavailable rather than inventing one.
+
+Agreement is not validity: raters can consistently apply a flawed rubric. Use domain-expert rubric review, blinded scoring, and construct-validity checks in addition to reliability coefficients. The Rust `reliability` module implements nominal Cohen's kappa and Krippendorff's alpha; the scorecard records these separately from raw percentage agreement.
+
 ## 8. Hard gates
 
 The following are non-compensatory:
