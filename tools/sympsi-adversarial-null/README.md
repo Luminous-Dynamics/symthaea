@@ -17,6 +17,8 @@ The conditional statistic uses the exact mean and variance of the match count un
 
 Each profile uses its original planned sample size and exact-binomial critical value. The manifest fixes 10,000 campaigns per scenario.
 
+Each campaign seed is SHA-256-derived from the master seed, profile ID, scenario ID and campaign index. Target and response generation then use separate domain-separated synthetic RNG streams. Campaign seeds must not be obtained by incrementing a PRNG seed by the generator's own step constant; that creates overlapping streams and invalidates Monte Carlo independence.
+
 | Scenario | Target/response construction | Expected diagnostic |
 |---|---|---|
 | uniform_iid | Independent uniform targets and responses | All three procedures control FPR |
