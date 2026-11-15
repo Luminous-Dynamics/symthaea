@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-zkproof-field-binding"
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-or-later"
+description = "Bounded JSON Pointer field selection with raw byte spans for PPAC source-proof experiments"
+
+[dependencies]
+serde = { version = "=1.0.228" }
+serde_json = { version = "=1.0.150", features = ["raw_value"] }
+thiserror = "=2.0.18"
+
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"

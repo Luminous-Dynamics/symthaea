@@ -1,0 +1,31 @@
+name: Symthaea TLSN field-binding research tool
+
+on:
+  pull_request:
+    paths:
+      - 'research-tools/tlsn-field-binding-selector/**'
+      - '.github/workflows/symthaea-tlsn-field-binding.yml'
+  push:
+    branches:
+      - research/tlsn-json-field-binding-selector-v1-2026-11-15
+    paths:
+      - 'research-tools/tlsn-field-binding-selector/**'
+      - '.github/workflows/symthaea-tlsn-field-binding.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  field-binding:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Run standalone unit tests
+        run: cargo test --manifest-path research-tools/tlsn-field-binding-selector/Cargo.toml
+      - name: Run Clippy
+        run: cargo clippy --manifest-path research-tools/tlsn-field-binding-selector/Cargo.toml --all-targets
