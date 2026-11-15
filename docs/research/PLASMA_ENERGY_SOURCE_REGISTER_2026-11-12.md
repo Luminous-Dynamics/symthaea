@@ -707,3 +707,8 @@ The new scientific workstream is [PLASMA-QUENCH-001 #12342](https://github.com/L
 Four 2026 source cases were added for counterflow quenching, particle-assisted catalytic kinetic quenching, multidimensional arc quenching CFD, and thermal-management measurements/modeling. Eight negative controls prevent mixing operating points, confusing relative with absolute gains, promoting model predictions into experimental evidence, applying ideal-wall assumptions as measured results, transferring chemistry regimes and omitting quench energy/auxiliary burdens.
 
 The counterflow paper's 792 W / 4 slm MAGD point (23.6% conversion / 25.1% efficiency) is separate from its 302 W point (46.2% efficiency; conversion not specified in that highlight). The 207.3% / 203.6% values at a 2.5 ratio and 30 mm distance are relative improvements against a paper-defined baseline.
+
+
+## 9.19 Corpus snapshot — 2026-11-15
+
+The source-register branch contains 31 unique source cases, 40 unique negative controls and 4 derived checks. The separate offline-audit branch merges the source-register content with six additional microplasma cases, for 37 cases / 46 controls / 5 derived checks. These counts refer to different branch snapshots.
