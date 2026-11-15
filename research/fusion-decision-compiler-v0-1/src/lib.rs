@@ -6,6 +6,7 @@
 
 use std::collections::{BTreeSet, VecDeque};
 
+pub mod evidence_dependence;
 pub mod screening_funnel;
 pub mod validation_domain;
 
