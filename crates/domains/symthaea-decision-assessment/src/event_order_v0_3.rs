@@ -13,13 +13,16 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::{EventTraceDisposition, GateState};
+use crate::{EventOrder, EventTraceDisposition, GateState, ReconciledOperationOutcome};
 use crate::event_order_v0_2::{
-    BitemporalEventEnvelope, QualifiedEventTime, compare_qualified_event_times,
+    AttemptHistoryInventory, AttemptIdentity, AttemptLifecycleReport, AttemptStopDischargeRelation,
+    AttemptTerminalReconciliation, BitemporalEventEnvelope, OperationAttemptRecord,
+    QualifiedEventTime, ScopedStopObligation, StartGateReport, StopDischargeReceipt, StopScope,
+    assess_start_under_stop_obligations, compare_qualified_event_times, validate_attempt_lifecycle,
 };
 
-pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3.1";
-pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.2";
+pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3.2";
+pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.3";
 pub const MAX_GENERATED_EVENTS: usize = 4_096;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,10 +37,56 @@ pub struct VirtualSchedule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ActionEvidence {
+    AttemptStart {
+        retry_of_attempt_id: Option<String>,
+    },
+    EffectCommit {
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+    CancellationAcknowledgement {
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+    TerminalReconciliation {
+        exact_start_action_id: String,
+        qualification: GateState,
+    },
+    StopTrigger {
+        scope: StopScope,
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+    StopPolicyRevision {
+        scope: StopScope,
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+    StopDischarge {
+        scope: StopScope,
+        inventory_frontier_event_id: String,
+        attempt_manifest_sha256: String,
+    },
+    InventoryAttestation {
+        scope: StopScope,
+        inventory_frontier_event_id: String,
+        attempt_manifest_sha256: String,
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScheduledAction {
     pub action_id: String,
     pub at_ns: u64,
     pub ordinal: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner_time_ref: Option<ActionClockTimeReference>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub evidence: Option<ActionEvidence>,
     pub action: ScheduleAction,
 }
 
@@ -164,6 +213,11 @@ pub enum ScheduleAction {
         event_id: String,
         superseded_event_id: String,
     },
+    AttemptInventoryAttested {
+        scope: StopScope,
+        inventory_frontier_event_id: String,
+        attempt_manifest_sha256: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -200,9 +254,12 @@ pub enum SchedulerDisposition {
     ClockRegression,
     EventTimeRegression,
     StaleClockMappingReference,
+    OwnerTimeMissing,
+    OwnerTimeUnqualified,
     ClockMappingUnqualified,
     ClockMappingRejected,
     ClockMappingExpired,
+    ClockMappingBeyondSample,
     ClockMappingNotYetValid,
     ClockMappingValidityInvalid,
     ClockTimestampBeyondQualifiedTick,
@@ -225,6 +282,8 @@ pub struct ReplayRecord {
     pub action_id: String,
     pub at_ns: u64,
     pub ordinal: u64,
+    pub owner_time_ref: Option<ActionClockTimeReference>,
+    pub evidence: Option<ActionEvidence>,
     pub disposition: SchedulerDisposition,
     pub action: ScheduleAction,
 }
@@ -276,6 +335,8 @@ pub enum ReplayError {
     Serialization(String),
     #[error("the original schedule does not satisfy the counterexample predicate")]
     OriginalDoesNotReproduce,
+    #[error("action evidence does not match the scheduled action: {0}")]
+    ActionEvidenceMismatch(&'static str),
 }
 
 /// Validate structural schedule invariants. Intentionally does not reject
@@ -447,7 +508,7 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
             }
             ScheduleAction::CancellationRequested { operation_id, attempt_id }
             | ScheduleAction::CancellationAcknowledged { operation_id, attempt_id, .. }
-            | ScheduleAction::EffectAttempted { operation_id, attempt_id }
+            | ScheduleAction::EffectAttempted { operation_id, attempt_id, .. }
             | ScheduleAction::EffectCommitted { operation_id, attempt_id, .. }
             | ScheduleAction::AttemptReconciled { operation_id, attempt_id, .. } => {
                 require_id(operation_id, "operation_id")?;
@@ -476,6 +537,18 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(receipt_ref, "receipt_ref")?;
                 require_sha256(receipt_sha256, "stop_discharge_receipt_sha256")?;
             }
+            ScheduleAction::AttemptInventoryAttested {
+                scope, inventory_frontier_event_id, attempt_manifest_sha256,
+            } => {
+                if !scope.is_well_formed() {
+                    return Err(ReplayError::ActionEvidenceMismatch("inventory_scope"));
+                }
+                require_id(inventory_frontier_event_id, "inventory_frontier_event_id")?;
+                if !produced_events.contains(inventory_frontier_event_id) {
+                    return Err(ReplayError::InvalidCausalPredecessor(inventory_frontier_event_id.clone()));
+                }
+                require_sha256(attempt_manifest_sha256, "attempt_manifest_sha256")?;
+            }
             ScheduleAction::ProcessCrashed { process_id }
             | ScheduleAction::ProcessRestarted { process_id } => {
                 require_id(process_id, "process_id")?;
@@ -485,6 +558,76 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(superseded_event_id, "superseded_event_id")?;
                 if !produced_events.contains(event_id) || !produced_events.contains(superseded_event_id) {
                     return Err(ReplayError::InvalidCausalPredecessor(event_id.clone()));
+                }
+            }
+        }
+
+        if let Some(owner_time_ref) = &scheduled.owner_time_ref {
+            require_id(&owner_time_ref.clock_mapping_action_id, "owner_time_mapping_action_id")?;
+            if !clock_mapping_action_history.values().any(|history| {
+                history.contains_key(&owner_time_ref.clock_mapping_action_id)
+            }) {
+                return Err(ReplayError::InvalidCausalPredecessor(
+                    owner_time_ref.clock_mapping_action_id.clone(),
+                ));
+            }
+            let payload_clock_reference = match &scheduled.action {
+                ScheduleAction::EventProduced { clock_mapping_action_id, source_timestamp_ns, .. } =>
+                    Some((clock_mapping_action_id.as_str(), *source_timestamp_ns)),
+                ScheduleAction::EventObserved { clock_mapping_action_id, observed_at_ns, .. } =>
+                    Some((clock_mapping_action_id.as_str(), *observed_at_ns)),
+                ScheduleAction::EventPersisted { clock_mapping_action_id, persisted_at_ns, .. } =>
+                    Some((clock_mapping_action_id.as_str(), *persisted_at_ns)),
+                _ => None,
+            };
+            if payload_clock_reference.is_some_and(|(mapping_id, timestamp)| {
+                mapping_id != owner_time_ref.clock_mapping_action_id
+                    || timestamp != owner_time_ref.local_timestamp_ns
+            }) {
+                return Err(ReplayError::ActionEvidenceMismatch("owner_time_payload_binding"));
+            }
+        }
+
+        if let Some(evidence) = &scheduled.evidence {
+            let matches_action = matches!(
+                (&scheduled.action, evidence),
+                (ScheduleAction::EffectAttempted { .. }, ActionEvidence::AttemptStart { .. })
+                    | (ScheduleAction::EffectCommitted { .. }, ActionEvidence::EffectCommit { .. })
+                    | (ScheduleAction::CancellationAcknowledged { .. }, ActionEvidence::CancellationAcknowledgement { .. })
+                    | (ScheduleAction::AttemptReconciled { .. }, ActionEvidence::TerminalReconciliation { .. })
+                    | (ScheduleAction::StopTriggered { .. }, ActionEvidence::StopTrigger { .. })
+                    | (ScheduleAction::StopPolicyRevised { .. }, ActionEvidence::StopPolicyRevision { .. })
+                    | (ScheduleAction::StopDischarged { .. }, ActionEvidence::StopDischarge { .. })
+                    | (ScheduleAction::AttemptInventoryAttested { .. }, ActionEvidence::InventoryAttestation { .. })
+            );
+            if !matches_action {
+                return Err(ReplayError::ActionEvidenceMismatch("action_variant"));
+            }
+            match evidence {
+                ActionEvidence::AttemptStart { retry_of_attempt_id } => {
+                    if let Some(predecessor) = retry_of_attempt_id {
+                        require_id(predecessor, "retry_of_attempt_id")?;
+                    }
+                }
+                ActionEvidence::EffectCommit { receipt_ref, receipt_sha256 }
+                | ActionEvidence::CancellationAcknowledgement { receipt_ref, receipt_sha256 }
+                | ActionEvidence::StopTrigger { receipt_ref, receipt_sha256, .. }
+                | ActionEvidence::StopPolicyRevision { receipt_ref, receipt_sha256, .. }
+                | ActionEvidence::InventoryAttestation { receipt_ref, receipt_sha256, .. } => {
+                    require_id(receipt_ref, "action_evidence_receipt_ref")?;
+                    require_sha256(receipt_sha256, "action_evidence_receipt_sha256")?;
+                }
+                ActionEvidence::TerminalReconciliation { exact_start_action_id, .. } => {
+                    require_id(exact_start_action_id, "exact_start_action_id")?;
+                }
+                ActionEvidence::StopDischarge {
+                    scope, inventory_frontier_event_id, attempt_manifest_sha256,
+                } => {
+                    if !scope.is_well_formed() {
+                        return Err(ReplayError::ActionEvidenceMismatch("stop_discharge_scope"));
+                    }
+                    require_id(inventory_frontier_event_id, "inventory_frontier_event_id")?;
+                    require_sha256(attempt_manifest_sha256, "attempt_manifest_sha256")?;
                 }
             }
         }
@@ -612,6 +755,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut produced = BTreeSet::<String>::new();
     let mut active_clock_mapping_ids = BTreeMap::<ClockSeriesKey, String>::new();
     let mut clock_mapping_states = BTreeMap::<String, ClockMappingState>::new();
+    let mut clock_series_by_mapping_id = BTreeMap::<String, ClockSeriesKey>::new();
     let mut event_times = BTreeMap::<ClockSeriesKey, u64>::new();
     let mut delivered = BTreeSet::<(String, String)>::new();
     let mut observed = BTreeSet::<(String, String)>::new();
@@ -625,9 +769,12 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut stop_triggers = BTreeMap::<String, StopReplayState>::new();
     let mut stop_discharges = BTreeSet::<String>::new();
     let mut attempts = BTreeSet::<(String, String)>::new();
-    let mut committed_attempts = BTreeMap::<(String, String), String>::new();
+    let mut attempt_start_action_ids = BTreeMap::<(String, String), String>::new();
+    let mut committed_attempts =
+        BTreeMap::<(String, String), (String, String, String)>::new();
     let mut reconciled_attempts =
-        BTreeMap::<(String, String), (ReconciliationOutcome, String, String)>::new();
+        BTreeMap::<(String, String), (ReconciliationOutcome, String, String, GateState, String)>::new();
+    let mut inventory_attestations = BTreeSet::<(StopScope, String, String)>::new();
     let mut records = Vec::new();
 
     for scheduled in ordered_actions(schedule) {
@@ -651,6 +798,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                         qualification: *qualification,
                     },
                 );
+                clock_series_by_mapping_id.insert(scheduled.action_id.clone(), clock_series_key(clock_domain, basis_id, epoch, scale, unit));
                 if previous_tick.is_some_and(|tick| *local_tick_ns < tick) {
                     SchedulerDisposition::ClockRegression
                 } else {
@@ -801,7 +949,10 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 }
             }
             ScheduleAction::CancellationRequested { operation_id, attempt_id } => {
-                if cancel_requests.insert((operation_id.clone(), attempt_id.clone())) {
+                let key = (operation_id.clone(), attempt_id.clone());
+                if !attempts.contains(&key) {
+                    SchedulerDisposition::PreconditionViolation
+                } else if cancel_requests.insert(key) {
                     SchedulerDisposition::Applied
                 } else {
                     SchedulerDisposition::Duplicate
@@ -830,10 +981,15 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 if stop_triggers.contains_key(obligation_id) {
                     SchedulerDisposition::PreconditionViolation
                 } else {
+                    let scope = match &scheduled.evidence {
+                        Some(ActionEvidence::StopTrigger { scope, .. }) => Some(scope.clone()),
+                        _ => None,
+                    };
                     stop_triggers.insert(obligation_id.clone(), StopReplayState {
                         trigger_action_id: scheduled.action_id.clone(),
                         policy_revision_action_id: scheduled.action_id.clone(),
                         policy_revision: policy_revision.clone(),
+                        scope,
                     });
                     SchedulerDisposition::Applied
                 }
@@ -842,6 +998,10 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 if let Some(state) = stop_triggers.get_mut(obligation_id) {
                     state.policy_revision = policy_revision.clone();
                     state.policy_revision_action_id = scheduled.action_id.clone();
+                    state.scope = match &scheduled.evidence {
+                        Some(ActionEvidence::StopPolicyRevision { scope, .. }) => Some(scope.clone()),
+                        _ => None,
+                    };
                     stop_discharges.remove(obligation_id);
                     SchedulerDisposition::Applied
                 } else {
@@ -856,7 +1016,19 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                         && state.policy_revision_action_id == *policy_revision_action_id
                         && state.policy_revision == *policy_revision
                 });
-                if exact_binding && stop_discharges.insert(obligation_id.clone()) {
+                let inventory_binding = match (&scheduled.evidence, stop_triggers.get(obligation_id)) {
+                    (Some(ActionEvidence::StopDischarge { scope, inventory_frontier_event_id, attempt_manifest_sha256 }), Some(state)) => {
+                        state.scope.as_ref() == Some(scope)
+                            && inventory_attestations.iter().any(|(inventory_scope, frontier, manifest)| {
+                                stop_scope_covers(inventory_scope, scope)
+                                    && frontier == inventory_frontier_event_id
+                                    && manifest == attempt_manifest_sha256
+                            })
+                    }
+                    (None, Some(state)) if state.scope.is_none() => true,
+                    _ => false,
+                };
+                if exact_binding && inventory_binding && stop_discharges.insert(obligation_id.clone()) {
                     SchedulerDisposition::Applied
                 } else {
                     SchedulerDisposition::PreconditionViolation
@@ -864,7 +1036,23 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
             }
             ScheduleAction::EffectAttempted { operation_id, attempt_id } => {
                 let key = (operation_id.clone(), attempt_id.clone());
-                if attempts.insert(key) {
+                let retry_valid = match &scheduled.evidence {
+                    Some(ActionEvidence::AttemptStart { retry_of_attempt_id: Some(predecessor_id) }) => {
+                        let predecessor_key = (operation_id.clone(), predecessor_id.clone());
+                        reconciled_attempts.get(&predecessor_key).is_some_and(|terminal| {
+                            terminal.0 == ReconciliationOutcome::NotApplied
+                                && terminal.3 == GateState::Pass
+                                && terminal.4 == attempt_start_action_ids.get(&predecessor_key).cloned().unwrap_or_default()
+                        })
+                    }
+                    Some(ActionEvidence::AttemptStart { retry_of_attempt_id: None }) => true,
+                    None => true,
+                    _ => false,
+                };
+                if !retry_valid {
+                    SchedulerDisposition::PreconditionViolation
+                } else if attempts.insert(key.clone()) {
+                    attempt_start_action_ids.insert(key, scheduled.action_id.clone());
                     SchedulerDisposition::Applied
                 } else {
                     SchedulerDisposition::PreconditionViolation
@@ -872,16 +1060,23 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
             }
             ScheduleAction::EffectCommitted { operation_id, attempt_id, effect_id } => {
                 let key = (operation_id.clone(), attempt_id.clone());
+                let evidence = match &scheduled.evidence {
+                    Some(ActionEvidence::EffectCommit { receipt_ref, receipt_sha256 }) => {
+                        (receipt_ref.clone(), receipt_sha256.clone())
+                    }
+                    _ => (String::new(), String::new()),
+                };
+                let candidate = (effect_id.clone(), evidence.0, evidence.1);
                 if !attempts.contains(&key) {
                     SchedulerDisposition::PreconditionViolation
-                } else if let Some(previous_effect_id) = committed_attempts.get(&key) {
-                    if previous_effect_id == effect_id {
+                } else if let Some(previous) = committed_attempts.get(&key) {
+                    if previous == &candidate {
                         SchedulerDisposition::Duplicate
                     } else {
                         SchedulerDisposition::ConflictingEffectCommit
                     }
                 } else {
-                    committed_attempts.insert(key.clone(), effect_id.clone());
+                    committed_attempts.insert(key.clone(), candidate);
                     if cancel_acknowledgements.get(&key) == Some(&true) {
                         SchedulerDisposition::CommitAfterAcceptedCancellation
                     } else {
@@ -893,8 +1088,17 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 operation_id, attempt_id, outcome, receipt_ref, receipt_sha256,
             } => {
                 let key = (operation_id.clone(), attempt_id.clone());
-                let terminal = (*outcome, receipt_ref.clone(), receipt_sha256.clone());
-                if !attempts.contains(&key) {
+                let (qualification, exact_start_action_id) = match &scheduled.evidence {
+                    Some(ActionEvidence::TerminalReconciliation { exact_start_action_id, qualification }) => {
+                        (*qualification, exact_start_action_id.clone())
+                    }
+                    _ => (GateState::Indeterminate, String::new()),
+                };
+                let terminal = (*outcome, receipt_ref.clone(), receipt_sha256.clone(), qualification, exact_start_action_id);
+                let exact_start = attempt_start_action_ids.get(&key).is_some_and(|start_id| {
+                    terminal.4 == *start_id
+                });
+                if !attempts.contains(&key) || (scheduled.evidence.is_some() && !exact_start) {
                     SchedulerDisposition::PreconditionViolation
                 } else if let Some(previous) = reconciled_attempts.get(&key) {
                     if previous == &terminal {
@@ -905,6 +1109,31 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 } else {
                     reconciled_attempts.insert(key, terminal);
                     SchedulerDisposition::Applied
+                }
+            }
+            ScheduleAction::AttemptInventoryAttested {
+                scope, inventory_frontier_event_id, attempt_manifest_sha256,
+            } => {
+                let exact = match &scheduled.evidence {
+                    Some(ActionEvidence::InventoryAttestation {
+                        scope: evidence_scope,
+                        inventory_frontier_event_id: evidence_frontier,
+                        attempt_manifest_sha256: evidence_manifest,
+                        ..
+                    }) => evidence_scope == scope
+                        && evidence_frontier == inventory_frontier_event_id
+                        && evidence_manifest == attempt_manifest_sha256,
+                    _ => false,
+                };
+                if exact {
+                    inventory_attestations.insert((
+                        scope.clone(),
+                        inventory_frontier_event_id.clone(),
+                        attempt_manifest_sha256.clone(),
+                    ));
+                    SchedulerDisposition::Applied
+                } else {
+                    SchedulerDisposition::PreconditionViolation
                 }
             }
             ScheduleAction::ProcessCrashed { process_id } => {
@@ -923,10 +1152,28 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
             }
             ScheduleAction::EventSuperseded { .. } => SchedulerDisposition::Applied,
         };
+        let mut disposition = disposition;
+        if let Some(owner_time_ref) = &scheduled.owner_time_ref {
+            let series_key = clock_series_by_mapping_id.get(&owner_time_ref.clock_mapping_action_id);
+            let active_mapping_id = series_key.and_then(|key| active_clock_mapping_ids.get(key));
+            let owner_time_disposition = classify_clock_mapping(
+                active_mapping_id,
+                &owner_time_ref.clock_mapping_action_id,
+                clock_mapping_states.get(&owner_time_ref.clock_mapping_action_id),
+                owner_time_ref.local_timestamp_ns,
+            );
+            if let Some(owner_time_disposition) = owner_time_disposition {
+                if matches!(disposition, SchedulerDisposition::Applied | SchedulerDisposition::Duplicate) {
+                    disposition = owner_time_disposition;
+                }
+            }
+        }
         records.push(ReplayRecord {
             action_id: scheduled.action_id,
             at_ns: scheduled.at_ns,
             ordinal: scheduled.ordinal,
+            owner_time_ref: scheduled.owner_time_ref,
+            evidence: scheduled.evidence,
             disposition,
             action: scheduled.action,
         });
@@ -983,6 +1230,8 @@ fn push_action(
         action_id: format!("action-{ordinal:06}"),
         at_ns,
         ordinal,
+        owner_time_ref: None,
+        evidence: None,
         action,
     });
 }
@@ -1806,6 +2055,1552 @@ pub fn generate_capture_clock_fault_schedule(
     Ok(schedule)
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OwnerReceiptAssessment {
+    /// Exact immutable receipt identity the owner verifier actually checked.
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub identity: GateState,
+    pub digest_integrity: GateState,
+    pub authenticity: GateState,
+    pub scope_qualification: GateState,
+    pub completeness: GateState,
+    pub semantic_qualification: GateState,
+    pub in_flight_reconciliation: GateState,
+}
+
+impl OwnerReceiptAssessment {
+    fn receipt_qualification(&self) -> GateState {
+        let gates = [
+            self.identity,
+            self.digest_integrity,
+            self.authenticity,
+            self.scope_qualification,
+            self.semantic_qualification,
+        ];
+        if gates.contains(&GateState::Fail) {
+            GateState::Fail
+        } else if gates.iter().all(|gate| *gate == GateState::Pass) {
+            GateState::Pass
+        } else {
+            GateState::Indeterminate
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectedEffectCommit {
+    pub action_id: String,
+    pub logical_operation_id: String,
+    pub attempt_id: String,
+    pub effect_id: String,
+    pub owner_time: QualifiedEventTime,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub receipt_qualification: GateState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectedCancellationAcknowledgement {
+    pub action_id: String,
+    pub request_action_id: String,
+    pub logical_operation_id: String,
+    pub attempt_id: String,
+    pub accepted: bool,
+    pub requested_at: QualifiedEventTime,
+    pub acknowledged_at: QualifiedEventTime,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub receipt_qualification: GateState,
+    /// Cancellation acknowledgement is intentionally not a terminal outcome.
+    pub establishes_not_applied: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectedTerminalReconciliation {
+    pub action_id: String,
+    pub logical_operation_id: String,
+    pub attempt_id: String,
+    pub exact_start_action_id: String,
+    pub outcome: ReconciledOperationOutcome,
+    pub owner_time: QualifiedEventTime,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub receipt_qualification: GateState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProjectedStopEvidenceKind {
+    Trigger,
+    PolicyRevision,
+    Discharge,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectedStopEvidence {
+    pub action_id: String,
+    pub obligation_id: String,
+    pub kind: ProjectedStopEvidenceKind,
+    pub policy_revision: String,
+    pub scope: StopScope,
+    pub owner_time: QualifiedEventTime,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub receipt_qualification: GateState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectedInventoryAttestation {
+    pub action_id: String,
+    pub scope: StopScope,
+    pub inventory_frontier_event_id: String,
+    pub attempt_manifest_sha256: String,
+    pub owner_time: QualifiedEventTime,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub identity: GateState,
+    pub digest_integrity: GateState,
+    pub authenticity: GateState,
+    pub scope_qualification: GateState,
+    pub completeness: GateState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionHistoryProjectionReport {
+    pub schedule_sha256: Option<String>,
+    pub replay_sha256: Option<String>,
+    pub disposition: EventTraceDisposition,
+    pub attempts: Vec<OperationAttemptRecord>,
+    pub terminal_reconciliations: Vec<ProjectedTerminalReconciliation>,
+    pub attempt_lifecycle: AttemptLifecycleReport,
+    pub obligations: Vec<ScopedStopObligation>,
+    pub stop_evidence: Vec<ProjectedStopEvidence>,
+    pub inventory: Option<AttemptHistoryInventory>,
+    pub inventory_attestations: Vec<ProjectedInventoryAttestation>,
+    pub start_gate: Option<StartGateReport>,
+    pub effect_commits: Vec<ProjectedEffectCommit>,
+    pub cancellation_acknowledgements: Vec<ProjectedCancellationAcknowledgement>,
+    pub reason_codes: Vec<String>,
+}
+
+fn action_owner_time(
+    schedule: &VirtualSchedule,
+    action: &ScheduledAction,
+    resolutions: &BTreeMap<(String, u64), QualifiedEventTime>,
+) -> Result<QualifiedEventTime, ProjectionFault> {
+    let reference = action.owner_time_ref.as_ref()
+        .ok_or(ProjectionFault::Indeterminate("ACTION_OWNER_TIME_REFERENCE_MISSING"))?;
+    let mapping_action = schedule.actions.iter()
+        .find(|candidate| candidate.action_id == reference.clock_mapping_action_id)
+        .ok_or(ProjectionFault::Critical("ACTION_OWNER_TIME_MAPPING_NOT_FOUND"))?;
+    let (clock_domain, receipt_ref, receipt_sha256) = match &mapping_action.action {
+        ScheduleAction::ClockAdvance {
+            clock_domain, mapping_receipt_ref, mapping_receipt_sha256, ..
+        } => (clock_domain.as_str(), mapping_receipt_ref.as_str(), mapping_receipt_sha256.as_str()),
+        _ => return Err(ProjectionFault::Critical("ACTION_OWNER_TIME_REFERENCE_NOT_CLOCK_MAPPING")),
+    };
+    resolve_owner_qualified_time(
+        schedule,
+        &reference.clock_mapping_action_id,
+        reference.local_timestamp_ns,
+        clock_domain,
+        receipt_ref,
+        receipt_sha256,
+        resolutions,
+    )
+}
+
+fn receipt_assessment_for_action(
+    action_id: &str,
+    expected_receipt_ref: &str,
+    expected_receipt_sha256: &str,
+    assessments: &BTreeMap<String, OwnerReceiptAssessment>,
+) -> Result<OwnerReceiptAssessment, ProjectionFault> {
+    let assessment = assessments.get(action_id)
+        .cloned()
+        .ok_or(ProjectionFault::Indeterminate("OWNER_RECEIPT_ASSESSMENT_MISSING"))?;
+    if assessment.receipt_ref != expected_receipt_ref
+        || assessment.receipt_sha256 != expected_receipt_sha256
+    {
+        return Err(ProjectionFault::Critical("OWNER_RECEIPT_IDENTITY_BINDING_MISMATCH"));
+    }
+    match assessment.receipt_qualification() {
+        GateState::Pass => Ok(assessment),
+        GateState::Fail => Err(ProjectionFault::Critical("OWNER_RECEIPT_QUALIFICATION_FAILED")),
+        GateState::Indeterminate | GateState::NotApplicable => {
+            Err(ProjectionFault::Indeterminate("OWNER_RECEIPT_QUALIFICATION_UNRESOLVED"))
+        }
+    }
+}
+
+fn stop_scope_covers(candidate: &StopScope, required: &StopScope) -> bool {
+    match (candidate, required) {
+        (StopScope::Global, _) => true,
+        (StopScope::LogicalOperations(_), StopScope::Global) => false,
+        (StopScope::LogicalOperations(candidate), StopScope::LogicalOperations(required)) => {
+            required.is_subset(candidate)
+        }
+    }
+}
+
+fn stop_scope_revision_is_monotonic(original: &StopScope, revised: &StopScope) -> bool {
+    stop_scope_covers(revised, original)
+}
+
+fn action_projection_failure(fault: ProjectionFault) -> ActionHistoryProjectionReport {
+    let (disposition, code) = match fault {
+        ProjectionFault::Indeterminate(code) => (EventTraceDisposition::Indeterminate, code),
+        ProjectionFault::Critical(code) => (EventTraceDisposition::CriticalFailure, code),
+    };
+    ActionHistoryProjectionReport {
+        schedule_sha256: None,
+        replay_sha256: None,
+        disposition,
+        attempts: Vec::new(),
+        terminal_reconciliations: Vec::new(),
+        attempt_lifecycle: AttemptLifecycleReport {
+            disposition,
+            pending_attempt_ids: Vec::new(),
+            reason_codes: vec![code.to_owned()],
+        },
+        obligations: Vec::new(),
+        stop_evidence: Vec::new(),
+        inventory: None,
+        inventory_attestations: Vec::new(),
+        start_gate: None,
+        effect_commits: Vec::new(),
+        cancellation_acknowledgements: Vec::new(),
+        reason_codes: vec![code.to_owned()],
+    }
+}
+
+fn event_order_between(
+    first: &QualifiedEventTime,
+    second: &QualifiedEventTime,
+) -> EventOrder {
+    compare_qualified_event_times(first, second).order
+}
+
+/// Project scheduled effect/attempt/stop evidence into v0.2's typed attempt,
+/// obligation and inventory contracts. Owner time and owner receipt results
+/// are injected by the caller; this function never authenticates bytes,
+/// normalizes clocks, synthesizes PASS, authorizes execution, or treats a
+/// cancellation acknowledgement as a NOT_APPLIED terminal result.
+pub fn project_action_history(
+    schedule: &VirtualSchedule,
+    logical_operation_id: &str,
+    time_resolutions: &BTreeMap<(String, u64), QualifiedEventTime>,
+    receipt_assessments: &BTreeMap<String, OwnerReceiptAssessment>,
+) -> Result<ActionHistoryProjectionReport, ReplayError> {
+    validate_schedule(schedule)?;
+    let replay = replay_virtual_schedule(schedule)?;
+    let canonical_actions = ordered_actions(schedule);
+    let mut reasons = BTreeSet::new();
+    let mut critical = false;
+    let mut indeterminate = false;
+
+    let record_disposition = |action_id: &str| {
+        replay.records.iter()
+            .find(|record| record.action_id == action_id)
+            .map(|record| record.disposition)
+    };
+
+    let mut starts = BTreeMap::<(String, String), (&ScheduledAction, QualifiedEventTime, Option<String>)>::new();
+    let mut terminal_actions = BTreeMap::<(String, String), (&ScheduledAction, QualifiedEventTime, OwnerReceiptAssessment)>::new();
+    let mut commits = Vec::new();
+    let mut commit_times = BTreeMap::<(String, String), Vec<QualifiedEventTime>>::new();
+    let mut terminal_receipts = Vec::<ProjectedTerminalReconciliation>::new();
+    let mut stop_evidence = Vec::<ProjectedStopEvidence>::new();
+    let mut inventory_attestations = Vec::<ProjectedInventoryAttestation>::new();
+    let mut cancellation_acknowledgements = Vec::new();
+
+    for action in &canonical_actions {
+        match &action.action {
+            ScheduleAction::EffectAttempted { operation_id, attempt_id } => {
+                let key = (operation_id.clone(), attempt_id.clone());
+                if starts.contains_key(&key) {
+                    critical = true;
+                    reasons.insert(format!("DUPLICATE_ATTEMPT_START_ACTION:{operation_id}:{attempt_id}"));
+                    continue;
+                }
+                if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
+                    critical = true;
+                    reasons.insert(format!("ATTEMPT_START_NOT_REPLAY_APPLIED:{attempt_id}"));
+                    continue;
+                }
+                let retry_of = match &action.evidence {
+                    Some(ActionEvidence::AttemptStart { retry_of_attempt_id }) => retry_of_attempt_id.clone(),
+                    _ => {
+                        indeterminate = true;
+                        reasons.insert(format!("ATTEMPT_START_LINEAGE_EVIDENCE_MISSING:{attempt_id}"));
+                        None
+                    }
+                };
+                match action_owner_time(schedule, action, time_resolutions) {
+                    Ok(owner_time) => {
+                        starts.insert(key, (action, owner_time, retry_of));
+                    }
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                    }
+                }
+            }
+            ScheduleAction::AttemptReconciled {
+                operation_id, attempt_id, outcome, receipt_ref, receipt_sha256,
+            } => {
+                let key = (operation_id.clone(), attempt_id.clone());
+                if !starts.contains_key(&key) {
+                    critical = true;
+                    reasons.insert(format!("TERMINAL_WITHOUT_ATTEMPT_START:{attempt_id}"));
+                    continue;
+                }
+                match record_disposition(&action.action_id) {
+                    Some(SchedulerDisposition::Applied) => {}
+                    Some(SchedulerDisposition::Duplicate) => continue,
+                    _ => {
+                        critical = true;
+                        reasons.insert(format!("TERMINAL_NOT_REPLAY_APPLIED:{attempt_id}"));
+                        continue;
+                    }
+                }
+                let (exact_start_action_id, qualification) = match &action.evidence {
+                    Some(ActionEvidence::TerminalReconciliation { exact_start_action_id, qualification }) => {
+                        (exact_start_action_id, *qualification)
+                    }
+                    _ => {
+                        indeterminate = true;
+                        reasons.insert(format!("TERMINAL_LINEAGE_EVIDENCE_MISSING:{attempt_id}"));
+                        continue;
+                    }
+                };
+                let (start_action, _, _) = starts.get(&key).expect("start was inserted");
+                if exact_start_action_id != &start_action.action_id {
+                    critical = true;
+                    reasons.insert(format!("TERMINAL_START_ACTION_BINDING_MISMATCH:{attempt_id}"));
+                    continue;
+                }
+                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_ref, receipt_sha256, receipt_assessments) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                };
+                if qualification != GateState::Pass {
+                    if qualification == GateState::Fail {
+                        critical = true;
+                        reasons.insert(format!("TERMINAL_QUALIFICATION_FAILED:{attempt_id}"));
+                    } else {
+                        indeterminate = true;
+                        reasons.insert(format!("TERMINAL_QUALIFICATION_UNRESOLVED:{attempt_id}"));
+                    }
+                    continue;
+                }
+                let terminal_time = match action_owner_time(schedule, action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                };
+                if let Some(previous) = terminal_actions.insert(key.clone(), (action, terminal_time, assessment)) {
+                    let _ = previous;
+                    critical = true;
+                    reasons.insert(format!("MULTIPLE_TERMINAL_ACTIONS:{attempt_id}"));
+                }
+                let _ = (outcome, receipt_ref, receipt_sha256);
+            }
+            ScheduleAction::EffectCommitted {
+                operation_id, attempt_id, effect_id, ..
+            } => {
+                if !starts.contains_key(&(operation_id.clone(), attempt_id.clone())) {
+                    critical = true;
+                    reasons.insert(format!("EFFECT_COMMIT_WITHOUT_ATTEMPT_START:{attempt_id}"));
+                    continue;
+                }
+                match record_disposition(&action.action_id) {
+                    Some(SchedulerDisposition::Applied) => {}
+                    Some(SchedulerDisposition::Duplicate) => continue,
+                    _ => {
+                        critical = true;
+                        reasons.insert(format!("EFFECT_COMMIT_NOT_REPLAY_APPLIED:{attempt_id}"));
+                        continue;
+                    }
+                }
+                let (receipt_ref, receipt_sha256) = match &action.evidence {
+                    Some(ActionEvidence::EffectCommit { receipt_ref, receipt_sha256 }) => {
+                        (receipt_ref.clone(), receipt_sha256.clone())
+                    }
+                    _ => {
+                        indeterminate = true;
+                        reasons.insert(format!("EFFECT_COMMIT_RECEIPT_EVIDENCE_MISSING:{attempt_id}"));
+                        continue;
+                    }
+                };
+                let assessment = match receipt_assessment_for_action(&action.action_id, &receipt_ref, &receipt_sha256, receipt_assessments) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                };
+                let owner_time = match action_owner_time(schedule, action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                };
+                let (_, start_time, _) = starts
+                    .get(&(operation_id.clone(), attempt_id.clone()))
+                    .expect("attempt start was checked above");
+                match event_order_between(start_time, &owner_time) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert(format!("EFFECT_COMMIT_PRECEDES_ATTEMPT_START:{attempt_id}"));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("ATTEMPT_START_EFFECT_COMMIT_ORDER_UNRESOLVED:{attempt_id}"));
+                    }
+                }
+                commit_times.entry((operation_id.clone(), attempt_id.clone()))
+                    .or_default()
+                    .push(owner_time.clone());
+                commits.push(ProjectedEffectCommit {
+                    action_id: action.action_id.clone(),
+                    logical_operation_id: operation_id.clone(),
+                    attempt_id: attempt_id.clone(),
+                    effect_id: effect_id.clone(),
+                    owner_time,
+                    receipt_ref,
+                    receipt_sha256,
+                    receipt_qualification: assessment.receipt_qualification(),
+                });
+            }
+            ScheduleAction::CancellationAcknowledged {
+                operation_id, attempt_id, accepted,
+            } => {
+                if !starts.contains_key(&(operation_id.clone(), attempt_id.clone())) {
+                    critical = true;
+                    reasons.insert(format!("CANCELLATION_ACK_WITHOUT_ATTEMPT_START:{attempt_id}"));
+                    continue;
+                }
+                let matching_requests = canonical_actions.iter().filter(|candidate| {
+                    matches!(&candidate.action, ScheduleAction::CancellationRequested {
+                        operation_id: request_operation, attempt_id: request_attempt,
+                    } if request_operation == operation_id && request_attempt == attempt_id)
+                        && record_disposition(&candidate.action_id) == Some(SchedulerDisposition::Applied)
+                }).collect::<Vec<_>>();
+                if matching_requests.len() != 1 {
+                    critical = true;
+                    reasons.insert(if matching_requests.is_empty() {
+                        format!("CANCELLATION_ACK_WITHOUT_UNIQUE_REQUEST:{attempt_id}")
+                    } else {
+                        format!("CANCELLATION_REQUEST_CARDINALITY_INVALID:{attempt_id}")
+                    });
+                    continue;
+                }
+                let request_action = matching_requests[0];
+                let requested_at = match action_owner_time(schedule, request_action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}:CANCEL_REQUEST"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}:CANCEL_REQUEST"));
+                        continue;
+                    }
+                };
+                let (_, start_time, _) = starts
+                    .get(&(operation_id.clone(), attempt_id.clone()))
+                    .expect("attempt start was checked above");
+                match event_order_between(start_time, &requested_at) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert(format!("CANCELLATION_REQUEST_PRECEDES_ATTEMPT_START:{attempt_id}"));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("ATTEMPT_START_CANCELLATION_REQUEST_ORDER_UNRESOLVED:{attempt_id}"));
+                    }
+                }
+                match record_disposition(&action.action_id) {
+                    Some(SchedulerDisposition::Applied) => {}
+                    Some(SchedulerDisposition::Duplicate) => continue,
+                    Some(SchedulerDisposition::AcceptedCancellationAfterCommit) => {
+                        critical = true;
+                        reasons.insert(format!("CANCELLATION_ACKNOWLEDGED_AFTER_COMMIT:{attempt_id}"));
+                    }
+                    _ => {
+                        critical = true;
+                        reasons.insert(format!("CANCELLATION_ACK_NOT_REPLAY_APPLIED:{attempt_id}"));
+                        continue;
+                    }
+                }
+                let (receipt_ref, receipt_sha256) = match &action.evidence {
+                    Some(ActionEvidence::CancellationAcknowledgement { receipt_ref, receipt_sha256 }) => {
+                        (receipt_ref.clone(), receipt_sha256.clone())
+                    }
+                    _ => {
+                        indeterminate = true;
+                        reasons.insert(format!("CANCELLATION_ACK_RECEIPT_EVIDENCE_MISSING:{attempt_id}"));
+                        continue;
+                    }
+                };
+                let assessment = match receipt_assessment_for_action(&action.action_id, &receipt_ref, &receipt_sha256, receipt_assessments) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                };
+                let acknowledged_at = match action_owner_time(schedule, action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}:CANCEL_ACK"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}:CANCEL_ACK"));
+                        continue;
+                    }
+                };
+                match event_order_between(&requested_at, &acknowledged_at) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert(format!("CANCELLATION_ACK_PRECEDES_REQUEST:{attempt_id}"));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("CANCELLATION_REQUEST_ACK_ORDER_UNRESOLVED:{attempt_id}"));
+                    }
+                }
+                if *accepted {
+                    if commit_times.contains_key(&(operation_id.clone(), attempt_id.clone())) {
+                        critical = true;
+                        reasons.insert(format!("ACCEPTED_CANCELLATION_CONTRADICTS_EFFECT_COMMIT:{attempt_id}"));
+                    }
+                }
+                cancellation_acknowledgements.push(ProjectedCancellationAcknowledgement {
+                    action_id: action.action_id.clone(),
+                    request_action_id: request_action.action_id.clone(),
+                    logical_operation_id: operation_id.clone(),
+                    attempt_id: attempt_id.clone(),
+                    accepted: *accepted,
+                    requested_at,
+                    acknowledged_at,
+                    receipt_ref,
+                    receipt_sha256,
+                    receipt_qualification: assessment.receipt_qualification(),
+                    establishes_not_applied: false,
+                });
+            }
+            _ => {}
+        }
+    }
+
+    let mut attempts = Vec::new();
+    let mut attempt_start_times = BTreeMap::<String, QualifiedEventTime>::new();
+    let mut attempt_terminal_times = BTreeMap::<String, QualifiedEventTime>::new();
+
+    for ((operation_id, attempt_id), (start_action, start_time, retry_of)) in &starts {
+        let start_event_id = start_action.action_id.clone();
+        attempt_start_times.insert(attempt_id.clone(), start_time.clone());
+        let terminal = terminal_actions.get(&(operation_id.clone(), attempt_id.clone()));
+        let (terminal_record, terminal_time) = if let Some((terminal_action, terminal_time, assessment)) = terminal {
+            let (outcome, receipt_ref, receipt_sha256) = match &terminal_action.action {
+                ScheduleAction::AttemptReconciled { outcome, receipt_ref, receipt_sha256, .. } => {
+                    (*outcome, receipt_ref.clone(), receipt_sha256.clone())
+                }
+                _ => unreachable!("terminal action index is typed"),
+            };
+            let (exact_start_action_id, qualification) = match &terminal_action.evidence {
+                Some(ActionEvidence::TerminalReconciliation { exact_start_action_id, qualification }) => {
+                    (exact_start_action_id.clone(), *qualification)
+                }
+                _ => unreachable!("evidence checked during collection"),
+            };
+            let start_to_terminal = event_order_between(start_time, terminal_time);
+            if let Some(committed_times) = commit_times.get(&(operation_id.clone(), attempt_id.clone())) {
+                for committed_time in committed_times {
+                    match event_order_between(committed_time, terminal_time) {
+                        EventOrder::Before => {}
+                        EventOrder::After | EventOrder::Inconsistent => {
+                            critical = true;
+                            reasons.insert(format!("TERMINAL_PRECEDES_EFFECT_COMMIT:{attempt_id}"));
+                        }
+                        EventOrder::Overlapping | EventOrder::Unknown => {
+                            indeterminate = true;
+                            reasons.insert(format!("EFFECT_COMMIT_TERMINAL_ORDER_UNRESOLVED:{attempt_id}"));
+                        }
+                    }
+                }
+            }
+            if *outcome == ReconciliationOutcome::NotApplied
+                && commit_times.contains_key(&(operation_id.clone(), attempt_id.clone()))
+            {
+                critical = true;
+                reasons.insert(format!("NOT_APPLIED_TERMINAL_CONTRADICTS_EFFECT_COMMIT:{attempt_id}"));
+            }
+            let mapped_outcome = match outcome {
+                ReconciliationOutcome::Applied => Some(ReconciledOperationOutcome::Applied),
+                ReconciliationOutcome::NotApplied => Some(ReconciledOperationOutcome::NotApplied),
+                ReconciliationOutcome::Unknown => None,
+            };
+            if let Some(mapped_outcome) = mapped_outcome {
+                let record = AttemptTerminalReconciliation {
+                    event_id: terminal_action.action_id.clone(),
+                    start_event_id: exact_start_action_id.clone(),
+                    outcome: mapped_outcome,
+                    qualification,
+                    start_to_terminal_order: start_to_terminal,
+                };
+                attempt_terminal_times.insert(attempt_id.clone(), terminal_time.clone());
+                terminal_receipts.push(ProjectedTerminalReconciliation {
+                    action_id: terminal_action.action_id.clone(),
+                    logical_operation_id: operation_id.clone(),
+                    attempt_id: attempt_id.clone(),
+                    exact_start_action_id,
+                    outcome: mapped_outcome,
+                    owner_time: terminal_time.clone(),
+                    receipt_ref: receipt_ref.clone(),
+                    receipt_sha256: receipt_sha256.clone(),
+                    receipt_qualification: assessment.receipt_qualification(),
+                });
+                (Some(record), Some(terminal_time.clone()))
+            } else {
+                indeterminate = true;
+                reasons.insert(format!("TERMINAL_OUTCOME_UNKNOWN:{attempt_id}"));
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
+        if let (Some(terminal), Some(terminal_time)) = (terminal_record.as_ref(), terminal_time.as_ref()) {
+            let linked_commits = commits.iter().filter(|commit| {
+                commit.logical_operation_id == *operation_id
+                    && commit.attempt_id == *attempt_id
+            }).collect::<Vec<_>>();
+            if terminal.outcome == ReconciledOperationOutcome::NotApplied && !linked_commits.is_empty() {
+                critical = true;
+                reasons.insert(format!("NOT_APPLIED_TERMINAL_HAS_EFFECT_COMMIT:{attempt_id}"));
+            }
+            if terminal.outcome == ReconciledOperationOutcome::Applied {
+                for commit in linked_commits {
+                    match event_order_between(&commit.owner_time, terminal_time) {
+                        EventOrder::Before => {}
+                        EventOrder::After | EventOrder::Inconsistent => {
+                            critical = true;
+                            reasons.insert(format!("EFFECT_COMMIT_AFTER_TERMINAL_RECONCILIATION:{attempt_id}"));
+                        }
+                        EventOrder::Overlapping | EventOrder::Unknown => {
+                            indeterminate = true;
+                            reasons.insert(format!("EFFECT_COMMIT_TERMINAL_ORDER_UNRESOLVED:{attempt_id}"));
+                        }
+                    }
+                }
+            }
+        }
+
+        attempts.push(OperationAttemptRecord {
+            identity: AttemptIdentity {
+                logical_operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                retry_of_attempt_id: retry_of.clone(),
+            },
+            start_event_ids: vec![start_event_id],
+            terminal_reconciliation_event_ids: terminal_record.iter().map(|item| item.event_id.clone()).collect(),
+            terminal_reconciliation: terminal_record,
+            stop_discharge_relations: Vec::new(),
+            retry_predecessor_terminal_event_id: None,
+            retry_predecessor_start_event_id: None,
+            retry_predecessor_terminal_to_start_order: None,
+        });
+        let _ = terminal_time;
+    }
+
+    let mut obligations = Vec::<ScopedStopObligation>::new();
+    let mut inventories = Vec::<(AttemptHistoryInventory, String)>::new();
+    let mut inventory_frontier_times = BTreeMap::<String, QualifiedEventTime>::new();
+    let mut stop_trigger_actions = BTreeMap::<String, (&ScheduledAction, StopScope, String, QualifiedEventTime)>::new();
+    let mut latest_policy_actions = BTreeMap::<String, (&ScheduledAction, StopScope, String, QualifiedEventTime)>::new();
+    for action in &canonical_actions {
+        match &action.action {
+            ScheduleAction::StopTriggered { obligation_id, policy_revision } => {
+                if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
+                    critical = true;
+                    reasons.insert(format!("STOP_TRIGGER_NOT_REPLAY_APPLIED:{obligation_id}"));
+                    continue;
+                }
+                let (scope, receipt_ref, receipt_sha256) = match &action.evidence {
+                    Some(ActionEvidence::StopTrigger { scope, receipt_ref, receipt_sha256 }) => {
+                        (scope.clone(), receipt_ref.clone(), receipt_sha256.clone())
+                    }
+                    _ => {
+                        indeterminate = true;
+                        reasons.insert(format!("STOP_TRIGGER_EVIDENCE_MISSING:{obligation_id}"));
+                        continue;
+                    }
+                };
+                let assessment = match receipt_assessment_for_action(&action.action_id, &receipt_ref, &receipt_sha256, receipt_assessments) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{obligation_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{obligation_id}"));
+                        continue;
+                    }
+                };
+                let owner_time = match action_owner_time(schedule, action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{obligation_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{obligation_id}"));
+                        continue;
+                    }
+                };
+                stop_evidence.push(ProjectedStopEvidence {
+                    action_id: action.action_id.clone(),
+                    obligation_id: obligation_id.clone(),
+                    kind: ProjectedStopEvidenceKind::Trigger,
+                    policy_revision: policy_revision.clone(),
+                    scope: scope.clone(),
+                    owner_time: owner_time.clone(),
+                    receipt_ref,
+                    receipt_sha256,
+                    receipt_qualification: assessment.receipt_qualification(),
+                });
+                if stop_trigger_actions.insert(obligation_id.clone(), (action, scope.clone(), policy_revision.clone(), owner_time.clone())).is_some() {
+                    critical = true;
+                    reasons.insert(format!("DUPLICATE_STOP_TRIGGER:{obligation_id}"));
+                    continue;
+                }
+                latest_policy_actions.insert(obligation_id.clone(), (action, scope, policy_revision.clone(), owner_time));
+            }
+            ScheduleAction::StopPolicyRevised { obligation_id, policy_revision } => {
+                if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
+                    critical = true;
+                    reasons.insert(format!("STOP_POLICY_REVISION_NOT_REPLAY_APPLIED:{obligation_id}"));
+                    continue;
+                }
+                let (scope, receipt_ref, receipt_sha256) = match &action.evidence {
+                    Some(ActionEvidence::StopPolicyRevision { scope, receipt_ref, receipt_sha256 }) => {
+                        (scope.clone(), receipt_ref.clone(), receipt_sha256.clone())
+                    }
+                    _ => {
+                        indeterminate = true;
+                        reasons.insert(format!("STOP_POLICY_REVISION_EVIDENCE_MISSING:{obligation_id}"));
+                        continue;
+                    }
+                };
+                let Some((trigger_action, _trigger_scope, _old_policy, trigger_time)) = stop_trigger_actions.get(obligation_id) else {
+                    critical = true;
+                    reasons.insert(format!("STOP_POLICY_REVISION_WITHOUT_TRIGGER:{obligation_id}"));
+                    continue;
+                };
+                let assessment = match receipt_assessment_for_action(&action.action_id, &receipt_ref, &receipt_sha256, receipt_assessments) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{obligation_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{obligation_id}"));
+                        continue;
+                    }
+                };
+                let owner_time = match action_owner_time(schedule, action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{obligation_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{obligation_id}"));
+                        continue;
+                    }
+                };
+                let mut revision_is_ordered = true;
+                match event_order_between(trigger_time, &owner_time) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        revision_is_ordered = false;
+                        reasons.insert(format!("STOP_POLICY_REVISION_PRECEDES_TRIGGER:{obligation_id}"));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        revision_is_ordered = false;
+                        reasons.insert(format!("STOP_POLICY_REVISION_ORDER_UNRESOLVED:{obligation_id}"));
+                    }
+                }
+                if let Some((_previous_action, _previous_scope, _previous_policy, previous_time)) = latest_policy_actions.get(obligation_id) {
+                    match event_order_between(previous_time, &owner_time) {
+                        EventOrder::Before => {}
+                        EventOrder::After | EventOrder::Inconsistent => {
+                            critical = true;
+                            revision_is_ordered = false;
+                            reasons.insert(format!("STOP_POLICY_REVISION_ORDER_CONTRADICTION:{obligation_id}"));
+                        }
+                        EventOrder::Overlapping | EventOrder::Unknown => {
+                            indeterminate = true;
+                            revision_is_ordered = false;
+                            reasons.insert(format!("STOP_POLICY_REVISION_SEQUENCE_UNRESOLVED:{obligation_id}"));
+                        }
+                    }
+                }
+                if revision_is_ordered {
+                    let original_scope = stop_trigger_actions.get(obligation_id)
+                        .map(|entry| &entry.1);
+                    if original_scope.is_some_and(|original| {
+                        !stop_scope_revision_is_monotonic(original, &scope)
+                    }) {
+                        critical = true;
+                        reasons.insert(format!("STOP_POLICY_SCOPE_NARROWED:{obligation_id}"));
+                    } else {
+                        stop_evidence.push(ProjectedStopEvidence {
+                            action_id: action.action_id.clone(),
+                            obligation_id: obligation_id.clone(),
+                            kind: ProjectedStopEvidenceKind::PolicyRevision,
+                            policy_revision: policy_revision.clone(),
+                            scope: scope.clone(),
+                            owner_time: owner_time.clone(),
+                            receipt_ref,
+                            receipt_sha256,
+                            receipt_qualification: assessment.receipt_qualification(),
+                        });
+                        latest_policy_actions.insert(obligation_id.clone(), (action, scope, policy_revision.clone(), owner_time));
+                    }
+                }
+                let _ = trigger_action;
+            }
+            ScheduleAction::AttemptInventoryAttested {
+                scope, inventory_frontier_event_id, attempt_manifest_sha256,
+            } => {
+                if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
+                    critical = true;
+                    reasons.insert("ATTEMPT_INVENTORY_ATTESTATION_NOT_REPLAY_APPLIED".to_owned());
+                    continue;
+                }
+                let (evidence_scope, evidence_frontier, evidence_manifest, receipt_ref, receipt_sha256) =
+                    match &action.evidence {
+                        Some(ActionEvidence::InventoryAttestation {
+                            scope, inventory_frontier_event_id, attempt_manifest_sha256,
+                            receipt_ref, receipt_sha256,
+                        }) => (scope, inventory_frontier_event_id, attempt_manifest_sha256, receipt_ref, receipt_sha256),
+                        _ => {
+                            indeterminate = true;
+                            reasons.insert("ATTEMPT_INVENTORY_RECEIPT_EVIDENCE_MISSING".to_owned());
+                            continue;
+                        }
+                    };
+                if evidence_scope != scope || evidence_frontier != inventory_frontier_event_id
+                    || evidence_manifest != attempt_manifest_sha256
+                {
+                    critical = true;
+                    reasons.insert("ATTEMPT_INVENTORY_EVIDENCE_BINDING_MISMATCH".to_owned());
+                    continue;
+                }
+                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_ref, receipt_sha256, receipt_assessments) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(code.to_owned());
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(code.to_owned());
+                        continue;
+                    }
+                };
+                let inventory_time = match action_owner_time(schedule, action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(code.to_owned());
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(code.to_owned());
+                        continue;
+                    }
+                };
+                let frontier_actions = canonical_actions.iter().filter(|candidate| {
+                    matches!(&candidate.action, ScheduleAction::EventProduced { event_id, .. }
+                        if event_id == inventory_frontier_event_id)
+                }).collect::<Vec<_>>();
+                if frontier_actions.len() != 1 {
+                    critical = true;
+                    reasons.insert("ATTEMPT_INVENTORY_FRONTIER_EVENT_NOT_UNIQUE".to_owned());
+                    continue;
+                }
+                let frontier_action = frontier_actions[0];
+                if record_disposition(&frontier_action.action_id) != Some(SchedulerDisposition::Applied) {
+                    critical = true;
+                    reasons.insert("ATTEMPT_INVENTORY_FRONTIER_EVENT_NOT_REPLAY_APPLIED".to_owned());
+                    continue;
+                }
+                let frontier_time = match action_owner_time(schedule, frontier_action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:INVENTORY_FRONTIER"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:INVENTORY_FRONTIER"));
+                        continue;
+                    }
+                };
+                match event_order_between(&frontier_time, &inventory_time) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert("ATTEMPT_INVENTORY_FRONTIER_AFTER_ATTESTATION".to_owned());
+                        continue;
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert("ATTEMPT_INVENTORY_FRONTIER_ORDER_UNRESOLVED".to_owned());
+                        continue;
+                    }
+                }
+                inventory_frontier_times.insert(inventory_frontier_event_id.clone(), frontier_time);
+                inventory_attestations.push(ProjectedInventoryAttestation {
+                    action_id: action.action_id.clone(),
+                    scope: scope.clone(),
+                    inventory_frontier_event_id: inventory_frontier_event_id.clone(),
+                    attempt_manifest_sha256: attempt_manifest_sha256.clone(),
+                    owner_time: inventory_time.clone(),
+                    receipt_ref: receipt_ref.clone(),
+                    receipt_sha256: receipt_sha256.clone(),
+                    identity: assessment.identity,
+                    digest_integrity: assessment.digest_integrity,
+                    authenticity: assessment.authenticity,
+                    scope_qualification: assessment.scope_qualification,
+                    completeness: assessment.completeness,
+                });
+                inventories.push((AttemptHistoryInventory {
+                    inventory_frontier_event_id: inventory_frontier_event_id.clone(),
+                    attempt_manifest_sha256: attempt_manifest_sha256.clone(),
+                    receipt_ref: receipt_ref.clone(),
+                    receipt_sha256: receipt_sha256.clone(),
+                    scope: scope.clone(),
+                    identity: assessment.identity,
+                    digest_integrity: assessment.digest_integrity,
+                    authenticity: assessment.authenticity,
+                    scope_qualification: assessment.scope_qualification,
+                    completeness: assessment.completeness,
+                }, action.action_id.clone()));
+            }
+            _ => {}
+        }
+    }
+
+    let mut discharged_obligation_ids = BTreeSet::new();
+    let mut discharged_policy_generations = BTreeSet::<(String, String)>::new();
+    for action in &canonical_actions {
+        let ScheduleAction::StopDischarged {
+            obligation_id, trigger_action_id, policy_revision_action_id, policy_revision,
+            receipt_ref, receipt_sha256,
+        } = &action.action else { continue; };
+        if record_disposition(&action.action_id) != Some(SchedulerDisposition::Applied) {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_NOT_REPLAY_APPLIED:{obligation_id}"));
+            continue;
+        }
+        let Some((trigger_action, trigger_scope, _trigger_policy, trigger_time)) = stop_trigger_actions.get(obligation_id) else {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_WITHOUT_TRIGGER:{obligation_id}"));
+            continue;
+        };
+        let Some(discharge_position) = canonical_actions.iter()
+            .position(|candidate| candidate.action_id == action.action_id) else {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_ACTION_NOT_IN_CANONICAL_HISTORY:{obligation_id}"));
+            continue;
+        };
+        let current_policy_action = canonical_actions[..discharge_position].iter().rev().find(|candidate| {
+            match &candidate.action {
+                ScheduleAction::StopTriggered { obligation_id: candidate_id, .. }
+                | ScheduleAction::StopPolicyRevised { obligation_id: candidate_id, .. } => candidate_id == obligation_id,
+                _ => false,
+            }
+        });
+        let Some(current_policy_action) = current_policy_action else {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_WITHOUT_PRIOR_POLICY_ACTION:{obligation_id}"));
+            continue;
+        };
+        let policy_evidence = stop_evidence.iter().find(|evidence| {
+            evidence.action_id == current_policy_action.action_id
+                && evidence.obligation_id == *obligation_id
+                && evidence.kind != ProjectedStopEvidenceKind::Discharge
+        });
+        let Some(policy_evidence) = policy_evidence else {
+            indeterminate = true;
+            reasons.insert(format!("STOP_DISCHARGE_PRIOR_POLICY_NOT_OWNER_QUALIFIED:{obligation_id}"));
+            continue;
+        };
+        let current_scope = &policy_evidence.scope;
+        let current_policy = &policy_evidence.policy_revision;
+        let revision_time = &policy_evidence.owner_time;
+        if trigger_action.action_id != *trigger_action_id
+            || current_policy_action.action_id != *policy_revision_action_id
+            || current_policy != policy_revision
+        {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_ACTION_LINEAGE_MISMATCH:{obligation_id}"));
+            continue;
+        }
+        let (scope, frontier, manifest) = match &action.evidence {
+            Some(ActionEvidence::StopDischarge { scope, inventory_frontier_event_id, attempt_manifest_sha256 }) => {
+                (scope.clone(), inventory_frontier_event_id.clone(), attempt_manifest_sha256.clone())
+            }
+            _ => {
+                indeterminate = true;
+                reasons.insert(format!("STOP_DISCHARGE_INVENTORY_BINDING_MISSING:{obligation_id}"));
+                continue;
+            }
+        };
+        if scope != *current_scope || !stop_scope_revision_is_monotonic(trigger_scope, &scope) {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_SCOPE_MISMATCH_OR_NARROWING:{obligation_id}"));
+            continue;
+        }
+        let inventory_match = inventories.iter().filter(|(inventory, _)| {
+            stop_scope_covers(&inventory.scope, &scope)
+                && inventory.inventory_frontier_event_id == frontier
+                && inventory.attempt_manifest_sha256 == manifest
+        }).collect::<Vec<_>>();
+        if inventory_match.len() != 1 {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_INVENTORY_ATTESTATION_NOT_UNIQUE:{obligation_id}"));
+            continue;
+        }
+        let assessment = match receipt_assessment_for_action(&action.action_id, receipt_ref, receipt_sha256, receipt_assessments) {
+            Ok(value) => value,
+            Err(ProjectionFault::Indeterminate(code)) => {
+                indeterminate = true;
+                reasons.insert(format!("{code}:{obligation_id}"));
+                continue;
+            }
+            Err(ProjectionFault::Critical(code)) => {
+                critical = true;
+                reasons.insert(format!("{code}:{obligation_id}"));
+                continue;
+            }
+        };
+        let discharge_time = match action_owner_time(schedule, action, time_resolutions) {
+            Ok(value) => value,
+            Err(ProjectionFault::Indeterminate(code)) => {
+                indeterminate = true;
+                reasons.insert(format!("{code}:{obligation_id}"));
+                continue;
+            }
+            Err(ProjectionFault::Critical(code)) => {
+                critical = true;
+                reasons.insert(format!("{code}:{obligation_id}"));
+                continue;
+            }
+        };
+        let Some(frontier_time) = inventory_frontier_times.get(&frontier) else {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_FRONTIER_TIME_MISSING:{obligation_id}"));
+            continue;
+        };
+        match event_order_between(trigger_time, frontier_time) {
+            EventOrder::Before => {}
+            EventOrder::After | EventOrder::Inconsistent => {
+                critical = true;
+                reasons.insert(format!("STOP_TRIGGER_AFTER_INVENTORY_FRONTIER:{obligation_id}"));
+                continue;
+            }
+            EventOrder::Overlapping | EventOrder::Unknown => {
+                indeterminate = true;
+                reasons.insert(format!("STOP_TRIGGER_FRONTIER_ORDER_UNRESOLVED:{obligation_id}"));
+                continue;
+            }
+        }
+        match event_order_between(revision_time, frontier_time) {
+            EventOrder::Before => {}
+            EventOrder::After | EventOrder::Inconsistent => {
+                critical = true;
+                reasons.insert(format!("STOP_POLICY_AFTER_INVENTORY_FRONTIER:{obligation_id}"));
+                continue;
+            }
+            EventOrder::Overlapping | EventOrder::Unknown => {
+                indeterminate = true;
+                reasons.insert(format!("STOP_POLICY_FRONTIER_ORDER_UNRESOLVED:{obligation_id}"));
+                continue;
+            }
+        }
+        match event_order_between(revision_time, &discharge_time) {
+            EventOrder::Before => {}
+            EventOrder::After | EventOrder::Inconsistent => {
+                critical = true;
+                reasons.insert(format!("STOP_DISCHARGE_PRECEDES_CURRENT_POLICY:{obligation_id}"));
+                continue;
+            }
+            EventOrder::Overlapping | EventOrder::Unknown => {
+                indeterminate = true;
+                reasons.insert(format!("STOP_DISCHARGE_POLICY_ORDER_UNRESOLVED:{obligation_id}"));
+                continue;
+            }
+        }
+        let trigger_order = event_order_between(trigger_time, &discharge_time);
+        if trigger_order != EventOrder::Before {
+            match trigger_order {
+                EventOrder::After | EventOrder::Inconsistent => {
+                    critical = true;
+                    reasons.insert(format!("STOP_DISCHARGE_PRECEDES_TRIGGER:{obligation_id}"));
+                }
+                EventOrder::Overlapping | EventOrder::Unknown => {
+                    indeterminate = true;
+                    reasons.insert(format!("STOP_DISCHARGE_ORDER_UNRESOLVED:{obligation_id}"));
+                }
+                EventOrder::Before => {}
+            }
+        }
+        stop_evidence.push(ProjectedStopEvidence {
+            action_id: action.action_id.clone(),
+            obligation_id: obligation_id.clone(),
+            kind: ProjectedStopEvidenceKind::Discharge,
+            policy_revision: current_policy.clone(),
+            scope: scope.clone(),
+            owner_time: discharge_time.clone(),
+            receipt_ref: receipt_ref.clone(),
+            receipt_sha256: receipt_sha256.clone(),
+            receipt_qualification: assessment.receipt_qualification(),
+        });
+        let discharge = StopDischargeReceipt {
+            event_id: action.action_id.clone(),
+            obligation_id: obligation_id.clone(),
+            trigger_event_id: trigger_action.action_id.clone(),
+            policy_revision: current_policy.clone(),
+            scope: scope.clone(),
+            receipt_ref: receipt_ref.clone(),
+            receipt_sha256: receipt_sha256.clone(),
+            qualification: assessment.receipt_qualification(),
+            in_flight_reconciliation: assessment.in_flight_reconciliation,
+            in_flight_inventory_frontier_event_id: frontier,
+            in_flight_attempt_manifest_sha256: manifest,
+            trigger_to_discharge_order: trigger_order,
+        };
+        let policy_generation_key = (
+            obligation_id.clone(),
+            current_policy_action.action_id.clone(),
+        );
+        if !discharged_policy_generations.insert(policy_generation_key) {
+            critical = true;
+            reasons.insert(format!("DUPLICATE_STOP_DISCHARGE_FOR_POLICY_GENERATION:{obligation_id}"));
+            continue;
+        }
+        let is_final_policy_generation = latest_policy_actions.get(obligation_id)
+            .is_some_and(|(latest_action, _, _, _)| latest_action.action_id == current_policy_action.action_id);
+        let inventory_action_id = &inventory_match[0].1;
+        if let Some(inventory_action) = schedule.actions.iter().find(|item| item.action_id == *inventory_action_id) {
+            match action_owner_time(schedule, inventory_action, time_resolutions) {
+                Ok(inventory_time) => match event_order_between(&inventory_time, &discharge_time) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert(format!("INVENTORY_ATTESTATION_AFTER_DISCHARGE:{obligation_id}"));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("INVENTORY_ATTESTATION_ORDER_UNRESOLVED:{obligation_id}"));
+                    }
+                },
+                Err(ProjectionFault::Indeterminate(code)) => {
+                    indeterminate = true;
+                    reasons.insert(format!("{code}:{obligation_id}"));
+                }
+                Err(ProjectionFault::Critical(code)) => {
+                    critical = true;
+                    reasons.insert(format!("{code}:{obligation_id}"));
+                }
+            }
+        }
+        if is_final_policy_generation {
+            if !discharged_obligation_ids.insert(obligation_id.clone()) {
+                critical = true;
+                reasons.insert(format!("MULTIPLE_FINAL_STOP_DISCHARGES:{obligation_id}"));
+                continue;
+            }
+            obligations.push(ScopedStopObligation {
+                obligation_id: obligation_id.clone(),
+                trigger_event_id: trigger_action.action_id.clone(),
+                policy_revision: current_policy.clone(),
+                scope,
+                discharge: Some(discharge),
+            });
+        }
+    }
+
+    for (obligation_id, (trigger_action, trigger_scope, _trigger_policy, _trigger_time)) in &stop_trigger_actions {
+        if discharged_obligation_ids.contains(obligation_id) {
+            continue;
+        }
+        let (current_scope, current_policy) = latest_policy_actions.get(obligation_id)
+            .map(|entry| (entry.1.clone(), entry.2.clone()))
+            .unwrap_or_else(|| (trigger_scope.clone(), _trigger_policy.clone()));
+        obligations.push(ScopedStopObligation {
+            obligation_id: obligation_id.clone(),
+            trigger_event_id: trigger_action.action_id.clone(),
+            policy_revision: current_policy,
+            scope: current_scope,
+            discharge: None,
+        });
+        indeterminate = true;
+        reasons.insert(format!("STOP_OBLIGATION_UNDISCHARGED:{obligation_id}"));
+    }
+
+    if inventories.len() != 1 {
+        indeterminate = true;
+        reasons.insert("COMPLETE_ATTEMPT_INVENTORY_NOT_UNIQUE".to_owned());
+    }
+    let inventory = (inventories.len() == 1).then(|| inventories[0].0.clone());
+
+    let attempt_index: BTreeMap<String, usize> = attempts.iter().enumerate()
+        .map(|(index, attempt)| (attempt.identity.attempt_id.clone(), index))
+        .collect();
+
+    for index in 0..attempts.len() {
+        let attempt_id = attempts[index].identity.attempt_id.clone();
+        let logical_id = attempts[index].identity.logical_operation_id.clone();
+        let start_time = attempt_start_times.get(&attempt_id).cloned();
+        if let Some(parent_id) = attempts[index].identity.retry_of_attempt_id.clone() {
+            let parent = attempt_index.get(&parent_id).copied();
+            if let Some(parent_index) = parent {
+                let parent_record = &attempts[parent_index];
+                attempts[index].retry_predecessor_start_event_id = attempts[index].start_event_ids.first().cloned();
+                attempts[index].retry_predecessor_terminal_event_id =
+                    parent_record.terminal_reconciliation.as_ref().map(|terminal| terminal.event_id.clone());
+                if let (Some(parent_terminal_time), Some(current_start_time)) = (
+                    attempt_terminal_times.get(&parent_id),
+                    start_time.as_ref(),
+                ) {
+                    attempts[index].retry_predecessor_terminal_to_start_order =
+                        Some(event_order_between(parent_terminal_time, current_start_time));
+                }
+            }
+        }
+
+        for obligation in obligations.iter().filter(|obligation| {
+            obligation.scope.applies_to(&logical_id)
+        }) {
+            let Some(discharge) = obligation.discharge.as_ref() else { continue; };
+            let discharge_action = schedule.actions.iter().find(|item| item.action_id == discharge.event_id);
+            let Some(discharge_action) = discharge_action else {
+                critical = true;
+                reasons.insert(format!("STOP_DISCHARGE_ACTION_NOT_FOUND:{}", discharge.event_id));
+                continue;
+            };
+            let discharge_time = match action_owner_time(schedule, discharge_action, time_resolutions) {
+                Ok(value) => value,
+                Err(_) => {
+                    indeterminate = true;
+                    reasons.insert(format!("STOP_DISCHARGE_OWNER_TIME_MISSING:{}", discharge.event_id));
+                    continue;
+                }
+            };
+            let Some(start_time) = start_time.as_ref() else {
+                indeterminate = true;
+                reasons.insert(format!("ATTEMPT_START_OWNER_TIME_MISSING:{attempt_id}"));
+                continue;
+            };
+            let discharge_to_start = event_order_between(&discharge_time, start_time);
+            let (terminal_event_id_at_discharge, terminal_to_discharge_order) = if discharge_to_start == EventOrder::After {
+                if let Some(terminal_time) = attempt_terminal_times.get(&attempt_id) {
+                    let terminal_id = attempts[index].terminal_reconciliation.as_ref().map(|item| item.event_id.clone());
+                    (terminal_id, Some(event_order_between(terminal_time, &discharge_time)))
+                } else {
+                    (None, None)
+                }
+            } else {
+                (None, None)
+            };
+            let attempt_start_event_id = attempts[index].start_event_ids[0].clone();
+            attempts[index].stop_discharge_relations.push(AttemptStopDischargeRelation {
+                obligation_id: obligation.obligation_id.clone(),
+                discharge_event_id: discharge.event_id.clone(),
+                attempt_start_event_id,
+                discharge_to_start_order: discharge_to_start,
+                terminal_event_id_at_discharge,
+                terminal_to_discharge_order,
+            });
+        }
+    }
+
+    let mut inventory_snapshot_attempts = Vec::new();
+    if let Some(inventory) = inventory.as_ref() {
+        if let Some(frontier_time) = inventory_frontier_times.get(&inventory.inventory_frontier_event_id) {
+            for attempt in &attempts {
+                let attempt_id = &attempt.identity.attempt_id;
+                let Some(start_time) = attempt_start_times.get(attempt_id) else {
+                    indeterminate = true;
+                    reasons.insert(format!("ATTEMPT_START_OWNER_TIME_MISSING_AT_INVENTORY_CUT:{attempt_id}"));
+                    continue;
+                };
+                match event_order_between(start_time, frontier_time) {
+                    EventOrder::Before => {
+                        // The inventory manifest commits the attempt as it existed
+                        // at this cut. A terminal reconciliation strictly after the
+                        // cut belongs to the append-only delta, not the snapshot.
+                        let mut snapshot_attempt = attempt.clone();
+                        if let Some(terminal_time) = attempt_terminal_times.get(attempt_id) {
+                            match event_order_between(terminal_time, frontier_time) {
+                                EventOrder::Before => {}
+                                EventOrder::After => {
+                                    snapshot_attempt.terminal_reconciliation = None;
+                                    snapshot_attempt.terminal_reconciliation_event_ids.clear();
+                                }
+                                EventOrder::Overlapping | EventOrder::Unknown => {
+                                    indeterminate = true;
+                                    reasons.insert(format!("ATTEMPT_TERMINAL_FRONTIER_ORDER_UNRESOLVED:{attempt_id}"));
+                                    snapshot_attempt.terminal_reconciliation = None;
+                                    snapshot_attempt.terminal_reconciliation_event_ids.clear();
+                                }
+                                EventOrder::Inconsistent => {
+                                    critical = true;
+                                    reasons.insert(format!("ATTEMPT_TERMINAL_FRONTIER_ORDER_INCONSISTENT:{attempt_id}"));
+                                    snapshot_attempt.terminal_reconciliation = None;
+                                    snapshot_attempt.terminal_reconciliation_event_ids.clear();
+                                }
+                            }
+                        }
+                        // The snapshot may only contain stop-discharge relations
+                        // whose exact discharge event was already before the cut.
+                        // Later discharge relations are part of the current delta,
+                        // not evidence that existed at this inventory frontier.
+                        let mut snapshot_relations = Vec::new();
+                        for relation in &attempt.stop_discharge_relations {
+                            let discharge_action = canonical_actions.iter().find(|candidate| {
+                                candidate.action_id == relation.discharge_event_id
+                            });
+                            let Some(discharge_action) = discharge_action else {
+                                critical = true;
+                                reasons.insert(format!(
+                                    "SNAPSHOT_STOP_RELATION_DISCHARGE_MISSING:{}:{}",
+                                    attempt_id, relation.obligation_id
+                                ));
+                                continue;
+                            };
+                            let discharge_time = match action_owner_time(schedule, discharge_action, time_resolutions) {
+                                Ok(value) => value,
+                                Err(ProjectionFault::Indeterminate(code)) => {
+                                    indeterminate = true;
+                                    reasons.insert(format!("{code}:{attempt_id}:SNAPSHOT_STOP_RELATION"));
+                                    continue;
+                                }
+                                Err(ProjectionFault::Critical(code)) => {
+                                    critical = true;
+                                    reasons.insert(format!("{code}:{attempt_id}:SNAPSHOT_STOP_RELATION"));
+                                    continue;
+                                }
+                            };
+                            match event_order_between(&discharge_time, frontier_time) {
+                                EventOrder::Before => snapshot_relations.push(relation.clone()),
+                                EventOrder::After => {}
+                                EventOrder::Overlapping | EventOrder::Unknown => {
+                                    indeterminate = true;
+                                    reasons.insert(format!(
+                                        "SNAPSHOT_STOP_RELATION_FRONTIER_ORDER_UNRESOLVED:{}:{}",
+                                        attempt_id, relation.obligation_id
+                                    ));
+                                }
+                                EventOrder::Inconsistent => {
+                                    critical = true;
+                                    reasons.insert(format!(
+                                        "SNAPSHOT_STOP_RELATION_FRONTIER_ORDER_INCONSISTENT:{}:{}",
+                                        attempt_id, relation.obligation_id
+                                    ));
+                                }
+                            }
+                        }
+                        snapshot_attempt.stop_discharge_relations = snapshot_relations;
+                        inventory_snapshot_attempts.push(snapshot_attempt);
+                    }
+                    EventOrder::After => {
+                        // This attempt is not part of the attested snapshot. It is
+                        // admissible as a later delta only when every applicable
+                        // stop obligation already discharged before its start.
+                        for obligation in obligations.iter().filter(|obligation| {
+                            obligation.scope.applies_to(&attempt.identity.logical_operation_id)
+                        }) {
+                            let relation = attempt.stop_discharge_relations.iter().find(|relation| {
+                                relation.obligation_id == obligation.obligation_id
+                            });
+                            match (obligation.discharge.as_ref(), relation) {
+                                (Some(_), Some(relation)) if relation.discharge_to_start_order == EventOrder::Before => {}
+                                (Some(_), Some(relation)) if matches!(
+                                    relation.discharge_to_start_order,
+                                    EventOrder::After | EventOrder::Inconsistent
+                                ) => {
+                                    critical = true;
+                                    reasons.insert(format!("POST_FRONTIER_ATTEMPT_PRECEDES_STOP_DISCHARGE:{attempt_id}:{}", obligation.obligation_id));
+                                }
+                                (Some(_), Some(_)) => {
+                                    indeterminate = true;
+                                    reasons.insert(format!("POST_FRONTIER_ATTEMPT_STOP_ORDER_UNRESOLVED:{attempt_id}:{}", obligation.obligation_id));
+                                }
+                                (Some(_), None) => {
+                                    critical = true;
+                                    reasons.insert(format!("POST_FRONTIER_ATTEMPT_STOP_RELATION_MISSING:{attempt_id}:{}", obligation.obligation_id));
+                                }
+                                (None, _) => {
+                                    indeterminate = true;
+                                    reasons.insert(format!("POST_FRONTIER_ATTEMPT_UNDISCHARGED_STOP:{attempt_id}:{}", obligation.obligation_id));
+                                }
+                            }
+                        }
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("ATTEMPT_START_FRONTIER_ORDER_UNRESOLVED:{attempt_id}"));
+                    }
+                    EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert(format!("ATTEMPT_START_FRONTIER_ORDER_INCONSISTENT:{attempt_id}"));
+                    }
+                }
+            }
+        } else {
+            critical = true;
+            reasons.insert("ATTEMPT_INVENTORY_FRONTIER_TIME_NOT_RESOLVED".to_owned());
+        }
+    }
+
+    let attempt_lifecycle = validate_attempt_lifecycle(&attempts);
+    if attempt_lifecycle.disposition == EventTraceDisposition::CriticalFailure {
+        critical = true;
+        reasons.extend(attempt_lifecycle.reason_codes.clone());
+    }
+    // A pending sibling operation can be a valid post-discharge delta. The
+    // requested operation's pending attempts are checked by the v0.2 gate below.
+    // Keep the full-history lifecycle report visible without globally serializing
+    // independent work solely because a sibling attempt remains active.
+
+    let inventory = inventory;
+    let start_gate = if let Some(inventory) = inventory.as_ref() {
+        Some(assess_start_under_stop_obligations_with_inventory_cut(
+            logical_operation_id,
+            &attempts,
+            &inventory_snapshot_attempts,
+            inventory,
+            &obligations,
+        ))
+    } else {
+        None
+    };
+    if let Some(gate) = &start_gate {
+        if gate.disposition == EventTraceDisposition::CriticalFailure {
+            critical = true;
+            reasons.extend(gate.reason_codes.clone());
+        } else if gate.disposition == EventTraceDisposition::Indeterminate {
+            indeterminate = true;
+            reasons.extend(gate.reason_codes.clone());
+        }
+    }
+
+    let disposition = if critical {
+        EventTraceDisposition::CriticalFailure
+    } else if indeterminate {
+        EventTraceDisposition::Indeterminate
+    } else {
+        EventTraceDisposition::Safe
+    };
+    let start_gate = start_gate.map(|mut gate| {
+        if disposition != EventTraceDisposition::Safe {
+            gate.start_permitted_by_stop_contract = false;
+            gate.disposition = disposition;
+            gate.reason_codes.extend(reasons.iter().cloned());
+            gate.reason_codes.sort();
+            gate.reason_codes.dedup();
+        }
+        gate
+    });
+    Ok(ActionHistoryProjectionReport {
+        schedule_sha256: Some(replay.schedule_sha256.clone()),
+        replay_sha256: Some(replay.replay_sha256.clone()),
+        disposition,
+        attempts,
+        terminal_reconciliations: terminal_receipts,
+        attempt_lifecycle,
+        obligations,
+        stop_evidence,
+        inventory,
+        inventory_attestations,
+        start_gate,
+        effect_commits: commits,
+        cancellation_acknowledgements,
+        reason_codes: reasons.into_iter().collect(),
+    })
+}
+
 /// Generate a deterministic stop/cancellation/effect-commit race. The
 /// attempt starts before the stop trigger; both schedules then contain a
 /// cancellation request, the selected acknowledgement/commit order, an
@@ -2049,6 +3844,347 @@ mod tests {
                 latest_ns: normalized_timestamp_ns,
             },
         }
+    }
+
+    fn push_clocked_action(
+        actions: &mut Vec<ScheduledAction>,
+        ordinal: &mut u64,
+        at_ns: u64,
+        action: ScheduleAction,
+        owner_time_ref: ActionClockTimeReference,
+        evidence: ActionEvidence,
+    ) -> String {
+        let action_id = format!("action-{ordinal:06}");
+        push_action(actions, ordinal, at_ns, action);
+        let scheduled = actions.last_mut().expect("action was pushed");
+        scheduled.owner_time_ref = Some(owner_time_ref);
+        scheduled.evidence = Some(evidence);
+        action_id
+    }
+
+    fn push_test_clock_mapping(
+        actions: &mut Vec<ScheduledAction>,
+        ordinal: &mut u64,
+        at_ns: u64,
+        local_tick_ns: u64,
+    ) -> String {
+        let action_id = format!("action-{ordinal:06}");
+        push_action(
+            actions,
+            ordinal,
+            at_ns,
+            ScheduleAction::ClockAdvance {
+                clock_domain: "action-clock".to_owned(),
+                basis_id: "action-basis".to_owned(),
+                epoch: "action-epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                local_tick_ns,
+                offset_ns: 0,
+                uncertainty_ns: 0,
+                calibration_id: format!("cal-{local_tick_ns}"),
+                mapping_valid_from_ns: 0,
+                mapping_valid_through_ns: 10_000,
+                mapping_receipt_ref: format!("synthetic://action-clock/{local_tick_ns}"),
+                mapping_receipt_sha256: "a".repeat(64),
+                qualification: GateState::Pass,
+            },
+        );
+        action_id
+    }
+
+    fn passing_owner_receipt(receipt_ref: &str, receipt_sha256: &str) -> OwnerReceiptAssessment {
+        OwnerReceiptAssessment {
+            receipt_ref: receipt_ref.to_owned(),
+            receipt_sha256: receipt_sha256.to_owned(),
+            identity: GateState::Pass,
+            digest_integrity: GateState::Pass,
+            authenticity: GateState::Pass,
+            scope_qualification: GateState::Pass,
+            completeness: GateState::Pass,
+            semantic_qualification: GateState::Pass,
+            in_flight_reconciliation: GateState::Pass,
+        }
+    }
+
+    #[derive(serde::Deserialize)]
+    struct ActionHistoryFixtureInput {
+        fixture_version: String,
+        schedule: VirtualSchedule,
+        logical_operation_id: String,
+        time_resolutions: Vec<ActionHistoryTimeResolutionInput>,
+        owner_receipt_assessments: BTreeMap<String, OwnerReceiptAssessment>,
+        expected: ActionHistoryExpected,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct ActionHistoryTimeResolutionInput {
+        mapping_action_id: String,
+        local_timestamp_ns: u64,
+        qualified_time: QualifiedEventTime,
+    }
+
+    #[derive(serde::Deserialize)]
+    struct ActionHistoryExpected {
+        disposition: String,
+        attempt_count: usize,
+        obligation_count: usize,
+        effect_commit_count: usize,
+        start_permitted_by_stop_contract: bool,
+        attempt_manifest_sha256: String,
+    }
+
+    fn action_history_fixture() -> (
+        VirtualSchedule,
+        BTreeMap<(String, u64), QualifiedEventTime>,
+        BTreeMap<String, OwnerReceiptAssessment>,
+        String,
+    ) {
+        let mut actions = Vec::new();
+        let mut ordinal = 0_u64;
+        let mut resolutions = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        let operation_id = "robot-1".to_owned();
+        let attempt_id = "attempt-1".to_owned();
+        let obligation_id = "global-stop-1".to_owned();
+
+        let start_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 1, 100);
+        let start_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::EffectAttempted {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: start_mapping.clone(),
+                local_timestamp_ns: 100,
+            },
+            ActionEvidence::AttemptStart { retry_of_attempt_id: None },
+        );
+        resolutions.insert(
+            (start_mapping.clone(), 100),
+            qualified_resolution_from_fixture(
+                &actions, &start_mapping, 100, 1_000,
+            ),
+        );
+
+        let commit_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 3, 110);
+        let commit_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::EffectCommitted {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                effect_id: "effect-1".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: commit_mapping.clone(),
+                local_timestamp_ns: 110,
+            },
+            ActionEvidence::EffectCommit {
+                receipt_ref: "synthetic://effect-commit/1".to_owned(),
+                receipt_sha256: "b".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (commit_mapping.clone(), 110),
+            qualified_resolution_from_fixture(&actions, &commit_mapping, 110, 1_050),
+        );
+        receipts.insert(commit_action_id, passing_owner_receipt("synthetic://effect-commit/1", &"b".repeat(64)));
+
+        let terminal_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 5, 120);
+        let terminal_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            6,
+            ScheduleAction::AttemptReconciled {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                outcome: ReconciliationOutcome::Applied,
+                receipt_ref: "synthetic://terminal/1".to_owned(),
+                receipt_sha256: "c".repeat(64),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: terminal_mapping.clone(),
+                local_timestamp_ns: 120,
+            },
+            ActionEvidence::TerminalReconciliation {
+                exact_start_action_id: start_action_id.clone(),
+                qualification: GateState::Pass,
+            },
+        );
+        resolutions.insert(
+            (terminal_mapping.clone(), 120),
+            qualified_resolution_from_fixture(&actions, &terminal_mapping, 120, 1_100),
+        );
+        receipts.insert(terminal_action_id.clone(), passing_owner_receipt("synthetic://terminal/1", &"c".repeat(64)));
+
+        let trigger_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 7, 130);
+        let trigger_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            8,
+            ScheduleAction::StopTriggered {
+                obligation_id: obligation_id.clone(),
+                policy_revision: "policy-v1".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: trigger_mapping.clone(),
+                local_timestamp_ns: 130,
+            },
+            ActionEvidence::StopTrigger {
+                scope: StopScope::Global,
+                receipt_ref: "synthetic://stop-trigger/1".to_owned(),
+                receipt_sha256: "d".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (trigger_mapping.clone(), 130),
+            qualified_resolution_from_fixture(&actions, &trigger_mapping, 130, 1_150),
+        );
+        receipts.insert(trigger_action_id.clone(), passing_owner_receipt("synthetic://stop-trigger/1", &"d".repeat(64)));
+
+        let frontier_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 9, 135);
+        let inventory_frontier = "inventory-frontier-1".to_owned();
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            10,
+            ScheduleAction::EventProduced {
+                event_id: inventory_frontier.clone(),
+                clock_domain: "action-clock".to_owned(),
+                basis_id: "action-basis".to_owned(),
+                epoch: "action-epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                clock_mapping_action_id: frontier_mapping.clone(),
+                source_timestamp_ns: 132,
+                causal_predecessors: Vec::new(),
+            },
+        );
+        let frontier_action = actions.last_mut().expect("frontier event action");
+        frontier_action.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: frontier_mapping.clone(),
+            local_timestamp_ns: 132,
+        });
+        resolutions.insert(
+            (frontier_mapping.clone(), 132),
+            qualified_resolution_from_fixture(&actions, &frontier_mapping, 132, 1_160),
+        );
+
+        let inventory_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 11, 135);
+        let discharge_action_id = format!("action-{:06}", ordinal + 2);
+        let mut expected_attempt = OperationAttemptRecord {
+            identity: AttemptIdentity {
+                logical_operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                retry_of_attempt_id: None,
+            },
+            start_event_ids: vec![start_action_id.clone()],
+            terminal_reconciliation_event_ids: vec![terminal_action_id.clone()],
+            terminal_reconciliation: Some(AttemptTerminalReconciliation {
+                event_id: terminal_action_id.clone(),
+                start_event_id: start_action_id.clone(),
+                outcome: ReconciledOperationOutcome::Applied,
+                qualification: GateState::Pass,
+                start_to_terminal_order: EventOrder::Before,
+            }),
+            // This inventory frontier is before discharge; the manifest must
+            // not contain the future attempt-to-discharge relation.
+            stop_discharge_relations: Vec::new(),
+            retry_predecessor_terminal_event_id: None,
+            retry_predecessor_start_event_id: None,
+            retry_predecessor_terminal_to_start_order: None,
+        };
+        let manifest = crate::event_order_v0_2::canonical_attempt_manifest_sha256(
+            std::slice::from_ref(&expected_attempt),
+        ).expect("canonical attempt manifest");
+        expected_attempt.stop_discharge_relations.sort_by(|a, b| a.obligation_id.cmp(&b.obligation_id));
+
+        let inventory_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            12,
+            ScheduleAction::AttemptInventoryAttested {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: inventory_frontier.clone(),
+                attempt_manifest_sha256: manifest.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: inventory_mapping.clone(),
+                local_timestamp_ns: 135,
+            },
+            ActionEvidence::InventoryAttestation {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: inventory_frontier.clone(),
+                attempt_manifest_sha256: manifest.clone(),
+                receipt_ref: "synthetic://inventory-attestation/1".to_owned(),
+                receipt_sha256: "e".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (inventory_mapping.clone(), 135),
+            qualified_resolution_from_fixture(&actions, &inventory_mapping, 135, 1_175),
+        );
+        receipts.insert(inventory_action_id, passing_owner_receipt("synthetic://inventory-attestation/1", &"e".repeat(64)));
+
+        let discharge_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 13, 140);
+        let discharge_action_id_actual = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            14,
+            ScheduleAction::StopDischarged {
+                obligation_id,
+                trigger_action_id: trigger_action_id.clone(),
+                policy_revision_action_id: trigger_action_id,
+                policy_revision: "policy-v1".to_owned(),
+                receipt_ref: "synthetic://stop-discharge/1".to_owned(),
+                receipt_sha256: "f".repeat(64),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: discharge_mapping.clone(),
+                local_timestamp_ns: 140,
+            },
+            ActionEvidence::StopDischarge {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: inventory_frontier,
+                attempt_manifest_sha256: manifest.clone(),
+            },
+        );
+        assert_eq!(discharge_action_id, discharge_action_id_actual);
+        resolutions.insert(
+            (discharge_mapping.clone(), 140),
+            qualified_resolution_from_fixture(&actions, &discharge_mapping, 140, 1_200),
+        );
+        receipts.insert(discharge_action_id_actual, passing_owner_receipt("synthetic://stop-discharge/1", &"f".repeat(64)));
+
+        let schedule = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 0x2026_1123,
+            scenario_family: "qualified_attempt_terminal_stop_inventory".to_owned(),
+            actions,
+        };
+        (schedule, resolutions, receipts, manifest)
+    }
+
+    fn qualified_resolution_from_fixture(
+        actions: &[ScheduledAction],
+        mapping_action_id: &str,
+        local_timestamp_ns: u64,
+        normalized_ns: i64,
+    ) -> QualifiedEventTime {
+        let temporary = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 1,
+            scenario_family: "test_resolution".to_owned(),
+            actions: actions.to_vec(),
+        };
+        qualified_resolution(&temporary, mapping_action_id, local_timestamp_ns, normalized_ns)
     }
 
     fn owner_time_resolutions(schedule: &VirtualSchedule) -> BTreeMap<(String, u64), QualifiedEventTime> {
@@ -2685,6 +4821,1469 @@ mod tests {
             matches!(record.action, ScheduleAction::EventObserved { .. })
                 && record.disposition == SchedulerDisposition::ClockTimestampBeyondQualifiedTick
         }));
+    }
+
+    #[test]
+    fn owner_time_sidecar_must_match_native_event_clock_fields() {
+        let mut schedule = generate_clocked_observation_persistence_schedule(0x2026_1127)
+            .expect("clocked schedule");
+        let observation = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::EventObserved { .. })
+        }).expect("observation");
+        let (mapping_id, timestamp) = match &observation.action {
+            ScheduleAction::EventObserved { clock_mapping_action_id, observed_at_ns, .. } => {
+                (clock_mapping_action_id.clone(), *observed_at_ns)
+            }
+            _ => unreachable!("selected observation"),
+        };
+        observation.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: mapping_id,
+            local_timestamp_ns: timestamp + 1,
+        });
+        assert!(matches!(
+            validate_schedule(&schedule),
+            Err(ReplayError::ActionEvidenceMismatch("owner_time_payload_binding"))
+        ));
+    }
+
+    #[test]
+    fn retry_requires_exact_qualified_not_applied_predecessor() {
+        for (outcome, expected) in [
+            (ReconciliationOutcome::NotApplied, SchedulerDisposition::Applied),
+            (ReconciliationOutcome::Applied, SchedulerDisposition::PreconditionViolation),
+            (ReconciliationOutcome::Unknown, SchedulerDisposition::PreconditionViolation),
+        ] {
+            let mut schedule = generate_delivery_schedule(0x2026_1125, 1).expect("base schedule");
+            let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+            let operation_id = "retry-op".to_owned();
+            let predecessor_id = "attempt-1".to_owned();
+            let retry_id = "attempt-2".to_owned();
+            let start_action_id = format!("action-{ordinal:06}");
+            push_action(
+                &mut schedule.actions,
+                &mut ordinal,
+                20_000,
+                ScheduleAction::EffectAttempted {
+                    operation_id: operation_id.clone(),
+                    attempt_id: predecessor_id.clone(),
+                },
+            );
+            if let Some(start) = schedule.actions.iter_mut().find(|item| item.action_id == start_action_id) {
+                start.evidence = Some(ActionEvidence::AttemptStart { retry_of_attempt_id: None });
+            }
+            push_action(
+                &mut schedule.actions,
+                &mut ordinal,
+                20_001,
+                ScheduleAction::AttemptReconciled {
+                    operation_id: operation_id.clone(),
+                    attempt_id: predecessor_id.clone(),
+                    outcome,
+                    receipt_ref: "synthetic://retry-predecessor-terminal".to_owned(),
+                    receipt_sha256: "a".repeat(64),
+                },
+            );
+            if let Some(terminal) = schedule.actions.iter_mut().find(|item| {
+                matches!(&item.action, ScheduleAction::AttemptReconciled { attempt_id, .. } if attempt_id == &predecessor_id)
+            }) {
+                terminal.evidence = Some(ActionEvidence::TerminalReconciliation {
+                    exact_start_action_id: start_action_id.clone(),
+                    qualification: GateState::Pass,
+                });
+            }
+            let retry_action_id = format!("action-{ordinal:06}");
+            push_action(
+                &mut schedule.actions,
+                &mut ordinal,
+                20_002,
+                ScheduleAction::EffectAttempted {
+                    operation_id,
+                    attempt_id: retry_id.clone(),
+                },
+            );
+            if let Some(retry) = schedule.actions.iter_mut().find(|item| item.action_id == retry_action_id) {
+                retry.evidence = Some(ActionEvidence::AttemptStart {
+                    retry_of_attempt_id: Some(predecessor_id.clone()),
+                });
+            }
+            validate_schedule(&schedule).expect("retry schedule is structurally valid");
+            let replay = replay_virtual_schedule(&schedule).expect("retry replay");
+            let retry_record = replay.records.iter().find(|record| {
+                record.action_id == retry_action_id
+            }).expect("retry action record");
+            assert_eq!(retry_record.disposition, expected, "outcome {outcome:?}");
+        }
+    }
+
+    #[test]
+    fn cancellation_request_without_attempt_start_is_not_applied() {
+        let mut schedule = generate_delivery_schedule(0x2026_1130, 1)
+            .expect("base deterministic schedule");
+        let mut ordinal = schedule.actions.iter().map(|action| action.ordinal).max().unwrap_or(0) + 1;
+        push_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            20_000,
+            ScheduleAction::CancellationRequested {
+                operation_id: "missing-operation".to_owned(),
+                attempt_id: "missing-attempt".to_owned(),
+            },
+        );
+        validate_schedule(&schedule).expect("request without start is a semantic fault input");
+        let report = replay_virtual_schedule(&schedule).expect("fault schedule replays");
+        let request = report.records.iter().find(|record| {
+            matches!(record.action, ScheduleAction::CancellationRequested {
+                attempt_id, ..
+            } if attempt_id == "missing-attempt")
+        }).expect("cancellation request record");
+        assert_eq!(request.disposition, SchedulerDisposition::PreconditionViolation);
+    }
+
+    #[test]
+    fn cancellation_acknowledgement_does_not_create_not_applied_terminal() {
+        let mut actions = Vec::new();
+        let mut ordinal = 0_u64;
+        let mut resolutions = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        let operation_id = "cancelled-operation".to_owned();
+        let attempt_id = "cancelled-attempt".to_owned();
+        let mapping_id = push_test_clock_mapping(&mut actions, &mut ordinal, 1, 200);
+        let start_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::EffectAttempted {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 100,
+            },
+            ActionEvidence::AttemptStart { retry_of_attempt_id: None },
+        );
+        let request_action_id = format!("action-{ordinal:06}");
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            3,
+            ScheduleAction::CancellationRequested {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+            },
+        );
+        let request_action = actions.iter_mut()
+            .find(|action| action.action_id == request_action_id)
+            .expect("cancellation request action");
+        request_action.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: mapping_id.clone(),
+            local_timestamp_ns: 125,
+        });
+        let acknowledgement_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::CancellationAcknowledged {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                accepted: true,
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 150,
+            },
+            ActionEvidence::CancellationAcknowledgement {
+                receipt_ref: "synthetic://cancel-ack-only".to_owned(),
+                receipt_sha256: "1".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 100),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 100, 1_000),
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 125),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 125, 1_025),
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 150),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 150, 1_050),
+        );
+        receipts.insert(acknowledgement_action_id, passing_owner_receipt("synthetic://cancel-ack-only", &"1".repeat(64)));
+        let schedule = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 0x2026_1126,
+            scenario_family: "cancel_ack_is_not_terminal_reconciliation".to_owned(),
+            actions,
+        };
+        let report = project_action_history(&schedule, &operation_id, &resolutions, &receipts)
+            .expect("projection assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::Indeterminate);
+        assert_eq!(report.cancellation_acknowledgements.len(), 1);
+        assert!(!report.cancellation_acknowledgements[0].establishes_not_applied);
+        assert!(report.attempts.iter().any(|attempt| {
+            attempt.identity.attempt_id == attempt_id
+                && attempt.terminal_reconciliation.is_none()
+                && attempt.start_event_ids == vec![start_action_id.clone()]
+        }));
+        assert!(report.reason_codes.iter().any(|code| code == "ATTEMPT_OUTCOME_UNRECONCILED:cancelled-attempt"));
+
+        // The simulator order is unchanged, but the owner-qualified request
+        // time is moved before the attempt start. Projection must catch this
+        // temporal contradiction rather than trusting scheduler order.
+        let mut contradictory_schedule = schedule.clone();
+        let request = contradictory_schedule.actions.iter_mut().find(|item| {
+            matches!(item.action, ScheduleAction::CancellationRequested { .. })
+        }).expect("cancellation request");
+        let mapping_id = request.owner_time_ref.as_ref()
+            .expect("request owner time")
+            .clock_mapping_action_id.clone();
+        request.owner_time_ref.as_mut().expect("request owner time").local_timestamp_ns = 90;
+        let mut contradictory_resolutions = resolutions.clone();
+        contradictory_resolutions.insert(
+            (mapping_id.clone(), 90),
+            qualified_resolution_from_fixture(&contradictory_schedule, &mapping_id, 90, 990),
+        );
+        let contradictory = project_action_history(
+            &contradictory_schedule, &operation_id, &contradictory_resolutions, &receipts,
+        ).expect("contradictory owner time assessment");
+        assert_eq!(contradictory.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(contradictory.reason_codes.iter().any(|code| {
+            code == "CANCELLATION_REQUEST_PRECEDES_ATTEMPT_START:cancelled-attempt"
+        }));
+    }
+
+    #[test]
+    fn accepted_cancellation_cannot_coexist_with_effect_commit() {
+        let (mut schedule, mut resolutions, mut receipts, _) = action_history_fixture();
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let operation_id = "robot-1".to_owned();
+        let attempt_id = "attempt-1".to_owned();
+        let mapping_id = push_test_clock_mapping(&mut schedule.actions, &mut ordinal, 3, 200);
+        let cancellation_mapping = schedule.actions.iter_mut()
+            .find(|item| item.action_id == mapping_id)
+            .expect("cancellation clock mapping");
+        if let ScheduleAction::ClockAdvance { clock_domain, basis_id, .. } = &mut cancellation_mapping.action {
+            *clock_domain = "cancellation-clock".to_owned();
+            *basis_id = "cancellation-basis".to_owned();
+        }
+        let request_action_id = format!("action-{ordinal:06}");
+        push_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::CancellationRequested {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+            },
+        );
+        let request = schedule.actions.iter_mut()
+            .find(|item| item.action_id == request_action_id)
+            .expect("request action");
+        request.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: mapping_id.clone(),
+            local_timestamp_ns: 150,
+        });
+        let acknowledgement_action_id = push_clocked_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::CancellationAcknowledged {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                accepted: true,
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 160,
+            },
+            ActionEvidence::CancellationAcknowledgement {
+                receipt_ref: "synthetic://cancel-after-commit".to_owned(),
+                receipt_sha256: "9".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 150),
+            qualified_resolution_from_fixture(&schedule.actions, &mapping_id, 150, 1_075),
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 160),
+            qualified_resolution_from_fixture(&schedule.actions, &mapping_id, 160, 1_080),
+        );
+        receipts.insert(
+            acknowledgement_action_id,
+            passing_owner_receipt("synthetic://cancel-after-commit", &"9".repeat(64)),
+        );
+        let report = project_action_history(&schedule, &operation_id, &resolutions, &receipts)
+            .expect("contradictory cancellation/commit assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert_eq!(report.cancellation_acknowledgements.len(), 1);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "CANCELLATION_ACKNOWLEDGED_AFTER_COMMIT:attempt-1"
+                || code == "ACCEPTED_CANCELLATION_CONTRADICTS_EFFECT_COMMIT:attempt-1"
+        }));
+        assert!(!report.cancellation_acknowledgements[0].establishes_not_applied);
+    }
+
+    #[test]
+    fn historical_discharge_is_valid_for_its_policy_but_does_not_clear_a_later_revision() {
+        let mut actions = Vec::new();
+        let mut ordinal = 0_u64;
+        let mut resolutions = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        let obligation_id = "revised-obligation".to_owned();
+        let mapping_id = push_test_clock_mapping(&mut actions, &mut ordinal, 1, 1_000);
+        let trigger_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::StopTriggered {
+                obligation_id: obligation_id.clone(),
+                policy_revision: "policy-v1".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 100,
+            },
+            ActionEvidence::StopTrigger {
+                scope: StopScope::Global,
+                receipt_ref: "synthetic://revision-test/trigger".to_owned(),
+                receipt_sha256: "a".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 100),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 100, 1_000),
+        );
+        receipts.insert(
+            trigger_id.clone(),
+            passing_owner_receipt("synthetic://revision-test/trigger", &"a".repeat(64)),
+        );
+
+        let frontier_id = "revision-frontier".to_owned();
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            3,
+            ScheduleAction::EventProduced {
+                event_id: frontier_id.clone(),
+                clock_domain: "action-clock".to_owned(),
+                basis_id: "action-basis".to_owned(),
+                epoch: "action-epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                clock_mapping_action_id: mapping_id.clone(),
+                source_timestamp_ns: 110,
+                causal_predecessors: Vec::new(),
+            },
+        );
+        actions.last_mut().expect("frontier action").owner_time_ref =
+            Some(ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 110,
+            });
+        resolutions.insert(
+            (mapping_id.clone(), 110),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 110, 1_020),
+        );
+
+        let empty_manifest = crate::event_order_v0_2::canonical_attempt_manifest_sha256(&[])
+            .expect("empty complete attempt manifest");
+        let inventory_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::AttemptInventoryAttested {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: frontier_id.clone(),
+                attempt_manifest_sha256: empty_manifest.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 120,
+            },
+            ActionEvidence::InventoryAttestation {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: frontier_id.clone(),
+                attempt_manifest_sha256: empty_manifest.clone(),
+                receipt_ref: "synthetic://revision-test/inventory".to_owned(),
+                receipt_sha256: "b".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 120),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 120, 1_030),
+        );
+        receipts.insert(
+            inventory_id,
+            passing_owner_receipt("synthetic://revision-test/inventory", &"b".repeat(64)),
+        );
+
+        let historical_discharge_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            5,
+            ScheduleAction::StopDischarged {
+                obligation_id: obligation_id.clone(),
+                trigger_action_id: trigger_id.clone(),
+                policy_revision_action_id: trigger_id.clone(),
+                policy_revision: "policy-v1".to_owned(),
+                receipt_ref: "synthetic://revision-test/discharge-v1".to_owned(),
+                receipt_sha256: "c".repeat(64),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 130,
+            },
+            ActionEvidence::StopDischarge {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: frontier_id.clone(),
+                attempt_manifest_sha256: empty_manifest.clone(),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 130),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 130, 1_040),
+        );
+        receipts.insert(
+            historical_discharge_id,
+            passing_owner_receipt("synthetic://revision-test/discharge-v1", &"c".repeat(64)),
+        );
+
+        let revision_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            6,
+            ScheduleAction::StopPolicyRevised {
+                obligation_id: obligation_id.clone(),
+                policy_revision: "policy-v2".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 140,
+            },
+            ActionEvidence::StopPolicyRevision {
+                scope: StopScope::Global,
+                receipt_ref: "synthetic://revision-test/policy-v2".to_owned(),
+                receipt_sha256: "d".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 140),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 140, 1_050),
+        );
+        receipts.insert(
+            revision_id,
+            passing_owner_receipt("synthetic://revision-test/policy-v2", &"d".repeat(64)),
+        );
+
+        let schedule = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 0x2026_1131,
+            scenario_family: "historical_stop_discharge_then_policy_revision".to_owned(),
+            actions,
+        };
+        let report = project_action_history(
+            &schedule,
+            "robot-not-started",
+            &resolutions,
+            &receipts,
+        ).expect("historical discharge projection");
+        assert_ne!(report.disposition, EventTraceDisposition::Safe);
+        assert_eq!(report.obligations.len(), 1);
+        assert_eq!(report.obligations[0].policy_revision, "policy-v2");
+        assert!(report.obligations[0].discharge.is_none());
+        assert!(report.stop_evidence.iter().any(|evidence| {
+            evidence.kind == ProjectedStopEvidenceKind::Discharge
+                && evidence.policy_revision == "policy-v1"
+        }));
+        assert!(report.reason_codes.iter().any(|code| code == "STOP_OBLIGATION_UNDISCHARGED:revised-obligation"));
+        assert!(!report.reason_codes.iter().any(|code| {
+            code == "STOP_DISCHARGE_ACTION_LINEAGE_MISMATCH:revised-obligation"
+        }));
+    }
+
+    #[test]
+    fn undischarged_scope_widening_preserves_the_expanded_scope() {
+        let mut actions = Vec::new();
+        let mut ordinal = 0_u64;
+        let mut resolutions = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        let obligation_id = "widened-obligation".to_owned();
+        let mapping_id = push_test_clock_mapping(&mut actions, &mut ordinal, 1, 1_000);
+        let original_scope = StopScope::LogicalOperations(
+            ["robot-1".to_owned()].into_iter().collect(),
+        );
+        let expanded_scope = StopScope::LogicalOperations(
+            ["robot-1".to_owned(), "robot-2".to_owned()].into_iter().collect(),
+        );
+        let trigger_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::StopTriggered {
+                obligation_id: obligation_id.clone(),
+                policy_revision: "policy-v1".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 100,
+            },
+            ActionEvidence::StopTrigger {
+                scope: original_scope,
+                receipt_ref: "synthetic://widening/trigger".to_owned(),
+                receipt_sha256: "1".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 100),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 100, 1_000),
+        );
+        receipts.insert(
+            trigger_id,
+            passing_owner_receipt("synthetic://widening/trigger", &"1".repeat(64)),
+        );
+        let revision_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            3,
+            ScheduleAction::StopPolicyRevised {
+                obligation_id: obligation_id.clone(),
+                policy_revision: "policy-v2".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 110,
+            },
+            ActionEvidence::StopPolicyRevision {
+                scope: expanded_scope.clone(),
+                receipt_ref: "synthetic://widening/policy-v2".to_owned(),
+                receipt_sha256: "2".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 110),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 110, 1_010),
+        );
+        receipts.insert(
+            revision_id,
+            passing_owner_receipt("synthetic://widening/policy-v2", &"2".repeat(64)),
+        );
+        let schedule = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 0x2026_1132,
+            scenario_family: "undischarged_stop_scope_widening".to_owned(),
+            actions,
+        };
+        let report = project_action_history(
+            &schedule,
+            "robot-2",
+            &resolutions,
+            &receipts,
+        ).expect("scope widening projection");
+        assert_eq!(report.disposition, EventTraceDisposition::Indeterminate);
+        assert_eq!(report.obligations.len(), 1);
+        assert_eq!(report.obligations[0].policy_revision, "policy-v2");
+        assert_eq!(report.obligations[0].scope, expanded_scope);
+        assert!(report.obligations[0].discharge.is_none());
+        assert!(report.reason_codes.iter().any(|code| code == "STOP_OBLIGATION_UNDISCHARGED:widened-obligation"));
+    }
+
+    #[test]
+    fn action_projection_rejects_inventory_frontier_not_in_event_history() {
+        let (mut schedule, _, _, _) = action_history_fixture();
+        for action in &mut schedule.actions {
+            match &mut action.action {
+                ScheduleAction::AttemptInventoryAttested { inventory_frontier_event_id, .. } => {
+                    *inventory_frontier_event_id = "missing-frontier-event".to_owned();
+                    if let Some(ActionEvidence::InventoryAttestation { inventory_frontier_event_id, .. }) = &mut action.evidence {
+                        *inventory_frontier_event_id = "missing-frontier-event".to_owned();
+                    }
+                }
+                ScheduleAction::StopDischarged { .. } => {
+                    if let Some(ActionEvidence::StopDischarge { inventory_frontier_event_id, .. }) = &mut action.evidence {
+                        *inventory_frontier_event_id = "missing-frontier-event".to_owned();
+                    }
+                }
+                _ => {}
+            }
+        }
+        assert!(matches!(
+            validate_schedule(&schedule),
+            Err(ReplayError::InvalidCausalPredecessor(id)) if id == "missing-frontier-event"
+        ));
+    }
+
+    #[test]
+    fn action_projection_rejects_not_applied_terminal_when_effect_commit_exists() {
+        let (mut schedule, resolutions, receipts, _) = action_history_fixture();
+        for action in &mut schedule.actions {
+            if let ScheduleAction::AttemptReconciled { outcome, .. } = &mut action.action {
+                *outcome = ReconciliationOutcome::NotApplied;
+            }
+        }
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("projection assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "NOT_APPLIED_TERMINAL_CONTRADICTS_EFFECT_COMMIT:attempt-1"
+        }));
+    }
+
+    #[test]
+    fn action_projection_rejects_terminal_ordered_before_effect_commit() {
+        let (schedule, mut resolutions, receipts, _) = action_history_fixture();
+        let terminal_key = schedule.actions.iter().find_map(|action| {
+            if let ScheduleAction::AttemptReconciled { .. } = &action.action {
+                action.owner_time_ref.as_ref().map(|reference| {
+                    (reference.clock_mapping_action_id.clone(), reference.local_timestamp_ns)
+                })
+            } else {
+                None
+            }
+        }).expect("terminal owner-time key");
+        let terminal_time = resolutions.get_mut(&terminal_key).expect("terminal resolution");
+        terminal_time.interval.earliest_ns = 900;
+        terminal_time.interval.latest_ns = 900;
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("projection assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "TERMINAL_PRECEDES_EFFECT_COMMIT:attempt-1"
+        }));
+    }
+
+    #[test]
+    fn action_projection_blocks_incomplete_attempt_inventory_attestation() {
+        let (schedule, resolutions, mut receipts, _) = action_history_fixture();
+        let inventory_action_id = schedule.actions.iter().find_map(|action| {
+            matches!(action.action, ScheduleAction::AttemptInventoryAttested { .. })
+                .then_some(action.action_id.clone())
+        }).expect("inventory attestation action");
+        let mut assessment = receipts.get(&inventory_action_id).copied().expect("inventory receipt result");
+        assessment.completeness = GateState::Fail;
+        receipts.insert(inventory_action_id, assessment);
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("projection assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "ATTEMPT_INVENTORY_COMPLETENESS_FAILED"
+        }));
+    }
+
+    #[test]
+    fn frozen_v0_3_2_action_history_fixture_reconstructs_the_v0_2_contracts() {
+        let raw = include_str!("../../../../benchmarks/engineering-change-impact/event-order-v0.3.2-action-history-known-answer.json");
+        let fixture: ActionHistoryFixtureInput = serde_json::from_str(raw)
+            .expect("frozen v0.3.2 action-history fixture parses");
+        assert_eq!(fixture.fixture_version, "symthaea.event-order-action-history-fixture.v0.3.2");
+        validate_schedule(&fixture.schedule).expect("frozen action-history schedule validates");
+
+        let resolutions = fixture.time_resolutions.into_iter().map(|item| {
+            ((item.mapping_action_id, item.local_timestamp_ns), item.qualified_time)
+        }).collect::<BTreeMap<_, _>>();
+        let report = project_action_history(
+            &fixture.schedule,
+            &fixture.logical_operation_id,
+            &resolutions,
+            &fixture.owner_receipt_assessments,
+        ).expect("frozen action-history projection");
+        let disposition = match report.disposition {
+            EventTraceDisposition::Safe => "safe",
+            EventTraceDisposition::Indeterminate => "indeterminate",
+            EventTraceDisposition::CriticalFailure => "critical_failure",
+        };
+        assert_eq!(disposition, fixture.expected.disposition);
+        assert_eq!(report.attempts.len(), fixture.expected.attempt_count);
+        assert_eq!(report.obligations.len(), fixture.expected.obligation_count);
+        assert_eq!(report.effect_commits.len(), fixture.expected.effect_commit_count);
+        assert_eq!(
+            report.inventory.as_ref().map(|inventory| inventory.attempt_manifest_sha256.as_str()),
+            Some(fixture.expected.attempt_manifest_sha256.as_str()),
+        );
+        assert_eq!(
+            report.start_gate.as_ref().map(|gate| gate.start_permitted_by_stop_contract),
+            Some(fixture.expected.start_permitted_by_stop_contract),
+        );
+        assert!(report.schedule_sha256.as_ref().is_some_and(|digest| digest.len() == 64));
+        assert!(report.replay_sha256.as_ref().is_some_and(|digest| digest.len() == 64));
+        assert_eq!(report.terminal_reconciliations.len(), 1);
+        assert_eq!(report.stop_evidence.len(), 2);
+        assert_eq!(report.inventory_attestations.len(), 1);
+    }
+
+    #[test]
+    fn action_projection_binds_retry_predecessor_terminal_to_child_start() {
+        let mut actions = Vec::new();
+        let mut ordinal = 0_u64;
+        let mut resolutions = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        let operation_id = "robot-retry".to_owned();
+        let predecessor_id = "attempt-predecessor".to_owned();
+        let child_id = "attempt-child".to_owned();
+
+        let clock_mapping_id = push_test_clock_mapping(&mut actions, &mut ordinal, 1, 1_000);
+        let frontier_action_id = format!("action-{ordinal:06}");
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::EventProduced {
+                event_id: "inventory-frontier-retry".to_owned(),
+                clock_domain: "action-clock".to_owned(),
+                basis_id: "action-basis".to_owned(),
+                epoch: "action-epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                clock_mapping_action_id: clock_mapping_id.clone(),
+                source_timestamp_ns: 50,
+                causal_predecessors: Vec::new(),
+            },
+        );
+        let frontier = actions.iter_mut().find(|item| item.action_id == frontier_action_id)
+            .expect("frontier production");
+        frontier.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: clock_mapping_id.clone(),
+            local_timestamp_ns: 50,
+        });
+        resolutions.insert(
+            (clock_mapping_id.clone(), 50),
+            qualified_resolution_from_fixture(&actions, &clock_mapping_id, 50, 500),
+        );
+
+        let predecessor_start_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            3,
+            ScheduleAction::EffectAttempted {
+                operation_id: operation_id.clone(),
+                attempt_id: predecessor_id.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: clock_mapping_id.clone(),
+                local_timestamp_ns: 100,
+            },
+            ActionEvidence::AttemptStart { retry_of_attempt_id: None },
+        );
+        resolutions.insert(
+            (clock_mapping_id.clone(), 100),
+            qualified_resolution_from_fixture(&actions, &clock_mapping_id, 100, 1_000),
+        );
+
+        let terminal_ref = "synthetic://retry/predecessor-terminal".to_owned();
+        let terminal_sha = "a".repeat(64);
+        let terminal_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::AttemptReconciled {
+                operation_id: operation_id.clone(),
+                attempt_id: predecessor_id.clone(),
+                outcome: ReconciliationOutcome::NotApplied,
+                receipt_ref: terminal_ref.clone(),
+                receipt_sha256: terminal_sha.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: clock_mapping_id.clone(),
+                local_timestamp_ns: 200,
+            },
+            ActionEvidence::TerminalReconciliation {
+                exact_start_action_id: predecessor_start_id,
+                qualification: GateState::Pass,
+            },
+        );
+        resolutions.insert(
+            (clock_mapping_id.clone(), 200),
+            qualified_resolution_from_fixture(&actions, &clock_mapping_id, 200, 2_000),
+        );
+        receipts.insert(terminal_action_id.clone(), passing_owner_receipt(&terminal_ref, &terminal_sha));
+
+        let child_start_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            5,
+            ScheduleAction::EffectAttempted {
+                operation_id: operation_id.clone(),
+                attempt_id: child_id.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: clock_mapping_id.clone(),
+                local_timestamp_ns: 300,
+            },
+            ActionEvidence::AttemptStart {
+                retry_of_attempt_id: Some(predecessor_id.clone()),
+            },
+        );
+        resolutions.insert(
+            (clock_mapping_id.clone(), 300),
+            qualified_resolution_from_fixture(&actions, &clock_mapping_id, 300, 3_000),
+        );
+
+        let expected_attempts = vec![
+            OperationAttemptRecord {
+                identity: AttemptIdentity {
+                    logical_operation_id: operation_id.clone(),
+                    attempt_id: predecessor_id.clone(),
+                    retry_of_attempt_id: None,
+                },
+                start_event_ids: vec![actions.iter().find(|item| {
+                    matches!(&item.action, ScheduleAction::EffectAttempted { attempt_id, .. } if attempt_id == &predecessor_id)
+                }).expect("predecessor start").action_id.clone()],
+                terminal_reconciliation_event_ids: vec![terminal_action_id.clone()],
+                terminal_reconciliation: Some(AttemptTerminalReconciliation {
+                    event_id: terminal_action_id.clone(),
+                    start_event_id: actions.iter().find(|item| {
+                        matches!(&item.action, ScheduleAction::EffectAttempted { attempt_id, .. } if attempt_id == &predecessor_id)
+                    }).expect("predecessor start").action_id.clone(),
+                    outcome: ReconciledOperationOutcome::NotApplied,
+                    qualification: GateState::Pass,
+                    start_to_terminal_order: EventOrder::Before,
+                }),
+                stop_discharge_relations: Vec::new(),
+                retry_predecessor_terminal_event_id: None,
+                retry_predecessor_start_event_id: None,
+                retry_predecessor_terminal_to_start_order: None,
+            },
+            OperationAttemptRecord {
+                identity: AttemptIdentity {
+                    logical_operation_id: operation_id.clone(),
+                    attempt_id: child_id.clone(),
+                    retry_of_attempt_id: Some(predecessor_id.clone()),
+                },
+                start_event_ids: vec![child_start_id.clone()],
+                terminal_reconciliation_event_ids: Vec::new(),
+                terminal_reconciliation: None,
+                stop_discharge_relations: Vec::new(),
+                retry_predecessor_terminal_event_id: Some(terminal_action_id.clone()),
+                retry_predecessor_start_event_id: Some(child_start_id.clone()),
+                retry_predecessor_terminal_to_start_order: Some(EventOrder::Before),
+            },
+        ];
+        let manifest = crate::event_order_v0_2::canonical_attempt_manifest_sha256(&expected_attempts)
+            .expect("manifest digest");
+        let inventory_ref = "synthetic://retry/inventory".to_owned();
+        let inventory_sha = "b".repeat(64);
+        let inventory_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            6,
+            ScheduleAction::AttemptInventoryAttested {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: "inventory-frontier-retry".to_owned(),
+                attempt_manifest_sha256: manifest.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: clock_mapping_id.clone(),
+                local_timestamp_ns: 400,
+            },
+            ActionEvidence::InventoryAttestation {
+                scope: StopScope::Global,
+                inventory_frontier_event_id: "inventory-frontier-retry".to_owned(),
+                attempt_manifest_sha256: manifest,
+                receipt_ref: inventory_ref.clone(),
+                receipt_sha256: inventory_sha.clone(),
+            },
+        );
+        resolutions.insert(
+            (clock_mapping_id.clone(), 400),
+            qualified_resolution_from_fixture(&actions, &clock_mapping_id, 400, 4_000),
+        );
+        receipts.insert(inventory_action_id, passing_owner_receipt(&inventory_ref, &inventory_sha));
+
+        let schedule = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 0x2026_1127,
+            scenario_family: "retry_child_start_exact_binding".to_owned(),
+            actions,
+        };
+        validate_schedule(&schedule).expect("retry lineage schedule validates");
+        let replay = replay_virtual_schedule(&schedule).expect("retry replay");
+        assert!(replay.records.iter().any(|record| {
+            record.action_id == child_start_id && record.disposition == SchedulerDisposition::Applied
+        }));
+
+        let report = project_action_history(&schedule, &operation_id, &resolutions, &receipts)
+            .expect("attempt history projection");
+        assert_ne!(report.disposition, EventTraceDisposition::CriticalFailure);
+        let child = report.attempts.iter().find(|attempt| attempt.identity.attempt_id == child_id)
+            .expect("child attempt");
+        assert_eq!(child.retry_predecessor_terminal_event_id.as_deref(), Some(terminal_action_id.as_str()));
+        assert_eq!(child.retry_predecessor_start_event_id.as_deref(), Some(child_start_id.as_str()));
+        assert_eq!(child.retry_predecessor_terminal_to_start_order, Some(EventOrder::Before));
+        assert!(!report.reason_codes.iter().any(|code| code == "RETRY_EVENT_BINDING_INVALID:attempt-child"));
+    }
+
+    #[test]
+    fn broader_inventory_can_attest_a_narrower_stop_obligation() {
+        let (mut schedule, resolutions, receipts, _) = action_history_fixture();
+        let operation_scope = StopScope::LogicalOperations(
+            ["robot-1".to_owned()].into_iter().collect(),
+        );
+        for action in &mut schedule.actions {
+            match action.evidence.as_mut() {
+                Some(ActionEvidence::StopTrigger { scope, .. })
+                | Some(ActionEvidence::StopDischarge { scope, .. }) => {
+                    *scope = operation_scope.clone();
+                }
+                _ => {}
+            }
+        }
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("broader inventory projection");
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+        assert_eq!(report.inventory.as_ref().map(|inventory| inventory.scope.clone()), Some(StopScope::Global));
+        assert_eq!(report.obligations[0].scope, operation_scope);
+        assert!(report.start_gate.as_ref().is_some_and(|gate| gate.start_permitted_by_stop_contract));
+    }
+
+    #[test]
+    fn policy_revision_may_expand_stop_scope_but_not_narrow_it() {
+        let (mut schedule, mut resolutions, mut receipts, _) = action_history_fixture();
+        let operation_scope = StopScope::LogicalOperations(
+            ["robot-1".to_owned()].into_iter().collect(),
+        );
+        for action in &mut schedule.actions {
+            if let Some(ActionEvidence::StopTrigger { scope, .. }) = action.evidence.as_mut() {
+                *scope = operation_scope.clone();
+            }
+        }
+
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let revision_mapping_id = push_test_clock_mapping(
+            &mut schedule.actions, &mut ordinal, 8, 133,
+        );
+        let revision_ref = "synthetic://stop-policy-revision/expanded".to_owned();
+        let revision_sha = "9".repeat(64);
+        let revision_action_id = push_clocked_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            8,
+            ScheduleAction::StopPolicyRevised {
+                obligation_id: "global-stop-1".to_owned(),
+                policy_revision: "policy-v2".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: revision_mapping_id.clone(),
+                local_timestamp_ns: 133,
+            },
+            ActionEvidence::StopPolicyRevision {
+                scope: StopScope::Global,
+                receipt_ref: revision_ref.clone(),
+                receipt_sha256: revision_sha.clone(),
+            },
+        );
+        resolutions.insert(
+            (revision_mapping_id.clone(), 133),
+            qualified_resolution_from_fixture(
+                &schedule.actions, &revision_mapping_id, 133, 1_155,
+            ),
+        );
+        receipts.insert(revision_action_id.clone(), passing_owner_receipt(&revision_ref, &revision_sha));
+
+        let discharge = schedule.actions.iter_mut().find(|item| {
+            matches!(item.action, ScheduleAction::StopDischarged { .. })
+        }).expect("stop discharge action");
+        if let ScheduleAction::StopDischarged {
+            policy_revision_action_id, policy_revision, ..
+        } = &mut discharge.action {
+            *policy_revision_action_id = revision_action_id.clone();
+            *policy_revision = "policy-v2".to_owned();
+        }
+        if let Some(ActionEvidence::StopDischarge { scope, .. }) = discharge.evidence.as_mut() {
+            *scope = StopScope::Global;
+        }
+
+        let expanded = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("monotonic scope expansion assessment");
+        assert_eq!(expanded.disposition, EventTraceDisposition::Safe);
+        assert_eq!(expanded.obligations[0].scope, StopScope::Global);
+        assert!(expanded.stop_evidence.iter().any(|item| {
+            item.kind == ProjectedStopEvidenceKind::PolicyRevision
+                && item.scope == StopScope::Global
+        }));
+
+        let (mut narrowed_schedule, mut narrowed_resolutions, mut narrowed_receipts, _) =
+            action_history_fixture();
+        let mut ordinal = narrowed_schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let narrowed_mapping_id = push_test_clock_mapping(
+            &mut narrowed_schedule.actions, &mut ordinal, 8, 133,
+        );
+        let narrowed_ref = "synthetic://stop-policy-revision/narrowed".to_owned();
+        let narrowed_sha = "8".repeat(64);
+        let narrowed_action_id = push_clocked_action(
+            &mut narrowed_schedule.actions,
+            &mut ordinal,
+            8,
+            ScheduleAction::StopPolicyRevised {
+                obligation_id: "global-stop-1".to_owned(),
+                policy_revision: "policy-v2".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: narrowed_mapping_id.clone(),
+                local_timestamp_ns: 133,
+            },
+            ActionEvidence::StopPolicyRevision {
+                scope: StopScope::LogicalOperations(
+                    ["robot-1".to_owned()].into_iter().collect(),
+                ),
+                receipt_ref: narrowed_ref.clone(),
+                receipt_sha256: narrowed_sha.clone(),
+            },
+        );
+        narrowed_resolutions.insert(
+            (narrowed_mapping_id.clone(), 133),
+            qualified_resolution_from_fixture(
+                &narrowed_schedule.actions, &narrowed_mapping_id, 133, 1_155,
+            ),
+        );
+        narrowed_receipts.insert(narrowed_action_id.clone(), passing_owner_receipt(&narrowed_ref, &narrowed_sha));
+
+        let narrowed_discharge = narrowed_schedule.actions.iter_mut().find(|item| {
+            matches!(item.action, ScheduleAction::StopDischarged { .. })
+        }).expect("stop discharge action");
+        if let ScheduleAction::StopDischarged {
+            policy_revision_action_id, policy_revision, ..
+        } = &mut narrowed_discharge.action {
+            *policy_revision_action_id = narrowed_action_id;
+            *policy_revision = "policy-v2".to_owned();
+        }
+        if let Some(ActionEvidence::StopDischarge { scope, .. }) = narrowed_discharge.evidence.as_mut() {
+            *scope = StopScope::LogicalOperations(
+                ["robot-1".to_owned()].into_iter().collect(),
+            );
+        }
+        let narrowed = project_action_history(
+            &narrowed_schedule, "robot-1", &narrowed_resolutions, &narrowed_receipts,
+        ).expect("scope narrowing assessment");
+        assert_eq!(narrowed.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(narrowed.reason_codes.iter().any(|code| code == "STOP_POLICY_SCOPE_NARROWED:global-stop-1"));
+    }
+
+    #[test]
+    fn global_stop_allows_a_pending_sibling_started_after_discharge_and_inventory_cut() {
+        let (mut schedule, mut resolutions, receipts, expected_manifest) = action_history_fixture();
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let mapping_id = push_test_clock_mapping(
+            &mut schedule.actions,
+            &mut ordinal,
+            13,
+            150,
+        );
+        let sibling_start_id = push_clocked_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            14,
+            ScheduleAction::EffectAttempted {
+                operation_id: "robot-2".to_owned(),
+                attempt_id: "attempt-sibling".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 150,
+            },
+            ActionEvidence::AttemptStart {
+                retry_of_attempt_id: None,
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 150),
+            qualified_resolution_from_fixture(
+                &schedule.actions,
+                &mapping_id,
+                150,
+                1_250,
+            ),
+        );
+        let report = project_action_history(
+            &schedule,
+            "robot-1",
+            &resolutions,
+            &receipts,
+        ).expect("post-discharge sibling projection");
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+        assert_eq!(report.inventory.as_ref().map(|inventory| {
+            inventory.attempt_manifest_sha256.as_str()
+        }), Some(expected_manifest.as_str()));
+        assert_eq!(report.attempts.len(), 2);
+        assert_eq!(report.attempt_lifecycle.disposition, EventTraceDisposition::Indeterminate);
+        assert!(report.attempts.iter().any(|attempt| {
+            attempt.identity.attempt_id == "attempt-sibling"
+                && attempt.start_event_ids == vec![sibling_start_id.clone()]
+                && attempt.terminal_reconciliation.is_none()
+                && attempt.stop_discharge_relations.iter().any(|relation| {
+                    relation.obligation_id == "global-stop-1"
+                        && relation.discharge_to_start_order == EventOrder::Before
+                        && relation.terminal_event_id_at_discharge.is_none()
+                })
+        }));
+        assert!(report.start_gate.as_ref().is_some_and(|gate| {
+            gate.disposition == EventTraceDisposition::Safe
+                && gate.start_permitted_by_stop_contract
+        }));
+    }
+
+    #[test]
+    fn inventory_cut_rejects_an_unattested_attempt_started_before_discharge() {
+        let (mut schedule, mut resolutions, receipts, _) = action_history_fixture();
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let mapping_id = push_test_clock_mapping(
+            &mut schedule.actions,
+            &mut ordinal,
+            13,
+            150,
+        );
+        push_clocked_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            14,
+            ScheduleAction::EffectAttempted {
+                operation_id: "robot-2".to_owned(),
+                attempt_id: "attempt-omitted-before-discharge".to_owned(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 150,
+            },
+            ActionEvidence::AttemptStart {
+                retry_of_attempt_id: None,
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 150),
+            qualified_resolution_from_fixture(
+                &schedule.actions,
+                &mapping_id,
+                150,
+                1_190,
+            ),
+        );
+        let report = project_action_history(
+            &schedule,
+            "robot-1",
+            &resolutions,
+            &receipts,
+        ).expect("unattested pre-discharge attempt assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(!report.start_gate.as_ref().is_some_and(|gate| {
+            gate.start_permitted_by_stop_contract
+        }));
+        assert!(report.reason_codes.iter().any(|code| {
+            code.contains("POST_FRONTIER_ATTEMPT_PRECEDES_STOP_DISCHARGE:attempt-omitted-before-discharge")
+        }));
+    }
+
+    #[test]
+    fn action_history_projection_composes_attempt_stop_and_complete_inventory() {
+        let (schedule, resolutions, receipts, expected_manifest) = action_history_fixture();
+        validate_schedule(&schedule).expect("valid action-history fixture");
+        let report = project_action_history(
+            &schedule,
+            "robot-1",
+            &resolutions,
+            &receipts,
+        ).expect("action-history projection");
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+        assert_eq!(report.attempts.len(), 1);
+        assert_eq!(report.attempt_lifecycle.disposition, EventTraceDisposition::Safe);
+        assert_eq!(
+            report.inventory.as_ref().map(|inventory| inventory.attempt_manifest_sha256.as_str()),
+            Some(expected_manifest.as_str()),
+        );
+        assert_eq!(report.obligations.len(), 1);
+        assert_eq!(report.obligations[0].discharge.as_ref().map(|receipt| receipt.qualification), Some(GateState::Pass));
+        assert!(report.start_gate.as_ref().is_some_and(|gate| gate.start_permitted_by_stop_contract));
+        assert_eq!(report.effect_commits.len(), 1);
+        assert!(report.cancellation_acknowledgements.is_empty());
+        assert_eq!(report.attempts[0].terminal_reconciliation.as_ref().map(|t| t.outcome), Some(ReconciledOperationOutcome::Applied));
+        assert!(report.schedule_sha256.as_ref().is_some_and(|digest| digest.len() == 64));
+        assert!(report.replay_sha256.as_ref().is_some_and(|digest| digest.len() == 64));
+        assert_eq!(report.terminal_reconciliations.len(), 1);
+        assert_eq!(report.terminal_reconciliations[0].exact_start_action_id, report.attempts[0].start_event_ids[0]);
+        assert_eq!(report.terminal_reconciliations[0].receipt_ref, "synthetic://terminal/1");
+        assert_eq!(report.stop_evidence.len(), 2);
+        assert!(report.stop_evidence.iter().any(|item| item.kind == ProjectedStopEvidenceKind::Trigger));
+        assert!(report.stop_evidence.iter().any(|item| item.kind == ProjectedStopEvidenceKind::Discharge));
+        assert_eq!(report.inventory_attestations.len(), 1);
+        assert_eq!(report.inventory_attestations[0].inventory_frontier_event_id, "inventory-frontier-1");
+    }
+
+    #[test]
+    fn composite_projection_never_exposes_start_permission_after_other_gate_failure() {
+        let (schedule, resolutions, mut receipts, _) = action_history_fixture();
+        let commit_action_id = schedule.actions.iter().find_map(|action| {
+            if matches!(action.action, ScheduleAction::EffectCommitted { .. }) {
+                Some(action.action_id.clone())
+            } else {
+                None
+            }
+        }).expect("commit action");
+        let mut receipt = receipts.get(&commit_action_id).cloned().expect("commit verifier result");
+        receipt.authenticity = GateState::Fail;
+        receipts.insert(commit_action_id, receipt);
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("composite projection");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.start_gate.as_ref().is_some_and(|gate| {
+            !gate.start_permitted_by_stop_contract
+                && gate.disposition == EventTraceDisposition::CriticalFailure
+        }));
+    }
+
+    #[test]
+    fn action_history_projection_rejects_effect_commit_before_attempt_start() {
+        let (schedule, mut resolutions, receipts, _) = action_history_fixture();
+        let commit_reference = schedule.actions.iter().find_map(|action| {
+            if matches!(action.action, ScheduleAction::EffectCommitted { .. }) {
+                action.owner_time_ref.as_ref().map(|reference| {
+                    (reference.clock_mapping_action_id.clone(), reference.local_timestamp_ns)
+                })
+            } else {
+                None
+            }
+        }).expect("commit owner time");
+        let commit_time = resolutions.get_mut(&commit_reference).expect("commit resolution");
+        commit_time.interval.earliest_ns = 900;
+        commit_time.interval.latest_ns = 900;
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("commit/start ordering assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "EFFECT_COMMIT_PRECEDES_ATTEMPT_START:attempt-1"
+        }));
+        assert!(report.start_gate.as_ref().is_some_and(|gate| {
+            !gate.start_permitted_by_stop_contract
+        }));
+    }
+
+    #[test]
+    fn action_history_projection_rejects_commit_after_terminal_and_not_applied_with_commit() {
+        let (schedule, mut resolutions, receipts, _) = action_history_fixture();
+        let (commit_action, commit_mapping, commit_timestamp) = schedule.actions.iter().find_map(|action| {
+            if let ScheduleAction::EffectCommitted { .. } = &action.action {
+                action.owner_time_ref.as_ref().map(|reference| (
+                    action.action_id.clone(),
+                    reference.clock_mapping_action_id.clone(),
+                    reference.local_timestamp_ns,
+                ))
+            } else {
+                None
+            }
+        }).expect("commit owner time");
+        let commit_time = resolutions.get_mut(&(commit_mapping, commit_timestamp))
+            .expect("commit resolution");
+        commit_time.interval.earliest_ns = 1_300;
+        commit_time.interval.latest_ns = 1_300;
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("commit/terminal ordering assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code.contains("EFFECT_COMMIT_AFTER_TERMINAL_RECONCILIATION")));
+        assert_eq!(commit_action, report.effect_commits.first().map(|commit| commit.action_id.clone()).unwrap_or_default());
+
+        let (mut schedule, resolutions, receipts, _) = action_history_fixture();
+        let terminal = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::AttemptReconciled { .. })
+        }).expect("terminal action");
+        if let ScheduleAction::AttemptReconciled { outcome, .. } = &mut terminal.action {
+            *outcome = ReconciliationOutcome::NotApplied;
+        }
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("not-applied/commit contradiction assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code.contains("NOT_APPLIED_TERMINAL_HAS_EFFECT_COMMIT")));
+    }
+
+    #[test]
+    fn action_history_projection_rejects_terminal_after_inventory_frontier() {
+        let (schedule, mut resolutions, receipts, _) = action_history_fixture();
+        let terminal_reference = schedule.actions.iter().find_map(|action| {
+            if matches!(action.action, ScheduleAction::AttemptReconciled { .. }) {
+                action.owner_time_ref.as_ref().map(|reference| {
+                    (reference.clock_mapping_action_id.clone(), reference.local_timestamp_ns)
+                })
+            } else {
+                None
+            }
+        }).expect("terminal owner-time reference");
+        let terminal_time = resolutions.get_mut(&terminal_reference).expect("terminal time");
+        terminal_time.interval.earliest_ns = 1_180;
+        terminal_time.interval.latest_ns = 1_180;
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("terminal/frontier order assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code == "ATTEMPT_TERMINAL_AFTER_INVENTORY_FRONTIER:attempt-1"));
+    }
+
+    #[test]
+    fn action_history_projection_rejects_policy_revision_after_inventory_frontier() {
+        let (mut schedule, mut resolutions, mut receipts, _) = action_history_fixture();
+        let policy_mapping = ScheduledAction {
+            action_id: "action-000014".to_owned(),
+            at_ns: 13,
+            ordinal: 14,
+            owner_time_ref: None,
+            evidence: None,
+            action: ScheduleAction::ClockAdvance {
+                clock_domain: "policy-clock".to_owned(),
+                basis_id: "policy-basis".to_owned(),
+                epoch: "policy-epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                local_tick_ns: 150,
+                offset_ns: 0,
+                uncertainty_ns: 0,
+                calibration_id: "policy-cal-150".to_owned(),
+                mapping_valid_from_ns: 0,
+                mapping_valid_through_ns: 10_000,
+                mapping_receipt_ref: "synthetic://policy-clock/150".to_owned(),
+                mapping_receipt_sha256: "9".repeat(64),
+                qualification: GateState::Pass,
+            },
+        };
+        let policy_revision = ScheduledAction {
+            action_id: "action-000015".to_owned(),
+            at_ns: 13,
+            ordinal: 15,
+            owner_time_ref: Some(ActionClockTimeReference {
+                clock_mapping_action_id: "action-000014".to_owned(),
+                local_timestamp_ns: 138,
+            }),
+            evidence: Some(ActionEvidence::StopPolicyRevision {
+                scope: StopScope::Global,
+                receipt_ref: "synthetic://policy-revision/1".to_owned(),
+                receipt_sha256: "8".repeat(64),
+            }),
+            action: ScheduleAction::StopPolicyRevised {
+                obligation_id: "global-stop-1".to_owned(),
+                policy_revision: "policy-v2".to_owned(),
+            },
+        };
+        schedule.actions.push(policy_mapping);
+        schedule.actions.push(policy_revision);
+        let discharge = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::StopDischarged { .. })
+        }).expect("stop discharge");
+        if let ScheduleAction::StopDischarged { policy_revision_action_id, policy_revision, .. } = &mut discharge.action {
+            *policy_revision_action_id = "action-000015".to_owned();
+            *policy_revision = "policy-v2".to_owned();
+        }
+        resolutions.insert(
+            ("action-000014".to_owned(), 138),
+            QualifiedEventTime {
+                source_clock_domain_id: "policy-clock".to_owned(),
+                time_basis: TimeBasisDescriptor {
+                    basis_id: "owner-normalized-tai-v1".to_owned(),
+                    epoch: "tai-epoch-0".to_owned(),
+                    scale: "TAI".to_owned(),
+                    unit: EventTimeUnit::Nanoseconds,
+                },
+                mapping_receipt_ref: "synthetic://policy-clock/150".to_owned(),
+                mapping_receipt_sha256: "9".repeat(64),
+                mapping_qualification: GateState::Pass,
+                mapping_valid_from_ns: 0,
+                mapping_valid_through_ns: 10_000,
+                max_interval_width_ns: 0,
+                interval: EventTimeIntervalNs { earliest_ns: 1_190, latest_ns: 1_190 },
+            },
+        );
+        receipts.insert(
+            "action-000015".to_owned(),
+            passing_owner_receipt("synthetic://policy-revision/1", &"8".repeat(64)),
+        );
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("policy/frontier order assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code == "STOP_POLICY_AFTER_INVENTORY_FRONTIER:global-stop-1"));
+    }
+
+    #[test]
+    fn action_history_projection_requires_frontier_event_and_exact_discharge_manifest() {
+        let (mut schedule, resolutions, receipts, _) = action_history_fixture();
+        let frontier = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::EventProduced { event_id, .. } if event_id == "inventory-frontier-1")
+        }).expect("inventory frontier event");
+        if let ScheduleAction::EventProduced { event_id, .. } = &mut frontier.action {
+            *event_id = "substituted-frontier".to_owned();
+        }
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("missing frontier is an assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code == "ATTEMPT_INVENTORY_FRONTIER_EVENT_NOT_UNIQUE"));
+
+        let (mut schedule, resolutions, receipts, _) = action_history_fixture();
+        let discharge = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::StopDischarged { .. })
+        }).expect("discharge action");
+        discharge.evidence = Some(ActionEvidence::StopDischarge {
+            scope: StopScope::Global,
+            inventory_frontier_event_id: "inventory-frontier-1".to_owned(),
+            attempt_manifest_sha256: "0".repeat(64),
+        });
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("manifest substitution is an assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code.contains("STOP_DISCHARGE_NOT_REPLAY_APPLIED")));
+    }
+
+    #[test]
+    fn action_history_projection_is_invariant_under_action_vector_permutation() {
+        let (schedule, resolutions, receipts, _) = action_history_fixture();
+        let original = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("original projection");
+        let mut permuted = schedule.clone();
+        permuted.actions.reverse();
+        let shuffled = project_action_history(&permuted, "robot-1", &resolutions, &receipts)
+            .expect("permuted projection");
+        assert_eq!(original, shuffled);
+        assert_eq!(original.disposition, EventTraceDisposition::Safe);
+    }
+
+    #[test]
+    fn action_history_projection_blocks_missing_owner_time_and_receipt_authenticity() {
+        let (mut schedule, resolutions, mut receipts, _) = action_history_fixture();
+        let start = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::EffectAttempted { .. })
+        }).expect("attempt start");
+        start.owner_time_ref = None;
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("missing owner time is an assessment");
+        assert_ne!(report.disposition, EventTraceDisposition::Safe);
+        assert!(report.reason_codes.iter().any(|code| code.contains("ACTION_OWNER_TIME_REFERENCE_MISSING")));
+
+        let (schedule, resolutions, mut receipts, _) = action_history_fixture();
+        let terminal_action_id = schedule.actions.iter().find_map(|action| {
+            if matches!(action.action, ScheduleAction::AttemptReconciled { .. }) {
+                Some(action.action_id.clone())
+            } else {
+                None
+            }
+        }).expect("terminal action");
+        let mut receipt = receipts.get(&terminal_action_id).cloned().expect("owner assessment");
+        receipt.authenticity = GateState::Fail;
+        receipts.insert(terminal_action_id, receipt);
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("failed authenticity is an assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code.contains("OWNER_RECEIPT_QUALIFICATION_FAILED")));
+
+        let (schedule, resolutions, mut receipts, _) = action_history_fixture();
+        let terminal_action_id = schedule.actions.iter().find_map(|action| {
+            if matches!(action.action, ScheduleAction::AttemptReconciled { .. }) {
+                Some(action.action_id.clone())
+            } else {
+                None
+            }
+        }).expect("terminal action");
+        let mut receipt = receipts.get(&terminal_action_id).cloned().expect("owner assessment");
+        receipt.receipt_ref = "synthetic://different-receipt".to_owned();
+        receipts.insert(terminal_action_id, receipt);
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("receipt identity substitution is an assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| code.contains("OWNER_RECEIPT_IDENTITY_BINDING_MISMATCH")));
     }
 
     #[test]

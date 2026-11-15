@@ -1,0 +1,145 @@
+{
+  "schema_version": "symthaea.event-order-schedule.v0.3.2",
+  "generator_version": "symthaea.event-order-generator.v0.3.2",
+  "seed": 20261115,
+  "scenario_family": "frozen_independent_observer_store_clock_known_answer",
+  "actions": [
+    {
+      "action_id": "action-000000",
+      "at_ns": 1,
+      "ordinal": 0,
+      "action": {
+        "kind": "clock_advance",
+        "clock_domain": "source-clock-0",
+        "basis_id": "source-basis-0",
+        "epoch": "source-epoch-0",
+        "scale": "TAI",
+        "unit": "nanoseconds",
+        "local_tick_ns": 10000,
+        "offset_ns": 0,
+        "uncertainty_ns": 25,
+        "calibration_id": "cal-source-0",
+        "mapping_valid_from_ns": 0,
+        "mapping_valid_through_ns": 10000,
+        "mapping_receipt_ref": "synthetic://clock/source-0",
+        "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "qualification": "pass"
+      }
+    },
+    {
+      "action_id": "action-000001",
+      "at_ns": 2,
+      "ordinal": 1,
+      "action": {
+        "kind": "event_produced",
+        "event_id": "event-0001",
+        "clock_domain": "source-clock-0",
+        "basis_id": "source-basis-0",
+        "epoch": "source-epoch-0",
+        "scale": "TAI",
+        "unit": "nanoseconds",
+        "clock_mapping_action_id": "action-000000",
+        "source_timestamp_ns": 500,
+        "causal_predecessors": []
+      }
+    },
+    {
+      "action_id": "action-000002",
+      "at_ns": 3,
+      "ordinal": 2,
+      "action": {
+        "kind": "delivery",
+        "event_id": "event-0001",
+        "channel_id": "telemetry",
+        "recipient_id": "observer-0",
+        "delivery_id": "delivery-0001",
+        "mode": "deliver"
+      }
+    },
+    {
+      "action_id": "action-000003",
+      "at_ns": 4,
+      "ordinal": 3,
+      "action": {
+        "kind": "clock_advance",
+        "clock_domain": "observer-clock-0",
+        "basis_id": "observer-basis-0",
+        "epoch": "observer-epoch-0",
+        "scale": "TAI",
+        "unit": "nanoseconds",
+        "local_tick_ns": 5000,
+        "offset_ns": 0,
+        "uncertainty_ns": 15,
+        "calibration_id": "cal-observer-0",
+        "mapping_valid_from_ns": 0,
+        "mapping_valid_through_ns": 5000,
+        "mapping_receipt_ref": "synthetic://clock/observer-0",
+        "mapping_receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "qualification": "pass"
+      }
+    },
+    {
+      "action_id": "action-000004",
+      "at_ns": 5,
+      "ordinal": 4,
+      "action": {
+        "kind": "clock_advance",
+        "clock_domain": "durable-store-clock-0",
+        "basis_id": "store-basis-0",
+        "epoch": "store-epoch-0",
+        "scale": "TAI",
+        "unit": "nanoseconds",
+        "local_tick_ns": 6000,
+        "offset_ns": 0,
+        "uncertainty_ns": 10,
+        "calibration_id": "cal-store-0",
+        "mapping_valid_from_ns": 0,
+        "mapping_valid_through_ns": 6000,
+        "mapping_receipt_ref": "synthetic://clock/store-0",
+        "mapping_receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "qualification": "pass"
+      }
+    },
+    {
+      "action_id": "action-000005",
+      "at_ns": 6,
+      "ordinal": 5,
+      "action": {
+        "kind": "event_observed",
+        "event_id": "event-0001",
+        "observer_id": "observer-0",
+        "clock_domain": "observer-clock-0",
+        "basis_id": "observer-basis-0",
+        "epoch": "observer-epoch-0",
+        "scale": "TAI",
+        "unit": "nanoseconds",
+        "clock_mapping_action_id": "action-000003",
+        "observed_at_ns": 1000,
+        "observation_receipt_ref": "synthetic://observation/0001",
+        "observation_receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+        "qualification": "pass"
+      }
+    },
+    {
+      "action_id": "action-000006",
+      "at_ns": 7,
+      "ordinal": 6,
+      "action": {
+        "kind": "event_persisted",
+        "event_id": "event-0001",
+        "observer_id": "observer-0",
+        "store_id": "ledger-0",
+        "clock_domain": "durable-store-clock-0",
+        "basis_id": "store-basis-0",
+        "epoch": "store-epoch-0",
+        "scale": "TAI",
+        "unit": "nanoseconds",
+        "clock_mapping_action_id": "action-000004",
+        "persisted_at_ns": 1200,
+        "persistence_receipt_ref": "synthetic://persistence/0001",
+        "persistence_receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "qualification": "pass"
+      }
+    }
+  ]
+}

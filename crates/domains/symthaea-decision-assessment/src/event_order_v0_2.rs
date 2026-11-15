@@ -951,6 +951,22 @@ pub fn assess_start_under_stop_obligations(
     inventory: &AttemptHistoryInventory,
     obligations: &[ScopedStopObligation],
 ) -> StartGateReport {
+    assess_start_under_stop_obligations_with_inventory_cut(
+        logical_operation_id, prior_attempts, prior_attempts, inventory, obligations,
+    )
+}
+
+/// Assess full current history against a separately attested point-in-time
+/// inventory cut. The snapshot is hashed against the inventory manifest;
+/// current history is checked for lifecycle and stop-relation integrity.
+/// This preserves post-discharge append-only deltas without weakening lineage.
+pub fn assess_start_under_stop_obligations_with_inventory_cut(
+    logical_operation_id: &str,
+    current_attempts: &[OperationAttemptRecord],
+    inventory_snapshot_attempts: &[OperationAttemptRecord],
+    inventory: &AttemptHistoryInventory,
+    obligations: &[ScopedStopObligation],
+) -> StartGateReport {
     let mut reasons = BTreeSet::new();
     let mut critical = false;
     let mut indeterminate = false;
@@ -964,7 +980,7 @@ pub fn assess_start_under_stop_obligations(
     // Validate complete-history structural integrity across the supplied snapshot.
     // A critical identity/lineage defect anywhere in the qualified inventory is
     // not hidden by filtering to one logical operation.
-    let full_history_report = validate_attempt_lifecycle(prior_attempts);
+    let full_history_report = validate_attempt_lifecycle(current_attempts);
     if full_history_report.disposition == EventTraceDisposition::CriticalFailure {
         critical = true;
         reasons.insert("ATTEMPT_INVENTORY_CONTAINS_CRITICAL_HISTORY_DEFECT".to_owned());
@@ -973,13 +989,13 @@ pub fn assess_start_under_stop_obligations(
     // Retry/active-attempt admissibility is local to the requested logical
     // operation. A pending sibling operation inside a discharged global scope
     // is not, by itself, a reason to serialize otherwise independent work.
-    let relevant_prior_attempts = prior_attempts
+    let relevant_prior_attempts = current_attempts
         .iter()
         .filter(|attempt| attempt.identity.logical_operation_id == logical_operation_id)
         .cloned()
         .collect::<Vec<_>>();
     let (inventory_disposition, inventory_reasons) = validate_attempt_inventory(
-        prior_attempts,
+        inventory_snapshot_attempts,
         inventory,
         logical_operation_id,
         obligations,
@@ -1118,7 +1134,7 @@ pub fn assess_start_under_stop_obligations(
     }
 
     let (relation_disposition, relation_reasons) =
-        validate_attempt_stop_discharge_relations(prior_attempts, obligations);
+        validate_attempt_stop_discharge_relations(current_attempts, obligations);
     reasons.extend(relation_reasons);
     match relation_disposition {
         EventTraceDisposition::CriticalFailure => critical = true,
@@ -1140,8 +1156,8 @@ pub fn assess_start_under_stop_obligations(
         applicable_obligation_ids: applicable.into_iter().collect(),
         reason_codes: reasons.into_iter().collect(),
     }
-}
 
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1268,6 +1284,89 @@ mod tests {
         }
     }
 
+    #[test]
+    fn inventory_cut_and_current_history_allow_a_post_discharge_pending_sibling() {
+        let obligation = ScopedStopObligation {
+            obligation_id: "global-cut".to_owned(),
+            trigger_event_id: "trigger-global-cut".to_owned(),
+            policy_revision: "policy-v1".to_owned(),
+            scope: StopScope::Global,
+            discharge: Some(StopDischargeReceipt {
+                event_id: "discharge-global-cut".to_owned(),
+                obligation_id: "global-cut".to_owned(),
+                trigger_event_id: "trigger-global-cut".to_owned(),
+                policy_revision: "policy-v1".to_owned(),
+                scope: StopScope::Global,
+                receipt_ref: "synthetic://global-cut/discharge".to_owned(),
+                receipt_sha256: "b".repeat(64),
+                qualification: GateState::Pass,
+                in_flight_reconciliation: GateState::Pass,
+                in_flight_inventory_frontier_event_id: "frontier-global-cut".to_owned(),
+                in_flight_attempt_manifest_sha256: "c".repeat(64),
+                trigger_to_discharge_order: EventOrder::Before,
+            }),
+        };
+        let mut snapshot_attempt = attempt(
+            "robot-1", "pre-cut-attempt", None, "pre-cut-start",
+            Some(terminal("pre-cut-terminal", "pre-cut-start", ReconciledOperationOutcome::Applied)),
+            None, None,
+        );
+        snapshot_attempt.stop_discharge_relations.push(AttemptStopDischargeRelation {
+            obligation_id: "global-cut".to_owned(),
+            discharge_event_id: "discharge-global-cut".to_owned(),
+            attempt_start_event_id: "pre-cut-start".to_owned(),
+            discharge_to_start_order: EventOrder::After,
+            terminal_event_id_at_discharge: Some("pre-cut-terminal".to_owned()),
+            terminal_to_discharge_order: Some(EventOrder::Before),
+        });
+        let snapshot = vec![snapshot_attempt.clone()];
+        let inventory = attempt_inventory(&snapshot, StopScope::Global, GateState::Pass);
+        let mut post_discharge_sibling = attempt(
+            "robot-2", "post-discharge-sibling", None, "post-discharge-start", None, None, None,
+        );
+        post_discharge_sibling.stop_discharge_relations.push(
+            post_discharge_relation(&obligation, "post-discharge-start"),
+        );
+        let current = vec![snapshot_attempt, post_discharge_sibling];
+        let report = assess_start_under_stop_obligations_with_inventory_cut(
+            "robot-1", &current, &snapshot, &inventory, std::slice::from_ref(&obligation),
+        );
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+        assert!(report.start_permitted_by_stop_contract);
+        let legacy_report = assess_start_under_stop_obligations(
+            "robot-1", &current, &inventory, std::slice::from_ref(&obligation),
+        );
+        assert_eq!(legacy_report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(!legacy_report.start_permitted_by_stop_contract);
+    }
+
+    #[test]
+    fn inventory_cut_does_not_hide_a_pending_attempt_for_the_requested_operation() {
+        let obligation = scoped_obligation("robot-stop", "robot-1");
+        let snapshot_attempt = attempt(
+            "robot-1", "snapshot-attempt", None, "snapshot-start",
+            Some(terminal("snapshot-terminal", "snapshot-start", ReconciledOperationOutcome::Applied)),
+            None, None,
+        );
+        let snapshot = vec![snapshot_attempt.clone()];
+        let inventory = attempt_inventory(
+            &snapshot,
+            StopScope::LogicalOperations(["robot-1".to_owned()].into_iter().collect()),
+            GateState::Pass,
+        );
+        let pending_current = attempt(
+            "robot-1", "post-cut-pending", None, "post-cut-start", None, None, None,
+        );
+        let current = vec![snapshot_attempt, pending_current];
+        let report = assess_start_under_stop_obligations_with_inventory_cut(
+            "robot-1", &current, &snapshot, &inventory, std::slice::from_ref(&obligation),
+        );
+        assert_eq!(report.disposition, EventTraceDisposition::Indeterminate);
+        assert!(!report.start_permitted_by_stop_contract);
+        assert!(report.reason_codes.iter().any(|reason| {
+            reason == "PRIOR_ATTEMPT_NOT_RECONCILED:post-cut-pending"
+        }));
+    }
     #[test]
     fn only_same_qualified_time_basis_can_establish_cross_domain_order() {
         let effect = qualified_time("device-clock", "tai-ns-v1", 100, 110);

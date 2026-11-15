@@ -105,15 +105,72 @@ A deterministic generator creates event → delivery → observer clock/observat
 
 Missing owner time is Indeterminate; explicit owner FAIL, substituted clock identity or receipt mismatch is CriticalFailure. It does not normalize source clocks, authenticate signatures or trust roots, or infer durable time from simulator time. Occurrence time remains optional if no independently qualified occurrence-time resolution is supplied. The projected envelope is suitable for the v0.2 bitemporal visibility evaluator; attempt lineage, scoped stops and complete attempt inventory are not yet reconstructed by this adapter.
 
-The v0.3.1 branch has 24 authored module unit tests, six Proptest properties (256 cases each configured; 1,536 potential property cases), and one frozen integration known-answer fixture at `benchmarks/engineering-change-impact/event-order-v0.3.1-clocked-observation-persistence.json`. The fixture contains seven schedule actions and is linked through the v0.3.1 JSON Schema. These are source counts and a frozen input, not executed results.
+The v0.3.1 branch historically contained 24 module unit tests, six Proptest properties (256 cases each configured), and one frozen integration known-answer fixture. The stacked v0.3.2 branch extends this with the action-history projection and additional tests documented above.
 
-## Known limitations / next increment
+## v0.3.2: action-level evidence and attempt/stop projection
+
+The follow-on is tracked by [issue #12316](https://github.com/Luminous-Dynamics/symthaea/issues/12316) on branch `research/event-order-v0-3-2-action-evidence-2026-11-15`, based on the exact v0.3.1 head. It introduces the separate `symthaea.event-order-schedule.v0.3.2` schema; it does not overwrite the v0.3.1 schema.
+
+### Contract changes
+
+- `ScheduledAction.owner_time_ref` names an exact earlier mapping-action ID and source-local timestamp. The reference must match native event source fields for production, observation and persistence actions. Scheduler `at_ns` remains a replay-ordering coordinate only.
+- `ActionEvidence` sidecars are typed by action kind: attempt start and retry parent; effect-commit receipt; cancellation-ack receipt; terminal-reconciliation exact-start binding and qualification; stop trigger and policy revision receipts plus scope; discharge scope/frontier/manifest; and complete inventory attestation.
+- The owner verifier input is now bound to the exact action ID, receipt reference and SHA-256 that were checked. Its injected gates cover identity, digest integrity, authenticity, scope and semantics; inventory completeness and in-flight reconciliation remain separately represented. This is a trust boundary, not an implementation of signature or trust-root verification.
+- `project_action_history` constructs `OperationAttemptRecord`, `ScopedStopObligation`, `StopDischargeReceipt` and `AttemptHistoryInventory` from canonical replay order and externally qualified owner-time/receipt inputs. It calls the v0.2 lifecycle and start-eligibility validators.
+- An inventory frontier must be exactly one replay-applied produced event and owner-time-before its inventory attestation. Its manifest digest is recomputed by the v0.2 attempt-manifest projection.
+- A stop discharge binds exact trigger action, the policy-revision action current at that historical discharge, scope, unique complete inventory attestation, frontier and manifest digest. Each policy generation is discharged independently; a later revision invalidates earlier discharge for the current obligation without erasing valid historical evidence. Policy scopes may widen but never narrow, and the undischarged current obligation preserves the widened scope. Per-attempt relations bind exact start and discharge event IDs; pre-discharge attempts require exact terminal-before-discharge evidence.
+- Cancellation requests and acknowledgements have their own owner times and exact request/action/receipt bindings. The attempt must precede the cancellation request, which must precede the acknowledgement; an accepted cancellation with any linked effect commit is CriticalFailure. Cancellation never implies `NOT_APPLIED`. Retry requires the exact predecessor, a qualified `NOT_APPLIED` terminal, and terminal-before-retry-start.
+- The action projector rejects effect-commit-after-terminal and `NOT_APPLIED`-with-commit contradictions. If any owner-time, receipt, lifecycle, stop or inventory check fails, the combined report suppresses a positive start-eligibility flag.
+
+### v0.3.2 source and reference evidence
+
+- 53 module `#[test]` cases are authored.
+- Eight Proptest properties are configured for 256 cases each (2,048 potential property cases per full run).
+- Two integration tests cover the frozen clocked schedule and action-evidence variant rejection.
+- A standalone independent reference model is stored at `benchmarks/engineering-change-impact/event-order-v0.3.2-independent-reference.mjs` with result record `event-order-v0.3.2-independent-reference.json`. On Node.js v22.16.0 with seed `0x4c554d49` it exercised 100,000 interval pairs, 150,000 receipt identity checks, 100,000 retry cases, 90,000 stop/inventory cases, 10,000 action-vector permutations, 50,000 cancellation semantics checks, and 50,000 effect/terminal chronology cases. All recorded semantic violation counters were zero. This is a separately authored JavaScript reference model, not Rust execution or evidence of production reliability.
+- JSON Schema syntax/JSON parsing and source-level identity/cardinality audits are separate from a full schema-engine test and Rust compile. No `cargo test`, `cargo clippy`, `cargo fmt` or physical qualification is claimed. The authoring environment has no `rustc`, `cargo` or `rustfmt`, and skipped CI is not pass.
+
+### Remaining hard gates
+
+1. Run exact-head Rust tests, clippy and format checks; resolve all compile or lint failures without weakening safety semantics.
+2. Implement owner-native receipt verification (signature chain, revocation, trust-root version, semantic scope, inventory completeness and freshness).
+3. Add crash windows between physical effect and durable reconciliation, retry-after-restart, policy-revision races, stop-scope expansion, receipt revocation, late arrivals and inventory omission generators.
+4. Validate action/effect projection against independently authored oracles and real adapter traces; report per-family false-safe, false-hold and indeterminate rates.
+5. Benchmark projection latency, throughput, memory, counterexample shrinking and deterministic replay under increasing action cardinality.
+
+## v0.3.2 adversarial projection corrections
+
+The current v0.3.2 branch corrects two edge semantics found during source audit:
+
+- Retry linkage now binds the exact predecessor terminal action to the retry child's own start action. A regression test checks the child-start ID, the predecessor terminal ID and the terminal-before-child-start order.
+- Stop scope is monotonic: a revision may preserve or widen the trigger scope, never narrow it. A broader attempt inventory can cover a narrower stop scope, but a narrower inventory cannot cover a broader discharge. Regression tests cover broad-inventory/narrow-obligation, global expansion and narrowing rejection.
+
+The v2 independent reference model exercises exact child-start bindings and scope relationships. A further finite-state policy-generation model covers discharge-as-of-policy semantics, historical v1 discharge followed by v2 revision, final-policy discharge status, scope widening/narrowing, and stale/substituted references. The recorded V8 run exercised 100,000 generated histories with zero historical false rejects, stale false accepts, scope-narrowing false accepts or final-policy projection mismatches; 109,887 historically valid discharge instances were preserved. The execution was in a V8 JavaScript runtime, not Node.js and not Rust; checked-in mjs files are reproducible Node.js implementations, but the recorded V8 run is not Rust execution.
+
+
+## v0.3.2 inventory frontier: snapshot plus append-only delta
+
+The first action-history projector used the same attempt slice both to validate the inventory manifest and to evaluate current history. That is incorrect once attempts may be appended after the inventory frontier. The v0.2 API now preserves the original `assess_start_under_stop_obligations` as a compatibility wrapper and exposes `assess_start_under_stop_obligations_with_inventory_cut` with distinct `current_attempts` and `inventory_snapshot_attempts`.
+
+The manifest is checked only against the attempt state knowable at its frontier. Attempt starts before the frontier enter the snapshot. Terminal reconciliations and attempt-to-stop-discharge relations are retained in the snapshot only when their exact owner times are before the frontier. Later terminals and discharge relations remain in current history but are excluded from the earlier snapshot commitment. A later attempt is a delta, never an implicit addition to the old manifest.
+
+Delta safety remains fail-closed:
+- a pending sibling that starts after an applicable global discharge may remain in flight without blocking a different logical operation;
+- an attempt outside the snapshot that started before its applicable discharge is a critical inventory omission;
+- a pending attempt for the requested logical operation still makes the requested start ineligible;
+- overlapping/unknown start-to-frontier or discharge-to-start ordering is Indeterminate, not a guessed side of the cut.
+
+The frozen 14-action known-answer fixture was updated to hash the actual pre-discharge snapshot (no future discharge relation). Canonical v0.2 attempt-manifest digest: `dd24fe30e2d4391a07629ba1e08990e5de7054bda2b393b62daeaac56bd3c865`.
+
+A separately authored V8 reference model exercised 100,000 cases across six cut/delta families with zero model violations. It is not Rust execution, owner receipt verification, or a reliability claim. See the [reference implementation](../../benchmarks/engineering-change-impact/event-order-v0.3.2-inventory-snapshot-delta-reference.mjs) and [recorded result](../../benchmarks/engineering-change-impact/event-order-v0.3.2-inventory-snapshot-delta-reference.json).
+
+## Known limitations at the v0.3.1 stage
 
 - The implemented generator families cover event production/delivery/partition, source-clock unqualified/expired/stale mapping faults, eight observer/store mapping faults (unqualified, expired, not-yet-valid and invalid validity interval), and the two principal stop/cancel/commit orderings. Dedicated generators are still needed for gradual calibration drift/step changes, crash precisely between physical effect and durable reconciliation, multi-scope stops, bitemporal late arrival, revocation and inventory omission.
 - The current scheduler records owner receipt fields but does not authenticate them. Owner-native signature, trust-root, scope, completeness and semantic verifiers must qualify those receipts.
-- The v0.3.1 bitemporal projection is wired to v0.2's bitemporal envelope and returns exact action/mapping/receipt sidecars, but does not yet reconstruct attempt lifecycle, retry lineage, scoped stop obligations or complete attempt inventory. A full action/effect adapter and separately implemented independent oracle remain critical next steps.
+- The v0.3.1 bitemporal projection alone does not reconstruct attempt lifecycle, retry lineage, scoped stop obligations or complete attempt inventory; the v0.3.2 action projector now supplies a synthetic-schedule adapter for these contracts, but production owner verification and real effect-system adapters remain unimplemented.
 - Deterministic replay depends on exact code build and input digest. The schedule seed alone is not a full reproducibility receipt.
-- Thirty Rust module unit tests and seven Proptest properties (256 cases each configured; 1,792 potential cases) are authored in the v0.3.1 branch at this point. No Rust toolchain is available in the execution environment used for this authoring pass. Source checks and independent reference tests must not be represented as Rust execution or CI pass.
+- At v0.3.2, 86 Rust module unit tests across v0.2/v0.3, eight Proptest properties (256 cases each configured; 2,048 potential cases), and two integration tests are authored, not executed. The frozen action-history known-answer fixture contains 14 actions, seven owner-time resolutions and five owner receipt assessments. The projector returns exact terminal, stop, inventory, effect and cancellation sidecars plus schedule/replay digests. The local authoring environment has no Rust toolchain. Independent JavaScript reference checks must not be represented as Rust execution or CI pass.
 
 ## Reproduction
 
