@@ -1,0 +1,13 @@
+[package]
+name = "decision-sufficient-evidence"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Decision-sufficient evidence acquisition planner using expected value of sample information"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[workspace]
