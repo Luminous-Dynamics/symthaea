@@ -354,7 +354,7 @@ impl SailcraftEncoder {
                     channel,
                     value: degrees,
                     minimum: 0.0,
-                    maximum_exclusive: 360.0,
+                    maximum: 360.0,
                 });
             }
             let radians = degrees.to_radians();
