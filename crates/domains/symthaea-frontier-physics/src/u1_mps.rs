@@ -3070,7 +3070,6 @@ impl U1TwoSiteState {
     /// This policy does not renormalize. Its local error is a two-site tensor
     /// Frobenius residual; a canonical-gauge exterior receipt is required to
     /// convert it into a global state-vector bound.
-
     fn assemble_truncated_from_exact(
         &self,
         exact: &U1TwoSiteSplitDiagnostics,
@@ -3356,6 +3355,17 @@ impl U1TwoSiteState {
 /// unitary. The current TEBD scheduler does not verify that canonical-gauge
 /// precondition, so global qualification remains false.
 #[derive(Debug, Clone, Default, PartialEq)]
+
+
+#[derive(Debug, Clone, Copy)]
+struct GateErrorBoundInputs {
+    unitarity_residual: f64,
+    charge_residual: f64,
+    hamiltonian_projection_operator_error_upper_bound: f64,
+    pre_gate_norm_squared: f64,
+    tolerance: f64,
+}
+
 pub struct U1MpsTruncationLedger {
     gate_count: usize,
     accumulated_discarded_weight: f64,
@@ -3502,6 +3512,7 @@ impl U1MpsTruncationLedger {
 
     /// Record local tensor truncation diagnostics without claiming a global
     /// state-vector bound.
+    #[cfg(test)]
     fn record(&mut self, diagnostics: &U1TwoSiteTruncationDiagnostics) -> Result<(), U1MpsError> {
         self.record_local(diagnostics)?;
         self.global_state_error_bound_qualified = false;
@@ -3512,6 +3523,7 @@ impl U1MpsTruncationLedger {
     /// Compatibility helper for callers that have already established an
     /// exactly unitary, charge-conserving two-site gate. Production TEBD should
     /// use record_with_canonical_gauge_and_gate so gate defects are included.
+    #[cfg(test)]
     fn record_with_canonical_gauge(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
@@ -3521,11 +3533,13 @@ impl U1MpsTruncationLedger {
         self.record_with_gate_error_bounds(
             diagnostics,
             receipt,
-            0.0,
-            0.0,
-            0.0,
-            receipt.output_norm_squared,
-            tolerance,
+            GateErrorBoundInputs {
+                unitarity_residual: 0.0,
+                charge_residual: 0.0,
+                hamiltonian_projection_operator_error_upper_bound: 0.0,
+                pre_gate_norm_squared: receipt.output_norm_squared,
+                tolerance,
+            },
         )
     }
 
@@ -3559,11 +3573,14 @@ impl U1MpsTruncationLedger {
         self.record_with_gate_error_bounds(
             diagnostics,
             receipt,
-            unitarity_residual,
-            charge_residual,
-            gate.hamiltonian_projection_error_operator_upper_bound(),
-            receipt.output_norm_squared,
-            tolerance,
+            GateErrorBoundInputs {
+                unitarity_residual,
+                charge_residual,
+                hamiltonian_projection_operator_error_upper_bound: gate
+                    .hamiltonian_projection_error_operator_upper_bound(),
+                pre_gate_norm_squared: receipt.output_norm_squared,
+                tolerance,
+            },
         )
     }
 
@@ -3571,12 +3588,15 @@ impl U1MpsTruncationLedger {
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
         receipt: &U1CanonicalGaugeReceipt,
-        gate_unitarity_residual: f64,
-        gate_charge_residual: f64,
-        hamiltonian_projection_operator_error_upper_bound: f64,
-        pre_gate_norm_squared: f64,
-        tolerance: f64,
+        inputs: GateErrorBoundInputs,
     ) -> Result<(), U1MpsError> {
+        let GateErrorBoundInputs {
+            unitarity_residual: gate_unitarity_residual,
+            charge_residual: gate_charge_residual,
+            hamiltonian_projection_operator_error_upper_bound,
+            pre_gate_norm_squared,
+            tolerance,
+        } = inputs;
         let prior_count = self.gate_count;
         let prior_qualified = self.global_state_error_bound_qualified;
         let prior_bound = self.global_state_error_bound_upper;
@@ -4393,7 +4413,7 @@ mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsErrorBudgetFractions,
         U1MpsErrorBudgetPlan, U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate, U1TeBDGateReceipt,
-        U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDLayerErrorBudgetPolicy, U1TeBDStepResult,
+        U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDLayerErrorBudgetPolicy,
         U1TeBDStrangStepper, U1TwoSiteErrorBudgetPolicy, U1TwoSiteGate, U1TwoSiteHamiltonian,
         U1TwoSiteState, U1TwoSiteTruncationPolicy, left_isometry_residual, right_isometry_residual,
     };
