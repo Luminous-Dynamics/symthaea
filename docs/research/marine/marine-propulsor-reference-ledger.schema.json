@@ -1,0 +1,234 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/marine-propulsor-reference-ledger.schema.json",
+  "title": "Marine propulsor literature reference ledger",
+  "description": "Source-pinned literature claims for architecture-family reproduction. It is not a measured benchmark result or an authorization record.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "created_utc",
+    "issue_url",
+    "source_records"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "status": {
+      "const": "REFERENCE_LEDGER_ONLY_NOT_BENCHMARK_RESULT"
+    },
+    "created_utc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "issue_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "source_records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/source_record"
+      }
+    }
+  },
+  "$defs": {
+    "source_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "title",
+        "authors",
+        "venue",
+        "published_on",
+        "doi",
+        "source_url",
+        "architecture_families",
+        "evidence_class",
+        "comparators",
+        "claims",
+        "data_availability",
+        "rights_status",
+        "limitations",
+        "admitted_for_cross_source_ranking"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9-]{2,63}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 8
+        },
+        "authors": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          }
+        },
+        "venue": {
+          "type": "string",
+          "minLength": 2
+        },
+        "published_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "doi": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "architecture_families": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "CONVENTIONAL_OPEN_PROPELLER",
+              "DUCTED_PROPELLER",
+              "CONTRA_ROTATING_PROPELLER",
+              "TOROIDAL_PROPELLER",
+              "FLEXIBLE_COMPOSITE_BLADE",
+              "WATERJET",
+              "CYCLOIDAL_PROPULSOR",
+              "RIM_DRIVEN_PROPULSOR",
+              "DISTRIBUTED_ELECTRIC_PROPULSOR"
+            ]
+          }
+        },
+        "evidence_class": {
+          "enum": [
+            "EXPERIMENTAL",
+            "EXPERIMENTALLY_VALIDATED_CFD",
+            "CFD_ONLY",
+            "MODEL_SCREENING",
+            "THESIS_WITH_CFD_AND_EXPERIMENTAL_COMPARISON"
+          ]
+        },
+        "comparators": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "description",
+              "cross_source_comparability"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9_-]{2,63}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 8
+              },
+              "cross_source_comparability": {
+                "enum": [
+                  "NOT_COMPARABLE",
+                  "NOT_ASSESSED",
+                  "MATCHED_WITHIN_SOURCE_ONLY"
+                ]
+              }
+            }
+          }
+        },
+        "claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "metric",
+              "reported_value",
+              "unit",
+              "direction",
+              "comparator_id",
+              "condition",
+              "reported_interpretation"
+            ],
+            "properties": {
+              "metric": {
+                "type": "string",
+                "minLength": 3
+              },
+              "reported_value": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              },
+              "direction": {
+                "enum": [
+                  "INCREASE",
+                  "DECREASE",
+                  "NO_SIGNIFICANT_CHANGE",
+                  "QUALITATIVE",
+                  "UNKNOWN"
+                ]
+              },
+              "comparator_id": {
+                "type": "string"
+              },
+              "condition": {
+                "type": "string",
+                "minLength": 5
+              },
+              "reported_interpretation": {
+                "type": "string",
+                "minLength": 8
+              }
+            }
+          }
+        },
+        "data_availability": {
+          "enum": [
+            "OPEN_RAW_DATA_CONFIRMED",
+            "OPEN_ARTIFACTS_UNVERIFIED",
+            "NOT_LOCATED",
+            "ACCESS_RESTRICTED",
+            "UNKNOWN"
+          ]
+        },
+        "rights_status": {
+          "enum": [
+            "LICENSE_CONFIRMED",
+            "REVIEW_REQUIRED",
+            "RESTRICTED",
+            "UNKNOWN"
+          ]
+        },
+        "limitations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 8
+          }
+        },
+        "admitted_for_cross_source_ranking": {
+          "const": false
+        }
+      }
+    }
+  }
+}
