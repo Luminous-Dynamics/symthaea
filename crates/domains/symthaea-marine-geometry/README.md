@@ -6,18 +6,19 @@ Deterministic candidate manifests and a deliberately narrow Rust geometry-admiss
 
 This first implementation accepts a versioned JSON triangle mesh and checks:
 
-- schema, candidate identity, declared metres and explicit right-handed frame;
+- schema, candidate identity, declared metres and explicit right-handed frame metadata;
 - BLAKE3 digest of normalized geometry data;
 - finite coordinates, face indices, duplicate and degenerate triangles;
 - edge manifoldness, shared-edge winding consistency and optional closure;
-- positive signed volume and a profile minimum when a closed surface is required;
+- vertex-link cycles for closed surfaces, rejecting pinched/disconnected local shells;
+- signed volume calculated independently per edge-connected closed component, preventing a positive component from masking an inward-oriented component;
 - explicit UNKNOWN results for additional required checks not implemented here.
 
-It emits deterministic JSON with typed dispositions: admissible-for-profile, invalid, incomplete, incomparable, or blocked.
+It emits deterministic JSON with typed dispositions: admissible-for-profile, invalid, incomplete, incomparable, or blocked. The report includes per-component signed volumes and the count of vertices that fail the closed-surface link condition.
 
 ## Important claim boundary
 
-Admissible-for-profile means only that the supplied triangle mesh passed the selected triangle-mesh-integrity-v1 profile. This is not full hull admission.
+Admissible-for-profile means only that the supplied mesh passed the selected triangle-mesh-integrity-v1 profile. This profile supports closed, consistently outward-oriented positive-volume shells. Internal cavity/void boundary semantics are not modelled and must not be represented as accepted geometry under this profile.
 
 The axis convention and handedness are declared by the submitting artifact. This adapter checks that the declarations are present and supported; it does not independently reconstruct or verify the underlying CAD coordinate transform.
 
@@ -25,14 +26,14 @@ This crate does not currently perform native CAD/B-rep validity, triangle-triang
 
 A digest is an identity/integrity aid, not a signature, publisher authentication, rights statement, or proof of engineering correctness.
 
-The tetrahedron used in the unit tests is a topology and signed-volume fixture, not a naval hull benchmark.
+The tetrahedron and adversarial component fixtures are topology and signed-volume known-answer controls, not naval-hull benchmark results.
 
 ## Build and test
 
 From the workspace root:
 
-    cargo test -p symthaea-marine-geometry
-    cargo clippy -p symthaea-marine-geometry --all-targets -- -D warnings
+    cargo test --locked -p symthaea-marine-geometry
+    cargo clippy --locked -p symthaea-marine-geometry --all-targets -- -D warnings
 
 ## Candidate input
 
@@ -40,11 +41,11 @@ A candidate contains schema_version (currently 1), a non-empty candidate_id, geo
 
 Compute a digest, then insert the returned value into geometry_digest_blake3:
 
-    cargo run -p symthaea-marine-geometry --bin marine-geometry-admit -- --digest-only candidate.json
+    cargo run --locked -p symthaea-marine-geometry --bin marine-geometry-admit -- --digest-only candidate.json
 
 The digest is over the normalized geometry struct serialization, not the original JSON whitespace. Then run admission:
 
-    cargo run -p symthaea-marine-geometry --bin marine-geometry-admit -- candidate.json --report admission.json
+    cargo run --locked -p symthaea-marine-geometry --bin marine-geometry-admit -- candidate.json --report admission.json
 
 Exit codes: 0 = admissible for the declared mesh profile; 1 = a typed non-admissible disposition; 2 = CLI, I/O, or input parse error.
 
