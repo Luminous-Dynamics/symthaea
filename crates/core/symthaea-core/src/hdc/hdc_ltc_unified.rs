@@ -1786,6 +1786,15 @@ impl NetworkStateSnapshot {
         self.neuron_states.first().map(|hv| hv.values.len())
     }
 
+    #[cfg(test)]
+    fn snapshot_with(state_value: f32, total_time: f64, updates: u64) -> Self {
+        Self {
+            neuron_states: vec![ContinuousHV::from_values(vec![state_value; 4])],
+            layer_outputs: vec![ContinuousHV::from_values(vec![state_value; 4])],
+            neuron_clocks: vec![(total_time, updates)],
+        }
+    }
+
     /// Compare only the state vectors and cached layer outputs, deliberately
     /// excluding per-neuron clocks/call counters. A zero-duration transition
     /// may preserve the mathematical state while still recording an attempted
