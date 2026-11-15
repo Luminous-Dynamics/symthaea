@@ -15,6 +15,7 @@ use crate::section::{compute_sampled_sections_digest, SectionFamilyArtifact};
 
 const RESULT_SCHEMA_VERSION: u32 = 1;
 const METHOD_ID: &str = "triangle-slice-sectional-simpson-1-3-v1";
+const POLYHEDRAL_METHOD_ID: &str = "oriented-tetrahedral-mesh-hydrostatics-v1";
 const WATERPLANE_TOLERANCE_M: f64 = 1.0e-9;
 const MINIMUM_SECTION_AREA_M2: f64 = 1.0e-14;
 const GEOMETRY_EPSILON_FACTOR: f64 = 128.0;
@@ -136,6 +137,9 @@ pub struct SectionalCrossCheckReport {
     pub sampled_sections_digest_blake3: String,
     pub geometry_digest_blake3: String,
     pub loft_manifest_digest_blake3: String,
+    pub sectional_method_id: String,
+    pub polyhedral_method_id: String,
+    pub water_density_kg_m3: f64,
     pub tolerance: SectionalCrossCheckTolerance,
     pub disposition: CrossCheckDisposition,
     pub identity_errors: Vec<String>,
@@ -889,6 +893,9 @@ struct CrossCheckDigestIdentity<'a> {
     sampled_sections_digest_blake3: &'a str,
     geometry_digest_blake3: &'a str,
     loft_manifest_digest_blake3: &'a str,
+    sectional_method_id: &'a str,
+    polyhedral_method_id: &'a str,
+    water_density_kg_m3: f64,
     tolerance: &'a SectionalCrossCheckTolerance,
     disposition: CrossCheckDisposition,
     identity_errors: &'a [String],
@@ -903,6 +910,9 @@ fn report_digest(report: &SectionalCrossCheckReport) -> Result<String, serde_jso
         sampled_sections_digest_blake3: &report.sampled_sections_digest_blake3,
         geometry_digest_blake3: &report.geometry_digest_blake3,
         loft_manifest_digest_blake3: &report.loft_manifest_digest_blake3,
+        sectional_method_id: &report.sectional_method_id,
+        polyhedral_method_id: &report.polyhedral_method_id,
+        water_density_kg_m3: report.water_density_kg_m3,
         tolerance: &report.tolerance,
         disposition: report.disposition,
         identity_errors: &report.identity_errors,
@@ -1033,6 +1043,9 @@ pub fn compare_with_polyhedral_hydrostatics(
         sampled_sections_digest_blake3: sectional.sampled_sections_digest_blake3.clone(),
         geometry_digest_blake3: sectional.geometry_digest_blake3.clone(),
         loft_manifest_digest_blake3: sectional.loft_manifest_digest_blake3.clone(),
+        sectional_method_id: sectional.method_id.clone(),
+        polyhedral_method_id: POLYHEDRAL_METHOD_ID.to_owned(),
+        water_density_kg_m3: sectional.water_density_kg_m3,
         tolerance: tolerance.clone(),
         disposition: CrossCheckDisposition::Incomparable,
         identity_errors,
