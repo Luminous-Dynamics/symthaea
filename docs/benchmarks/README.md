@@ -12,7 +12,7 @@ This directory separates three questions that are often collapsed into one AI sc
 |---|---|---|
 | Symthaea Psych-Bench | Does the architecture exhibit the cognitive and psychometric behaviours represented by its test suite? | Existing suite; see its own README and calibration transparency report |
 | Agent-operations interoperability | How does a Symthaea-driven agent compare on external, role-aware operations evaluations? | Adapter semantics, protocol contract, Rust decision guard, and schemas drafted; no AOBench run yet |
-| SympoeticBench | Does human-AI collaboration produce useful joint capability without eroding agency, diversity, consent, or provenance? | v0.1 protocol, 17-scenario seed set, JSON schemas, Rust validators, metrics, and agent-protocol guard; human validation pending |
+| SympoeticBench | Does human-AI collaboration produce useful joint capability without eroding agency, diversity, consent, or provenance? | v0.1 protocol, 18-scenario seed set, JSON schemas, Rust validators, metrics, and agent-protocol guard; human validation pending |
 
 These programmes are complementary, not interchangeable. Psych-Bench is not a human-AI collaboration benchmark. An operations score is not evidence of general intelligence. A creative artifact's quality is not evidence that collaboration was reciprocal.
 
@@ -64,7 +64,7 @@ SympoeticBench evaluates observable interaction behaviour and participant-report
 
 ## Current release status
 
-Version 0.1 is a design and development release. It contains a proposed protocol, scenario schema, and 17-scenario development seed corpus. It does not contain human-subject study results, validated scales, a public leaderboard, or SOTA claims. The seed corpus is for harness development and pilot design; it is not a locked test set.
+Version 0.1 is a design and development release. It contains a proposed protocol, scenario schema, and 18-scenario development seed corpus. It does not contain human-subject study results, validated scales, a public leaderboard, or SOTA claims. The seed corpus is for harness development and pilot design; it is not a locked test set.
 
 ## Next steps
 
