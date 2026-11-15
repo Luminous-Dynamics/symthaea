@@ -259,6 +259,7 @@ pub enum SchedulerDisposition {
     ClockMappingUnqualified,
     ClockMappingRejected,
     ClockMappingExpired,
+    ClockMappingBeyondSample,
     ClockMappingNotYetValid,
     ClockMappingValidityInvalid,
     ClockTimestampBeyondQualifiedTick,
@@ -736,6 +737,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut produced = BTreeSet::<String>::new();
     let mut active_clock_mapping_ids = BTreeMap::<ClockSeriesKey, String>::new();
     let mut clock_mapping_states = BTreeMap::<String, ClockMappingState>::new();
+    let mut clock_series_by_mapping_id = BTreeMap::<String, ClockSeriesKey>::new();
     let mut event_times = BTreeMap::<ClockSeriesKey, u64>::new();
     let mut delivered = BTreeSet::<(String, String)>::new();
     let mut observed = BTreeSet::<(String, String)>::new();
@@ -749,9 +751,12 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut stop_triggers = BTreeMap::<String, StopReplayState>::new();
     let mut stop_discharges = BTreeSet::<String>::new();
     let mut attempts = BTreeSet::<(String, String)>::new();
-    let mut committed_attempts = BTreeMap::<(String, String), String>::new();
+    let mut attempt_start_action_ids = BTreeMap::<(String, String), String>::new();
+    let mut committed_attempts =
+        BTreeMap::<(String, String), (String, String, String)>::new();
     let mut reconciled_attempts =
-        BTreeMap::<(String, String), (ReconciliationOutcome, String, String)>::new();
+        BTreeMap::<(String, String), (ReconciliationOutcome, String, String, GateState, String)>::new();
+    let mut inventory_attestations = BTreeSet::<(String, String, String)>::new();
     let mut records = Vec::new();
 
     for scheduled in ordered_actions(schedule) {
@@ -775,6 +780,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                         qualification: *qualification,
                     },
                 );
+                clock_series_by_mapping_id.insert(scheduled.action_id.clone(), clock_series_key(clock_domain, basis_id, epoch, scale, unit));
                 if previous_tick.is_some_and(|tick| *local_tick_ns < tick) {
                     SchedulerDisposition::ClockRegression
                 } else {
@@ -954,10 +960,15 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 if stop_triggers.contains_key(obligation_id) {
                     SchedulerDisposition::PreconditionViolation
                 } else {
+                    let scope = match &scheduled.evidence {
+                        Some(ActionEvidence::StopTrigger { scope, .. }) => Some(scope.clone()),
+                        _ => None,
+                    };
                     stop_triggers.insert(obligation_id.clone(), StopReplayState {
                         trigger_action_id: scheduled.action_id.clone(),
                         policy_revision_action_id: scheduled.action_id.clone(),
                         policy_revision: policy_revision.clone(),
+                        scope,
                     });
                     SchedulerDisposition::Applied
                 }
@@ -966,6 +977,10 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 if let Some(state) = stop_triggers.get_mut(obligation_id) {
                     state.policy_revision = policy_revision.clone();
                     state.policy_revision_action_id = scheduled.action_id.clone();
+                    state.scope = match &scheduled.evidence {
+                        Some(ActionEvidence::StopPolicyRevision { scope, .. }) => Some(scope.clone()),
+                        _ => None,
+                    };
                     stop_discharges.remove(obligation_id);
                     SchedulerDisposition::Applied
                 } else {
@@ -980,7 +995,19 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                         && state.policy_revision_action_id == *policy_revision_action_id
                         && state.policy_revision == *policy_revision
                 });
-                if exact_binding && stop_discharges.insert(obligation_id.clone()) {
+                let inventory_binding = match (&scheduled.evidence, stop_triggers.get(obligation_id)) {
+                    (Some(ActionEvidence::StopDischarge { scope, inventory_frontier_event_id, attempt_manifest_sha256 }), Some(state)) => {
+                        state.scope.as_ref() == Some(scope)
+                            && inventory_attestations.contains(&(
+                                serde_json::to_string(scope).unwrap_or_default(),
+                                inventory_frontier_event_id.clone(),
+                                attempt_manifest_sha256.clone(),
+                            ))
+                    }
+                    (None, Some(state)) if state.scope.is_none() => true,
+                    _ => false,
+                };
+                if exact_binding && inventory_binding && stop_discharges.insert(obligation_id.clone()) {
                     SchedulerDisposition::Applied
                 } else {
                     SchedulerDisposition::PreconditionViolation
@@ -988,7 +1015,23 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
             }
             ScheduleAction::EffectAttempted { operation_id, attempt_id } => {
                 let key = (operation_id.clone(), attempt_id.clone());
-                if attempts.insert(key) {
+                let retry_valid = match &scheduled.evidence {
+                    Some(ActionEvidence::AttemptStart { retry_of_attempt_id: Some(predecessor_id) }) => {
+                        let predecessor_key = (operation_id.clone(), predecessor_id.clone());
+                        reconciled_attempts.get(&predecessor_key).is_some_and(|terminal| {
+                            terminal.0 == ReconciliationOutcome::NotApplied
+                                && terminal.3 == GateState::Pass
+                                && terminal.4 == attempt_start_action_ids.get(&predecessor_key).cloned().unwrap_or_default()
+                        })
+                    }
+                    Some(ActionEvidence::AttemptStart { retry_of_attempt_id: None }) => true,
+                    None => true,
+                    _ => false,
+                };
+                if !retry_valid {
+                    SchedulerDisposition::PreconditionViolation
+                } else if attempts.insert(key.clone()) {
+                    attempt_start_action_ids.insert(key, scheduled.action_id.clone());
                     SchedulerDisposition::Applied
                 } else {
                     SchedulerDisposition::PreconditionViolation
@@ -996,16 +1039,23 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
             }
             ScheduleAction::EffectCommitted { operation_id, attempt_id, effect_id } => {
                 let key = (operation_id.clone(), attempt_id.clone());
+                let evidence = match &scheduled.evidence {
+                    Some(ActionEvidence::EffectCommit { receipt_ref, receipt_sha256 }) => {
+                        (receipt_ref.clone(), receipt_sha256.clone())
+                    }
+                    _ => (String::new(), String::new()),
+                };
+                let candidate = (effect_id.clone(), evidence.0, evidence.1);
                 if !attempts.contains(&key) {
                     SchedulerDisposition::PreconditionViolation
-                } else if let Some(previous_effect_id) = committed_attempts.get(&key) {
-                    if previous_effect_id == effect_id {
+                } else if let Some(previous) = committed_attempts.get(&key) {
+                    if previous == &candidate {
                         SchedulerDisposition::Duplicate
                     } else {
                         SchedulerDisposition::ConflictingEffectCommit
                     }
                 } else {
-                    committed_attempts.insert(key.clone(), effect_id.clone());
+                    committed_attempts.insert(key.clone(), candidate);
                     if cancel_acknowledgements.get(&key) == Some(&true) {
                         SchedulerDisposition::CommitAfterAcceptedCancellation
                     } else {
@@ -1017,8 +1067,17 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 operation_id, attempt_id, outcome, receipt_ref, receipt_sha256,
             } => {
                 let key = (operation_id.clone(), attempt_id.clone());
-                let terminal = (*outcome, receipt_ref.clone(), receipt_sha256.clone());
-                if !attempts.contains(&key) {
+                let (qualification, exact_start_action_id) = match &scheduled.evidence {
+                    Some(ActionEvidence::TerminalReconciliation { exact_start_action_id, qualification }) => {
+                        (*qualification, exact_start_action_id.clone())
+                    }
+                    _ => (GateState::Indeterminate, String::new()),
+                };
+                let terminal = (*outcome, receipt_ref.clone(), receipt_sha256.clone(), qualification, exact_start_action_id);
+                let exact_start = attempt_start_action_ids.get(&key).is_some_and(|start_id| {
+                    terminal.4 == *start_id
+                });
+                if !attempts.contains(&key) || (scheduled.evidence.is_some() && !exact_start) {
                     SchedulerDisposition::PreconditionViolation
                 } else if let Some(previous) = reconciled_attempts.get(&key) {
                     if previous == &terminal {
@@ -1029,6 +1088,31 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 } else {
                     reconciled_attempts.insert(key, terminal);
                     SchedulerDisposition::Applied
+                }
+            }
+            ScheduleAction::AttemptInventoryAttested {
+                scope, inventory_frontier_event_id, attempt_manifest_sha256,
+            } => {
+                let exact = match &scheduled.evidence {
+                    Some(ActionEvidence::InventoryAttestation {
+                        scope: evidence_scope,
+                        inventory_frontier_event_id: evidence_frontier,
+                        attempt_manifest_sha256: evidence_manifest,
+                        ..
+                    }) => evidence_scope == scope
+                        && evidence_frontier == inventory_frontier_event_id
+                        && evidence_manifest == attempt_manifest_sha256,
+                    _ => false,
+                };
+                if exact {
+                    inventory_attestations.insert((
+                        serde_json::to_string(scope).unwrap_or_default(),
+                        inventory_frontier_event_id.clone(),
+                        attempt_manifest_sha256.clone(),
+                    ));
+                    SchedulerDisposition::Applied
+                } else {
+                    SchedulerDisposition::PreconditionViolation
                 }
             }
             ScheduleAction::ProcessCrashed { process_id } => {
@@ -1047,10 +1131,28 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
             }
             ScheduleAction::EventSuperseded { .. } => SchedulerDisposition::Applied,
         };
+        let mut disposition = disposition;
+        if let Some(owner_time_ref) = &scheduled.owner_time_ref {
+            let series_key = clock_series_by_mapping_id.get(&owner_time_ref.clock_mapping_action_id);
+            let active_mapping_id = series_key.and_then(|key| active_clock_mapping_ids.get(key));
+            let owner_time_disposition = classify_clock_mapping(
+                active_mapping_id,
+                &owner_time_ref.clock_mapping_action_id,
+                clock_mapping_states.get(&owner_time_ref.clock_mapping_action_id),
+                owner_time_ref.local_timestamp_ns,
+            );
+            if let Some(owner_time_disposition) = owner_time_disposition {
+                if matches!(disposition, SchedulerDisposition::Applied | SchedulerDisposition::Duplicate) {
+                    disposition = owner_time_disposition;
+                }
+            }
+        }
         records.push(ReplayRecord {
             action_id: scheduled.action_id,
             at_ns: scheduled.at_ns,
             ordinal: scheduled.ordinal,
+            owner_time_ref: scheduled.owner_time_ref,
+            evidence: scheduled.evidence,
             disposition,
             action: scheduled.action,
         });
