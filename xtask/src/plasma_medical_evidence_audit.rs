@@ -191,10 +191,10 @@ mod tests {
     fn all_medical_claim_scenarios_replay_with_frozen_counts() {
         let (registry, fixture) = inputs();
         let result = evaluate(&registry, &fixture).expect("medical claim replay");
-        assert_eq!(result.len(), 22);
-        assert_eq!(fixture.counts_expected.supported, 8);
-        assert_eq!(fixture.counts_expected.blocked, 6);
-        assert_eq!(fixture.counts_expected.rejected, 8);
+        assert_eq!(result.len(), 29);
+        assert_eq!(fixture.counts_expected.supported, 11);
+        assert_eq!(fixture.counts_expected.blocked, 7);
+        assert_eq!(fixture.counts_expected.rejected, 11);
     }
     #[test]
     fn phase_one_oncology_safety_signal_does_not_support_efficacy() {
@@ -226,6 +226,32 @@ mod tests {
         let case = fixture.cases.iter().find(|x| x.id == "ONCOLOGY_IDE_MISSTATED_AS_MARKETING_APPROVAL").unwrap();
         assert_eq!(decide(case, &registry).disposition, Disposition::Rejected);
     }
+
+    #[test]
+    fn nonsignificant_venous_ulcer_trial_is_not_promoted_to_superiority_or_equivalence() {
+        let (registry, fixture) = inputs();
+        let superiority = fixture.cases.iter().find(|x| x.id == "VLU_RCT_PROMOTED_TO_STATISTICAL_SUPERIORITY").unwrap();
+        let equivalence = fixture.cases.iter().find(|x| x.id == "VLU_RCT_NON_SIGNIFICANCE_PROMOTED_TO_EQUIVALENCE").unwrap();
+        assert_eq!(decide(superiority, &registry).disposition, Disposition::Rejected);
+        assert_eq!(decide(equivalence, &registry).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn device_catalogue_does_not_establish_medical_efficacy() {
+        let (registry, fixture) = inputs();
+        let case = fixture.cases.iter().find(|x| x.id == "KINPEN_MED_SPECIFICATION_PROMOTED_TO_EFFICACY").unwrap();
+        assert_eq!(decide(case, &registry).disposition, Disposition::Rejected);
+    }
+
+    #[test]
+    fn recruitment_status_does_not_promote_phase_three_protocol_to_results() {
+        let (registry, fixture) = inputs();
+        let status = fixture.cases.iter().find(|x| x.id == "NIPP_RD_III_RECRUITMENT_COMPLETE_STATUS").unwrap();
+        let efficacy = fixture.cases.iter().find(|x| x.id == "NIPP_RD_III_PROTOCOL_AS_EFFICACY_RESULT").unwrap();
+        assert_eq!(decide(status, &registry).disposition, Disposition::Supported);
+        assert_eq!(decide(efficacy, &registry).disposition, Disposition::Rejected);
+    }
+
     #[test]
     fn proposed_dose_framework_is_not_a_validated_universal_standard() {
         let (registry, fixture) = inputs();
