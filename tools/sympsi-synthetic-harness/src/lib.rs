@@ -196,7 +196,7 @@ fn target_mapping_digest(
     context: &TargetMappingContext<'_>,
     counter: u32,
 ) -> Result<[u8; 32], String> {
-    let mut bytes = b"sympsi.aia.target.v1\\0".to_vec();
+    let mut bytes = b"sympsi.aia.target.v1\0".to_vec();
     append_length_prefixed(&mut bytes, context.protocol_id.as_bytes())?;
     append_length_prefixed(&mut bytes, context.campaign_id.as_bytes())?;
     append_length_prefixed(&mut bytes, context.trial_id.as_bytes())?;
