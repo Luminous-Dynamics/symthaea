@@ -1021,7 +1021,7 @@ mod tests {
         let original = source(128, 2);
         let window = FrameWindowV1 { start_frame: 40, end_frame: 64 };
         let output = edited(&original, window, 400);
-        let result = run(&original, 1, [step(1, &original, output, window)]).unwrap();
+        let result = run(&original, 1, &[step(1, &original, output, window)]).unwrap();
         assert_eq!(result.disposition, AudioSequenceDispositionV1::Accepted);
         assert_eq!(result.steps[0].off_support_changed_sample_value_count, 0);
         assert_eq!(result.steps[0].changed_frame_count, 24);
@@ -1034,7 +1034,7 @@ mod tests {
         let mut output = edited(&original, window, 400);
         output.samples[39] = output.samples[39].saturating_add(1);
         assert_eq!(
-            run(&original, 1, [step(1, &original, output, window)]),
+            run(&original, 1, &[step(1, &original, output, window)]),
             Err(AudioContinuityErrorV1::OffSupportMutation)
         );
     }
@@ -1045,7 +1045,7 @@ mod tests {
         let window = FrameWindowV1 { start_frame: 40, end_frame: 64 };
         let unchanged = original.clone();
         assert_eq!(
-            run(&original, 1, [step(1, &original, unchanged, window)]),
+            run(&original, 1, &[step(1, &original, unchanged, window)]),
             Err(AudioContinuityErrorV1::NoAudioMutation)
         );
     }
@@ -1058,7 +1058,7 @@ mod tests {
         let output = edited(&original, transition, 200);
         let mut edit_step = step(1, &original, output, edit);
         edit_step.transition_support = vec![transition];
-        let result = run(&original, 1, [edit_step]).unwrap();
+        let result = run(&original, 1, &[edit_step]).unwrap();
         assert_eq!(result.disposition, AudioSequenceDispositionV1::Accepted);
         assert_eq!(result.steps[0].authorized_frame_count, 32);
     }
@@ -1070,7 +1070,7 @@ mod tests {
         let enlarged = FrameWindowV1 { start_frame: 36, end_frame: 68 };
         let output = edited(&original, enlarged, 200);
         assert_eq!(
-            run(&original, 1, [step(1, &original, output, edit)]),
+            run(&original, 1, &[step(1, &original, output, edit)]),
             Err(AudioContinuityErrorV1::OffSupportMutation)
         );
     }
@@ -1083,7 +1083,7 @@ mod tests {
         let mut edit_step = step(1, &original, output, window);
         edit_step.parent_audio_sha256 = h(999);
         assert_eq!(
-            run(&original, 1, [edit_step]),
+            run(&original, 1, &[edit_step]),
             Err(AudioContinuityErrorV1::ParentDigestMismatch)
         );
     }
@@ -1095,7 +1095,7 @@ mod tests {
         let mut output = edited(&original, window, 200);
         output.format.sample_rate_hz = 44_100;
         assert_eq!(
-            run(&original, 1, [step(1, &original, output, window)]),
+            run(&original, 1, &[step(1, &original, output, window)]),
             Err(AudioContinuityErrorV1::InvalidFormat)
         );
     }
@@ -1107,7 +1107,7 @@ mod tests {
         let mut output = edited(&original, window, 200);
         output.samples.pop();
         assert_eq!(
-            run(&original, 1, [step(1, &original, output, window)]),
+            run(&original, 1, &[step(1, &original, output, window)]),
             Err(AudioContinuityErrorV1::FrameCountMismatch)
         );
     }
@@ -1163,7 +1163,7 @@ mod tests {
         let output = edited(&original, window, 200);
         let mut edit_step = step(1, &original, output, window);
         edit_step.boundary_policy.maximum_jump_delta_samples = None;
-        let result = run(&original, 1, [edit_step]).unwrap();
+        let result = run(&original, 1, &[edit_step]).unwrap();
         assert_eq!(result.disposition, AudioSequenceDispositionV1::AbstainedAtStep);
         assert_eq!(result.steps[0].boundary_gate, AudioGateVerdictV1::Unknown);
     }
@@ -1176,7 +1176,7 @@ mod tests {
         let mut edit_step = step(1, &original, output, window);
         edit_step.boundary_policy.maximum_jump_delta_samples = Some(0);
         edit_step.boundary_policy.maximum_side_rms_delta_samples = Some(0);
-        let result = run(&original, 1, [edit_step]).unwrap();
+        let result = run(&original, 1, &[edit_step]).unwrap();
         assert_eq!(result.disposition, AudioSequenceDispositionV1::RejectedAtStep);
         assert_eq!(result.blocked_at_step, Some(1));
     }
@@ -1192,7 +1192,7 @@ mod tests {
         first.boundary_policy.maximum_side_rms_delta_samples = None;
         let second = step(2, &first_output, second_output, second_window);
         assert_eq!(
-            run(&original, 2, [first, second]),
+            run(&original, 2, &[first, second]),
             Err(AudioContinuityErrorV1::ContinuationAfterBlockedStep)
         );
     }
@@ -1204,7 +1204,7 @@ mod tests {
         let first_output = edited(&original, first_window, 100);
         let second_window = FrameWindowV1 { start_frame: 160, end_frame: 184 };
         let second_output = edited(&first_output, second_window, -75);
-        let result = run(&original, 2, [
+        let result = run(&original, 2, &[
                 step(1, &original, first_output.clone(), first_window),
                 step(2, &first_output, second_output, second_window),
             ]).unwrap();
@@ -1247,7 +1247,7 @@ mod tests {
         let mut edit_step = step(1, &original, output, first);
         edit_step.transition_support = vec![second, first];
         assert_eq!(
-            run(&original, 1, [edit_step]),
+            run(&original, 1, &[edit_step]),
             Err(AudioContinuityErrorV1::NonCanonicalWindows)
         );
         let mut out_of_range = step(
@@ -1256,7 +1256,7 @@ mod tests {
         );
         out_of_range.edit_regions = vec![FrameWindowV1 { start_frame: 100, end_frame: 129 }];
         assert_eq!(
-            run(&original, 1, [out_of_range]),
+            run(&original, 1, &[out_of_range]),
             Err(AudioContinuityErrorV1::InvalidWindow)
         );
     }
