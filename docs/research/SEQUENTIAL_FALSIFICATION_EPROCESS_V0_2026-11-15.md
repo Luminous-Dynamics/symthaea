@@ -153,4 +153,4 @@ Before claiming statistical validity in a campaign:
 - sealed alternative-specific power and detection-delay evaluation;
 - independent review of the alternative custody and action-prediction event log.
 
-A successful implementation test is not a scientific result, an external benchmark result, or physical validation. The exact-head smoke simulation is calibration evidence for one frozen synthetic generator only; a campaign still needs independently custodied null families, confidence intervals, terminal-test parity and matched baselines.
+A successful implementation test is not a scientific result, an external benchmark result, or physical validation. The exact-head 20,000-path / 100-look smoke simulation and the separate calibration binary are evidence only for the frozen synthetic generator and seed schedule. They do not prove universal 5% type-I control; a campaign still needs independent null families, family-clustered uncertainty, terminal-test parity and matched baselines.
