@@ -587,6 +587,7 @@ pub fn summarize_cognitive_process(
             human_first_attempt_rate: None,
             human_monitoring_rate: None,
             human_reflection_rate: None,
+            ai_core_step_supply_rate: None,
             ai_core_step_substitution_rate: None,
             human_verification_rate: None,
         });
@@ -628,7 +629,8 @@ pub fn summarize_cognitive_process(
         human_first_attempt_rate: rate(attempted_first, observations.len()),
         human_monitoring_rate: rate(monitored, observations.len()),
         human_reflection_rate: rate(reflected, observations.len()),
-        ai_core_step_substitution_rate: rate(ai_substitution, observations.len()),
+        ai_core_step_supply_rate: rate(ai_core_steps, observations.len()),
+        ai_core_step_substitution_rate: rate(ai_substitution, ai_core_steps),
         human_verification_rate: rate(verified_ai_steps, ai_core_steps),
     })
 }
@@ -746,7 +748,8 @@ mod tests {
         assert_eq!(summary.opportunity_count, 3);
         assert_eq!(summary.ai_core_step_count, 2);
         assert!((summary.human_first_attempt_rate.unwrap() - 2.0 / 3.0).abs() < 1e-12);
-        assert!((summary.ai_core_step_substitution_rate.unwrap() - 1.0 / 3.0).abs() < 1e-12);
+        assert!((summary.ai_core_step_supply_rate.unwrap() - 2.0 / 3.0).abs() < 1e-12);
+        assert!((summary.ai_core_step_substitution_rate.unwrap() - 0.5).abs() < 1e-12);
         assert_eq!(summary.human_verification_rate, Some(0.5));
     }
 
