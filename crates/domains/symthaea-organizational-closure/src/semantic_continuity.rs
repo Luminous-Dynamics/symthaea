@@ -1234,9 +1234,9 @@ mod tests {
 
     #[test]
     fn required_provenance_cannot_be_omitted() {
-        let mut baseline = transition();
-        baseline.lineage.clear();
+        let baseline = transition();
         let mut candidate = baseline.clone();
+        candidate.lineage.clear();
         let policy = SemanticContinuityPolicy {
             provenance_required_for_actions: ["refresh".into()].into(),
             ..SemanticContinuityPolicy::default()
