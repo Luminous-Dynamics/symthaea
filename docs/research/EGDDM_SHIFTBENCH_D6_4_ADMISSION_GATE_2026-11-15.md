@@ -92,7 +92,7 @@ D6 uses twelve intervention families:
 11. Common-cause environment change.
 12. Cross-repository contract or schema change.
 
-Intervention position is assigned by planned work completed, not wall-clock elapsed time: early (15%), middle (50%) and late (85%). Store the exact work-unit denominator and realized position in the eventual trial record. A nominal "late" intervention is not late if the agent has done little work.
+The exact intervention position is assigned by planned work completed, not wall-clock elapsed time: p10, p20, p30, p40, p50, p60, p70, p80 or p90. Store both the exact percentile and its planned-work denominator in every trial record. The manifest's `position_percentile` is the exact position; `position` is only its broad reporting aggregate: early (10–30%), middle (40–60%) or late (70–90%). The admission checker rejects percentiles outside the nine-point schedule and mismatches between the exact position and aggregate. A nominal "late" intervention is not late if the agent has done little work.
 
 ## 5. Controls and causal identification
 
@@ -114,7 +114,7 @@ The branch adds:
 - JSON Schema \`egddm-shiftbench-task-admission-v0.1.schema.json\`
 - a synthetic fixture \`fixtures/egddm-shiftbench-task-admission-v0.1.synthetic.json\`
 
-The checker fails closed on missing or malformed task/snapshot digests, unsupported intervention families or positions, reference-patch failure, empty-patch success, non-matching grader environments, incomplete blind reconstruction, author/adjudicator overlap, gold-label exposure, shared candidate/evaluator environment, unrestricted network, or missing pristine regrade/custody declarations.
+The checker fails closed on missing or malformed task/snapshot digests, unsupported intervention families or positions/percentiles, phase/percentile mismatches, reference-patch failure, empty-patch success, non-matching grader environments, incomplete blind reconstruction, author/adjudicator overlap, gold-label exposure, shared candidate/evaluator environment, unrestricted network, or missing pristine regrade/custody declarations.
 
 The sample fixture is intentionally marked \`fixture_kind: synthetic\` and contains placeholder digests. It demonstrates the expected contract; it is not a real or admitted benchmark task.
 
@@ -155,7 +155,7 @@ Admission targets:
 
 Capability targets must be set after the pilot reveals the baseline distribution. The first preregistration should specify minimum paired sample sizes, task exclusions, confidence intervals, best-of-N/pass-all-N reporting and a stopping rule. Do not pre-claim a numerical improvement over SWE-Shift or SWE-Bench Pro V2.
 
-A reasonable first operational pilot is one independently authored task per family/position cell (36 task candidates), then add seeds only after the admission pipeline and scorer survive red-team controls. This 36-task pilot is a validation stage, not a replacement for the D6 target of 360 matched scenario pairs.
+A reasonable first operational pilot is one independently authored task per family/position cell (108 candidate tasks), then add seeds only after the admission pipeline and scorer survive red-team controls. This 108-task pilot is a validation stage, not a replacement for the D6 target of 540 matched scenario pairs (five seeds per cell).
 
 ## 9. Acceptance tests and limits
 
