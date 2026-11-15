@@ -123,6 +123,10 @@ Require the paired external AUC difference to exceed a preregistered minimum mea
 
 The published upper cross-trial AUC anchor of approximately 0.68 is a reproduction target, not a universal performance ceiling. An AUC of 0.70 on a different cohort, outcome or split does not beat it. A higher AUC with worse calibration or no decision benefit is not sufficient.
 
+**Stretch research target:** achieve AUC ≥0.70 in each of the preregistered cross-trial directions, on the identical outcome and compatible participant set, with the paired confidence interval for improvement over the reproduced published baseline excluding zero. Treat ≥0.70 as an aspiration, not an acceptance threshold or an independently established clinical cutoff. A result that reaches it in one direction but fails in the reverse direction is a directional result, not general transport superiority. Calibration, clinically relevant sensitivity, subgroup reliability and decision utility must remain acceptable.
+
+Do not set a numerical superiority margin after seeing held-out outcomes. The study protocol and clinical collaborators must define the minimum meaningful paired difference before the lockbox is opened, with the uncertainty and sample-size constraints documented.
+
 ### Gate D — independent third-trial transport
 
 Before making a broad generalization claim, validate on a third independent trial / institution not used for model design. Two-trial cross-validation is stronger than a random split but remains a limited evidence base.
