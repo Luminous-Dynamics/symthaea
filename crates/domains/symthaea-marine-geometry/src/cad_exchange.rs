@@ -75,6 +75,8 @@ pub struct ArtifactReference {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BackendIdentity {
+    /// Product/backend implementation family, not an arbitrary executable label.
+    pub backend_family: String,
     pub backend_id: String,
     pub version: String,
     pub build_digest_blake3: String,
@@ -135,6 +137,8 @@ pub struct CadTranslationPayload {
     pub geometry_semantic: GeometrySemantic,
     /// Explicit, human-readable statement of what the artifact represents.
     pub semantic_scope: String,
+    /// True only when the external deck/freeboard geometry is actually modelled.
+    pub has_deck_freeboard_surface: bool,
     /// A displacement shell's waterplane cap must never be labelled as deck/freeboard.
     pub waterplane_cap_is_deck: bool,
     pub source_artifact: ArtifactReference,
@@ -179,9 +183,11 @@ pub fn compute_receipt_digest(
 }
 
 fn backends_are_independent(exporter: &BackendIdentity, importer: &BackendIdentity) -> bool {
-    exporter.backend_id != importer.backend_id
-        || exporter.version != importer.version
-        || exporter.build_digest_blake3 != importer.build_digest_blake3
+    !exporter.backend_family.trim().is_empty()
+        && !importer.backend_family.trim().is_empty()
+        && exporter.backend_family != importer.backend_family
+        && exporter.backend_id != importer.backend_id
+        && exporter.build_digest_blake3 != importer.build_digest_blake3
 }
 
 fn disposition_from_checks(
@@ -255,8 +261,10 @@ pub fn verify_translation_receipt(
         );
     }
 
-    if payload.exporter.backend_id.trim().is_empty()
+    if payload.exporter.backend_family.trim().is_empty()
+        || payload.exporter.backend_id.trim().is_empty()
         || payload.exporter.version.trim().is_empty()
+        || payload.importer.backend_family.trim().is_empty()
         || payload.importer.backend_id.trim().is_empty()
         || payload.importer.version.trim().is_empty()
     {
@@ -284,7 +292,7 @@ pub fn verify_translation_receipt(
     }
 
     if payload.geometry_semantic == GeometrySemantic::DisplacementVolumeShell
-        && payload.waterplane_cap_is_deck
+        && (payload.waterplane_cap_is_deck || payload.has_deck_freeboard_surface)
     {
         add_violation(
             &mut violations,
@@ -294,7 +302,8 @@ pub fn verify_translation_receipt(
     }
 
     if payload.geometry_semantic == GeometrySemantic::FullExternalHull
-        && payload.semantic_scope.to_ascii_lowercase().contains("waterplane-capped displacement")
+        && (!payload.has_deck_freeboard_surface
+            || payload.semantic_scope.to_ascii_lowercase().contains("waterplane-capped displacement"))
     {
         add_violation(
             &mut violations,
@@ -359,6 +368,66 @@ pub fn verify_translation_receipt(
                 format!("required translation check '{}' is missing", required),
             ),
         }
+    }
+
+    let metric_requirements = [
+        (
+            "length-deviation",
+            payload.evidence.metrics.max_absolute_length_deviation_m,
+            payload.tolerance_profile.max_absolute_length_deviation_m,
+        ),
+        (
+            "volume-deviation",
+            payload.evidence.metrics.relative_volume_deviation,
+            payload.tolerance_profile.max_relative_volume_deviation,
+        ),
+        (
+            "area-deviation",
+            payload.evidence.metrics.relative_area_deviation,
+            payload.tolerance_profile.max_relative_area_deviation,
+        ),
+        (
+            "centroid-deviation",
+            payload.evidence.metrics.centroid_deviation_m,
+            payload.tolerance_profile.max_centroid_deviation_m,
+        ),
+        (
+            "surface-deviation",
+            payload.evidence.metrics.max_surface_deviation_m,
+            payload.tolerance_profile.max_surface_deviation_m,
+        ),
+        (
+            "edge-gap",
+            payload.evidence.metrics.max_edge_gap_m,
+            payload.tolerance_profile.max_edge_gap_m,
+        ),
+    ];
+    for (check_code, measured, limit) in metric_requirements {
+        if payload.tolerance_profile.required_checks.iter().any(|required| required == check_code) {
+            match measured {
+                Some(value) if value.is_finite() && value >= 0.0 && value <= limit => {}
+                Some(value) if !value.is_finite() || value < 0.0 || value > limit => add_violation(
+                    &mut violations,
+                    "metric_outside_tolerance",
+                    format!("metric '{}' value {} exceeds or invalidates its declared tolerance {}", check_code, value, limit),
+                ),
+                None => add_violation(
+                    &mut violations,
+                    "required_metric_missing",
+                    format!("required metric '{}' has no measured value", check_code),
+                ),
+            }
+        }
+    }
+
+    if payload.geometry_semantic == GeometrySemantic::FullExternalHull
+        && payload.target_representation != RepresentationKind::ExactBrep
+    {
+        add_violation(
+            &mut violations,
+            "full_hull_requires_exact_brep",
+            "the initial full-external-hull exchange profile requires an exact B-rep target; a tessellation alone is not a CAD hull surface",
+        );
     }
 
     if payload.evidence.disposition != TranslationDisposition::QualifiedWithinProfile
@@ -434,6 +503,7 @@ mod tests {
 
     fn backend(id: &str) -> BackendIdentity {
         BackendIdentity {
+            backend_family: id.into(),
             backend_id: id.into(),
             version: "1.0.0".into(),
             build_digest_blake3: digest(&format!("{id}-build")),
@@ -457,6 +527,7 @@ mod tests {
             candidate_id: "cad-fixture-001".into(),
             geometry_semantic: GeometrySemantic::FullExternalHull,
             semantic_scope: "full external hull including deck/freeboard surfaces".into(),
+            has_deck_freeboard_surface: true,
             waterplane_cap_is_deck: false,
             source_artifact: ArtifactReference {
                 artifact_id: "source-geometry-001".into(),
@@ -548,6 +619,7 @@ mod tests {
         let mut item = receipt();
         item.payload.geometry_semantic = GeometrySemantic::DisplacementVolumeShell;
         item.payload.semantic_scope = "waterplane-capped displacement volume".into();
+        item.payload.has_deck_freeboard_surface = false;
         item.payload.waterplane_cap_is_deck = true;
         item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
         let error = verify_translation_receipt(&item).unwrap_err();
@@ -559,12 +631,31 @@ mod tests {
     #[test]
     fn full_external_hull_cannot_be_a_waterplane_capped_displacement_shell() {
         let mut item = receipt();
+        item.payload.has_deck_freeboard_surface = false;
         item.payload.semantic_scope = "waterplane-capped displacement shell".into();
         item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
         let error = verify_translation_receipt(&item).unwrap_err();
         assert!(error
             .iter()
             .any(|issue| issue.code == "full_hull_semantic_mismatch"));
+    }
+
+    #[test]
+    fn translation_metric_cannot_exceed_its_frozen_tolerance() {
+        let mut item = receipt();
+        item.payload.evidence.metrics.relative_volume_deviation = Some(1.0e-3);
+        item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
+        let error = verify_translation_receipt(&item).unwrap_err();
+        assert!(error.iter().any(|issue| issue.code == "metric_outside_tolerance"));
+    }
+
+    #[test]
+    fn full_hull_cannot_be_qualified_by_tessellation_only() {
+        let mut item = receipt();
+        item.payload.target_representation = RepresentationKind::TessellatedBrep;
+        item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
+        let error = verify_translation_receipt(&item).unwrap_err();
+        assert!(error.iter().any(|issue| issue.code == "full_hull_requires_exact_brep"));
     }
 
     #[test]
