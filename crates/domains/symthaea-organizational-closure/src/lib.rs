@@ -28,6 +28,7 @@ pub mod identity;
 pub mod model_refinement;
 pub mod reconfiguration;
 pub mod semantic_continuity;
+pub mod transport_bounds;
 pub mod viability;
 
 pub use algorithmic_residual::{
@@ -72,6 +73,13 @@ pub use reconfiguration::{
     EdgeRequirement, ExternalDependencyEdge, ProcessInputEdge, ProcessOutputEdge,
     ReconfigurationDiff, ReconfigurationFinding, ReconfigurationFindingCode, ReconfigurationPolicy,
     ReconfigurationQualification, ReconfigurationReport, evaluate_reconfiguration,
+};
+pub use transport_bounds::{
+    SourceTrialOutcome, TargetPotentialOutcomeRow, TargetStratumMass, TransportArmBounds,
+    TransportClaim, TransportDecision, TransportDecisionQuality, TransportEffectInterval,
+    TransportFinding, TransportFindingCode, TransportOracle, TransportQualification,
+    TransportReport, TransportScenario, TransportStratumReport, TransportTrace,
+    evaluate_transport_bounds,
 };
 pub use semantic_continuity::{
     AuthorityBinding, ConsentBinding, ConsentStatus, DependencyStatus, EffectRecord,
