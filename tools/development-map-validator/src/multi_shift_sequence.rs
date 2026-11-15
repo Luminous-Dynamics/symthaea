@@ -723,7 +723,7 @@ fn score_trace(
         let report = MultiShiftEpochReport {
             epoch,
             event_id: event_id.clone(),
-            decision_cutoff: decision_cutoff.to_rfc3339(),
+            decision_cutoff: required_str(checkpoint, "decision_cutoff", &label)?.to_owned(),
             required_revalidation_obligations: required.iter().cloned().collect(),
             dependency_implied_revalidation_obligations: dependency_implied.iter().cloned().collect(),
             dependency_only_impact_obligations: dependency_only.iter().cloned().collect(),
