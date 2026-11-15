@@ -42,6 +42,24 @@ The evaluator retains at most one worst-case-VMG candidate per tack. It only dec
 
 The robust module does **not** yet model vertical wind profile, apparent-wind conversion, leeway, heel/roll, waves, tack/gybe duration or loss, actuator response, weather evolution, COLREG encounter resolution or a closed-loop sailcraft dynamics model. Those are separate research increments.
 
+## Tack and gybe transition-cost envelopes
+
+The `transition` module adjusts a robust steady-course VMG interval over a fixed scoring horizon using a source-bound interval for:
+- elapsed tack or gybe time;
+- signed ground progress toward the active waypoint during the manoeuvre;
+- exact craft/configuration, polar-artifact and actuator-model identities;
+- common timebase, source digest and freshness.
+
+For horizon (H), transition duration interval (T_m), signed transition progress (D_m), and post-transition steady VMG interval (V_s):
+
+`D_total = D_m + V_s × (H - T_m)`
+
+`V_effective = D_total / H`
+
+All endpoint products are evaluated. Negative transition progress is preserved. The duration upper bound must be strictly shorter than the horizon. Missing, stale, conflicted, mismatched or malformed transition evidence is not scored.
+
+This is an interval arithmetic contract, not a physical tack/gybe model. The input bounds must be justified by a vessel-specific model or instrumented manoeuvre campaign before use in a physical claim. The module has no helm, rudder, sail-sheet, reef or furl actuator output.
+
 ## Explicit exclusions
 
 This P0 kernel does not implement or validate:
