@@ -53,9 +53,9 @@ jobs:
           path = "$GITHUB_WORKSPACE/crates/domains/symthaea-sailcraft/src/lib.rs"
           EOF
       - name: Apply canonical Rust formatting in isolated checkout
-        run: rustfmt --edition 2024 crates/domains/symthaea-sailcraft/src/lib.rs crates/domains/symthaea-sailcraft/src/robust.rs
+        run: rustfmt --edition 2024 crates/domains/symthaea-sailcraft/src/lib.rs crates/domains/symthaea-sailcraft/src/robust.rs crates/domains/symthaea-sailcraft/src/transition.rs
       - name: Verify normalized Rust formatting
-        run: rustfmt --edition 2024 --check crates/domains/symthaea-sailcraft/src/lib.rs crates/domains/symthaea-sailcraft/src/robust.rs
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-sailcraft/src/lib.rs crates/domains/symthaea-sailcraft/src/robust.rs crates/domains/symthaea-sailcraft/src/transition.rs
       - name: Run isolated P0 and robust-route Rust tests
         run: cargo test --manifest-path "$RUNNER_TEMP/sailcraft-robust-p1/Cargo.toml" --all-targets
       - name: Run strict Clippy for isolated P0 and robust-route kernel
@@ -68,7 +68,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add crates/domains/symthaea-sailcraft/src/lib.rs crates/domains/symthaea-sailcraft/src/robust.rs
+          git add crates/domains/symthaea-sailcraft/src/lib.rs crates/domains/symthaea-sailcraft/src/robust.rs crates/domains/symthaea-sailcraft/src/transition.rs
           tested_tree="$(git write-tree)"
           if ! git diff --cached --quiet; then
             git commit -m "chore(marine): normalize robust sailcraft evaluator sources"
