@@ -48,6 +48,8 @@ pub struct MultiShiftEpochReport {
     pub receipt_source_context_mismatch_obligations: Vec<String>,
     pub future_evidence_leakage_obligations: Vec<String>,
     pub unsupported_current_claims: Vec<String>,
+    pub unclaimed_active_obligations: Vec<String>,
+    pub critical_unclaimed_obligations: Vec<String>,
     pub invalid_fresh_receipts: Vec<ReceiptIssue>,
     pub invalid_reuse_receipts: Vec<ReceiptIssue>,
     pub critical_false_resurrection_count: usize,
@@ -70,6 +72,8 @@ pub struct MultiShiftTraceReport {
     pub total_stale_carryovers: usize,
     pub total_future_evidence_leakages: usize,
     pub total_unsupported_current_claims: usize,
+    pub total_unclaimed_active_obligations: usize,
+    pub total_critical_unclaimed_obligations: usize,
     pub total_direct_dependency_only_impact_labels: usize,
     pub total_gold_only_impact_labels: usize,
 }
@@ -569,6 +573,8 @@ fn score_trace(
     let mut total_stale_carryovers = 0usize;
     let mut total_future_leakages = 0usize;
     let mut total_unsupported = 0usize;
+    let mut total_unclaimed = 0usize;
+    let mut total_critical_unclaimed = 0usize;
     let mut total_dependency_only = 0usize;
     let mut total_gold_only = 0usize;
     let mut previous_cutoff: Option<DateTime<FixedOffset>> = None;
@@ -753,6 +759,13 @@ fn score_trace(
             .collect();
         let unsupported_current: BTreeSet<String> =
             declared_current.difference(&supported_current).cloned().collect();
+        let unclaimed_active: BTreeSet<String> =
+            active.difference(&declared_current).cloned().collect();
+        let critical_unclaimed: BTreeSet<String> = unclaimed_active
+            .iter()
+            .filter(|id| obligations.get(*id).is_some_and(|item| item.critical))
+            .cloned()
+            .collect();
 
         // A reused receipt can be current only if the complete set of
         // dependency dimensions declared by this obligation still matches.
@@ -781,6 +794,8 @@ fn score_trace(
             receipt_source_context_mismatch_obligations: source_context_mismatch.iter().cloned().collect(),
             future_evidence_leakage_obligations: future_leakage.iter().cloned().collect(),
             unsupported_current_claims: unsupported_current.iter().cloned().collect(),
+            unclaimed_active_obligations: unclaimed_active.iter().cloned().collect(),
+            critical_unclaimed_obligations: critical_unclaimed.iter().cloned().collect(),
             invalid_fresh_receipts,
             invalid_reuse_receipts,
             critical_false_resurrection_count: critical_false_resurrections,
@@ -799,6 +814,8 @@ fn score_trace(
         total_stale_carryovers += report.stale_carryover_obligations.len();
         total_future_leakages += report.future_evidence_leakage_obligations.len();
         total_unsupported += report.unsupported_current_claims.len();
+        total_unclaimed += report.unclaimed_active_obligations.len();
+        total_critical_unclaimed += report.critical_unclaimed_obligations.len();
         total_dependency_only += report.dependency_only_impact_obligations.len();
         total_gold_only += report.gold_only_impact_obligations.len();
         epoch_reports.push(report);
@@ -816,6 +833,8 @@ fn score_trace(
         total_stale_carryovers,
         total_future_evidence_leakages: total_future_leakages,
         total_unsupported_current_claims: total_unsupported,
+        total_unclaimed_active_obligations: total_unclaimed,
+        total_critical_unclaimed_obligations: total_critical_unclaimed,
         total_direct_dependency_only_impact_labels: total_dependency_only,
         total_gold_only_impact_labels: total_gold_only,
     })
@@ -851,15 +870,16 @@ fn score_restoration_control(
     }
     let decision_cutoff = parse_time(control, "decision_cutoff", "restoration_control")?;
     let active = unique_string_set(control, "active_obligation_ids", "restoration_control")?;
-    for id in &active {
-        let obligation = obligations
-            .get(id)
-            .ok_or_else(|| format!("restoration control references unknown obligation {id:?}"))?;
-        if obligation.introduced_epoch != 0 {
-            return Err(format!(
-                "restoration control baseline arm cannot activate later-introduced obligation {id:?}"
-            ));
-        }
+    let expected_active: BTreeSet<String> = obligations
+        .iter()
+        .filter(|(_, obligation)| obligation.introduced_epoch == 0)
+        .map(|(id, _)| id.clone())
+        .collect();
+    if active != expected_active {
+        return Err(format!(
+            "restoration active_obligation_ids must cover every baseline obligation: expected {:?}, got {:?}",
+            expected_active, active
+        ));
     }
 
     let receipts = control
@@ -1060,6 +1080,8 @@ mod tests {
         assert_eq!(conformant.total_under_revalidation_units, 0);
         assert_eq!(conformant.total_false_resurrections, 0);
         assert_eq!(conformant.total_critical_false_resurrections, 0);
+        assert_eq!(conformant.total_unclaimed_active_obligations, 0);
+        assert_eq!(conformant.total_critical_unclaimed_obligations, 0);
         assert_eq!(conformant.total_direct_dependency_only_impact_labels, 0);
         assert_eq!(conformant.total_gold_only_impact_labels, 0);
         assert_eq!(report.gold_adjudication_status, "synthetic_known_answer_not_independently_adjudicated");
@@ -1267,6 +1289,29 @@ mod tests {
             .pop();
         let error = score_multi_shift_sequence_json(&value.to_string()).unwrap_err();
         assert!(error.contains("exactly the required obligation IDs"));
+    }
+
+    #[test]
+    fn explicit_abstention_is_reported_separately_from_unsupported_claims() {
+        let mut value = fixture_value();
+        value["candidate_traces"][0]["checkpoints"][2]["declared_current_obligations"]
+            .as_array_mut().expect("declared current")
+            .retain(|item| item.as_str() != Some("docs-format"));
+        let report = report_for(&value);
+        let result = trace(&report, "conformant-sequence");
+        assert!(result.epochs[2].unclaimed_active_obligations.contains(&"docs-format".to_owned()));
+        assert!(!result.epochs[2].critical_unclaimed_obligations.contains(&"docs-format".to_owned()));
+        assert!(!result.epochs[2].unsupported_current_claims.contains(&"docs-format".to_owned()));
+    }
+
+    #[test]
+    fn restoration_control_cannot_omit_a_baseline_obligation() {
+        let mut value = fixture_value();
+        value["restoration_control"]["active_obligation_ids"]
+            .as_array_mut().expect("active obligations")
+            .retain(|item| item.as_str() != Some("release-authority"));
+        let error = score_multi_shift_sequence_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("must cover every baseline obligation"));
     }
 
     #[test]
