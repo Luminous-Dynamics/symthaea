@@ -73,6 +73,8 @@ pub struct SourceObservationV1 {
     pub schema_version: String,
     pub source_artifact_sha256: String,
     pub source_lineage_sha256: String,
+    /// Digest of the upstream observation/grounding attestation receipt.
+    pub observation_evidence_receipt_sha256: String,
     pub duration_ticks: u64,
     /// Canonical order by event_id.
     pub events: Vec<SourceEventV1>,
@@ -88,6 +90,7 @@ struct SourceObservationCommitmentV1<'a> {
     schema_version: &'a str,
     source_artifact_sha256: &'a str,
     source_lineage_sha256: &'a str,
+    observation_evidence_receipt_sha256: &'a str,
     duration_ticks: u64,
     events: &'a [SourceEventV1],
     anchors: &'a [TemporalAnchorV1],
@@ -174,6 +177,8 @@ pub enum GroundingEvidenceKindV1 {
 pub struct OccurrenceGroundingEvidenceV1 {
     pub occurrence_id: String,
     pub source_observation_sha256: String,
+    /// Digest of the occurrence-level detector/annotation evidence receipt.
+    pub evidence_receipt_sha256: String,
     pub evidence_kind: GroundingEvidenceKindV1,
     pub confidence_bp: u16,
 }
@@ -320,6 +325,7 @@ fn observation_commitment(
         schema_version: &observation.schema_version,
         source_artifact_sha256: &observation.source_artifact_sha256,
         source_lineage_sha256: &observation.source_lineage_sha256,
+        observation_evidence_receipt_sha256: &observation.observation_evidence_receipt_sha256,
         duration_ticks: observation.duration_ticks,
         events: &observation.events,
         anchors: &observation.anchors,
@@ -351,6 +357,7 @@ pub fn validate_source_observation_v1(
     }
     if !valid_sha256(&observation.source_artifact_sha256)
         || !valid_sha256(&observation.source_lineage_sha256)
+        || !valid_sha256(&observation.observation_evidence_receipt_sha256)
         || !valid_sha256(&observation.observation_sha256)
     {
         return Err(IntentPlanIssueV1::InvalidDigest);
@@ -778,6 +785,7 @@ pub fn verify_music_edit_intent_plan_v1(
             for (evidence, occurrence_id) in plan.grounding_evidence.iter().zip(expected_occurrences.iter()) {
                 if evidence.occurrence_id != *occurrence_id
                     || evidence.source_observation_sha256 != observation.observation_sha256
+                    || !valid_sha256(&evidence.evidence_receipt_sha256)
                     || evidence.confidence_bp > MAX_CONFIDENCE_BP_V1
                 {
                     return Err(IntentPlanIssueV1::GroundingEvidenceMismatch);
@@ -817,6 +825,7 @@ mod tests {
             schema_version: SOURCE_OBSERVATION_SCHEMA_V1.to_owned(),
             source_artifact_sha256: h(1),
             source_lineage_sha256: h(2),
+            observation_evidence_receipt_sha256: h(90),
             duration_ticks: 6_000,
             events: vec![
                 event("bass-note-1", "bass", 100, 300),
@@ -904,6 +913,7 @@ mod tests {
             grounding_evidence: occurrence_ids.iter().map(|id| OccurrenceGroundingEvidenceV1 {
                 occurrence_id: id.clone(),
                 source_observation_sha256: observation.observation_sha256.clone(),
+                evidence_receipt_sha256: h(500),
                 evidence_kind: GroundingEvidenceKindV1::EventMap,
                 confidence_bp: 9_500,
             }).collect(),
@@ -994,6 +1004,7 @@ mod tests {
         plan.grounding_evidence = ids.iter().map(|id| OccurrenceGroundingEvidenceV1 {
             occurrence_id: id.clone(),
             source_observation_sha256: observation.observation_sha256.clone(),
+            evidence_receipt_sha256: h(501),
             evidence_kind: GroundingEvidenceKindV1::HumanAnnotation,
             confidence_bp: 10_000,
         }).collect();
@@ -1136,6 +1147,25 @@ mod tests {
             verify_music_edit_intent_plan_v1(&observation, &plan),
             Err(IntentPlanIssueV1::InvalidOperationParameter)
         );
+    }
+
+    #[test]
+    fn malformed_occurrence_evidence_receipt_digest_rejects() {
+        let observation = source();
+        let mut plan = base_plan(&observation);
+        plan.grounding_evidence[0].evidence_receipt_sha256 = "not-a-digest".to_owned();
+        assert_eq!(
+            verify_music_edit_intent_plan_v1(&observation, &plan),
+            Err(IntentPlanIssueV1::GroundingEvidenceMismatch)
+        );
+    }
+
+    #[test]
+    fn malformed_source_observation_receipt_digest_rejects() {
+        let mut observation = source();
+        observation.observation_evidence_receipt_sha256 = "not-a-digest".to_owned();
+        let result = seal_source_observation_v1(observation);
+        assert_eq!(result, Err(IntentPlanIssueV1::InvalidDigest));
     }
 
     #[test]
