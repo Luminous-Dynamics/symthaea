@@ -50,6 +50,7 @@ jobs:
           cp tools/mel-music-sequence-integrity-harness/Cargo.toml "$staged/Cargo.toml"
           cp tools/mel-music-sequence-integrity-harness/src/lib.rs "$staged/src/lib.rs"
           cp tools/mel-music-sequence-integrity-harness/examples/eight_step_session.rs "$staged/examples/eight_step_session.rs"
+          cp tools/mel-music-sequence-integrity-harness/examples/reversibility_and_commutativity.rs "$staged/examples/reversibility_and_commutativity.rs"
           echo "MEL_SEQUENCE_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
 
       - name: Normalize staged formatting and check
@@ -66,6 +67,9 @@ jobs:
       - name: Run deterministic eight-step preservation fixture
         run: cargo +1.96.0 run --locked --manifest-path "$MEL_SEQUENCE_MANIFEST" --example eight_step_session
 
+      - name: Run reversible operation and commutativity controls
+        run: cargo +1.96.0 run --locked --manifest-path "$MEL_SEQUENCE_MANIFEST" --example reversibility_and_commutativity
+
       - name: Run Clippy with warnings denied
         run: cargo +1.96.0 clippy --locked --manifest-path "$MEL_SEQUENCE_MANIFEST" --all-targets -- -D warnings
 
@@ -78,6 +82,7 @@ jobs:
           sha256sum tools/mel-music-sequence-integrity-harness/Cargo.toml > "$evidence/manifest.sha256"
           sha256sum tools/mel-music-sequence-integrity-harness/src/lib.rs > "$evidence/library.sha256"
           sha256sum tools/mel-music-sequence-integrity-harness/examples/eight_step_session.rs > "$evidence/example.sha256"
+          sha256sum tools/mel-music-sequence-integrity-harness/examples/reversibility_and_commutativity.rs > "$evidence/reversibility-example.sha256"
           sha256sum benchmarks/mel/schemas/music-edit-sequence-v1.schema.json > "$evidence/schema.sha256"
           sha256sum "$(dirname "$MEL_SEQUENCE_MANIFEST")/Cargo.lock" > "$evidence/Cargo.lock.sha256"
           cp "$(dirname "$MEL_SEQUENCE_MANIFEST")/Cargo.lock" "$evidence/Cargo.lock"
