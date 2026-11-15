@@ -2849,18 +2849,27 @@ mod tests {
     /// it does not claim that the state-dependent HDC-LTC neuron is an exact flow.
     #[test]
     fn exponential_rate_gate_is_partition_consistent_but_product_gate_is_not() {
-        let sigma_base = 0.5_f32;
+        let gate_logit = 0.0_f32;
+        let stable_softplus =
+            |x: f32| x.max(0.0) + (-x.abs()).exp().ln_1p();
+        let sigma_base = 1.0 / (1.0 + (-gate_logit).exp());
         let tau = 0.1_f32;
         let dt = tau;
-        let lambda = -(1.0 - sigma_base).ln() / tau;
+        let lambda = stable_softplus(gate_logit) / tau;
 
         let rate_retention = |step: f32| (-lambda * step).exp();
+        let rate_sigma = |step: f32| -(-lambda * step).exp_m1();
         let rate_one = rate_retention(dt);
         let rate_two = rate_retention(dt / 2.0).powi(2);
         assert!(
             (rate_one - rate_two).abs() < 2e-7,
             "exponential-rate retention must compose: full={rate_one}, halves={rate_two}"
         );
+        assert!(
+            (rate_sigma(tau) - sigma_base).abs() < 2e-7,
+            "rate mapping must preserve the original gate at dt=tau"
+        );
+        assert_eq!(rate_sigma(0.0), 0.0);
 
         let product_retention = |step: f32| {
             1.0 - sigma_base * (1.0 - (-step / tau).exp())
@@ -2873,8 +2882,11 @@ mod tests {
              full={product_one}, halves={product_two}"
         );
 
-        let rate_sigma_at_zero = 1.0 - (-lambda * 0.0).exp();
-        assert_eq!(rate_sigma_at_zero, 0.0);
+        let large_logit_rate = stable_softplus(80.0) / tau;
+        assert!(
+            large_logit_rate.is_finite() && large_logit_rate > 0.0,
+            "softplus rate must remain finite for large positive logits"
+        );
     }
 
     /// Acceptance regression for the currently known zero-time identity defect.
