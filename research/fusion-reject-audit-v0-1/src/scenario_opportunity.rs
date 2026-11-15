@@ -16,8 +16,8 @@ use super::decision_opportunity::{
     epsilon_dominates, epsilon_equivalent, is_epsilon_frontier_extension, valid_objective_vector,
 };
 use super::{
-    AuditError, AuditOutcome, RejectAuditPlan, audit_rejected_candidates,
-    upper_hypergeometric_population_successes,
+    AuditError, AuditOutcome, BOUND_METHOD, RejectAuditPlan, SAMPLING_ALGORITHM,
+    audit_rejected_candidates, upper_hypergeometric_population_successes,
 };
 
 pub const SCENARIO_OPPORTUNITY_VERSION: &str = "fusion-scenario-opportunity/0.1";
@@ -220,8 +220,20 @@ pub struct UnionOpportunityRecallReport {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ScenarioEvaluationReceiptRef {
+    pub candidate_id: String,
+    pub scenario_id: String,
+    pub run_id: String,
+    pub evidence_ref: String,
+    pub reference_outcome: AuditOutcome,
+    pub within_declared_domain: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct ScenarioOpportunityReport {
     pub contract_version: &'static str,
+    pub bound_method: &'static str,
+    pub sampling_algorithm: &'static str,
     pub opportunity_rule: &'static str,
     pub campaign_id: String,
     pub scenario_manifest_sha256: String,
@@ -240,6 +252,8 @@ pub struct ScenarioOpportunityReport {
     pub feasibility_target_met: bool,
     pub union: UnionOpportunityRecallReport,
     pub scenarios: Vec<ScenarioRecallReport>,
+    /// Exact ordered run/evidence references consumed by this report.
+    pub evaluation_receipts: Vec<ScenarioEvaluationReceiptRef>,
 }
 
 /// Audit candidate opportunities across a frozen family of required scenarios.
@@ -498,8 +512,41 @@ pub fn audit_scenario_opportunities(
         strata: union_stratum_reports,
     };
 
+    let mut evaluation_receipts = Vec::new();
+    for bundle in &plan.accepted_bundles {
+        for evaluation in &bundle.evaluations {
+            evaluation_receipts.push(ScenarioEvaluationReceiptRef {
+                candidate_id: bundle.candidate_id.clone(),
+                scenario_id: evaluation.scenario_id.clone(),
+                run_id: evaluation.run_id.clone(),
+                evidence_ref: evaluation.evidence_ref.clone(),
+                reference_outcome: evaluation.reference_outcome,
+                within_declared_domain: evaluation.within_declared_domain,
+            });
+        }
+    }
+    for base_stratum in &plan.base_plan.strata {
+        let bundle_group = rejected_map
+            .get(base_stratum.stratum_id.as_str())
+            .expect("validated rejected stratum bundle must exist");
+        for bundle in &bundle_group.bundles {
+            for evaluation in &bundle.evaluations {
+                evaluation_receipts.push(ScenarioEvaluationReceiptRef {
+                    candidate_id: bundle.candidate_id.clone(),
+                    scenario_id: evaluation.scenario_id.clone(),
+                    run_id: evaluation.run_id.clone(),
+                    evidence_ref: evaluation.evidence_ref.clone(),
+                    reference_outcome: evaluation.reference_outcome,
+                    within_declared_domain: evaluation.within_declared_domain,
+                });
+            }
+        }
+    }
+
     Ok(ScenarioOpportunityReport {
         contract_version: SCENARIO_OPPORTUNITY_VERSION,
+        bound_method: BOUND_METHOD,
+        sampling_algorithm: SAMPLING_ALGORITHM,
         opportunity_rule: SCENARIO_OPPORTUNITY_RULE,
         campaign_id: plan.campaign_id.clone(),
         scenario_manifest_sha256: plan.scenario_manifest_sha256.clone(),
@@ -517,6 +564,7 @@ pub fn audit_scenario_opportunities(
         feasibility_target_met: feasibility_report.target_met,
         union: union_report,
         scenarios: scenario_reports,
+        evaluation_receipts,
     })
 }
 
@@ -1252,6 +1300,9 @@ mod tests {
         let report = audit_scenario_opportunities(&plan()).unwrap();
         assert_eq!(report.scenarios.len(), 2);
         assert_eq!(report.simultaneous_bound_count, 3);
+        assert_eq!(report.evaluation_receipts.len(), 12);
+        assert_eq!(report.bound_method, BOUND_METHOD);
+        assert_eq!(report.sampling_algorithm, SAMPLING_ALGORITHM);
         assert_eq!(report.union.accepted_confirmed_opportunities, 1);
         assert_eq!(report.union.accepted_unresolved, 1);
         assert_eq!(report.union.rejected_opportunities_observed, 2);
