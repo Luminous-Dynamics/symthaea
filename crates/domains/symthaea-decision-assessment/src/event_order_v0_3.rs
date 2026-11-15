@@ -2622,7 +2622,7 @@ pub fn project_action_history(
             obligation_id, trigger_action_id, policy_revision_action_id, policy_revision,
             receipt_ref, receipt_sha256,
         } = &action.action else { continue; };
-        let Some((trigger_action, trigger_scope, trigger_policy, trigger_time)) = stop_trigger_actions.get(obligation_id) else {
+        let Some((trigger_action, trigger_scope, _trigger_policy, trigger_time)) = stop_trigger_actions.get(obligation_id) else {
             critical = true;
             reasons.insert(format!("STOP_DISCHARGE_WITHOUT_TRIGGER:{obligation_id}"));
             continue;
@@ -3317,7 +3317,7 @@ mod tests {
 
         let inventory_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 9, 135);
         let inventory_frontier = "inventory-frontier-1".to_owned();
-        let discharge_action_id = format!("action-{:06}", ordinal + 3);
+        let discharge_action_id = format!("action-{:06}", ordinal + 2);
         let mut expected_attempt = OperationAttemptRecord {
             identity: AttemptIdentity {
                 logical_operation_id: operation_id.clone(),
