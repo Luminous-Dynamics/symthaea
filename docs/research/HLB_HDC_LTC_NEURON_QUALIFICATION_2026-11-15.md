@@ -168,6 +168,44 @@ which makes the interpolation coefficient zero at zero elapsed time. This is a *
 
 Until the zero-time test passes, horizon-independent interpolation should not be described as a qualified continuous-time flow.
 
+### 2.6.1 Zero-time identity is necessary, but not sufficient for a flow
+
+The multiplicative repair candidate above fixes the boundary `sigma(0) = 0`, but it does **not** in general satisfy the semigroup property, even when the equilibrium, gate and time constant are frozen. This matters because a continuous-time flow should satisfy:
+
+\[F(t+s,x)=F(t,F(s,x)).\]
+
+For a fixed equilibrium `x_inf`, write an interpolation update as:
+
+\[x(t+\Delta t)=x_\infty+(x(t)-x_\infty)r(\Delta t).\]
+
+Composition requires `r(t+s) = r(t) r(s)`. Under continuity and `r(0)=1`, the scalar retention must be exponential:
+
+\[r(\Delta t)=e^{-\lambda\Delta t},\qquad \sigma(\Delta t)=1-e^{-\lambda\Delta t}.\]
+
+One way to preserve the interpretation of `sigma_base` as the interpolation fraction at `dt = tau` is to define a rate:
+
+\[\lambda=-\frac{\ln(1-\sigma_{\mathrm{base}})}{\tau},\qquad
+\sigma_{\mathrm{rate}}(\Delta t)=1-e^{-\lambda\Delta t}
+=1-(1-\sigma_{\mathrm{base}})^{\Delta t/\tau}.\]
+
+This yields zero-time identity and exact interval-partition consistency **for the frozen-equilibrium scalar interpolation model**. A numerically stable implementation would use `ln_1p(-sigma_base)` and `-expm1(-lambda * dt)`, and should parameterize or clamp the rate so floating-point sigmoid saturation at exactly one cannot create an infinite rate.
+
+A scalar calculation illustrates why the distinction matters. With `sigma_base = 0.5` and `dt = tau`, the product candidate `sigma = sigma_base * (1 - exp(-dt/tau))` has retention `0.6839397` for one full step, but `0.6452352` for two half-steps. The partition discrepancy is about `0.0387045`. The exponential-rate mapping has matching retention for the one-step and two-half-step calculations (up to floating-point rounding). These are algebraic toy calculations, not Symthaea runtime measurements.
+
+**Important limitation:** the active neuron recomputes `x_inf`, `tau` and the gate from state/input-dependent quantities. Freezing those quantities gives a useful local reference, but does not make the complete nonlinear neuron an exact semigroup. The actual state-dependent model must still be compared against converged RK4/adaptive integration, with partition error reported by `dt/tau`, input curvature and regime.
+
+Required candidate matrix:
+
+1. Current production gate (negative control for the identity property).
+2. Product gate `sigma_base * (1 - exp(-dt/tau))` (identity-only candidate).
+3. Exponential-rate gate `1 - exp(-lambda*dt)` (identity + frozen-parameter composition candidate).
+4. Ungated physical relaxation `1 - exp(-dt/tau)` (constant-equilibrium ODE reference).
+5. Iterative/re-evaluated and high-accuracy numerical integration (trajectory references).
+
+Do not select a winner from the algebra alone. Test zero-time identity, the right-hand derivative as `dt -> 0+`, monotonicity, finite values, positive-time stability, frozen-equilibrium partition consistency, full state-dependent partition error, scalar/SIMD agreement, and the documented semantics for negative/non-finite `dt`. Also decide whether zero-duration calls may update counters/statistics; state identity and bookkeeping identity are separate contracts.
+
+Production behavior remains unchanged until those tests and the frozen Temporal Benchmark V2 comparisons pass.
+
 ### 2.7 What "O(1) temporal jump" means—and does not mean
 
 The per-neuron interpolation update is \(O(D)\) in hypervector dimension \(D\), while a single update does not require a number of ODE solver substeps proportional to the elapsed interval. It is therefore reasonable to describe the interpolation step as **horizon-independent in step count**, not as constant total work independent of dimension.
