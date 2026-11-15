@@ -44,6 +44,14 @@ pub struct SnapshotHistoryEvent {
     pub kind: SnapshotHistoryEventKind,
     pub logical_operation_id: Option<String>,
     pub attempt_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<StopScope>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub policy_revision: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt_sha256: Option<String>,
     pub envelope: BitemporalEventEnvelope,
 }
 
@@ -109,6 +117,7 @@ pub struct CurrentDecisionSnapshotSelection {
     pub logical_operation_id: String,
     pub decision_time: QualifiedEventTime,
     pub current_snapshot_id: String,
+    pub applicable_stop_obligation_ids: Vec<String>,
     pub stop_discharges: Vec<StopDischargeSnapshotBinding>,
 }
 
@@ -136,6 +145,15 @@ fn scope_covers(candidate: &StopScope, required: &StopScope) -> bool {
         (StopScope::LogicalOperations(_), StopScope::Global) => false,
         (StopScope::LogicalOperations(candidate), StopScope::LogicalOperations(required)) => {
             required.is_subset(candidate)
+        }
+    }
+}
+
+fn scopes_intersect(left: &StopScope, right: &StopScope) -> bool {
+    match (left, right) {
+        (StopScope::Global, _) | (_, StopScope::Global) => true,
+        (StopScope::LogicalOperations(left), StopScope::LogicalOperations(right)) => {
+            left.iter().any(|logical_id| right.contains(logical_id))
         }
     }
 }
@@ -206,6 +224,9 @@ pub fn canonical_snapshot_manifest_sha256(
         snapshot.attestation_event_id.as_str(),
         &snapshot.attested_at,
         &snapshot.scope,
+        &snapshot.receipt_ref,
+        &snapshot.receipt_sha256,
+        snapshot.qualification,
         attempt_digest,
         events,
     ))?;
@@ -280,6 +301,45 @@ fn validate_snapshot_payload(
             merge_disposition(&mut disposition, EventTraceDisposition::CriticalFailure);
             reasons.insert(format!("SNAPSHOT_EVENT_ID_INVALID_OR_DUPLICATE:{}", event.event_id));
             continue;
+        }
+        if let Some(receipt_ref) = event.receipt_ref.as_deref() {
+            if receipt_ref.trim().is_empty() {
+                merge_disposition(&mut disposition, EventTraceDisposition::CriticalFailure);
+                reasons.insert(format!("SNAPSHOT_EVENT_RECEIPT_REF_INVALID:{}", event.event_id));
+            }
+        }
+        if let Some(receipt_sha256) = event.receipt_sha256.as_deref() {
+            if !is_sha256_hex(receipt_sha256) {
+                merge_disposition(&mut disposition, EventTraceDisposition::CriticalFailure);
+                reasons.insert(format!("SNAPSHOT_EVENT_RECEIPT_DIGEST_INVALID:{}", event.event_id));
+            }
+        }
+        match event.kind {
+            SnapshotHistoryEventKind::AttemptStart | SnapshotHistoryEventKind::AttemptTerminal => {
+                if event.logical_operation_id.as_deref().is_none_or(|logical_id| {
+                    !snapshot.scope.applies_to(logical_id)
+                }) {
+                    merge_disposition(&mut disposition, EventTraceDisposition::CriticalFailure);
+                    reasons.insert(format!("SNAPSHOT_ATTEMPT_EVENT_SCOPE_INVALID:{}", event.event_id));
+                }
+            }
+            SnapshotHistoryEventKind::StopTrigger
+            | SnapshotHistoryEventKind::StopPolicyRevision
+            | SnapshotHistoryEventKind::StopDischarge => {
+                if event.scope.as_ref().is_none_or(|scope| {
+                    !scope.is_well_formed() || !scope_covers(&snapshot.scope, scope)
+                }) {
+                    merge_disposition(&mut disposition, EventTraceDisposition::CriticalFailure);
+                    reasons.insert(format!("SNAPSHOT_STOP_EVENT_SCOPE_INVALID:{}", event.event_id));
+                }
+            }
+            _ => {}
+        }
+        if event.kind == SnapshotHistoryEventKind::StopPolicyRevision
+            && event.policy_revision.as_deref().is_none_or(str::is_empty)
+        {
+            merge_disposition(&mut disposition, EventTraceDisposition::CriticalFailure);
+            reasons.insert(format!("SNAPSHOT_POLICY_REVISION_ID_MISSING:{}", event.event_id));
         }
         if event.envelope.capture_qualification != GateState::Pass {
             merge_disposition(
@@ -499,13 +559,17 @@ fn validate_snapshot_transition(
         .collect();
     for new_event in &child.events {
         if parent_event_ids.contains(new_event.event_id.as_str())
-            || new_event.kind == SnapshotHistoryEventKind::SnapshotFrontier
+            || new_event.event_id == child.frontier_event_id
         {
             continue;
         }
-        let parent_scope_applies = match new_event.logical_operation_id.as_deref() {
-            Some(logical_id) => parent.scope.applies_to(logical_id),
-            None => matches!(parent.scope, StopScope::Global),
+        let parent_scope_applies = match (
+            new_event.logical_operation_id.as_deref(),
+            new_event.scope.as_ref(),
+        ) {
+            (Some(logical_id), _) => parent.scope.applies_to(logical_id),
+            (None, Some(event_scope)) => scopes_intersect(&parent.scope, event_scope),
+            (None, None) => matches!(parent.scope, StopScope::Global),
         };
         if !parent_scope_applies {
             continue;
@@ -642,6 +706,16 @@ pub fn assess_snapshot_chain(
 
     let mut obligations = Vec::<ScopedStopObligation>::new();
     let mut seen_obligations = BTreeSet::new();
+    let declared_obligations: BTreeSet<_> = selection.applicable_stop_obligation_ids.iter().cloned().collect();
+    let binding_obligations: BTreeSet<_> = selection.stop_discharges.iter()
+        .map(|binding| binding.obligation_id.clone())
+        .collect();
+    if declared_obligations.len() != selection.applicable_stop_obligation_ids.len()
+        || declared_obligations != binding_obligations
+    {
+        merge_disposition(&mut disposition, EventTraceDisposition::CriticalFailure);
+        reasons.insert("APPLICABLE_STOP_OBLIGATION_SET_MISMATCH".to_owned());
+    }
     let mut ancestors = BTreeSet::new();
     snapshot_ancestors(&current_snapshot.snapshot_id, &snapshot_index, &mut ancestors);
     let current_event_index: BTreeMap<_, _> = current_snapshot.events.iter()
@@ -686,7 +760,9 @@ pub fn assess_snapshot_chain(
             match discharge_snapshot_events.get(event_id.as_str()) {
                 Some(event)
                     if event.kind == expected_kind
-                        && event.envelope.occurred_at.as_ref() == Some(expected_time) => {}
+                        && event.envelope.occurred_at.as_ref() == Some(expected_time)
+                        && (expected_kind != SnapshotHistoryEventKind::StopPolicyRevision
+                            || event.policy_revision.as_deref() == Some(binding.policy_revision.as_str())) => {}
                 _ => {
                     merge_disposition(&mut disposition, EventTraceDisposition::CriticalFailure);
                     reasons.insert(format!("STOP_{label}_NOT_BOUND_IN_DISCHARGE_SNAPSHOT:{}", binding.obligation_id));
@@ -739,10 +815,14 @@ pub fn assess_snapshot_chain(
         match current_event_index.get(binding.discharge_event_id.as_str()) {
             Some(event)
                 if event.kind == SnapshotHistoryEventKind::StopDischarge
-                    && event.envelope.occurred_at.as_ref() == Some(&binding.discharge_time) => {}
+                    && event.envelope.occurred_at.as_ref() == Some(&binding.discharge_time)
+                    && event.scope.as_ref() == Some(&binding.scope)
+                    && event.policy_revision.as_deref() == Some(binding.policy_revision.as_str())
+                    && event.receipt_ref.as_deref() == Some(binding.receipt_ref.as_str())
+                    && event.receipt_sha256.as_deref() == Some(binding.receipt_sha256.as_str()) => {}
             _ => {
                 merge_disposition(&mut disposition, EventTraceDisposition::CriticalFailure);
-                reasons.insert(format!("CURRENT_SNAPSHOT_MISSING_BOUND_DISCHARGE_EVENT:{}", binding.obligation_id));
+                reasons.insert(format!("CURRENT_SNAPSHOT_DISCHARGE_BINDING_MISMATCH:{}", binding.obligation_id));
             }
         }
         check_before(
