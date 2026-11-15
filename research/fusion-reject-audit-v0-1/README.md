@@ -98,6 +98,7 @@ cargo fmt --manifest-path Cargo.toml -- --check
 cargo test --manifest-path Cargo.toml
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 cargo run --manifest-path Cargo.toml --bin audit_rejected_candidates
+cargo run --manifest-path Cargo.toml --bin audit_decision_opportunities
 ```
 
 ## Claim ceiling
