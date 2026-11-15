@@ -938,10 +938,17 @@ mod tests {
         ] {
             assert!(plasma_case_ids.contains(expected), "missing {expected}");
         }
-        assert!(plasma.cases.as_array().unwrap().iter().any(|case| {
-            case.get("case_id").and_then(Value::as_str)
-                == Some("FUSION-FUEL-DHE3-ARC-NEUTRON-PARTITION-2026")
-        }));
+        assert!(
+            plasma
+                .get("cases")
+                .and_then(Value::as_array)
+                .unwrap()
+                .iter()
+                .any(|case| {
+                    case.get("case_id").and_then(Value::as_str)
+                        == Some("FUSION-FUEL-DHE3-ARC-NEUTRON-PARTITION-2026")
+                })
+        );
         assert_eq!(hts_summary.case_count, 6);
         assert_eq!(hts_summary.negative_control_count, 12);
     }
