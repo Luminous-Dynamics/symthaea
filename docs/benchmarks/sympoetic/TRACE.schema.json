@@ -43,7 +43,9 @@
           "payload_storage",
           "consent_scope",
           "external_side_effect",
-          "reversible"
+          "reversible",
+          "reconciled_status",
+          "reconciliation_state_digest"
         ],
         "properties": {
           "event_id": {
@@ -227,6 +229,10 @@
               "failure",
               "not_executed"
             ]
+          },
+          "reconciliation_state_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
           }
         }
       }
