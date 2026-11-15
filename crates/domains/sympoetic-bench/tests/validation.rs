@@ -112,6 +112,7 @@ fn base_scorecard() -> Scorecard {
             human_first_attempt_rate: Some(0.75),
             human_monitoring_rate: Some(0.7),
             human_reflection_rate: Some(0.65),
+            ai_core_step_supply_rate: Some(0.2),
             ai_core_step_substitution_rate: Some(0.1),
             human_verification_rate: Some(0.9),
         },
