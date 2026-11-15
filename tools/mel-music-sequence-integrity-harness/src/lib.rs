@@ -80,6 +80,7 @@ pub struct SequenceRequestV1 {
     pub session_id: String,
     pub source_lineage_sha256: String,
     pub initial_artifact_sha256: String,
+    pub initial_state_sha256: String,
     pub operation_plan_sha256: String,
     /// Confirmatory lengths are fixed at 1, 2, 4 and 8.
     pub expected_step_count: u8,
@@ -175,6 +176,7 @@ pub enum SequenceErrorV1 {
     StepIdentityMissing,
     SourceLineageMismatch,
     ArtifactAncestryMismatch,
+    ArtifactIdentityNoChange,
     StateAncestryMismatch,
     OutputStateDigestMismatch,
     UnauthorizedEventMutation,
@@ -199,6 +201,7 @@ impl fmt::Display for SequenceErrorV1 {
             Self::StepIdentityMissing => "step and operation identities must be nonempty",
             Self::SourceLineageMismatch => "step source lineage differs from the frozen session",
             Self::ArtifactAncestryMismatch => "step input artifact is not the previous verified output",
+            Self::ArtifactIdentityNoChange => "a changed symbolic state cannot retain the same artifact digest",
             Self::StateAncestryMismatch => "step input event state is not the previous verified state",
             Self::OutputStateDigestMismatch => "recomputed output event-state digest differs",
             Self::UnauthorizedEventMutation => "an event outside the declared edit support changed",
@@ -276,6 +279,7 @@ fn validate_request(request: &SequenceRequestV1) -> Result<(), SequenceErrorV1> 
     for digest_value in [
         &request.source_lineage_sha256,
         &request.initial_artifact_sha256,
+        &request.initial_state_sha256,
         &request.operation_plan_sha256,
     ] {
         if !valid_sha256(digest_value) {
@@ -317,6 +321,9 @@ pub fn evaluate_sequence_v1(
     }
 
     let initial_state_sha256 = symbolic_state_sha256_v1(initial_events)?;
+    if initial_state_sha256 != request.initial_state_sha256 {
+        return Err(SequenceErrorV1::StateAncestryMismatch);
+    }
     let mut previous_state_sha256 = initial_state_sha256;
     let mut previous_artifact_sha256 = request.initial_artifact_sha256.clone();
     let mut previous_events = initial_events.to_vec();
@@ -330,13 +337,19 @@ pub fn evaluate_sequence_v1(
     let mut accepted_steps = 0_u8;
     let mut rejected_at_step = None;
     let mut reports = Vec::with_capacity(steps.len());
+    let mut step_ids = BTreeSet::new();
+    let mut operation_ids = BTreeSet::new();
 
     for (index, step) in steps.iter().enumerate() {
         let expected_sequence = index as u8 + 1;
         if step.schema_version != SEQUENCE_STEP_SCHEMA_V1 || step.sequence != expected_sequence {
             return Err(SequenceErrorV1::StepSequenceMismatch);
         }
-        if step.step_id.is_empty() || step.operation_id.is_empty() {
+        if step.step_id.is_empty()
+            || step.operation_id.is_empty()
+            || !step_ids.insert(step.step_id.as_str())
+            || !operation_ids.insert(step.operation_id.as_str())
+        {
             return Err(SequenceErrorV1::StepIdentityMissing);
         }
         if rejected_at_step.is_some() {
@@ -389,6 +402,11 @@ pub fn evaluate_sequence_v1(
         }
         if step.hard_gates.target_edit == StepGateVerdictV1::Verified && changed_ids.is_empty() {
             return Err(SequenceErrorV1::NoTargetMutation);
+        }
+        if !changed_ids.is_empty()
+            && step.input_artifact_sha256 == step.output_artifact_sha256
+        {
+            return Err(SequenceErrorV1::ArtifactIdentityNoChange);
         }
 
         total_attempts += u32::from(step.candidate_attempt_count);
@@ -477,12 +495,17 @@ mod tests {
         }
     }
 
+    fn initial_fixture_events() -> Vec<MusicalEventV1> {
+        vec![event("event-a", 60_000), event("event-b", 64_000)]
+    }
+
     fn request(count: u8) -> SequenceRequestV1 {
         SequenceRequestV1 {
             schema_version: SEQUENCE_REQUEST_SCHEMA_V1.to_owned(),
             session_id: format!("session-{count}"),
             source_lineage_sha256: h(10),
             initial_artifact_sha256: h(11),
+            initial_state_sha256: symbolic_state_sha256_v1(&initial_fixture_events()).unwrap(),
             operation_plan_sha256: h(12),
             expected_step_count: count,
         }
@@ -521,6 +544,42 @@ mod tests {
             retry_count: 1,
             manual_intervention_count: 0,
         }
+    }
+
+    #[test]
+    fn initial_symbolic_state_must_be_bound_to_frozen_source() {
+        let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
+        let mut req = request(1);
+        req.initial_state_sha256 = h(999);
+        assert_eq!(
+            evaluate_sequence_v1(&req, &initial, &[]),
+            Err(SequenceErrorV1::StateAncestryMismatch)
+        );
+    }
+
+    #[test]
+    fn changed_artifact_must_have_a_new_artifact_digest() {
+        let initial = vec![event("event-a", 60_000), event("event-b", 64_000)];
+        let output = vec![event("event-a", 61_000), event("event-b", 64_000)];
+        let first = step(1, h(11), h(11), &initial, output, "event-a", StepGateVerdictV1::Verified);
+        assert_eq!(
+            evaluate_sequence_v1(&request(1), &initial, &[first]),
+            Err(SequenceErrorV1::ArtifactIdentityNoChange)
+        );
+    }
+
+    #[test]
+    fn later_hard_gate_is_checked_even_when_earlier_steps_passed() {
+        let initial = initial_fixture_events();
+        let state_1 = vec![event("event-a", 61_000), event("event-b", 64_000)];
+        let state_2 = vec![event("event-a", 61_000), event("event-b", 65_000)];
+        let first = step(1, h(11), h(21), &initial, state_1.clone(), "event-a", StepGateVerdictV1::Verified);
+        let mut second = step(2, h(21), h(22), &state_1, state_2, "event-b", StepGateVerdictV1::Verified);
+        second.hard_gates.integrity = StepGateVerdictV1::Unknown;
+        let result = evaluate_sequence_v1(&request(2), &initial, &[first, second]).unwrap();
+        assert_eq!(result.disposition, SequenceDispositionV1::RejectedAtStep);
+        assert_eq!(result.accepted_step_count, 1);
+        assert_eq!(result.rejected_at_step, Some(2));
     }
 
     #[test]
