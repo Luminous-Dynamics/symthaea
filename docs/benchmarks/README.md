@@ -49,7 +49,7 @@ SympoeticBench evaluates observable interaction behaviour and participant-report
 
 ## Current release status
 
-Version 0.1 is a design and development release. It contains a proposed protocol, scenario schema, and development seed corpus. It does not contain human-subject study results, validated scales, a public leaderboard, or SOTA claims. The seed corpus is for harness development and pilot design; it is not a locked test set.
+Version 0.1 is a design and development release. It contains a proposed protocol, scenario schema, and 13-scenario development seed corpus. It does not contain human-subject study results, validated scales, a public leaderboard, or SOTA claims. The seed corpus is for harness development and pilot design; it is not a locked test set.
 
 ## Next steps
 
