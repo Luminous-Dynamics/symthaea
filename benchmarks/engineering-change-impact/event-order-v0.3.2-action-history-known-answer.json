@@ -251,7 +251,7 @@
             "kind": "global"
           },
           "inventory_frontier_event_id": "inventory-frontier-1",
-          "attempt_manifest_sha256": "94f7e89ab06398d2f63fb856522593de7aa04602392cb8567137b919d621d826"
+          "attempt_manifest_sha256": "dd24fe30e2d4391a07629ba1e08990e5de7054bda2b393b62daeaac56bd3c865"
         },
         "owner_time_ref": {
           "clock_mapping_action_id": "action-000010",
@@ -263,7 +263,7 @@
             "kind": "global"
           },
           "inventory_frontier_event_id": "inventory-frontier-1",
-          "attempt_manifest_sha256": "94f7e89ab06398d2f63fb856522593de7aa04602392cb8567137b919d621d826",
+          "attempt_manifest_sha256": "dd24fe30e2d4391a07629ba1e08990e5de7054bda2b393b62daeaac56bd3c865",
           "receipt_ref": "synthetic://inventory-attestation/1",
           "receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
         }
@@ -313,7 +313,7 @@
             "kind": "global"
           },
           "inventory_frontier_event_id": "inventory-frontier-1",
-          "attempt_manifest_sha256": "94f7e89ab06398d2f63fb856522593de7aa04602392cb8567137b919d621d826"
+          "attempt_manifest_sha256": "dd24fe30e2d4391a07629ba1e08990e5de7054bda2b393b62daeaac56bd3c865"
         }
       }
     ]
@@ -545,6 +545,6 @@
     "obligation_count": 1,
     "effect_commit_count": 1,
     "start_permitted_by_stop_contract": true,
-    "attempt_manifest_sha256": "94f7e89ab06398d2f63fb856522593de7aa04602392cb8567137b919d621d826"
+    "attempt_manifest_sha256": "dd24fe30e2d4391a07629ba1e08990e5de7054bda2b393b62daeaac56bd3c865"
   }
 }
