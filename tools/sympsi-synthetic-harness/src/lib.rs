@@ -602,6 +602,13 @@ fn validate_trial_bundle(
                 code: "REJECT_RESPONSE_AFTER_TARGET",
             });
         }
+        let expected_payload =
+            format!("{}|{}|fixture-v0.1", trial.trial_id, trial.response_index);
+        if trial.response_payload != expected_payload {
+            return Err(Rejection {
+                code: "REJECT_RESPONSE_PAYLOAD_MISMATCH",
+            });
+        }
         if !is_sha256_hex(&trial.response_digest_sha256) {
             return Err(Rejection {
                 code: "REJECT_RESPONSE_DIGEST_INVALID",
@@ -650,15 +657,13 @@ fn target_order_permutation_recomputes(choices: usize, seed: u64, profile: &str)
     for target in &targets {
         counts[*target] += 1;
     }
-    let recomputed_hits = targets
-        .iter()
-        .zip(&responses)
-        .filter(|(target, response)| target == response)
+    let recomputed_hits = (0..count)
+        .filter(|index| targets[*index] == responses[*index])
         .count();
     let independent_hits = (0..count)
         .map(|index| usize::from(targets[index] == responses[index]))
         .sum::<usize>();
-    counts.iter().all(|count| *count == count / choices.max(1) * choices.max(1))
+    counts.iter().all(|count| *count == 37)
         && recomputed_hits == independent_hits
 }
 
@@ -674,10 +679,8 @@ fn label_permutation_is_invariant(choices: usize, seed: u64, profile: &str) -> b
             }
         })
         .collect();
-    let original_hits = targets
-        .iter()
-        .zip(&responses)
-        .filter(|(target, response)| target == response)
+    let original_hits = (0..count)
+        .filter(|index| targets[*index] == responses[*index])
         .count();
 
     let mut rng = SplitMix64::new(derive_seed(seed, &format!("label-permutation-{profile}")));
@@ -686,10 +689,8 @@ fn label_permutation_is_invariant(choices: usize, seed: u64, profile: &str) -> b
         let other = rng.below(index + 1);
         mapping.swap(index, other);
     }
-    let recoded_hits = targets
-        .iter()
-        .zip(&responses)
-        .filter(|(target, response)| mapping[**target] == mapping[**response])
+    let recoded_hits = (0..count)
+        .filter(|index| mapping[targets[*index]] == mapping[responses[*index]])
         .count();
     original_hits == recoded_hits
 }
@@ -1016,6 +1017,23 @@ mod tests {
         assert_eq!(
             validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
             "REJECT_RESPONSE_DIGEST_MISMATCH"
+        );
+    }
+
+    #[test]
+    fn response_payload_cannot_disagree_with_scored_choice() {
+        let digest = "a".repeat(64);
+        let mut trials = make_trial_fixture(24, 5, &digest, false, false, false);
+        trials[4].response_payload = "payload-for-a-different-choice".into();
+        let guard = ProtocolGuard {
+            stopping_policy: "fixed_count".into(),
+            posthoc_exclusions: 0,
+            expected_trial_count: 24,
+            assumes_independent_units: true,
+        };
+        assert_eq!(
+            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            "REJECT_RESPONSE_PAYLOAD_MISMATCH"
         );
     }
 
