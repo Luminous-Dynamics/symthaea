@@ -114,7 +114,52 @@ Averaging a (t+1), (t+5), and (t+10) forecast generally creates a new vector tha
 
 A related perception issue remains visible in `detect_semantic_patterns()`: it uses substring tests for words such as `if`, `do`, and `act`. The 2026-07-18 zero-vector failure from unmatched phantom primitives was fixed by changing the attention-weight averaging rule, but substring-triggered false positives (for example, `if` inside `life`) still deserve a word-boundary regression battery. Do not interpret the old zero-vector fix as a complete semantic-pattern parser.
 
-### 2.6 What "O(1) temporal jump" means—and does not mean
+### 2.6 Critical invariant: the current gate does not preserve zero-time identity
+
+A source-level calculation exposes a mathematical qualification that should be tested before any performance comparison.
+
+In the active core implementation, `compute_gating()` computes:
+
+```text
+sigma_base = sigmoid(gate_activation * gating_steepness)
+decay      = exp(-dt / tau)
+sigma      = 1 - decay * (1 - sigma_base)
+```
+
+At `dt = 0`, `decay = 1`, so:
+
+[
+\sigma(0)=\sigma_{\mathrm{base}}
+]
+
+The sigmoid gate is generally nonzero. Therefore, whenever the current state differs from the current equilibrium, the update
+
+[
+x'=(1-\sigma)x+\sigma x_\infty
+]
+
+moves the state even though no time elapsed. This does not satisfy the continuous-time identity invariant (F(0,x)=x). The source-level derivation is direct; a runtime regression test has not yet been executed.
+
+**Required first test:**
+
+- initialize a non-equilibrium state and fixed input;
+- snapshot the state;
+- call `evolve_closed_form(0.0, input)`;
+- assert state identity to a declared floating-point tolerance;
+- repeat over seeds, dimensions, activations and network layers;
+- test `dt\to0^+) for continuity and reject or explicitly define negative `dt`.
+
+A candidate alternative is:
+
+[
+\sigma=\sigma_{\mathrm{base}}\left(1-e^{-\Delta t/\tau}\right)
+]
+
+which makes the interpolation coefficient zero at zero elapsed time. This is a **hypothesis for a repair**, not a validated drop-in correction: it changes the gate's influence and must be compared against the current formula for stability, trajectory error and task performance. Other formulations may be justified, but none should be adopted without the invariant tests and a matched counterfactual.
+
+Until the zero-time test passes, horizon-independent interpolation should not be described as a qualified continuous-time flow.
+
+### 2.7 What "O(1) temporal jump" means—and does not mean
 
 The per-neuron interpolation update is \(O(D)\) in hypervector dimension \(D\), while a single update does not require a number of ODE solver substeps proportional to the elapsed interval. It is therefore reasonable to describe the interpolation step as **horizon-independent in step count**, not as constant total work independent of dimension.
 
