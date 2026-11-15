@@ -14,6 +14,11 @@
 #![forbid(unsafe_code)]
 
 pub mod robust;
+pub mod transition;
+pub use transition::{
+    ManeuverKind, ManeuverTransitionBound, TransitionAdjustedVmg, TransitionEvaluation,
+    TransitionEvaluationStatus, evaluate_transition_adjusted_vmg,
+};
 pub use robust::{
     CurrentUncertainty, DirectionInterval, PolarErrorBound, RobustCourseCandidate,
     RobustPlanStatus, RobustRouteEvaluation, RobustRouteRequest, ScalarInterval, WindUncertainty,
