@@ -2247,6 +2247,78 @@
         "Do not substitute electrochemical Faradaic efficiency or area-normalized rate for grid-to-accepted-ammonia energy yield."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-GAS-LIQUID-PLASMA-ELECTROCATALYTIC-TANDEM-2026",
+      "lane": "AMMONIA_SYNTHESIS",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "One-step ammonia synthesis via a gas–liquid plasma-electrocatalytic tandem reactor with effective proton utilization",
+        "publisher": "AIChE Journal",
+        "first_publication_date": "2026-04-20",
+        "volume": 72,
+        "issue": 8,
+        "article": "e70407",
+        "doi": "10.1002/aic.70407",
+        "url": "https://doi.org/10.1002/aic.70407"
+      },
+      "configuration": {
+        "architecture": "gas–liquid non-thermal plasma plus electrocatalytic tandem reactor",
+        "plasma_role": "NTP activation of N2 into active nitrogen components",
+        "electrochemical_role": "Cu-catalysed hydrogenation using H2O-derived proton / adsorbed-H utilization",
+        "catalyst": "Cu",
+        "operating_pressure": "ambient",
+        "operating_temperature": "ambient",
+        "source_reported_electrochemical_current_density_mA_cm2": 20,
+        "source_reported_electrolyte_acidity": "pH <= 1",
+        "mechanism_evidence": "source reports direct coupling of active nitrogen components with adsorbed H on Cu(111), with a secondary NOx-minus reduction pathway"
+      },
+      "observations": [
+        {
+          "metric": "ammonia_production_rate",
+          "value": 150.2,
+          "unit": "umol_NH3_per_hour",
+          "qualifier": "source-reported integrated NTP-ERR tandem system; absolute rate, not area-normalized"
+        },
+        {
+          "metric": "specific_energy_consumption",
+          "value": 1161,
+          "unit": "kWh_per_kg_NH3",
+          "qualifier": "source-reported system-specific energy consumption; the NTP/ERR input split and exact inclusion of auxiliaries/product isolation must be reconstructed from supplementary Table S6 and raw data"
+        },
+        {
+          "metric": "electrochemical_current_density",
+          "value": 20,
+          "unit": "mA_per_cm2",
+          "qualifier": "approximate source-reported operating current density"
+        }
+      ],
+      "reproducibility_assets": {
+        "figure_data": "Dataset_Figures1-5.xlsx",
+        "supplementary_figure_data": "Dataset_SupplementaryFigures.xlsx",
+        "cfd_inputs": "Supplementary_Simulation.zip",
+        "supplementary_document": "aic70407-sup-0001-Supinfo1.docx",
+        "supplementary_workbook": "aic70407-sup-0002-Supinfo2.xlsx",
+        "energy_reconciliation": "Supplementary Table S6 separates output power and specific energy consumption under different NTP and ERR input accounting choices",
+        "replication_repeats": "Source states triplicate independent measurements for selected figures; other figures include single-run data"
+      },
+      "derived_metrics": {
+        "ammonia_energy_yield_g_per_kWh": 0.8613264427217916,
+        "evidence_class": "DERIVED_ARITHMETIC_FROM_SOURCE_SPECIFIC_ENERGY_CONSUMPTION",
+        "luminous_measurement": false,
+        "note": "Reciprocal of the source-reported 1161 kWh/kg NH3. This remains on the source's own system boundary and is not asserted to be accepted purified NH3 at plant gate."
+      },
+      "comparison_status": "SOURCE_SPECIFIC_TANDEM_REACTOR_ENERGY_NOT_YET_MATCHED_TO_ACCEPTED_PRODUCT_BOUNDARY",
+      "blockers": [
+        "150.2 umol/hour is an absolute production rate and cannot be compared directly with JACS 7.7 nmol/s/cm2 without exposed area and normalization.",
+        "Reconstruct the separate NTP and ERR input terms from Supplementary Table S6; do not double-count or omit either supply.",
+        "The published 1161 kWh/kg NH3 basis must be verified against metered source power, electrochemical power, power conditioning and declared auxiliaries.",
+        "NH3 is quantified in a gas-liquid/electrolyte process; product isolation, concentration, purification, drying and storage are not automatically included in the reported specific-energy metric.",
+        "The reported pH/current and catalyst arrangement are source-specific; they are not a universal operating recommendation or a Luminous test configuration.",
+        "Selected figures use triplicate independent measurements while others derive from single runs; uncertainty coverage must remain figure-specific.",
+        "No Luminous reproduction, full industrial lifetime, plant-gate accepted-product yield or commercial competitiveness is claimed."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -2569,6 +2641,26 @@
       "control_id": "NC-064",
       "condition": "Treat 15N2 product attribution, electrochemical Faradaic efficiency or an area-normalized NH3 rate as proof of full-chain causal improvement per grid kWh without matched plasma/electrolysis controls and full-system energy meters.",
       "expected_disposition": "BLOCKED_INCOMPLETE_CAUSAL_AND_ENERGY_BOUNDARY"
+    },
+    {
+      "control_id": "NC-065",
+      "condition": "Compare the tandem system's absolute 150.2 umol NH3/h with the JACS 7.7 nmol/s/cm2 rate without converting both to the same active/geometric area and product basis.",
+      "expected_disposition": "NOT_COMPARABLE_RATE_NORMALIZATION_MISMATCH"
+    },
+    {
+      "control_id": "NC-066",
+      "condition": "Use the 1161 kWh/kg NH3 source-specific metric as a plant-gate accepted-NH3 value without reconciling separate NTP and ERR power, power conditioning, auxiliaries, electrolyte/product recovery and purification.",
+      "expected_disposition": "BLOCKED_INCOMPLETE_GRID_TO_ACCEPTED_PRODUCT_BOUNDARY"
+    },
+    {
+      "control_id": "NC-067",
+      "condition": "Omit either NTP or electrocatalytic-reduction electricity from the integrated tandem energy denominator, or double count it by adding an already aggregated meter and its branch meters.",
+      "expected_disposition": "REJECT_ENERGY_LEDGER_BOUNDARY_ERROR"
+    },
+    {
+      "control_id": "NC-068",
+      "condition": "Treat the source's triplicate error bars for selected figures as evidence that every figure/metric has triplicate independent measurements.",
+      "expected_disposition": "REJECT_REPLICATE_COVERAGE_OVERGENERALIZATION"
     }
   ],
   "derived_reference_checks": [
