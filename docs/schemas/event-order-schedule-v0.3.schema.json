@@ -36,13 +36,13 @@
       "oneOf": [
         {
           "type": "object", "additionalProperties": false,
-          "required": ["kind", "clock_domain", "basis_id", "epoch", "scale", "unit", "local_tick_ns", "offset_ns", "uncertainty_ns", "calibration_id", "mapping_valid_through_ns", "mapping_receipt_ref", "mapping_receipt_sha256", "qualification"],
+          "required": ["kind", "clock_domain", "basis_id", "epoch", "scale", "unit", "local_tick_ns", "offset_ns", "uncertainty_ns", "calibration_id", "mapping_valid_from_ns", "mapping_valid_through_ns", "mapping_receipt_ref", "mapping_receipt_sha256", "qualification"],
           "properties": {
             "kind": { "const": "clock_advance" }, "clock_domain": { "$ref": "#/$defs/id" },
             "basis_id": { "$ref": "#/$defs/id" }, "epoch": { "$ref": "#/$defs/id" }, "scale": { "$ref": "#/$defs/id" },
             "unit": { "const": "nanoseconds" }, "local_tick_ns": { "$ref": "#/$defs/u64" },
             "offset_ns": { "type": "integer" }, "uncertainty_ns": { "$ref": "#/$defs/u64" },
-            "calibration_id": { "$ref": "#/$defs/id" }, "mapping_valid_through_ns": { "$ref": "#/$defs/u64" },
+            "calibration_id": { "$ref": "#/$defs/id" }, "mapping_valid_from_ns": { "$ref": "#/$defs/u64" }, "mapping_valid_through_ns": { "$ref": "#/$defs/u64" },
             "mapping_receipt_ref": { "$ref": "#/$defs/id" }, "mapping_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
             "qualification": { "$ref": "#/$defs/gate_state" }
           }
@@ -74,13 +74,31 @@
         },
         {
           "type": "object", "additionalProperties": false,
-          "required": ["kind", "event_id", "observer_id"],
-          "properties": { "kind": { "const": "event_observed" }, "event_id": { "$ref": "#/$defs/id" }, "observer_id": { "$ref": "#/$defs/id" } }
+          "required": ["kind", "event_id", "observer_id", "clock_domain", "basis_id", "epoch", "scale", "unit", "clock_mapping_action_id", "observed_at_ns", "observation_receipt_ref", "observation_receipt_sha256", "qualification"],
+          "properties": {
+            "kind": { "const": "event_observed" }, "event_id": { "$ref": "#/$defs/id" },
+            "observer_id": { "$ref": "#/$defs/id" }, "clock_domain": { "$ref": "#/$defs/id" },
+            "basis_id": { "$ref": "#/$defs/id" }, "epoch": { "$ref": "#/$defs/id" },
+            "scale": { "$ref": "#/$defs/id" }, "unit": { "const": "nanoseconds" },
+            "clock_mapping_action_id": { "$ref": "#/$defs/id" }, "observed_at_ns": { "$ref": "#/$defs/u64" },
+            "observation_receipt_ref": { "$ref": "#/$defs/id" },
+            "observation_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "qualification": { "$ref": "#/$defs/gate_state" }
+          }
         },
         {
           "type": "object", "additionalProperties": false,
-          "required": ["kind", "event_id", "observer_id", "store_id"],
-          "properties": { "kind": { "const": "event_persisted" }, "event_id": { "$ref": "#/$defs/id" }, "observer_id": { "$ref": "#/$defs/id" }, "store_id": { "$ref": "#/$defs/id" } }
+          "required": ["kind", "event_id", "observer_id", "store_id", "clock_domain", "basis_id", "epoch", "scale", "unit", "clock_mapping_action_id", "persisted_at_ns", "persistence_receipt_ref", "persistence_receipt_sha256", "qualification"],
+          "properties": {
+            "kind": { "const": "event_persisted" }, "event_id": { "$ref": "#/$defs/id" },
+            "observer_id": { "$ref": "#/$defs/id" }, "store_id": { "$ref": "#/$defs/id" },
+            "clock_domain": { "$ref": "#/$defs/id" }, "basis_id": { "$ref": "#/$defs/id" },
+            "epoch": { "$ref": "#/$defs/id" }, "scale": { "$ref": "#/$defs/id" },
+            "unit": { "const": "nanoseconds" }, "clock_mapping_action_id": { "$ref": "#/$defs/id" },
+            "persisted_at_ns": { "$ref": "#/$defs/u64" }, "persistence_receipt_ref": { "$ref": "#/$defs/id" },
+            "persistence_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+            "qualification": { "$ref": "#/$defs/gate_state" }
+          }
         },
         {
           "type": "object", "additionalProperties": false,
