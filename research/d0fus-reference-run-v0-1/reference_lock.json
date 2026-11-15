@@ -1,0 +1,18 @@
+{
+  "solver": "D0FUS",
+  "version": "3.2.0",
+  "repository": "https://github.com/IRFM/D0FUS.git",
+  "git_ref": "v3.2.0",
+  "git_commit": "a682c3511dc189b2a4cdd6f4b8bc545d3cdb8924",
+  "pyproject_path": "pyproject.toml",
+  "pyproject_git_blob_sha": "cb526504e8be1b318c2e7c05195e98adb3ca7d2d",
+  "deck_path": "D0FUS_INPUTS/1_run_ITER.txt",
+  "deck_git_blob_sha": "d8932a85adf05e2b1b72a52d5a04a20cb25943b8",
+  "pypi_distribution": "d0fus==3.2.0",
+  "wheel_filename": "d0fus-3.2.0-py3-none-any.whl",
+  "wheel_sha256": "068a865a979367b1c74a93138bc16384e00d7d85c2dfe7e6d8b5a212d5885847",
+  "sdist_filename": "d0fus-3.2.0.tar.gz",
+  "sdist_sha256": "02a81bbead2f7bc87b7f0f981687e784acfce27dea1090c9a2931ecd44e2fd40",
+  "expected_run_output_count": 165,
+  "python_minor": "3.11"
+}
