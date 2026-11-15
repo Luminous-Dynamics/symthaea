@@ -133,7 +133,6 @@ fn insert_observation(
     if observed_at > available_at {
         return Err(format!("{label}: observed_at is after available_at"));
     }
-    let source_family = required_str(value, "source_family", label)?.to_owned();
     let signal_kind = required_str(value, "signal_kind", label)?.to_owned();
     required_str(value, "value", label)?;
     let root = source_root(value, label)?;
