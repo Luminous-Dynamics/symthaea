@@ -1,14 +1,10 @@
-# Atelier FactoryBench v0.1 synthetic corpus
+# Atelier FactoryBench research corpus
 
-This directory is the initial, synthetic-only case corpus for ATELIER-FACTORYBENCH-001 #12289.
+- `factory-bench-corpus.v0.1.json` — four synthetic product operation graphs, layout alternatives and disruption scenarios.
+- `factory-from-to-matrix.v0.1.json` — synthetic From-To flow matrix.
+- `sota-comparison.v0.2.json` — machine-readable current research comparators, reported metrics, scope limits and reproduction tasks.
+- `sota-comparison-v0.2.md` — research synthesis and staged product-to-factory co-optimization plan.
 
-- factory-bench-corpus.v0.1.json — four product operation graphs, synthetic quantities/work ticks, capability/skill pools, four layout alternatives and twelve disruption cases.
-- factory-from-to-matrix.v0.1.json — deterministic aggregation of product routes into synthetic zone-to-zone move counts.
-- README.md — evidence and interpretation boundaries.
+The v0.2 literature matrix expands the benchmark beyond facility layout to pattern-derived workload, fabric cut-order planning, machine/worker allocation, multi-line scheduling, supplier/partner allocation and event-based adaptation.
 
-Important:
-- Synthetic work ticks are not minutes or standard allowed minutes (SMV).
-- Synthetic batch quantities are not customer demand.
-- No floor geometry, distances, costs, utility data, equipment inventory or measured capacity is supplied.
-- A layout comparison must use identical product/operation/demand/skill/quality constraints for all four alternatives.
-- Physical factory claims require measured data and professional site/facility/safety qualification.
+All performance figures from papers remain paper-reported, case-specific comparators. They are not Atelier results. Synthetic inputs are not production observations or capacity claims.
