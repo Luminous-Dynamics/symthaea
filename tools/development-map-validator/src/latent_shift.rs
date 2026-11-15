@@ -802,6 +802,54 @@ mod tests {
     }
 
     #[test]
+    fn synthetic_gold_impact_must_match_declared_obligation_dependencies() {
+        let mut value = fixture_value();
+        value["episodes"][0]["gold_overlay"]["affected_obligations"] =
+            json!(["build-repro"]);
+        value["episodes"][0]["gold_overlay"]["unaffected_obligations"] =
+            json!(["api-compat","docs-format","release-authority"]);
+        let error = score_latent_shift_bundle_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("synthetic gold impact disagrees with dependency-implied impact"));
+    }
+
+    #[test]
+    fn independently_adjudicated_impact_disagreement_is_reported_not_rewritten() {
+        let mut value = fixture_value();
+        value["episodes"][0]["gold_overlay"]["adjudication_status"] =
+            json!("independently_adjudicated");
+        value["episodes"][0]["gold_overlay"]["affected_obligations"] =
+            json!(["build-repro"]);
+        value["episodes"][0]["gold_overlay"]["unaffected_obligations"] =
+            json!(["api-compat","docs-format","release-authority"]);
+        let report = score(&value);
+        let result = episode(&report, "silent-runner-drift");
+        assert_eq!(
+            result.dependency_implied_affected_obligations,
+            vec!["api-compat".to_owned(),"build-repro".to_owned()]
+        );
+        assert_eq!(
+            result.gold_only_impact_obligations,
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            result.dependency_only_impact_obligations,
+            vec!["api-compat".to_owned()]
+        );
+    }
+
+    #[test]
+    fn critical_unsupported_claim_is_reported_separately() {
+        let mut value = fixture_value();
+        value["episodes"][0]["candidate_trace"]["decisions"][1]["claimed_current_obligations"] =
+            json!(["api-compat","build-repro","docs-format","release-authority"]);
+        let report = score(&value);
+        let result = episode(&report, "silent-runner-drift");
+        assert!(result.unsupported_current_claims.contains(&"api-compat".to_owned()));
+        assert!(result.critical_unsupported_current_claims.contains(&"api-compat".to_owned()));
+        assert!(result.critical_unsupported_current_claims.contains(&"build-repro".to_owned()));
+    }
+
+    #[test]
     fn rejects_probe_response_without_request() {
         let mut value = fixture_value();
         value["episodes"][0]["candidate_trace"]["probe_requests"]
