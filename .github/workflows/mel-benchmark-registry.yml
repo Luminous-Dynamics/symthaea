@@ -4,7 +4,8 @@ on:
   pull_request:
     paths:
       - "crates/domains/symthaea-muse/src/benchmark_registry.rs"
-      - "benchmarks/mel/registry/**"
+      - "benchmarks/mel/registry/music-benchmark-profile-v1.json"
+      - "benchmarks/mel/registry/music-benchmark-run-v1.json"
       - "benchmarks/mel/schemas/music-benchmark-profile-v1.schema.json"
       - "benchmarks/mel/schemas/music-benchmark-run-v1.schema.json"
       - "tools/mel-benchmark-registry-harness/**"
