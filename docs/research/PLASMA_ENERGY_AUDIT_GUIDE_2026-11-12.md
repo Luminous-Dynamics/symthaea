@@ -283,3 +283,18 @@ The September 2026 microwave NH3 source now stores three explicit operating-poin
 The derived check now independently calculates 22.22, 20.00 and 19.61 kWh/kg H2 respectively, and separate relative improvements versus the high-conversion point. A new negative unit test mutates the throughput point's derived specific energy to ensure the points cannot be cross-paired.
 
 The audit module now has 36 authored Rust tests. These are test definitions; the focused workflow's result is separately tracked.
+
+
+## 9.18 Ammonia synthesis full-chain target and evidence floor
+
+The merged register now has a separate `AMMONIA_SYNTHESIS` lane for the 2026 JACS plasma-electrocatalytic nitrogen-reduction experiment and the 2026 industrial-roadmap energy-yield comparison. Do not combine these with ammonia cracking.
+
+The third linked benchmark target `NH3-PLASMA-SYNTHESIS-FULL-CHAIN-001` requires:
+- >=3 g accepted NH3/kWh at plant gate;
+- H2-generation energy included;
+- plasma and electrolysis electricity included;
+- gas/feed and product separation energy included;
+- declared product purity and pressure contract;
+- Haber–Bosch comparison with H2-production energy included.
+
+The Rust validator checks all five guards, the numeric threshold, comparator IDs and `RESEARCH_TARGET_NOT_RESULT` ceiling.
