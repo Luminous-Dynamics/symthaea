@@ -223,7 +223,7 @@ proptest! {
 
 #[test]
 fn frozen_v0_3_1_observer_store_clock_fixture_replays_and_projects() {
-    let fixture = include_str!("../../../../benchmarks/engineering-change-impact/event-order-v0.3.1-clocked-observation-persistence.json");
+    let fixture = include_str!("../../../../benchmarks/engineering-change-impact/event-order-v0.3.2-clocked-observation-persistence.json");
     let schedule: VirtualSchedule = serde_json::from_str(fixture).expect("frozen schedule parses");
     validate_schedule(&schedule).expect("frozen v0.3.1 schedule validates");
     let replay = replay_virtual_schedule(&schedule).expect("frozen schedule replays");
