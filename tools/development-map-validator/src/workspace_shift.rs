@@ -633,6 +633,7 @@ mod tests {
         let digest_scenario = scenario.clone();
         let shifted = scenario.arms.iter_mut()
             .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
+        let arm_id = shifted.arm_id.clone();
         let receipt = shifted.checkpoints.last_mut().expect("final checkpoint").receipts.iter_mut()
             .find(|receipt| receipt.obligation_id == "api-contract").expect("api receipt");
         receipt.available_at = "2026-11-15T07:16:00Z".to_owned();
@@ -646,6 +647,7 @@ mod tests {
         let digest_scenario = scenario.clone();
         let shifted = scenario.arms.iter_mut()
             .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
+        let arm_id = shifted.arm_id.clone();
         let receipt = shifted.checkpoints.last_mut().expect("final checkpoint").receipts.iter_mut()
             .find(|receipt| receipt.obligation_id == "api-contract").expect("api receipt");
         receipt.observed_at = "2026-11-15T07:14:00Z".to_owned();
