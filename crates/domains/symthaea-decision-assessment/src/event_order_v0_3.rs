@@ -1369,7 +1369,7 @@ fn resolve_owner_qualified_time(
     let (clock_domain, local_tick_ns, valid_from, valid_through, mapped_ref, mapped_sha, qualification) =
         match &mapping_action.action {
             ScheduleAction::ClockAdvance {
-                clock_domain, mapping_valid_from_ns, mapping_valid_through_ns,
+                clock_domain, local_tick_ns, mapping_valid_from_ns, mapping_valid_through_ns,
                 mapping_receipt_ref, mapping_receipt_sha256, qualification, ..
             } => (
                 clock_domain.as_str(),
