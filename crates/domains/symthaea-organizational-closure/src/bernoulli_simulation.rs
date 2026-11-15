@@ -396,7 +396,7 @@ mod tests {
 
     #[test]
     fn stratum_order_does_not_change_seeded_episodes_or_digest() {
-        let mut forward = manifest();
+        let forward = manifest();
         let mut reverse = manifest();
         reverse.strata.reverse();
         let a = run_bernoulli_simulation_suite(&forward).unwrap();
