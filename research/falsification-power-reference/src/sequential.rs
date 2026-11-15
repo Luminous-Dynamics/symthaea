@@ -278,7 +278,7 @@ impl PredictableGaussianEProcess {
             .checked_add(1)
             .ok_or(SequentialError::ObservationCountOverflow)?;
         let next_maximum = self.maximum_log_e_value.max(next_log_e_value);
-        let alpha_boundary = (1.0 / self.alpha).ln();
+        let alpha_boundary = -self.alpha.ln();
         let anytime_p = anytime_p_value(next_maximum);
         let crossed = next_maximum >= alpha_boundary;
 
@@ -465,7 +465,7 @@ impl PredictableGaussianMixture {
             .checked_add(1)
             .ok_or(SequentialError::ObservationCountOverflow)?;
         let next_maximum = self.maximum_log_e_value.max(next_log_e_value);
-        let alpha_boundary = (1.0 / self.alpha).ln();
+        let alpha_boundary = -self.alpha.ln();
         let anytime_p = anytime_p_value(next_maximum);
         let crossed = next_maximum >= alpha_boundary;
 
