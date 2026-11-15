@@ -3395,34 +3395,86 @@ pub fn project_action_history(
         }
     }
 
+    let mut inventory_snapshot_attempts = Vec::new();
     if let Some(inventory) = inventory.as_ref() {
         if let Some(frontier_time) = inventory_frontier_times.get(&inventory.inventory_frontier_event_id) {
             for attempt in &attempts {
                 let attempt_id = &attempt.identity.attempt_id;
-                if let Some(start_time) = attempt_start_times.get(attempt_id) {
-                    match event_order_between(start_time, frontier_time) {
-                        EventOrder::Before => {}
-                        EventOrder::After | EventOrder::Inconsistent => {
-                            critical = true;
-                            reasons.insert(format!("ATTEMPT_START_AFTER_INVENTORY_FRONTIER:{attempt_id}"));
+                let Some(start_time) = attempt_start_times.get(attempt_id) else {
+                    indeterminate = true;
+                    reasons.insert(format!("ATTEMPT_START_OWNER_TIME_MISSING_AT_INVENTORY_CUT:{attempt_id}"));
+                    continue;
+                };
+                match event_order_between(start_time, frontier_time) {
+                    EventOrder::Before => {
+                        // The inventory manifest commits the attempt as it existed
+                        // at this cut. A terminal reconciliation strictly after the
+                        // cut belongs to the append-only delta, not the snapshot.
+                        let mut snapshot_attempt = attempt.clone();
+                        if let Some(terminal_time) = attempt_terminal_times.get(attempt_id) {
+                            match event_order_between(terminal_time, frontier_time) {
+                                EventOrder::Before => {}
+                                EventOrder::After => {
+                                    snapshot_attempt.terminal_reconciliation = None;
+                                    snapshot_attempt.terminal_reconciliation_event_ids.clear();
+                                }
+                                EventOrder::Overlapping | EventOrder::Unknown => {
+                                    indeterminate = true;
+                                    reasons.insert(format!("ATTEMPT_TERMINAL_FRONTIER_ORDER_UNRESOLVED:{attempt_id}"));
+                                    snapshot_attempt.terminal_reconciliation = None;
+                                    snapshot_attempt.terminal_reconciliation_event_ids.clear();
+                                }
+                                EventOrder::Inconsistent => {
+                                    critical = true;
+                                    reasons.insert(format!("ATTEMPT_TERMINAL_FRONTIER_ORDER_INCONSISTENT:{attempt_id}"));
+                                    snapshot_attempt.terminal_reconciliation = None;
+                                    snapshot_attempt.terminal_reconciliation_event_ids.clear();
+                                }
+                            }
                         }
-                        EventOrder::Overlapping | EventOrder::Unknown => {
-                            indeterminate = true;
-                            reasons.insert(format!("ATTEMPT_START_FRONTIER_ORDER_UNRESOLVED:{attempt_id}"));
+                        inventory_snapshot_attempts.push(snapshot_attempt);
+                    }
+                    EventOrder::After => {
+                        // This attempt is not part of the attested snapshot. It is
+                        // admissible as a later delta only when every applicable
+                        // stop obligation already discharged before its start.
+                        for obligation in obligations.iter().filter(|obligation| {
+                            obligation.scope.applies_to(&attempt.identity.logical_operation_id)
+                        }) {
+                            let relation = attempt.stop_discharge_relations.iter().find(|relation| {
+                                relation.obligation_id == obligation.obligation_id
+                            });
+                            match (obligation.discharge.as_ref(), relation) {
+                                (Some(_), Some(relation)) if relation.discharge_to_start_order == EventOrder::Before => {}
+                                (Some(_), Some(relation)) if matches!(
+                                    relation.discharge_to_start_order,
+                                    EventOrder::After | EventOrder::Inconsistent
+                                ) => {
+                                    critical = true;
+                                    reasons.insert(format!("POST_FRONTIER_ATTEMPT_PRECEDES_STOP_DISCHARGE:{attempt_id}:{}", obligation.obligation_id));
+                                }
+                                (Some(_), Some(_)) => {
+                                    indeterminate = true;
+                                    reasons.insert(format!("POST_FRONTIER_ATTEMPT_STOP_ORDER_UNRESOLVED:{attempt_id}:{}", obligation.obligation_id));
+                                }
+                                (Some(_), None) => {
+                                    critical = true;
+                                    reasons.insert(format!("POST_FRONTIER_ATTEMPT_STOP_RELATION_MISSING:{attempt_id}:{}", obligation.obligation_id));
+                                }
+                                (None, _) => {
+                                    indeterminate = true;
+                                    reasons.insert(format!("POST_FRONTIER_ATTEMPT_UNDISCHARGED_STOP:{attempt_id}:{}", obligation.obligation_id));
+                                }
+                            }
                         }
                     }
-                }
-                if let Some(terminal_time) = attempt_terminal_times.get(attempt_id) {
-                    match event_order_between(terminal_time, frontier_time) {
-                        EventOrder::Before => {}
-                        EventOrder::After | EventOrder::Inconsistent => {
-                            critical = true;
-                            reasons.insert(format!("ATTEMPT_TERMINAL_AFTER_INVENTORY_FRONTIER:{attempt_id}"));
-                        }
-                        EventOrder::Overlapping | EventOrder::Unknown => {
-                            indeterminate = true;
-                            reasons.insert(format!("ATTEMPT_TERMINAL_FRONTIER_ORDER_UNRESOLVED:{attempt_id}"));
-                        }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("ATTEMPT_START_FRONTIER_ORDER_UNRESOLVED:{attempt_id}"));
+                    }
+                    EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert(format!("ATTEMPT_START_FRONTIER_ORDER_INCONSISTENT:{attempt_id}"));
                     }
                 }
             }
@@ -3436,15 +3488,20 @@ pub fn project_action_history(
     if attempt_lifecycle.disposition == EventTraceDisposition::CriticalFailure {
         critical = true;
         reasons.extend(attempt_lifecycle.reason_codes.clone());
-    } else if attempt_lifecycle.disposition == EventTraceDisposition::Indeterminate {
-        indeterminate = true;
-        reasons.extend(attempt_lifecycle.reason_codes.clone());
     }
+    // A pending sibling operation can be a valid post-discharge delta. The
+    // requested operation's pending attempts are checked by the v0.2 gate below.
+    // Keep the full-history lifecycle report visible without globally serializing
+    // independent work solely because a sibling attempt remains active.
 
     let inventory = inventory;
     let start_gate = if let Some(inventory) = inventory.as_ref() {
-        Some(assess_start_under_stop_obligations(
-            logical_operation_id, &attempts, inventory, &obligations,
+        Some(assess_start_under_stop_obligations_with_inventory_cut(
+            logical_operation_id,
+            &attempts,
+            &inventory_snapshot_attempts,
+            inventory,
+            &obligations,
         ))
     } else {
         None
