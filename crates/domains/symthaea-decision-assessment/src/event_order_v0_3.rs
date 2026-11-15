@@ -4892,6 +4892,13 @@ mod tests {
         let operation_id = "robot-1".to_owned();
         let attempt_id = "attempt-1".to_owned();
         let mapping_id = push_test_clock_mapping(&mut schedule.actions, &mut ordinal, 3, 200);
+        let cancellation_mapping = schedule.actions.iter_mut()
+            .find(|item| item.action_id == mapping_id)
+            .expect("cancellation clock mapping");
+        if let ScheduleAction::ClockAdvance { clock_domain, basis_id, .. } = &mut cancellation_mapping.action {
+            *clock_domain = "cancellation-clock".to_owned();
+            *basis_id = "cancellation-basis".to_owned();
+        }
         let request_action_id = format!("action-{ordinal:06}");
         push_action(
             &mut schedule.actions,
