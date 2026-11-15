@@ -1,0 +1,1 @@
+instance synthesis trace: target uses Demo.instExample

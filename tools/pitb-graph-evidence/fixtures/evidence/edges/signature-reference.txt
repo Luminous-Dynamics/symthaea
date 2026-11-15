@@ -1,0 +1,1 @@
+lean elaborator receipt: target signature references helper_normalize

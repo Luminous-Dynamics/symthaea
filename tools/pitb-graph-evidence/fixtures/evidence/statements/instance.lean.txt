@@ -1,0 +1,1 @@
+instance Demo.instExample : Demo.C Demo.T := by

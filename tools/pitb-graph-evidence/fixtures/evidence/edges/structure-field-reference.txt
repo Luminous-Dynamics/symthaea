@@ -1,0 +1,1 @@
+lean elaborator receipt: structure field type references instExample

@@ -1,0 +1,1 @@
+build graph receipt: target requires Demo.Root module
