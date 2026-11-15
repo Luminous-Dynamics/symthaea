@@ -92,7 +92,7 @@ pub struct TraceEvent {
     pub confidence: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_execution: Option<ToolExecution>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub attribution: Vec<Attribution>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub annotation: Option<String>,
@@ -151,7 +151,7 @@ pub struct SystemInfo {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prompt_digest: Option<String>,
     pub memory_policy: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub tools_enabled: Vec<String>,
 }
 
@@ -227,10 +227,10 @@ pub struct HardGates {
     pub consent_violation_count: u64,
     pub fabricated_attribution_count: u64,
     pub hidden_side_effect_count: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub unresolved_unknown_outcome_count: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub reconciliation_bypass_count: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub failure_event_ids: Vec<String>,
 }
