@@ -713,5 +713,58 @@ mod tests {
             error,
             AuditError::UnsortedCandidatePopulation(id) if id == "core"
         )));
+
+    #[test]
+    fn accepted_feasible_identity_cannot_overlap_rejected_population() {
+        let rejected = vec![
+            "accepted-feasible-00000000".to_string(),
+            "rejected-candidate-00000001".to_string(),
+        ];
+        let errors = audit_rejected_candidates(&plan(
+            vec![stratum("edge", rejected, vec![])],
+            1,
+        ))
+        .unwrap_err();
+
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            AuditError::DuplicateCandidateId(id) if id == "accepted-feasible-00000000"
+        )));
+    }
+
+    #[test]
+    fn accepted_feasible_manifest_requires_candidate_evidence() {
+        let population = stratum_population("edge", 4);
+        let mut invalid = plan(vec![stratum("edge", population, vec![])], 1);
+        invalid.accepted_feasible.candidates[0].evidence_ref.clear();
+
+        let errors = audit_rejected_candidates(&invalid).unwrap_err();
+        assert!(errors.contains(&AuditError::EmptyIdentity(
+            "accepted_feasible.candidate.evidence_ref"
+        )));
+    }
+
+    #[test]
+    fn exact_infeasible_reject_census_can_certify_recall_target() {
+        let population = stratum_population("edge", 2);
+        let outcomes = [
+            AuditOutcome::ConfirmedInfeasible,
+            AuditOutcome::ConfirmedInfeasible,
+        ];
+        let samples = sample_outcomes(
+            "edge",
+            &population,
+            population.len(),
+            0x5eed_f00d_cafe_babe,
+            &outcomes,
+        );
+        let report = audit_rejected_candidates(&plan(
+            vec![stratum("edge", population, samples)],
+            100,
+        ))
+        .unwrap();
+
+        assert_eq!(report.feasible_recall_lower_bound, Some(1.0));
+        assert!(report.target_met);
     }
 }
