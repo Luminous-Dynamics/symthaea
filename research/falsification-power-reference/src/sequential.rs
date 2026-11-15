@@ -142,6 +142,7 @@ struct PendingPrediction {
     observation_id: String,
     decision_digest: String,
     residuals: Vec<f64>,
+    sigma: f64,
 }
 
 fn validate_alpha_sigma(alpha: f64, sigma: f64) -> Result<(), SequentialError> {
@@ -237,9 +238,29 @@ impl PredictableGaussianEProcess {
         decision_digest: impl Into<String>,
         expected_residual: f64,
     ) -> Result<(), SequentialError> {
+        self.commit_prediction_with_sigma(
+            observation_id,
+            decision_digest,
+            expected_residual,
+            self.sigma,
+        )
+    }
+
+    /// Commit a per-observation conditional noise sigma with the alternative
+    /// prediction. This supports known action-dependent measurement precision.
+    pub fn commit_prediction_with_sigma(
+        &mut self,
+        observation_id: impl Into<String>,
+        decision_digest: impl Into<String>,
+        expected_residual: f64,
+        sigma: f64,
+    ) -> Result<(), SequentialError> {
         let observation_id = observation_id.into();
         let decision_digest = decision_digest.into();
         validate_prediction_identity(&observation_id, &decision_digest)?;
+        if !sigma.is_finite() || sigma <= 0.0 {
+            return Err(SequentialError::InvalidSigma);
+        }
         if !expected_residual.is_finite() {
             return Err(SequentialError::NonFiniteDiscrepancy);
         }
@@ -253,6 +274,7 @@ impl PredictableGaussianEProcess {
             observation_id,
             decision_digest,
             residuals: vec![expected_residual],
+            sigma,
         });
         Ok(())
     }
@@ -403,9 +425,28 @@ impl PredictableGaussianMixture {
         decision_digest: impl Into<String>,
         expected_residuals: &[f64],
     ) -> Result<(), SequentialError> {
+        self.commit_predictions_with_sigma(
+            observation_id,
+            decision_digest,
+            expected_residuals,
+            self.sigma,
+        )
+    }
+
+    /// Commit a per-observation conditional sigma shared by all alternatives.
+    pub fn commit_predictions_with_sigma(
+        &mut self,
+        observation_id: impl Into<String>,
+        decision_digest: impl Into<String>,
+        expected_residuals: &[f64],
+        sigma: f64,
+    ) -> Result<(), SequentialError> {
         let observation_id = observation_id.into();
         let decision_digest = decision_digest.into();
         validate_prediction_identity(&observation_id, &decision_digest)?;
+        if !sigma.is_finite() || sigma <= 0.0 {
+            return Err(SequentialError::InvalidSigma);
+        }
         if self.pending.is_some() {
             return Err(SequentialError::PredictionAlreadyPending);
         }
@@ -425,6 +466,7 @@ impl PredictableGaussianMixture {
             observation_id,
             decision_digest,
             residuals: expected_residuals.to_vec(),
+            sigma,
         });
         Ok(())
     }
@@ -461,7 +503,7 @@ impl PredictableGaussianMixture {
             .copied()
             .zip(self.component_log_e_values.iter().copied())
         {
-            let increment = likelihood_ratio_increment(discrepancy, observed_residual, self.sigma)?;
+            let increment = likelihood_ratio_increment(discrepancy, observed_residual, pending.sigma)?;
             let next = current + increment;
             if !next.is_finite() {
                 return Err(SequentialError::NumericalOverflow);
