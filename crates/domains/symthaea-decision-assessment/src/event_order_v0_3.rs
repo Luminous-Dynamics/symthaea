@@ -3146,6 +3146,16 @@ pub fn project_action_history(
     } else {
         EventTraceDisposition::Safe
     };
+    let start_gate = start_gate.map(|mut gate| {
+        if disposition != EventTraceDisposition::Safe {
+            gate.start_permitted_by_stop_contract = false;
+            gate.disposition = disposition;
+            gate.reason_codes.extend(reasons.iter().cloned());
+            gate.reason_codes.sort();
+            gate.reason_codes.dedup();
+        }
+        gate
+    });
     Ok(ActionHistoryProjectionReport {
         disposition,
         attempts,
@@ -4624,6 +4634,28 @@ mod tests {
         assert_eq!(report.effect_commits.len(), 1);
         assert!(report.cancellation_acknowledgements.is_empty());
         assert_eq!(report.attempts[0].terminal_reconciliation.as_ref().map(|t| t.outcome), Some(ReconciledOperationOutcome::Applied));
+    }
+
+    #[test]
+    fn composite_projection_never_exposes_start_permission_after_other_gate_failure() {
+        let (schedule, resolutions, mut receipts, _) = action_history_fixture();
+        let commit_action_id = schedule.actions.iter().find_map(|action| {
+            if matches!(action.action, ScheduleAction::EffectCommitted { .. }) {
+                Some(action.action_id.clone())
+            } else {
+                None
+            }
+        }).expect("commit action");
+        let mut receipt = receipts.get(&commit_action_id).cloned().expect("commit verifier result");
+        receipt.authenticity = GateState::Fail;
+        receipts.insert(commit_action_id, receipt);
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("composite projection");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.start_gate.as_ref().is_some_and(|gate| {
+            !gate.start_permitted_by_stop_contract
+                && gate.disposition == EventTraceDisposition::CriticalFailure
+        }));
     }
 
     #[test]
