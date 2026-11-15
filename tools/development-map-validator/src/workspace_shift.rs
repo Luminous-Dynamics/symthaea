@@ -5,7 +5,7 @@
 //! provide deterministic integrity checks only; they do not authenticate a
 //! producer, source observation, test execution, authority or CI result.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use chrono::{DateTime, FixedOffset};
 use serde::{Deserialize, Serialize};
@@ -386,7 +386,38 @@ fn validate_scenario(scenario: &ShiftScenario) -> Result<(), String> {
             }
         }
     }
+
+    let clean_arm = scenario.arms.iter()
+        .find(|arm| arm.condition == ArmCondition::Clean)
+        .expect("scenario validation requires a clean arm");
+    let shifted_arm = scenario.arms.iter()
+        .find(|arm| arm.condition == ArmCondition::Shifted)
+        .expect("scenario validation requires a shifted arm");
+    if clean_arm.epochs[0].active_obligation_ids != shifted_arm.epochs[0].active_obligation_ids {
+        return Err("matched clean and shifted arms must share the same initial active obligations".to_owned());
+    }
+    if baseline_receipt_signature(clean_arm) != baseline_receipt_signature(shifted_arm) {
+        return Err("matched clean and shifted arms must share the same initial evidence outcomes and scope".to_owned());
+    }
     Ok(())
+}
+
+fn baseline_receipt_signature(
+    arm: &ShiftArm,
+) -> BTreeMap<String, (String, CheckOutcome, u64, String, String, String, String, String)> {
+    arm.checkpoints[0].receipts.iter().map(|receipt| (
+        receipt.obligation_id.clone(),
+        (
+            receipt.check_id.clone(),
+            receipt.outcome,
+            receipt.source_epoch,
+            receipt.observed_at.clone(),
+            receipt.available_at.clone(),
+            receipt.revision.clone(),
+            receipt.tree_oid.clone(),
+            receipt.configuration_world_digest.clone(),
+        ),
+    )).collect()
 }
 
 fn last_affected_epoch(arm: &ShiftArm, obligation_id: &str, through_epoch: u64) -> u64 {
@@ -560,6 +591,15 @@ mod tests {
         assert_eq!(report.active_requirement_conformance_delta, Some(0.0));
         assert_eq!(report.arm_scores.len(), 2);
         assert!(report.arm_scores.iter().all(|score| score.final_checkpoint_success));
+    }
+
+    #[test]
+    fn matched_arms_must_share_the_same_initial_obligations_and_evidence() {
+        let mut scenario = fixture();
+        let shifted = scenario.arms.iter_mut()
+            .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
+        shifted.epochs[0].active_obligation_ids.push("audit-requirement".to_owned());
+        assert!(evaluate_shift_scenario(&scenario).is_err());
     }
 
     #[test]
