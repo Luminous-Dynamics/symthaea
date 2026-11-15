@@ -609,6 +609,16 @@ mod tests {
         low.selection_basis = SelectionBasis::StratifiedAudit;
         low.selection_reason = Some("sample rejected stratum for false-negative audit".to_string());
 
+        let high = records
+            .iter_mut()
+            .find(|record| {
+                record.candidate_id == "candidate-b"
+                    && record.stage == ScreeningStage::HighFidelity
+            })
+            .unwrap();
+        high.selection_basis = SelectionBasis::StratifiedAudit;
+        high.selection_reason = Some("complete reference audit of sampled rejected candidate".to_string());
+
         let report = audit_screening_funnel(
             &ids,
             &records,
