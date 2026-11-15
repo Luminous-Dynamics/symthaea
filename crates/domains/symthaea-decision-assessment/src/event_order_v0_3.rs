@@ -2160,7 +2160,7 @@ pub struct OwnerReceiptAssessment {
 }
 
 impl OwnerReceiptAssessment {
-    fn receipt_qualification(self) -> GateState {
+    fn receipt_qualification(&self) -> GateState {
         let gates = [
             self.identity,
             self.digest_integrity,
@@ -4565,7 +4565,7 @@ mod tests {
                 None
             }
         }).expect("terminal action");
-        let mut receipt = receipts.get(&terminal_action_id).copied().expect("owner assessment");
+        let mut receipt = receipts.get(&terminal_action_id).cloned().expect("owner assessment");
         receipt.authenticity = GateState::Fail;
         receipts.insert(terminal_action_id, receipt);
         let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
