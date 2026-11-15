@@ -713,6 +713,7 @@ mod tests {
             error,
             AuditError::UnsortedCandidatePopulation(id) if id == "core"
         )));
+    }
 
     #[test]
     fn accepted_feasible_identity_cannot_overlap_rejected_population() {
