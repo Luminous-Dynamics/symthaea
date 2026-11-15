@@ -170,7 +170,7 @@ Additional negative controls cover training-group overlap, a missing group manif
 
 The signed sample offset now treats both stale and future-dated samples as outside the allowed run window. Sensor and energy-meter calibrations must be valid at the actual run timestamp, not just carry the string `QUALIFIED`.
 
-The fixture now has 16 scenarios (1 PASS, 6 REJECTED, 9 BLOCKED) and the Rust source has 20 authored tests. Independent source-side replay matched 16/16 expected dispositions. These tests remain uncompiled/unexecuted in the current environment.
+The fixture now has 16 scenarios (1 PASS, 6 REJECTED, 9 BLOCKED) and the Rust source has 23 authored tests. Independent source-side replay matched 16/16 expected dispositions. These tests remain uncompiled/unexecuted in the current environment.
 
 ## 2026 virtual-metrology benchmark context
 
