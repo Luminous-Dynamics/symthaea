@@ -58,8 +58,8 @@
         "algorithm": "sha256",
         "value": "8888888888888888888888888888888888888888888888888888888888888888"
       },
-      "permitted_scope": "synthetic/decision-api@revision:obligation",
-      "operation": "record_observation",
+      "permitted_scope": "synthetic/decision-api@dddddddddddddddddddddddddddddddddddddddd:deployment-scope",
+      "operation": "authorize_deployment_scope",
       "valid_from": "2026-11-15T07:59:00Z",
       "valid_until": "2026-11-15T09:00:00Z"
     },
