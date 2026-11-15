@@ -879,6 +879,50 @@ mod tests {
         }
     }
 
+    fn rectangular_spec() -> SectionHullSpec {
+        let shape = vec![
+            SectionControlPoint {
+                breadth_fraction: 0.0,
+                depth_fraction: 1.0,
+            },
+            SectionControlPoint {
+                breadth_fraction: 1.0,
+                depth_fraction: 1.0,
+            },
+            SectionControlPoint {
+                breadth_fraction: 1.0,
+                depth_fraction: 0.0,
+            },
+        ];
+        SectionHullSpec {
+            schema_version: 1,
+            candidate_id: "rectangular-prism-known-answer-001".into(),
+            length_m: 100.0,
+            beam_m: 20.0,
+            draft_m: 6.0,
+            coordinate_frame: CoordinateFrame {
+                id: "ship-local".into(),
+                axis_convention: "x-forward,y-starboard,z-down".into(),
+                handedness: "right-handed".into(),
+            },
+            samples_per_segment: 1,
+            stations: vec![
+                SectionStation {
+                    x_over_length: 0.0,
+                    half_breadth_fraction: 1.0,
+                    draft_fraction: 1.0,
+                    control_points: shape.clone(),
+                },
+                SectionStation {
+                    x_over_length: 1.0,
+                    half_breadth_fraction: 1.0,
+                    draft_fraction: 1.0,
+                    control_points: shape,
+                },
+            ],
+        }
+    }
+
     fn prismatic_artifact() -> SectionFamilyArtifact {
         let spec = SectionHullSpec {
             schema_version: 1,
@@ -998,6 +1042,21 @@ mod tests {
         result.admission_report = admit(&result.candidate);
         let error = verify_loft_artifact_integrity(&result).unwrap_err();
         assert!(error.iter().any(|item| item.code == "loft_manifest_digest"));
+    }
+
+    #[test]
+    fn rectangular_prism_mesh_matches_known_volume_and_waterplane() {
+        let source = generate_section_artifact(&rectangular_spec()).unwrap();
+        let result = loft_waterplane_capped_hull(&source, profile()).unwrap();
+        assert_eq!(
+            result.admission_report.disposition,
+            Disposition::AdmissibleForProfile
+        );
+        assert!((result.admission_report.metrics.signed_volume_m3.unwrap() - 12_000.0).abs() < 1.0e-9);
+        assert_eq!(result.admission_report.metrics.boundary_edge_count, 0);
+        assert_eq!(result.admission_report.metrics.non_manifold_edge_count, 0);
+        assert_eq!(result.admission_report.metrics.non_manifold_vertex_link_count, 0);
+        assert!(verify_loft_artifact_integrity(&result).is_ok());
     }
 
     #[test]
