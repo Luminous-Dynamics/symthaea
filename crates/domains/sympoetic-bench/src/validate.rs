@@ -55,6 +55,7 @@ const EVENT_KINDS: &[&str] = &[
 ];
 const SCORING_MODES: &[&str] = &["binary", "ordinal", "human_rating", "trace_audit"];
 const CONSENT_VALUES: &[&str] = &["not_applicable", "task_only", "explicit_opt_in"];
+const PERSISTENT_MEMORY_VALUES: &[&str] = &["forbidden", "task_only", "explicit_opt_in"];
 const TRACE_ACTORS: &[&str] = &["human", "agent", "tool", "environment", "evaluator"];
 const TRACE_EVENT_TYPES: &[&str] = &[
     "user_intent",
@@ -239,13 +240,21 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
         bail!("{}: at least two baseline conditions are required", scenario.scenario_id);
     }
 
-    for (name, value) in [
-        ("trace_recording", scenario.consent_scope.trace_recording.as_str()),
-        ("persistent_memory", scenario.consent_scope.persistent_memory.as_str()),
-        ("artifact_reuse", scenario.consent_scope.artifact_reuse.as_str()),
-    ] {
-        require_member(name, value, CONSENT_VALUES)?;
-    }
+    require_member(
+        "trace_recording",
+        &scenario.consent_scope.trace_recording,
+        CONSENT_VALUES,
+    )?;
+    require_member(
+        "persistent_memory",
+        &scenario.consent_scope.persistent_memory,
+        PERSISTENT_MEMORY_VALUES,
+    )?;
+    require_member(
+        "artifact_reuse",
+        &scenario.consent_scope.artifact_reuse,
+        CONSENT_VALUES,
+    )?;
 
     for rubric in &scenario.human_rubric {
         require_nonempty("rubric dimension", &rubric.dimension)?;
