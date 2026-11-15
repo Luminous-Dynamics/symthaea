@@ -391,6 +391,31 @@ fn run_controls(
     let blindness_result =
         validate_trial_bundle(&blinded_violation, choices, manifest_sha256, &guard);
 
+    let mut runner_blindness_violation = valid.clone();
+    runner_blindness_violation[0].runner_can_read_target = true;
+    let runner_blindness_result = validate_trial_bundle(
+        &runner_blindness_violation,
+        choices,
+        manifest_sha256,
+        &guard,
+    );
+
+    let mut missing_receipt = valid.clone();
+    missing_receipt.pop();
+    let missing_result =
+        validate_trial_bundle(&missing_receipt, choices, manifest_sha256, &guard);
+
+    let mut response_tamper = valid.clone();
+    response_tamper[0].response_digest_sha256 = "0".repeat(64);
+    let response_tamper_result =
+        validate_trial_bundle(&response_tamper, choices, manifest_sha256, &guard);
+
+    let mut chronology_tamper = valid.clone();
+    chronology_tamper[0].target_reveal_sequence =
+        chronology_tamper[0].response_commit_sequence;
+    let chronology_result =
+        validate_trial_bundle(&chronology_tamper, choices, manifest_sha256, &guard);
+
     let optional_stopping = ProtocolGuard {
         stopping_policy: "optional_stopping".into(),
         posthoc_exclusions: 1,
@@ -444,6 +469,30 @@ fn run_controls(
             "REJECT_TARGET_VISIBILITY",
             disposition(blindness_result, "REJECT_TARGET_VISIBILITY"),
             "An analyst-visible hidden target is rejected.",
+        ),
+        control(
+            "runner_blinding_violation",
+            "REJECT_TARGET_VISIBILITY",
+            disposition(runner_blindness_result, "REJECT_TARGET_VISIBILITY"),
+            "The inference runner must not have access to hidden target labels.",
+        ),
+        control(
+            "missing_trial_receipt",
+            "REJECT_TRIAL_COUNT_MISMATCH",
+            disposition(missing_result, "REJECT_TRIAL_COUNT_MISMATCH"),
+            "A missing member of the fixed trial set is rejected, not silently replaced.",
+        ),
+        control(
+            "response_digest_tamper",
+            "REJECT_RESPONSE_DIGEST_MISMATCH",
+            disposition(response_tamper_result, "REJECT_RESPONSE_DIGEST_MISMATCH"),
+            "A response digest that no longer matches the committed synthetic payload is rejected.",
+        ),
+        control(
+            "response_target_chronology",
+            "REJECT_RESPONSE_AFTER_TARGET",
+            disposition(chronology_result, "REJECT_RESPONSE_AFTER_TARGET"),
+            "A target reveal sequence that is not strictly after response commitment is rejected.",
         ),
         control(
             "optional_stopping",
@@ -630,6 +679,11 @@ fn validate_trial_bundle(
         {
             return Err(Rejection {
                 code: "REJECT_KNOWN_DIRECT_TARGET_CHANNEL",
+            });
+        }
+        if trial.independent_unit_id.trim().is_empty() {
+            return Err(Rejection {
+                code: "REJECT_EMPTY_INDEPENDENCE_UNIT",
             });
         }
         if guard.assumes_independent_units
@@ -849,6 +903,28 @@ mod tests {
 
     fn manifest_bytes() -> Vec<u8> {
         include_bytes!("../fixtures/manifest-v0.1.json").to_vec()
+    }
+
+    #[test]
+    fn manifest_with_synthetic_only_false_is_rejected() {
+        let manifest: Manifest = serde_json::from_slice(&manifest_bytes()).unwrap();
+        let mut invalid = manifest;
+        invalid.synthetic_only = false;
+        assert!(validate_manifest(&invalid).is_err());
+    }
+
+    #[test]
+    fn full_five_choice_profile_emits_deterministic_synthetic_receipt() {
+        let bytes = manifest_bytes();
+        let head = "a".repeat(40);
+        let first = run_profile("five-choice", &head, &bytes).unwrap();
+        let second = run_profile("five-choice", &head, &bytes).unwrap();
+        assert!(first.receipt.all_controls_passed);
+        assert_eq!(first.receipt_sha256, second.receipt_sha256);
+        assert_eq!(first.receipt.profile, "five-choice");
+        assert_eq!(first.receipt.chance_rate, 0.20);
+        assert!(first.receipt.synthetic_only);
+        assert_eq!(first.receipt.measurement_class, "SIMULATED");
     }
 
     #[test]
