@@ -118,7 +118,12 @@
               "build-repro",
               "api-compat"
             ],
-            "uses_prior_evidence": true
+            "uses_prior_evidence": true,
+            "observation_ids_used": [
+              "obs-latency-spike",
+              "obs-cache-miss-spike"
+            ],
+            "claimed_independent_source_count": 1
           },
           {
             "decision_id": "decision-detected",
@@ -135,7 +140,13 @@
               "build-repro",
               "api-compat"
             ],
-            "uses_prior_evidence": true
+            "uses_prior_evidence": true,
+            "observation_ids_used": [
+              "obs-latency-spike",
+              "obs-cache-miss-spike",
+              "obs-runner-r2"
+            ],
+            "claimed_independent_source_count": 2
           }
         ],
         "probe_responses": [
@@ -299,7 +310,13 @@
               "docs-format"
             ],
             "blocked_obligations": [],
-            "uses_prior_evidence": true
+            "uses_prior_evidence": true,
+            "observation_ids_used": [
+              "obs-sham-latency-spike",
+              "obs-sham-cache-miss-spike",
+              "obs-runner-r1"
+            ],
+            "claimed_independent_source_count": 2
           }
         ],
         "probe_responses": [
