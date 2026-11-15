@@ -154,6 +154,7 @@ pub struct TargetMappingContext<'a> {
     pub trial_id: &'a str,
     pub chain_hash: &'a [u8; 32],
     pub scheme_id: &'a str,
+    pub response_commitment: &'a [u8; 32],
     pub round: u64,
     pub verified_randomness: &'a [u8; 32],
 }
@@ -202,6 +203,7 @@ fn target_mapping_digest(
     append_length_prefixed(&mut bytes, context.chain_hash)?;
     append_length_prefixed(&mut bytes, context.scheme_id.as_bytes())?;
     bytes.extend_from_slice(&context.round.to_be_bytes());
+    append_length_prefixed(&mut bytes, context.response_commitment)?;
     append_length_prefixed(&mut bytes, context.verified_randomness)?;
     bytes.extend_from_slice(&counter.to_be_bytes());
     Ok(Sha256::digest(&bytes).into())
@@ -220,8 +222,7 @@ fn two_to_256_mod(modulus: usize) -> usize {
 }
 
 fn digest_is_below_small_integer(digest: &[u8; 32], threshold: usize) -> bool {
-    digest[..31].iter().all(|byte| *byte == 0)
-        && usize::from(digest[31]) < threshold
+    digest[..31].iter().all(|byte| *byte == 0) && usize::from(digest[31]) < threshold
 }
 
 fn digest_modulo(digest: &[u8; 32], modulus: usize) -> usize {
@@ -793,12 +794,15 @@ fn target_mapping_known_answer_vectors() -> bool {
         0x42, 0xde, 0x45, 0x66, 0x18, 0x3e, 0xc5, 0x1c, 0x56, 0xff, 0x3c, 0xd6, 0x03, 0xd9,
         0x30, 0xe5, 0x4f, 0xdd,
     ];
+    let response_commitment =
+        Sha256::digest(b"sympsi-response-commitment-000042").into();
     let context = TargetMappingContext {
         protocol_id: "sympsi-aia-01-v0.1",
         campaign_id: "campaign-0001",
         trial_id: "trial-000042",
         chain_hash: &chain_hash,
         scheme_id: "bls-unchained-g1-rfc9380",
+        response_commitment: &response_commitment,
         round: 1000,
         verified_randomness: &randomness,
     };
@@ -1260,6 +1264,7 @@ mod tests {
             trial_id: "trial-1",
             chain_hash: &chain_hash,
             scheme_id: "scheme-a",
+            response_commitment: &[0x01_u8; 32],
             round: 100,
             verified_randomness: &randomness,
         };
@@ -1267,9 +1272,15 @@ mod tests {
             round: 101,
             ..first_context
         };
+        let third_context = TargetMappingContext {
+            response_commitment: &[0x02_u8; 32],
+            ..first_context
+        };
         let first = target_mapping_digest(&first_context, 0).unwrap();
         let second = target_mapping_digest(&second_context, 0).unwrap();
+        let third = target_mapping_digest(&third_context, 0).unwrap();
         assert_ne!(first, second);
+        assert_ne!(first, third);
     }
 
     #[test]
