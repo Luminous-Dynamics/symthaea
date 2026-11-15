@@ -688,8 +688,6 @@ mod tests {
         let mut item = receipt();
         item.payload.evidence.metrics.max_surface_deviation_m = None;
         item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
-        item.payload.tolerance_profile.required_checks.push("surface-deviation".into());
-        item.receipt_digest_blake3 = compute_receipt_digest(&item.payload).unwrap();
         let error = verify_translation_receipt(&item).unwrap_err();
         assert!(error.iter().any(|issue| issue.code == "required_metric_missing"));
     }
