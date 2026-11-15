@@ -722,7 +722,10 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
         "coalition",
     ];
 
-    let metric_values = scorecard.scores.entries();
+    let metric_values = scorecard
+        .scores
+        .entries()
+        .map_err(anyhow::Error::msg)?;
     let mut evidenced_metrics = HashSet::new();
 
     for receipt in &scorecard.metric_evidence {
@@ -782,7 +785,7 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
 
         let score_value = metric_values
             .iter()
-            .find(|(name, _)| *name == receipt.metric_name.as_str())
+            .find(|(name, _)| name == &receipt.metric_name)
             .with_context(|| {
                 format!(
                     "metric evidence references unknown metric {:?}",
@@ -847,11 +850,10 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
         }
     }
 
-    for (metric_name, value) in metric_values {
-        if value.is_some()
-            && !evidenced_metrics
-                .iter()
-                .any(|evidenced| *evidenced == metric_name)
+    for (metric_name, _) in metric_values {
+        if !evidenced_metrics
+            .iter()
+            .any(|evidenced| *evidenced == metric_name)
         {
             bail!(
                 "scorecard metric {:?} has a value but no evidence receipt",
