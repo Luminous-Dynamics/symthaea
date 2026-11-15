@@ -50,6 +50,12 @@ Relevant Symtropy owners:
 - [rotating habitat structure trade study #5280](https://github.com/Luminous-Dynamics/symtropy/issues/5280);
 - [cislunar industrialization gate #5341](https://github.com/Luminous-Dynamics/symtropy/issues/5341).
 
+
+
+### Cross-stack integration precedent
+
+Symtropy [ENERGY-SYSTEMS-STUDIO-001 #2721](https://github.com/Luminous-Dynamics/symtropy/issues/2721) already establishes the general collaboration pattern in another domain: Symthaea proposes candidate architectures and policies; Symtropy executes deterministic twins and fault replay; Sol-Atlas supplies spatial/resource evidence; Mycelix preserves provenance and approvals. This space-structure programme specializes that pattern for structural model applicability, mesh/material/load identity and solver qualification. It does not replace or fork the generic integration pattern.
+
 ## 3. Paradigm shifts
 
 ### 3.1 Candidate and fidelity are chosen together
