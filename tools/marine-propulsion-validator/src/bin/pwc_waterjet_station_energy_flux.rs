@@ -106,6 +106,7 @@ struct Record {
     method: Method,
     measurement_window: MeasurementWindow,
     evaluation_time_utc: String,
+    maximum_observation_skew_ms: f64,
     fluid: Fluid,
     pressure_reference: PressureReference,
     elevation_datum: ElevationDatum,
@@ -149,6 +150,8 @@ struct AuditReport {
     station_flow_difference: Option<Scalar>,
     flow_balance_tolerance_m3_s: Option<f64>,
     flow_balance_valid: bool,
+    observed_timestamp_skew_ms: Option<i64>,
+    maximum_observation_skew_ms: f64,
     effective_jet_system_power_p_jse: Option<Scalar>,
     station_6_shortcut_used: bool,
     diagnostics: Vec<String>,
@@ -184,6 +187,23 @@ fn validate_schema(schema: &Value, instance: &Value) -> Result<(), String> {
     let errors = validator.iter_errors(instance)
         .map(|e| format!("{}: {e}", e.instance_path())).collect::<Vec<_>>();
     if errors.is_empty() { Ok(()) } else { Err(format!("instance schema violations: {}", errors.join("; "))) }
+}
+
+fn observation_skew_ms(record: &Record) -> Option<i64> {
+    let mut observed = Vec::new();
+    observed.push(parse_time(&record.fluid.density.observed_at_utc)?.timestamp_millis());
+    for station in [&record.station_1, &record.station_7] {
+        for cell in &station.cells {
+            observed.push(parse_time(&cell.axial_velocity.observed_at_utc)?.timestamp_millis());
+            observed.push(parse_time(&cell.normal_x.observed_at_utc)?.timestamp_millis());
+            observed.push(parse_time(&cell.static_pressure.observed_at_utc)?.timestamp_millis());
+            observed.push(parse_time(&cell.elevation.observed_at_utc)?.timestamp_millis());
+            observed.push(parse_time(&cell.area.observed_at_utc)?.timestamp_millis());
+        }
+    }
+    let minimum = *observed.iter().min()?;
+    let maximum = *observed.iter().max()?;
+    Some(maximum - minimum)
 }
 
 fn validate_measurement(
@@ -314,6 +334,8 @@ fn empty_report(record: &Record, findings: Findings, arithmetic: &'static str, r
         station_flow_difference: None,
         flow_balance_tolerance_m3_s: None,
         flow_balance_valid: false,
+        observed_timestamp_skew_ms: observation_skew_ms(record),
+        maximum_observation_skew_ms: record.maximum_observation_skew_ms,
         effective_jet_system_power_p_jse: None,
         station_6_shortcut_used: false,
         diagnostics: findings.diagnostics,
@@ -340,6 +362,9 @@ fn audit(record: &Record) -> AuditReport {
         findings.invalid("/pressure_reference", "pressure datum must be explicit and either absolute or gauge");
     }
     if record.elevation_datum.datum_id.trim().is_empty() { findings.invalid("/elevation_datum", "elevation datum must be declared"); }
+    if !record.maximum_observation_skew_ms.is_finite()
+        || !(0.0..=5000.0).contains(&record.maximum_observation_skew_ms)
+    { findings.invalid("/maximum_observation_skew_ms", "observation-time skew tolerance must be finite and between 0 and 5000 ms"); }
     if !record.flow_balance_tolerance.absolute_m3_s.is_finite()
         || !record.flow_balance_tolerance.relative_fraction.is_finite()
         || record.flow_balance_tolerance.absolute_m3_s < 0.0
@@ -391,6 +416,12 @@ fn audit(record: &Record) -> AuditReport {
 
     let station_1 = station_result(&record.station_1, q1_nominal, q1, e1_nominal, e1, area1);
     let station_7 = station_result(&record.station_7, q7_nominal, q7, e7_nominal, e7, area7);
+    let observed_skew_ms = observation_skew_ms(record).unwrap_or(i64::MAX);
+
+    if observed_skew_ms as f64 > record.maximum_observation_skew_ms {
+        findings.incomparable("/measurement_window", format!("cross-station and within-station observation skew {observed_skew_ms} ms exceeds declared limit {:.3} ms", record.maximum_observation_skew_ms));
+        return report_with_stations(record, findings, station_1, station_7, flow_difference, tolerance, false, None, "STATION_OBSERVATION_SKEW_EXCEEDED");
+    }
 
     if q1_nominal <= 0.0 || q7_nominal <= 0.0 {
         findings.incomparable("/station_flow", "integrated flow is non-positive; check local axial velocity sign and station normal orientation");
@@ -472,6 +503,8 @@ fn report_with_stations(
         station_flow_difference: Some(scalar(nominal_flow_difference, flow_difference, "m3/s")),
         flow_balance_tolerance_m3_s: Some(tolerance),
         flow_balance_valid: flow_valid,
+        observed_timestamp_skew_ms: observation_skew_ms(record),
+        maximum_observation_skew_ms: record.maximum_observation_skew_ms,
         effective_jet_system_power_p_jse: p_jse,
         station_6_shortcut_used: false,
         diagnostics: findings.diagnostics,
@@ -559,6 +592,19 @@ mod tests {
         let (q, _, _) = integrate_station(&record.station_7, &record.fluid.density);
         assert!((q.lo + 2.0).abs() < 1e-12);
         assert!((q.hi + 2.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn station_measurement_skew_exceeding_the_contract_is_incomparable() {
+        let mut record = instance(POSITIVE).1;
+        record.maximum_observation_skew_ms = 5.0;
+        record.station_7.cells[0].axial_velocity.observed_at_utc =
+            "2026-11-15T00:00:30.010Z".to_owned();
+        let report = audit(&record);
+        assert_eq!(report.disposition, "INCOMPARABLE");
+        assert_eq!(report.reason_code, "STATION_OBSERVATION_SKEW_EXCEEDED");
+        assert!(report.effective_jet_system_power_p_jse.is_none());
+        assert_eq!(report.observed_timestamp_skew_ms, Some(10));
     }
 
     #[test]
