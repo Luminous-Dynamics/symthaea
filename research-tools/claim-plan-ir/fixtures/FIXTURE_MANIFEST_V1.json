@@ -1,0 +1,44 @@
+{
+  "version": "claim-plan-fixture-manifest/v1",
+  "purpose": "Synthetic-only claim-plan schema and semantic preflight fixtures. No cryptographic or issuer qualification is implied.",
+  "positive": [
+    {
+      "path": "positive_zar_balance_plan_v1.json",
+      "expected": "accept-structure-and-semantic-preflight",
+      "required": true
+    }
+  ],
+  "negative": [
+    {
+      "path": "negative/unsafe_integer_literal.json",
+      "expected": "reject-json-schema",
+      "reason": "JCS/I-JSON exact-integer limit exceeded; large integers must be typed decimal strings."
+    },
+    {
+      "path": "negative/status_version_maturity_mismatch.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "W3C Bitstring Status List v1.1 Working Draft cannot be labelled a W3C Recommendation."
+    },
+    {
+      "path": "negative/origin_contains_path.json",
+      "expected": "reject-json-schema",
+      "reason": "The source origin field must be an HTTPS origin, not a URL containing an application path."
+    },
+    {
+      "path": "negative/missing_status_anti_rollback.json",
+      "expected": "reject-json-schema",
+      "reason": "Status evidence profile must explicitly require anti-rollback checking."
+    },
+    {
+      "path": "negative/duplicate_member_name.raw.json",
+      "expected": "reject-raw-json-admission-before-schema",
+      "reason": "Duplicate JSON object member names violate the JCS/I-JSON input contract and cannot be safely detected after lossy object parsing."
+    }
+  ],
+  "nonclaims": [
+    "The fixture uses synthetic identifiers and zero digests.",
+    "No TLS session or proof is present.",
+    "All profile IDs are test labels, not qualified profiles.",
+    "Schema shape is not policy correctness or authorization."
+  ]
+}
