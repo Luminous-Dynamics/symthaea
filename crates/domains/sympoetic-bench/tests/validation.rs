@@ -88,7 +88,10 @@ fn fixture_metric_evidence(metric_name: &str, value: f64) -> MetricEvidence {
         sample_size: 10,
         measurement_method: "fixture-method-v1".to_owned(),
         scorer_revision: "git:scorer-fixture".to_owned(),
-        evidence_refs: vec![format!("fixture:evidence:{metric_name}")],
+        evidence_refs: vec![
+            format!("artifact:sha256:{}", digest('d')),
+            format!("fixture:evidence:{metric_name}"),
+        ],
         numerator: None,
         denominator: None,
         ci_lower: None,
@@ -664,6 +667,17 @@ fn cognitive_process_trace_events_enforce_human_and_agent_actors() {
     };
     let bytes = serde_json::to_vec(&trace).unwrap();
     assert!(validate_trace(&trace, &bytes).is_err());
+}
+
+#[test]
+fn metric_evidence_must_bind_to_run_scorer_revision_and_provenance_digest() {
+    let mut scorecard = base_scorecard();
+    scorecard.metric_evidence[0].scorer_revision = "git:other-scorer".to_owned();
+    assert!(validate_scorecard(&scorecard).is_err());
+
+    let mut scorecard = base_scorecard();
+    scorecard.metric_evidence[0].evidence_refs = vec!["unbound:source".to_owned()];
+    assert!(validate_scorecard(&scorecard).is_err());
 }
 
 #[test]
