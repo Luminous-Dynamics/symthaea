@@ -1788,6 +1788,77 @@ fn sha256_domain_hex(domain: &[u8], bytes: &[u8]) -> String {
 mod tests {
     use super::*;
 
+    fn qualified_resolution(
+        schedule: &VirtualSchedule,
+        mapping_action_id: &str,
+        local_timestamp_ns: u64,
+        normalized_timestamp_ns: i64,
+    ) -> QualifiedEventTime {
+        let action = schedule.actions.iter()
+            .find(|action| action.action_id == mapping_action_id)
+            .expect("mapping action exists");
+        let (clock_domain, receipt_ref, receipt_sha256) = match &action.action {
+            ScheduleAction::ClockAdvance {
+                clock_domain, mapping_receipt_ref, mapping_receipt_sha256, ..
+            } => (clock_domain.clone(), mapping_receipt_ref.clone(), mapping_receipt_sha256.clone()),
+            _ => panic!("mapping reference targets a non-clock action"),
+        };
+        let _ = local_timestamp_ns;
+        QualifiedEventTime {
+            source_clock_domain_id: clock_domain,
+            time_basis: crate::event_order_v0_2::TimeBasisDescriptor {
+                basis_id: "owner-normalized-tai-v1".to_owned(),
+                epoch: "tai-epoch-0".to_owned(),
+                scale: "TAI".to_owned(),
+                unit: crate::event_order_v0_2::EventTimeUnit::Nanoseconds,
+            },
+            mapping_receipt_ref: receipt_ref,
+            mapping_receipt_sha256: receipt_sha256,
+            mapping_qualification: GateState::Pass,
+            mapping_valid_from_ns: 0,
+            mapping_valid_through_ns: 100_000,
+            max_interval_width_ns: 0,
+            interval: crate::event_order_v0_2::EventTimeIntervalNs {
+                earliest_ns: normalized_timestamp_ns,
+                latest_ns: normalized_timestamp_ns,
+            },
+        }
+    }
+
+    fn owner_time_resolutions(schedule: &VirtualSchedule) -> BTreeMap<(String, u64), QualifiedEventTime> {
+        let mut resolutions = BTreeMap::new();
+        for action in &schedule.actions {
+            match &action.action {
+                ScheduleAction::EventProduced {
+                    clock_mapping_action_id, source_timestamp_ns, ..
+                } => {
+                    resolutions.insert(
+                        (clock_mapping_action_id.clone(), *source_timestamp_ns),
+                        qualified_resolution(schedule, clock_mapping_action_id, *source_timestamp_ns, 500),
+                    );
+                }
+                ScheduleAction::EventObserved {
+                    clock_mapping_action_id, observed_at_ns, ..
+                } => {
+                    resolutions.insert(
+                        (clock_mapping_action_id.clone(), *observed_at_ns),
+                        qualified_resolution(schedule, clock_mapping_action_id, *observed_at_ns, 1_000),
+                    );
+                }
+                ScheduleAction::EventPersisted {
+                    clock_mapping_action_id, persisted_at_ns, ..
+                } => {
+                    resolutions.insert(
+                        (clock_mapping_action_id.clone(), *persisted_at_ns),
+                        qualified_resolution(schedule, clock_mapping_action_id, *persisted_at_ns, 1_200),
+                    );
+                }
+                _ => {}
+            }
+        }
+        resolutions
+    }
+
     #[test]
     fn seeded_generator_is_byte_for_byte_deterministic() {
         let left = generate_delivery_schedule(0x4c55_4d49, 24).expect("valid schedule");
@@ -2194,6 +2265,69 @@ mod tests {
             SchedulerDisposition::Duplicate,
             SchedulerDisposition::ConflictingReconciliation,
         ]);
+    }
+
+    #[test]
+    fn bitemporal_projection_uses_owner_times_not_simulator_action_time() {
+        let schedule = generate_clocked_observation_persistence_schedule(0x2026_1115)
+            .expect("clocked observation/persistence schedule");
+        let resolutions = owner_time_resolutions(&schedule);
+        let report = project_bitemporal_event(
+            &schedule,
+            "event-000000",
+            "worker-after-reconnect",
+            "durable-store-0",
+            &resolutions,
+        ).expect("projection result");
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+        let envelope = report.envelope.expect("qualified bitemporal envelope");
+        let occurred = envelope.occurred_at.expect("owner-qualified occurrence time");
+        assert_eq!(occurred.interval.earliest_ns, 500);
+        assert_eq!(envelope.first_observed_at.interval.earliest_ns, 1_000);
+        assert_eq!(envelope.durably_recorded_at.interval.earliest_ns, 1_200);
+        let simulator_observed_at = schedule.actions.iter().find_map(|action| {
+            if let ScheduleAction::EventObserved { event_id, .. } = &action.action {
+                (event_id == "event-000000").then_some(action.at_ns)
+            } else {
+                None
+            }
+        }).expect("simulator observation action exists");
+        assert_ne!(
+            envelope.first_observed_at.interval.earliest_ns as u64,
+            simulator_observed_at,
+        );
+        assert_eq!(envelope.capture_qualification, GateState::Pass);
+    }
+
+    #[test]
+    fn bitemporal_projection_fails_closed_on_missing_or_substituted_owner_time() {
+        let schedule = generate_clocked_observation_persistence_schedule(0x2026_1116)
+            .expect("clocked observation/persistence schedule");
+        let mut missing = owner_time_resolutions(&schedule);
+        let observation_key = schedule.actions.iter().find_map(|action| {
+            if let ScheduleAction::EventObserved {
+                clock_mapping_action_id, observed_at_ns, ..
+            } = &action.action {
+                Some((clock_mapping_action_id.clone(), *observed_at_ns))
+            } else {
+                None
+            }
+        }).expect("observation mapping key");
+        missing.remove(&observation_key);
+        let missing_report = project_bitemporal_event(
+            &schedule, "event-000000", "worker-after-reconnect", "durable-store-0", &missing,
+        ).expect("missing resolution remains an assessment");
+        assert_eq!(missing_report.disposition, EventTraceDisposition::Indeterminate);
+        assert!(missing_report.envelope.is_none());
+
+        let mut substituted = owner_time_resolutions(&schedule);
+        let value = substituted.get_mut(&observation_key).expect("owner time resolution");
+        value.mapping_receipt_sha256 = "f".repeat(64);
+        let substituted_report = project_bitemporal_event(
+            &schedule, "event-000000", "worker-after-reconnect", "durable-store-0", &substituted,
+        ).expect("substituted resolution remains an assessment");
+        assert_eq!(substituted_report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(substituted_report.envelope.is_none());
     }
 
     #[test]
