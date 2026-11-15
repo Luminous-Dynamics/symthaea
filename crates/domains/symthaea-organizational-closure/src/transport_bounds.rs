@@ -1412,7 +1412,12 @@ mod tests {
         ];
         trace.claim.reported_interval = TransportEffectInterval::new(-10.0, 10.0);
         let report = evaluate_transport_bounds(&scenario, &oracle, &trace);
-        assert_eq!(report.qualification, TransportQualification::Qualified, "{:?}", report.findings);
+        assert_eq!(
+            report.qualification,
+            TransportQualification::Qualified,
+            "{:?}",
+            report.findings
+        );
         assert_eq!(report.oracle_within_sensitivity_model, Some(true));
         let bounds = report.recomputed_target_effect_bounds.unwrap();
         assert!(bounds.lower <= bounds.upper);
