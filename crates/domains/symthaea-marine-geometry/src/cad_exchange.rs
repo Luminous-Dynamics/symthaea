@@ -6,6 +6,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::step_header::{inspect_step_part21_header, StepHeaderProfile};
+
 const RECEIPT_SCHEMA_VERSION: u32 = 1;
 const BLAKE3_HEX_LEN: usize = 64;
 
@@ -226,6 +228,80 @@ fn disposition_from_checks(
     } else {
         TranslationDisposition::QualifiedWithinProfile
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StepArtifactQualification {
+    pub candidate_id: String,
+    pub receipt_digest_blake3: String,
+    pub step_file_digest_blake3: String,
+    pub header_profile_id: String,
+    pub file_schema_identifiers: Vec<String>,
+    pub profile_required_edition: StepSchemaEdition,
+}
+
+/// Compose the receipt verifier and Part 21 header inspector against the
+/// actual STEP bytes. This binds the receipt's file digest to the bytes read
+/// and checks that the exact FILE_SCHEMA identifiers match the pinned profile.
+///
+/// This still does not parse DATA records or validate B-rep geometry. Those
+/// require the independent importer/backend evidence carried by the receipt.
+pub fn verify_step_translation_artifact(
+    step_bytes: &[u8],
+    receipt: &CadTranslationReceipt,
+    header_profile: &StepHeaderProfile,
+) -> Result<StepArtifactQualification, Vec<CadViolation>> {
+    let mut violations = Vec::new();
+
+    if let Err(items) = verify_translation_receipt(receipt) {
+        violations.extend(items);
+    }
+
+    let inspection = match inspect_step_part21_header(step_bytes, header_profile) {
+        Ok(value) => Some(value),
+        Err(items) => {
+            violations.extend(items.into_iter().map(|item| CadViolation {
+                code: format!("step_header:{}", item.code),
+                detail: item.detail,
+            }));
+            None
+        }
+    };
+
+    if header_profile.required_edition != receipt.payload.step_schema_edition {
+        add_violation(
+            &mut violations,
+            "step_profile_edition_mismatch",
+            "Part 21 header profile edition does not match the receipt's STEP schema edition",
+        );
+    }
+
+    if let Some(inspection) = inspection.as_ref() {
+        if !inspection
+            .file_digest_blake3
+            .eq_ignore_ascii_case(&receipt.payload.step_file_digest_blake3)
+        {
+            add_violation(
+                &mut violations,
+                "step_file_digest_mismatch",
+                "actual STEP bytes do not match the file digest in the translation receipt",
+            );
+        }
+    }
+
+    if !violations.is_empty() {
+        return Err(violations);
+    }
+
+    let inspection = inspection.expect("successful Part 21 inspection has an inspection result");
+    Ok(StepArtifactQualification {
+        candidate_id: receipt.payload.candidate_id.clone(),
+        receipt_digest_blake3: receipt.receipt_digest_blake3.clone(),
+        step_file_digest_blake3: inspection.file_digest_blake3,
+        header_profile_id: inspection.profile_id,
+        file_schema_identifiers: inspection.file_schema_identifiers,
+        profile_required_edition: inspection.profile_required_edition,
+    })
 }
 
 /// Validate a translation receipt's evidence and integrity envelope.
@@ -671,6 +747,61 @@ mod tests {
             payload,
             receipt_digest_blake3,
         }
+    }
+
+    fn ap242_step_bytes() -> Vec<u8> {
+        b"ISO-10303-21;\nHEADER;\nFILE_DESCRIPTION(('fixture'),'2;1');\nFILE_SCHEMA(('AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF'));\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;".to_vec()
+    }
+
+    fn header_profile() -> StepHeaderProfile {
+        StepHeaderProfile {
+            id: "marine-ap242e4-header-v1".into(),
+            required_edition: StepSchemaEdition::Ap2422025Edition4,
+            expected_file_schema_identifiers: vec![
+                "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF".into(),
+            ],
+        }
+    }
+
+    #[test]
+    fn actual_step_bytes_are_bound_to_translation_receipt_and_header_profile() {
+        let mut receipt = receipt();
+        let bytes = ap242_step_bytes();
+        receipt.payload.step_file_digest_blake3 =
+            blake3::hash(&bytes).to_hex().to_string();
+        receipt.receipt_digest_blake3 = compute_receipt_digest(&receipt.payload).unwrap();
+        let verified =
+            verify_step_translation_artifact(&bytes, &receipt, &header_profile()).unwrap();
+        assert_eq!(verified.candidate_id, receipt.payload.candidate_id);
+        assert_eq!(
+            verified.step_file_digest_blake3,
+            receipt.payload.step_file_digest_blake3
+        );
+    }
+
+    #[test]
+    fn step_file_digest_mismatch_is_rejected() {
+        let receipt = receipt();
+        let error =
+            verify_step_translation_artifact(&ap242_step_bytes(), &receipt, &header_profile())
+                .unwrap_err();
+        assert!(error
+            .iter()
+            .any(|issue| issue.code == "step_file_digest_mismatch"));
+    }
+
+    #[test]
+    fn step_header_ap214_cannot_satisfy_ap242_receipt() {
+        let mut receipt = receipt();
+        let bytes = b"ISO-10303-21;\nHEADER;\nFILE_SCHEMA(('AUTOMOTIVE_DESIGN'));\nENDSEC;\nDATA;\nENDSEC;\nEND-ISO-10303-21;";
+        receipt.payload.step_file_digest_blake3 =
+            blake3::hash(bytes).to_hex().to_string();
+        receipt.receipt_digest_blake3 = compute_receipt_digest(&receipt.payload).unwrap();
+        let error =
+            verify_step_translation_artifact(bytes, &receipt, &header_profile()).unwrap_err();
+        assert!(error
+            .iter()
+            .any(|issue| issue.code == "step_header:file_schema_mismatch"));
     }
 
     #[test]
