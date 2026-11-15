@@ -1063,6 +1063,71 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                     }
                 }
             }
+            ScheduleAction::CancellationAcknowledged {
+                operation_id, attempt_id, accepted,
+            } => {
+                let replay_state = record_disposition(&action.action_id);
+                match replay_state {
+                    Some(SchedulerDisposition::Applied) => {}
+                    Some(SchedulerDisposition::Duplicate) => continue,
+                    Some(SchedulerDisposition::AcceptedCancellationAfterCommit) => {
+                        critical = true;
+                        reasons.insert(format!("CANCELLATION_ACKNOWLEDGED_AFTER_COMMIT:{attempt_id}"));
+                    }
+                    _ => {
+                        critical = true;
+                        reasons.insert(format!("CANCELLATION_ACK_NOT_REPLAY_APPLIED:{attempt_id}"));
+                        continue;
+                    }
+                }
+                let (receipt_ref, receipt_sha256) = match &action.evidence {
+                    Some(ActionEvidence::CancellationAcknowledgement { receipt_ref, receipt_sha256 }) => {
+                        (receipt_ref.clone(), receipt_sha256.clone())
+                    }
+                    _ => {
+                        indeterminate = true;
+                        reasons.insert(format!("CANCELLATION_ACK_RECEIPT_EVIDENCE_MISSING:{attempt_id}"));
+                        continue;
+                    }
+                };
+                let assessment = match receipt_assessment_for_action(&action.action_id, receipt_assessments) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                };
+                let owner_time = match action_owner_time(schedule, action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}"));
+                        continue;
+                    }
+                };
+                cancellation_acknowledgements.push(ProjectedCancellationAcknowledgement {
+                    action_id: action.action_id.clone(),
+                    logical_operation_id: operation_id.clone(),
+                    attempt_id: attempt_id.clone(),
+                    accepted: *accepted,
+                    owner_time,
+                    receipt_ref,
+                    receipt_sha256,
+                    receipt_qualification: assessment.receipt_qualification(),
+                    establishes_not_applied: false,
+                });
+            }
             ScheduleAction::AttemptReconciled {
                 operation_id, attempt_id, outcome, receipt_ref, receipt_sha256,
             } => {
@@ -2077,6 +2142,20 @@ pub struct ProjectedEffectCommit {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProjectedCancellationAcknowledgement {
+    pub action_id: String,
+    pub logical_operation_id: String,
+    pub attempt_id: String,
+    pub accepted: bool,
+    pub owner_time: QualifiedEventTime,
+    pub receipt_ref: String,
+    pub receipt_sha256: String,
+    pub receipt_qualification: GateState,
+    /// Cancellation acknowledgement is intentionally not a terminal outcome.
+    pub establishes_not_applied: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ActionHistoryProjectionReport {
     pub disposition: EventTraceDisposition,
     pub attempts: Vec<OperationAttemptRecord>,
@@ -2085,6 +2164,7 @@ pub struct ActionHistoryProjectionReport {
     pub inventory: Option<AttemptHistoryInventory>,
     pub start_gate: Option<StartGateReport>,
     pub effect_commits: Vec<ProjectedEffectCommit>,
+    pub cancellation_acknowledgements: Vec<ProjectedCancellationAcknowledgement>,
     pub reason_codes: Vec<String>,
 }
 
@@ -2148,6 +2228,7 @@ fn action_projection_failure(fault: ProjectionFault) -> ActionHistoryProjectionR
         inventory: None,
         start_gate: None,
         effect_commits: Vec::new(),
+        cancellation_acknowledgements: Vec::new(),
         reason_codes: vec![code.to_owned()],
     }
 }
@@ -2186,6 +2267,7 @@ pub fn project_action_history(
     let mut starts = BTreeMap::<(String, String), (&ScheduledAction, QualifiedEventTime, Option<String>)>::new();
     let mut terminal_actions = BTreeMap::<(String, String), (&ScheduledAction, QualifiedEventTime, OwnerReceiptAssessment)>::new();
     let mut commits = Vec::new();
+    let mut cancellation_acknowledgements = Vec::new();
 
     for action in &canonical_actions {
         match &action.action {
@@ -2922,6 +3004,7 @@ pub fn project_action_history(
         inventory,
         start_gate,
         effect_commits: commits,
+        cancellation_acknowledgements,
         reason_codes: reasons.into_iter().collect(),
     })
 }
