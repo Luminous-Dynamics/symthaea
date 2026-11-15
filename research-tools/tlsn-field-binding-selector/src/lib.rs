@@ -521,11 +521,11 @@ fn borrowed_raw_span(document: &[u8], raw_value: &str) -> Result<Range<usize>, F
 mod tests {
     use super::*;
 
-    fn select<'a>(document: &'a [u8], pointer: &str) -> JsonFieldSelectionV1 {
+    fn select(document: &[u8], pointer: &str) -> JsonFieldSelectionV1 {
         select_json_field_v1(document, pointer, FieldSelectorLimits::default()).unwrap()
     }
 
-    fn selected_bytes<'a>(document: &'a [u8], selection: &JsonFieldSelectionV1) -> &'a [u8] {
+    fn selected_bytes(document: &[u8], selection: &JsonFieldSelectionV1) -> &[u8] {
         &document[selection.body_range.clone()]
     }
 
