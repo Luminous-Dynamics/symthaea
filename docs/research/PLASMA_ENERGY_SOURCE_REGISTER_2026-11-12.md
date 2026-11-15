@@ -655,3 +655,14 @@ Keep these as independent Pareto dimensions:
 - duty-cycle, start/stop response, maintenance and consumables.
 
 A lower single-pass conversion could be preferable only if the full separation/recycle chain achieves lower total energy and cost per kg of accepted delivered H2. That is a falsifiable benchmark hypothesis, not an established result.
+
+
+## 9.15 Industrial plasma Power-to-X TEA comparator — 2026-11-15
+
+Kaufmann et al., *Electrification of the chemical industry via plasma power to X – A techno economic view*, Energy 358 (2026), DOI https://doi.org/10.1016/j.energy.2026.141338.
+
+The source models plasma-based routes from biogas to syngas and downstream Fischer–Tropsch fuels or methanol. It reports a leading biogas-reforming route at approximately EUR 840/t syngas and about 44% plant efficiency for a 300 MW scale. Electricity accounts for about 50–60% of total syngas cost. Under favourable renewable-electricity assumptions and reduced full-load hours, the study models syngas costs below EUR 600/t.
+
+This is a plant-level techno-economic model, not a physical demonstration or observed product price. Its 44% metric is not plasma coupling efficiency. The favourable-cost result depends on source-specific power price, location, capacity-factor and process assumptions.
+
+Benchmark consequence: preserve complete syngas quality, biogas/feed boundary, grid-side electricity, power conversion, reactor/plant auxiliaries, capacity factor, renewable supply profile, CAPEX/OPEX, maintenance, coproducts and downstream integration. A plasma route only beats the incumbent if it produces the same accepted syngas service at lower risk-adjusted lifecycle cost under matched assumptions.
