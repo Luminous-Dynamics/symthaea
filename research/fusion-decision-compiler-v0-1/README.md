@@ -18,6 +18,9 @@ It is an integration contract, not another fusion system code. It does not repla
 - Pairwise solver dependence classification across declared dataset, code and assumption groups; empty or missing dependency identities remain unknown.
 - Deterministic transitive invalidation of downstream dependency nodes.
 - Fixed claim ceiling: eligible candidates are only eligible for further engineering review.
+- Candidate-funnel audit across the frozen universe at analytical, low-fidelity and high-fidelity stages; every candidate/stage pair must have an explicit disposition, including NotEvaluated.
+- Pipeline advancement must follow prior passes; rejected candidates can re-enter only through a documented stratified audit or human override.
+- Exact screening recall is reported only when retrospective reference labels cover the full candidate universe; partial labels never masquerade as an exact recall estimate.
 
 ## Dispositions
 
@@ -50,7 +53,7 @@ cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
-The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The crate has 31 authored Rust unit tests, including one that applies all 26 corpus mutations to the actual compiler and checks each disposition. These are authored test cases, not executed test results.
+The independent corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 31 authored Rust unit tests, including one that applies all 26 corpus mutations to the actual compiler and checks each disposition. The new candidate-funnel module adds 13 authored tests for complete stage matrices, missing/duplicate candidate records, skip reasons, ordinary pipeline transitions, explicit audit overrides, failure/non-convergence accounting and exact-vs-partial reference-label coverage. Total authored Rust test declarations across the two source files: 44. These are authored test cases, not executed test results.
 
 ## Claim ceiling
 
