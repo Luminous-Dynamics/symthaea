@@ -1,0 +1,550 @@
+{
+  "fixture_version": "symthaea.event-order-action-history-fixture.v0.3.2",
+  "schedule": {
+    "schema_version": "symthaea.event-order-schedule.v0.3.2",
+    "generator_version": "symthaea.event-order-generator.v0.3.3",
+    "seed": 539365667,
+    "scenario_family": "qualified_attempt_terminal_stop_inventory",
+    "actions": [
+      {
+        "action_id": "action-000000",
+        "at_ns": 1,
+        "ordinal": 0,
+        "action": {
+          "kind": "clock_advance",
+          "clock_domain": "action-clock",
+          "basis_id": "action-basis",
+          "epoch": "action-epoch-0",
+          "scale": "tai",
+          "unit": "nanoseconds",
+          "local_tick_ns": 100,
+          "offset_ns": 0,
+          "uncertainty_ns": 0,
+          "calibration_id": "cal-100",
+          "mapping_valid_from_ns": 0,
+          "mapping_valid_through_ns": 10000,
+          "mapping_receipt_ref": "synthetic://action-clock/100",
+          "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "qualification": "pass"
+        }
+      },
+      {
+        "action_id": "action-000001",
+        "at_ns": 2,
+        "ordinal": 1,
+        "action": {
+          "kind": "effect_attempted",
+          "operation_id": "robot-1",
+          "attempt_id": "attempt-1"
+        },
+        "owner_time_ref": {
+          "clock_mapping_action_id": "action-000000",
+          "local_timestamp_ns": 100
+        },
+        "evidence": {
+          "kind": "attempt_start",
+          "retry_of_attempt_id": null
+        }
+      },
+      {
+        "action_id": "action-000002",
+        "at_ns": 3,
+        "ordinal": 2,
+        "action": {
+          "kind": "clock_advance",
+          "clock_domain": "action-clock",
+          "basis_id": "action-basis",
+          "epoch": "action-epoch-0",
+          "scale": "tai",
+          "unit": "nanoseconds",
+          "local_tick_ns": 110,
+          "offset_ns": 0,
+          "uncertainty_ns": 0,
+          "calibration_id": "cal-110",
+          "mapping_valid_from_ns": 0,
+          "mapping_valid_through_ns": 10000,
+          "mapping_receipt_ref": "synthetic://action-clock/110",
+          "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "qualification": "pass"
+        }
+      },
+      {
+        "action_id": "action-000003",
+        "at_ns": 4,
+        "ordinal": 3,
+        "action": {
+          "kind": "effect_committed",
+          "operation_id": "robot-1",
+          "attempt_id": "attempt-1",
+          "effect_id": "effect-1"
+        },
+        "owner_time_ref": {
+          "clock_mapping_action_id": "action-000002",
+          "local_timestamp_ns": 110
+        },
+        "evidence": {
+          "kind": "effect_commit",
+          "receipt_ref": "synthetic://effect-commit/1",
+          "receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        }
+      },
+      {
+        "action_id": "action-000004",
+        "at_ns": 5,
+        "ordinal": 4,
+        "action": {
+          "kind": "clock_advance",
+          "clock_domain": "action-clock",
+          "basis_id": "action-basis",
+          "epoch": "action-epoch-0",
+          "scale": "tai",
+          "unit": "nanoseconds",
+          "local_tick_ns": 120,
+          "offset_ns": 0,
+          "uncertainty_ns": 0,
+          "calibration_id": "cal-120",
+          "mapping_valid_from_ns": 0,
+          "mapping_valid_through_ns": 10000,
+          "mapping_receipt_ref": "synthetic://action-clock/120",
+          "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "qualification": "pass"
+        }
+      },
+      {
+        "action_id": "action-000005",
+        "at_ns": 6,
+        "ordinal": 5,
+        "action": {
+          "kind": "attempt_reconciled",
+          "operation_id": "robot-1",
+          "attempt_id": "attempt-1",
+          "outcome": "applied",
+          "receipt_ref": "synthetic://terminal/1",
+          "receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        },
+        "owner_time_ref": {
+          "clock_mapping_action_id": "action-000004",
+          "local_timestamp_ns": 120
+        },
+        "evidence": {
+          "kind": "terminal_reconciliation",
+          "exact_start_action_id": "action-000001",
+          "qualification": "pass"
+        }
+      },
+      {
+        "action_id": "action-000006",
+        "at_ns": 7,
+        "ordinal": 6,
+        "action": {
+          "kind": "clock_advance",
+          "clock_domain": "action-clock",
+          "basis_id": "action-basis",
+          "epoch": "action-epoch-0",
+          "scale": "tai",
+          "unit": "nanoseconds",
+          "local_tick_ns": 130,
+          "offset_ns": 0,
+          "uncertainty_ns": 0,
+          "calibration_id": "cal-130",
+          "mapping_valid_from_ns": 0,
+          "mapping_valid_through_ns": 10000,
+          "mapping_receipt_ref": "synthetic://action-clock/130",
+          "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "qualification": "pass"
+        }
+      },
+      {
+        "action_id": "action-000007",
+        "at_ns": 8,
+        "ordinal": 7,
+        "action": {
+          "kind": "stop_triggered",
+          "obligation_id": "global-stop-1",
+          "policy_revision": "policy-v1"
+        },
+        "owner_time_ref": {
+          "clock_mapping_action_id": "action-000006",
+          "local_timestamp_ns": 130
+        },
+        "evidence": {
+          "kind": "stop_trigger",
+          "scope": {
+            "kind": "global"
+          },
+          "receipt_ref": "synthetic://stop-trigger/1",
+          "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        }
+      },
+      {
+        "action_id": "action-000008",
+        "at_ns": 9,
+        "ordinal": 8,
+        "action": {
+          "kind": "clock_advance",
+          "clock_domain": "action-clock",
+          "basis_id": "action-basis",
+          "epoch": "action-epoch-0",
+          "scale": "tai",
+          "unit": "nanoseconds",
+          "local_tick_ns": 135,
+          "offset_ns": 0,
+          "uncertainty_ns": 0,
+          "calibration_id": "cal-135",
+          "mapping_valid_from_ns": 0,
+          "mapping_valid_through_ns": 10000,
+          "mapping_receipt_ref": "synthetic://action-clock/135",
+          "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "qualification": "pass"
+        }
+      },
+      {
+        "action_id": "action-000009",
+        "at_ns": 10,
+        "ordinal": 9,
+        "action": {
+          "kind": "event_produced",
+          "event_id": "inventory-frontier-1",
+          "clock_domain": "action-clock",
+          "basis_id": "action-basis",
+          "epoch": "action-epoch-0",
+          "scale": "tai",
+          "unit": "nanoseconds",
+          "clock_mapping_action_id": "action-000008",
+          "source_timestamp_ns": 132,
+          "causal_predecessors": []
+        },
+        "owner_time_ref": {
+          "clock_mapping_action_id": "action-000008",
+          "local_timestamp_ns": 132
+        }
+      },
+      {
+        "action_id": "action-000010",
+        "at_ns": 9,
+        "ordinal": 10,
+        "action": {
+          "kind": "clock_advance",
+          "clock_domain": "action-clock",
+          "basis_id": "action-basis",
+          "epoch": "action-epoch-0",
+          "scale": "tai",
+          "unit": "nanoseconds",
+          "local_tick_ns": 135,
+          "offset_ns": 0,
+          "uncertainty_ns": 0,
+          "calibration_id": "cal-135",
+          "mapping_valid_from_ns": 0,
+          "mapping_valid_through_ns": 10000,
+          "mapping_receipt_ref": "synthetic://action-clock/135",
+          "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "qualification": "pass"
+        }
+      },
+      {
+        "action_id": "action-000011",
+        "at_ns": 12,
+        "ordinal": 11,
+        "action": {
+          "kind": "attempt_inventory_attested",
+          "scope": {
+            "kind": "global"
+          },
+          "inventory_frontier_event_id": "inventory-frontier-1",
+          "attempt_manifest_sha256": "94f7e89ab06398d2f63fb856522593de7aa04602392cb8567137b919d621d826"
+        },
+        "owner_time_ref": {
+          "clock_mapping_action_id": "action-000010",
+          "local_timestamp_ns": 135
+        },
+        "evidence": {
+          "kind": "inventory_attestation",
+          "scope": {
+            "kind": "global"
+          },
+          "inventory_frontier_event_id": "inventory-frontier-1",
+          "attempt_manifest_sha256": "94f7e89ab06398d2f63fb856522593de7aa04602392cb8567137b919d621d826",
+          "receipt_ref": "synthetic://inventory-attestation/1",
+          "receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        }
+      },
+      {
+        "action_id": "action-000012",
+        "at_ns": 13,
+        "ordinal": 12,
+        "action": {
+          "kind": "clock_advance",
+          "clock_domain": "action-clock",
+          "basis_id": "action-basis",
+          "epoch": "action-epoch-0",
+          "scale": "tai",
+          "unit": "nanoseconds",
+          "local_tick_ns": 140,
+          "offset_ns": 0,
+          "uncertainty_ns": 0,
+          "calibration_id": "cal-140",
+          "mapping_valid_from_ns": 0,
+          "mapping_valid_through_ns": 10000,
+          "mapping_receipt_ref": "synthetic://action-clock/140",
+          "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "qualification": "pass"
+        }
+      },
+      {
+        "action_id": "action-000013",
+        "at_ns": 14,
+        "ordinal": 13,
+        "action": {
+          "kind": "stop_discharged",
+          "obligation_id": "global-stop-1",
+          "trigger_action_id": "action-000007",
+          "policy_revision_action_id": "action-000007",
+          "policy_revision": "policy-v1",
+          "receipt_ref": "synthetic://stop-discharge/1",
+          "receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        },
+        "owner_time_ref": {
+          "clock_mapping_action_id": "action-000012",
+          "local_timestamp_ns": 140
+        },
+        "evidence": {
+          "kind": "stop_discharge",
+          "scope": {
+            "kind": "global"
+          },
+          "inventory_frontier_event_id": "inventory-frontier-1",
+          "attempt_manifest_sha256": "94f7e89ab06398d2f63fb856522593de7aa04602392cb8567137b919d621d826"
+        }
+      }
+    ]
+  },
+  "logical_operation_id": "robot-1",
+  "time_resolutions": [
+    {
+      "mapping_action_id": "action-000000",
+      "local_timestamp_ns": 100,
+      "qualified_time": {
+        "source_clock_domain_id": "action-clock",
+        "time_basis": {
+          "basis_id": "owner-normalized-tai-v1",
+          "epoch": "tai-epoch-0",
+          "scale": "TAI",
+          "unit": "nanoseconds"
+        },
+        "mapping_receipt_ref": "synthetic://action-clock/100",
+        "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mapping_qualification": "pass",
+        "mapping_valid_from_ns": 0,
+        "mapping_valid_through_ns": 10000,
+        "max_interval_width_ns": 0,
+        "interval": {
+          "earliest_ns": 1000,
+          "latest_ns": 1000
+        }
+      }
+    },
+    {
+      "mapping_action_id": "action-000002",
+      "local_timestamp_ns": 110,
+      "qualified_time": {
+        "source_clock_domain_id": "action-clock",
+        "time_basis": {
+          "basis_id": "owner-normalized-tai-v1",
+          "epoch": "tai-epoch-0",
+          "scale": "TAI",
+          "unit": "nanoseconds"
+        },
+        "mapping_receipt_ref": "synthetic://action-clock/110",
+        "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mapping_qualification": "pass",
+        "mapping_valid_from_ns": 0,
+        "mapping_valid_through_ns": 10000,
+        "max_interval_width_ns": 0,
+        "interval": {
+          "earliest_ns": 1050,
+          "latest_ns": 1050
+        }
+      }
+    },
+    {
+      "mapping_action_id": "action-000004",
+      "local_timestamp_ns": 120,
+      "qualified_time": {
+        "source_clock_domain_id": "action-clock",
+        "time_basis": {
+          "basis_id": "owner-normalized-tai-v1",
+          "epoch": "tai-epoch-0",
+          "scale": "TAI",
+          "unit": "nanoseconds"
+        },
+        "mapping_receipt_ref": "synthetic://action-clock/120",
+        "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mapping_qualification": "pass",
+        "mapping_valid_from_ns": 0,
+        "mapping_valid_through_ns": 10000,
+        "max_interval_width_ns": 0,
+        "interval": {
+          "earliest_ns": 1100,
+          "latest_ns": 1100
+        }
+      }
+    },
+    {
+      "mapping_action_id": "action-000006",
+      "local_timestamp_ns": 130,
+      "qualified_time": {
+        "source_clock_domain_id": "action-clock",
+        "time_basis": {
+          "basis_id": "owner-normalized-tai-v1",
+          "epoch": "tai-epoch-0",
+          "scale": "TAI",
+          "unit": "nanoseconds"
+        },
+        "mapping_receipt_ref": "synthetic://action-clock/130",
+        "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mapping_qualification": "pass",
+        "mapping_valid_from_ns": 0,
+        "mapping_valid_through_ns": 10000,
+        "max_interval_width_ns": 0,
+        "interval": {
+          "earliest_ns": 1150,
+          "latest_ns": 1150
+        }
+      }
+    },
+    {
+      "mapping_action_id": "action-000008",
+      "local_timestamp_ns": 132,
+      "qualified_time": {
+        "source_clock_domain_id": "action-clock",
+        "time_basis": {
+          "basis_id": "owner-normalized-tai-v1",
+          "epoch": "tai-epoch-0",
+          "scale": "TAI",
+          "unit": "nanoseconds"
+        },
+        "mapping_receipt_ref": "synthetic://action-clock/135",
+        "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mapping_qualification": "pass",
+        "mapping_valid_from_ns": 0,
+        "mapping_valid_through_ns": 10000,
+        "max_interval_width_ns": 0,
+        "interval": {
+          "earliest_ns": 1160,
+          "latest_ns": 1160
+        }
+      }
+    },
+    {
+      "mapping_action_id": "action-000010",
+      "local_timestamp_ns": 135,
+      "qualified_time": {
+        "source_clock_domain_id": "action-clock",
+        "time_basis": {
+          "basis_id": "owner-normalized-tai-v1",
+          "epoch": "tai-epoch-0",
+          "scale": "TAI",
+          "unit": "nanoseconds"
+        },
+        "mapping_receipt_ref": "synthetic://action-clock/135",
+        "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mapping_qualification": "pass",
+        "mapping_valid_from_ns": 0,
+        "mapping_valid_through_ns": 10000,
+        "max_interval_width_ns": 0,
+        "interval": {
+          "earliest_ns": 1175,
+          "latest_ns": 1175
+        }
+      }
+    },
+    {
+      "mapping_action_id": "action-000012",
+      "local_timestamp_ns": 140,
+      "qualified_time": {
+        "source_clock_domain_id": "action-clock",
+        "time_basis": {
+          "basis_id": "owner-normalized-tai-v1",
+          "epoch": "tai-epoch-0",
+          "scale": "TAI",
+          "unit": "nanoseconds"
+        },
+        "mapping_receipt_ref": "synthetic://action-clock/140",
+        "mapping_receipt_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "mapping_qualification": "pass",
+        "mapping_valid_from_ns": 0,
+        "mapping_valid_through_ns": 10000,
+        "max_interval_width_ns": 0,
+        "interval": {
+          "earliest_ns": 1200,
+          "latest_ns": 1200
+        }
+      }
+    }
+  ],
+  "owner_receipt_assessments": {
+    "action-000003": {
+      "receipt_ref": "synthetic://effect-commit/1",
+      "receipt_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "identity": "pass",
+      "digest_integrity": "pass",
+      "authenticity": "pass",
+      "scope_qualification": "pass",
+      "completeness": "pass",
+      "semantic_qualification": "pass",
+      "in_flight_reconciliation": "pass"
+    },
+    "action-000005": {
+      "receipt_ref": "synthetic://terminal/1",
+      "receipt_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "identity": "pass",
+      "digest_integrity": "pass",
+      "authenticity": "pass",
+      "scope_qualification": "pass",
+      "completeness": "pass",
+      "semantic_qualification": "pass",
+      "in_flight_reconciliation": "pass"
+    },
+    "action-000007": {
+      "receipt_ref": "synthetic://stop-trigger/1",
+      "receipt_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "identity": "pass",
+      "digest_integrity": "pass",
+      "authenticity": "pass",
+      "scope_qualification": "pass",
+      "completeness": "pass",
+      "semantic_qualification": "pass",
+      "in_flight_reconciliation": "pass"
+    },
+    "action-000011": {
+      "receipt_ref": "synthetic://inventory-attestation/1",
+      "receipt_sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "identity": "pass",
+      "digest_integrity": "pass",
+      "authenticity": "pass",
+      "scope_qualification": "pass",
+      "completeness": "pass",
+      "semantic_qualification": "pass",
+      "in_flight_reconciliation": "pass"
+    },
+    "action-000013": {
+      "receipt_ref": "synthetic://stop-discharge/1",
+      "receipt_sha256": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "identity": "pass",
+      "digest_integrity": "pass",
+      "authenticity": "pass",
+      "scope_qualification": "pass",
+      "completeness": "pass",
+      "semantic_qualification": "pass",
+      "in_flight_reconciliation": "pass"
+    }
+  },
+  "expected": {
+    "disposition": "safe",
+    "attempt_count": 1,
+    "obligation_count": 1,
+    "effect_commit_count": 1,
+    "start_permitted_by_stop_contract": true,
+    "attempt_manifest_sha256": "94f7e89ab06398d2f63fb856522593de7aa04602392cb8567137b919d621d826"
+  }
+}
