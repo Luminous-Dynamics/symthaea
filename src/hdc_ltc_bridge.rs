@@ -1411,17 +1411,28 @@ mod tests {
 
         let before_state = bridge.snapshot_evolution_state();
         let before_output = bridge.current_output.clone();
+        let before_steps = bridge.total_steps();
+        let before_neuron = bridge.network.layer(0).unwrap()[0].stats();
+
         bridge.step(&next_input, 0.0).unwrap();
+
         let after_state = bridge.snapshot_evolution_state();
+        let after_neuron = bridge.network.layer(0).unwrap()[0].stats();
 
         assert!(
-            before_state.approx_eq(&after_state, 1e-7),
-            "zero elapsed time changed bridge neuron state, cached layer outputs or clocks"
+            before_state.state_values_approx_eq(&after_state, 1e-7),
+            "zero elapsed time changed bridge neuron states or cached layer outputs"
         );
         assert_eq!(
             bridge.current_output, before_output,
             "zero elapsed time changed the bridge readout"
         );
+
+        // A zero-duration call is still an attempted update: accounting may
+        // advance even though physical/evolution time and state values do not.
+        assert_eq!(bridge.total_steps(), before_steps + 1);
+        assert_eq!(after_neuron.update_count, before_neuron.update_count + 1);
+        assert_eq!(after_neuron.total_time, before_neuron.total_time);
     }
 
 }
