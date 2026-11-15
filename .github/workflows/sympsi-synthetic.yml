@@ -97,6 +97,14 @@ jobs:
                 empirical_power: .power_calibration.empirical_power,
                 monte_carlo_within_four_standard_errors: .power_calibration.monte_carlo_within_four_standard_errors
               },
+              sequential_look_calibration: {
+                campaigns: .sequential_look_calibration.campaigns,
+                looks: .sequential_look_calibration.looks,
+                empirical_familywise_false_positive_rate: .sequential_look_calibration.empirical_familywise_false_positive_rate,
+                nominal_fixed_sample_alpha: .sequential_look_calibration.nominal_fixed_sample_alpha,
+                inflation_multiple: .sequential_look_calibration.inflation_multiple,
+                demonstrates_optional_stopping_inflation: .sequential_look_calibration.demonstrates_optional_stopping_inflation
+              },
               control_count: (.controls | length),
               failed_controls: [.controls[] | select(.passed == false) | .id],
               all_controls_passed
