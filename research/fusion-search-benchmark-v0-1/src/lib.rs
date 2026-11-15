@@ -160,13 +160,13 @@ fn selected_by_policy(scenario: Scenario, policy: Policy, candidate: Candidate) 
 }
 
 fn synthetic_solver_disposition(candidate: Candidate) -> Disposition {
-    if candidate.id % 307 == 0 {
+    if candidate.id.is_multiple_of(307) {
         Disposition::Inconclusive
-    } else if candidate.id % 211 == 0 {
+    } else if candidate.id.is_multiple_of(211) {
         Disposition::Failed
-    } else if candidate.id % 113 == 0 {
+    } else if candidate.id.is_multiple_of(113) {
         Disposition::NonConverged
-    } else if candidate.id % 509 == 0 {
+    } else if candidate.id.is_multiple_of(509) {
         Disposition::Unsupported
     } else {
         Disposition::Passed
