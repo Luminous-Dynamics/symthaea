@@ -250,5 +250,6 @@
     "Pressure reference and elevation datum are identical across both station planes.",
     "No station-6 shortcut, nozzle parallel-outflow assumption, NVR, interaction efficiency or overall propulsion efficiency is asserted.",
     "Station-1 and station-7 integrated volume flows intentionally mismatch; P_JSE must remain unavailable."
-  ]
+  ],
+  "maximum_observation_skew_ms": 0
 }
