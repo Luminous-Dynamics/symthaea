@@ -7,6 +7,7 @@ use development_map_validator::{
     dynamapbench::validate_dynamapbench_manifest_json,
     temporal_replay::{validate_temporal_ledger_json, replay_temporal_ledger_json},
     workspace_shift::evaluate_shift_scenario_json,
+    selective_revalidation::score_selective_revalidation_oracle_json,
     validate_document_json,
 };
 
@@ -21,6 +22,7 @@ fn usage() {
     eprintln!("  development-map-validator temporal-ledger <ledger.json>");
     eprintln!("  development-map-validator temporal-replay <ledger.json> <query.json>");
     eprintln!("  development-map-validator workspace-shift <scenario.json>");
+    eprintln!("  development-map-validator revalidation-oracle <scenario.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
     eprintln!("projects source files, composes a Git tree snapshot, or replays a pinned epistemic temporal ledger.");
@@ -327,6 +329,36 @@ fn evaluate_workspace_shift_file(args: &[String]) -> i32 {
     }
 }
 
+
+fn score_selective_revalidation_oracle_file(args: &[String]) -> i32 {
+    if args.len() != 2 {
+        usage();
+        return 2;
+    }
+    let path = &args[1];
+    let input = match read_input(path, "D6.6-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match score_selective_revalidation_oracle_json(&input) {
+        Err(error) => {
+            eprintln!("ERROR D6.6-ORACLE-001 {path}: {error}");
+            1
+        }
+        Ok(report) => match serde_json::to_string_pretty(&report) {
+            Ok(output) => {
+                println!("{output}");
+                println!("NOTE gold-label-side lower bound only; never expose this output to candidate agents");
+                0
+            }
+            Err(error) => {
+                eprintln!("ERROR D6.6-ORACLE-JSON-001 {path}: {error}");
+                2
+            }
+        },
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -346,6 +378,7 @@ fn main() {
         "temporal-ledger" => validate_temporal_ledger_file(&args),
         "temporal-replay" => replay_temporal_ledger_file(&args),
         "workspace-shift" => evaluate_workspace_shift_file(&args),
+        "revalidation-oracle" => score_selective_revalidation_oracle_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {
             usage();
