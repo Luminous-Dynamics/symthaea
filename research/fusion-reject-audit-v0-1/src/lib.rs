@@ -193,11 +193,6 @@ pub fn audit_rejected_candidates(
 
     let mut stratum_ids = BTreeSet::new();
     let mut population_ids = BTreeSet::new();
-    let mut accepted_count = 0_u64;
-
-    for candidate in &plan.accepted_feasible_candidate_ids_placeholder() {
-        let _ = candidate;
-    }
 
     for stratum in &plan.strata {
         if stratum.stratum_id.trim().is_empty() {
@@ -288,7 +283,7 @@ pub fn audit_rejected_candidates(
 
     // The manifest count and digest are declarations. The raw manifest payload
     // must be independently verified by the caller before this report is trusted.
-    accepted_count = plan.accepted_feasible.count_lower_bound;
+    let accepted_count = plan.accepted_feasible.count_lower_bound;
     if !errors.is_empty() {
         return Err(errors);
     }
