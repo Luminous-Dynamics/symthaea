@@ -592,6 +592,12 @@ pub fn audit_scenario_opportunities(
     })
 }
 
+#[derive(Default)]
+struct ScenarioReceiptRegistry {
+    run_ids: BTreeSet<String>,
+    evidence_refs: BTreeSet<String>,
+}
+
 fn validate_plan(plan: &ScenarioOpportunityPlan) -> Vec<ScenarioOpportunityError> {
     let mut errors = Vec::new();
     for (value, field) in [
@@ -735,8 +741,7 @@ fn validate_plan(plan: &ScenarioOpportunityPlan) -> Vec<ScenarioOpportunityError
         errors.push(ScenarioOpportunityError::AcceptedBundleCountMismatch);
     }
     let mut accepted_seen = BTreeSet::new();
-    let mut scenario_run_ids = BTreeSet::new();
-    let mut scenario_evidence_refs = BTreeSet::new();
+    let mut receipt_registry = ScenarioReceiptRegistry::default();
     for (index, bundle) in plan.accepted_bundles.iter().enumerate() {
         if plan
             .base_plan
@@ -766,8 +771,7 @@ fn validate_plan(plan: &ScenarioOpportunityPlan) -> Vec<ScenarioOpportunityError
                 &plan.objective_definitions,
                 &plan.primary_scenario_id,
                 Some((expected.outcome, expected.evidence_ref.as_str())),
-                &mut scenario_run_ids,
-                &mut scenario_evidence_refs,
+                &mut receipt_registry,
                 &mut errors,
             );
         } else {
@@ -777,8 +781,7 @@ fn validate_plan(plan: &ScenarioOpportunityPlan) -> Vec<ScenarioOpportunityError
                 &plan.objective_definitions,
                 &plan.primary_scenario_id,
                 None,
-                &mut scenario_run_ids,
-                &mut scenario_evidence_refs,
+                &mut receipt_registry,
                 &mut errors,
             );
         }
@@ -844,8 +847,7 @@ fn validate_plan(plan: &ScenarioOpportunityPlan) -> Vec<ScenarioOpportunityError
                 &plan.objective_definitions,
                 &plan.primary_scenario_id,
                 Some((sample.outcome, sample.evidence_ref.as_str())),
-                &mut scenario_run_ids,
-                &mut scenario_evidence_refs,
+                &mut receipt_registry,
                 &mut errors,
             );
         }
@@ -866,8 +868,7 @@ fn validate_bundle(
     definitions: &[ObjectiveDefinition],
     primary_scenario_id: &str,
     primary_expected: Option<(AuditOutcome, &str)>,
-    scenario_run_ids: &mut BTreeSet<String>,
-    scenario_evidence_refs: &mut BTreeSet<String>,
+    receipt_registry: &mut ScenarioReceiptRegistry,
     errors: &mut Vec<ScenarioOpportunityError>,
 ) {
     if bundle.evaluations.len() != scenarios.len() {
@@ -888,7 +889,7 @@ fn validate_bundle(
             errors.push(ScenarioOpportunityError::EmptyRunId(
                 bundle.candidate_id.clone(),
             ));
-        } else if !scenario_run_ids.insert(evaluation.run_id.clone()) {
+        } else if !receipt_registry.run_ids.insert(evaluation.run_id.clone()) {
             errors.push(ScenarioOpportunityError::DuplicateScenarioRunId(
                 evaluation.run_id.clone(),
             ));
@@ -897,7 +898,7 @@ fn validate_bundle(
             errors.push(ScenarioOpportunityError::EmptyEvidenceRef(
                 bundle.candidate_id.clone(),
             ));
-        } else if !scenario_evidence_refs.insert(evaluation.evidence_ref.clone()) {
+        } else if !receipt_registry.evidence_refs.insert(evaluation.evidence_ref.clone()) {
             errors.push(ScenarioOpportunityError::DuplicateScenarioEvidenceRef(
                 evaluation.evidence_ref.clone(),
             ));
