@@ -905,32 +905,31 @@ pub fn evaluate_delayed_outcomes(
                         not_qualified = true;
                     }
                 }
-                if unit.entry_time <= stop_time {
-                    if let Some(potential) = oracle
+                if unit.entry_time <= stop_time
+                    && let Some(potential) = oracle
                         .potential_outcomes
                         .get(&(query.id.clone(), unit.unit_id))
-                    {
-                        let actual = if unit.assigned_treatment {
-                            potential.treatment
-                        } else {
-                            potential.control
-                        };
-                        match actual {
-                            DelayedPotentialEvent::Event { event_time, reward }
-                                if event_time == event.event_time
-                                    && (reward - event.reward).abs() <= 1.0e-12 => {}
-                            _ => {
-                                not_qualified = true;
-                                query_unresolved = true;
-                                push_finding(
-                                    &mut findings,
-                                    DelayedOutcomeFindingCode::ObservationContradictsOracle,
-                                    Some(query.id.clone()),
-                                    Some(unit.unit_id),
-                                    Some(event.measurement_receipt_id.clone()),
-                                    "observed event time/reward differs from the assigned-arm evaluator oracle",
-                                );
-                            }
+                {
+                    let actual = if unit.assigned_treatment {
+                        potential.treatment
+                    } else {
+                        potential.control
+                    };
+                    match actual {
+                        DelayedPotentialEvent::Event { event_time, reward }
+                            if event_time == event.event_time
+                                && (reward - event.reward).abs() <= 1.0e-12 => {}
+                        _ => {
+                            not_qualified = true;
+                            query_unresolved = true;
+                            push_finding(
+                                &mut findings,
+                                DelayedOutcomeFindingCode::ObservationContradictsOracle,
+                                Some(query.id.clone()),
+                                Some(unit.unit_id),
+                                Some(event.measurement_receipt_id.clone()),
+                                "observed event time/reward differs from the assigned-arm evaluator oracle",
+                            );
                         }
                     }
                 }
