@@ -343,10 +343,8 @@ fn validate_scenario(scenario: &ShiftScenario) -> Result<(), String> {
                 {
                     return Err(format!("receipt {} is not bound to its claimed source epoch", receipt.receipt_id));
                 }
-                if !epoch.active_obligation_ids.contains(&receipt.obligation_id)
-                    && !source.active_obligation_ids.contains(&receipt.obligation_id)
-                {
-                    return Err(format!("receipt {} refers to an obligation not active at source or checkpoint", receipt.receipt_id));
+                if !source.active_obligation_ids.contains(&receipt.obligation_id) {
+                    return Err(format!("receipt {} refers to an obligation that was not active at its source epoch", receipt.receipt_id));
                 }
                 if !valid_hex(&receipt.receipt_digest, &[64])
                     || receipt_digest(scenario, arm, receipt)? != receipt.receipt_digest.to_ascii_lowercase()
@@ -574,6 +572,23 @@ mod tests {
         assert_eq!(shifted_score.active_requirement_conformance, Some(2.0 / 3.0));
         assert_eq!(shifted_score.missing_active_receipts, vec!["audit-requirement"]);
         assert!(!shifted_score.final_checkpoint_success);
+    }
+
+    #[test]
+    fn new_obligation_cannot_reuse_a_pre_introduction_receipt() {
+        let mut scenario = fixture();
+        let digest_scenario = scenario.clone();
+        let shifted = scenario.arms.iter_mut()
+            .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
+        let receipt = shifted.checkpoints.last_mut().expect("final checkpoint").receipts.iter_mut()
+            .find(|receipt| receipt.obligation_id == "audit-requirement").expect("audit receipt");
+        receipt.source_epoch = 0;
+        let source = &shifted.epochs[0].snapshot;
+        receipt.revision = source.revision.clone();
+        receipt.tree_oid = source.tree_oid.clone();
+        receipt.configuration_world_digest = source.configuration_world_digest.clone();
+        receipt.receipt_digest = receipt_digest(&digest_scenario, shifted, receipt).expect("reseal");
+        assert!(evaluate_shift_scenario(&scenario).is_err());
     }
 
     #[test]
