@@ -60,7 +60,7 @@ A system must clear all applicable hard gates before its quality/cost results ar
 
 Any violation is a failed run or failed gate. Do not subtract it from a high task score and call the result acceptable.
 
-Every reported score must also carry exactly one metric-level evidence receipt. A free-floating number without a scorer type, measurement method, sample unit/count, revision and source references is not eligible for comparison. Model auxiliary judgments are not accepted as primary scoring evidence in v0.1.
+Every reported score must also carry exactly one metric-level evidence receipt. A free-floating number without a scorer type, measurement method, sample unit/count, revision and source references is not eligible for comparison. The receipt's scorer revision must match the run's scorecard provenance, and a source reference must bind to the exact scenario, trace or artifact digest for that run. Model auxiliary judgments are not accepted as primary scoring evidence in v0.1.
 
 ### Gate B — consent, privacy and provenance
 
