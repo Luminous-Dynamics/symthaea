@@ -26,6 +26,7 @@ pub mod viability;
 pub mod reconfiguration;
 pub mod semantic_continuity;
 pub mod experiment_design;
+pub mod bernoulli_sequential;
 
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
@@ -42,6 +43,13 @@ pub use experiment_design::{
     ExperimentTrial, HypothesisId, MechanismHypothesis, ProbeId,
     SequentialExperimentReport, SequentialExperimentScenario, SequentialExperimentTrace,
     TrialInformationAssessment, evaluate_sequential_experiment,
+};
+pub use bernoulli_sequential::{
+    BernoulliArm, BernoulliArmSummary, BernoulliBoundary, BernoulliClaim,
+    BernoulliFinding, BernoulliFindingCode, BernoulliInterval, BernoulliOracle,
+    BernoulliQualification, BernoulliSequentialReport, BernoulliSequentialScenario,
+    BernoulliSequentialTrace, BernoulliTerminalDecision, BernoulliTrial,
+    BernoulliTrialAssessment, evaluate_bernoulli_sequential,
 };
 pub use semantic_continuity::{
     AuthorityBinding, ConsentBinding, ConsentStatus, DependencyStatus, EffectRecord,
