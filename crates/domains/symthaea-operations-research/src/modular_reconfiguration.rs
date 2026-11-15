@@ -34,6 +34,9 @@ pub struct EvidenceRecord {
 pub enum ModuleStatus { Candidate, Qualified, Suspended, Expired, Revoked }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ModuleAvailability { Available, Unavailable, Unknown }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum PortDirection { Input, Output, Bidirectional }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,6 +65,7 @@ pub struct ModuleProfile {
     pub module_ref: String,
     pub facility_ref: String,
     pub status: ModuleStatus,
+    pub availability: ModuleAvailability,
     pub valid_from_unix_seconds: Option<i64>,
     pub valid_until_unix_seconds: Option<i64>,
     pub footprint_width_mm: u64,
@@ -114,6 +118,51 @@ pub struct OperationDemand {
 pub struct OperationAssignment {
     pub operation_ref: String,
     pub module_ref: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SoftAssignmentIssueCode {
+    EmptyRequiredReference,
+    DuplicateInstalledModule,
+    DuplicateOperationDemand,
+    DuplicateCurrentAssignment,
+    ModulePoolUnresolved,
+    ModuleMissing,
+    ModuleAmbiguous,
+    ModuleWrongFacility,
+    ModuleNotQualified,
+    ModuleUnavailable,
+    ModuleAvailabilityUnknown,
+    ModuleValidityUnknown,
+    QualificationEvidenceInvalid,
+    IndependentEvidenceInvalid,
+    CapabilityMissing,
+    CapabilityAmbiguous,
+    ProcessRevisionMismatch,
+    ParameterDigestInvalid,
+    ParameterDigestMismatch,
+    InspectionPlanMismatch,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct SoftAssignmentIssue {
+    pub code: SoftAssignmentIssueCode,
+    pub subject_ref: String,
+}
+
+/// Least-churn routing proposal over modules already installed in one facility.
+/// This is not a schedule: it does not model precedence, machine loading,
+/// operator capacity, material, buffers, or promised delivery times.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SoftAssignmentProposal {
+    pub facility_ref: String,
+    pub evaluated_at_unix_seconds: i64,
+    pub status: PlanStatus,
+    pub assignments: Vec<OperationAssignment>,
+    pub retained_assignment_count: usize,
+    pub changed_assignment_count: usize,
+    pub issues: Vec<SoftAssignmentIssue>,
+    pub production_authorized: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -200,6 +249,8 @@ pub enum ReconfigurationReasonCode {
     ModuleProfileAmbiguous,
     ModuleWrongFacility,
     ModuleNotQualified,
+    ModuleUnavailable,
+    ModuleAvailabilityUnknown,
     ModuleNotYetValid,
     ModuleExpired,
     ModuleValidityUnknown,
@@ -494,6 +545,11 @@ pub fn evaluate_reconfiguration(input: ReconfigurationInput<'_>) -> Reconfigurat
         if profile.status != ModuleStatus::Qualified {
             findings.add(ReconfigurationReasonCode::ModuleNotQualified, ReasonSeverity::Blocked, module_ref);
         }
+        match profile.availability {
+            ModuleAvailability::Available => {}
+            ModuleAvailability::Unavailable => findings.add(ReconfigurationReasonCode::ModuleUnavailable, ReasonSeverity::Blocked, module_ref),
+            ModuleAvailability::Unknown => findings.add(ReconfigurationReasonCode::ModuleAvailabilityUnknown, ReasonSeverity::Indeterminate, module_ref),
+        }
         match (profile.valid_from_unix_seconds, profile.valid_until_unix_seconds) {
             (Some(from), Some(until)) if from <= at && at < until => {}
             (Some(from), Some(_)) if at < from => findings.add(ReconfigurationReasonCode::ModuleNotYetValid, ReasonSeverity::Blocked, module_ref),
@@ -570,6 +626,254 @@ pub fn evaluate_reconfiguration(input: ReconfigurationInput<'_>) -> Reconfigurat
         obligations,
         physical_change,
     )
+}
+
+
+/// Propose the least-disruptive assignment of required operations to modules
+/// already installed in the named facility.
+///
+/// The selector first preserves a currently assigned module when it remains
+/// qualified, available, valid and exactly capable. Otherwise it selects the
+/// lexicographically smallest eligible installed module reference. This is a
+/// transparent minimum-churn baseline, not a throughput optimizer or scheduler.
+pub fn propose_soft_reallocation(
+    facility_ref: &str,
+    evaluated_at_unix_seconds: i64,
+    installed_module_refs: &[String],
+    module_profiles: &[ModuleProfile],
+    module_pool_resolution: SnapshotResolution,
+    operation_demands: &[OperationDemand],
+    current_assignments: &[OperationAssignment],
+) -> SoftAssignmentProposal {
+    let at = evaluated_at_unix_seconds;
+    let mut issues = Vec::new();
+    let mut installed = BTreeSet::new();
+
+    if facility_ref.trim().is_empty() {
+        issues.push(SoftAssignmentIssue {
+            code: SoftAssignmentIssueCode::EmptyRequiredReference,
+            subject_ref: "facility_ref".to_owned(),
+        });
+    }
+    for module_ref in installed_module_refs {
+        if module_ref.trim().is_empty() {
+            issues.push(SoftAssignmentIssue {
+                code: SoftAssignmentIssueCode::EmptyRequiredReference,
+                subject_ref: "installed_module_ref".to_owned(),
+            });
+        } else if !installed.insert(module_ref.as_str()) {
+            issues.push(SoftAssignmentIssue {
+                code: SoftAssignmentIssueCode::DuplicateInstalledModule,
+                subject_ref: module_ref.clone(),
+            });
+        }
+    }
+
+    let mut profiles_by_ref = BTreeMap::<&str, Vec<&ModuleProfile>>::new();
+    for profile in module_profiles {
+        profiles_by_ref.entry(profile.module_ref.as_str()).or_default().push(profile);
+    }
+    let mut current_by_operation = BTreeMap::<&str, &str>::new();
+    for assignment in current_assignments {
+        if current_by_operation.insert(assignment.operation_ref.as_str(), assignment.module_ref.as_str()).is_some() {
+            issues.push(SoftAssignmentIssue {
+                code: SoftAssignmentIssueCode::DuplicateCurrentAssignment,
+                subject_ref: assignment.operation_ref.clone(),
+            });
+        }
+    }
+
+    let mut demands_by_ref = BTreeSet::new();
+    let mut assignments = Vec::new();
+    let mut retained = 0_usize;
+    let mut changed = 0_usize;
+
+    for demand in operation_demands {
+        if demand.operation_ref.trim().is_empty()
+            || demand.capability_ref.trim().is_empty()
+            || demand.process_revision_ref.trim().is_empty()
+            || demand.inspection_plan_ref.trim().is_empty()
+        {
+            issues.push(SoftAssignmentIssue {
+                code: SoftAssignmentIssueCode::EmptyRequiredReference,
+                subject_ref: demand.operation_ref.clone(),
+            });
+        }
+        if !demands_by_ref.insert(demand.operation_ref.as_str()) {
+            issues.push(SoftAssignmentIssue {
+                code: SoftAssignmentIssueCode::DuplicateOperationDemand,
+                subject_ref: demand.operation_ref.clone(),
+            });
+            continue;
+        }
+        if !is_sha256_hex(&demand.parameter_digest_sha256) {
+            issues.push(SoftAssignmentIssue {
+                code: SoftAssignmentIssueCode::ParameterDigestInvalid,
+                subject_ref: demand.operation_ref.clone(),
+            });
+            continue;
+        }
+
+        let is_eligible = |module_ref: &str| -> Result<bool, SoftAssignmentIssueCode> {
+            let Some(matches) = profiles_by_ref.get(module_ref) else {
+                return Err(if module_pool_resolution == SnapshotResolution::Complete {
+                    SoftAssignmentIssueCode::ModuleMissing
+                } else {
+                    SoftAssignmentIssueCode::ModulePoolUnresolved
+                });
+            };
+            let profile = match matches.as_slice() {
+                [one] => *one,
+                [] => return Err(SoftAssignmentIssueCode::ModuleMissing),
+                _ => return Err(SoftAssignmentIssueCode::ModuleAmbiguous),
+            };
+            if profile.facility_ref != facility_ref {
+                return Err(SoftAssignmentIssueCode::ModuleWrongFacility);
+            }
+            if profile.status != ModuleStatus::Qualified {
+                return Err(SoftAssignmentIssueCode::ModuleNotQualified);
+            }
+            match profile.availability {
+                ModuleAvailability::Available => {}
+                ModuleAvailability::Unavailable => return Err(SoftAssignmentIssueCode::ModuleUnavailable),
+                ModuleAvailability::Unknown => return Err(SoftAssignmentIssueCode::ModuleAvailabilityUnknown),
+            }
+            if !matches!(
+                (profile.valid_from_unix_seconds, profile.valid_until_unix_seconds),
+                (Some(from), Some(until)) if from <= at && at < until
+            ) {
+                return Err(SoftAssignmentIssueCode::ModuleValidityUnknown);
+            }
+            if !evidence_is_current(&profile.qualification_evidence, at) {
+                return Err(SoftAssignmentIssueCode::QualificationEvidenceInvalid);
+            }
+            if !evidence_is_current(&profile.independent_verification_evidence, at) {
+                return Err(SoftAssignmentIssueCode::IndependentEvidenceInvalid);
+            }
+            let capabilities: Vec<_> = profile.capabilities.iter()
+                .filter(|capability| capability.capability_ref == demand.capability_ref)
+                .collect();
+            let capability = match capabilities.as_slice() {
+                [] => return Err(SoftAssignmentIssueCode::CapabilityMissing),
+                [one] => *one,
+                _ => return Err(SoftAssignmentIssueCode::CapabilityAmbiguous),
+            };
+            if capability.process_revision_ref != demand.process_revision_ref {
+                return Err(SoftAssignmentIssueCode::ProcessRevisionMismatch);
+            }
+            if !is_sha256_hex(&capability.parameter_digest_sha256) {
+                return Err(SoftAssignmentIssueCode::ParameterDigestInvalid);
+            }
+            if !capability.parameter_digest_sha256.eq_ignore_ascii_case(&demand.parameter_digest_sha256) {
+                return Err(SoftAssignmentIssueCode::ParameterDigestMismatch);
+            }
+            if capability.inspection_plan_ref != demand.inspection_plan_ref {
+                return Err(SoftAssignmentIssueCode::InspectionPlanMismatch);
+            }
+            Ok(true)
+        };
+
+        let current = current_by_operation.get(demand.operation_ref.as_str()).copied();
+        let selected = if let Some(current_module) = current {
+            if installed.contains(current_module) && is_eligible(current_module) == Ok(true) {
+                Some(current_module.to_owned())
+            } else {
+                installed.iter().copied().filter(|module_ref| is_eligible(module_ref) == Ok(true)).min().map(str::to_owned)
+            }
+        } else {
+            installed.iter().copied().filter(|module_ref| is_eligible(module_ref) == Ok(true)).min().map(str::to_owned)
+        };
+
+        match selected {
+            Some(module_ref) => {
+                if current == Some(module_ref.as_str()) {
+                    retained += 1;
+                } else {
+                    changed += 1;
+                }
+                assignments.push(OperationAssignment {
+                    operation_ref: demand.operation_ref.clone(),
+                    module_ref,
+                });
+            }
+            None => {
+                let mut emitted = false;
+                if let Some(current_module) = current {
+                    if !installed.contains(current_module) {
+                        issues.push(SoftAssignmentIssue {
+                            code: SoftAssignmentIssueCode::ModuleMissing,
+                            subject_ref: current_module.to_owned(),
+                        });
+                        emitted = true;
+                    } else if let Err(code) = is_eligible(current_module) {
+                        issues.push(SoftAssignmentIssue {
+                            code,
+                            subject_ref: current_module.to_owned(),
+                        });
+                        emitted = true;
+                    }
+                }
+                if !emitted {
+                    let code = if installed.is_empty() && module_pool_resolution != SnapshotResolution::Complete {
+                        SoftAssignmentIssueCode::ModulePoolUnresolved
+                    } else if installed.is_empty() {
+                        SoftAssignmentIssueCode::ModuleMissing
+                    } else {
+                        SoftAssignmentIssueCode::CapabilityMissing
+                    };
+                    issues.push(SoftAssignmentIssue {
+                        code,
+                        subject_ref: demand.operation_ref.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    issues.sort();
+    issues.dedup();
+    let status = if issues.iter().any(|issue| matches!(
+        issue.code,
+        SoftAssignmentIssueCode::DuplicateInstalledModule
+            | SoftAssignmentIssueCode::DuplicateOperationDemand
+            | SoftAssignmentIssueCode::DuplicateCurrentAssignment
+            | SoftAssignmentIssueCode::ModuleWrongFacility
+            | SoftAssignmentIssueCode::ModuleNotQualified
+            | SoftAssignmentIssueCode::ModuleUnavailable
+            | SoftAssignmentIssueCode::CapabilityMissing
+            | SoftAssignmentIssueCode::CapabilityAmbiguous
+            | SoftAssignmentIssueCode::ProcessRevisionMismatch
+            | SoftAssignmentIssueCode::ParameterDigestInvalid
+            | SoftAssignmentIssueCode::ParameterDigestMismatch
+            | SoftAssignmentIssueCode::InspectionPlanMismatch
+    )) {
+        PlanStatus::Blocked
+    } else if !issues.is_empty() {
+        PlanStatus::Indeterminate
+    } else {
+        PlanStatus::FeasibleForQualification
+    };
+
+    SoftAssignmentProposal {
+        facility_ref: facility_ref.to_owned(),
+        evaluated_at_unix_seconds: at,
+        status,
+        assignments,
+        retained_assignment_count: retained,
+        changed_assignment_count: changed,
+        issues,
+        production_authorized: false,
+    }
+}
+
+fn evidence_is_current(evidence: &EvidenceRecord, at: i64) -> bool {
+    evidence.status == EvidenceStatus::Current
+        && !evidence.evidence_ref.trim().is_empty()
+        && evidence.issuer_ref.as_deref().is_some_and(|issuer| !issuer.trim().is_empty())
+        && matches!(
+            (evidence.valid_from_unix_seconds, evidence.valid_until_unix_seconds),
+            (Some(from), Some(until)) if from <= at && at < until
+        )
 }
 
 fn missing_severity(resolution: SnapshotResolution) -> ReasonSeverity {
@@ -980,6 +1284,7 @@ mod tests {
             module_ref: reference.to_owned(),
             facility_ref: "urn:example:facility:atelier-01".to_owned(),
             status: ModuleStatus::Qualified,
+            availability: ModuleAvailability::Available,
             valid_from_unix_seconds: Some(NOW - 10),
             valid_until_unix_seconds: Some(NOW + 10),
             footprint_width_mm: 1_000,
@@ -1055,6 +1360,81 @@ mod tests {
             module_pool_resolution: SnapshotResolution::Complete,
             operation_demands: demands,
         }
+    }
+
+
+    #[test]
+    fn soft_selector_preserves_a_still_qualified_assignment() {
+        let (profile_a, placement_a) = module("urn:example:module:cut-a", 0, vec![capability("urn:example:capability:cut")]);
+        let (profile_b, placement_b) = module("urn:example:module:cut-b", 1_200, vec![capability("urn:example:capability:cut")]);
+        let operation = "urn:example:operation:cut";
+        let proposal = propose_soft_reallocation(
+            "urn:example:facility:atelier-01",
+            NOW,
+            &vec![placement_a.module_ref, placement_b.module_ref],
+            &[profile_a, profile_b],
+            SnapshotResolution::Complete,
+            &[demand(operation, "urn:example:capability:cut")],
+            &[OperationAssignment { operation_ref: operation.to_owned(), module_ref: "urn:example:module:cut-b".to_owned() }],
+        );
+        assert_eq!(proposal.status, PlanStatus::FeasibleForQualification);
+        assert_eq!(proposal.retained_assignment_count, 1);
+        assert_eq!(proposal.changed_assignment_count, 0);
+        assert_eq!(proposal.assignments[0].module_ref, "urn:example:module:cut-b");
+        assert!(!proposal.production_authorized);
+    }
+
+    #[test]
+    fn soft_selector_moves_from_unavailable_module_to_installed_qualified_substitute() {
+        let (mut profile_a, placement_a) = module("urn:example:module:cut-a", 0, vec![capability("urn:example:capability:cut")]);
+        profile_a.availability = ModuleAvailability::Unavailable;
+        let (profile_b, placement_b) = module("urn:example:module:cut-b", 1_200, vec![capability("urn:example:capability:cut")]);
+        let operation = "urn:example:operation:cut";
+        let proposal = propose_soft_reallocation(
+            "urn:example:facility:atelier-01",
+            NOW,
+            &vec![placement_a.module_ref, placement_b.module_ref],
+            &[profile_a, profile_b],
+            SnapshotResolution::Complete,
+            &[demand(operation, "urn:example:capability:cut")],
+            &[OperationAssignment { operation_ref: operation.to_owned(), module_ref: "urn:example:module:cut-a".to_owned() }],
+        );
+        assert_eq!(proposal.status, PlanStatus::FeasibleForQualification);
+        assert_eq!(proposal.retained_assignment_count, 0);
+        assert_eq!(proposal.changed_assignment_count, 1);
+        assert_eq!(proposal.assignments[0].module_ref, "urn:example:module:cut-b");
+    }
+
+    #[test]
+    fn soft_selector_tie_break_is_deterministic() {
+        let (profile_b, placement_b) = module("urn:example:module:cut-b", 1_200, vec![capability("urn:example:capability:cut")]);
+        let (profile_a, placement_a) = module("urn:example:module:cut-a", 0, vec![capability("urn:example:capability:cut")]);
+        let proposal = propose_soft_reallocation(
+            "urn:example:facility:atelier-01",
+            NOW,
+            &vec![placement_b.module_ref, placement_a.module_ref],
+            &[profile_b, profile_a],
+            SnapshotResolution::Complete,
+            &[demand("urn:example:operation:cut", "urn:example:capability:cut")],
+            &[],
+        );
+        assert_eq!(proposal.status, PlanStatus::FeasibleForQualification);
+        assert_eq!(proposal.assignments[0].module_ref, "urn:example:module:cut-a");
+    }
+
+    #[test]
+    fn soft_selector_keeps_unknown_module_pool_indeterminate() {
+        let proposal = propose_soft_reallocation(
+            "urn:example:facility:atelier-01",
+            NOW,
+            &["urn:example:module:missing".to_owned()],
+            &[],
+            SnapshotResolution::Partial,
+            &[demand("urn:example:operation:cut", "urn:example:capability:cut")],
+            &[],
+        );
+        assert_eq!(proposal.status, PlanStatus::Indeterminate);
+        assert!(proposal.assignments.is_empty());
     }
 
     #[test]
