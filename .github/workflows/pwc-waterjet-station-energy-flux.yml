@@ -1,0 +1,109 @@
+name: PWC Waterjet Station Energy Flux
+
+on:
+  pull_request:
+    branches:
+      - research/marine-waps-co-design-20261110
+    paths:
+      - "tools/marine-propulsion-validator/Cargo.toml"
+      - "tools/marine-propulsion-validator/src/bin/pwc_waterjet_station_energy_flux.rs"
+      - "docs/research/marine/pwc-waterjet-station-energy-flux-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-pwc-waterjet-station-flux-*.json"
+      - ".github/workflows/pwc-waterjet-station-energy-flux.yml"
+  push:
+    branches:
+      - research/pwc-waterjet-station-flux-20261115
+    paths:
+      - "tools/marine-propulsion-validator/Cargo.toml"
+      - "tools/marine-propulsion-validator/src/bin/pwc_waterjet_station_energy_flux.rs"
+      - "docs/research/marine/pwc-waterjet-station-energy-flux-v0.1.0.schema.json"
+      - "docs/research/marine/fixtures/synthetic-pwc-waterjet-station-flux-*.json"
+      - ".github/workflows/pwc-waterjet-station-energy-flux.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pwc-waterjet-station-flux-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  flux:
+    name: Exact-head station quadrature and continuity controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Install repository-pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Generate standalone lockfile
+        run: cargo generate-lockfile --manifest-path tools/marine-propulsion-validator/Cargo.toml
+
+      - name: Format check for the new station auditor only
+        run: rustfmt --edition 2024 --check tools/marine-propulsion-validator/src/bin/pwc_waterjet_station_energy_flux.rs
+
+      - name: Unit tests for station energy-flux contract
+        run: cargo test --manifest-path tools/marine-propulsion-validator/Cargo.toml --locked --bin pwc-waterjet-station-energy-flux
+
+      - name: Positive direct station-1/station-7 vector stays synthetic INCOMPLETE
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin pwc-waterjet-station-energy-flux -- \
+            docs/research/marine/pwc-waterjet-station-energy-flux-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-pwc-waterjet-station-flux-v0.1.0.json \
+            > "$RUNNER_TEMP/pwc-station-flux-positive.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/pwc-station-flux-positive.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPLETE" and .arithmetic_status == "VALID" and .flow_balance_valid == true and .station_6_shortcut_used == false and (.station_1.total_axial_energy_flux.value - 209650 | fabs) < 0.0000001 and (.station_7.total_axial_energy_flux.value - 306650 | fabs) < 0.0000001 and (.effective_jet_system_power_p_jse.value - 97000 | fabs) < 0.0000001' "$RUNNER_TEMP/pwc-station-flux-positive.json"
+
+      - name: Station flow mismatch is incomparable and has no effective power
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin pwc-waterjet-station-energy-flux -- \
+            docs/research/marine/pwc-waterjet-station-energy-flux-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-pwc-waterjet-station-flux-mismatch-v0.1.0.json \
+            > "$RUNNER_TEMP/pwc-station-flux-mismatch.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/pwc-station-flux-mismatch.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPARABLE" and .reason_code == "STATION_FLOW_MISMATCH" and .effective_jet_system_power_p_jse == null' "$RUNNER_TEMP/pwc-station-flux-mismatch.json"
+
+      - name: Reversed station normal is not silently normalized
+        shell: bash
+        run: |
+          set +e
+          cargo run --quiet --locked --manifest-path tools/marine-propulsion-validator/Cargo.toml \
+            --bin pwc-waterjet-station-energy-flux -- \
+            docs/research/marine/pwc-waterjet-station-energy-flux-v0.1.0.schema.json \
+            docs/research/marine/fixtures/synthetic-pwc-waterjet-station-flux-reversed-normal-v0.1.0.json \
+            > "$RUNNER_TEMP/pwc-station-flux-reversed.json"
+          status=$?
+          set -e
+          cat "$RUNNER_TEMP/pwc-station-flux-reversed.json"
+          test "$status" -eq 2
+          jq -e '.disposition == "INCOMPARABLE" and .reason_code == "STATION_FLOW_DIRECTION_INVALID" and .effective_jet_system_power_p_jse == null' "$RUNNER_TEMP/pwc-station-flux-reversed.json"
+
+      - name: Preserve station-flux audit receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pwc-station-flux-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            ${{ runner.temp }}/pwc-station-flux-positive.json
+            ${{ runner.temp }}/pwc-station-flux-mismatch.json
+            ${{ runner.temp }}/pwc-station-flux-reversed.json
