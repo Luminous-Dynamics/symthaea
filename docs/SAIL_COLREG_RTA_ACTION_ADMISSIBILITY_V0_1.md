@@ -20,10 +20,12 @@ The module consumes external assessment results. This is deliberate: COLREG appl
 Every required evidence reference binds:
 - a source SHA-256 digest;
 - an explicit evidence state;
+- own-vessel identity and exact configuration digest;
+- target-track identity and encounter/scenario identity;
 - a common qualified timebase identity;
 - observation age and maximum permitted age.
 
-The evaluator requires evidence references for the route candidate, encounter/rule assessment, ODD assessment, model-feasibility assessment and the authority ceiling. Human readiness evidence is additionally required when rule applicability is ambiguous.
+The evaluator requires evidence references for the route candidate, encounter/rule assessment, ODD assessment, model-feasibility assessment and the authority ceiling. Each reference must match the same own-vessel, target-track, configuration, scenario and timebase scope; a digest from another rig, vessel, target track or encounter is not reusable. Human readiness evidence is additionally required when rule applicability is ambiguous.
 
 A digest identifies an artifact; it does not authenticate its publisher, prove the underlying physical measurement, or establish independence.
 
@@ -77,7 +79,7 @@ A result of `AdmissibleWithinDeclaredModel` is only a software admission result 
 
 ## Frozen tests
 
-Twenty-two Rust unit tests cover:
+Twenty-seven Rust unit tests cover:
 - nominal evidence-qualified candidate;
 - missing, stale, conflicted and revoked evidence;
 - common-timebase mismatch and freshness expiry;
