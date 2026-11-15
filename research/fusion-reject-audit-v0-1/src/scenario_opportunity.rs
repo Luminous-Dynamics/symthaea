@@ -12,8 +12,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::decision_opportunity::{
-    IncumbentFrontierPoint, ObjectiveDefinition, ObjectiveDirection, ObjectiveValue,
-    epsilon_dominates, epsilon_equivalent, is_epsilon_frontier_extension, valid_objective_vector,
+    IncumbentFrontierPoint, ObjectiveDefinition, ObjectiveValue, epsilon_dominates,
+    epsilon_equivalent, is_epsilon_frontier_extension, valid_objective_vector,
 };
 use super::{
     AuditError, AuditOutcome, BOUND_METHOD, RejectAuditPlan, SAMPLING_ALGORITHM,
@@ -1021,6 +1021,7 @@ fn is_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::decision_opportunity::ObjectiveDirection;
     use crate::{
         AcceptedCandidate, AcceptedCandidateManifest, AuditSample, FrozenCandidateUniverse,
         RejectStratum, deterministic_audit_sample_ids,
@@ -1526,7 +1527,7 @@ mod tests {
 
     #[test]
     fn changed_scenario_manifest_identity_changes_report_identity() {
-        let mut first = plan();
+        let first = plan();
         let mut second = plan();
         second.scenario_manifest_sha256 = digest('9');
         let first_report = audit_scenario_opportunities(&first).unwrap();
