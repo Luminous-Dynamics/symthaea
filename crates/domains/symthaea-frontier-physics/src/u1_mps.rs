@@ -3475,8 +3475,7 @@ impl U1TeBDLayer {
             let hamiltonian_projection_operator_error_upper_bound =
                 entry.gate.hamiltonian_projection_error_operator_upper_bound();
             let hamiltonian_projection_error_upper_bound =
-                hamiltonian_projection_operator_error_upper_bound
-                    * gauge_receipt.output_norm_squared.sqrt();
+                hamiltonian_projection_operator_error_upper_bound * reference_state_norm_upper;
             state.tensors[bond] = truncation.left_tensor.clone();
             state.tensors[bond + 1] = truncation.right_tensor.clone();
             state = ComplexU1Mps::new(state.tensors.clone(), input_total_charge, policy.tolerance)?;
