@@ -44,6 +44,7 @@ jobs:
         run: |
           cargo run --manifest-path tools/sympsi-beacon-verifier/Cargo.toml -- \
             --requested-round 1000 \
+            --git-head "$EXACT_HEAD" \
             --input tools/sympsi-beacon-verifier/fixtures/quicknet-round-1000.json \
             --out "$RUNNER_TEMP/sympsi-quicknet-round-1000-receipt.json"
           cat "$RUNNER_TEMP/sympsi-quicknet-round-1000-receipt.json"
