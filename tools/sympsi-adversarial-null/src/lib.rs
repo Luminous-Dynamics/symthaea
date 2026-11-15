@@ -330,13 +330,7 @@ fn simulate_scenario(
     for campaign in 0..manifest.campaigns_per_scenario {
         let campaign_seed =
             derive_campaign_seed(manifest.master_seed, profile_name, spec.id, campaign);
-        let counts = generate_campaign(
-            choices,
-            n,
-            block_count,
-            spec.id,
-            campaign_seed,
-        );
+        let counts = generate_campaign(choices, n, block_count, spec.id, campaign_seed);
 
         if counts.global_hits >= profile.naive_critical_hits as u64 {
             naive_rejections += 1;
@@ -622,12 +616,7 @@ fn control(id: &str, passed: bool, detail: &str) -> ControlResult {
     }
 }
 
-fn derive_campaign_seed(
-    master: u64,
-    profile: &str,
-    scenario: &str,
-    campaign: u64,
-) -> u64 {
+fn derive_campaign_seed(master: u64, profile: &str, scenario: &str, campaign: u64) -> u64 {
     let mut hasher = Sha256::new();
     hasher.update(DOMAIN.as_bytes());
     hasher.update([0]);
@@ -759,7 +748,8 @@ mod tests {
     fn campaign_and_random_stream_seeds_are_domain_separated() {
         let first = derive_campaign_seed(20261115, "four-choice", "uniform_iid", 0);
         let second = derive_campaign_seed(20261115, "four-choice", "uniform_iid", 1);
-        let other_scenario = derive_campaign_seed(20261115, "four-choice", "persistent_response_preference", 0);
+        let other_scenario =
+            derive_campaign_seed(20261115, "four-choice", "persistent_response_preference", 0);
         assert_ne!(first, second);
         assert_ne!(first, other_scenario);
         assert_ne!(
