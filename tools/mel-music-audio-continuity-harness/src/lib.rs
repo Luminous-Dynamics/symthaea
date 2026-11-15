@@ -851,17 +851,27 @@ mod tests {
     fn request(
         source: &PcmAudioArtifactV1,
         count: u8,
+        steps: &[AudioSequenceStepV1],
     ) -> AudioSequenceRequestV1 {
         AudioSequenceRequestV1 {
             schema_version: AUDIO_SEQUENCE_SCHEMA_V1.to_owned(),
             session_id: format!("audio-session-{count}"),
             source_lineage_sha256: h(10),
             source_audio_sha256: pcm_audio_sha256_v1(source).unwrap(),
-            operation_plan_sha256: h(11),
+            operation_plan_sha256: audio_operation_plan_sha256_v1(steps).unwrap(),
             expected_step_count: count,
             format: source.format,
             frame_count: source.frame_count().unwrap(),
         }
+    }
+
+    fn run(
+        source: &PcmAudioArtifactV1,
+        count: u8,
+        steps: &[AudioSequenceStepV1],
+    ) -> Result<AudioSequenceEvaluationV1, AudioContinuityErrorV1> {
+        let frozen_request = request(source, count, steps);
+        evaluate_audio_sequence_v1(&frozen_request, source, steps)
     }
 
     fn gates(verdict: AudioGateVerdictV1) -> AudioUpstreamGatesV1 {
@@ -1043,6 +1053,21 @@ mod tests {
                 &[step(1, &original, output, window)],
             ),
             Err(AudioContinuityErrorV1::FrameCountMismatch)
+        );
+    }
+
+    #[test]
+    fn operation_plan_digest_binds_regions_thresholds_and_upstream_gates() {
+        let original = source(128, 1);
+        let window = FrameWindowV1 { start_frame: 40, end_frame: 64 };
+        let output = edited(&original, window, 200);
+        let operation_step = step(1, &original, output, window);
+        let frozen = request(&original, 1, std::slice::from_ref(&operation_step));
+        let mut changed = operation_step;
+        changed.boundary_policy.maximum_jump_delta_samples = Some(0);
+        assert_eq!(
+            evaluate_audio_sequence_v1(&frozen, &original, &[changed]),
+            Err(AudioContinuityErrorV1::OperationPlanMismatch)
         );
     }
 
