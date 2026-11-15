@@ -34,8 +34,8 @@ pub struct MultiShiftEpochReport {
     pub event_id: String,
     pub decision_cutoff: String,
     pub required_revalidation_obligations: Vec<String>,
-    pub dependency_implied_revalidation_obligations: Vec<String>,
-    pub dependency_only_impact_obligations: Vec<String>,
+    pub direct_dependency_implied_revalidation_obligations: Vec<String>,
+    pub direct_dependency_only_impact_obligations: Vec<String>,
     pub gold_only_impact_obligations: Vec<String>,
     pub fresh_revalidated_obligations: Vec<String>,
     pub fresh_passing_obligations: Vec<String>,
@@ -45,6 +45,7 @@ pub struct MultiShiftEpochReport {
     pub unnecessary_revalidation_obligations: Vec<String>,
     pub false_resurrection_obligations: Vec<String>,
     pub stale_carryover_obligations: Vec<String>,
+    pub receipt_source_context_mismatch_obligations: Vec<String>,
     pub future_evidence_leakage_obligations: Vec<String>,
     pub unsupported_current_claims: Vec<String>,
     pub invalid_fresh_receipts: Vec<ReceiptIssue>,
@@ -69,7 +70,7 @@ pub struct MultiShiftTraceReport {
     pub total_stale_carryovers: usize,
     pub total_future_evidence_leakages: usize,
     pub total_unsupported_current_claims: usize,
-    pub total_dependency_only_impact_labels: usize,
+    pub total_direct_dependency_only_impact_labels: usize,
     pub total_gold_only_impact_labels: usize,
 }
 
@@ -105,6 +106,7 @@ struct ReceiptAssessment {
     outcome: String,
     reasons: Vec<String>,
     context_mismatch_dimensions: Vec<String>,
+    source_context_mismatch_dimensions: Vec<String>,
     unavailable_at_cutoff: bool,
 }
 
@@ -286,8 +288,10 @@ fn assess_receipt(
     }
 
     let mut context_mismatch_dimensions = Vec::new();
+    let mut source_context_mismatch_dimensions = Vec::new();
     for dimension in &obligation.dependency_dimensions {
         if context.get(dimension) != source_state.get(dimension) {
+            source_context_mismatch_dimensions.push(dimension.clone());
             reasons.push(format!("receipt_source_context_mismatch:{dimension}"));
         }
         if context.get(dimension) != current_state.get(dimension) {
@@ -296,6 +300,7 @@ fn assess_receipt(
         }
     }
     context_mismatch_dimensions.sort();
+    source_context_mismatch_dimensions.sort();
     reasons.sort();
     reasons.dedup();
 
@@ -303,6 +308,7 @@ fn assess_receipt(
         outcome,
         reasons,
         context_mismatch_dimensions,
+        source_context_mismatch_dimensions,
         unavailable_at_cutoff,
     })
 }
@@ -605,6 +611,7 @@ fn score_trace(
         let mut valid_reused_pass = BTreeSet::new();
         let mut false_resurrection = BTreeSet::new();
         let mut stale_carryover = BTreeSet::new();
+        let mut source_context_mismatch = BTreeSet::new();
         let mut future_leakage = BTreeSet::new();
         let mut invalid_fresh_receipts = Vec::new();
         let mut invalid_reuse_receipts = Vec::new();
@@ -666,9 +673,15 @@ fn score_trace(
                         false_resurrection.insert(id.clone());
                     }
                     if declared_current.contains(&id)
-                        && !assessment.context_mismatch_dimensions.is_empty()
+                        && (!assessment.context_mismatch_dimensions.is_empty()
+                            || !assessment.source_context_mismatch_dimensions.is_empty())
                     {
                         stale_carryover.insert(id.clone());
+                    }
+                    if declared_current.contains(&id)
+                        && !assessment.source_context_mismatch_dimensions.is_empty()
+                    {
+                        source_context_mismatch.insert(id.clone());
                     }
                     if !assessment.reasons.is_empty() || assessment.outcome != "pass" {
                         let mut reasons = assessment.reasons.clone();
@@ -741,8 +754,8 @@ fn score_trace(
             event_id: event_id.clone(),
             decision_cutoff: required_str(checkpoint, "decision_cutoff", &label)?.to_owned(),
             required_revalidation_obligations: required.iter().cloned().collect(),
-            dependency_implied_revalidation_obligations: dependency_implied.iter().cloned().collect(),
-            dependency_only_impact_obligations: dependency_only.iter().cloned().collect(),
+            direct_dependency_implied_revalidation_obligations: dependency_implied.iter().cloned().collect(),
+            direct_dependency_only_impact_obligations: dependency_only.iter().cloned().collect(),
             gold_only_impact_obligations: gold_only.iter().cloned().collect(),
             fresh_revalidated_obligations: valid_fresh.iter().cloned().collect(),
             fresh_passing_obligations: fresh_pass.iter().cloned().collect(),
@@ -752,6 +765,7 @@ fn score_trace(
             unnecessary_revalidation_obligations: unnecessary.iter().cloned().collect(),
             false_resurrection_obligations: false_resurrection.iter().cloned().collect(),
             stale_carryover_obligations: stale_carryover.iter().cloned().collect(),
+            receipt_source_context_mismatch_obligations: source_context_mismatch.iter().cloned().collect(),
             future_evidence_leakage_obligations: future_leakage.iter().cloned().collect(),
             unsupported_current_claims: unsupported_current.iter().cloned().collect(),
             invalid_fresh_receipts,
@@ -789,7 +803,7 @@ fn score_trace(
         total_stale_carryovers,
         total_future_evidence_leakages: total_future_leakages,
         total_unsupported_current_claims: total_unsupported,
-        total_dependency_only_impact_labels: total_dependency_only,
+        total_direct_dependency_only_impact_labels: total_dependency_only,
         total_gold_only_impact_labels: total_gold_only,
     })
 }
@@ -1033,7 +1047,7 @@ mod tests {
         assert_eq!(conformant.total_under_revalidation_units, 0);
         assert_eq!(conformant.total_false_resurrections, 0);
         assert_eq!(conformant.total_critical_false_resurrections, 0);
-        assert_eq!(conformant.total_dependency_only_impact_labels, 0);
+        assert_eq!(conformant.total_direct_dependency_only_impact_labels, 0);
         assert_eq!(conformant.total_gold_only_impact_labels, 0);
         assert_eq!(report.gold_adjudication_status, "synthetic_known_answer_not_independently_adjudicated");
         let adversarial = trace(&report, "false-resurrection-sequence");
@@ -1104,6 +1118,7 @@ mod tests {
         let result = trace(&report, "conformant-sequence");
         assert!(result.epochs[0].false_resurrection_obligations.contains(&"build-repro".to_owned()));
         assert!(result.epochs[0].stale_carryover_obligations.contains(&"build-repro".to_owned()));
+        assert!(result.epochs[0].receipt_source_context_mismatch_obligations.contains(&"build-repro".to_owned()));
         assert!(result.epochs[0].missing_required_revalidation_obligations.contains(&"build-repro".to_owned()));
     }
 
