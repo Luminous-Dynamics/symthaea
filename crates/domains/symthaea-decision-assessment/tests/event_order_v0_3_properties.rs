@@ -7,8 +7,8 @@ use symthaea_decision_assessment::event_order_v0_2::{
 use symthaea_decision_assessment::event_order_v0_3::{
     canonical_schedule_bytes, canonical_schedule_sha256, generate_cancellation_commit_race_schedule,
     generate_clock_mapping_fault_schedule, generate_clocked_observation_persistence_schedule,
-    generate_delivery_schedule, project_bitemporal_event, replay_virtual_schedule,
-    CancellationCommitOrder, ClockMappingFault, SchedulerDisposition, ScheduleAction,
+    generate_delivery_schedule, project_bitemporal_event, replay_virtual_schedule, validate_schedule,
+    CancellationCommitOrder, ClockMappingFault, SchedulerDisposition, ScheduleAction, VirtualSchedule,
 };
 
 fn owner_qualified_resolutions(
@@ -184,4 +184,35 @@ proptest! {
         prop_assert!(projection.envelope.is_none());
     }
 
+#[test]
+fn frozen_v0_3_1_observer_store_clock_fixture_replays_and_projects() {
+    let fixture = include_str!("../../../../benchmarks/engineering-change-impact/event-order-v0.3.1-clocked-observation-persistence.json");
+    let schedule: VirtualSchedule = serde_json::from_str(fixture).expect("frozen schedule parses");
+    validate_schedule(&schedule).expect("frozen v0.3.1 schedule validates");
+    let replay = replay_virtual_schedule(&schedule).expect("frozen schedule replays");
+    assert_eq!(replay.event_count, 1);
+    assert_eq!(replay.observed_count, 1);
+    assert_eq!(replay.persisted_count, 1);
+    assert!(replay.records.iter().any(|record| {
+        matches!(record.action, ScheduleAction::EventObserved { .. })
+            && record.disposition == SchedulerDisposition::Applied
+    }));
+    assert!(replay.records.iter().any(|record| {
+        matches!(record.action, ScheduleAction::EventPersisted { .. })
+            && record.disposition == SchedulerDisposition::Applied
+    }));
+
+    let resolutions = owner_qualified_resolutions(&schedule);
+    let projected = project_bitemporal_event(
+        &schedule, "event-0001", "observer-0", "ledger-0", &resolutions,
+    ).expect("bitemporal projection");
+    assert_eq!(
+        projected.disposition,
+        symthaea_decision_assessment::EventTraceDisposition::Safe
+    );
+    let envelope = projected.envelope.expect("qualified envelope");
+    assert_eq!(envelope.occurred_at.expect("qualified occurrence").interval.earliest_ns, 500);
+    assert_eq!(envelope.first_observed_at.interval.earliest_ns, 1_000);
+    assert_eq!(envelope.durably_recorded_at.interval.earliest_ns, 1_200);
+}
 }
