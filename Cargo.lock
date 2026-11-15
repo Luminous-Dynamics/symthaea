@@ -19260,6 +19260,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-marine-geometry"
+version = "0.1.0"
+dependencies = [
+ "blake3",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "symthaea-memetics"
 version = "0.1.0"
 dependencies = [
