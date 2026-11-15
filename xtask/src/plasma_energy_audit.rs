@@ -24,6 +24,7 @@ pub struct SourceManifestSummary {
     pub programme: String,
     pub case_count: usize,
     pub negative_control_count: usize,
+    pub derived_reference_check_count: usize,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -600,8 +601,12 @@ pub fn print_report(report: &AuditReport, as_json: bool) -> Result<()> {
     println!("Claim ceiling: {}", report.claim_ceiling);
     for source in &report.source_manifests {
         println!(
-            "SOURCE PASS {} cases={} negative_controls={} path={}",
-            source.programme, source.case_count, source.negative_control_count, source.path
+            "SOURCE PASS {} cases={} negative_controls={} derived_checks={} path={}",
+            source.programme,
+            source.case_count,
+            source.negative_control_count,
+            source.derived_reference_check_count,
+            source.path
         );
     }
     println!("Thermal scenarios:");
@@ -1044,6 +1049,75 @@ mod tests {
         assert!(error.to_string().contains("fusion_born_output_demonstrated=false"));
     }
 
+    fn nh3_energy_yield_source_manifest() -> Value {
+        serde_json::json!({
+            "programme": "PLASMA-ENERGY-001",
+            "claim_ceiling": "SOURCE_REGISTER_ONLY",
+            "evidence_classes": ["PUBLISHED_LAB_EXPERIMENT"],
+            "cases": [{
+                "case_id": "NH3-CRACK-MW-ATM-MECHANISM-2026",
+                "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+                "luminous_reproduction": false,
+                "source": {"url": "https://doi.org/10.1016/j.ijhydene.2026.156912"}
+            }],
+            "derived_reference_checks": [{
+                "check_id": "NH3-MW-ENERGY-YIELD-TO-SPECIFIC-ENERGY-2026",
+                "source_case_id": "NH3-CRACK-MW-ATM-MECHANISM-2026",
+                "evidence_class": "DERIVED_ARITHMETIC_FROM_PUBLISHED_HYDROGEN_ENERGY_YIELD",
+                "luminous_measurement": false,
+                "inputs": {
+                    "near_complete_conversion_energy_yield_g_H2_per_kWh": 45.0,
+                    "best_energy_yield_g_H2_per_kWh": 51.0
+                },
+                "derivation": {
+                    "near_complete_conversion_specific_energy_kWh_per_kg_H2": 1000.0 / 45.0,
+                    "best_energy_yield_specific_energy_kWh_per_kg_H2": 1000.0 / 51.0,
+                    "relative_specific_energy_reduction_at_76_percent_conversion": 1.0 - 45.0 / 51.0
+                },
+                "interpretation": "Two distinct source operating points; not a matched process result."
+            }],
+            "negative_controls": [{
+                "control_id": "NC-024",
+                "expected_disposition": "REJECT_OPERATING_POINT_MISMATCH"
+            }]
+        })
+    }
+
+    #[test]
+    fn source_manifest_accepts_correct_nh3_energy_yield_derivation() {
+        let source = nh3_energy_yield_source_manifest();
+        let summary = audit_source_value(&source, "nh3-derived.json").unwrap();
+        assert_eq!(summary.case_count, 1);
+        assert_eq!(summary.derived_reference_check_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_incorrect_nh3_specific_energy_arithmetic() {
+        let mut source = nh3_energy_yield_source_manifest();
+        source["derived_reference_checks"][0]["derivation"]
+            ["best_energy_yield_specific_energy_kWh_per_kg_H2"] = serde_json::json!(18.0);
+        let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
+        assert!(error.to_string().contains("best-yield specific-energy derivation"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_derived_check_with_unknown_case_reference() {
+        let mut source = nh3_energy_yield_source_manifest();
+        source["derived_reference_checks"][0]["source_case_id"] =
+            serde_json::json!("MISSING-CASE");
+        let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
+        assert!(error.to_string().contains("references unknown source case"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_derived_check_claimed_as_luminous_measurement() {
+        let mut source = nh3_energy_yield_source_manifest();
+        source["derived_reference_checks"][0]["luminous_measurement"] =
+            serde_json::json!(true);
+        let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
+        assert!(error.to_string().contains("luminous_measurement=false"));
+    }
+
     #[test]
     fn source_manifest_rejects_duplicate_case_and_control_ids() {
         let duplicate_case = serde_json::json!({
@@ -1163,6 +1237,78 @@ fn has_http_authority(url: &str) -> bool {
     !authority.is_empty() && !authority.chars().any(char::is_whitespace)
 }
 
+fn close_f64(actual: f64, expected: f64) -> bool {
+    actual.is_finite()
+        && expected.is_finite()
+        && (actual - expected).abs() <= 1.0e-9 * actual.abs().max(expected.abs()).max(1.0)
+}
+
+fn required_f64(object: &Value, key: &str, context: &str) -> Result<f64> {
+    object
+        .get(key)
+        .and_then(Value::as_f64)
+        .filter(|value| value.is_finite())
+        .with_context(|| format!("{context}: missing/non-finite numeric field {key}"))
+}
+
+fn validate_nh3_energy_yield_check(check: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: NH3 microwave energy-yield derivation");
+    ensure!(
+        check.get("source_case_id").and_then(Value::as_str)
+            == Some("NH3-CRACK-MW-ATM-MECHANISM-2026"),
+        "{context}: source_case_id must point to NH3-CRACK-MW-ATM-MECHANISM-2026"
+    );
+    let inputs = check
+        .get("inputs")
+        .with_context(|| format!("{context}: inputs are missing"))?;
+    let derivation = check
+        .get("derivation")
+        .with_context(|| format!("{context}: derivation is missing"))?;
+
+    let near_complete_yield =
+        required_f64(inputs, "near_complete_conversion_energy_yield_g_H2_per_kWh", &context)?;
+    let best_yield =
+        required_f64(inputs, "best_energy_yield_g_H2_per_kWh", &context)?;
+    ensure!(
+        near_complete_yield > 0.0 && best_yield > 0.0,
+        "{context}: energy yields must be positive"
+    );
+
+    let expected_near_complete = 1000.0 / near_complete_yield;
+    let expected_best = 1000.0 / best_yield;
+    let expected_reduction = 1.0 - near_complete_yield / best_yield;
+
+    let actual_near_complete = required_f64(
+        derivation,
+        "near_complete_conversion_specific_energy_kWh_per_kg_H2",
+        &context,
+    )?;
+    let actual_best = required_f64(
+        derivation,
+        "best_energy_yield_specific_energy_kWh_per_kg_H2",
+        &context,
+    )?;
+    let actual_reduction = required_f64(
+        derivation,
+        "relative_specific_energy_reduction_at_76_percent_conversion",
+        &context,
+    )?;
+
+    ensure!(
+        close_f64(actual_near_complete, expected_near_complete),
+        "{context}: near-complete specific-energy derivation does not equal 1000 / reported yield"
+    );
+    ensure!(
+        close_f64(actual_best, expected_best),
+        "{context}: best-yield specific-energy derivation does not equal 1000 / reported yield"
+    );
+    ensure!(
+        close_f64(actual_reduction, expected_reduction),
+        "{context}: relative specific-energy reduction is inconsistent with the two source points"
+    );
+    Ok(())
+}
+
 fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifestSummary> {
     let programme = root
         .get("programme")
@@ -1263,6 +1409,61 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         }
     }
 
+    let derived_checks: &[Value] = match root.get("derived_reference_checks") {
+        None => &[],
+        Some(value) => value
+            .as_array()
+            .with_context(|| format!("{display_name}: derived_reference_checks must be an array"))?,
+    };
+    let mut derived_check_ids = BTreeSet::new();
+    for check in derived_checks {
+        let check_id = check
+            .get("check_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{display_name}: derived reference check has no check_id"))?;
+        ensure!(
+            derived_check_ids.insert(check_id.to_owned()),
+            "{display_name}: duplicate derived reference check ID {check_id}"
+        );
+
+        let evidence_class = check
+            .get("evidence_class")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{display_name}: derived check {check_id} has no evidence_class"))?;
+        ensure!(
+            evidence_class.starts_with("DERIVED_ARITHMETIC_"),
+            "{display_name}: derived check {check_id} must use a DERIVED_ARITHMETIC evidence class"
+        );
+        ensure!(
+            check.get("luminous_measurement").and_then(Value::as_bool) == Some(false),
+            "{display_name}: derived check {check_id} must preserve luminous_measurement=false"
+        );
+        ensure!(
+            check.get("inputs").and_then(Value::as_object).is_some_and(|value| !value.is_empty()),
+            "{display_name}: derived check {check_id} has no input values"
+        );
+        ensure!(
+            check.get("derivation").and_then(Value::as_object).is_some_and(|value| !value.is_empty()),
+            "{display_name}: derived check {check_id} has no derivation values"
+        );
+        ensure!(
+            check.get("interpretation").and_then(Value::as_str).is_some_and(|value| !value.trim().is_empty()),
+            "{display_name}: derived check {check_id} has no interpretation/claim ceiling"
+        );
+        if let Some(source_case_id) = check.get("source_case_id").and_then(Value::as_str) {
+            ensure!(
+                case_ids.contains(source_case_id),
+                "{display_name}: derived check {check_id} references unknown source case {source_case_id}"
+            );
+        }
+
+        if check_id == "NH3-MW-ENERGY-YIELD-TO-SPECIFIC-ENERGY-2026" {
+            validate_nh3_energy_yield_check(check, display_name)?;
+        }
+    }
+
     let controls = root
         .get("negative_controls")
         .and_then(Value::as_array)
@@ -1290,6 +1491,7 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         programme,
         case_count: cases.len(),
         negative_control_count: controls.len(),
+        derived_reference_check_count: derived_checks.len(),
     })
 }
 
