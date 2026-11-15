@@ -9,6 +9,7 @@ use development_map_validator::{
     workspace_shift::evaluate_shift_scenario_json,
     selective_revalidation::score_selective_revalidation_oracle_json,
     multi_shift_sequence::score_multi_shift_sequence_json,
+    latent_shift::score_latent_shift_bundle_json,
     validate_document_json,
 };
 
@@ -25,6 +26,7 @@ fn usage() {
     eprintln!("  development-map-validator workspace-shift <scenario.json>");
     eprintln!("  development-map-validator revalidation-oracle <scenario.json>");
     eprintln!("  development-map-validator multi-shift-sequence <bundle.json>");
+    eprintln!("  development-map-validator latent-shift <bundle.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
     eprintln!("projects source files, composes a Git tree snapshot, or replays a pinned epistemic temporal ledger.");
@@ -391,6 +393,36 @@ fn score_multi_shift_sequence_file(args: &[String]) -> i32 {
     }
 }
 
+
+fn score_latent_shift_bundle_file(args: &[String]) -> i32 {
+    if args.len() != 2 {
+        usage();
+        return 2;
+    }
+    let path = &args[1];
+    let input = match read_input(path, "D6.9-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match score_latent_shift_bundle_json(&input) {
+        Err(error) => {
+            eprintln!("ERROR D6.9-LATENT-SHIFT-001 {path}: {error}");
+            1
+        }
+        Ok(report) => match serde_json::to_string_pretty(&report) {
+            Ok(output) => {
+                println!("{output}");
+                println!("NOTE evaluator-only hidden-truth report; never expose this output or input bundle to candidate agents");
+                0
+            }
+            Err(error) => {
+                eprintln!("ERROR D6.9-LATENT-SHIFT-JSON-001 {path}: {error}");
+                2
+            }
+        },
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -412,6 +444,7 @@ fn main() {
         "workspace-shift" => evaluate_workspace_shift_file(&args),
         "revalidation-oracle" => score_selective_revalidation_oracle_file(&args),
         "multi-shift-sequence" => score_multi_shift_sequence_file(&args),
+        "latent-shift" => score_latent_shift_bundle_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {
             usage();
