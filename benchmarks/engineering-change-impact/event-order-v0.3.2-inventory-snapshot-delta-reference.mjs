@@ -75,8 +75,9 @@ function run() {
       if (cut.snapshot.length !== 0 || result !== expected) families[name].violations++;
       futureRelations += cut.futureDischargeExcluded;
     } else if (family === 3) {
-      const startNs = 995 + j % 10;
-      const attempt = { logicalId: "robot-2", start: { basis: "tai", qualification: "pass", lo: startNs, hi: startNs + 10 }, terminal: null, stopRelations: [] };
+      // All generated intervals strictly straddle the point-in-time frontier.
+      const startNs = 990 + j % 10;
+      const attempt = { logicalId: "robot-2", start: { basis: "tai", qualification: "pass", lo: startNs, hi: 1010 + (j % 10) }, terminal: null, stopRelations: [] };
       const cut = snapshotAtCut([attempt], frontier);
       families.ambiguous_inventory_cut.n++;
       if (cut.snapshot.length !== 0 || cut.indeterminate !== 1) families.ambiguous_inventory_cut.violations++;
