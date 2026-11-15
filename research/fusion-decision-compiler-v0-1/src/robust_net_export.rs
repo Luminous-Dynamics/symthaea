@@ -17,6 +17,16 @@ pub enum NetExportBoundMethod {
     DirectNetOutputInterval,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NetExportEvidenceClass {
+    SyntheticFixture,
+    Assumption,
+    ModelledOutput,
+    MeasuredObservation,
+    IndependentVerification,
+    PhysicalQualification,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct NetExportLowerBoundReceipt {
     pub receipt_id: String,
@@ -30,6 +40,7 @@ pub struct NetExportLowerBoundReceipt {
     pub sign_convention_ref: String,
     pub lower_bound_mwe: f64,
     pub one_sided_coverage_level: f64,
+    pub evidence_class: NetExportEvidenceClass,
     /// Identifies the single-test or campaign-family coverage scope.
     pub coverage_scope_ref: String,
     pub method: NetExportBoundMethod,
@@ -72,6 +83,10 @@ pub enum RobustNetExportDisposition {
     RobustlyBelowReserve,
     /// A valid one-sided lower bound clears the declared net-export reserve.
     RobustlyAboveReserve,
+    /// Synthetic bounds can exercise the contract but never qualify service.
+    SyntheticOnly,
+    /// Assumption-only bounds can support sensitivity analysis, not robust qualification.
+    AssumptionOnly,
     /// A supplied receipt or its source binding is invalid/stale/incompatible.
     NotEvaluable,
 }
@@ -124,6 +139,7 @@ pub struct RobustNetExportReport {
     pub required_reserve_mwe: f64,
     pub robust_reserve_margin_mwe: Option<f64>,
     pub one_sided_coverage_level: Option<f64>,
+    pub evidence_class: Option<NetExportEvidenceClass>,
     pub method: Option<NetExportBoundMethod>,
     pub method_ref: Option<String>,
     pub method_evidence_sha256: Option<String>,
@@ -399,16 +415,25 @@ pub fn evaluate_robust_net_export(
 
     let lower = receipt.lower_bound_mwe;
     let margin = lower - power_profile.required_net_export_reserve_mw;
-    let disposition = if power_profile.reserve_threshold_inclusive {
-        if margin >= 0.0 {
-            RobustNetExportDisposition::RobustlyAboveReserve
-        } else {
-            RobustNetExportDisposition::RobustlyBelowReserve
+    let disposition = match receipt.evidence_class {
+        NetExportEvidenceClass::SyntheticFixture => RobustNetExportDisposition::SyntheticOnly,
+        NetExportEvidenceClass::Assumption => RobustNetExportDisposition::AssumptionOnly,
+        NetExportEvidenceClass::ModelledOutput
+        | NetExportEvidenceClass::MeasuredObservation
+        | NetExportEvidenceClass::IndependentVerification
+        | NetExportEvidenceClass::PhysicalQualification => {
+            if power_profile.reserve_threshold_inclusive {
+                if margin >= 0.0 {
+                    RobustNetExportDisposition::RobustlyAboveReserve
+                } else {
+                    RobustNetExportDisposition::RobustlyBelowReserve
+                }
+            } else if margin > 0.0 {
+                RobustNetExportDisposition::RobustlyAboveReserve
+            } else {
+                RobustNetExportDisposition::RobustlyBelowReserve
+            }
         }
-    } else if margin > 0.0 {
-        RobustNetExportDisposition::RobustlyAboveReserve
-    } else {
-        RobustNetExportDisposition::RobustlyBelowReserve
     };
 
     report(
@@ -444,6 +469,7 @@ fn report(
         required_reserve_mwe: point_report.required_net_export_reserve_mw,
         robust_reserve_margin_mwe: margin,
         one_sided_coverage_level: receipt.map(|value| value.one_sided_coverage_level),
+        evidence_class: receipt.map(|value| value.evidence_class),
         method: receipt.map(|value| value.method),
         method_ref: receipt.map(|value| value.method_ref.clone()),
         method_evidence_sha256: receipt.map(|value| value.method_evidence_sha256.clone()),
@@ -550,6 +576,7 @@ mod tests {
             sign_convention_ref: profile.sign_convention_ref,
             lower_bound_mwe,
             one_sided_coverage_level: 0.95,
+            evidence_class: NetExportEvidenceClass::ModelledOutput,
             coverage_scope_ref: "single-net-export-reserve-test-v1".to_string(),
             method: NetExportBoundMethod::JointCovarianceContrast,
             method_ref: "joint-linear-contrast-v1".to_string(),
@@ -597,6 +624,26 @@ mod tests {
         let run = power_run();
         let point = evaluate_plant_power_balance(&profile, &run);
         evaluate_robust_net_export(&profile, &run, &point, &robust_profile(), receipt)
+    }
+
+    #[test]
+    fn synthetic_lower_bound_is_never_promoted_to_robust_qualification() {
+        let mut receipt = lower_bound(60.0);
+        receipt.evidence_class = NetExportEvidenceClass::SyntheticFixture;
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::SyntheticOnly
+        );
+    }
+
+    #[test]
+    fn assumption_only_lower_bound_is_not_robust_qualification() {
+        let mut receipt = lower_bound(60.0);
+        receipt.evidence_class = NetExportEvidenceClass::Assumption;
+        assert_eq!(
+            evaluate(Some(&receipt)).disposition,
+            RobustNetExportDisposition::AssumptionOnly
+        );
     }
 
     #[test]
