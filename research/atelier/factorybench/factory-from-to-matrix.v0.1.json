@@ -1,0 +1,118 @@
+{
+  "schema_version": "atelier.factory-from-to/0.1",
+  "status": "synthetic_only_not_measured",
+  "units": "synthetic_unit_moves_per_base_batch",
+  "source_corpus": "factory-bench-corpus.v0.1.json",
+  "rows": [
+    {
+      "from_zone": "Z01",
+      "to_zone": "Z02",
+      "synthetic_moves": 18,
+      "products": [
+        "AO-01",
+        "K-01",
+        "T-01",
+        "CR-01"
+      ]
+    },
+    {
+      "from_zone": "Z02",
+      "to_zone": "Z03",
+      "synthetic_moves": 18,
+      "products": [
+        "AO-01",
+        "K-01",
+        "T-01",
+        "CR-01"
+      ]
+    },
+    {
+      "from_zone": "Z03",
+      "to_zone": "Z04",
+      "synthetic_moves": 18,
+      "products": [
+        "AO-01",
+        "K-01",
+        "T-01",
+        "CR-01"
+      ]
+    },
+    {
+      "from_zone": "Z04",
+      "to_zone": "Z05",
+      "synthetic_moves": 18,
+      "products": [
+        "AO-01",
+        "K-01",
+        "T-01",
+        "CR-01"
+      ]
+    },
+    {
+      "from_zone": "Z05",
+      "to_zone": "Z06",
+      "synthetic_moves": 18,
+      "products": [
+        "AO-01",
+        "K-01",
+        "T-01",
+        "CR-01"
+      ]
+    },
+    {
+      "from_zone": "Z06",
+      "to_zone": "Z08",
+      "synthetic_moves": 18,
+      "products": [
+        "AO-01",
+        "K-01",
+        "T-01",
+        "CR-01"
+      ]
+    },
+    {
+      "from_zone": "Z08",
+      "to_zone": "Z11",
+      "synthetic_moves": 18,
+      "products": [
+        "AO-01",
+        "K-01",
+        "T-01",
+        "CR-01"
+      ]
+    },
+    {
+      "from_zone": "Z10",
+      "to_zone": "Z12",
+      "synthetic_moves": 18,
+      "products": [
+        "AO-01",
+        "K-01",
+        "T-01",
+        "CR-01"
+      ]
+    },
+    {
+      "from_zone": "Z11",
+      "to_zone": "Z10",
+      "synthetic_moves": 18,
+      "products": [
+        "AO-01",
+        "K-01",
+        "T-01",
+        "CR-01"
+      ]
+    },
+    {
+      "from_zone": "Z12",
+      "to_zone": "Z14",
+      "synthetic_moves": 18,
+      "products": [
+        "AO-01",
+        "K-01",
+        "T-01",
+        "CR-01"
+      ]
+    }
+  ]
+}
