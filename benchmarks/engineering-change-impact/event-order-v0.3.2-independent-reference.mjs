@@ -235,7 +235,7 @@ for (let i = 0; i < 50_000; i++) {
 }
 
 const report = {
-  report_version: "event-order-v0.3.2-independent-reference.v1",
+  report_version: "event-order-v0.3.2-independent-reference.v2",
   tested_contract: "symthaea.event-order-schedule.v0.3.2",
   implementation: "standalone JavaScript reference model; no repository imports or package dependencies",
   runtime: process.version,
@@ -247,11 +247,17 @@ const report = {
   owner_receipt_identity_checks: ownerReceiptChecks,
   owner_receipt_binding_violations: ownerReceiptBindingViolations,
   retry_checks: retryChecks,
+  retry_case_families: retryKinds.length,
   retry_expected_admissions: retryAccepted,
   retry_unexpected_admissions: retryUnexpectedAdmissions,
+  retry_child_start_binding_checks: 2 * (retryChecks / retryKinds.length),
+  retry_child_start_binding_violations: retryUnexpectedAdmissions,
   stop_scope_discharge_inventory_checks: stopChecks,
+  stop_case_families: stopFaults.length,
   stop_expected_admissions: stopAccepted,
   stop_unexpected_admissions: stopUnexpectedAdmissions,
+  stop_scope_widening_checks: 2 * (stopChecks / stopFaults.length),
+  stop_scope_widening_violations: stopUnexpectedAdmissions,
   action_delivery_permutation_checks: permutationChecks,
   action_delivery_permutation_violations: permutationViolations,
   cancellation_acknowledgement_checks: cancellationChecks,
@@ -259,7 +265,7 @@ const report = {
   effect_terminal_chronology_checks: effectTerminalChecks,
   applied_commit_order_violations: appliedCommitOrderViolations,
   not_applied_with_commit_contradictions_missed: notAppliedCommitContradictionsMissed,
-  interpretation: "Independent semantic reference checks only. They do not execute Rust, authenticate real receipts, establish production reliability, or replace CI and owner-native verification."
+  interpretation: "Independent semantic reference checks only. This script is Node.js-compatible and reports its runtime when executed. It does not execute Rust, authenticate real receipts, establish production reliability, or replace CI and owner-native verification."
 };
 for (const [key, value] of Object.entries(report)) {
   if (key.endsWith("_violations") || key.endsWith("_missed") || key.endsWith("_inferences")) assert.equal(value, 0, key);
