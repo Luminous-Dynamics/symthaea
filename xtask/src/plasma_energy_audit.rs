@@ -920,8 +920,8 @@ mod tests {
         let plasma_summary = audit_source_value(&plasma, "plasma-source-cases").unwrap();
         let hts_summary = audit_source_value(&hts, "hts-source-cases").unwrap();
 
-        assert_eq!(plasma_summary.case_count, 29);
-        assert_eq!(plasma_summary.negative_control_count, 29);
+        assert_eq!(plasma_summary.case_count, 41);
+        assert_eq!(plasma_summary.negative_control_count, 60);
         let plasma_case_ids: BTreeSet<_> = plasma
             .get("cases")
             .and_then(Value::as_array)
@@ -1534,29 +1534,36 @@ mod tests {
     #[test]
     fn source_manifest_rejects_ammonia_thermal_target_without_heat_double_count_guard() {
         let mut source = minimal_benchmark_target_manifest("AMMONIA_CRACKING_THERMAL_INTEGRATION");
-        source["benchmark_targets"][0]["claim_guards"]
-            ["no_double_counting_of_recirculated_heat_or_reaction_enthalpy"] =
+        source["benchmark_targets"][0]["claim_guards"]["no_double_counting_of_recirculated_heat_or_reaction_enthalpy"] =
             serde_json::json!(false);
         let error = audit_source_value(&source, "ammonia-thermal-target.json").unwrap_err();
-        assert!(error.to_string().contains("no_double_counting_of_recirculated_heat"));
+        assert!(
+            error
+                .to_string()
+                .contains("no_double_counting_of_recirculated_heat")
+        );
     }
 
     #[test]
     fn source_manifest_rejects_ammonia_thermal_target_below_energy_reduction_floor() {
         let mut source = minimal_benchmark_target_manifest("AMMONIA_CRACKING_THERMAL_INTEGRATION");
-        source["benchmark_targets"][0]["metric_thresholds"]
-            ["net_grid_specific_energy_reduction_min_fraction"] = serde_json::json!(0.10);
+        source["benchmark_targets"][0]["metric_thresholds"]["net_grid_specific_energy_reduction_min_fraction"] =
+            serde_json::json!(0.10);
         let error = audit_source_value(&source, "ammonia-thermal-target.json").unwrap_err();
-        assert!(error.to_string().contains("net_grid_specific_energy_reduction"));
+        assert!(
+            error
+                .to_string()
+                .contains("net_grid_specific_energy_reduction")
+        );
     }
 
     #[test]
     fn source_manifest_rejects_ammonia_thermal_metrics_from_different_operating_points() {
         let mut source = minimal_benchmark_target_manifest("AMMONIA_CRACKING_THERMAL_INTEGRATION");
-        source["benchmark_targets"][0]["metric_thresholds"]
-            ["all_thresholds_must_hold_at_same_operating_point"] = serde_json::json!(false);
+        source["benchmark_targets"][0]["metric_thresholds"]["all_thresholds_must_hold_at_same_operating_point"] =
+            serde_json::json!(false);
         let error = audit_source_value(&source, "ammonia-thermal-target.json").unwrap_err();
-        assert!(error.to_string().contains("same operating point"));
+        assert!(error.to_string().contains("one operating point"));
     }
 
     #[test]
@@ -2527,8 +2534,10 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             "AMMONIA_CRACKING_THERMAL_INTEGRATION" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
                 ensure!(
-                    metrics.get("all_thresholds_must_hold_at_same_operating_point")
-                        .and_then(Value::as_bool) == Some(true),
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
                     "{display_name}: ammonia thermal-integration target {target_id} must bind all improvements to one operating point"
                 );
                 for (key, minimum) in [
@@ -2537,12 +2546,15 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     ("net_grid_specific_energy_reduction_min_fraction", 0.15),
                 ] {
                     ensure!(
-                        metrics.get(key).and_then(Value::as_f64)
+                        metrics
+                            .get(key)
+                            .and_then(Value::as_f64)
                             .is_some_and(|value| value.is_finite() && value >= minimum),
                         "{display_name}: ammonia thermal-integration target {target_id} has an insufficient or invalid threshold {key}"
                     );
                 }
-                let residual = metrics.get("heat_balance_abs_residual_fraction_max")
+                let residual = metrics
+                    .get("heat_balance_abs_residual_fraction_max")
                     .and_then(Value::as_f64)
                     .filter(|value| value.is_finite() && *value > 0.0 && *value <= 0.05);
                 ensure!(
