@@ -262,7 +262,16 @@
         "Pareto rankings depend on objective weighting and study-defined process boundaries.",
         "No universal plasma inferiority claim follows from this review."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "coproduct_accounting": {
+        "policy": "NO_SOURCE_COPRODUCT_CREDIT_REPORTED",
+        "credit_claim_status": "SOURCE_MODEL_ONLY",
+        "carbon_product_qualification_status": "NOT_VALIDATED",
+        "carbon_market_capacity_status": "NOT_VALIDATED",
+        "offtake_status": "NOT_VALIDATED",
+        "realized_revenue_evidence": false,
+        "no_credit_baseline_required": true
+      }
     },
     {
       "case_id": "HTTES-PACKED-BED-EXPERIMENT-2026",
@@ -1591,7 +1600,16 @@
         "The 2023 USD basis and assumed electricity/natural-gas/carbon-black prices require source-normalized scenario analysis.",
         "The modeled annual capacity and CAPEX do not constitute a commissioned plant or achieved industrial availability."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "coproduct_accounting": {
+        "policy": "MODELED_CARBON_BLACK_SALES_REVENUE",
+        "credit_claim_status": "SOURCE_MODEL_ONLY",
+        "carbon_product_qualification_status": "NOT_VALIDATED",
+        "carbon_market_capacity_status": "NOT_VALIDATED",
+        "offtake_status": "NOT_VALIDATED",
+        "realized_revenue_evidence": false,
+        "no_credit_baseline_required": true
+      }
     },
     {
       "case_id": "METHANE-PYROLYSIS-LCA-CARBON-CREDIT-2026",
@@ -1665,7 +1683,16 @@
         "Methane leakage, electricity carbon intensity, conversion rate and carbon-yield assumptions strongly affect results.",
         "The source's 200 bar plant-gate functional unit must remain exact for comparisons."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "coproduct_accounting": {
+        "policy": "AVOIDED_PRODUCT_CARBON_BLACK_CREDIT",
+        "credit_claim_status": "SOURCE_MODEL_ONLY",
+        "carbon_product_qualification_status": "NOT_VALIDATED",
+        "carbon_market_capacity_status": "NOT_VALIDATED",
+        "offtake_status": "NOT_VALIDATED",
+        "realized_revenue_evidence": false,
+        "no_credit_baseline_required": true
+      }
     }
   ],
   "negative_controls": [
