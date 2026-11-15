@@ -2454,6 +2454,42 @@ mod materialization_tests {
     }
 
     #[test]
+    fn pcm_wav_decoder_accepts_odd_sized_ancillary_chunk_with_padding() {
+        let mut valid = pcm_wav_fixture(48_000, 1, &[10, -10, 20, -20]);
+        let insert_at = 36;
+        let mut junk = Vec::new();
+        junk.extend_from_slice(b"JUNK");
+        junk.extend_from_slice(&3_u32.to_le_bytes());
+        junk.extend_from_slice(&[0xaa, 0xbb, 0xcc, 0x00]);
+        valid.splice(insert_at..insert_at, junk);
+        let riff_size = (valid.len() - 8) as u32;
+        valid[4..8].copy_from_slice(&riff_size.to_le_bytes());
+        let decoded = decode_pcm_wav_s16le_v1(&valid, "fixture.wav").unwrap();
+        assert_eq!(decoded.sample_rate_hz, 48_000);
+        assert_eq!(decoded.channels, 1);
+        assert_eq!(decoded.frame_count, 4);
+        assert_eq!(decoded.samples, vec![10, -10, 20, -20]);
+    }
+
+    #[test]
+    fn pcm_wav_decoder_rejects_byte_rate_and_block_alignment_substitution() {
+        let valid = pcm_wav_fixture(48_000, 2, &[1, 2, 3, 4]);
+        let mut wrong_rate = valid.clone();
+        wrong_rate[28..32].copy_from_slice(&1_u32.to_le_bytes());
+        assert!(matches!(
+            decode_pcm_wav_s16le_v1(&wrong_rate, "fixture.wav"),
+            Err(MusicEditMaterializationIssueV1::InvalidPcmWav { .. })
+        ));
+
+        let mut wrong_alignment = valid;
+        wrong_alignment[32..34].copy_from_slice(&2_u16.to_le_bytes());
+        assert!(matches!(
+            decode_pcm_wav_s16le_v1(&wrong_alignment, "fixture.wav"),
+            Err(MusicEditMaterializationIssueV1::InvalidPcmWav { .. })
+        ));
+    }
+
+    #[test]
     fn bytes_changed_after_materialization_receipt_are_rejected_before_decode() {
         let root = TestRoot::new();
         let (manifest, artifact_map, _wav) = manifest_map_with_source_wav(&root);
@@ -2484,6 +2520,42 @@ mod materialization_tests {
                 }
             ))
         ));
+    }
+
+    #[test]
+    fn symlink_swap_after_receipt_is_rejected_by_wav_reopen_path() {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::symlink;
+            let root = TestRoot::new();
+            let (manifest, artifact_map, _wav) = manifest_map_with_source_wav(&root);
+            let receipt = materialize_music_edit_dataset_v1(
+                &root.0,
+                &manifest,
+                &artifact_map,
+                MusicEditMaterializationLimitsV1::default(),
+            ).unwrap();
+            let original = root.0.join("samples/one/source.wav");
+            let moved = root.0.join("samples/one/source-original.wav");
+            fs::rename(&original, &moved).unwrap();
+            symlink(&moved, &original).unwrap();
+            let result = materialize_verified_pcm_wav_v1(
+                &root.0,
+                &receipt,
+                &manifest,
+                &artifact_map,
+                "sample-one",
+                MusicEditMaterializedArtifactRoleV1::SourceAudio,
+                MusicEditMaterializationLimitsV1::default(),
+            );
+            assert!(matches!(
+                result,
+                Err(issues) if issues.iter().any(|issue| matches!(
+                    issue,
+                    MusicEditMaterializationIssueV1::SymlinkDisallowed { .. }
+                ))
+            ));
+        }
     }
 
     #[test]
