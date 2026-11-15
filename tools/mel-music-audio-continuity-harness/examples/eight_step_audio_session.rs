@@ -3,6 +3,7 @@ use mel_music_audio_continuity_harness::{
     AudioSequenceRequestV1, AudioSequenceStepV1, AudioUpstreamGatesV1,
     FrameWindowV1, PcmAudioArtifactV1, PcmEncodingV1, PcmFormatV1,
     audio_operation_plan_sha256_v1, evaluate_audio_sequence_v1, pcm_audio_sha256_v1,
+    verify_audio_sequence_report_v1,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -79,6 +80,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if result.accepted_step_count != 8 {
         return Err("synthetic 8-step audio contract did not qualify".into());
     }
+    verify_audio_sequence_report_v1(&request, &source, &steps, &result)?;
     println!("{}", serde_json::to_string_pretty(&result)?);
     Ok(())
 }
