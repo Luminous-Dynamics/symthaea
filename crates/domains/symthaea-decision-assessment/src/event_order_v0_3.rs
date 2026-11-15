@@ -417,6 +417,9 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut observed = BTreeSet::<(String, String)>::new();
     let mut persisted = BTreeSet::<(String, String)>::new();
     let mut cancel_requests = BTreeSet::<(String, String)>::new();
+    let mut cancel_acknowledgements = BTreeSet::<(String, String)>::new();
+    let mut stop_triggers = BTreeSet::<String>::new();
+    let mut stop_discharges = BTreeSet::<String>::new();
     let mut stop_policies = BTreeMap::<String, String>::new();
     let mut attempts = BTreeSet::<(String, String)>::new();
     let mut committed_attempts = BTreeSet::<(String, String)>::new();
@@ -481,7 +484,9 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
             ScheduleAction::EventPersisted { event_id, observer_id, store_id } => {
                 let observation = (event_id.clone(), observer_id.clone());
                 let persistence = (event_id.clone(), store_id.clone());
-                if !observed.contains(&observation) {
+                if crashed.contains(observer_id) {
+                    SchedulerDisposition::BlockedByCrashedRecipient
+                } else if !observed.contains(&observation) {
                     SchedulerDisposition::PreconditionViolation
                 } else if persisted.insert(persistence) {
                     SchedulerDisposition::Applied
@@ -490,23 +495,44 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 }
             }
             ScheduleAction::CancellationRequested { operation_id, attempt_id } => {
-                cancel_requests.insert((operation_id.clone(), attempt_id.clone()));
-                SchedulerDisposition::Applied
+                if cancel_requests.insert((operation_id.clone(), attempt_id.clone())) {
+                    SchedulerDisposition::Applied
+                } else {
+                    SchedulerDisposition::Duplicate
+                }
             }
             ScheduleAction::CancellationAcknowledged { operation_id, attempt_id, .. } => {
-                if cancel_requests.contains(&(operation_id.clone(), attempt_id.clone())) {
+                let key = (operation_id.clone(), attempt_id.clone());
+                if !cancel_requests.contains(&key) {
+                    SchedulerDisposition::PreconditionViolation
+                } else if cancel_acknowledgements.insert(key) {
+                    SchedulerDisposition::Applied
+                } else {
+                    SchedulerDisposition::Duplicate
+                }
+            }
+            ScheduleAction::StopTriggered { obligation_id, policy_revision } => {
+                if stop_triggers.insert(obligation_id.clone()) {
+                    stop_policies.insert(obligation_id.clone(), policy_revision.clone());
                     SchedulerDisposition::Applied
                 } else {
                     SchedulerDisposition::PreconditionViolation
                 }
             }
-            ScheduleAction::StopTriggered { obligation_id, policy_revision }
-            | ScheduleAction::StopPolicyRevised { obligation_id, policy_revision } => {
-                stop_policies.insert(obligation_id.clone(), policy_revision.clone());
-                SchedulerDisposition::Applied
+            ScheduleAction::StopPolicyRevised { obligation_id, policy_revision } => {
+                if stop_triggers.contains(obligation_id) {
+                    stop_policies.insert(obligation_id.clone(), policy_revision.clone());
+                    stop_discharges.remove(obligation_id);
+                    SchedulerDisposition::Applied
+                } else {
+                    SchedulerDisposition::PreconditionViolation
+                }
             }
             ScheduleAction::StopDischarged { obligation_id, policy_revision, .. } => {
-                if stop_policies.get(obligation_id) == Some(policy_revision) {
+                if stop_triggers.contains(obligation_id)
+                    && stop_policies.get(obligation_id) == Some(policy_revision)
+                    && stop_discharges.insert(obligation_id.clone())
+                {
                     SchedulerDisposition::Applied
                 } else {
                     SchedulerDisposition::PreconditionViolation
@@ -537,8 +563,11 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 }
             }
             ScheduleAction::ProcessCrashed { process_id } => {
-                crashed.insert(process_id.clone());
-                SchedulerDisposition::Applied
+                if crashed.insert(process_id.clone()) {
+                    SchedulerDisposition::Applied
+                } else {
+                    SchedulerDisposition::Duplicate
+                }
             }
             ScheduleAction::ProcessRestarted { process_id } => {
                 if crashed.remove(process_id) {
