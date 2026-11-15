@@ -1198,6 +1198,68 @@ mod tests {
         assert!(error.to_string().contains("duplicate configuration ID"));
     }
 
+    fn minimal_methane_source_manifest() -> Value {
+        serde_json::json!({
+            "programme": "PLASMA-ENERGY-001",
+            "claim_ceiling": "SOURCE_REGISTER_ONLY",
+            "evidence_classes": ["PUBLISHED_TECHNO_ECONOMIC_ANALYSIS"],
+            "cases": [{
+                "case_id": "METHANE-CASE",
+                "lane": "METHANE_PYROLYSIS",
+                "evidence_class": "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+                "luminous_reproduction": false,
+                "source": {"url": "https://example.org/methane"},
+                "coproduct_accounting": {
+                    "policy": "MODELED_CARBON_BLACK_SALES_REVENUE",
+                    "credit_claim_status": "SOURCE_MODEL_ONLY",
+                    "carbon_product_qualification_status": "NOT_VALIDATED",
+                    "carbon_market_capacity_status": "NOT_VALIDATED",
+                    "offtake_status": "NOT_VALIDATED",
+                    "realized_revenue_evidence": false,
+                    "no_credit_baseline_required": true
+                }
+            }],
+            "negative_controls": [{
+                "control_id": "NC-METHANE",
+                "expected_disposition": "BLOCKED"
+            }]
+        })
+    }
+
+    #[test]
+    fn methane_source_case_requires_conservative_coproduct_accounting() {
+        let source = minimal_methane_source_manifest();
+        let summary = audit_source_value(&source, "methane.json").unwrap();
+        assert_eq!(summary.case_count, 1);
+    }
+
+    #[test]
+    fn methane_source_case_rejects_unvalidated_carbon_black_as_qualified() {
+        let mut source = minimal_methane_source_manifest();
+        source["cases"][0]["coproduct_accounting"]["carbon_product_qualification_status"] =
+            serde_json::json!("VALIDATED");
+        let error = audit_source_value(&source, "methane.json").unwrap_err();
+        assert!(error.to_string().contains("must not promote carbon-product grade"));
+    }
+
+    #[test]
+    fn methane_source_case_rejects_realized_revenue_without_physical_evidence() {
+        let mut source = minimal_methane_source_manifest();
+        source["cases"][0]["coproduct_accounting"]["realized_revenue_evidence"] =
+            serde_json::json!(true);
+        let error = audit_source_value(&source, "methane.json").unwrap_err();
+        assert!(error.to_string().contains("cannot claim realized carbon-black revenue"));
+    }
+
+    #[test]
+    fn methane_source_case_requires_no_credit_baseline() {
+        let mut source = minimal_methane_source_manifest();
+        source["cases"][0]["coproduct_accounting"]["no_credit_baseline_required"] =
+            serde_json::json!(false);
+        let error = audit_source_value(&source, "methane.json").unwrap_err();
+        assert!(error.to_string().contains("must preserve a no-credit baseline"));
+    }
+
     #[test]
     fn source_manifest_rejects_duplicate_case_and_control_ids() {
         let duplicate_case = serde_json::json!({
@@ -1581,6 +1643,59 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         }
 
         let lane = case.get("lane").and_then(Value::as_str);
+        if lane == Some("METHANE_PYROLYSIS") {
+            let coproduct = case
+                .get("coproduct_accounting")
+                .with_context(|| {
+                    format!("{display_name}: methane-pyrolysis case {case_id} has no coproduct_accounting contract")
+                })?;
+            let policy = coproduct
+                .get("policy")
+                .and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .with_context(|| {
+                    format!("{display_name}: methane-pyrolysis case {case_id} has no coproduct accounting policy")
+                })?;
+            ensure!(
+                matches!(
+                    policy,
+                    "NO_SOURCE_COPRODUCT_CREDIT_REPORTED"
+                        | "MODELED_CARBON_BLACK_SALES_REVENUE"
+                        | "AVOIDED_PRODUCT_CARBON_BLACK_CREDIT"
+                        | "REVIEW_LEVEL_NO_SPECIFIC_CREDIT_ASSUMPTION"
+                ),
+                "{display_name}: methane-pyrolysis case {case_id} has unsupported coproduct policy {policy}"
+            );
+            ensure!(
+                coproduct.get("credit_claim_status").and_then(Value::as_str)
+                    == Some("SOURCE_MODEL_ONLY"),
+                "{display_name}: methane-pyrolysis case {case_id} must label carbon credit as SOURCE_MODEL_ONLY"
+            );
+            ensure!(
+                coproduct.get("carbon_product_qualification_status").and_then(Value::as_str)
+                    == Some("NOT_VALIDATED"),
+                "{display_name}: methane-pyrolysis case {case_id} must not promote carbon-product grade to validated"
+            );
+            ensure!(
+                coproduct.get("carbon_market_capacity_status").and_then(Value::as_str)
+                    == Some("NOT_VALIDATED"),
+                "{display_name}: methane-pyrolysis case {case_id} must not promote carbon-market capacity to validated"
+            );
+            ensure!(
+                coproduct.get("offtake_status").and_then(Value::as_str)
+                    == Some("NOT_VALIDATED"),
+                "{display_name}: methane-pyrolysis case {case_id} must not infer verified offtake"
+            );
+            ensure!(
+                coproduct.get("realized_revenue_evidence").and_then(Value::as_bool) == Some(false),
+                "{display_name}: methane-pyrolysis case {case_id} cannot claim realized carbon-black revenue"
+            );
+            ensure!(
+                coproduct.get("no_credit_baseline_required").and_then(Value::as_bool) == Some(true),
+                "{display_name}: methane-pyrolysis case {case_id} must preserve a no-credit baseline"
+            );
+        }
+
         if lane == Some("FUSION_DIRECT_ENERGY_CONVERSION")
             || lane == Some("FUSION_FUEL_ENERGY_PARTITION")
         {
