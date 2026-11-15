@@ -21,6 +21,7 @@ The benchmark is motivated by a problem in current evaluation: artifact quality 
 - **RQ6 — Repair:** Can the pair detect and repair misunderstandings before they propagate into the final artifact or an external action?
 - **RQ7 — Longitudinal adaptation:** Does collaboration improve over repeated sessions without silently converting temporary preferences into permanent user profiles?
 - **RQ8 — Provenance and consent:** Can the system accurately record contribution origins, respect permissions, and propagate withdrawal or revision requests?
+- **RQ9 — Capability amplification:** Does collaboration improve the participant's independent capability, delayed retention, and transfer to new tasks versus matched controls?
 
 ## 3. Constructs and operational measurements
 
@@ -81,6 +82,14 @@ Attribute material contributions to human, AI, external source, or jointly trans
 ### 3.9 Consent and boundary handling
 
 Test explicit opt-in, scope changes, revocation, deletion requests, and limits on reuse. Consent and authorization violations are reported as hard failures, never averaged against quality. A system must not claim to have deleted data from systems it cannot control; it must accurately describe the scope of the action it performed.
+
+### 3.11 Participant capability amplification
+
+Measure whether a participant becomes more capable independently after collaboration. Use a baseline pretest, a non-identical immediate post-test without AI assistance, a delayed retention test, and a transfer task in a new context. The primary estimand is the difference-in-differences between the collaboration arm's pre/post gain and a matched control arm's pre/post gain. Report delayed retention and transfer separately.
+
+The participant must complete independent assessments without AI hints, tools, or hidden assistance. Test forms, difficulty, time budgets, scoring rubrics, and assistance exposure must be preregistered and matched. Do not infer learning from joint artifact quality, confidence alone, or one immediate post-test. See [Capability Amplification](CAPABILITY_AMPLIFICATION.md) for the full experimental protocol and statistical design.
+
+For small teams, exact Shapley values may be used to allocate a bounded task outcome across contributors only when the complete coalition-value table is identifiable. Missing coalitions are reported as non-identifiable; they are never imputed as zero. Shapley allocation is neither legal authorship nor a measure of human worth.
 
 ### 3.10 Burden and efficiency
 
@@ -193,6 +202,9 @@ Targets below are design goals for the first research cycle, not measured result
 | Agency | Non-inferior within 0.20 SD | Against the preregistered human-led reflective condition; validate margin first |
 | Quality-matched diversity ratio | ≥0.90 | Human-AI versus human-only condition; aspirational |
 | Synergy | Positive with interval excluding zero | Only on tasks with matched, randomized baselines |
+| Capability amplification | Positive treatment-control gain with interval excluding zero | Independent post-test; preregistered matched control and task forms |
+| Delayed retention | Positive treatment-control gain | New independent assessment at the preregistered delay |
+| Transfer | Positive treatment-control gain | Held-out context and no AI assistance during assessment |
 | Longitudinal adaptation | Replicated improvement | Must not rely on hidden or non-consensual memory |
 
 These thresholds should be revised only through versioned protocol changes, never silently after seeing test outcomes.
