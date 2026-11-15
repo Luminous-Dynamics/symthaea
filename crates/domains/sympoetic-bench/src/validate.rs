@@ -748,6 +748,12 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
             "metric_evidence.scorer_revision",
             &receipt.scorer_revision,
         )?;
+        if receipt.scorer_revision != scorecard.provenance.scorer_revision {
+            bail!(
+                "metric {:?} scorer_revision differs from the scorecard provenance",
+                receipt.metric_name
+            );
+        }
         if receipt.sample_size == 0 {
             bail!(
                 "metric {:?} must have a non-zero sample_size",
@@ -770,6 +776,30 @@ fn validate_metric_evidence(scorecard: &Scorecard) -> Result<()> {
         {
             bail!(
                 "metric {:?} contains duplicate evidence references",
+                receipt.metric_name
+            );
+        }
+        let bound_sources = [
+            format!(
+                "scenario:sha256:{}",
+                scorecard.provenance.scenario_sha256
+            ),
+            format!(
+                "trace:sha256:{}",
+                scorecard.provenance.trace_sha256
+            ),
+            format!(
+                "artifact:sha256:{}",
+                scorecard.provenance.artifact_sha256
+            ),
+        ];
+        if !receipt
+            .evidence_refs
+            .iter()
+            .any(|reference| bound_sources.iter().any(|source| source == reference))
+        {
+            bail!(
+                "metric {:?} must reference this run's scenario, trace, or artifact digest",
                 receipt.metric_name
             );
         }
