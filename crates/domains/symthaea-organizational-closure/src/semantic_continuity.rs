@@ -920,7 +920,7 @@ pub fn evaluate_semantic_continuity(
         }
     }
 
-    for (key, _) in &right {
+    for key in right.keys() {
         if left.contains_key(key) {
             continue;
         }
@@ -1295,7 +1295,7 @@ mod tests {
         extra.authority.scopes.insert("diagnose".into());
         extra.authority.grant_id = "grant-diagnose".into();
         let simulation = evaluate_semantic_continuity(
-            &[baseline.clone()],
+            std::slice::from_ref(&baseline),
             &[candidate.clone(), extra.clone()],
             &SemanticContinuityPolicy::default(),
         );
