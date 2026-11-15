@@ -170,6 +170,68 @@ pub fn parse_http11_single_json_response_header_v1(
     })
 }
 
+/// Result: a verifier-selected hidden JSON field mapped into the received application-data stream.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Http11FieldRangeCandidateV1 {
+    pub parser_profile_id: &'static str,
+    pub json_pointer: String,
+    pub response_body_range: Range<usize>,
+    pub field_body_range: Range<usize>,
+    pub hidden_value_body_range: Range<usize>,
+    pub field_received_stream_range: Range<usize>,
+    pub hidden_value_received_stream_range: Range<usize>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum Http11FieldBindingError {
+    #[error(transparent)]
+    Http(#[from] Http11ResponseError),
+    #[error(transparent)]
+    Field(#[from] crate::FieldSelectorError),
+    #[error("partial JSON body length does not match the HTTP Content-Length")]
+    PartialBodyLengthMismatch,
+}
+
+/// Bind one hidden JSON string to the exact requested field and map it into the
+/// received application-data stream.
+///
+/// The header block and total stream length must be anchored by the caller.
+/// The body input must contain authenticated disclosed bytes as Some and exactly
+/// one undisclosed field-value run as None. This returns offsets; it does not
+/// itself verify TLSNotary commitments or transcript openings.
+pub fn bind_hidden_json_field_to_received_stream_v1(
+    response_header_block: &[u8],
+    received_stream_len: usize,
+    partial_json_body: &[Option<u8>],
+    json_pointer: &str,
+    response_limits: Http11ResponseLimits,
+    selector_limits: crate::FieldSelectorLimits,
+) -> Result<Http11FieldRangeCandidateV1, Http11FieldBindingError> {
+    let response = parse_http11_single_json_response_header_v1(
+        response_header_block, received_stream_len, response_limits,
+    )?;
+    if partial_json_body.len() != response.content_length {
+        return Err(Http11FieldBindingError::PartialBodyLengthMismatch);
+    }
+    let field = crate::bind_single_hidden_string_field_v1(
+        partial_json_body, json_pointer, selector_limits,
+    )?;
+    let field_received_stream_range = map_body_range_to_received_transcript_v1(
+        &response, field.body_range.clone(),
+    )?;
+    let hidden_value_received_stream_range = map_body_range_to_received_transcript_v1(
+        &response, field.hidden_content_range.clone(),
+    )?;
+    Ok(Http11FieldRangeCandidateV1 {
+        parser_profile_id: field.parser_profile_id,
+        json_pointer: field.json_pointer,
+        response_body_range: response.transcript_body_range,
+        field_body_range: field.body_range,
+        hidden_value_body_range: field.hidden_content_range,
+        field_received_stream_range,
+        hidden_value_received_stream_range,
+    })
+}
 /// Map a body-relative JSON value or hidden-string range into the received
 /// application-data transcript direction.
 pub fn map_body_range_to_received_transcript_v1(
@@ -238,8 +300,40 @@ mod tests {
     fn maps_exact_json_body_start_and_field_range() {
         let response = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: 20\r\n\r\n{\"dob\":\"1985-03-12\"}";
         let parsed = parse_http11_single_json_response_header_v1(headers(response), response.len(), Http11ResponseLimits::default()).unwrap();
-        let absolute = map_body_range_to_received_transcript_v1(&parsed, 8..20).unwrap();
+        let absolute = map_body_range_to_received_transcript_v1(&parsed, 8..19).unwrap();
         assert_eq!(&response[absolute], b"1985-03-12\"");
+    }
+
+    #[test]
+    fn binds_hidden_json_field_to_exact_received_stream_range() {
+        let body = br#"{"taxpayer":{"date_of_birth":"1985-03-12"},"other_date":"2020-01-01"}"#;
+        let field = crate::select_json_field_v1(body, "/taxpayer/date_of_birth", crate::FieldSelectorLimits::default()).unwrap();
+        let hidden = (field.body_range.start + 1)..(field.body_range.end - 1);
+        let partial = body.iter().enumerate().map(|(i, b)| if hidden.contains(&i) { None } else { Some(*b) }).collect::<Vec<_>>();
+        let header = format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n", body.len());
+        let header_bytes = header.as_bytes();
+        let received_len = header_bytes.len() + body.len();
+        let result = bind_hidden_json_field_to_received_stream_v1(
+            header_bytes, received_len, &partial, "/taxpayer/date_of_birth",
+            Http11ResponseLimits::default(), crate::FieldSelectorLimits::default(),
+        ).unwrap();
+        assert_eq!(result.field_body_range, field.body_range);
+        assert_eq!(result.hidden_value_body_range, hidden);
+        assert_eq!(result.field_received_stream_range, (header_bytes.len() + field.body_range.start)..(header_bytes.len() + field.body_range.end));
+        assert_eq!(result.hidden_value_received_stream_range, (header_bytes.len() + hidden.start)..(header_bytes.len() + hidden.end));
+    }
+
+    #[test]
+    fn composite_binding_rejects_wrong_json_pointer() {
+        let body = br#"{"dob":"1985-03-12","other_date":"2020-01-01"}"#;
+        let field = crate::select_json_field_v1(body, "/dob", crate::FieldSelectorLimits::default()).unwrap();
+        let hidden = (field.body_range.start + 1)..(field.body_range.end - 1);
+        let partial = body.iter().enumerate().map(|(i, b)| if hidden.contains(&i) { None } else { Some(*b) }).collect::<Vec<_>>();
+        let header = format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n", body.len());
+        assert!(bind_hidden_json_field_to_received_stream_v1(
+            header.as_bytes(), header.len() + body.len(), &partial, "/other_date",
+            Http11ResponseLimits::default(), crate::FieldSelectorLimits::default(),
+        ).is_err());
     }
 
     #[test]
