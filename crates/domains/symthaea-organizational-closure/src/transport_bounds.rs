@@ -1027,7 +1027,7 @@ pub fn evaluate_transport_bounds(
             recomputed_target_effect_bounds: None,
             reported_target_effect_bounds: trace.claim.reported_interval,
             oracle_target_ate: Some(target_ate),
-            oracle_within_sensitivity_model: Some(false),
+            oracle_within_sensitivity_model: None,
             target_truth_covered: None,
             recomputed_interval_width: None,
             reported_interval_width: trace.claim.reported_interval.width(),
@@ -1340,6 +1340,7 @@ mod tests {
         let report = evaluate_transport_bounds(&scenario, &oracle, &trace);
         assert_eq!(report.qualification, TransportQualification::Inconclusive);
         assert_eq!(report.oracle_target_ate, Some(3.0));
+        assert_eq!(report.oracle_within_sensitivity_model, None);
         assert!(report.findings.iter().any(|finding| {
             finding.code == TransportFindingCode::MissingSourceArmSupport
         }));
