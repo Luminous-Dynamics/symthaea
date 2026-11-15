@@ -10,6 +10,7 @@ pub mod tree_projection;
 pub mod dynamapbench;
 pub mod temporal_replay;
 pub mod workspace_shift;
+pub mod shiftbench_admission;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
