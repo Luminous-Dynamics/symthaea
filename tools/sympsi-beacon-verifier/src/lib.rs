@@ -175,10 +175,7 @@ pub fn verify_quicknet_response(
         .map_err(|_| VerificationError::TrustRoot("genesis timestamp exceeds i64".into()))?;
     let period = Period::from_secs(period_seconds)
         .ok_or_else(|| VerificationError::TrustRoot("invalid round period in trust root".into()))?;
-    let timeline = Timeline::new(
-        UnixTimestamp::from_secs(genesis_unix_seconds),
-        period,
-    );
+    let timeline = Timeline::new(UnixTimestamp::from_secs(genesis_unix_seconds), period);
     let verifier = AnyVerifier::new(
         SchemeId::BlsUnchainedG1Rfc9380,
         &public_key,
