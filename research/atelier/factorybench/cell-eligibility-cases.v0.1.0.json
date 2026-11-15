@@ -13,7 +13,9 @@
     "known_absence": "Missing required record in a Complete snapshot is Blocked.",
     "unresolved_absence": "Missing required record in a Partial or Unknown snapshot is Indeterminate.",
     "conflict_rule": "Known hard violations produce Blocked even when other facts are unresolved.",
-    "duplicate_reference_rule": "Multiple records matching one required stable reference are Blocked; input order must never select one."
+    "duplicate_reference_rule": "Multiple records matching one required stable reference are Blocked; input order must never select one.",
+    "skill_rule": "Eligibility requires available_qualified_people to be known and >= minimum_people for every required skill; known shortfall is Blocked, unresolved headcount is Indeterminate.",
+    "configuration_rule": "The exact process configuration must be valid at scheduled_at, match the required parameter SHA-256 digest, and carry current configuration qualification evidence."
   },
   "cases": [
     {
@@ -141,6 +143,48 @@
       "expected_outcome": "Blocked",
       "mutation": "configuration_process_capability_ref!=operation_process_capability_ref",
       "reason": "A process configuration must bind the exact process capability requested by the operation."
+    },
+    {
+      "case_id": "B1-NEG-019",
+      "name": "Process configuration expired before operation",
+      "expected_outcome": "Blocked",
+      "mutation": "configuration_valid_until<=scheduled_operation_time",
+      "reason": "Process qualification evidence does not extend the configuration's own validity interval."
+    },
+    {
+      "case_id": "B1-NEG-020",
+      "name": "Process configuration digest mismatch",
+      "expected_outcome": "Blocked",
+      "mutation": "configuration_parameter_digest!=required_parameter_digest",
+      "reason": "A changed process parameter set cannot reuse evidence bound to a different digest."
+    },
+    {
+      "case_id": "B1-NEG-021",
+      "name": "Insufficient qualified operator headcount",
+      "expected_outcome": "Blocked",
+      "mutation": "available_qualified_people<minimum_people",
+      "reason": "A skill label is not enough when the available qualified headcount is below the declared minimum."
+    },
+    {
+      "case_id": "B1-NEG-022",
+      "name": "Unresolved qualified operator headcount",
+      "expected_outcome": "Indeterminate",
+      "mutation": "available_qualified_people=null",
+      "reason": "Unknown operator availability cannot be interpreted as adequate staffing."
+    },
+    {
+      "case_id": "B1-NEG-023",
+      "name": "Malformed process parameter digest",
+      "expected_outcome": "Blocked",
+      "mutation": "parameter_digest_not_64_hex_characters",
+      "reason": "A malformed parameter digest cannot bind a process configuration to immutable evidence."
+    },
+    {
+      "case_id": "B1-NEG-024",
+      "name": "Zero minimum operator requirement",
+      "expected_outcome": "Blocked",
+      "mutation": "minimum_people=0",
+      "reason": "A zero-person skill requirement is invalid and cannot bypass staffing constraints."
     }
   ],
   "publication_requirements": [
