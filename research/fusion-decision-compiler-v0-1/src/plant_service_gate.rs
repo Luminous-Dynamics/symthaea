@@ -328,29 +328,29 @@ pub fn evaluate_plant_power_balance(
                 | PowerBalanceDiagnostic::NegativeRecirculationLoad
         )
     });
-    let disposition = if !required_values_present || has_non_balance_diagnostic {
-        PowerBalanceDisposition::NotEvaluable
-    } else if diagnostics.contains(&PowerBalanceDiagnostic::NegativeGrossGeneration)
-        || diagnostics.contains(&PowerBalanceDiagnostic::NegativeRecirculationLoad)
-    {
-        PowerBalanceDisposition::NotEvaluable
-    } else if max_residual.is_none_or(|value| value > profile.absolute_balance_tolerance_mw) {
-        PowerBalanceDisposition::BalanceInconsistent
-    } else if net.is_some_and(|value| value < 0.0) {
-        PowerBalanceDisposition::NetImport
-    } else if net.is_some_and(|value| value == 0.0) {
-        PowerBalanceDisposition::NoNetExport
-    } else if reserve_margin.is_some_and(|margin| {
-        if profile.reserve_threshold_inclusive {
-            margin < 0.0
+    let has_invalid_power_sign = diagnostics
+        .contains(&PowerBalanceDiagnostic::NegativeGrossGeneration)
+        || diagnostics.contains(&PowerBalanceDiagnostic::NegativeRecirculationLoad);
+    let disposition =
+        if !required_values_present || has_non_balance_diagnostic || has_invalid_power_sign {
+            PowerBalanceDisposition::NotEvaluable
+        } else if max_residual.is_none_or(|value| value > profile.absolute_balance_tolerance_mw) {
+            PowerBalanceDisposition::BalanceInconsistent
+        } else if net.is_some_and(|value| value < 0.0) {
+            PowerBalanceDisposition::NetImport
+        } else if net.is_some_and(|value| value == 0.0) {
+            PowerBalanceDisposition::NoNetExport
+        } else if reserve_margin.is_some_and(|margin| {
+            if profile.reserve_threshold_inclusive {
+                margin < 0.0
+            } else {
+                margin <= 0.0
+            }
+        }) {
+            PowerBalanceDisposition::NetExportBelowReserve
         } else {
-            margin <= 0.0
-        }
-    }) {
-        PowerBalanceDisposition::NetExportBelowReserve
-    } else {
-        PowerBalanceDisposition::NetExportQualifiedForDeclaredBoundary
-    };
+            PowerBalanceDisposition::NetExportQualifiedForDeclaredBoundary
+        };
 
     PowerBalanceReport {
         contract_version: PLANT_SERVICE_GATE_VERSION,
