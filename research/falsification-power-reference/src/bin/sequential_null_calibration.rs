@@ -49,8 +49,7 @@ impl Scenario {
     fn design(self, previous_observation: f64) -> (f64, f64) {
         match self {
             Self::FixedNull => (0.25, 1.0),
-            Self::AdaptiveHeteroskedasticNull
-            | Self::AdaptiveHeteroskedasticAlternative => {
+            Self::AdaptiveHeteroskedasticNull | Self::AdaptiveHeteroskedasticAlternative => {
                 if previous_observation >= 0.0 {
                     (0.25, 0.7)
                 } else {
@@ -108,9 +107,7 @@ fn wilson_95(successes: u64, trials: u64) -> (f64, f64) {
     let z2 = WILSON_Z_95 * WILSON_Z_95;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let half = WILSON_Z_95
-        * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt())
-        / denominator;
+    let half = WILSON_Z_95 * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
     ((center - half).max(0.0), (center + half).min(1.0))
 }
 
@@ -119,9 +116,7 @@ fn run_scenario(scenario: Scenario) -> Result<OperatingCounts, Box<dyn Error>> {
 
     for path in 0..PATHS {
         let mut rng = SplitMix64::new(
-            ROOT_SEED
-                ^ scenario.seed_offset()
-                ^ path.wrapping_mul(0xd6e8_feb8_6659_fd93),
+            ROOT_SEED ^ scenario.seed_offset() ^ path.wrapping_mul(0xd6e8_feb8_6659_fd93),
         );
         let mut process = PredictableGaussianEProcess::new(1.0, ALPHA)?;
         let mut previous_observation = 0.0;
@@ -149,8 +144,7 @@ fn run_scenario(scenario: Scenario) -> Result<OperatingCounts, Box<dyn Error>> {
                 discrepancy,
                 sigma,
             )?;
-            let update =
-                process.observe(&observation_id, &decision_digest, observed)?;
+            let update = process.observe(&observation_id, &decision_digest, observed)?;
 
             if update.crossed_alpha_boundary && e_process_first_crossing.is_none() {
                 e_process_first_crossing = Some(look);
@@ -184,8 +178,7 @@ fn emit_scenario(scenario: Scenario, counts: &OperatingCounts) {
     let e_rate = counts.e_process_crossings as f64 / PATHS as f64;
     let naive_rate = counts.naive_repeated_test_crossings as f64 / PATHS as f64;
     let (e_lower, e_upper) = wilson_95(counts.e_process_crossings, PATHS);
-    let (naive_lower, naive_upper) =
-        wilson_95(counts.naive_repeated_test_crossings, PATHS);
+    let (naive_lower, naive_upper) = wilson_95(counts.naive_repeated_test_crossings, PATHS);
     let mean_detection_step = if counts.detections_with_step == 0 {
         0.0
     } else {
@@ -227,8 +220,7 @@ fn emit_scenario(scenario: Scenario, counts: &OperatingCounts) {
 fn main() -> Result<(), Box<dyn Error>> {
     let fixed_null = run_scenario(Scenario::FixedNull)?;
     let adaptive_null = run_scenario(Scenario::AdaptiveHeteroskedasticNull)?;
-    let adaptive_alternative =
-        run_scenario(Scenario::AdaptiveHeteroskedasticAlternative)?;
+    let adaptive_alternative = run_scenario(Scenario::AdaptiveHeteroskedasticAlternative)?;
 
     println!(
         concat!(
@@ -242,10 +234,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "\"claim\":\"synthetic Monte Carlo calibration diagnostic only; not a theorem or physical validation\",",
             "\"scenarios\":["
         ),
-        ROOT_SEED,
-        ALPHA,
-        PATHS,
-        HORIZON
+        ROOT_SEED, ALPHA, PATHS, HORIZON
     );
     emit_scenario(Scenario::FixedNull, &fixed_null);
     println!(",");
