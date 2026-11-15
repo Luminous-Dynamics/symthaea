@@ -3347,16 +3347,6 @@ impl U1TwoSiteState {
     }
 }
 
-/// Cumulative local L2 projection ledger for a sequence of two-site splits.
-///
-/// The sum of local sqrt(discarded_weight) values is a global state-vector
-/// error bound only when every split is performed in a mixed-canonical gauge
-/// with orthonormal exterior left/right block bases, and intervening gates are
-/// unitary. The current TEBD scheduler does not verify that canonical-gauge
-/// precondition, so global qualification remains false.
-#[derive(Debug, Clone, Default, PartialEq)]
-
-
 #[derive(Debug, Clone, Copy)]
 struct GateErrorBoundInputs {
     unitarity_residual: f64,
@@ -3366,6 +3356,14 @@ struct GateErrorBoundInputs {
     tolerance: f64,
 }
 
+/// Cumulative local L2 projection ledger for a sequence of two-site splits.
+///
+/// The sum of local sqrt(discarded_weight) values is a global state-vector
+/// error bound only when every split is performed in a mixed-canonical gauge
+/// with orthonormal exterior left/right block bases, and intervening gates are
+/// unitary. The current TEBD scheduler does not verify that canonical-gauge
+/// precondition, so global qualification remains false.
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct U1MpsTruncationLedger {
     gate_count: usize,
     accumulated_discarded_weight: f64,
