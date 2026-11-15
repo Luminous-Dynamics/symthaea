@@ -115,6 +115,16 @@ pub enum FieldSelectorError {
     InvalidRawSpan,
     #[error("byte offset overflow")]
     OffsetOverflow,
+    #[error("the disclosure view contains no undisclosed byte range")]
+    MissingHiddenRange,
+    #[error("the disclosure view contains multiple undisclosed byte ranges")]
+    MultipleHiddenRanges,
+    #[error("the one undisclosed range is empty or exceeds the selected scalar bound")]
+    InvalidHiddenRange,
+    #[error("the selected JSON field is not a string")]
+    SelectedValueNotString,
+    #[error("the undisclosed range is not exactly the selected JSON string contents")]
+    HiddenRangeNotSelectedField,
 }
 
 #[derive(Debug)]
@@ -254,6 +264,109 @@ pub fn select_json_field_v1(
         json_pointer: json_pointer.to_owned(),
         value_kind: selected_kind,
         body_range,
+    })
+}
+
+/// Result of binding one hidden string's contents to a verifier-selected JSON Pointer.
+/// Both ranges are relative to the JSON body. body_range includes the quote bytes;
+/// hidden_content_range excludes those quotes.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HiddenJsonFieldBindingV1 {
+    pub parser_profile_id: &'static str,
+    pub json_pointer: String,
+    pub body_range: Range<usize>,
+    pub hidden_content_range: Range<usize>,
+}
+
+/// Bind the one undisclosed byte run to the string value selected by json_pointer.
+///
+/// Some(byte) means disclosed (the caller must already authenticate it); None
+/// means undisclosed. Exactly one non-empty contiguous hidden run is permitted.
+/// The function removes that run, parses the structural JSON, and requires the
+/// selected pointer to resolve to the resulting empty-string token.
+///
+/// This establishes a parser-profile/path relation only. It does not authenticate
+/// disclosed bytes or map body-relative offsets into TLS transcript offsets.
+pub fn bind_single_hidden_string_field_v1(
+    partial_document: &[Option<u8>],
+    json_pointer: &str,
+    limits: FieldSelectorLimits,
+) -> Result<HiddenJsonFieldBindingV1, FieldSelectorError> {
+    if partial_document.len() > limits.max_document_bytes {
+        return Err(FieldSelectorError::DocumentTooLarge);
+    }
+
+    let mut hidden_start: Option<usize> = None;
+    let mut hidden_end = 0usize;
+    let mut in_hidden = false;
+    let mut hidden_runs = 0usize;
+    let mut skeleton = Vec::with_capacity(partial_document.len());
+
+    for (index, byte) in partial_document.iter().enumerate() {
+        match byte {
+            Some(value) => {
+                in_hidden = false;
+                skeleton.push(*value);
+            }
+            None => {
+                if !in_hidden {
+                    hidden_runs = hidden_runs
+                        .checked_add(1)
+                        .ok_or(FieldSelectorError::MultipleHiddenRanges)?;
+                    if hidden_start.is_none() {
+                        hidden_start = Some(index);
+                    }
+                    in_hidden = true;
+                }
+                hidden_end = index + 1;
+            }
+        }
+    }
+
+    if hidden_runs == 0 {
+        return Err(FieldSelectorError::MissingHiddenRange);
+    }
+    if hidden_runs != 1 {
+        return Err(FieldSelectorError::MultipleHiddenRanges);
+    }
+
+    let hidden_start = hidden_start.ok_or(FieldSelectorError::MissingHiddenRange)?;
+    let hidden_range = hidden_start..hidden_end;
+    if hidden_range.is_empty() || hidden_range.len() > limits.max_scalar_bytes {
+        return Err(FieldSelectorError::InvalidHiddenRange);
+    }
+
+    let selection = select_json_field_v1(&skeleton, json_pointer, limits)?;
+    if selection.value_kind != JsonValueKind::String {
+        return Err(FieldSelectorError::SelectedValueNotString);
+    }
+
+    let selected_token = skeleton
+        .get(selection.body_range.clone())
+        .ok_or(FieldSelectorError::InvalidRawSpan)?;
+    if selected_token != b"\"\"" {
+        return Err(FieldSelectorError::HiddenRangeNotSelectedField);
+    }
+
+    let expected_hidden_start = selection.body_range.start
+        .checked_add(1)
+        .ok_or(FieldSelectorError::OffsetOverflow)?;
+    let expected_hidden_end = selection.body_range.end
+        .checked_add(hidden_range.len())
+        .and_then(|end| end.checked_sub(1))
+        .ok_or(FieldSelectorError::OffsetOverflow)?;
+    if hidden_range.start != expected_hidden_start || hidden_range.end != expected_hidden_end {
+        return Err(FieldSelectorError::HiddenRangeNotSelectedField);
+    }
+
+    let original_end = selection.body_range.end
+        .checked_add(hidden_range.len())
+        .ok_or(FieldSelectorError::OffsetOverflow)?;
+    Ok(HiddenJsonFieldBindingV1 {
+        parser_profile_id: FIELD_BINDING_PARSER_PROFILE_V1,
+        json_pointer: json_pointer.to_owned(),
+        body_range: selection.body_range.start..original_end,
+        hidden_content_range: hidden_range,
     })
 }
 
@@ -513,6 +626,57 @@ mod tests {
         assert_eq!(selected_bytes(document, &composed), br#""composed""#);
         assert_eq!(selected_bytes(document, &decomposed), br#""decomposed""#);
         assert_ne!(composed.body_range, decomposed.body_range);
+    }
+
+    #[test]
+    fn binds_one_hidden_string_to_exact_json_pointer() {
+        let document = br#"{\"taxpayer\":{\"date_of_birth\":\"1985-03-12\"},\"other_date\":\"2020-01-01\"}"#;
+        let selection = select(document, "/taxpayer/date_of_birth");
+        let hidden = (selection.body_range.start + 1)..(selection.body_range.end - 1);
+        let partial = document.iter().enumerate().map(|(i, b)| if hidden.contains(&i) { None } else { Some(*b) }).collect::<Vec<_>>();
+        let binding = bind_single_hidden_string_field_v1(&partial, "/taxpayer/date_of_birth", FieldSelectorLimits::default()).unwrap();
+        assert_eq!(binding.body_range, selection.body_range);
+        assert_eq!(binding.hidden_content_range, hidden);
+    }
+
+    #[test]
+    fn rejects_hidden_value_at_wrong_json_pointer() {
+        let document = br#"{\"date_of_birth\":\"2010-01-01\",\"beneficiary_date_of_birth\":\"1985-03-12\"}"#;
+        let selection = select(document, "/beneficiary_date_of_birth");
+        let hidden = (selection.body_range.start + 1)..(selection.body_range.end - 1);
+        let partial = document.iter().enumerate().map(|(i, b)| if hidden.contains(&i) { None } else { Some(*b) }).collect::<Vec<_>>();
+        assert_eq!(bind_single_hidden_string_field_v1(&partial, "/date_of_birth", FieldSelectorLimits::default()), Err(FieldSelectorError::HiddenRangeNotSelectedField));
+    }
+
+    #[test]
+    fn rejects_multiple_hidden_ranges() {
+        let document = br#"{\"dob\":\"1985-03-12\",\"name\":\"Alice\"}"#;
+        let partial = document.iter().enumerate().map(|(i, b)| if (8..12).contains(&i) || (25..28).contains(&i) { None } else { Some(*b) }).collect::<Vec<_>>();
+        assert_eq!(bind_single_hidden_string_field_v1(&partial, "/dob", FieldSelectorLimits::default()), Err(FieldSelectorError::MultipleHiddenRanges));
+    }
+
+    #[test]
+    fn rejects_no_hidden_range() {
+        let document = br#"{\"dob\":\"1985-03-12\"}"#;
+        let partial = document.iter().copied().map(Some).collect::<Vec<_>>();
+        assert_eq!(bind_single_hidden_string_field_v1(&partial, "/dob", FieldSelectorLimits::default()), Err(FieldSelectorError::MissingHiddenRange));
+    }
+
+    #[test]
+    fn rejects_hidden_range_that_includes_string_quotes() {
+        let document = br#"{\"dob\":\"1985-03-12\"}"#;
+        let selection = select(document, "/dob");
+        let partial = document.iter().enumerate().map(|(i, b)| if selection.body_range.contains(&i) { None } else { Some(*b) }).collect::<Vec<_>>();
+        assert!(bind_single_hidden_string_field_v1(&partial, "/dob", FieldSelectorLimits::default()).is_err());
+    }
+
+    #[test]
+    fn hidden_string_is_not_confused_with_other_value_kind() {
+        let document = br#"{\"dob\":\"1985-03-12\",\"age\":40}"#;
+        let selection = select(document, "/dob");
+        let hidden = (selection.body_range.start + 1)..(selection.body_range.end - 1);
+        let partial = document.iter().enumerate().map(|(i, b)| if hidden.contains(&i) { None } else { Some(*b) }).collect::<Vec<_>>();
+        assert_eq!(bind_single_hidden_string_field_v1(&partial, "/age", FieldSelectorLimits::default()), Err(FieldSelectorError::SelectedValueNotString));
     }
 
     #[test]
