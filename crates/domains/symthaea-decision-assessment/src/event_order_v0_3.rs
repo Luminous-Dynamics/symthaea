@@ -4859,6 +4859,95 @@ mod tests {
                 && attempt.start_event_ids == vec![start_action_id.clone()]
         }));
         assert!(report.reason_codes.iter().any(|code| code == "ATTEMPT_OUTCOME_UNRECONCILED:cancelled-attempt"));
+
+        // The simulator order is unchanged, but the owner-qualified request
+        // time is moved before the attempt start. Projection must catch this
+        // temporal contradiction rather than trusting scheduler order.
+        let mut contradictory_schedule = schedule.clone();
+        let request = contradictory_schedule.actions.iter_mut().find(|item| {
+            matches!(item.action, ScheduleAction::CancellationRequested { .. })
+        }).expect("cancellation request");
+        let mapping_id = request.owner_time_ref.as_ref()
+            .expect("request owner time")
+            .clock_mapping_action_id.clone();
+        request.owner_time_ref.as_mut().expect("request owner time").local_timestamp_ns = 90;
+        let mut contradictory_resolutions = resolutions.clone();
+        contradictory_resolutions.insert(
+            (mapping_id.clone(), 90),
+            qualified_resolution_from_fixture(&contradictory_schedule, &mapping_id, 90, 990),
+        );
+        let contradictory = project_action_history(
+            &contradictory_schedule, &operation_id, &contradictory_resolutions, &receipts,
+        ).expect("contradictory owner time assessment");
+        assert_eq!(contradictory.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(contradictory.reason_codes.iter().any(|code| {
+            code == "CANCELLATION_REQUEST_PRECEDES_ATTEMPT_START:cancelled-attempt"
+        }));
+    }
+
+    #[test]
+    fn accepted_cancellation_cannot_coexist_with_effect_commit() {
+        let (mut schedule, mut resolutions, mut receipts, _) = action_history_fixture();
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let operation_id = "robot-1".to_owned();
+        let attempt_id = "attempt-1".to_owned();
+        let mapping_id = push_test_clock_mapping(&mut schedule.actions, &mut ordinal, 3, 200);
+        let request_action_id = format!("action-{ordinal:06}");
+        push_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::CancellationRequested {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+            },
+        );
+        let request = schedule.actions.iter_mut()
+            .find(|item| item.action_id == request_action_id)
+            .expect("request action");
+        request.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: mapping_id.clone(),
+            local_timestamp_ns: 150,
+        });
+        let acknowledgement_action_id = push_clocked_action(
+            &mut schedule.actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::CancellationAcknowledged {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                accepted: true,
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 160,
+            },
+            ActionEvidence::CancellationAcknowledgement {
+                receipt_ref: "synthetic://cancel-after-commit".to_owned(),
+                receipt_sha256: "9".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 150),
+            qualified_resolution_from_fixture(&schedule.actions, &mapping_id, 150, 1_075),
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 160),
+            qualified_resolution_from_fixture(&schedule.actions, &mapping_id, 160, 1_080),
+        );
+        receipts.insert(
+            acknowledgement_action_id,
+            passing_owner_receipt("synthetic://cancel-after-commit", &"9".repeat(64)),
+        );
+        let report = project_action_history(&schedule, &operation_id, &resolutions, &receipts)
+            .expect("contradictory cancellation/commit assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert_eq!(report.cancellation_acknowledgements.len(), 1);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "CANCELLATION_ACKNOWLEDGED_AFTER_COMMIT:attempt-1"
+                || code == "ACCEPTED_CANCELLATION_CONTRADICTS_EFFECT_COMMIT:attempt-1"
+        }));
+        assert!(!report.cancellation_acknowledgements[0].establishes_not_applied);
     }
 
     #[test]
