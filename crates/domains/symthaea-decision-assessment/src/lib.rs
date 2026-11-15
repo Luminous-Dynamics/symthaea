@@ -844,17 +844,17 @@ pub fn evaluate_event_order(
                     .as_deref()
                     == Some(discharge_event.event_id.as_str());
 
-                if !(receipt_ref_valid
+                let receipt_binding_valid = receipt_ref_valid
                     && receipt_digest_valid
                     && trigger_binding_valid
-                    && discharge_binding_valid)
-                {
+                    && discharge_binding_valid;
+                if !receipt_binding_valid {
                     critical_failure = true;
                     reasons.insert("STOP_DISPOSITION_RECEIPT_BINDING_INVALID".to_owned());
                 }
 
                 match compare_decision_events(trigger_event, discharge_event, &by_id, qualification) {
-                    EventOrder::Before => discharge_valid = true,
+                    EventOrder::Before => discharge_valid = receipt_binding_valid,
                     EventOrder::After => {
                         critical_failure = true;
                         reasons.insert("STOP_DISCHARGE_PRECEDES_TRIGGER".to_owned());
@@ -877,14 +877,38 @@ pub fn evaluate_event_order(
                 indeterminate = true;
                 reasons.insert("STOP_DISPOSITION_QUALIFICATION_INDETERMINATE".to_owned());
             }
-            (None, _) => {
+            (None, GateState::Fail) => {
+                critical_failure = true;
+                reasons.insert("STOP_DISPOSITION_QUALIFICATION_FAILED".to_owned());
+                reasons.insert("STOP_OBLIGATION_NOT_DISCHARGED".to_owned());
+            }
+            (None, GateState::Pass) => {
                 indeterminate = true;
                 reasons.insert("STOP_OBLIGATION_NOT_DISCHARGED".to_owned());
             }
+            (None, GateState::Indeterminate | GateState::NotApplicable) => {
+                indeterminate = true;
+                reasons.insert("STOP_DISPOSITION_QUALIFICATION_INDETERMINATE".to_owned());
+                reasons.insert("STOP_OBLIGATION_NOT_DISCHARGED".to_owned());
+            }
         }
-    } else if qualification.stop_disposition != GateState::NotApplicable {
-        indeterminate = true;
-        reasons.insert("STOP_DISPOSITION_WITHOUT_TRIGGER".to_owned());
+    } else {
+        match qualification.stop_disposition {
+            GateState::NotApplicable => {}
+            GateState::Fail => {
+                critical_failure = true;
+                reasons.insert("STOP_DISPOSITION_QUALIFICATION_FAILED".to_owned());
+                reasons.insert("STOP_DISPOSITION_WITHOUT_TRIGGER".to_owned());
+            }
+            GateState::Pass => {
+                indeterminate = true;
+                reasons.insert("STOP_DISPOSITION_WITHOUT_TRIGGER".to_owned());
+            }
+            GateState::Indeterminate => {
+                indeterminate = true;
+                reasons.insert("STOP_DISPOSITION_QUALIFICATION_INDETERMINATE".to_owned());
+            }
+        }
     }
 
     let effects: Vec<&DecisionEvent> = events
