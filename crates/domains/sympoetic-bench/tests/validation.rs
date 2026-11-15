@@ -100,6 +100,20 @@ fn base_scorecard() -> Scorecard {
             participant_capability_gain_delta: Some(0.2),
             delayed_retention_gain_delta: Some(0.15),
             transfer_gain_delta: Some(0.1),
+            agent_confidence_brier_score: Some(0.08),
+            agent_expected_calibration_error: Some(0.06),
+            agent_metacognitive_sensitivity_auc: Some(0.91),
+            agent_selective_accuracy_at_80pct_coverage: Some(0.95),
+            participant_confidence_brier_score: Some(0.11),
+            participant_expected_calibration_error: Some(0.08),
+            participant_metacognitive_sensitivity_auc: Some(0.82),
+            participant_selective_accuracy_at_80pct_coverage: Some(0.88),
+            human_planning_rate: Some(0.8),
+            human_first_attempt_rate: Some(0.75),
+            human_monitoring_rate: Some(0.7),
+            human_reflection_rate: Some(0.65),
+            ai_core_step_substitution_rate: Some(0.1),
+            human_verification_rate: Some(0.9),
         },
         hard_gates: HardGates {
             pass: true,
@@ -418,6 +432,18 @@ fn scorecard_accepts_negative_capability_gain_deltas_and_rejects_out_of_range_va
     validate_scorecard(&scorecard).unwrap();
 
     scorecard.scores.participant_capability_gain_delta = Some(2.1);
+    assert!(validate_scorecard(&scorecard).is_err());
+}
+
+#[test]
+fn scorecard_validates_confidence_and_cognitive_process_measures() {
+    let mut scorecard = base_scorecard();
+    scorecard.scores.agent_metacognitive_sensitivity_auc = Some(0.94);
+    scorecard.scores.participant_confidence_brier_score = Some(0.12);
+    scorecard.scores.ai_core_step_substitution_rate = Some(0.18);
+    validate_scorecard(&scorecard).unwrap();
+
+    scorecard.scores.agent_expected_calibration_error = Some(1.1);
     assert!(validate_scorecard(&scorecard).is_err());
 }
 
