@@ -2532,6 +2532,20 @@ pub fn project_action_history(
                         continue;
                     }
                 };
+                let (_, start_time, _) = starts
+                    .get(&(operation_id.clone(), attempt_id.clone()))
+                    .expect("attempt start was checked above");
+                match event_order_between(start_time, &requested_at) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert(format!("CANCELLATION_REQUEST_PRECEDES_ATTEMPT_START:{attempt_id}"));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("ATTEMPT_START_CANCELLATION_REQUEST_ORDER_UNRESOLVED:{attempt_id}"));
+                    }
+                }
                 match record_disposition(&action.action_id) {
                     Some(SchedulerDisposition::Applied) => {}
                     Some(SchedulerDisposition::Duplicate) => continue,
@@ -2590,6 +2604,12 @@ pub fn project_action_history(
                     EventOrder::Overlapping | EventOrder::Unknown => {
                         indeterminate = true;
                         reasons.insert(format!("CANCELLATION_REQUEST_ACK_ORDER_UNRESOLVED:{attempt_id}"));
+                    }
+                }
+                if *accepted {
+                    if commit_times.contains_key(&(operation_id.clone(), attempt_id.clone())) {
+                        critical = true;
+                        reasons.insert(format!("ACCEPTED_CANCELLATION_CONTRADICTS_EFFECT_COMMIT:{attempt_id}"));
                     }
                 }
                 cancellation_acknowledgements.push(ProjectedCancellationAcknowledgement {
