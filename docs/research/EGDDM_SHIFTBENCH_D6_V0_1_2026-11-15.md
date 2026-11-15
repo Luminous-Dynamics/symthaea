@@ -114,13 +114,13 @@ The synthetic fixture yields the following hand-derived values:
 | Measure | Clean arm | Shifted arm |
 |---|---:|---:|
 | Active obligation-seconds | 1,800 | 2,100 |
-| Unverified obligation-seconds | 120 | 480 |
-| Critical unverified obligation-seconds | 60 | 420 |
-| Time-weighted conformance | 93.33% | 77.14% |
-| Critical time-weighted conformance | 93.33% | 65.00% |
-| Maximum critical evidence gap | 60 s | 180 s |
+| Unverified obligation-seconds | 240 | 600 |
+| Critical unverified obligation-seconds | 120 | 480 |
+| Time-weighted conformance | 86.67% | 71.43% |
+| Critical time-weighted conformance | 86.67% | 60.00% |
+| Maximum critical evidence gap | 120 s | 180 s |
 
-The shifted arm still reaches 100% terminal conformance. The longitudinal metric reveals that its critical API and audit requirements spent 420 combined seconds unverified during recovery. This prevents a final green snapshot from erasing an earlier evidence gap.
+The shifted arm still reaches 100% terminal conformance. The longitudinal metric reveals that its critical API and audit requirements spent 480 combined seconds unverified during recovery. This prevents a final green snapshot from erasing an earlier evidence gap.
 
 The metric is a benchmark proxy, not a field-validated operational hazard measure. It relies on the scenario's event and receipt timestamps, assumes the gold affected-obligation labels are correct, and does not authenticate execution or actor identity.
 
