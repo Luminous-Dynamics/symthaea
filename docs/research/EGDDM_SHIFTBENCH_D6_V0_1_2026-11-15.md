@@ -237,13 +237,15 @@ No cross-paper headline score should be described as a direct apples-to-apples c
 
 ## 10. Next experiments
 
-1. Expand from the synthetic case to 12 intervention families and at least three intervention positions per scenario.
+The corpus plan is tracked in [issue #12281](https://github.com/Luminous-Dynamics/symthaea/issues/12281), with its [machine-readable 12-family/3-position blueprint](EGDDM_SHIFTBENCH_D6_CORPUS_BLUEPRINT_V0_1_2026-11-15.json) and [execution protocol](EGDDM_SHIFTBENCH_D6_CORPUS_PLAN_V0_1_2026-11-15.md).
+
+1. Expand from the synthetic case to 12 intervention families, 3 intervention positions and 10 independently authored seeds per family/position cell: 360 matched scenario pairs (720 trajectories per model per trial). This is a target, not a collected dataset.
 2. Add multiple change events so the invalidation frontier can grow, shrink or be partially superseded.
-3. Add uncertainty intervals for impact and evidence freshness, with an explicit unknown state.
+3. Extend uncertainty intervals for impact and evidence freshness, with an explicit unknown state.
 4. Integrate D3 EVSI so the system chooses which authorized checks to acquire under multidimensional cost budgets.
 5. Evaluate D2 temporal replay under event delivery reordering and multi-actor partial-order history.
 6. Build blind task and label custody outside the candidate-readable repository.
-7. Run matched agent rollouts with at least three model/harness families and expert adjudication.
+7. Run matched agent rollouts with at least three model/harness families and expert adjudication, including pass-fail-pass receipt histories and repeated trials.
 
 ## 11. Limitations
 
