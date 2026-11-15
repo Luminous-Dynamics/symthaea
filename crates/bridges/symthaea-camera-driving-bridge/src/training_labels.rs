@@ -7,6 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use symthaea_core::hdc::ContinuousHV;
 use symthaea_vehicle::VehicleCommand;
 
 use crate::{
@@ -93,6 +94,15 @@ fn update_string(hasher: &mut Sha256, value: &str) {
     hasher.update(value.as_bytes());
 }
 
+fn fused_policy_input_sha256(input: &ContinuousHV) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update((input.dim() as u64).to_le_bytes());
+    for value in input.as_slice() {
+        hasher.update(value.to_bits().to_le_bytes());
+    }
+    format!("{:x}", hasher.finalize())
+}
+
 fn privilege_profile_name(value: CameraPolicyPrivilegeProfile) -> &'static str {
     match value {
         CameraPolicyPrivilegeProfile::NoPrivilegedInputs => "NO_PRIVILEGED_INPUTS",
@@ -162,6 +172,7 @@ pub enum TrainingLabelError {
     IdentityTooLong,
     InvalidReceiptDigest,
     ObservationReceiptMismatch,
+    PolicyInputDigestMismatch,
     InvalidObservationDeltaTime,
     ActionSchemaMismatch,
     MissingAppliedActionReference,
@@ -247,6 +258,9 @@ pub fn validate_applied_action_training_label(
     {
         return Err(TrainingLabelError::ObservationReceiptMismatch);
     }
+    if receipt.fused_policy_input_sha256 != fused_policy_input_sha256(&observation.policy_input) {
+        return Err(TrainingLabelError::PolicyInputDigestMismatch);
+    }
     if receipt.derived_dt_us == 0 {
         return Err(TrainingLabelError::InvalidObservationDeltaTime);
     }
@@ -327,8 +341,7 @@ mod tests {
         BridgeConfig, CameraDrivingBridge, CapturedDrivingObservation, DrivingRunIdentity,
         UpstreamCameraObservation, digest_bytes,
     };
-    use symthaea_core::genesis::GenesisSeed;
-    use symthaea_vehicle::{VehicleConfig, VehicleState};
+    use symthaea_vehicle::VehicleState;
     use symthaea_vision_manifold::VisionConfig;
 
     const EPISODE: &str = "episode-applied-action-1";
@@ -474,6 +487,18 @@ mod tests {
         let validated = validate_applied_action_training_label(&observation, &value).unwrap();
         assert_eq!(validated.policy_input_sha256, observation.receipt.fused_policy_input_sha256);
         assert_eq!(validated.observation_receipt_sha256, observation.receipt.receipt_sha256);
+    }
+
+    #[test]
+    fn mutated_fused_policy_vector_is_rejected_even_when_receipt_is_unchanged() {
+        let valid = label();
+        let mut observation = fused_input(&valid);
+        observation.policy_input =
+            ContinuousHV::from_vec(vec![0.0; observation.policy_input.dim()]);
+        assert_eq!(
+            validate_applied_action_training_label(&observation, &valid).unwrap_err(),
+            TrainingLabelError::PolicyInputDigestMismatch
+        );
     }
 
     #[test]
