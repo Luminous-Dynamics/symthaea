@@ -84,7 +84,7 @@ pub struct AgentCheckpoint {
     pub revalidation_cost_units: f64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CheckReceipt {
     pub receipt_id: String,
@@ -142,8 +142,27 @@ pub struct ArmScore {
     pub total_revalidation_cost_units: f64,
     pub full_rerun_reference_units: f64,
     pub revalidation_savings_fraction: Option<f64>,
+    pub active_obligation_seconds: u64,
+    pub unverified_obligation_seconds: u64,
+    pub critical_active_obligation_seconds: u64,
+    pub critical_unverified_obligation_seconds: u64,
+    pub time_weighted_requirement_conformance: Option<f64>,
+    pub critical_time_weighted_conformance: Option<f64>,
+    pub recovery_event_count: usize,
+    pub max_unverified_gap_seconds: u64,
+    pub obligation_exposures: Vec<ObligationExposure>,
     pub final_checkpoint_success: bool,
     pub claim_ceiling: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObligationExposure {
+    pub obligation_id: String,
+    pub critical: bool,
+    pub active_seconds: u64,
+    pub unverified_seconds: u64,
+    pub recovery_events: usize,
+    pub max_unverified_gap_seconds: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -300,9 +319,12 @@ fn validate_scenario(scenario: &ShiftScenario) -> Result<(), String> {
                 }
             }
             if arm.condition == ArmCondition::Clean && index > 0
-                && (epoch.change_kind != "none" || !epoch.affected_obligation_ids.is_empty())
+                && (epoch.change_kind != "none"
+                    || !epoch.affected_obligation_ids.is_empty()
+                    || epoch.snapshot != scenario.initial_snapshot
+                    || epoch.active_obligation_ids != arm.epochs[0].active_obligation_ids)
             {
-                return Err(format!("clean arm {} must not contain a material workspace shift", arm.arm_id));
+                return Err(format!("clean arm {} must preserve its initial snapshot and active obligations without a material shift", arm.arm_id));
             }
         }
         if arm.condition == ArmCondition::Shifted
@@ -324,6 +346,12 @@ fn validate_scenario(scenario: &ShiftScenario) -> Result<(), String> {
             }
             if prior_checkpoint_time.as_ref().is_some_and(|prior| &checkpoint_time <= prior) {
                 return Err(format!("arm {} checkpoint times must increase strictly", arm.arm_id));
+            }
+            if index + 1 < arm.epochs.len() {
+                let next_epoch_time = parse_time(&arm.epochs[index + 1].observed_at)?;
+                if checkpoint_time > next_epoch_time {
+                    return Err(format!("arm {} checkpoint {} occurs after the next workspace intervention", arm.arm_id, index));
+                }
             }
             prior_checkpoint_time = Some(checkpoint_time.clone());
             if !checkpoint.revalidation_cost_units.is_finite() || checkpoint.revalidation_cost_units < 0.0 {
@@ -396,6 +424,11 @@ fn validate_scenario(scenario: &ShiftScenario) -> Result<(), String> {
     if clean_arm.epochs[0].active_obligation_ids != shifted_arm.epochs[0].active_obligation_ids {
         return Err("matched clean and shifted arms must share the same initial active obligations".to_owned());
     }
+    if clean_arm.epochs[0].observed_at != shifted_arm.epochs[0].observed_at
+        || clean_arm.checkpoints[0].checkpoint_at != shifted_arm.checkpoints[0].checkpoint_at
+    {
+        return Err("matched clean and shifted arms must share initial observation and checkpoint cutoffs".to_owned());
+    }
     if baseline_receipt_signature(clean_arm) != baseline_receipt_signature(shifted_arm) {
         return Err("matched clean and shifted arms must share the same initial evidence outcomes and scope".to_owned());
     }
@@ -431,6 +464,133 @@ fn last_affected_epoch(arm: &ShiftArm, obligation_id: &str, through_epoch: u64) 
 
 fn latest_receipts(checkpoint: &AgentCheckpoint) -> HashMap<&str, &CheckReceipt> {
     checkpoint.receipts.iter().map(|receipt| (receipt.obligation_id.as_str(), receipt)).collect()
+}
+
+fn obligation_starts_new_interval(arm: &ShiftArm, epoch_index: usize, obligation_id: &str) -> bool {
+    let epoch = &arm.epochs[epoch_index];
+    if !epoch.active_obligation_ids.iter().any(|id| id == obligation_id) {
+        return false;
+    }
+    if epoch_index == 0 {
+        return true;
+    }
+    let was_active = arm.epochs[epoch_index - 1].active_obligation_ids
+        .iter().any(|id| id == obligation_id);
+    !was_active || epoch.affected_obligation_ids.iter().any(|id| id == obligation_id)
+}
+
+fn unique_arm_receipts(arm: &ShiftArm) -> Result<Vec<CheckReceipt>, String> {
+    let mut by_id: BTreeMap<String, CheckReceipt> = BTreeMap::new();
+    for checkpoint in &arm.checkpoints {
+        for receipt in &checkpoint.receipts {
+            match by_id.get(&receipt.receipt_id) {
+                Some(existing) if existing != receipt => {
+                    return Err(format!("receipt ID {} changes content between checkpoints", receipt.receipt_id));
+                }
+                Some(_) => {}
+                None => { by_id.insert(receipt.receipt_id.clone(), receipt.clone()); }
+            }
+        }
+    }
+    Ok(by_id.into_values().collect())
+}
+
+fn obligation_exposure(
+    arm: &ShiftArm,
+    obligation: &Obligation,
+    receipts: &[CheckReceipt],
+) -> Result<ObligationExposure, String> {
+    let mut result = ObligationExposure {
+        obligation_id: obligation.obligation_id.clone(),
+        critical: obligation.critical,
+        active_seconds: 0,
+        unverified_seconds: 0,
+        recovery_events: 0,
+        max_unverified_gap_seconds: 0,
+    };
+
+    for start_epoch in 0..arm.epochs.len() {
+        if !obligation_starts_new_interval(arm, start_epoch, &obligation.obligation_id) {
+            continue;
+        }
+        let start_time = parse_time(&arm.epochs[start_epoch].observed_at)?;
+        let mut boundary_index = None;
+        for index in start_epoch + 1..arm.epochs.len() {
+            let epoch = &arm.epochs[index];
+            let still_active = epoch.active_obligation_ids.iter()
+                .any(|id| id == &obligation.obligation_id);
+            let invalidated = epoch.affected_obligation_ids.iter()
+                .any(|id| id == &obligation.obligation_id);
+            if !still_active || invalidated {
+                boundary_index = Some(index);
+                break;
+            }
+        }
+        let end_time = match boundary_index {
+            Some(index) => parse_time(&arm.epochs[index].observed_at)?,
+            None => parse_time(&arm.checkpoints.last().expect("validated checkpoints").checkpoint_at)?,
+        };
+        let duration = end_time.signed_duration_since(start_time).num_seconds();
+        if duration < 0 {
+            return Err(format!("obligation {} has a negative active interval", obligation.obligation_id));
+        }
+        let duration = duration as u64;
+        result.active_seconds += duration;
+
+        let mut transitions: Vec<(&CheckReceipt, DateTime<FixedOffset>)> = receipts.iter()
+            .filter(|receipt| {
+                receipt.obligation_id == obligation.obligation_id
+                    && receipt.source_epoch >= start_epoch as u64
+            })
+            .map(|receipt| Ok((receipt, parse_time(&receipt.available_at)?)))
+            .collect::<Result<Vec<_>, String>>()?;
+        transitions.retain(|(_, available)| *available >= start_time && *available <= end_time);
+        transitions.sort_by(|left, right| {
+            left.1.cmp(&right.1)
+                .then_with(|| left.0.receipt_id.cmp(&right.0.receipt_id))
+        });
+
+        for pair in transitions.windows(2) {
+            if pair[0].1 == pair[1].1 && pair[0].0.outcome != pair[1].0.outcome {
+                return Err(format!(
+                    "obligation {} has conflicting outcomes at the same availability timestamp",
+                    obligation.obligation_id
+                ));
+            }
+        }
+
+        let mut verified = false;
+        let mut gap_start = Some(start_time);
+        for (receipt, available_at) in transitions {
+            match receipt.outcome {
+                CheckOutcome::Pass => {
+                    if let Some(gap) = gap_start.take() {
+                        let gap_seconds = available_at.signed_duration_since(gap).num_seconds().max(0) as u64;
+                        result.unverified_seconds += gap_seconds;
+                        result.max_unverified_gap_seconds =
+                            result.max_unverified_gap_seconds.max(gap_seconds);
+                        if gap_seconds > 0 {
+                            result.recovery_events += 1;
+                        }
+                    }
+                    verified = true;
+                }
+                CheckOutcome::Fail | CheckOutcome::Unknown => {
+                    if verified {
+                        gap_start = Some(available_at);
+                        verified = false;
+                    }
+                }
+            }
+        }
+        if let Some(gap) = gap_start {
+            let gap_seconds = end_time.signed_duration_since(gap).num_seconds().max(0) as u64;
+            result.unverified_seconds += gap_seconds;
+            result.max_unverified_gap_seconds =
+                result.max_unverified_gap_seconds.max(gap_seconds);
+        }
+    }
+    Ok(result)
 }
 
 fn score_arm(scenario: &ShiftScenario, arm: &ShiftArm) -> Result<ArmScore, String> {
@@ -512,6 +672,30 @@ fn score_arm(scenario: &ShiftScenario, arm: &ShiftArm) -> Result<ArmScore, Strin
     let revalidation_savings_fraction = (full_rerun_reference_units > 0.0)
         .then_some(1.0 - total_revalidation_cost_units / full_rerun_reference_units);
 
+    let all_receipts = unique_arm_receipts(arm)?;
+    let mut obligation_exposures: Vec<ObligationExposure> = scenario.obligations.iter()
+        .map(|obligation| obligation_exposure(arm, obligation, &all_receipts))
+        .collect::<Result<Vec<_>, _>>()?;
+    obligation_exposures.sort_by(|left, right| left.obligation_id.cmp(&right.obligation_id));
+    let active_obligation_seconds: u64 = obligation_exposures.iter()
+        .map(|item| item.active_seconds).sum();
+    let unverified_obligation_seconds: u64 = obligation_exposures.iter()
+        .map(|item| item.unverified_seconds).sum();
+    let critical_active_obligation_seconds: u64 = obligation_exposures.iter()
+        .filter(|item| item.critical).map(|item| item.active_seconds).sum();
+    let critical_unverified_obligation_seconds: u64 = obligation_exposures.iter()
+        .filter(|item| item.critical).map(|item| item.unverified_seconds).sum();
+    let time_weighted_requirement_conformance = (active_obligation_seconds > 0).then_some(
+        (1.0 - unverified_obligation_seconds as f64 / active_obligation_seconds as f64).clamp(0.0, 1.0)
+    );
+    let critical_time_weighted_conformance = (critical_active_obligation_seconds > 0).then_some(
+        (1.0 - critical_unverified_obligation_seconds as f64 / critical_active_obligation_seconds as f64).clamp(0.0, 1.0)
+    );
+    let recovery_event_count: usize = obligation_exposures.iter()
+        .map(|item| item.recovery_events).sum();
+    let max_unverified_gap_seconds = obligation_exposures.iter()
+        .map(|item| item.max_unverified_gap_seconds).max().unwrap_or(0);
+
     let retained_ok = retained_functionality.is_none_or(|value| value >= 1.0);
     let conformance_ok = active_requirement_conformance.is_some_and(|value| value >= 1.0);
     let final_checkpoint_success = retained_ok
@@ -533,6 +717,15 @@ fn score_arm(scenario: &ShiftScenario, arm: &ShiftArm) -> Result<ArmScore, Strin
         total_revalidation_cost_units,
         full_rerun_reference_units,
         revalidation_savings_fraction,
+        active_obligation_seconds,
+        unverified_obligation_seconds,
+        critical_active_obligation_seconds,
+        critical_unverified_obligation_seconds,
+        time_weighted_requirement_conformance,
+        critical_time_weighted_conformance,
+        recovery_event_count,
+        max_unverified_gap_seconds,
+        obligation_exposures,
         final_checkpoint_success,
         claim_ceiling: "Deterministic scoring of a supplied synthetic/benchmark trace only. Receipt digests are not signatures; the evaluator does not authenticate test execution, source observations, gold custody, authority, CI, or deployed outcomes.".to_owned(),
     })
