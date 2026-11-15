@@ -66,6 +66,7 @@
         "policy": {
           "enum": [
             "random",
+            "greedy_first_improvement_similarity",
             "best_of_n_similarity",
             "best_of_n_loudness",
             "best_of_n_prompt_alignment",
