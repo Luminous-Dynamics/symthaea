@@ -773,3 +773,13 @@ A carbon coproduct only counts when the benchmark establishes, in order:
 Until those gates pass, the evaluator must show a no-credit case and may not let speculative carbon-black value make hydrogen appear cost-competitive.
 
 The benchmark must preserve distinct quantities: reactor energy, wall-plug energy, on-site power-generation boundary, PSA/compression load, methane conversion, H2 selectivity, carbon collection yield, carbon grade and product-level accepted output. Pareto comparisons should be repeated under no-credit, allocation and qualified avoided-product-credit policies, with sensitivity intervals for electricity, methane leakage and carbon price.
+
+
+## 9.17 Machine-readable research targets — 2026-11-15
+
+The source register now includes `benchmark_targets`, each bound to exact source-case IDs and marked `RESEARCH_TARGET_NOT_RESULT`.
+
+- `NH3-DELIVERED-H2-PARETO-001`: stretch target >99% NH3 conversion, >=51 g H2/kWh and >=150 g H2/h **at the same operating point**, with full wall-plug-to-accepted-H2 accounting and a matched catalytic/thermal baseline.
+- `CH4-PYROLYSIS-PLASMA-PARETO-CHALLENGE-001`: combined challenge envelope >=92% methane conversion, >=99% H2 selectivity and <=USD 0.70/kg H2 LCOH, all at the same operating point and matched boundary. Show no-credit, allocation and avoided-product-credit cases independently. Carbon credit requires qualified product grade, market capacity and offtake.
+
+The goals intentionally combine advantages that current published points report separately. They are falsifiable targets, not results, standards or assumed feasible operating points.
