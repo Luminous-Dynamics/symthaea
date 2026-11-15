@@ -49,12 +49,12 @@
         },
         {
           "type": "object", "additionalProperties": false,
-          "required": ["kind", "event_id", "clock_domain", "basis_id", "epoch", "scale", "unit", "source_timestamp_ns", "causal_predecessors"],
+          "required": ["kind", "event_id", "clock_domain", "basis_id", "epoch", "scale", "unit", "clock_mapping_action_id", "source_timestamp_ns", "causal_predecessors"],
           "properties": {
             "kind": { "const": "event_produced" }, "event_id": { "$ref": "#/$defs/id" },
             "clock_domain": { "$ref": "#/$defs/id" }, "basis_id": { "$ref": "#/$defs/id" },
             "epoch": { "$ref": "#/$defs/id" }, "scale": { "$ref": "#/$defs/id" },
-            "unit": { "const": "nanoseconds" }, "source_timestamp_ns": { "$ref": "#/$defs/u64" },
+            "unit": { "const": "nanoseconds" }, "clock_mapping_action_id": { "$ref": "#/$defs/id" }, "source_timestamp_ns": { "$ref": "#/$defs/u64" },
             "causal_predecessors": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
           }
         },
