@@ -85,9 +85,9 @@ Use participant-, family-, site- and time-aware partitions; nested preprocessing
 
 ## 4. First clinical research domain
 
-**Initial focus: major depressive disorder and anxiety treatment-response research.**
+**Initial focus: major depressive disorder (MDD) treatment-response research.**
 
-This is a pragmatic first domain because longitudinal clinical cohorts and multimodal measurements exist. It is not a claim that depression or anxiety is primarily a connectome disorder, nor that connectomics alone can determine treatment.
+This is the only first clinical task in v0.1 because the current matched comparator programme has identifiable MDD randomized-trial cohorts (EMBARC and CAN-BIND-1), a published cross-trial transport evaluation and defined treatment-response endpoints. Anxiety is a potential later, separately specified programme; it is not pooled into this MDD benchmark.
 
 A second, separate neurological track may evaluate stroke recovery or epilepsy only after its dataset, endpoints and clinical collaborators are independently established. Do not pool these conditions into one benchmark.
 
