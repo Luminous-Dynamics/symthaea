@@ -519,10 +519,10 @@ pub fn validate_music_edit_transaction_v1(
     issues
 }
 
-fn required_record<'a>(
-    attempt: &'a MusicEditCandidateAttemptV1,
+fn required_record(
+    attempt: &MusicEditCandidateAttemptV1,
     kind: MusicEditEvidenceKindV1,
-) -> Option<&'a MusicEditEvidenceRecordV1> {
+) -> Option<&MusicEditEvidenceRecordV1> {
     attempt.evidence.iter().find(|record| record.kind == kind)
 }
 
