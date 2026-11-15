@@ -19,9 +19,13 @@ It emits deterministic JSON with typed dispositions: admissible-for-profile, inv
 
 Admissible-for-profile means only that the supplied triangle mesh passed the selected triangle-mesh-integrity-v1 profile. This is not full hull admission.
 
+The axis convention and handedness are declared by the submitting artifact. This adapter checks that the declarations are present and supported; it does not independently reconstruct or verify the underlying CAD coordinate transform.
+
 This crate does not currently perform native CAD/B-rep validity, triangle-triangle self-intersection detection, surface fairness/continuity, hydrostatics, appendage/propulsor clearance, structural analysis, cavitation, CFD, class-rule checks, or manufacturing qualification. Such checks must be listed in additional_required_checks; they remain UNKNOWN and force an incomplete disposition. No automatic unit conversion, axis transform, normal repair, mesh healing, or geometry deformation is performed.
 
 A digest is an identity/integrity aid, not a signature, publisher authentication, rights statement, or proof of engineering correctness.
+
+The tetrahedron used in the unit tests is a topology and signed-volume fixture, not a naval hull benchmark.
 
 ## Build and test
 
