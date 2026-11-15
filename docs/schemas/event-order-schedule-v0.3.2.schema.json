@@ -1,0 +1,926 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/schemas/event-order-schedule-v0.3.2.schema.json",
+  "title": "Symthaea Event-Order Virtual Schedule v0.3.2",
+  "description": "Deterministic synthetic schedule with independent owner-clock references and typed action-evidence sidecars. Scheduler time is not owner time; sidecars do not authenticate receipts or authorize effects.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "generator_version",
+    "seed",
+    "scenario_family",
+    "actions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "symthaea.event-order-schedule.v0.3.2"
+    },
+    "generator_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "seed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709552000
+    },
+    "scenario_family": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actions": {
+      "type": "array",
+      "maxItems": 65536,
+      "items": {
+        "$ref": "#/$defs/scheduled_action"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "u64": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 18446744073709552000
+    },
+    "gate_state": {
+      "enum": [
+        "pass",
+        "fail",
+        "indeterminate",
+        "not_applicable"
+      ]
+    },
+    "scheduled_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "at_ns",
+        "ordinal",
+        "action"
+      ],
+      "properties": {
+        "action_id": {
+          "$ref": "#/$defs/id"
+        },
+        "at_ns": {
+          "$ref": "#/$defs/u64"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/u64"
+        },
+        "action": {
+          "$ref": "#/$defs/action"
+        },
+        "owner_time_ref": {
+          "$ref": "#/$defs/owner_time_reference"
+        },
+        "evidence": {
+          "$ref": "#/$defs/action_evidence"
+        }
+      }
+    },
+    "action": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "clock_domain",
+            "basis_id",
+            "epoch",
+            "scale",
+            "unit",
+            "local_tick_ns",
+            "offset_ns",
+            "uncertainty_ns",
+            "calibration_id",
+            "mapping_valid_from_ns",
+            "mapping_valid_through_ns",
+            "mapping_receipt_ref",
+            "mapping_receipt_sha256",
+            "qualification"
+          ],
+          "properties": {
+            "kind": {
+              "const": "clock_advance"
+            },
+            "clock_domain": {
+              "$ref": "#/$defs/id"
+            },
+            "basis_id": {
+              "$ref": "#/$defs/id"
+            },
+            "epoch": {
+              "$ref": "#/$defs/id"
+            },
+            "scale": {
+              "$ref": "#/$defs/id"
+            },
+            "unit": {
+              "const": "nanoseconds"
+            },
+            "local_tick_ns": {
+              "$ref": "#/$defs/u64"
+            },
+            "offset_ns": {
+              "type": "integer"
+            },
+            "uncertainty_ns": {
+              "$ref": "#/$defs/u64"
+            },
+            "calibration_id": {
+              "$ref": "#/$defs/id"
+            },
+            "mapping_valid_from_ns": {
+              "$ref": "#/$defs/u64"
+            },
+            "mapping_valid_through_ns": {
+              "$ref": "#/$defs/u64"
+            },
+            "mapping_receipt_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "mapping_receipt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "qualification": {
+              "$ref": "#/$defs/gate_state"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "event_id",
+            "clock_domain",
+            "basis_id",
+            "epoch",
+            "scale",
+            "unit",
+            "clock_mapping_action_id",
+            "source_timestamp_ns",
+            "causal_predecessors"
+          ],
+          "properties": {
+            "kind": {
+              "const": "event_produced"
+            },
+            "event_id": {
+              "$ref": "#/$defs/id"
+            },
+            "clock_domain": {
+              "$ref": "#/$defs/id"
+            },
+            "basis_id": {
+              "$ref": "#/$defs/id"
+            },
+            "epoch": {
+              "$ref": "#/$defs/id"
+            },
+            "scale": {
+              "$ref": "#/$defs/id"
+            },
+            "unit": {
+              "const": "nanoseconds"
+            },
+            "clock_mapping_action_id": {
+              "$ref": "#/$defs/id"
+            },
+            "source_timestamp_ns": {
+              "$ref": "#/$defs/u64"
+            },
+            "causal_predecessors": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "channel_id",
+            "partitioned"
+          ],
+          "properties": {
+            "kind": {
+              "const": "network_partition"
+            },
+            "channel_id": {
+              "$ref": "#/$defs/id"
+            },
+            "partitioned": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "event_id",
+            "channel_id",
+            "recipient_id",
+            "delivery_id",
+            "mode"
+          ],
+          "properties": {
+            "kind": {
+              "const": "delivery"
+            },
+            "event_id": {
+              "$ref": "#/$defs/id"
+            },
+            "channel_id": {
+              "$ref": "#/$defs/id"
+            },
+            "recipient_id": {
+              "$ref": "#/$defs/id"
+            },
+            "delivery_id": {
+              "$ref": "#/$defs/id"
+            },
+            "mode": {
+              "enum": [
+                "deliver",
+                "duplicate",
+                "drop"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "event_id",
+            "observer_id",
+            "clock_domain",
+            "basis_id",
+            "epoch",
+            "scale",
+            "unit",
+            "clock_mapping_action_id",
+            "observed_at_ns",
+            "observation_receipt_ref",
+            "observation_receipt_sha256",
+            "qualification"
+          ],
+          "properties": {
+            "kind": {
+              "const": "event_observed"
+            },
+            "event_id": {
+              "$ref": "#/$defs/id"
+            },
+            "observer_id": {
+              "$ref": "#/$defs/id"
+            },
+            "clock_domain": {
+              "$ref": "#/$defs/id"
+            },
+            "basis_id": {
+              "$ref": "#/$defs/id"
+            },
+            "epoch": {
+              "$ref": "#/$defs/id"
+            },
+            "scale": {
+              "$ref": "#/$defs/id"
+            },
+            "unit": {
+              "const": "nanoseconds"
+            },
+            "clock_mapping_action_id": {
+              "$ref": "#/$defs/id"
+            },
+            "observed_at_ns": {
+              "$ref": "#/$defs/u64"
+            },
+            "observation_receipt_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "observation_receipt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "qualification": {
+              "$ref": "#/$defs/gate_state"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "event_id",
+            "observer_id",
+            "store_id",
+            "clock_domain",
+            "basis_id",
+            "epoch",
+            "scale",
+            "unit",
+            "clock_mapping_action_id",
+            "persisted_at_ns",
+            "persistence_receipt_ref",
+            "persistence_receipt_sha256",
+            "qualification"
+          ],
+          "properties": {
+            "kind": {
+              "const": "event_persisted"
+            },
+            "event_id": {
+              "$ref": "#/$defs/id"
+            },
+            "observer_id": {
+              "$ref": "#/$defs/id"
+            },
+            "store_id": {
+              "$ref": "#/$defs/id"
+            },
+            "clock_domain": {
+              "$ref": "#/$defs/id"
+            },
+            "basis_id": {
+              "$ref": "#/$defs/id"
+            },
+            "epoch": {
+              "$ref": "#/$defs/id"
+            },
+            "scale": {
+              "$ref": "#/$defs/id"
+            },
+            "unit": {
+              "const": "nanoseconds"
+            },
+            "clock_mapping_action_id": {
+              "$ref": "#/$defs/id"
+            },
+            "persisted_at_ns": {
+              "$ref": "#/$defs/u64"
+            },
+            "persistence_receipt_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "persistence_receipt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "qualification": {
+              "$ref": "#/$defs/gate_state"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation_id",
+            "attempt_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "cancellation_requested"
+            },
+            "operation_id": {
+              "$ref": "#/$defs/id"
+            },
+            "attempt_id": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation_id",
+            "attempt_id",
+            "accepted"
+          ],
+          "properties": {
+            "kind": {
+              "const": "cancellation_acknowledged"
+            },
+            "operation_id": {
+              "$ref": "#/$defs/id"
+            },
+            "attempt_id": {
+              "$ref": "#/$defs/id"
+            },
+            "accepted": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "obligation_id",
+            "policy_revision"
+          ],
+          "properties": {
+            "kind": {
+              "const": "stop_triggered"
+            },
+            "obligation_id": {
+              "$ref": "#/$defs/id"
+            },
+            "policy_revision": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "obligation_id",
+            "policy_revision"
+          ],
+          "properties": {
+            "kind": {
+              "const": "stop_policy_revised"
+            },
+            "obligation_id": {
+              "$ref": "#/$defs/id"
+            },
+            "policy_revision": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "obligation_id",
+            "trigger_action_id",
+            "policy_revision_action_id",
+            "policy_revision",
+            "receipt_ref",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "stop_discharged"
+            },
+            "obligation_id": {
+              "$ref": "#/$defs/id"
+            },
+            "trigger_action_id": {
+              "$ref": "#/$defs/id"
+            },
+            "policy_revision_action_id": {
+              "$ref": "#/$defs/id"
+            },
+            "policy_revision": {
+              "$ref": "#/$defs/id"
+            },
+            "receipt_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "receipt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation_id",
+            "attempt_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "effect_attempted"
+            },
+            "operation_id": {
+              "$ref": "#/$defs/id"
+            },
+            "attempt_id": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation_id",
+            "attempt_id",
+            "effect_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "effect_committed"
+            },
+            "operation_id": {
+              "$ref": "#/$defs/id"
+            },
+            "attempt_id": {
+              "$ref": "#/$defs/id"
+            },
+            "effect_id": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "operation_id",
+            "attempt_id",
+            "outcome",
+            "receipt_ref",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "attempt_reconciled"
+            },
+            "operation_id": {
+              "$ref": "#/$defs/id"
+            },
+            "attempt_id": {
+              "$ref": "#/$defs/id"
+            },
+            "outcome": {
+              "enum": [
+                "applied",
+                "not_applied",
+                "unknown"
+              ]
+            },
+            "receipt_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "receipt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "process_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "process_crashed"
+            },
+            "process_id": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "process_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "process_restarted"
+            },
+            "process_id": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "event_id",
+            "superseded_event_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "event_superseded"
+            },
+            "event_id": {
+              "$ref": "#/$defs/id"
+            },
+            "superseded_event_id": {
+              "$ref": "#/$defs/id"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "scope",
+            "inventory_frontier_event_id",
+            "attempt_manifest_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "attempt_inventory_attested"
+            },
+            "scope": {
+              "$ref": "#/$defs/stop_scope"
+            },
+            "inventory_frontier_event_id": {
+              "$ref": "#/$defs/id"
+            },
+            "attempt_manifest_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      ]
+    },
+    "owner_time_reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "clock_mapping_action_id",
+        "local_timestamp_ns"
+      ],
+      "properties": {
+        "clock_mapping_action_id": {
+          "$ref": "#/$defs/id"
+        },
+        "local_timestamp_ns": {
+          "$ref": "#/$defs/u64"
+        }
+      }
+    },
+    "stop_scope": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind"
+          ],
+          "properties": {
+            "kind": {
+              "const": "global"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "logical_operation_ids"
+          ],
+          "properties": {
+            "kind": {
+              "const": "logical_operations"
+            },
+            "logical_operation_ids": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "#/$defs/id"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "action_evidence": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "retry_of_attempt_id"
+          ],
+          "properties": {
+            "kind": {
+              "const": "attempt_start"
+            },
+            "retry_of_attempt_id": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/id"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "receipt_ref",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "effect_commit"
+            },
+            "receipt_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "receipt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "receipt_ref",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "cancellation_acknowledgement"
+            },
+            "receipt_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "receipt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "exact_start_action_id",
+            "qualification"
+          ],
+          "properties": {
+            "kind": {
+              "const": "terminal_reconciliation"
+            },
+            "exact_start_action_id": {
+              "$ref": "#/$defs/id"
+            },
+            "qualification": {
+              "$ref": "#/$defs/gate_state"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "scope",
+            "receipt_ref",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "stop_trigger"
+            },
+            "scope": {
+              "$ref": "#/$defs/stop_scope"
+            },
+            "receipt_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "receipt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "scope",
+            "receipt_ref",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "stop_policy_revision"
+            },
+            "scope": {
+              "$ref": "#/$defs/stop_scope"
+            },
+            "receipt_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "receipt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "scope",
+            "inventory_frontier_event_id",
+            "attempt_manifest_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "stop_discharge"
+            },
+            "scope": {
+              "$ref": "#/$defs/stop_scope"
+            },
+            "inventory_frontier_event_id": {
+              "$ref": "#/$defs/id"
+            },
+            "attempt_manifest_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "scope",
+            "inventory_frontier_event_id",
+            "attempt_manifest_sha256",
+            "receipt_ref",
+            "receipt_sha256"
+          ],
+          "properties": {
+            "kind": {
+              "const": "inventory_attestation"
+            },
+            "scope": {
+              "$ref": "#/$defs/stop_scope"
+            },
+            "inventory_frontier_event_id": {
+              "$ref": "#/$defs/id"
+            },
+            "attempt_manifest_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "receipt_ref": {
+              "$ref": "#/$defs/id"
+            },
+            "receipt_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
