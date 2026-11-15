@@ -180,6 +180,8 @@ The five synthetic Statements under `docs/research/fixtures/` cover runner/test,
 
 ## 10. Acceptance tests and research targets
 
+The [machine-readable D6.3 test matrix](EGDDM_D6_3_RECEIPT_WITNESS_TEST_MATRIX_V0_1_2026-11-15.json) contains 8 positive and 25 negative cases. It is a proposed test contract, not an executed suite.
+
 - Valid statement with correct trusted signer verifies.
 - Any payload, subject, scope, outcome or timestamp mutation breaks signature verification.
 - A valid signature from an untrusted or wrong-role identity is rejected.
