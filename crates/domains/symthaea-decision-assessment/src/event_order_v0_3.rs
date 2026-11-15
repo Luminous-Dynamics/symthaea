@@ -13,7 +13,10 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::GateState;
+use crate::{EventTraceDisposition, GateState};
+use crate::event_order_v0_2::{
+    BitemporalEventEnvelope, QualifiedEventTime, compare_qualified_event_times,
+};
 
 pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3";
 pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.1";
