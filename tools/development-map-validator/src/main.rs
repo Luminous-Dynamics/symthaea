@@ -7,6 +7,7 @@ use development_map_validator::{
     dynamapbench::validate_dynamapbench_manifest_json,
     temporal_replay::{validate_temporal_ledger_json, replay_temporal_ledger_json},
     workspace_shift::evaluate_shift_scenario_json,
+    shiftbench_admission::validate_shiftbench_admission_json,
     validate_document_json,
 };
 
@@ -21,6 +22,7 @@ fn usage() {
     eprintln!("  development-map-validator temporal-ledger <ledger.json>");
     eprintln!("  development-map-validator temporal-replay <ledger.json> <query.json>");
     eprintln!("  development-map-validator workspace-shift <scenario.json>");
+    eprintln!("  development-map-validator shiftbench-admission <manifest.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
     eprintln!("projects source files, composes a Git tree snapshot, or replays a pinned epistemic temporal ledger.");
@@ -327,6 +329,38 @@ fn evaluate_workspace_shift_file(args: &[String]) -> i32 {
     }
 }
 
+
+fn validate_shiftbench_admission_file(args: &[String]) -> i32 {
+    if args.len() != 2 {
+        usage();
+        return 2;
+    }
+    let path = &args[1];
+    let input = match read_input(path, "D6.4-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match validate_shiftbench_admission_json(&input) {
+        Err(error) => {
+            eprintln!("ERROR D6.4-ADMISSION-001 {path}: {error}");
+            2
+        }
+        Ok(report) if report.valid => {
+            println!("VALID STRUCTURAL_ADMISSION task_id={}", report.task_id.as_deref().unwrap_or("unknown"));
+            println!("CLAIM_CEILING {}", report.claim_ceiling);
+            0
+        }
+        Ok(report) => {
+            for diagnostic in &report.diagnostics {
+                eprintln!("ERROR D6.4-ADMISSION-002 {diagnostic}");
+            }
+            eprintln!("INVALID STRUCTURAL_ADMISSION diagnostics={}", report.diagnostics.len());
+            eprintln!("CLAIM_CEILING {}", report.claim_ceiling);
+            1
+        }
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -346,6 +380,7 @@ fn main() {
         "temporal-ledger" => validate_temporal_ledger_file(&args),
         "temporal-replay" => replay_temporal_ledger_file(&args),
         "workspace-shift" => evaluate_workspace_shift_file(&args),
+        "shiftbench-admission" => validate_shiftbench_admission_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {
             usage();
