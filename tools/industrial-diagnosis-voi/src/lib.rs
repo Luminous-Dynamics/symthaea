@@ -62,6 +62,7 @@ pub enum CaseInputFailure {
     PriorMassNotOne,
     DecisionLossCountMismatch { hypothesis_id: &'static str },
     InvalidDecisionLoss { hypothesis_id: &'static str },
+    DuplicateMeasurementId { id: &'static str },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -245,7 +246,7 @@ fn minimum_expected_loss(case: &DecisionCase, posterior: &[f64]) -> DecisionEsti
 }
 
 fn posterior(prior: &[f64], likelihoods: &[f64], positive: bool, probability_outcome: f64) -> Option<Vec<f64>> {
-    if probability_outcome <= PROBABILITY_TOLERANCE {
+    if probability_outcome <= 0.0 {
         return None;
     }
     let values: Vec<f64> = prior.iter().zip(likelihoods)
@@ -349,7 +350,7 @@ pub fn evaluate_case(case: &DecisionCase, measurements: &[Measurement]) -> Resul
     let mut duplicate_failures = Vec::new();
     for measurement in measurements {
         if !measurement.id.trim().is_empty() && !measurement_ids.insert(measurement.id) {
-            duplicate_failures.push(CaseInputFailure::EmptyCaseId);
+            duplicate_failures.push(CaseInputFailure::DuplicateMeasurementId { id: measurement.id });
         }
     }
     if !duplicate_failures.is_empty() {
@@ -564,6 +565,19 @@ mod tests {
         let mut case = reference_case();
         case.hypotheses[0].prior += 0.1;
         assert!(evaluate_case(&case, &reference_measurements()).is_err());
+    }
+
+    #[test]
+    fn duplicate_measurement_ids_are_rejected_as_duplicate_ids() {
+        let mut measurements = reference_measurements();
+        measurements[1].id = measurements[0].id;
+        let result = evaluate_case(&reference_case(), &measurements);
+        assert!(matches!(
+            result,
+            Err(failures) if failures.contains(&CaseInputFailure::DuplicateMeasurementId {
+                id: "CALIBRATION_REFERENCE_ARTIFACT"
+            })
+        ));
     }
 
     #[test]
