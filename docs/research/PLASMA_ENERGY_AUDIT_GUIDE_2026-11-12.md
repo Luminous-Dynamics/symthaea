@@ -226,3 +226,15 @@ The merged audit corpus adds four quench source cases from the source-register b
 - thermal-management measurements/model: retain radiation loss and gradient values as source-specific, not universal constants.
 
 The source register must not combine operating points, turn relative improvements into absolute conversion, promote model predictions into experiments, or omit quench energy / pressure-drop / maintenance boundary terms. The merged audit corpus now contains **37 source cases / 46 negative controls / 5 derived checks**.
+
+
+## 9.18 Counterflow operating-point refusal oracle — 2026-11-15
+
+The Rust source auditor now validates the CO2 counterflow configurations as separate operating points:
+- 792 W / 4 slm MAGD: conversion 23.6%, energy efficiency 25.1%;
+- 302 W low-power point: efficiency 46.2%, conversion explicitly unknown;
+- 2.5 flow-ratio / 30 mm optimization point: 207.3% and 203.6% are relative increases, not absolute conversion/efficiency values.
+
+Four new source-audit tests accept the distinct source record and reject borrowing the 792 W conversion into the 302 W point, converting a relative improvement into an absolute fraction, and duplicate configuration IDs. The focused audit remains solver-free; it qualifies source metadata / operating-point identity, not plasma physics or the source experiment.
+
+The xtask suite now has 31 authored Rust tests. The merged source register remains **37 cases / 46 negative controls / 5 derived checks**.
