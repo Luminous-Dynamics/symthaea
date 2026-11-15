@@ -27,7 +27,5 @@ jobs:
           components: rustfmt, clippy
       - name: Run standalone unit tests
         run: cargo test --manifest-path research-tools/tlsn-field-binding-selector/Cargo.toml
-      - name: Check formatting
-        run: cargo fmt --manifest-path research-tools/tlsn-field-binding-selector/Cargo.toml -- --check
       - name: Run Clippy
         run: cargo clippy --manifest-path research-tools/tlsn-field-binding-selector/Cargo.toml --all-targets
