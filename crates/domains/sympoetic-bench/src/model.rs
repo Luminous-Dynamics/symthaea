@@ -229,6 +229,12 @@ pub struct Scores {
     pub missed_critical_intervention_rate: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub intervention_regret: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub participant_capability_gain_delta: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delayed_retention_gain_delta: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transfer_gain_delta: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
