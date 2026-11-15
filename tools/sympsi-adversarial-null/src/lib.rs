@@ -299,7 +299,7 @@ fn validate_profile(
         || profile.analysis_trials != trials
         || profile.naive_critical_hits != critical
         || profile.block_count != 10
-        || profile.analysis_trials % profile.block_count != 0
+        || !profile.analysis_trials.is_multiple_of(profile.block_count)
     {
         return Err(format!(
             "profile does not match frozen {choices}-choice reference contract"
@@ -384,10 +384,12 @@ fn simulate_scenario(
         spec.block_expected,
     );
 
-    let expected_block_count = if spec.id == "blockwise_shared_drift" {
-        block_count
-    } else {
-        1
+    let exchangeability_unit = match spec.exchangeability {
+        "global" => "whole campaign".to_string(),
+        "within each of 10 preregistered blocks" => {
+            format!("{block_count} fixed blocks of {block_size} trials")
+        }
+        _ => return Err(format!("unsupported exchangeability unit for {}", spec.id)),
     };
     Ok(ScenarioResult {
         scenario_id: spec.id.into(),
@@ -398,11 +400,7 @@ fn simulate_scenario(
         campaigns,
         target_response_independent_by_construction: true,
         response_temporal_dependence: spec.response_dependence.into(),
-        exchangeability_unit: if expected_block_count == 1 {
-            "whole campaign".into()
-        } else {
-            format!("{expected_block_count} fixed blocks of {block_size} trials")
-        },
+        exchangeability_unit,
         naive_fixed_1_over_k: naive,
         global_conditional_target_randomization: global,
         block_conditional_target_randomization: block,
