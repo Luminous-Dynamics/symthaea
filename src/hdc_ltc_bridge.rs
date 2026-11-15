@@ -1388,4 +1388,40 @@ mod tests {
             "should resize after cooldown"
         );
     }
+
+    /// End-to-end bridge identity regression. The baseline gate is known to
+    /// violate this property, so keep the acceptance test ignored until the
+    /// update law is repaired and the neuron/network gates are qualified.
+    #[test]
+    #[ignore = "known source-level failure; enable after a qualified zero-time gate repair"]
+    fn zero_dt_bridge_step_preserves_live_dynamics_and_output() {
+        let config = HdcLtcBridgeConfig {
+            input_dim: 8,
+            output_dim: 8,
+            layer_sizes: vec![2, 2],
+            hdc_dim: 256,
+            seed: 17,
+            ..Default::default()
+        };
+        let mut bridge = HdcLtcBridge::new(config);
+
+        let warm_input = Array1::from_vec(vec![0.25; 8]);
+        let next_input = Array1::from_vec(vec![-0.4; 8]);
+        bridge.step(&warm_input, 0.05).unwrap();
+
+        let before_state = bridge.snapshot_evolution_state();
+        let before_output = bridge.current_output.clone();
+        bridge.step(&next_input, 0.0).unwrap();
+        let after_state = bridge.snapshot_evolution_state();
+
+        assert!(
+            before_state.approx_eq(&after_state, 1e-7),
+            "zero elapsed time changed bridge neuron state, cached layer outputs or clocks"
+        );
+        assert_eq!(
+            bridge.current_output, before_output,
+            "zero elapsed time changed the bridge readout"
+        );
+    }
+
 }
