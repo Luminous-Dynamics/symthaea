@@ -5,4 +5,4 @@ edition = "2024"
 
 [dependencies]
 risc0-zkvm = { version = "3.0", default-features = false }
-symthaea-zkproof-core = { path = "../../core", default-features = false }
+symthaea-zkproof-request-bound-core = { path = "../../request-bound-core", default-features = false }
