@@ -215,3 +215,14 @@ The merged source register now includes four quench-related cases:
 Eight new negative controls refuse point mixing, relative-vs-absolute errors, predicted-to-measured promotion, ideal-wall extrapolation, chemistry/regime transfer and omitted cooling/auxiliary loads.
 
 The current merged register contains **37 source cases / 48 negative controls / 5 derived checks**. It preserves the six miniaturized-plasma sources unique to this audit branch.
+
+
+## 9.17 Warm-plasma CO2 afterglow-quench evidence — 2026-11-15
+
+The merged audit corpus adds four quench source cases from the source-register branch and eight adversarial controls:
+- counterflow MAGD experiment: preserve 792 W / 23.6% conversion / 25.1% efficiency separately from 302 W / 46.2% efficiency where conversion remains unknown;
+- particle-assisted catalytic kinetic model: keep 79% / 47% and SO2-assisted 72% / 43% as model outputs;
+- multidimensional arc quench CFD: distinguish experimental-comparison operating range from the >50% conversion ideal-wall-cooling prediction;
+- thermal-management measurements/model: retain radiation loss and gradient values as source-specific, not universal constants.
+
+The source register must not combine operating points, turn relative improvements into absolute conversion, promote model predictions into experiments, or omit quench energy / pressure-drop / maintenance boundary terms. The merged audit corpus now contains **37 source cases / 46 negative controls / 5 derived checks**.
