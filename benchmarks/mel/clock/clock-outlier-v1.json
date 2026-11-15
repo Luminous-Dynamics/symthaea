@@ -1,0 +1,73 @@
+{
+  "schema_version": "mel-output-clock-anchor-set-v1",
+  "fixture_id": "MEL-CLOCK-OUTLIER-001",
+  "description": "One callback timestamp is displaced by 2 ms. A strict fit policy must reject the window instead of silently filtering the anchor.",
+  "expected_disposition": "reject_residual",
+  "anchors": [
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 9,
+      "anchor_index": 0,
+      "first_output_frame_index": 0,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "callback_stream_time_ns": 0,
+      "playback_stream_time_ns": 5000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null,
+      "channel_count": 2
+    },
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 9,
+      "anchor_index": 1,
+      "first_output_frame_index": 480,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "callback_stream_time_ns": 10000000,
+      "playback_stream_time_ns": 15000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null,
+      "channel_count": 2
+    },
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 9,
+      "anchor_index": 2,
+      "first_output_frame_index": 960,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "callback_stream_time_ns": 22000000,
+      "playback_stream_time_ns": 27000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null,
+      "channel_count": 2
+    },
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 9,
+      "anchor_index": 3,
+      "first_output_frame_index": 1440,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "callback_stream_time_ns": 30000000,
+      "playback_stream_time_ns": 35000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null,
+      "channel_count": 2
+    }
+  ],
+  "stream_descriptor": {
+    "schema_version": "mel-output-clock-stream-descriptor-v1",
+    "stream_instance_id": 9,
+    "device_identity_sha256": "a2dacca21be29167c89c733daedd3ebf1d59edcf7883a85b3fe770a18a91f6d9",
+    "sample_rate_hz": 48000,
+    "channel_count": 2,
+    "sample_format": "f32",
+    "configuration_digest_sha256": "9379eb0e31a6ede79122c050d680569a6433220ca251f2dfaebed7a8d10d364f"
+  }
+}

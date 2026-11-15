@@ -1,0 +1,73 @@
+{
+  "schema_version": "mel-output-clock-anchor-set-v1",
+  "fixture_id": "MEL-CLOCK-MISSING-ANCHOR-001",
+  "description": "One callback anchor record is omitted, but cumulative output-frame position remains continuous across the missing callback. The fit must remain valid and report one missing anchor.",
+  "expected_disposition": "fit",
+  "stream_descriptor": {
+    "schema_version": "mel-output-clock-stream-descriptor-v1",
+    "stream_instance_id": 11,
+    "device_identity_sha256": "ccd75aa8ae78e6a8d7a001b068251a1016a7538d62d49a5c1dfe6e4804707261",
+    "sample_rate_hz": 48000,
+    "channel_count": 2,
+    "sample_format": "f32",
+    "configuration_digest_sha256": "f0fc7db87b2c07fe1ef99cf5b243e727877d50bf4503f52a3e5a46b9d5a284e8"
+  },
+  "anchors": [
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 11,
+      "anchor_index": 0,
+      "first_output_frame_index": 0,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "channel_count": 2,
+      "callback_stream_time_ns": 0,
+      "playback_stream_time_ns": 5000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null
+    },
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 11,
+      "anchor_index": 1,
+      "first_output_frame_index": 480,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "channel_count": 2,
+      "callback_stream_time_ns": 10000000,
+      "playback_stream_time_ns": 15000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null
+    },
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 11,
+      "anchor_index": 3,
+      "first_output_frame_index": 1440,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "channel_count": 2,
+      "callback_stream_time_ns": 30000000,
+      "playback_stream_time_ns": 35000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null
+    },
+    {
+      "schema_version": "mel-output-clock-anchor-v1",
+      "source": "synthetic_fixture_v1",
+      "stream_instance_id": 11,
+      "anchor_index": 4,
+      "first_output_frame_index": 1920,
+      "frame_count": 480,
+      "sample_rate_hz": 48000,
+      "channel_count": 2,
+      "callback_stream_time_ns": 40000000,
+      "playback_stream_time_ns": 45000000,
+      "callback_to_playback_ns": 5000000,
+      "timestamp_uncertainty_ns": null
+    }
+  ]
+}
