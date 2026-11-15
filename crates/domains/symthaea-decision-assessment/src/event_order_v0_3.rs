@@ -2640,6 +2640,7 @@ pub fn project_action_history(
 
     let mut obligations = Vec::<ScopedStopObligation>::new();
     let mut inventories = Vec::<(AttemptHistoryInventory, String)>::new();
+    let mut inventory_frontier_times = BTreeMap::<String, QualifiedEventTime>::new();
     let mut stop_trigger_actions = BTreeMap::<String, (&ScheduledAction, StopScope, String, QualifiedEventTime)>::new();
     let mut latest_policy_actions = BTreeMap::<String, (&ScheduledAction, StopScope, String, QualifiedEventTime)>::new();
     for action in &canonical_actions {
@@ -2869,6 +2870,7 @@ pub fn project_action_history(
                         continue;
                     }
                 }
+                inventory_frontier_times.insert(inventory_frontier_event_id.clone(), frontier_time);
                 inventories.push((AttemptHistoryInventory {
                     inventory_frontier_event_id: inventory_frontier_event_id.clone(),
                     attempt_manifest_sha256: attempt_manifest_sha256.clone(),
@@ -2902,7 +2904,7 @@ pub fn project_action_history(
             reasons.insert(format!("STOP_DISCHARGE_WITHOUT_TRIGGER:{obligation_id}"));
             continue;
         };
-        let Some((current_policy_action, current_scope, current_policy, _revision_time)) = latest_policy_actions.get(obligation_id) else {
+        let Some((current_policy_action, current_scope, current_policy, revision_time)) = latest_policy_actions.get(obligation_id) else {
             critical = true;
             reasons.insert(format!("STOP_DISCHARGE_WITHOUT_CURRENT_POLICY:{obligation_id}"));
             continue;
@@ -2966,6 +2968,37 @@ pub fn project_action_history(
                 continue;
             }
         };
+        let Some(frontier_time) = inventory_frontier_times.get(&frontier) else {
+            critical = true;
+            reasons.insert(format!("STOP_DISCHARGE_FRONTIER_TIME_MISSING:{obligation_id}"));
+            continue;
+        };
+        match event_order_between(trigger_time, frontier_time) {
+            EventOrder::Before => {}
+            EventOrder::After | EventOrder::Inconsistent => {
+                critical = true;
+                reasons.insert(format!("STOP_TRIGGER_AFTER_INVENTORY_FRONTIER:{obligation_id}"));
+                continue;
+            }
+            EventOrder::Overlapping | EventOrder::Unknown => {
+                indeterminate = true;
+                reasons.insert(format!("STOP_TRIGGER_FRONTIER_ORDER_UNRESOLVED:{obligation_id}"));
+                continue;
+            }
+        }
+        match event_order_between(revision_time, frontier_time) {
+            EventOrder::Before => {}
+            EventOrder::After | EventOrder::Inconsistent => {
+                critical = true;
+                reasons.insert(format!("STOP_POLICY_AFTER_INVENTORY_FRONTIER:{obligation_id}"));
+                continue;
+            }
+            EventOrder::Overlapping | EventOrder::Unknown => {
+                indeterminate = true;
+                reasons.insert(format!("STOP_POLICY_FRONTIER_ORDER_UNRESOLVED:{obligation_id}"));
+                continue;
+            }
+        }
         let trigger_order = event_order_between(trigger_time, &discharge_time);
         if trigger_order != EventOrder::Before {
             match trigger_order {
@@ -3124,6 +3157,43 @@ pub fn project_action_history(
                 terminal_event_id_at_discharge,
                 terminal_to_discharge_order,
             });
+        }
+    }
+
+    if let Some(inventory) = inventory.as_ref() {
+        if let Some(frontier_time) = inventory_frontier_times.get(&inventory.inventory_frontier_event_id) {
+            for attempt in &attempts {
+                let attempt_id = &attempt.identity.attempt_id;
+                if let Some(start_time) = attempt_start_times.get(attempt_id) {
+                    match event_order_between(start_time, frontier_time) {
+                        EventOrder::Before => {}
+                        EventOrder::After | EventOrder::Inconsistent => {
+                            critical = true;
+                            reasons.insert(format!("ATTEMPT_START_AFTER_INVENTORY_FRONTIER:{attempt_id}"));
+                        }
+                        EventOrder::Overlapping | EventOrder::Unknown => {
+                            indeterminate = true;
+                            reasons.insert(format!("ATTEMPT_START_FRONTIER_ORDER_UNRESOLVED:{attempt_id}"));
+                        }
+                    }
+                }
+                if let Some(terminal_time) = attempt_terminal_times.get(attempt_id) {
+                    match event_order_between(terminal_time, frontier_time) {
+                        EventOrder::Before => {}
+                        EventOrder::After | EventOrder::Inconsistent => {
+                            critical = true;
+                            reasons.insert(format!("ATTEMPT_TERMINAL_AFTER_INVENTORY_FRONTIER:{attempt_id}"));
+                        }
+                        EventOrder::Overlapping | EventOrder::Unknown => {
+                            indeterminate = true;
+                            reasons.insert(format!("ATTEMPT_TERMINAL_FRONTIER_ORDER_UNRESOLVED:{attempt_id}"));
+                        }
+                    }
+                }
+            }
+        } else {
+            critical = true;
+            reasons.insert("ATTEMPT_INVENTORY_FRONTIER_TIME_NOT_RESOLVED".to_owned());
         }
     }
 
