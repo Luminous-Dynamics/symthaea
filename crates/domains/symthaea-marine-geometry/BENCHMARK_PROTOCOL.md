@@ -113,6 +113,12 @@ Primary system outcome: energy per equivalent useful service, for example delive
 
 Report process-specific DFM dispositions; plate/section developability; forming and welding constraints; block split; assembly sequence; lifting, transport and yard envelope; access to inspection, repair and cleaning; corrosion/coating; fatigue; maintainability and lifecycle materials/energy. Track radiated noise, cavitation noise/erosion, biofouling, emissions, marine pollution and lifecycle greenhouse gas where the data are available. Missing required evidence is UNKNOWN, not PASS.
 
+### S: local and global design sensitivity
+
+For each supported geometry parameter, report base/perturbed specification digests, the exact step size and units, base/minus/plus hydrostatic properties, coarse/fine central differences, Richardson-extrapolated derivative and a truncation-error indicator. Both h and h/2 perturbation pairs must remain inside the unchanged geometry/admission profile. Do not clamp parameters or switch to one-sided differences when a perturbation leaves the domain.
+
+Use analytical triangular-prism known answers to test dV/dL, dV/dB, dV/dT and dLCB/dL. Extend to pairwise interactions/Hessian approximations only after the one-variable derivative and step-convergence contracts are qualified. For global sensitivity, use a frozen design-space sample and report Sobol/variance-based indices with confidence intervals; never infer global importance from one local derivative.
+
 ### D: decision and research economics
 
 Report:
