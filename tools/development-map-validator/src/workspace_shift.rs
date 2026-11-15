@@ -549,7 +549,7 @@ fn obligation_exposure(
             Some(index) => parse_time(&arm.epochs[index].observed_at)?,
             None => parse_time(&arm.checkpoints.last().expect("validated checkpoints").checkpoint_at)?,
         };
-        let duration = end_time.signed_duration_since(start_time).num_seconds();
+        let duration = end_time.signed_duration_since(start_time.clone()).num_seconds();
         if duration < 0 {
             return Err(format!("obligation {} has a negative active interval", obligation.obligation_id));
         }
@@ -563,7 +563,7 @@ fn obligation_exposure(
             })
             .map(|receipt| Ok((receipt, parse_time(&receipt.available_at)?)))
             .collect::<Result<Vec<_>, String>>()?;
-        transitions.retain(|(_, available)| *available >= start_time && *available <= end_time);
+        transitions.retain(|(_, available)| available >= &start_time && available <= &end_time);
         transitions.sort_by(|left, right| {
             left.1.cmp(&right.1)
                 .then_with(|| left.0.receipt_id.cmp(&right.0.receipt_id))
@@ -579,7 +579,7 @@ fn obligation_exposure(
         }
 
         let mut verified = false;
-        let mut gap_start = Some(start_time);
+        let mut gap_start = Some(start_time.clone());
         for (receipt, available_at) in transitions {
             match receipt.outcome {
                 CheckOutcome::Pass => {
