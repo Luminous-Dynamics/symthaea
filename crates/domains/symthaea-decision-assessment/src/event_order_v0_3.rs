@@ -15,11 +15,11 @@ use thiserror::Error;
 
 use crate::{EventTraceDisposition, GateState};
 use crate::event_order_v0_2::{
-    BitemporalEventEnvelope, QualifiedEventTime, compare_qualified_event_times,
+    BitemporalEventEnvelope, QualifiedEventTime, StopScope, compare_qualified_event_times,
 };
 
-pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3.1";
-pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.2";
+pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3.2";
+pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.3";
 pub const MAX_GENERATED_EVENTS: usize = 4_096;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,10 +34,18 @@ pub struct VirtualSchedule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActionClockTimeReference {
+    pub clock_mapping_action_id: String,
+    pub local_timestamp_ns: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScheduledAction {
     pub action_id: String,
     pub at_ns: u64,
     pub ordinal: u64,
+    #[serde(default)]
+    pub owner_time_ref: Option<ActionClockTimeReference>,
     pub action: ScheduleAction,
 }
 
@@ -125,27 +133,46 @@ pub enum ScheduleAction {
     StopTriggered {
         obligation_id: String,
         policy_revision: String,
+        scope: StopScope,
+        receipt_ref: String,
+        receipt_sha256: String,
     },
     StopPolicyRevised {
         obligation_id: String,
         policy_revision: String,
+        scope: StopScope,
+        receipt_ref: String,
+        receipt_sha256: String,
     },
     StopDischarged {
         obligation_id: String,
         trigger_action_id: String,
         policy_revision_action_id: String,
         policy_revision: String,
+        scope: StopScope,
+        in_flight_inventory_frontier_event_id: String,
+        in_flight_attempt_manifest_sha256: String,
         receipt_ref: String,
         receipt_sha256: String,
     },
     EffectAttempted {
         operation_id: String,
         attempt_id: String,
+        #[serde(default)]
+        retry_of_attempt_id: Option<String>,
     },
     EffectCommitted {
         operation_id: String,
         attempt_id: String,
         effect_id: String,
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+    AttemptInventoryAttested {
+        scope: StopScope,
+        attempt_manifest_sha256: String,
+        receipt_ref: String,
+        receipt_sha256: String,
     },
     AttemptReconciled {
         operation_id: String,
@@ -225,6 +252,7 @@ pub struct ReplayRecord {
     pub action_id: String,
     pub at_ns: u64,
     pub ordinal: u64,
+    pub owner_time_ref: Option<ActionClockTimeReference>,
     pub disposition: SchedulerDisposition,
     pub action: ScheduleAction,
 }
@@ -983,6 +1011,7 @@ fn push_action(
         action_id: format!("action-{ordinal:06}"),
         at_ns,
         ordinal,
+        owner_time_ref: None,
         action,
     });
 }
