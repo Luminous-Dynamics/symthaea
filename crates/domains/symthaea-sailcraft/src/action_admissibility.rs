@@ -134,7 +134,7 @@ pub enum HumanReadiness {
 
 /// Only maneuvers already present in this independently supplied envelope may
 /// be considered. This is a ceiling, never a grant of control authority.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct AuthorityCeiling {
     pub allowed_maneuvers: BTreeSet<ManeuverClass>,
     pub evidence: QualifiedEvidenceRef,
@@ -142,7 +142,7 @@ pub struct AuthorityCeiling {
 
 /// Human oversight is required for ambiguity; the contract cannot create the
 /// human role, presume acknowledgement, or mint a fallback capability.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct HumanOversight {
     pub readiness: HumanReadiness,
     pub evidence: QualifiedEvidenceRef,
