@@ -11,7 +11,7 @@
       "choice_count": 4,
       "analysis_trials": 7300,
       "smallest_effect_increment": 0.02,
-      "planted_hit_rate": 0.40
+      "planted_hit_rate": 0.4
     },
     "five-choice": {
       "choice_count": 5,
@@ -19,5 +19,6 @@
       "smallest_effect_increment": 0.02,
       "planted_hit_rate": 0.35
     }
-  }
+  },
+  "optional_stopping_looks": 10
 }
