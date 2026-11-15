@@ -45,7 +45,7 @@ Do not treat microbial-load changes as equivalent to complete wound closure, rec
 
 ### 2.4 Radiation dermatitis
 
-NIPP-RD III is a Phase III randomized, double-blind, placebo-controlled study protocol for non-invasive physical plasma to prevent radiation dermatitis during breast-cancer radiotherapy.
+NIPP-RD III is a Phase III randomized, double-blind, placebo-controlled study for non-invasive physical plasma to prevent radiation dermatitis during breast-cancer radiotherapy. The German Clinical Trials Register update of 8 October 2026 reports recruitment complete, study continuing and final sample size 141 (target 140); no Phase III results are posted in that record. Its primary endpoint is clinician-reported dermatitis severity at completion of radiotherapy, with patient-reported symptoms, objective skin-colour measurement, corticosteroid prescription and adverse effects as secondary measures. The registry also summarizes earlier Phase I (n=30) and Phase II (n=64) work, but those summaries are not Phase III results.
 
 Source: DRKS00032560 (registry last updated 8 October 2026), https://drks.de/search/en/trial/DRKS00032560/details.
 
