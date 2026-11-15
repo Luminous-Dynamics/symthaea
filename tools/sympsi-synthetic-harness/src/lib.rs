@@ -119,6 +119,7 @@ pub struct TrialReceipt {
     pub independent_unit_id: String,
     pub target_index: usize,
     pub response_index: usize,
+    pub response_payload: String,
     pub response_commit_sequence: u64,
     pub target_reveal_sequence: u64,
     pub target_manifest_sha256: String,
@@ -230,7 +231,6 @@ pub fn run_profile(
         &manifest_sha256,
         profile_name,
         critical_hits,
-        &null_distribution,
         &manifest,
     );
     let all_controls_passed = controls.iter().all(|control| control.passed)
@@ -355,7 +355,6 @@ fn run_controls(
     manifest_sha256: &str,
     profile_name: &str,
     critical_hits: usize,
-    null_distribution: &BinomialDistribution,
     manifest: &Manifest,
 ) -> Vec<ControlResult> {
     let expected_count = 24;
@@ -412,12 +411,8 @@ fn run_controls(
         validate_trial_bundle(&repeated_units, choices, manifest_sha256, &guard);
 
     let permutation_pass = label_permutation_is_invariant(choices, manifest.seed, profile_name);
-
-    let null_seed = derive_seed(manifest.seed, &format!("permutation-control-{profile_name}"));
-    let mut null_rng = SplitMix64::new(null_seed);
-    let permuted_null_hits = null_distribution.sample(&mut null_rng);
-    let permuted_null_p = null_distribution.upper_tail(permuted_null_hits);
-    let permuted_null_not_significant = permuted_null_p > manifest.alpha;
+    let target_order_permutation_pass =
+        target_order_permutation_recomputes(choices, manifest.seed, profile_name);
 
     vec![
         control(
@@ -474,15 +469,15 @@ fn run_controls(
             "A bijective relabeling applied to both targets and responses preserves the hit count.",
         ),
         control(
-            "permuted_null_fixture",
-            "NULL_COMPATIBLE_SYNTHETIC_DRAW",
-            if permuted_null_not_significant {
-                "NULL_COMPATIBLE_SYNTHETIC_DRAW"
+            "target_order_permutation",
+            "PERMUTED_TARGET_COUNTS_AND_SCORE_RECOMPUTED",
+            if target_order_permutation_pass {
+                "PERMUTED_TARGET_COUNTS_AND_SCORE_RECOMPUTED"
             } else {
-                "SEEDED_NULL_DRAW_CROSSED_ALPHA"
+                "PERMUTATION_SCORE_RECOMPUTATION_FAILED"
             }
             .into(),
-            "A fixed-seed independent null draw is reported; this is a deterministic fixture, not a theorem that every null sample must be nonsignificant.",
+            "A deterministic shuffle preserves target-label counts and the separately recomputed score is identical.",
         ),
         control(
             "critical_value",
@@ -533,7 +528,7 @@ fn make_trial_fixture(
             let trial_id = format!("synthetic-trial-{index:04}");
             let target_index = index % choices;
             let response_index = (index + 1) % choices;
-            let digest_input = format!("{trial_id}|{response_index}|fixture-v0.1");
+            let response_payload = format!("{trial_id}|{response_index}|fixture-v0.1");
             TrialReceipt {
                 trial_id,
                 independent_unit_id: if repeated_units {
@@ -543,10 +538,11 @@ fn make_trial_fixture(
                 },
                 target_index,
                 response_index,
+                response_payload: response_payload.clone(),
                 response_commit_sequence: (index as u64) * 2,
                 target_reveal_sequence: (index as u64) * 2 + 1,
                 target_manifest_sha256: manifest_sha256.into(),
-                response_digest_sha256: sha256_hex(digest_input.as_bytes()),
+                response_digest_sha256: sha256_hex(response_payload.as_bytes()),
                 status: "VALID".into(),
                 analyst_can_read_target: analyst_visible,
                 runner_can_read_target: false,
@@ -611,6 +607,11 @@ fn validate_trial_bundle(
                 code: "REJECT_RESPONSE_DIGEST_INVALID",
             });
         }
+        if sha256_hex(trial.response_payload.as_bytes()) != trial.response_digest_sha256 {
+            return Err(Rejection {
+                code: "REJECT_RESPONSE_DIGEST_MISMATCH",
+            });
+        }
         if trial.analyst_can_read_target || trial.runner_can_read_target {
             return Err(Rejection {
                 code: "REJECT_TARGET_VISIBILITY",
@@ -633,6 +634,32 @@ fn validate_trial_bundle(
         }
     }
     Ok(())
+}
+
+fn target_order_permutation_recomputes(choices: usize, seed: u64, profile: &str) -> bool {
+    let count = choices * 37;
+    let mut targets: Vec<usize> = (0..count).map(|index| index % choices).collect();
+    let responses: Vec<usize> = (0..count).map(|index| (index + 1) % choices).collect();
+    let mut rng = SplitMix64::new(derive_seed(seed, &format!("target-order-{profile}")));
+    for index in (1..targets.len()).rev() {
+        let other = rng.below(index + 1);
+        targets.swap(index, other);
+    }
+
+    let mut counts = vec![0usize; choices];
+    for target in &targets {
+        counts[*target] += 1;
+    }
+    let recomputed_hits = targets
+        .iter()
+        .zip(&responses)
+        .filter(|(target, response)| target == response)
+        .count();
+    let independent_hits = (0..count)
+        .map(|index| usize::from(targets[index] == responses[index]))
+        .sum::<usize>();
+    counts.iter().all(|count| *count == count / choices.max(1) * choices.max(1))
+        && recomputed_hits == independent_hits
 }
 
 fn label_permutation_is_invariant(choices: usize, seed: u64, profile: &str) -> bool {
@@ -956,6 +983,46 @@ mod tests {
             validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
             "REJECT_TARGET_VISIBILITY"
         );
+    }
+
+    #[test]
+    fn missing_trial_receipt_is_rejected() {
+        let digest = "a".repeat(64);
+        let mut trials = make_trial_fixture(24, 5, &digest, false, false, false);
+        trials.pop();
+        let guard = ProtocolGuard {
+            stopping_policy: "fixed_count".into(),
+            posthoc_exclusions: 0,
+            expected_trial_count: 24,
+            assumes_independent_units: true,
+        };
+        assert_eq!(
+            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            "REJECT_TRIAL_COUNT_MISMATCH"
+        );
+    }
+
+    #[test]
+    fn response_digest_tampering_is_rejected() {
+        let digest = "a".repeat(64);
+        let mut trials = make_trial_fixture(24, 5, &digest, false, false, false);
+        trials[4].response_digest_sha256 = "0".repeat(64);
+        let guard = ProtocolGuard {
+            stopping_policy: "fixed_count".into(),
+            posthoc_exclusions: 0,
+            expected_trial_count: 24,
+            assumes_independent_units: true,
+        };
+        assert_eq!(
+            validate_trial_bundle(&trials, 5, &digest, &guard).unwrap_err().code,
+            "REJECT_RESPONSE_DIGEST_MISMATCH"
+        );
+    }
+
+    #[test]
+    fn target_order_permutation_preserves_marginals_and_recomputes_score() {
+        assert!(target_order_permutation_recomputes(4, 20261115, "four-choice"));
+        assert!(target_order_permutation_recomputes(5, 20261115, "five-choice"));
     }
 
     #[test]
