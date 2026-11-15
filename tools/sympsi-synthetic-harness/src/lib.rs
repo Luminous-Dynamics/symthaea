@@ -1012,7 +1012,7 @@ fn simulate_optional_stopping_null(
     let mut cumulative_trials = 0usize;
 
     for look in 0..looks {
-        let block_size = base_block + usize::from(look < remainder);
+        let block_size = base_block + if look < remainder { 1 } else { 0 };
         let block_distribution = BinomialDistribution::new(block_size, chance_rate)?;
         cumulative_trials += block_size;
         let cumulative_distribution = BinomialDistribution::new(cumulative_trials, chance_rate)?;
