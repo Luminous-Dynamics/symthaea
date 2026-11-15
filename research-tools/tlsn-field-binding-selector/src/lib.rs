@@ -1,3 +1,5 @@
+pub mod http11;
+
 //! Bounded JSON field selection that preserves the exact raw JSON value byte span.
 //!
 //! This is a host-side parser/range-selection primitive for the PPAC/TLSN field
