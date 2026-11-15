@@ -924,6 +924,78 @@ mod tests {
     }
 
     #[test]
+    fn longitudinal_exposure_matches_hand_derived_fixture() {
+        let report = evaluate_shift_scenario(&fixture()).expect("valid fixture");
+        let clean = report.arm_scores.iter()
+            .find(|score| score.condition == ArmCondition::Clean).expect("clean score");
+        let shifted = report.arm_scores.iter()
+            .find(|score| score.condition == ArmCondition::Shifted).expect("shifted score");
+        assert_eq!(clean.active_obligation_seconds, 1_800);
+        assert_eq!(clean.unverified_obligation_seconds, 120);
+        assert_eq!(clean.critical_unverified_obligation_seconds, 60);
+        assert_eq!(clean.time_weighted_requirement_conformance, Some(1.0 - 120.0 / 1_800.0));
+        assert_eq!(shifted.active_obligation_seconds, 2_100);
+        assert_eq!(shifted.unverified_obligation_seconds, 480);
+        assert_eq!(shifted.critical_unverified_obligation_seconds, 420);
+        assert_eq!(shifted.critical_time_weighted_conformance, Some(0.65));
+        assert_eq!(shifted.max_unverified_gap_seconds, 180);
+    }
+
+    #[test]
+    fn delayed_critical_recovery_worsens_exposure_even_when_terminal_state_passes() {
+        let mut scenario = fixture();
+        let digest_scenario = scenario.clone();
+        let shifted = scenario.arms.iter_mut()
+            .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
+        let arm_id = shifted.arm_id.clone();
+        let receipt = shifted.checkpoints.last_mut().expect("final checkpoint").receipts.iter_mut()
+            .find(|receipt| receipt.obligation_id == "api-contract").expect("api receipt");
+        receipt.available_at = "2026-11-15T07:14:00Z".to_owned();
+        receipt.receipt_digest = receipt_digest(&digest_scenario, &arm_id, receipt).expect("reseal");
+        let report = evaluate_shift_scenario(&scenario).expect("valid delayed trace");
+        let shifted = report.arm_scores.iter()
+            .find(|score| score.condition == ArmCondition::Shifted).expect("shifted score");
+        assert!(shifted.final_checkpoint_success);
+        assert_eq!(shifted.critical_unverified_obligation_seconds, 480);
+        assert_eq!(shifted.max_unverified_gap_seconds, 240);
+    }
+
+    #[test]
+    fn clean_arm_cannot_drift_repository_or_active_requirements() {
+        let mut scenario = fixture();
+        let clean = scenario.arms.iter_mut()
+            .find(|arm| arm.condition == ArmCondition::Clean).expect("clean arm");
+        clean.epochs[1].snapshot.revision = "f".repeat(40);
+        assert!(evaluate_shift_scenario(&scenario).is_err());
+    }
+
+    #[test]
+    fn checkpoint_cannot_occur_after_the_next_intervention() {
+        let mut scenario = fixture();
+        let shifted = scenario.arms.iter_mut()
+            .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
+        shifted.checkpoints[0].checkpoint_at = "2026-11-15T07:11:00Z".to_owned();
+        assert!(evaluate_shift_scenario(&scenario).is_err());
+    }
+
+    #[test]
+    fn receipt_identity_cannot_change_between_checkpoints() {
+        let mut scenario = fixture();
+        let digest_scenario = scenario.clone();
+        let clean = scenario.arms.iter_mut()
+            .find(|arm| arm.condition == ArmCondition::Clean).expect("clean arm");
+        let arm_id = clean.arm_id.clone();
+        let baseline = clean.checkpoints[0].receipts.iter()
+            .find(|receipt| receipt.obligation_id == "api-contract").expect("baseline API receipt").clone();
+        let final_receipt = clean.checkpoints[1].receipts.iter_mut()
+            .find(|receipt| receipt.obligation_id == "api-contract").expect("final API receipt");
+        final_receipt.receipt_id = baseline.receipt_id;
+        final_receipt.outcome = CheckOutcome::Fail;
+        final_receipt.receipt_digest = receipt_digest(&digest_scenario, &arm_id, final_receipt).expect("reseal");
+        assert!(evaluate_shift_scenario(&scenario).is_err());
+    }
+
+    #[test]
     fn shifted_arm_must_contain_a_real_affected_scope() {
         let mut scenario = fixture();
         let shifted = scenario.arms.iter_mut()
