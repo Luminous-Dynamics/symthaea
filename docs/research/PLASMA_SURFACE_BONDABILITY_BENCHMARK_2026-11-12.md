@@ -178,7 +178,7 @@ The evaluator checks:
 - expected arm / pair dispositions and fail-closed comparability;
 - contact angle retained as a diagnostic only; it is not part of winner selection.
 
-Eleven Rust unit tests are authored for fixture replay, bondability-window calculation, untreated controls, over-treatment rejection, contact-angle invariance and optionality, missing loads, energy mismatch, insufficient replicates, and service / energy boundary mismatch.
+Fifteen Rust unit tests are authored for fixture replay, bondability-window calculation, untreated controls, over-treatment rejection, contact-angle invariance and optionality, missing loads, energy mismatch, insufficient replicates, and service / energy boundary mismatch.
 
 **Execution status:** the exact branch files and fixture are fetched back and the JSON is parsed / structurally checked. This execution environment does not contain cargo, rustc or rustfmt. The Rust module and eleven tests are authored but are not compiled or executed; no CI result or physical validation is claimed.
 
@@ -201,3 +201,14 @@ The source register now includes the additional PP/Loctite EA 9466 result from P
 Method limits remain important: three specimens per treatment category; immediate bonding; 24 h clamp cure; ISO 4587 single-lap geometry with 12.5 mm overlap and 10 mm/s crosshead speed; bondline thickness not measured; substrate temperature not measured directly. The reported 529 ± 1 W discharge power is not wall-plug-to-accepted-bonded-area energy.
 
 **Design consequence:** the optimization must search a joint feasible region of bond strength, surface integrity, adhesive compatibility, throughput and full-system energy. Minimizing contact angle or maximizing nominal bond strength alone is not the objective. Every adhesive/material system remains a separate service profile.
+
+
+## Source-register regression tests — 2026-11-15
+
+The offline Rust module now pins the machine-readable 2026 Ar/N2 source values:
+- PP/Loctite EA 9466: N2 11.6 ± 0.7 MPa vs untreated 0.5 ± 0.1 MPa, WCA 17° vs 94°;
+- PP/Soudal Fix All Flexi: Ar 0.8 MPa vs N2 0.3 ± 0.05 MPa, WCA 60° vs 17°;
+- source limitations: three specimens per treatment, immediate bond, no measured bondline thickness, and no direct substrate-temperature measurement;
+- source-specific N2 overexposure thresholds at PP 500 mm/min and PVC/HIPS 250 mm/min.
+
+These are source-record integrity tests, not tests that the reported experiments have been independently reproduced. The module now has 15 authored tests. A focused isolated workflow runs rustfmt, tests, strict Clippy and the synthetic fixture audit; its exact-head result is pending.
