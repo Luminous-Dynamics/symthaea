@@ -40,6 +40,12 @@ G3b is under development for [issue #12381](https://github.com/Luminous-Dynamics
 
 The current comparison candidates are OCCT 8.0.1, the experimental Rust `cad-kernel`, `brep-to-step` and `vcad_kernel_step`. Their documented STEP schema coverage differs; do not treat AP214, AP242 Edition 2 and AP242:2025 Edition 4 as equivalent.
 
+Run a backend capability manifest against a frozen requirement profile:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-cad-backend-evaluate -- backend-evaluation-request.json
+
+Exit codes: 0 = qualified within profile; 1 = incomplete; 2 = rejected; 3 = CLI, I/O, parse or manifest-integrity error.
+
 See [CAD_BACKEND_EVALUATION.md](./CAD_BACKEND_EVALUATION.md) for candidate capabilities, CAx-IF fixture families and the cross-kernel bake-off. No backend is qualified by this manifest alone; real backend tests remain required.
 
 ## Research benchmark protocol
