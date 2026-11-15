@@ -14,6 +14,7 @@
 //! - [`inventory`]: economic order quantity (EOQ) + total cost.
 //! - [`queue`]: M/M/1 queue metrics (ρ, L, Lq, W, Wq).
 //! - [`graph`]: Dijkstra single-source shortest paths.
+//! - [`manufacturing_metrics`]: checked, deterministic factory KPI calculations.
 //!
 //! ## Example
 //!
