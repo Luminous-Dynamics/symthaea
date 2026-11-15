@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
 use rand::{Rng, SeedableRng, rngs::StdRng};
+use std::collections::{BTreeMap, HashSet};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -293,6 +294,150 @@ pub fn participant_capability_amplification(
         collaborative_participants: collaborative_gains.len(),
         control_participants: control_gains.len(),
     })
+}
+
+
+/// One participant's independent pre/post assessment within a preregistered
+/// baseline-capability stratum. Strata must be derived from baseline task data
+/// before condition outcomes are inspected; do not infer sensitive identity.
+#[derive(Debug, Clone)]
+pub struct StratifiedCapabilityObservation {
+    pub participant_id: String,
+    pub baseline_stratum: String,
+    pub condition: String,
+    pub pre_score: f64,
+    pub post_score: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CapabilityStratumEstimate {
+    pub baseline_stratum: String,
+    pub collaborative_participants: usize,
+    pub control_participants: usize,
+    pub mean_gain_difference: f64,
+    pub ci_95_lower: f64,
+    pub ci_95_upper: f64,
+    pub collaborative_negative_gain_rate: f64,
+    pub control_negative_gain_rate: f64,
+    /// Difference in the fraction of participants whose independent score fell.
+    pub negative_gain_rate_difference: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct StratifiedCapabilitySummary {
+    pub strata: Vec<CapabilityStratumEstimate>,
+    pub seed: u64,
+    pub draws_per_stratum: usize,
+}
+
+/// Report capability amplification and negative-gain rates separately within
+/// preregistered baseline-capability strata. This exposes distributional
+/// effects that a pooled average can conceal. It does not classify participants
+/// by demographic or sensitive identity.
+pub fn summarize_capability_amplification_by_stratum(
+    observations: &[StratifiedCapabilityObservation],
+    draws: usize,
+    seed: u64,
+) -> Result<StratifiedCapabilitySummary> {
+    if draws < 1_000 {
+        bail!("stratified capability bootstrap requires at least 1,000 draws");
+    }
+    if observations.is_empty() {
+        bail!("stratified capability summary requires observations");
+    }
+
+    #[derive(Default)]
+    struct Arm {
+        pre: Vec<f64>,
+        post: Vec<f64>,
+        negative_gains: usize,
+    }
+    #[derive(Default)]
+    struct Stratum {
+        collaborative: Arm,
+        control: Arm,
+    }
+
+    let mut participants = HashSet::new();
+    let mut groups: BTreeMap<String, Stratum> = BTreeMap::new();
+
+    for (index, observation) in observations.iter().enumerate() {
+        require_nonempty_stratum("participant_id", &observation.participant_id)?;
+        require_nonempty_stratum("baseline_stratum", &observation.baseline_stratum)?;
+        if !participants.insert(observation.participant_id.as_str()) {
+            bail!(
+                "duplicate participant_id {:?} in stratified capability observations",
+                observation.participant_id
+            );
+        }
+        validate_learning_score("pre_score", index, observation.pre_score)?;
+        validate_learning_score("post_score", index, observation.post_score)?;
+
+        let arm = match observation.condition.as_str() {
+            "collaborative" => &mut groups
+                .entry(observation.baseline_stratum.clone())
+                .or_default()
+                .collaborative,
+            "control" => &mut groups
+                .entry(observation.baseline_stratum.clone())
+                .or_default()
+                .control,
+            other => bail!("unsupported capability condition {other:?}"),
+        };
+        arm.pre.push(observation.pre_score);
+        arm.post.push(observation.post_score);
+        arm.negative_gains += usize::from(observation.post_score < observation.pre_score);
+    }
+
+    let mut estimates = Vec::with_capacity(groups.len());
+    for (index, (stratum, group)) in groups.into_iter().enumerate() {
+        if group.collaborative.pre.len() < 2 || group.control.pre.len() < 2 {
+            bail!(
+                "baseline stratum {:?} requires at least two participants in each arm",
+                stratum
+            );
+        }
+        let estimate = participant_capability_amplification(
+            &group.collaborative.pre,
+            &group.collaborative.post,
+            &group.control.pre,
+            &group.control.post,
+            draws,
+            seed.wrapping_add(index as u64),
+        )?;
+        let collaborative_n = group.collaborative.pre.len();
+        let control_n = group.control.pre.len();
+        let collaborative_negative_gain_rate =
+            group.collaborative.negative_gains as f64 / collaborative_n as f64;
+        let control_negative_gain_rate =
+            group.control.negative_gains as f64 / control_n as f64;
+
+        estimates.push(CapabilityStratumEstimate {
+            baseline_stratum: stratum,
+            collaborative_participants: collaborative_n,
+            control_participants: control_n,
+            mean_gain_difference: estimate.mean_gain_difference,
+            ci_95_lower: estimate.ci_95_lower,
+            ci_95_upper: estimate.ci_95_upper,
+            collaborative_negative_gain_rate,
+            control_negative_gain_rate,
+            negative_gain_rate_difference: collaborative_negative_gain_rate
+                - control_negative_gain_rate,
+        });
+    }
+
+    Ok(StratifiedCapabilitySummary {
+        strata: estimates,
+        seed,
+        draws_per_stratum: draws,
+    })
+}
+
+fn require_nonempty_stratum(label: &str, value: &str) -> Result<()> {
+    if value.trim().is_empty() {
+        bail!("{label} must not be empty");
+    }
+    Ok(())
 }
 
 fn validate_learning_score(label: &str, index: usize, score: f64) -> Result<()> {
@@ -918,6 +1063,137 @@ mod tests {
         assert!(exact_shapley_values(&[Some(0.0), None]).is_err());
         assert!(exact_shapley_values(&[Some(0.0), Some(1.1)]).is_err());
         assert!(exact_shapley_values(&[Some(0.0), Some(0.5), Some(0.7)]).is_err());
+    }
+
+    #[test]
+    fn stratified_capability_amplification_exposes_unequal_benefit_and_harm() {
+        let mut observations = Vec::new();
+        for (i, (pre, post)) in [
+            (0.1, 0.2),
+            (0.2, 0.25),
+            (0.3, 0.4),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            observations.push(StratifiedCapabilityObservation {
+                participant_id: format!("low-collab-{i}"),
+                baseline_stratum: "low_baseline".to_owned(),
+                condition: "collaborative".to_owned(),
+                pre_score: pre,
+                post_score: post,
+            });
+        }
+        for (i, (pre, post)) in [
+            (0.1, 0.15),
+            (0.2, 0.3),
+            (0.3, 0.35),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            observations.push(StratifiedCapabilityObservation {
+                participant_id: format!("low-control-{i}"),
+                baseline_stratum: "low_baseline".to_owned(),
+                condition: "control".to_owned(),
+                pre_score: pre,
+                post_score: post,
+            });
+        }
+        for (i, (pre, post)) in [
+            (0.7, 0.6),
+            (0.75, 0.8),
+            (0.8, 0.82),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            observations.push(StratifiedCapabilityObservation {
+                participant_id: format!("high-collab-{i}"),
+                baseline_stratum: "high_baseline".to_owned(),
+                condition: "collaborative".to_owned(),
+                pre_score: pre,
+                post_score: post,
+            });
+        }
+        for (i, (pre, post)) in [
+            (0.7, 0.75),
+            (0.75, 0.8),
+            (0.8, 0.82),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            observations.push(StratifiedCapabilityObservation {
+                participant_id: format!("high-control-{i}"),
+                baseline_stratum: "high_baseline".to_owned(),
+                condition: "control".to_owned(),
+                pre_score: pre,
+                post_score: post,
+            });
+        }
+
+        let first = summarize_capability_amplification_by_stratum(&observations, 2_000, 42)
+            .unwrap();
+        let second = summarize_capability_amplification_by_stratum(&observations, 2_000, 42)
+            .unwrap();
+        assert_eq!(first.strata.len(), 2);
+        assert_eq!(first.strata[0].baseline_stratum, "high_baseline");
+        assert_eq!(first.strata[1].baseline_stratum, "low_baseline");
+        assert!((first.strata[0].mean_gain_difference + 0.05).abs() < 1e-12);
+        assert!((first.strata[0].collaborative_negative_gain_rate - 1.0 / 3.0).abs() < 1e-12);
+        assert_eq!(first.strata[0].control_negative_gain_rate, 0.0);
+        assert_eq!(
+            first.strata[0].ci_95_lower,
+            second.strata[0].ci_95_lower
+        );
+        assert_eq!(
+            first.strata[1].ci_95_upper,
+            second.strata[1].ci_95_upper
+        );
+    }
+
+    #[test]
+    fn stratified_capability_summary_rejects_duplicate_or_underfilled_participants() {
+        let duplicate = [
+            StratifiedCapabilityObservation {
+                participant_id: "p1".to_owned(),
+                baseline_stratum: "low".to_owned(),
+                condition: "collaborative".to_owned(),
+                pre_score: 0.2,
+                post_score: 0.3,
+            },
+            StratifiedCapabilityObservation {
+                participant_id: "p1".to_owned(),
+                baseline_stratum: "low".to_owned(),
+                condition: "control".to_owned(),
+                pre_score: 0.2,
+                post_score: 0.25,
+            },
+        ];
+        assert!(
+            summarize_capability_amplification_by_stratum(&duplicate, 1_000, 5).is_err()
+        );
+
+        let underfilled = [
+            StratifiedCapabilityObservation {
+                participant_id: "c1".to_owned(),
+                baseline_stratum: "low".to_owned(),
+                condition: "collaborative".to_owned(),
+                pre_score: 0.2,
+                post_score: 0.3,
+            },
+            StratifiedCapabilityObservation {
+                participant_id: "c2".to_owned(),
+                baseline_stratum: "low".to_owned(),
+                condition: "collaborative".to_owned(),
+                pre_score: 0.3,
+                post_score: 0.4,
+            },
+        ];
+        assert!(
+            summarize_capability_amplification_by_stratum(&underfilled, 1_000, 5).is_err()
+        );
     }
 
     #[test]
