@@ -108,10 +108,11 @@
     "evidence": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["occurrence_id", "source_observation_sha256", "evidence_kind", "confidence_bp"],
+      "required": ["occurrence_id", "source_observation_sha256", "evidence_receipt_sha256", "evidence_kind", "confidence_bp"],
       "properties": {
         "occurrence_id": { "type": "string", "minLength": 1 },
         "source_observation_sha256": { "$ref": "#/$defs/sha256" },
+        "evidence_receipt_sha256": { "$ref": "#/$defs/sha256" },
         "evidence_kind": { "enum": ["event_map", "temporal_anchor", "human_annotation", "audio_model_observation"] },
         "confidence_bp": { "type": "integer", "minimum": 0, "maximum": 10000 }
       }
