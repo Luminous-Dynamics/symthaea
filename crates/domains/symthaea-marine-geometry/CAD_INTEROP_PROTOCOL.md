@@ -66,7 +66,7 @@ The metric checks (length, volume, area, centroid, surface distance and edge gap
 
 ## 5. Suggested validation metrics
 
-Do not use one universal set of tolerances for all vessel scales, surface classes or downstream uses. A profile must state the measurement method and tolerance source for each metric.
+Do not use one universal set of tolerances for all vessel scales, surface classes or downstream uses. A profile must state the measurement method and tolerance source for each metric. The G3a receipt supports explicit required-semantic checks for product identity, configuration/revision, PMI/GD&T, materials, persistent IDs and validation properties; each must have an explicit PASS/FAIL/UNKNOWN result.
 
 At minimum record:
 - principal dimensions and bounding-box extents;
