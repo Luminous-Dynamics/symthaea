@@ -97,13 +97,15 @@ pub fn validate_shiftbench_admission_json(input: &str) -> Result<AdmissionReport
     if str_at(&manifest, &["schema_version"]) != Some(VERSION) {
         report.error("schema_version", "expected 0.1.0");
     }
-    report.task_id = required_string(&manifest, &["task_id"], "task_id", &mut report);
-    report.scenario_pair_id = required_string(
+    let task_id = required_string(&manifest, &["task_id"], "task_id", &mut report);
+    report.task_id = task_id;
+    let scenario_pair_id = required_string(
         &manifest,
         &["scenario_pair_id"],
         "scenario_pair_id",
         &mut report,
     );
+    report.scenario_pair_id = scenario_pair_id;
 
     let family = str_at(&manifest, &["intervention", "family"]).unwrap_or("");
     if !FAMILIES.contains(&family) {
