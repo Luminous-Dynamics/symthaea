@@ -73,7 +73,7 @@
       "additionalProperties": false,
       "required": [
         "schema_version", "sequence", "step_id", "operation_id",
-        "operation_kind", "instruction_sha256", "source_lineage_sha256",
+        "operation_kind", "history_action", "instruction_sha256", "source_lineage_sha256",
         "input_artifact_sha256", "output_artifact_sha256",
         "input_state_sha256", "output_state_sha256",
         "selection_receipt_sha256", "realization_receipt_sha256",
@@ -87,6 +87,9 @@
         "step_id": { "type": "string", "minLength": 1 },
         "operation_id": { "type": "string", "minLength": 1 },
         "operation_kind": { "enum": ["add", "remove", "replace", "volume", "tempo", "arrangement", "other"] },
+        "history_action": { "enum": ["apply", "undo", "redo"] },
+        "undo_target_step_id": { "type": "string", "minLength": 1 },
+        "redo_target_step_id": { "type": "string", "minLength": 1 },
         "instruction_sha256": { "$ref": "#/$defs/sha256" },
         "source_lineage_sha256": { "$ref": "#/$defs/sha256" },
         "input_artifact_sha256": { "$ref": "#/$defs/sha256" },
