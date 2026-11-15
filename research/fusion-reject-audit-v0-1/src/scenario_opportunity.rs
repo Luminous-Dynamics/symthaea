@@ -898,7 +898,10 @@ fn validate_bundle(
             errors.push(ScenarioOpportunityError::EmptyEvidenceRef(
                 bundle.candidate_id.clone(),
             ));
-        } else if !receipt_registry.evidence_refs.insert(evaluation.evidence_ref.clone()) {
+        } else if !receipt_registry
+            .evidence_refs
+            .insert(evaluation.evidence_ref.clone())
+        {
             errors.push(ScenarioOpportunityError::DuplicateScenarioEvidenceRef(
                 evaluation.evidence_ref.clone(),
             ));
