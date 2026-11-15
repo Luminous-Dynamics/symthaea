@@ -65,6 +65,34 @@ The upstream AOBench benchmark card identifies a gap between deterministic mock 
 
 These are candidate research directions, not completed capabilities. Keep any extended score separate from the official AOBench score.
 
+## Adapter semantics and the MCP trap
+
+The upstream AOBench MCP adapter is an **MCP client with an OpenAI agentic loop**, not a transparent executor for the MCP server's own reasoning. It connects to the supplied MCP server, discovers that server's tools, then presents those tools to an OpenAI-compatible model which makes the calls. A bare Symthaea MCP tool server evaluated through this adapter would therefore measure the OpenAI model driving those calls unless the integration explicitly routes decision-making through Symthaea.
+
+There are three defensible routes:
+
+1. **OpenAI-compatible endpoint:** use this only if Symthaea exposes an endpoint that itself performs the full reasoning/tool-use loop. Existing outbound OpenAI-compatible client code is not evidence that such an inbound endpoint exists. Verify the serving contract before selecting this route.
+2. **Custom AOBench adapter:** implement the upstream `BaseAdapter.run(context) -> Trace` interface. The adapter receives the task, role, environment, run ID, and role-filtered `context.tools` registry. Use `context.tools` for all benchmark tool calls; never read environment snapshots directly or bypass the registry. The adapter should call a documented Symthaea Rust service/sidecar for reasoning, then translate its decisions and tool observations into the upstream Trace schema.
+3. **MCP client adapter:** use only when the MCP server represents the evaluated agent's actual decision-making surface, rather than merely exposing raw tools for a different LLM to operate. Explicitly report which model is making tool decisions.
+
+The custom adapter may be a thin, research-only Python harness because AOBench's extension interface is Python. Keep production reasoning and benchmark-specific logic in Rust; do not let the adapter become a second agent. The adapter must preserve the upstream role-filtered tool boundary and record every tool call, observation, error, permission denial, model snapshot, and token/cost field available.
+
+### Minimum adapter acceptance tests
+
+- A role-denied tool call is recorded as a permission failure and never retried through an alternate path.
+- An unknown tool outcome blocks the next state-changing call until an independently observed reconciliation.
+- Tool calls are made only through the provided role-filtered registry.
+- A trace includes the exact task ID, role, environment ID, run ID, adapter revision, and final answer.
+- Model snapshot, prompts, sampling settings, timeout, retries, tokens, latency, and cost are pinned.
+- The AOBench `direct_qa` baseline is run under the identical task/profile configuration.
+- A test proves the candidate agent—not an external LLM hidden inside the adapter—makes the actual decisions being evaluated.
+
+Upstream references:
+- [Evaluate your own agent](https://github.com/MSKazemi/aobench/blob/main/docs/guides/evaluating-your-own-agent.md)
+- [MCP client adapter implementation](https://github.com/MSKazemi/aobench/blob/main/src/aobench/adapters/mcp_client_adapter.py)
+- [Base adapter interface](https://github.com/MSKazemi/aobench/blob/main/src/aobench/adapters/base.py)
+- [Trace schema](https://github.com/MSKazemi/aobench/blob/main/src/aobench/schemas/trace.py)
+
 ## Reproducibility record
 
 A public result must include the upstream version and commit, split, scoring profile, exact model snapshot, adapter revision, judge snapshot where applicable, run count, per-run artifacts, hard-fail count, cost, latency, and a reproducible command or endpoint. Do not compare scores across versions or profiles without a matched re-run.
