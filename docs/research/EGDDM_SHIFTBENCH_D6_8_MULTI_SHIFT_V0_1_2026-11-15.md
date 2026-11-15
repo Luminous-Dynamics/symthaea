@@ -40,7 +40,7 @@ Each shifted sequence contains 2–5 interventions. Every event binds:
 - reversibility, supersession, revocation, or no-op semantics;
 - active requirement changes and the validity dimensions relevant to each obligation.
 
-Timestamps alone do not establish causal order. Concurrent or incomparable events remain incomparable unless an independent causal relation is available.
+Timestamps alone do not establish causal order. **D6.8 v0.1 currently admits only strictly ordered event sequences** with monotone availability times; it rejects equal/out-of-order event times rather than inventing a total order. A future partial-order extension must represent a causal DAG and concurrent checkpoints explicitly.
 
 ## 4. Composition families
 
@@ -107,9 +107,9 @@ The conformant trace refreshes exactly ten required obligation/event pairs (3 + 
 
 These are synthetic fixture calculations. They are not Rust test results, independent adjudication, agent performance, measured cost, or empirical savings.
 
-The evaluator also recomputes a simple dependency-implied impact set from the changed identity dimensions and each obligation's declared dependency dimensions. Synthetic gold labels must match that set exactly. If a future overlay is marked independently adjudicated, the evaluator reports dependency-only and gold-only residuals rather than silently rewriting either side. This comparison is a diagnostic baseline, not a causal-completeness theorem.
+The evaluator also recomputes a **direct dependency-implied** impact set from the identity dimensions changed at each event and each obligation's declared dependency dimensions. Synthetic gold labels must match this direct-delta set exactly. If a future overlay is marked independently adjudicated, the evaluator reports direct-dependency-only and gold-only residuals rather than silently rewriting either side. This is a diagnostic baseline, not transitive dependency closure or a causal-completeness theorem; D6.7 remains the owner of independent impact adjudication and common-cause provenance.
 
-Every receipt's declared context is checked against the state at its `source_epoch` as well as the current state. This blocks a candidate from relabelling an old receipt with current context fields while keeping an old source epoch. It remains semantic consistency checking, not cryptographic execution authentication.
+Every receipt's declared context is checked against both (a) the state at its declared `source_epoch` and (b) the current state. This blocks a candidate from relabelling an old receipt with current context fields while keeping an old source epoch. The scorer reports source-context mismatches separately from current-context mismatches. This is semantic consistency checking, not cryptographic execution authentication.
 
 ## 8. Controls and validity pilot
 
@@ -121,7 +121,7 @@ Mandatory controls:
 - complete restoration of all relevant identities permits reuse when policy says so;
 - revocation followed by reauthorization requires a new authority decision;
 - sham/no-op intervention does not invalidate unrelated evidence;
-- concurrent events are not forced into an unsupported total order;
+- v0.1 rejects concurrent/equal-time event inputs rather than forcing a total order; a future causal-DAG extension must test incomparable events explicitly;
 - late-arriving evidence cannot appear before its availability checkpoint;
 - terminal pass cannot erase prior critical exposure.
 
@@ -152,7 +152,7 @@ Pin model/harness versions, system prompts, tool permissions, context, runner im
 - Zero false-resurrection accepts in critical rollback, revocation, and authority-rotation negative controls.
 - Zero future-evidence leakage at every checkpoint.
 - Positive, negative, sham, and no-op controls expose both under- and over-invalidation.
-- Incomparable event histories remain incomparable without independent causal ordering.
+- v0.1 accepts only strictly ordered events; partial-order/concurrent-event scoring is a deferred extension, not a current capability.
 - Terminal success does not erase prior critical unsupported exposure.
 - Candidate-visible data contains no gold labels, hidden obligations, reference patches, or grader credentials.
 - Unknown cost or impact remains unknown/bounded; it never silently becomes zero.
@@ -178,7 +178,7 @@ These benchmarks are complementary, not directly score-comparable. D6.8's propos
 - The branch is based on D6.6 PR #12351's source branch.
 - Added `tools/development-map-validator/src/multi_shift_sequence.rs`, exported it from `lib.rs`, and wired the `multi-shift-sequence <bundle.json>` CLI command in `main.rs`.
 - Added the input bundle schema, deterministic input fixture, output report schema, and full expected-output fixture.
-- Authored Rust tests for full known-answer equality, false resurrection, stale dependency reuse, forged source-epoch context, future evidence, restoration, failed fresh checks, duplicate receipts, broken event chains, missing gold reasons, and synthetic/independent impact-label disagreement.
+- Authored Rust tests for full known-answer equality, false resurrection, stale dependency reuse, source-epoch laundering by rewritten context, future evidence, restoration, failed fresh checks, duplicate receipts, broken event chains, missing gold reasons, and synthetic/independent impact-label disagreement.
 - A separate JavaScript audit reproduced the fixture's derived-impact sets and trace counts: conformant 10/10 required fresh checks; adversarial 9/10 with one critical false resurrection; full-identity restoration reused all four eligible baseline receipts. The same audit found zero dependency/gold-set residuals in the synthetic fixture.
 - The JSON files were parsed and fetched back from the branch. This is not Draft 2020-12 schema validation.
 - This environment has no `rustc`, `cargo`, `rustfmt`, or `nix`. Rust compilation/tests, formatting, Clippy, schema-engine validation, CI qualification, real task admission, independent human adjudication, model rollout, measured costs, and external replication have not been executed.
