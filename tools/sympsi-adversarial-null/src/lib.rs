@@ -327,15 +327,15 @@ fn simulate_scenario(
     let mut global_rejections = 0_u64;
     let mut block_rejections = 0_u64;
 
-    let scenario_seed = derive_seed(manifest.master_seed, profile_name, spec.id);
-
     for campaign in 0..manifest.campaigns_per_scenario {
+        let campaign_seed =
+            derive_campaign_seed(manifest.master_seed, profile_name, spec.id, campaign);
         let counts = generate_campaign(
             choices,
             n,
             block_count,
             spec.id,
-            scenario_seed.wrapping_add(campaign.wrapping_mul(0x9e37_79b9_7f4a_7c15)),
+            campaign_seed,
         );
 
         if counts.global_hits >= profile.naive_critical_hits as u64 {
@@ -414,7 +414,10 @@ fn generate_campaign(
     scenario_id: &str,
     seed: u64,
 ) -> CampaignCounts {
-    let mut rng = SplitMix64::new(seed);
+    // Separate deterministic streams ensure target generation never
+    // consumes or shifts the response generator's pseudo-random stream.
+    let mut target_rng = SplitMix64::new(derive_stream_seed(seed, "target-stream"));
+    let mut response_rng = SplitMix64::new(derive_stream_seed(seed, "response-stream"));
     let block_size = n / block_count;
     let mut global_target = vec![0_u64; choices];
     let mut global_response = vec![0_u64; choices];
@@ -431,14 +434,14 @@ fn generate_campaign(
         }
         let (target_weights, response_weights, markov) =
             scenario_weights(scenario_id, choices, block);
-        let target = rng.categorical(&target_weights);
+        let target = target_rng.categorical(&target_weights);
         let response = if markov {
             match previous_response {
-                Some(previous) if rng.unit() < 0.80 => previous,
-                _ => rng.categorical(&response_weights),
+                Some(previous) if response_rng.unit() < 0.80 => previous,
+                _ => response_rng.categorical(&response_weights),
             }
         } else {
-            rng.categorical(&response_weights)
+            response_rng.categorical(&response_weights)
         };
         previous_response = Some(response);
 
@@ -619,7 +622,12 @@ fn control(id: &str, passed: bool, detail: &str) -> ControlResult {
     }
 }
 
-fn derive_seed(master: u64, profile: &str, scenario: &str) -> u64 {
+fn derive_campaign_seed(
+    master: u64,
+    profile: &str,
+    scenario: &str,
+    campaign: u64,
+) -> u64 {
     let mut hasher = Sha256::new();
     hasher.update(DOMAIN.as_bytes());
     hasher.update([0]);
@@ -628,6 +636,20 @@ fn derive_seed(master: u64, profile: &str, scenario: &str) -> u64 {
     hasher.update(profile.as_bytes());
     hasher.update([0]);
     hasher.update(scenario.as_bytes());
+    hasher.update([0]);
+    hasher.update(b"campaign");
+    hasher.update(campaign.to_be_bytes());
+    let digest = hasher.finalize();
+    u64::from_be_bytes(digest[..8].try_into().expect("fixed digest prefix"))
+}
+
+fn derive_stream_seed(campaign_seed: u64, stream_id: &str) -> u64 {
+    let mut hasher = Sha256::new();
+    hasher.update(DOMAIN.as_bytes());
+    hasher.update([0]);
+    hasher.update(campaign_seed.to_be_bytes());
+    hasher.update([0]);
+    hasher.update(stream_id.as_bytes());
     let digest = hasher.finalize();
     u64::from_be_bytes(digest[..8].try_into().expect("fixed digest prefix"))
 }
@@ -731,6 +753,19 @@ mod tests {
         assert!(naive_rate > 0.45);
         assert!(global_z.abs() < 8.0);
         assert_eq!(four.choice_count, 4);
+    }
+
+    #[test]
+    fn campaign_and_random_stream_seeds_are_domain_separated() {
+        let first = derive_campaign_seed(20261115, "four-choice", "uniform_iid", 0);
+        let second = derive_campaign_seed(20261115, "four-choice", "uniform_iid", 1);
+        let other_scenario = derive_campaign_seed(20261115, "four-choice", "persistent_response_preference", 0);
+        assert_ne!(first, second);
+        assert_ne!(first, other_scenario);
+        assert_ne!(
+            derive_stream_seed(first, "target-stream"),
+            derive_stream_seed(first, "response-stream")
+        );
     }
 
     #[test]
