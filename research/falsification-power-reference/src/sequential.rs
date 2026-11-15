@@ -1,0 +1,744 @@
+//! Time-uniform Gaussian likelihood-ratio e-process references.
+//!
+//! The evaluator commits each alternative prediction before accepting the
+//! corresponding observation. This makes chronology explicit in the local
+//! protocol, although it cannot prove that a caller did not read an outcome
+//! through an out-of-band channel.
+//!
+//! Validity requires the conditional simple null
+//! Y_t | F_{t-1}, A_t ~ N(0, sigma^2), known common sigma, and a discrepancy
+//! committed using only information available before Y_t. Unknown variance,
+//! composite nulls, unmodelled dependence and arbitrary physical trajectories
+//! require separate methods and qualification.
+
+use std::collections::BTreeSet;
+use std::error::Error;
+use std::fmt;
+
+/// Invalid input or protocol transition for a sequential reference.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SequentialError {
+    InvalidSigma,
+    InvalidAlpha,
+    EmptyObservationId,
+    EmptyDecisionDigest,
+    DuplicateObservationId(String),
+    PredictionAlreadyPending,
+    NoPredictionPending,
+    ObservationIdMismatch {
+        expected: String,
+        actual: String,
+    },
+    DecisionDigestMismatch,
+    NonFiniteDiscrepancy,
+    NonFiniteObservation,
+    EmptyAlternativeSet,
+    EmptyAlternativeId,
+    DuplicateAlternativeId(String),
+    InvalidAlternativeWeight,
+    AlternativeWeightsMustSumToOne,
+    AlternativeCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    NumericalOverflow,
+    ObservationCountOverflow,
+}
+
+impl fmt::Display for SequentialError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidSigma => write!(f, "sigma must be finite and strictly positive"),
+            Self::InvalidAlpha => write!(f, "alpha must be finite and strictly between zero and one"),
+            Self::EmptyObservationId => write!(f, "observation ID must not be empty"),
+            Self::EmptyDecisionDigest => write!(f, "decision digest must not be empty"),
+            Self::DuplicateObservationId(id) => write!(f, "observation ID was already consumed: {id}"),
+            Self::PredictionAlreadyPending => write!(f, "a prediction is already pending an observation"),
+            Self::NoPredictionPending => write!(f, "an observation cannot be scored before a prediction is committed"),
+            Self::ObservationIdMismatch { expected, actual } => {
+                write!(f, "observation ID mismatch: expected {expected}, received {actual}")
+            }
+            Self::DecisionDigestMismatch => write!(f, "observation decision digest differs from the committed prediction"),
+            Self::NonFiniteDiscrepancy => write!(f, "predicted discrepancy must be finite"),
+            Self::NonFiniteObservation => write!(f, "observed residual must be finite"),
+            Self::EmptyAlternativeSet => write!(f, "alternative set must not be empty"),
+            Self::EmptyAlternativeId => write!(f, "alternative ID must not be empty"),
+            Self::DuplicateAlternativeId(id) => write!(f, "duplicate alternative ID: {id}"),
+            Self::InvalidAlternativeWeight => write!(f, "alternative weights must be finite and strictly positive"),
+            Self::AlternativeWeightsMustSumToOne => write!(f, "fixed alternative weights must sum to one"),
+            Self::AlternativeCountMismatch { expected, actual } => {
+                write!(f, "received {actual} alternative predictions; expected {expected}")
+            }
+            Self::NumericalOverflow => write!(f, "likelihood-ratio update exceeded finite f64 range"),
+            Self::ObservationCountOverflow => write!(f, "observation counter overflow"),
+        }
+    }
+}
+
+impl Error for SequentialError {}
+
+/// One update result. The p-value is based on the maximum e-value observed
+/// through this step, not only the current e-value.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SequentialUpdate {
+    pub observation_id: String,
+    pub decision_digest: String,
+    pub observations: u64,
+    pub log_e_value: f64,
+    pub maximum_log_e_value: f64,
+    pub anytime_p_value: f64,
+    pub crossed_alpha_boundary: bool,
+}
+
+/// A single evaluator-declared alternative that is fixed before the sequence.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WeightedAlternative {
+    pub id: String,
+    pub weight: f64,
+}
+
+/// One component of a fixed-mixture report.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MixtureComponentUpdate {
+    pub id: String,
+    pub weight: f64,
+    pub log_e_value: f64,
+}
+
+/// Report for a predeclared fixed mixture of alternative-specific e-processes.
+#[derive(Debug, Clone, PartialEq)]
+pub struct MixtureSequentialUpdate {
+    pub observation_id: String,
+    pub decision_digest: String,
+    pub observations: u64,
+    pub components: Vec<MixtureComponentUpdate>,
+    pub log_e_value: f64,
+    pub maximum_log_e_value: f64,
+    pub anytime_p_value: f64,
+    pub crossed_alpha_boundary: bool,
+}
+
+#[derive(Debug, Clone)]
+struct PendingPrediction {
+    observation_id: String,
+    decision_digest: String,
+    residuals: Vec<f64>,
+}
+
+fn validate_alpha_sigma(alpha: f64, sigma: f64) -> Result<(), SequentialError> {
+    if !sigma.is_finite() || sigma <= 0.0 {
+        return Err(SequentialError::InvalidSigma);
+    }
+    if !alpha.is_finite() || alpha <= 0.0 || alpha >= 1.0 {
+        return Err(SequentialError::InvalidAlpha);
+    }
+    Ok(())
+}
+
+fn validate_prediction_identity(
+    observation_id: &str,
+    decision_digest: &str,
+) -> Result<(), SequentialError> {
+    if observation_id.trim().is_empty() {
+        return Err(SequentialError::EmptyObservationId);
+    }
+    if decision_digest.trim().is_empty() {
+        return Err(SequentialError::EmptyDecisionDigest);
+    }
+    Ok(())
+}
+
+fn likelihood_ratio_increment(
+    discrepancy: f64,
+    observed_residual: f64,
+    sigma: f64,
+) -> Result<f64, SequentialError> {
+    if !discrepancy.is_finite() {
+        return Err(SequentialError::NonFiniteDiscrepancy);
+    }
+    if !observed_residual.is_finite() {
+        return Err(SequentialError::NonFiniteObservation);
+    }
+
+    let standardized_discrepancy = discrepancy / sigma;
+    let standardized_observation = observed_residual / sigma;
+    let increment = standardized_discrepancy * standardized_observation
+        - 0.5 * standardized_discrepancy * standardized_discrepancy;
+    if !increment.is_finite() {
+        return Err(SequentialError::NumericalOverflow);
+    }
+    Ok(increment)
+}
+
+fn anytime_p_value(maximum_log_e_value: f64) -> f64 {
+    (-maximum_log_e_value.max(0.0)).exp().min(1.0)
+}
+
+/// A predictable-prediction, single-alternative Gaussian e-process.
+///
+/// For each time t, the evaluator must call commit_prediction before observe.
+/// Under the conditional Gaussian simple null, the likelihood-ratio increment
+/// exp(d_t * Y_t / sigma^2 - d_t^2 / (2*sigma^2)) has conditional expectation 1
+/// when d_t is predictable. The product is therefore a nonnegative martingale.
+///
+/// The anytime p-value is 1 / max_{s <= t} E_s, capped at one. Ville's
+/// inequality controls the probability of ever crossing 1/alpha under the
+/// declared null. This is not valid automatically for estimated sigma,
+/// composite nulls, correlated observations or non-predictable d_t.
+#[derive(Debug, Clone)]
+pub struct PredictableGaussianEProcess {
+    sigma: f64,
+    alpha: f64,
+    log_e_value: f64,
+    maximum_log_e_value: f64,
+    observations: u64,
+    pending: Option<PendingPrediction>,
+    consumed_observation_ids: BTreeSet<String>,
+}
+
+impl PredictableGaussianEProcess {
+    pub fn new(sigma: f64, alpha: f64) -> Result<Self, SequentialError> {
+        validate_alpha_sigma(alpha, sigma)?;
+        Ok(Self {
+            sigma,
+            alpha,
+            log_e_value: 0.0,
+            maximum_log_e_value: 0.0,
+            observations: 0,
+            pending: None,
+            consumed_observation_ids: BTreeSet::new(),
+        })
+    }
+
+    /// Commit the discrepancy prediction and decision identity before the
+    /// corresponding observation becomes available to this evaluator.
+    pub fn commit_prediction(
+        &mut self,
+        observation_id: impl Into<String>,
+        decision_digest: impl Into<String>,
+        expected_residual: f64,
+    ) -> Result<(), SequentialError> {
+        let observation_id = observation_id.into();
+        let decision_digest = decision_digest.into();
+        validate_prediction_identity(&observation_id, &decision_digest)?;
+        if !expected_residual.is_finite() {
+            return Err(SequentialError::NonFiniteDiscrepancy);
+        }
+        if self.pending.is_some() {
+            return Err(SequentialError::PredictionAlreadyPending);
+        }
+        if self.consumed_observation_ids.contains(&observation_id) {
+            return Err(SequentialError::DuplicateObservationId(observation_id));
+        }
+        self.pending = Some(PendingPrediction {
+            observation_id,
+            decision_digest,
+            residuals: vec![expected_residual],
+        });
+        Ok(())
+    }
+
+    /// Consume the observation that matches the pending, previously committed
+    /// prediction. A mismatch or invalid observation leaves the prediction
+    /// pending and does not mutate the e-process.
+    pub fn observe(
+        &mut self,
+        observation_id: &str,
+        decision_digest: &str,
+        observed_residual: f64,
+    ) -> Result<SequentialUpdate, SequentialError> {
+        if !observed_residual.is_finite() {
+            return Err(SequentialError::NonFiniteObservation);
+        }
+        let pending = self
+            .pending
+            .as_ref()
+            .ok_or(SequentialError::NoPredictionPending)?;
+        if pending.observation_id != observation_id {
+            return Err(SequentialError::ObservationIdMismatch {
+                expected: pending.observation_id.clone(),
+                actual: observation_id.to_owned(),
+            });
+        }
+        if pending.decision_digest != decision_digest {
+            return Err(SequentialError::DecisionDigestMismatch);
+        }
+
+        let increment = likelihood_ratio_increment(
+            pending.residuals[0],
+            observed_residual,
+            self.sigma,
+        )?;
+        let next_log_e_value = self.log_e_value + increment;
+        if !next_log_e_value.is_finite() {
+            return Err(SequentialError::NumericalOverflow);
+        }
+        let next_observations = self
+            .observations
+            .checked_add(1)
+            .ok_or(SequentialError::ObservationCountOverflow)?;
+        let next_maximum = self.maximum_log_e_value.max(next_log_e_value);
+        let alpha_boundary = (1.0 / self.alpha).ln();
+        let anytime_p = anytime_p_value(next_maximum);
+        let crossed = next_maximum >= alpha_boundary;
+
+        let pending = self.pending.take().expect("pending prediction was checked above");
+        self.consumed_observation_ids
+            .insert(pending.observation_id.clone());
+        self.log_e_value = next_log_e_value;
+        self.maximum_log_e_value = next_maximum;
+        self.observations = next_observations;
+
+        Ok(SequentialUpdate {
+            observation_id: pending.observation_id,
+            decision_digest: pending.decision_digest,
+            observations: self.observations,
+            log_e_value: self.log_e_value,
+            maximum_log_e_value: self.maximum_log_e_value,
+            anytime_p_value: anytime_p,
+            crossed_alpha_boundary: crossed,
+        })
+    }
+
+    pub fn has_pending_prediction(&self) -> bool {
+        self.pending.is_some()
+    }
+}
+
+/// A fixed, predeclared mixture of alternative-specific Gaussian e-processes.
+///
+/// Weights are normalized at construction and then remain fixed. Each
+/// alternative residual must be committed before the shared observation.
+/// Under the same simple conditional Gaussian null, a fixed convex mixture
+/// remains an e-process. Post-hoc selection of the best component is not
+/// substituted for this mixture and is not covered by its validity guarantee.
+#[derive(Debug, Clone)]
+pub struct PredictableGaussianMixture {
+    sigma: f64,
+    alpha: f64,
+    alternatives: Vec<WeightedAlternative>,
+    weights: Vec<f64>,
+    component_log_e_values: Vec<f64>,
+    log_e_value: f64,
+    maximum_log_e_value: f64,
+    observations: u64,
+    pending: Option<PendingPrediction>,
+    consumed_observation_ids: BTreeSet<String>,
+}
+
+impl PredictableGaussianMixture {
+    pub fn new(
+        sigma: f64,
+        alpha: f64,
+        alternatives: Vec<WeightedAlternative>,
+    ) -> Result<Self, SequentialError> {
+        validate_alpha_sigma(alpha, sigma)?;
+        if alternatives.is_empty() {
+            return Err(SequentialError::EmptyAlternativeSet);
+        }
+
+        let mut seen = BTreeSet::new();
+        let mut weight_sum = 0.0;
+        for alternative in &alternatives {
+            if alternative.id.trim().is_empty() {
+                return Err(SequentialError::EmptyAlternativeId);
+            }
+            if !seen.insert(alternative.id.clone()) {
+                return Err(SequentialError::DuplicateAlternativeId(
+                    alternative.id.clone(),
+                ));
+            }
+            if !alternative.weight.is_finite() || alternative.weight <= 0.0 {
+                return Err(SequentialError::InvalidAlternativeWeight);
+            }
+            weight_sum += alternative.weight;
+        }
+        if !weight_sum.is_finite() || (weight_sum - 1.0).abs() > 1.0e-10 {
+            return Err(SequentialError::AlternativeWeightsMustSumToOne);
+        }
+
+        let weights = alternatives
+            .iter()
+            .map(|alternative| alternative.weight / weight_sum)
+            .collect::<Vec<_>>();
+        let count = alternatives.len();
+        Ok(Self {
+            sigma,
+            alpha,
+            alternatives,
+            weights,
+            component_log_e_values: vec![0.0; count],
+            log_e_value: 0.0,
+            maximum_log_e_value: 0.0,
+            observations: 0,
+            pending: None,
+            consumed_observation_ids: BTreeSet::new(),
+        })
+    }
+
+    /// Commit every alternative prediction for one observation before
+    /// accepting the corresponding shared outcome.
+    pub fn commit_predictions(
+        &mut self,
+        observation_id: impl Into<String>,
+        decision_digest: impl Into<String>,
+        expected_residuals: &[f64],
+    ) -> Result<(), SequentialError> {
+        let observation_id = observation_id.into();
+        let decision_digest = decision_digest.into();
+        validate_prediction_identity(&observation_id, &decision_digest)?;
+        if self.pending.is_some() {
+            return Err(SequentialError::PredictionAlreadyPending);
+        }
+        if self.consumed_observation_ids.contains(&observation_id) {
+            return Err(SequentialError::DuplicateObservationId(observation_id));
+        }
+        if expected_residuals.len() != self.alternatives.len() {
+            return Err(SequentialError::AlternativeCountMismatch {
+                expected: self.alternatives.len(),
+                actual: expected_residuals.len(),
+            });
+        }
+        if expected_residuals.iter().any(|value| !value.is_finite()) {
+            return Err(SequentialError::NonFiniteDiscrepancy);
+        }
+        self.pending = Some(PendingPrediction {
+            observation_id,
+            decision_digest,
+            residuals: expected_residuals.to_vec(),
+        });
+        Ok(())
+    }
+
+    /// Consume the shared observation only when it matches the pending
+    /// identity and all precommitted alternative predictions.
+    pub fn observe(
+        &mut self,
+        observation_id: &str,
+        decision_digest: &str,
+        observed_residual: f64,
+    ) -> Result<MixtureSequentialUpdate, SequentialError> {
+        if !observed_residual.is_finite() {
+            return Err(SequentialError::NonFiniteObservation);
+        }
+        let pending = self
+            .pending
+            .as_ref()
+            .ok_or(SequentialError::NoPredictionPending)?;
+        if pending.observation_id != observation_id {
+            return Err(SequentialError::ObservationIdMismatch {
+                expected: pending.observation_id.clone(),
+                actual: observation_id.to_owned(),
+            });
+        }
+        if pending.decision_digest != decision_digest {
+            return Err(SequentialError::DecisionDigestMismatch);
+        }
+
+        let mut next_components = Vec::with_capacity(self.alternatives.len());
+        for (discrepancy, current) in pending
+            .residuals
+            .iter()
+            .copied()
+            .zip(self.component_log_e_values.iter().copied())
+        {
+            let increment = likelihood_ratio_increment(discrepancy, observed_residual, self.sigma)?;
+            let next = current + increment;
+            if !next.is_finite() {
+                return Err(SequentialError::NumericalOverflow);
+            }
+            next_components.push(next);
+        }
+
+        let weighted_logs = next_components
+            .iter()
+            .copied()
+            .zip(self.weights.iter().copied())
+            .map(|(log_e, weight)| log_e + weight.ln())
+            .collect::<Vec<_>>();
+        let next_log_e_value = log_sum_exp(&weighted_logs);
+        if !next_log_e_value.is_finite() {
+            return Err(SequentialError::NumericalOverflow);
+        }
+        let next_observations = self
+            .observations
+            .checked_add(1)
+            .ok_or(SequentialError::ObservationCountOverflow)?;
+        let next_maximum = self.maximum_log_e_value.max(next_log_e_value);
+        let alpha_boundary = (1.0 / self.alpha).ln();
+        let anytime_p = anytime_p_value(next_maximum);
+        let crossed = next_maximum >= alpha_boundary;
+
+        let pending = self.pending.take().expect("pending prediction was checked above");
+        self.consumed_observation_ids
+            .insert(pending.observation_id.clone());
+        self.component_log_e_values = next_components;
+        self.log_e_value = next_log_e_value;
+        self.maximum_log_e_value = next_maximum;
+        self.observations = next_observations;
+
+        let components = self
+            .alternatives
+            .iter()
+            .zip(self.weights.iter().copied())
+            .zip(self.component_log_e_values.iter().copied())
+            .map(|((alternative, weight), log_e_value)| MixtureComponentUpdate {
+                id: alternative.id.clone(),
+                weight,
+                log_e_value,
+            })
+            .collect();
+
+        Ok(MixtureSequentialUpdate {
+            observation_id: pending.observation_id,
+            decision_digest: pending.decision_digest,
+            observations: self.observations,
+            components,
+            log_e_value: self.log_e_value,
+            maximum_log_e_value: self.maximum_log_e_value,
+            anytime_p_value: anytime_p,
+            crossed_alpha_boundary: crossed,
+        })
+    }
+
+    pub fn has_pending_prediction(&self) -> bool {
+        self.pending.is_some()
+    }
+}
+
+fn log_sum_exp(values: &[f64]) -> f64 {
+    let maximum = values
+        .iter()
+        .copied()
+        .fold(f64::NEG_INFINITY, f64::max);
+    maximum + values.iter().map(|value| (value - maximum).exp()).sum::<f64>().ln()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn known_gaussian_log_likelihood_increment_matches_reference() {
+        let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
+        process
+            .commit_prediction("obs-1", "sha256:decision-1", 0.24)
+            .unwrap();
+        let result = process
+            .observe("obs-1", "sha256:decision-1", 0.20)
+            .unwrap();
+        assert!((result.log_e_value - 0.853_333_333_333_333_3).abs() < 1.0e-12);
+        assert_eq!(result.observations, 1);
+    }
+
+    #[test]
+    fn outcome_cannot_be_scored_before_prediction_is_committed() {
+        let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
+        assert_eq!(
+            process.observe("obs-1", "sha256:decision-1", 0.20),
+            Err(SequentialError::NoPredictionPending)
+        );
+        assert_eq!(process.observations, 0);
+    }
+
+    #[test]
+    fn observation_must_match_committed_identity_and_digest() {
+        let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
+        process
+            .commit_prediction("obs-1", "sha256:decision-1", 0.24)
+            .unwrap();
+        assert!(matches!(
+            process.observe("obs-2", "sha256:decision-1", 0.20),
+            Err(SequentialError::ObservationIdMismatch { .. })
+        ));
+        assert_eq!(
+            process.observe("obs-1", "sha256:other", 0.20),
+            Err(SequentialError::DecisionDigestMismatch)
+        );
+        assert_eq!(process.observations, 0);
+        assert!(process.has_pending_prediction());
+        let valid = process
+            .observe("obs-1", "sha256:decision-1", 0.20)
+            .unwrap();
+        assert_eq!(valid.observations, 1);
+    }
+
+    #[test]
+    fn a_committed_prediction_cannot_be_replaced_before_observation() {
+        let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
+        process
+            .commit_prediction("obs-1", "sha256:decision-1", 0.24)
+            .unwrap();
+        assert_eq!(
+            process.commit_prediction("obs-2", "sha256:decision-2", 0.12),
+            Err(SequentialError::PredictionAlreadyPending)
+        );
+        assert_eq!(process.observations, 0);
+    }
+
+    #[test]
+    fn anytime_p_value_uses_the_running_maximum_not_current_evidence() {
+        let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
+        process
+            .commit_prediction("obs-1", "sha256:decision-1", 0.24)
+            .unwrap();
+        let first = process
+            .observe("obs-1", "sha256:decision-1", 0.50)
+            .unwrap();
+        assert!(first.crossed_alpha_boundary);
+        assert!(first.anytime_p_value <= 0.05);
+
+        process
+            .commit_prediction("obs-2", "sha256:decision-2", 0.24)
+            .unwrap();
+        let second = process
+            .observe("obs-2", "sha256:decision-2", -0.50)
+            .unwrap();
+        assert!(second.log_e_value < first.log_e_value);
+        assert_eq!(second.maximum_log_e_value, first.maximum_log_e_value);
+        assert!(second.crossed_alpha_boundary);
+        assert!(second.anytime_p_value <= 0.05);
+    }
+
+    #[test]
+    fn predictable_action_can_depend_on_previous_observation() {
+        let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
+        process
+            .commit_prediction("obs-1", "sha256:decision-1", 0.10)
+            .unwrap();
+        let first = process
+            .observe("obs-1", "sha256:decision-1", 0.20)
+            .unwrap();
+        let next_discrepancy = if first.log_e_value > 0.0 { 0.20 } else { -0.20 };
+        process
+            .commit_prediction("obs-2", "sha256:decision-2", next_discrepancy)
+            .unwrap();
+        let second = process
+            .observe("obs-2", "sha256:decision-2", 0.25)
+            .unwrap();
+        assert_eq!(second.observations, 2);
+        assert!(second.log_e_value.is_finite());
+    }
+
+    #[test]
+    fn nonfinite_values_fail_without_consuming_pending_prediction() {
+        let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
+        process
+            .commit_prediction("obs-1", "sha256:decision-1", 0.24)
+            .unwrap();
+        assert_eq!(
+            process.observe("obs-1", "sha256:decision-1", f64::NAN),
+            Err(SequentialError::NonFiniteObservation)
+        );
+        assert!(process.has_pending_prediction());
+        assert_eq!(process.observations, 0);
+    }
+
+    #[test]
+    fn fixed_mixture_matches_weighted_component_e_values() {
+        let mut mixture = PredictableGaussianMixture::new(
+            0.50,
+            0.05,
+            vec![
+                WeightedAlternative {
+                    id: "positive".to_owned(),
+                    weight: 0.5,
+                },
+                WeightedAlternative {
+                    id: "negative".to_owned(),
+                    weight: 0.5,
+                },
+            ],
+        )
+        .unwrap();
+        mixture
+            .commit_predictions("obs-1", "sha256:decision-1", &[0.20, -0.20])
+            .unwrap();
+        let result = mixture
+            .observe("obs-1", "sha256:decision-1", 0.30)
+            .unwrap();
+        let expected = (0.5_f64 * 0.16_f64.exp() + 0.5_f64 * (-0.32_f64).exp()).ln();
+        assert!((result.log_e_value - expected).abs() < 1.0e-12);
+        assert_eq!(result.components.len(), 2);
+        assert_eq!(result.observations, 1);
+    }
+
+    #[test]
+    fn fixed_mixture_rejects_bad_weights_and_duplicate_ids() {
+        let zero_weight = PredictableGaussianMixture::new(
+            0.5,
+            0.05,
+            vec![WeightedAlternative {
+                id: "a".to_owned(),
+                weight: 0.0,
+            }],
+        );
+        assert_eq!(
+            zero_weight.err(),
+            Some(SequentialError::InvalidAlternativeWeight)
+        );
+
+        let duplicate = PredictableGaussianMixture::new(
+            0.5,
+            0.05,
+            vec![
+                WeightedAlternative {
+                    id: "a".to_owned(),
+                    weight: 0.5,
+                },
+                WeightedAlternative {
+                    id: "a".to_owned(),
+                    weight: 0.5,
+                },
+            ],
+        );
+        assert_eq!(
+            duplicate.err(),
+            Some(SequentialError::DuplicateAlternativeId("a".to_owned()))
+        );
+    }
+
+    #[test]
+    fn fixed_mixture_rejects_wrong_prediction_count_without_mutation() {
+        let mut mixture = PredictableGaussianMixture::new(
+            0.5,
+            0.05,
+            vec![
+                WeightedAlternative {
+                    id: "a".to_owned(),
+                    weight: 0.5,
+                },
+                WeightedAlternative {
+                    id: "b".to_owned(),
+                    weight: 0.5,
+                },
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            mixture.commit_predictions("obs-1", "sha256:decision-1", &[0.2]),
+            Err(SequentialError::AlternativeCountMismatch {
+                expected: 2,
+                actual: 1
+            })
+        );
+        assert!(!mixture.has_pending_prediction());
+    }
+
+    #[test]
+    fn fixed_mixture_requires_prediction_before_observation() {
+        let mut mixture = PredictableGaussianMixture::new(
+            0.5,
+            0.05,
+            vec![WeightedAlternative {
+                id: "a".to_owned(),
+                weight: 1.0,
+            }],
+        )
+        .unwrap();
+        assert_eq!(
+            mixture.observe("obs-1", "sha256:decision-1", 0.3),
+            Err(SequentialError::NoPredictionPending)
+        );
+    }
+}
