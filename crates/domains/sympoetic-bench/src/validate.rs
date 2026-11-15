@@ -157,7 +157,10 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
         || scenario.observable_checks.is_empty()
         || scenario.human_rubric.is_empty()
     {
-        bail!("{}: constraints, capabilities, events, checks, and rubric must be non-empty", scenario.scenario_id);
+        bail!(
+            "{}: constraints, capabilities, events, checks, and rubric must be non-empty",
+            scenario.scenario_id
+        );
     }
 
     let mut constraint_set = HashSet::new();
@@ -219,8 +222,14 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
     for rubric in &scenario.human_rubric {
         require_nonempty("rubric dimension", &rubric.dimension)?;
         require_nonempty("rubric scale", &rubric.scale)?;
-        if rubric.anchors.len() < 2 || rubric.anchors.iter().any(|anchor| anchor.trim().is_empty()) {
-            bail!("{}: rubric {:?} needs at least two non-empty anchors", scenario.scenario_id, rubric.dimension);
+        if rubric.anchors.len() < 2
+            || rubric.anchors.iter().any(|anchor| anchor.trim().is_empty())
+        {
+            bail!(
+                "{}: rubric {:?} needs at least two non-empty anchors",
+                scenario.scenario_id,
+                rubric.dimension
+            );
         }
     }
     Ok(())
@@ -271,7 +280,10 @@ fn canonical_trace_digest(original_bytes: &[u8]) -> Result<String> {
     Ok(sha256_hex(&serde_json::to_vec(&value)?))
 }
 
-pub fn validate_trace(trace: &crate::model::Trace, original_bytes: &[u8]) -> Result<TraceValidation> {
+pub fn validate_trace(
+    trace: &crate::model::Trace,
+    original_bytes: &[u8],
+) -> Result<TraceValidation> {
     if trace.schema_version != "sympoetic-trace/0.1" {
         bail!("unsupported trace schema version {:?}", trace.schema_version);
     }
@@ -406,7 +418,9 @@ pub fn validate_trace(trace: &crate::model::Trace, original_bytes: &[u8]) -> Res
                         event.event_id
                     );
                 }
-                if event.reconciled_status.is_some() || event.reconciliation_state_digest.is_some() {
+                if event.reconciled_status.is_some()
+                    || event.reconciliation_state_digest.is_some()
+                {
                     bail!("tool_result must not contain reconciliation-only fields");
                 }
                 if execution.status == "unknown" {
@@ -428,7 +442,9 @@ pub fn validate_trace(trace: &crate::model::Trace, original_bytes: &[u8]) -> Res
                     );
                 }
                 if !matches!(event.actor.as_str(), "tool" | "environment" | "evaluator") {
-                    bail!("execution reconciliation must be independently observed, not self-attested by an agent");
+                    bail!(
+                        "execution reconciliation must be independently observed, not self-attested by an agent"
+                    );
                 }
                 if event.tool_execution.is_some() {
                     bail!("execution_reconciled must not contain tool_execution");
@@ -437,7 +453,11 @@ pub fn validate_trace(trace: &crate::model::Trace, original_bytes: &[u8]) -> Res
                     .reconciled_status
                     .as_deref()
                     .context("execution_reconciled requires reconciled_status")?;
-                require_member("reconciled_status", outcome, &["success", "failure", "not_executed"])?;
+                require_member(
+                    "reconciled_status",
+                    outcome,
+                    &["success", "failure", "not_executed"],
+                )?;
                 let state_digest = event
                     .reconciliation_state_digest
                     .as_deref()
@@ -467,7 +487,19 @@ pub fn validate_trace(trace: &crate::model::Trace, original_bytes: &[u8]) -> Res
             require_member(
                 "attribution contribution_type",
                 &attribution.contribution_type,
-                &["idea", "constraint", "question", "critique", "design", "text", "music", "edit", "synthesis", "fact", "other"],
+                &[
+                    "idea",
+                    "constraint",
+                    "question",
+                    "critique",
+                    "design",
+                    "text",
+                    "music",
+                    "edit",
+                    "synthesis",
+                    "fact",
+                    "other",
+                ],
             )?;
             require_nonempty("attribution artifact_ref", &attribution.artifact_ref)?;
             if !attribution.attribution_confidence.is_finite()
@@ -513,7 +545,9 @@ fn validate_optional_unit_interval(name: &str, value: Option<f64>) -> Result<()>
 }
 
 pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
-    if scorecard.schema_version != "sympoetic-scorecard/0.1" || scorecard.benchmark_version != "0.1" {
+    if scorecard.schema_version != "sympoetic-scorecard/0.1"
+        || scorecard.benchmark_version != "0.1"
+    {
         bail!("unsupported scorecard schema or benchmark version");
     }
     require_nonempty("run_id", &scorecard.run_id)?;
@@ -618,7 +652,9 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         scorecard.scores.collaboration_gap,
     ) {
         if (synergy + gap).abs() > 1e-6 {
-            bail!("synergy_delta and collaboration_gap must be sign-consistent when computed from the same matched comparison");
+            bail!(
+                "synergy_delta and collaboration_gap must be sign-consistent when computed from the same matched comparison"
+            );
         }
     }
     if let (Some(precision), Some(recall), Some(f1)) = (
