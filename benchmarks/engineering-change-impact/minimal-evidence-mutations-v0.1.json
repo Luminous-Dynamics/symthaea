@@ -1,0 +1,119 @@
+{
+  "schema_version": "engineering-decision-minimal-evidence-mutations-v0.1",
+  "status": "preregistered_controls_not_results",
+  "control_count": 16,
+  "controls": [
+    {
+      "id": "ME-CTRL-POS-001",
+      "case_id": "ME-POS-001",
+      "mutation": "remove duplicate E-A1-COPY",
+      "expected_result": "pass",
+      "reason": "another sufficient independent-root set remains"
+    },
+    {
+      "id": "ME-CTRL-NEG-001",
+      "case_id": "ME-NEG-001",
+      "mutation": "count E-EXPORT as a second independent root despite shared ROOT-X",
+      "expected_result": "fail",
+      "reason": "copied/derived evidence cannot inflate independence"
+    },
+    {
+      "id": "ME-CTRL-NEG-002",
+      "case_id": "ME-NEG-002",
+      "mutation": "remove E-THERM-B, the last independent support",
+      "expected_result": "fail",
+      "reason": "mandatory predicate has only one remaining independent root"
+    },
+    {
+      "id": "ME-CTRL-NEG-003",
+      "case_id": "ME-NEG-003",
+      "mutation": "treat content digest equality as overriding configuration mismatch",
+      "expected_result": "fail",
+      "reason": "identical content does not establish applicability"
+    },
+    {
+      "id": "ME-CTRL-POS-002",
+      "case_id": "ME-POS-002",
+      "mutation": "inject forty irrelevant records without changing source-role inventory",
+      "expected_result": "pass",
+      "reason": "irrelevant evidence cannot alter sufficient support"
+    },
+    {
+      "id": "ME-CTRL-NEG-004",
+      "case_id": "ME-POS-003",
+      "mutation": "count E-CORR-A-SUMMARY as an independent root",
+      "expected_result": "fail",
+      "reason": "derivative inherits CORR-A provenance"
+    },
+    {
+      "id": "ME-CTRL-POS-003",
+      "case_id": "ME-POS-004",
+      "mutation": "substitute TORQUE-B with independent admissible TORQUE-C",
+      "expected_result": "pass",
+      "reason": "alternative valid sufficient set preserves decision"
+    },
+    {
+      "id": "ME-CTRL-UNK-001",
+      "case_id": "ME-UNK-001",
+      "mutation": "assume unknown root differs from SEISMIC-A",
+      "expected_result": "indeterminate",
+      "reason": "unknown lineage cannot be counted as independent"
+    },
+    {
+      "id": "ME-CTRL-NEG-005",
+      "case_id": "ME-POS-001",
+      "mutation": "candidate deletes required predicate from the evaluator denominator",
+      "expected_result": "fail",
+      "reason": "candidate cannot redefine obligations"
+    },
+    {
+      "id": "ME-CTRL-NEG-006",
+      "case_id": "ME-POS-001",
+      "mutation": "candidate lowers minimum independent root threshold after seeing evidence",
+      "expected_result": "fail",
+      "reason": "policy denominator is evaluator-frozen"
+    },
+    {
+      "id": "ME-CTRL-NEG-007",
+      "case_id": "ME-POS-001",
+      "mutation": "candidate reports source count as independent root count",
+      "expected_result": "fail",
+      "reason": "raw records and independent roots are distinct measures"
+    },
+    {
+      "id": "ME-CTRL-NEG-008",
+      "case_id": "ME-UNK-001",
+      "mutation": "unknown provenance is silently dropped and assessment remains supported",
+      "expected_result": "indeterminate",
+      "reason": "support cannot be established from incomplete lineage"
+    },
+    {
+      "id": "ME-CTRL-NEG-009",
+      "case_id": "ME-POS-002",
+      "mutation": "irrelevant injection is used to claim higher independent support",
+      "expected_result": "fail",
+      "reason": "irrelevant material does not support the mandatory predicate"
+    },
+    {
+      "id": "ME-CTRL-NEG-010",
+      "case_id": "ME-POS-004",
+      "mutation": "substitute TORQUE-C with an inadmissible old-configuration source",
+      "expected_result": "fail",
+      "reason": "not every substitution is equivalent"
+    },
+    {
+      "id": "ME-CTRL-NEG-011",
+      "case_id": "ME-POS-001",
+      "mutation": "two records share a hidden common root omitted from the source graph",
+      "expected_result": "indeterminate",
+      "reason": "unresolved common-cause lineage blocks independence claim"
+    },
+    {
+      "id": "ME-CTRL-NEG-012",
+      "case_id": "ME-NEG-002",
+      "mutation": "retain supported disposition after all sufficient root sets are broken",
+      "expected_result": "fail",
+      "reason": "stale support cannot survive last-support removal"
+    }
+  ]
+}
