@@ -5,7 +5,7 @@ use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
-use crate::model::{Scenario, Scorecard, Trace};
+use crate::model::{Scenario, Scorecard};
 
 const SCENARIO_DOMAINS: &[&str] = &[
     "creative_composition",
