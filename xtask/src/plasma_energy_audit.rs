@@ -1060,7 +1060,30 @@ mod tests {
                 "case_id": "NH3-CRACK-MW-ATM-MECHANISM-2026",
                 "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
                 "luminous_reproduction": false,
-                "source": {"url": "https://doi.org/10.1016/j.ijhydene.2026.156912"}
+                "source": {"url": "https://doi.org/10.1016/j.ijhydene.2026.156912"},
+                "operating_points": [
+                    {
+                        "operating_point_id": "NH3-MW-ATM-HIGH-CONVERSION",
+                        "ammonia_conversion_lower_bound_fraction": 0.99,
+                        "hydrogen_energy_yield_g_H2_per_kWh": 45.0,
+                        "hydrogen_energy_cost_kJ_per_mol": 242.0,
+                        "hydrogen_production_rate_g_per_hour": null
+                    },
+                    {
+                        "operating_point_id": "NH3-MW-ATM-HIGH-THROUGHPUT",
+                        "ammonia_conversion_fraction": 0.924,
+                        "hydrogen_energy_yield_g_H2_per_kWh": 50.0,
+                        "hydrogen_energy_cost_kJ_per_mol": 217.0,
+                        "hydrogen_production_rate_g_per_hour": 150.0
+                    },
+                    {
+                        "operating_point_id": "NH3-MW-ATM-HIGH-ENERGY-YIELD",
+                        "ammonia_conversion_fraction": 0.76,
+                        "hydrogen_energy_yield_g_H2_per_kWh": 51.0,
+                        "hydrogen_energy_cost_kJ_per_mol": 210.0,
+                        "hydrogen_production_rate_g_per_hour": null
+                    }
+                ]
             }],
             "derived_reference_checks": [{
                 "check_id": "NH3-MW-ENERGY-YIELD-TO-SPECIFIC-ENERGY-2026",
@@ -1094,6 +1117,24 @@ mod tests {
         let summary = audit_source_value(&source, "nh3-derived.json").unwrap();
         assert_eq!(summary.case_count, 1);
         assert_eq!(summary.derived_reference_check_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_150_grams_per_hour_borrowed_by_high_conversion_point() {
+        let mut source = nh3_energy_yield_source_manifest();
+        source["cases"][0]["operating_points"][0]["hydrogen_production_rate_g_per_hour"] =
+            serde_json::json!(150.0);
+        let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
+        assert!(error.to_string().contains("must not borrow the 150 g/h throughput value"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_cross_paired_ammonia_energy_yield() {
+        let mut source = nh3_energy_yield_source_manifest();
+        source["cases"][0]["operating_points"][1]["hydrogen_energy_yield_g_H2_per_kWh"] =
+            serde_json::json!(45.0);
+        let error = audit_source_value(&source, "nh3-derived.json").unwrap_err();
+        assert!(error.to_string().contains("150 g/h point must retain its 50 g/kWh energy yield"));
     }
 
     #[test]
@@ -1561,6 +1602,115 @@ fn required_f64(object: &Value, key: &str, context: &str) -> Result<f64> {
         .with_context(|| format!("{context}: missing/non-finite numeric field {key}"))
 }
 
+fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: NH3 microwave operating-point pairing");
+    let points = case
+        .get("operating_points")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: operating_points array is missing"))?;
+    ensure!(
+        points.len() == 3,
+        "{context}: expected exactly three separately paired source operating points"
+    );
+
+    let mut point_ids = BTreeSet::new();
+    for point in points {
+        let point_id = point
+            .get("operating_point_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{context}: operating point has no identity"))?;
+        ensure!(
+            point_ids.insert(point_id.to_owned()),
+            "{context}: duplicate operating-point identity {point_id}"
+        );
+    }
+
+    let find_point = |expected_id: &str| -> Result<&Value> {
+        points
+            .iter()
+            .find(|point| point.get("operating_point_id").and_then(Value::as_str) == Some(expected_id))
+            .with_context(|| format!("{context}: missing required operating point {expected_id}"))
+    };
+    let high_conversion = find_point("NH3-MW-ATM-HIGH-CONVERSION")?;
+    let high_throughput = find_point("NH3-MW-ATM-HIGH-THROUGHPUT")?;
+    let high_yield = find_point("NH3-MW-ATM-HIGH-ENERGY-YIELD")?;
+
+    let conversion_lower_bound = required_f64(
+        high_conversion,
+        "ammonia_conversion_lower_bound_fraction",
+        &context,
+    )?;
+    ensure!(
+        close_f64(conversion_lower_bound, 0.99),
+        "{context}: high-conversion point must preserve its >99% lower bound"
+    );
+    ensure!(
+        close_f64(
+            required_f64(high_conversion, "hydrogen_energy_yield_g_H2_per_kWh", &context)?,
+            45.0
+        ),
+        "{context}: >99% conversion point must retain its 45 g/kWh yield"
+    );
+    ensure!(
+        required_f64(high_conversion, "hydrogen_energy_cost_kJ_per_mol", &context)? == 242.0,
+        "{context}: >99% conversion point must retain its 242 kJ/mol energy cost"
+    );
+    ensure!(
+        high_conversion.get("hydrogen_production_rate_g_per_hour").is_some_and(Value::is_null),
+        "{context}: high-conversion point must not borrow the 150 g/h throughput value"
+    );
+
+    ensure!(
+        close_f64(
+            required_f64(high_throughput, "ammonia_conversion_fraction", &context)?,
+            0.924
+        ),
+        "{context}: 150 g/h point must retain 92.4% conversion"
+    );
+    ensure!(
+        close_f64(
+            required_f64(high_throughput, "hydrogen_energy_yield_g_H2_per_kWh", &context)?,
+            50.0
+        ),
+        "{context}: 150 g/h point must retain its 50 g/kWh energy yield"
+    );
+    ensure!(
+        required_f64(high_throughput, "hydrogen_energy_cost_kJ_per_mol", &context)? == 217.0,
+        "{context}: 150 g/h point must retain its 217 kJ/mol energy cost"
+    );
+    ensure!(
+        high_throughput.get("hydrogen_production_rate_g_per_hour")
+            .and_then(Value::as_f64)
+            .is_some_and(|value| close_f64(value, 150.0)),
+        "{context}: 150 g/h throughput must remain paired with the 92.4% conversion point"
+    );
+
+    ensure!(
+        close_f64(
+            required_f64(high_yield, "ammonia_conversion_fraction", &context)?,
+            0.76
+        ),
+        "{context}: highest-yield point must retain 76% conversion"
+    );
+    ensure!(
+        close_f64(
+            required_f64(high_yield, "hydrogen_energy_yield_g_H2_per_kWh", &context)?,
+            51.0
+        ),
+        "{context}: highest-yield point must retain 51 g/kWh energy yield"
+    );
+    ensure!(
+        required_f64(high_yield, "hydrogen_energy_cost_kJ_per_mol", &context)? == 210.0,
+        "{context}: highest-yield point must retain 210 kJ/mol energy cost"
+    );
+    ensure!(
+        high_yield.get("hydrogen_production_rate_g_per_hour").is_some_and(Value::is_null),
+        "{context}: highest-yield point must not borrow the 150 g/h throughput value"
+    );
+    Ok(())
+}
+
 fn validate_nh3_energy_yield_check(check: &Value, display_name: &str) -> Result<()> {
     let context = format!("{display_name}: NH3 microwave energy-yield derivation");
     ensure!(
@@ -1840,6 +1990,9 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             validate_co2_counterflow_operating_points(case, display_name)?;
         }
 
+        if case_id == "NH3-CRACK-MW-ATM-MECHANISM-2026" {
+            validate_nh3_operating_points(case, display_name)?;
+        }
         let lane = case.get("lane").and_then(Value::as_str);
         if lane == Some("METHANE_PYROLYSIS") {
             let coproduct = case
