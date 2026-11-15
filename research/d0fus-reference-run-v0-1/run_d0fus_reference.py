@@ -36,12 +36,18 @@ REQUIRED_DISTRIBUTIONS = (
     "joblib",
 )
 
+# Core results tuple indices are defined by the exact pinned D0FUS RUN
+# implementation. The last 15 entries are the plant power-balance extension.
 CORE_OUTPUTS = {
     "B0_T": (0, True),
     "tau_E_s": (3, True),
     "Q": (5, True),
     "I_p_MA": (8, True),
     "P_elec_MW": (25, False),
+    "P_wallplug_MW": (26, True),
+    "P_th_MW": (-15, True),
+    "P_e_gross_MWe": (-12, True),
+    "P_recirculated_MWe": (-3, True),
 }
 
 
@@ -290,8 +296,16 @@ def main() -> int:
     report = reports[0]
 
     config_field_count = len(dataclasses.fields(type(DEFAULT_CONFIG)))
+    net_electric = core_observables["P_elec_MW"]
+    gross_electric = core_observables["P_e_gross_MWe"]
+    recirculated_electric = core_observables["P_recirculated_MWe"]
+    engineering_gain = (
+        gross_electric / recirculated_electric
+        if recirculated_electric is not None and recirculated_electric > 0.0
+        else None
+    )
     receipt = {
-        "receipt_version": "d0fus-reference-run/0.1",
+        "receipt_version": "d0fus-reference-run/0.2",
         "mode": args.mode,
         "solver": lock["solver"],
         "solver_version": lock["version"],
@@ -311,6 +325,21 @@ def main() -> int:
         "run_output_tuple_length": len(results),
         "canonical_output_tuple_sha256": hashlib.sha256(canonical_bytes).hexdigest(),
         "core_observables": core_observables,
+        "power_balance_interpretation": {
+            "gross_electric_over_recirculated_power": engineering_gain,
+            "net_electricity_state": (
+                "positive_net_export"
+                if net_electric is not None and net_electric > 0.0
+                else "zero_or_negative_net_export"
+            ),
+            "annual_cost_of_electricity_defined": (
+                net_electric is not None and net_electric > 0.0
+            ),
+            "note": (
+                "A negative P_elec is not a failed RUN; it means this reference case "
+                "does not export net electricity."
+            ),
+        },
         "output_report_relative_path": str(report.relative_to(args.output_dir)),
         "output_report_sha256": sha256_file(report),
         "output_report_bytes": report.stat().st_size,
