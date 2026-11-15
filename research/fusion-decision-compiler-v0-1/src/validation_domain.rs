@@ -120,6 +120,7 @@ pub enum ValidationDomainError {
     EmptyIdentity(String),
     InvalidSha256(&'static str),
     DuplicateEpisode(String),
+    DuplicateDomainValue { field: &'static str, value: String },
     DuplicateCalibrationRecord(String),
     UnsupportedModelUse,
     ModelRevisionMismatch,
@@ -561,7 +562,10 @@ fn validate_domain_values(
             validate_digest(value, field, errors);
         }
         if !seen.insert(value.as_str()) {
-            errors.push(ValidationDomainError::DuplicateEpisode(value.clone()));
+            errors.push(ValidationDomainError::DuplicateDomainValue {
+                field,
+                value: value.clone(),
+            });
         }
     }
 }
@@ -884,4 +888,84 @@ mod tests {
             ValidationDomainError::HoldoutNotWithheld
         ));
     }
+    #[test]
+    fn frozen_validation_domain_corpus_matches_contract_dispositions() {
+        const CORPUS: &str = include_str!("../fixtures/validation-domain-cases-v1.tsv");
+        let mut checked = 0usize;
+
+        for line in CORPUS.lines().map(str::trim) {
+            if line.is_empty() || line.starts_with('#') || line == "case_id|expected|mutation" {
+                continue;
+            }
+            let fields: Vec<&str> = line.split('|').collect();
+            assert_eq!(fields.len(), 3, "malformed validation-domain fixture: {line}");
+            let [case_id, expected, mutation] = [fields[0], fields[1], fields[2]];
+            let mut source = plan();
+
+            match mutation {
+                "valid_same_facility_new_op" => {}
+                "valid_new_case" => {
+                    source.blind_holdout.observation.case_id = "case-b".into();
+                    source.blind_holdout.observation.operating_point_id = "op-a".into();
+                }
+                "valid_new_facility" => {
+                    source.blind_holdout.observation.facility_id = "facility-b".into();
+                    source.blind_holdout.observation.operating_point_id = "op-a".into();
+                }
+                "no_scope_difference" => {
+                    source.blind_holdout.observation.operating_point_id = "op-a".into();
+                }
+                "calibration_episode_overlap" => {
+                    source.blind_holdout.observation.episode_ids = vec!["cal-shot-001".into()];
+                }
+                "calibration_dataset_reuse" => {
+                    source.blind_holdout.observation.dataset_id = "calibration-dataset".into();
+                }
+                "calibration_artifact_reuse" => {
+                    source.blind_holdout.observation.source_artifact_sha256 =
+                        source.calibration[0].source_artifact_sha256.clone();
+                }
+                "holdout_training_leak" => {
+                    source.blind_holdout.exposure.used_for_training = true;
+                }
+                "holdout_selection_leak" => {
+                    source.blind_holdout.exposure.used_for_model_or_policy_selection = true;
+                }
+                "synthetic_test_stand" => {
+                    source.test_stand.evidence_class = EvidenceClass::ModelOutput;
+                }
+                "missing_uncertainty" => {
+                    source.blind_holdout.observation.measurement_uncertainty_ref.clear();
+                }
+                "geometry_outside_domain" => {
+                    source.blind_holdout.observation.geometry_sha256 = digest('e');
+                }
+                "unsupported_use" => {
+                    source.requested_use = ModelUse::OptimizationInsideSurrogate;
+                }
+                "model_revision_mismatch" => {
+                    source.model_revision = "model-r5".into();
+                }
+                "not_withheld" => {
+                    source.blind_holdout.withheld_until_final_evaluation = false;
+                }
+                "test_holdout_episode_overlap" => {
+                    source.blind_holdout.observation.episode_ids =
+                        source.test_stand.episode_ids.clone();
+                }
+                other => panic!("unknown validation-domain mutation {other} for {case_id}"),
+            }
+
+            let actual = if validate_validation_domain(&source).is_ok() {
+                "ACCEPT"
+            } else {
+                "REJECT"
+            };
+            assert_eq!(actual, expected, "validation-domain case {case_id}/{mutation}");
+            checked += 1;
+        }
+
+        assert_eq!(checked, 16, "all frozen validation-domain cases must execute");
+    }
+
 }
