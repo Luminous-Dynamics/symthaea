@@ -646,7 +646,15 @@ mod tests {
 
     #[test]
     fn missing_inventory_completeness_never_becomes_independence() {
-        let first = manifest("run-a", &["psi"], &[], vec![binding("psi", dependency("dataset-a", "v1", DependencyKind::InputDataset, None))]);
+        let first = manifest(
+            "run-a",
+            &["psi"],
+            &[],
+            vec![binding(
+                "psi",
+                dependency("dataset-a", "v1", DependencyKind::InputDataset, None),
+            )],
+        );
         let second = manifest("run-b", &["psi"], &["psi"], Vec::new());
 
         let result = compare_one(&first, &second, "psi");
