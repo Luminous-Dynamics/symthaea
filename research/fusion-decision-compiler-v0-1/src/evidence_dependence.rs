@@ -57,7 +57,7 @@ pub struct RunDependencyManifest {
     pub dependencies: Vec<ObservableDependency>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DependencyMatchBasis {
     SameNodeLineage,
     SameContentDigest,
