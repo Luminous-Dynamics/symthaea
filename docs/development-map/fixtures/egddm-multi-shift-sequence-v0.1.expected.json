@@ -14,12 +14,12 @@
             "audit-logging",
             "build-repro"
           ],
-          "dependency_implied_revalidation_obligations": [
+          "direct_dependency_implied_revalidation_obligations": [
             "api-compat",
             "audit-logging",
             "build-repro"
           ],
-          "dependency_only_impact_obligations": [],
+          "direct_dependency_only_impact_obligations": [],
           "gold_only_impact_obligations": [],
           "fresh_revalidated_obligations": [
             "api-compat",
@@ -40,6 +40,7 @@
           "unnecessary_revalidation_obligations": [],
           "false_resurrection_obligations": [],
           "stale_carryover_obligations": [],
+          "receipt_source_context_mismatch_obligations": [],
           "future_evidence_leakage_obligations": [],
           "unsupported_current_claims": [],
           "invalid_fresh_receipts": [],
@@ -59,12 +60,12 @@
             "audit-logging",
             "build-repro"
           ],
-          "dependency_implied_revalidation_obligations": [
+          "direct_dependency_implied_revalidation_obligations": [
             "api-compat",
             "audit-logging",
             "build-repro"
           ],
-          "dependency_only_impact_obligations": [],
+          "direct_dependency_only_impact_obligations": [],
           "gold_only_impact_obligations": [],
           "fresh_revalidated_obligations": [
             "api-compat",
@@ -85,6 +86,7 @@
           "unnecessary_revalidation_obligations": [],
           "false_resurrection_obligations": [],
           "stale_carryover_obligations": [],
+          "receipt_source_context_mismatch_obligations": [],
           "future_evidence_leakage_obligations": [],
           "unsupported_current_claims": [],
           "invalid_fresh_receipts": [],
@@ -105,13 +107,13 @@
             "build-repro",
             "release-authority"
           ],
-          "dependency_implied_revalidation_obligations": [
+          "direct_dependency_implied_revalidation_obligations": [
             "api-compat",
             "audit-logging",
             "build-repro",
             "release-authority"
           ],
-          "dependency_only_impact_obligations": [],
+          "direct_dependency_only_impact_obligations": [],
           "gold_only_impact_obligations": [],
           "fresh_revalidated_obligations": [
             "api-compat",
@@ -133,6 +135,7 @@
           "unnecessary_revalidation_obligations": [],
           "false_resurrection_obligations": [],
           "stale_carryover_obligations": [],
+          "receipt_source_context_mismatch_obligations": [],
           "future_evidence_leakage_obligations": [],
           "unsupported_current_claims": [],
           "invalid_fresh_receipts": [],
@@ -153,7 +156,7 @@
       "total_stale_carryovers": 0,
       "total_future_evidence_leakages": 0,
       "total_unsupported_current_claims": 0,
-      "total_dependency_only_impact_labels": 0,
+      "total_direct_dependency_only_impact_labels": 0,
       "total_gold_only_impact_labels": 0
     },
     {
@@ -168,12 +171,12 @@
             "audit-logging",
             "build-repro"
           ],
-          "dependency_implied_revalidation_obligations": [
+          "direct_dependency_implied_revalidation_obligations": [
             "api-compat",
             "audit-logging",
             "build-repro"
           ],
-          "dependency_only_impact_obligations": [],
+          "direct_dependency_only_impact_obligations": [],
           "gold_only_impact_obligations": [],
           "fresh_revalidated_obligations": [
             "api-compat",
@@ -194,6 +197,7 @@
           "unnecessary_revalidation_obligations": [],
           "false_resurrection_obligations": [],
           "stale_carryover_obligations": [],
+          "receipt_source_context_mismatch_obligations": [],
           "future_evidence_leakage_obligations": [],
           "unsupported_current_claims": [],
           "invalid_fresh_receipts": [],
@@ -213,12 +217,12 @@
             "audit-logging",
             "build-repro"
           ],
-          "dependency_implied_revalidation_obligations": [
+          "direct_dependency_implied_revalidation_obligations": [
             "api-compat",
             "audit-logging",
             "build-repro"
           ],
-          "dependency_only_impact_obligations": [],
+          "direct_dependency_only_impact_obligations": [],
           "gold_only_impact_obligations": [],
           "fresh_revalidated_obligations": [
             "api-compat",
@@ -239,6 +243,7 @@
           "unnecessary_revalidation_obligations": [],
           "false_resurrection_obligations": [],
           "stale_carryover_obligations": [],
+          "receipt_source_context_mismatch_obligations": [],
           "future_evidence_leakage_obligations": [],
           "unsupported_current_claims": [],
           "invalid_fresh_receipts": [],
@@ -259,13 +264,13 @@
             "build-repro",
             "release-authority"
           ],
-          "dependency_implied_revalidation_obligations": [
+          "direct_dependency_implied_revalidation_obligations": [
             "api-compat",
             "audit-logging",
             "build-repro",
             "release-authority"
           ],
-          "dependency_only_impact_obligations": [],
+          "direct_dependency_only_impact_obligations": [],
           "gold_only_impact_obligations": [],
           "fresh_revalidated_obligations": [
             "api-compat",
@@ -293,6 +298,7 @@
           "stale_carryover_obligations": [
             "release-authority"
           ],
+          "receipt_source_context_mismatch_obligations": [],
           "future_evidence_leakage_obligations": [],
           "unsupported_current_claims": [
             "release-authority"
@@ -324,7 +330,7 @@
       "total_stale_carryovers": 1,
       "total_future_evidence_leakages": 0,
       "total_unsupported_current_claims": 1,
-      "total_dependency_only_impact_labels": 0,
+      "total_direct_dependency_only_impact_labels": 0,
       "total_gold_only_impact_labels": 0
     }
   ],
