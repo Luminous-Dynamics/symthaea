@@ -1,7 +1,7 @@
 use anyhow::{Context, Result, bail};
 use rand::{Rng, SeedableRng, rngs::StdRng};
 use std::collections::{BTreeMap, HashSet};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct BootstrapEstimate {
@@ -300,7 +300,8 @@ pub fn participant_capability_amplification(
 /// One participant's independent pre/post assessment within a preregistered
 /// baseline-capability stratum. Strata must be derived from baseline task data
 /// before condition outcomes are inspected; do not infer sensitive identity.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct StratifiedCapabilityObservation {
     pub participant_id: String,
     pub baseline_stratum: String,
