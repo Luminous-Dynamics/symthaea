@@ -333,9 +333,8 @@ pub fn evaluate_plant_power_balance(
         || diagnostics.contains(&PowerBalanceDiagnostic::NegativeRecirculationLoad);
     let disposition =
         if !required_values_present || has_non_balance_diagnostic || has_invalid_power_sign {
-
-        PowerBalanceDisposition::NotEvaluable
-    } else if max_residual.is_none_or(|value| value > profile.absolute_balance_tolerance_mw) {
+            PowerBalanceDisposition::NotEvaluable
+        } else if max_residual.is_none_or(|value| value > profile.absolute_balance_tolerance_mw) {
         PowerBalanceDisposition::BalanceInconsistent
     } else if net.is_some_and(|value| value < 0.0) {
         PowerBalanceDisposition::NetImport
