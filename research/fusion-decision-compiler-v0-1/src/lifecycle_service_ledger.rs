@@ -813,7 +813,10 @@ mod tests {
         );
         let report = evaluate_lifecycle_service_budget(&plan);
         assert_eq!(report.availability_fraction, Some(1.0));
-        assert_eq!(report.signed_net_energy_mwh, Some(100.0 * 400.0 / 3600.0 + 60.0 * 600.0 / 3600.0));
+        let expected = 100.0 * 400.0 / 3600.0 + 60.0 * 600.0 / 3600.0;
+        assert!(
+            (report.signed_net_energy_mwh.unwrap() - expected).abs() < 1e-12
+        );
     }
 
     #[test]
