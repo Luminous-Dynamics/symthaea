@@ -54,38 +54,44 @@
       "commitment_suite_digest": "0000000000000000000000000000000000000000000000000000000000000000"
     }
   },
-  "field": {
-    "parser_profile_id": "strict-http11-json-v1",
-    "parser_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
-    "schema_profile_id": "synthetic-bank-balance-v1",
-    "schema_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
-    "json_pointer": "/available_minor_units",
-    "duplicate_key_policy": "reject",
-    "unicode_policy": "exact_scalar_sequence_no_normalization",
-    "lexical_profile_id": "unsigned-decimal-integer-v1",
-    "lexical_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
-  },
-  "interpretation": {
-    "value_type": "unsigned_integer",
-    "unit": "ZAR_minor_units",
-    "currency": "ZAR",
-    "minor_unit_scale": 2,
-    "conversion_profile_id": "integer-minor-units-v1",
-    "conversion_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
-  },
   "predicate": {
     "language": "symthaea-claim-predicate/v1",
     "digest": "0000000000000000000000000000000000000000000000000000000000000000",
     "ast": {
-      "kind": "compare",
-      "operator": "gte",
-      "left": {
-        "kind": "claim_value"
-      },
-      "right": {
-        "kind": "literal",
-        "value": 100000
-      }
+      "kind": "all",
+      "children": [
+        {
+          "kind": "compare",
+          "operator": "eq",
+          "left": {
+            "kind": "claim_value",
+            "field_id": "currency"
+          },
+          "right": {
+            "kind": "literal",
+            "value": "ZAR"
+          }
+        },
+        {
+          "kind": "compare",
+          "operator": "gte",
+          "left": {
+            "kind": "claim_value",
+            "field_id": "available_minor_units"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 100000
+          }
+        },
+        {
+          "kind": "freshness",
+          "field_id": "as_of",
+          "max_age_seconds": 300,
+          "future_skew_seconds": 30,
+          "reference": "request_issued_at"
+        }
+      ]
     }
   },
   "request": {
@@ -95,7 +101,8 @@
     "challenge_ref": "synthetic-challenge-0001",
     "challenge_nonce_digest": "0000000000000000000000000000000000000000000000000000000000000000",
     "request_digest": "0000000000000000000000000000000000000000000000000000000000000000",
-    "expires_at": "2026-11-16T00:00:00Z"
+    "expires_at": "2026-11-16T00:00:00Z",
+    "issued_at": "2026-11-15T20:30:00Z"
   },
   "uniqueness": {
     "subject_kind": "entitlement",
@@ -193,6 +200,65 @@
       "dependency_id": "status-and-evidence-frontier",
       "digest": "0000000000000000000000000000000000000000000000000000000000000000",
       "invalidation_scope": "claim-currentness"
+    }
+  ],
+  "fields": [
+    {
+      "field_id": "currency",
+      "parser_profile_id": "strict-http11-json-v1",
+      "parser_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "schema_profile_id": "synthetic-bank-balance-v1",
+      "schema_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "json_pointer": "/currency",
+      "duplicate_key_policy": "reject",
+      "unicode_policy": "exact_scalar_sequence_no_normalization",
+      "lexical_profile_id": "iso4217-code-v1",
+      "lexical_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "interpretation": {
+        "value_type": "utf8_string",
+        "unit": "ISO4217",
+        "conversion_profile_id": "iso4217-uppercase-v1",
+        "conversion_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "field_id": "available_minor_units",
+      "parser_profile_id": "strict-http11-json-v1",
+      "parser_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "schema_profile_id": "synthetic-bank-balance-v1",
+      "schema_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "json_pointer": "/available_minor_units",
+      "duplicate_key_policy": "reject",
+      "unicode_policy": "exact_scalar_sequence_no_normalization",
+      "lexical_profile_id": "unsigned-decimal-integer-v1",
+      "lexical_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "interpretation": {
+        "value_type": "unsigned_integer",
+        "unit": "ZAR_minor_units",
+        "conversion_profile_id": "integer-minor-units-v1",
+        "conversion_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "currency": "ZAR",
+        "minor_unit_scale": 2
+      }
+    },
+    {
+      "field_id": "as_of",
+      "parser_profile_id": "strict-http11-json-v1",
+      "parser_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "schema_profile_id": "synthetic-bank-balance-v1",
+      "schema_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "json_pointer": "/as_of",
+      "duplicate_key_policy": "reject",
+      "unicode_policy": "exact_scalar_sequence_no_normalization",
+      "lexical_profile_id": "rfc3339-utc-strict-v1",
+      "lexical_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+      "interpretation": {
+        "value_type": "timestamp_rfc3339",
+        "unit": "UTC",
+        "conversion_profile_id": "rfc3339-utc-strict-v1",
+        "conversion_profile_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "timezone": "UTC"
+      }
     }
   ]
 }
