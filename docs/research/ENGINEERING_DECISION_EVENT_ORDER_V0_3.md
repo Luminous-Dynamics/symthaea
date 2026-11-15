@@ -41,7 +41,7 @@ Targets are preregistered objectives, not measured results.
 
 | Dimension | Target | Evidence unit |
 |---|---:|---|
-| False-safe | 0 on frozen and independently authored held-out hard negatives | Independent schedule lineage |
+| False-safe | 0 on frozen and independently authored held-out hard negatives; aim for 3,000 independent negative lineages aggregate | Independent schedule lineage |
 | Attempt cardinality | 100% one start / at most one terminal | Attempt identity |
 | Retry lineage | 100% exact predecessor, qualified NOT_APPLIED and strict BEFORE | Retry chain |
 | Stop discharge | 100% exact obligation/discharge/attempt binding | Applicable attempt-obligation pair |
@@ -52,7 +52,7 @@ Targets are preregistered objectives, not measured results.
 | False hold | Proposed ≤5% only after adequate eligible-ACT denominator | Paired ACT/HOLD case |
 | Performance | Report p50/p95 assessment latency, event/s, peak memory, generation cost, shrink iterations and replay time | Fixed hardware/build/corpus |
 
-Do not use mutations of one parent trace as independent observations. Split data by scenario lineage and causal skeleton before creating held-out sets. A mutation suite is a falsification check, not a reliability estimate. Use confidence intervals and publish denominator counts; zero misses on a small corpus is not a zero real-world failure rate.
+Do not use mutations of one parent trace as independent observations. Split data by scenario lineage and causal skeleton before creating held-out sets. A mutation suite is a falsification check, not a reliability estimate. Publish exact denominators and one-sided 95% binomial confidence bounds: with zero failures, 3,000 independent trials imply an upper bound of approximately 0.1% (the rule-of-three approximation); about 30,000 are needed for approximately 0.01%. These are statistical bounds on the sampled distribution, not guarantees against unmodelled faults or distribution shift. Report per-fault-family results as well as the aggregate.
 
 ## Matched evaluator ladder
 
@@ -72,13 +72,17 @@ Compare paired decisions and per-family confusion matrices. Report false-safe an
 
 ## Industry comparison and claim ceiling
 
-- **FoundationDB simulation testing** is the closest methodology comparator for deterministic fault-driven history exploration and reproducible failures. The relevant comparison is test methodology, not throughput or correctness superiority.
-- **Jepsen / Elle and Porcupine** are appropriate comparators on the subset that can be expressed as transactional histories with matching consistency models. They are not general engineering stop/effect authority evaluators.
-- **Hybrid logical clocks and Spanner/TrueTime** provide important clock/causal-order design baselines. v0.2's qualified interval and common-basis gate should be compared on the exact same traces; it does not replace TrueTime's infrastructure assumptions or Spanner's transaction guarantees.
-- **OpenTelemetry timestamp and observed-timestamp separation** is an interoperability clue: event time and observation time are not interchangeable. v0.2 bitemporal fields add durable-recording and decision-frontier semantics, but do not replace the telemetry system.
-- **NIST manufacturing traceability guidance** is an integration opportunity for provenance and cross-system traceability. Symthaea's potential contribution is decision admissibility over owner-qualified evidence, not a replacement for PLM, ALM, MES, ERP or quality-management systems.
+This is a capability comparison, not a claim of current superiority. The systems below solve adjacent but non-identical problems.
 
-The differentiator to test is not "better clock sync" or a universal distributed database. It is a cross-owner admissibility layer for irreversible engineering operations when time bases, evidence authorities, and system-of-record boundaries differ. Demonstrate this only with matched traces and independent ground truth.
+- **FoundationDB Simulation** is the strongest methodological reference for deterministic fault exploration: its simulation is integrated with the same Flow runtime used for production execution, and FoundationDB documents simulation alongside live performance and hardware failure testing. Symthaea's schedule/replay approach is still much earlier: currently a research scheduler and generator, not a production-equivalent execution runtime. The target is to adopt its discipline—deterministic reproductions, fault injection, live-system follow-through—not to claim parity. [FoundationDB testing documentation](https://github.com/apple/foundationdb/blob/main/documentation/sphinx/source/testing.rst)
+- **Jepsen / Elle** analyze observed transactional histories and detect consistency anomalies using dependency graphs and cycles. This is a strong comparator for transaction subsets and for independently adjudicating histories. Elle is not a universal stop/effect authority system; its own documentation notes limits around unobserved transactions and incomplete inference. Symthaea should integrate or differential-test against Elle where the event history is a database transaction history rather than recreate that checker. [Elle project](https://github.com/jepsen-io/elle)
+- **Porcupine** is a fast linearizability checker for histories of concurrent objects. It is an appropriate baseline for single-operation or register-like semantics, not for bitemporal evidence qualification, stop discharge, cross-owner receipt scope or engineering-effect retry lineage. [Porcupine project](https://github.com/anishathalye/porcupine)
+- **Google Spanner / TrueTime** provides a substantially stronger infrastructure guarantee than this repository currently does: Spanner's externally consistent transactions use time intervals and timestamp ordering to preserve real-time transaction order across servers. Symthaea must not claim to outperform this. The useful comparison is whether a cross-owner engineering decision can combine Spanner-like qualified time evidence with non-database evidence (calibration, permissions, test results, inventory completeness, stop obligations) and preserve fail-closed admissibility. [Spanner TrueTime and external consistency](https://docs.cloud.google.com/spanner/docs/true-time-external-consistency)
+- **Hybrid logical clocks** are an important logical/physical time baseline. They can preserve causal order while retaining physical-time proximity, but they are not a substitute for owner-authenticated clock calibration, mapping validity, source identity or durable observation evidence. Use matched replay traces and compare HLC-only, qualified-interval and combined order oracles.
+- **OpenTelemetry** explicitly distinguishes event Timestamp from collection ObservedTimestamp; Symthaea's v0.2 model goes further by distinguishing first observation, durable recording and decision-frontier visibility. The relationship is complementary: ingest telemetry without conflating these times; preserve its source semantics and add owner qualification on top. [OpenTelemetry log data model](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/logs/data-model.md)
+- **NIST IR 8536 (final, September 2026)** frames manufacturing traceability as decision-centric and risk-scaled, with interoperable cryptographic links and selective disclosure across organizations. This is a direct integration opportunity: reuse NIST-style traceability structures and existing sector standards; Symthaea's proposed addition is a decision-admissibility/reconciliation layer for irreversible actions, not a replacement for PLM, ALM, MES, ERP, QMS or the NIST framework. [NIST IR 8536 final](https://csrc.nist.gov/pubs/ir/8536/final)
+
+The differentiator to test is not "better clock sync" or a universal distributed database. It is a cross-owner admissibility layer for irreversible engineering operations when time bases, evidence authorities, policy scopes and systems of record differ. Demonstrate this only with identical frozen inputs, independently adjudicated ground truth, ablations and performance measurements.
 
 ## Known limitations / next increment
 
