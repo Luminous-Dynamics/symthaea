@@ -2481,6 +2481,20 @@ pub fn project_action_history(
                         continue;
                     }
                 };
+                let (_, start_time, _) = starts
+                    .get(&(operation_id.clone(), attempt_id.clone()))
+                    .expect("attempt start was checked above");
+                match event_order_between(start_time, &owner_time) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert(format!("EFFECT_COMMIT_PRECEDES_ATTEMPT_START:{attempt_id}"));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("ATTEMPT_START_EFFECT_COMMIT_ORDER_UNRESOLVED:{attempt_id}"));
+                    }
+                }
                 commit_times.entry((operation_id.clone(), attempt_id.clone()))
                     .or_default()
                     .push(owner_time.clone());
@@ -5801,6 +5815,32 @@ mod tests {
         assert!(report.start_gate.as_ref().is_some_and(|gate| {
             !gate.start_permitted_by_stop_contract
                 && gate.disposition == EventTraceDisposition::CriticalFailure
+        }));
+    }
+
+    #[test]
+    fn action_history_projection_rejects_effect_commit_before_attempt_start() {
+        let (schedule, mut resolutions, receipts, _) = action_history_fixture();
+        let commit_reference = schedule.actions.iter().find_map(|action| {
+            if matches!(action.action, ScheduleAction::EffectCommitted { .. }) {
+                action.owner_time_ref.as_ref().map(|reference| {
+                    (reference.clock_mapping_action_id.clone(), reference.local_timestamp_ns)
+                })
+            } else {
+                None
+            }
+        }).expect("commit owner time");
+        let commit_time = resolutions.get_mut(&commit_reference).expect("commit resolution");
+        commit_time.interval.earliest_ns = 900;
+        commit_time.interval.latest_ns = 900;
+        let report = project_action_history(&schedule, "robot-1", &resolutions, &receipts)
+            .expect("commit/start ordering assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        assert!(report.reason_codes.iter().any(|code| {
+            code == "EFFECT_COMMIT_PRECEDES_ATTEMPT_START:attempt-1"
+        }));
+        assert!(report.start_gate.as_ref().is_some_and(|gate| {
+            !gate.start_permitted_by_stop_contract
         }));
     }
 
