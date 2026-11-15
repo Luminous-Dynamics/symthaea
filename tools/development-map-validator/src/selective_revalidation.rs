@@ -329,6 +329,57 @@ mod tests {
         serde_json::from_str(FIXTURE).unwrap()
     }
 
+    fn refresh_receipt_digest(
+        scenario: &mut Value,
+        arm_index: usize,
+        checkpoint_index: usize,
+        receipt_index: usize,
+    ) {
+        use sha2::{Digest, Sha256};
+
+        #[derive(Serialize)]
+        struct ReceiptMaterial<'a> {
+            schema_version: &'a str,
+            scenario_id: &'a str,
+            repository_full_name: &'a str,
+            arm_id: &'a str,
+            receipt_id: &'a str,
+            obligation_id: &'a str,
+            check_id: &'a str,
+            outcome: &'a str,
+            source_epoch: u64,
+            observed_at: &'a str,
+            available_at: &'a str,
+            revision: &'a str,
+            tree_oid: &'a str,
+            configuration_world_digest: &'a str,
+        }
+
+        let arm = &scenario["arms"][arm_index];
+        let receipt = &arm["checkpoints"][checkpoint_index]["receipts"][receipt_index];
+        let material = ReceiptMaterial {
+            schema_version: scenario["schema_version"].as_str().unwrap(),
+            scenario_id: scenario["scenario_id"].as_str().unwrap(),
+            repository_full_name: scenario["repository_full_name"].as_str().unwrap(),
+            arm_id: arm["arm_id"].as_str().unwrap(),
+            receipt_id: receipt["receipt_id"].as_str().unwrap(),
+            obligation_id: receipt["obligation_id"].as_str().unwrap(),
+            check_id: receipt["check_id"].as_str().unwrap(),
+            outcome: receipt["outcome"].as_str().unwrap(),
+            source_epoch: receipt["source_epoch"].as_u64().unwrap(),
+            observed_at: receipt["observed_at"].as_str().unwrap(),
+            available_at: receipt["available_at"].as_str().unwrap(),
+            revision: receipt["revision"].as_str().unwrap(),
+            tree_oid: receipt["tree_oid"].as_str().unwrap(),
+            configuration_world_digest: receipt["configuration_world_digest"].as_str().unwrap(),
+        };
+        let bytes = serde_json::to_vec(&material).unwrap();
+        let digest = Sha256::digest(bytes);
+        let encoded = digest.iter().map(|byte| format!("{byte:02x}")).collect::<String>();
+        scenario["arms"][arm_index]["checkpoints"][checkpoint_index]["receipts"][receipt_index]["receipt_digest"] =
+            json!(encoded);
+    }
+
     #[test]
     fn computes_oracle_minimum_for_shifted_synthetic_trace() {
         let report = score_selective_revalidation_oracle_json(FIXTURE).unwrap();
@@ -364,6 +415,7 @@ mod tests {
     fn detects_unnecessary_refresh_of_unaffected_obligation() {
         let mut scenario = fixture_value();
         scenario["arms"][1]["checkpoints"][1]["receipts"][1]["source_epoch"] = json!(1);
+        refresh_receipt_digest(&mut scenario, 1, 1, 1);
         let report = score_selective_revalidation_oracle_json(&scenario.to_string()).unwrap();
         let shifted = report.arm_reports.iter().find(|arm| arm.condition == "shifted").unwrap();
         assert_eq!(shifted.total_over_revalidation_units, 1);
@@ -375,6 +427,7 @@ mod tests {
     fn detects_missing_required_revalidation() {
         let mut scenario = fixture_value();
         scenario["arms"][1]["checkpoints"][1]["receipts"][0]["source_epoch"] = json!(0);
+        refresh_receipt_digest(&mut scenario, 1, 1, 0);
         let report = score_selective_revalidation_oracle_json(&scenario.to_string()).unwrap();
         let shifted = report.arm_reports.iter().find(|arm| arm.condition == "shifted").unwrap();
         assert_eq!(shifted.total_under_revalidation_units, 1);
@@ -386,6 +439,7 @@ mod tests {
     fn distinguishes_fresh_failure_from_missing_revalidation() {
         let mut scenario = fixture_value();
         scenario["arms"][1]["checkpoints"][1]["receipts"][0]["outcome"] = json!("fail");
+        refresh_receipt_digest(&mut scenario, 1, 1, 0);
         let report = score_selective_revalidation_oracle_json(&scenario.to_string()).unwrap();
         let shifted = report.arm_reports.iter().find(|arm| arm.condition == "shifted").unwrap();
         assert_eq!(shifted.total_under_revalidation_units, 0);
