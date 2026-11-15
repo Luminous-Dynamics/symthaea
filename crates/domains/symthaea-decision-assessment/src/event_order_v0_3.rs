@@ -774,7 +774,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
         BTreeMap::<(String, String), (String, String, String)>::new();
     let mut reconciled_attempts =
         BTreeMap::<(String, String), (ReconciliationOutcome, String, String, GateState, String)>::new();
-    let mut inventory_attestations = BTreeSet::<(String, String, String)>::new();
+    let mut inventory_attestations = BTreeSet::<(StopScope, String, String)>::new();
     let mut records = Vec::new();
 
     for scheduled in ordered_actions(schedule) {
@@ -1016,11 +1016,11 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 let inventory_binding = match (&scheduled.evidence, stop_triggers.get(obligation_id)) {
                     (Some(ActionEvidence::StopDischarge { scope, inventory_frontier_event_id, attempt_manifest_sha256 }), Some(state)) => {
                         state.scope.as_ref() == Some(scope)
-                            && inventory_attestations.contains(&(
-                                serde_json::to_string(scope).unwrap_or_default(),
-                                inventory_frontier_event_id.clone(),
-                                attempt_manifest_sha256.clone(),
-                            ))
+                            && inventory_attestations.iter().any(|(inventory_scope, frontier, manifest)| {
+                                stop_scope_covers(inventory_scope, scope)
+                                    && frontier == inventory_frontier_event_id
+                                    && manifest == attempt_manifest_sha256
+                            })
                     }
                     (None, Some(state)) if state.scope.is_none() => true,
                     _ => false,
@@ -1232,7 +1232,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 };
                 if exact {
                     inventory_attestations.insert((
-                        serde_json::to_string(scope).unwrap_or_default(),
+                        scope.clone(),
                         inventory_frontier_event_id.clone(),
                         attempt_manifest_sha256.clone(),
                     ));
