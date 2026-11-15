@@ -1,0 +1,24 @@
+{
+  "schema_id": "d0fus-3.2.0-iter-run-output-165-v1",
+  "solver": "D0FUS",
+  "version": "3.2.0",
+  "source_git_commit": "a682c3511dc189b2a4cdd6f4b8bc545d3cdb8924",
+  "iter_deck_git_blob_sha": "d8932a85adf05e2b1b72a52d5a04a20cb25943b8",
+  "iter_deck_sha256": "15babfc79d7d9795afc83565ee926e332aa803816127922a25514174184feaa7",
+  "canonical_output_tuple_sha256": "59d59114ba7ecbcf873ea386c6f27495611b24464d02101acd68f3c79ca305e7",
+  "config_dataclass_field_count": 167,
+  "run_output_tuple_length": 165,
+  "tuple_fields": {
+    "P_elec": 25,
+    "P_th": 150,
+    "P_th_smoothed": 151,
+    "P_e_gross": 153,
+    "P_house_load": 158,
+    "P_BoP": 159,
+    "P_recirc_var": 160,
+    "P_recirc_fix": 161,
+    "P_recirculated": 162
+  },
+  "units": "MWe for all electric powers; MWth for thermal power",
+  "sign_convention": "gross_generation_positive_consumption_positive_net_export_positive"
+}
