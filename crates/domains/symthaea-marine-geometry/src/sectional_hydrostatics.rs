@@ -683,6 +683,10 @@ pub fn calculate_sectional_reference(
             .collect::<Vec<_>>()
     })?;
 
+    let first_station_x = sections.sections.first().expect("validated sections").x_m;
+    let last_station_x = sections.sections.last().expect("validated sections").x_m;
+    let reference_x = first_station_x + (last_station_x - first_station_x) * 0.5;
+
     let mut displacement = CompensatedSum::default();
     let mut first_x = CompensatedSum::default();
     let mut first_z = CompensatedSum::default();
@@ -717,9 +721,9 @@ pub fn calculate_sectional_reference(
             right_slice.area_m2,
         );
         let x_moment_bay = simpson(
-            left.x_m * left_slice.area_m2,
-            midpoint_x * midpoint_slice.area_m2,
-            right.x_m * right_slice.area_m2,
+            (left.x_m - reference_x) * left_slice.area_m2,
+            (midpoint_x - reference_x) * midpoint_slice.area_m2,
+            (right.x_m - reference_x) * right_slice.area_m2,
         );
         let z_moment_bay = simpson(
             left_slice.vertical_first_moment_m3,
@@ -736,9 +740,9 @@ pub fn calculate_sectional_reference(
             2.0 * right_breadth,
         );
         let wp_x_moment_bay = simpson(
-            2.0 * left.x_m * left_breadth,
-            2.0 * midpoint_x * middle_breadth,
-            2.0 * right.x_m * right_breadth,
+            2.0 * (left.x_m - reference_x) * left_breadth,
+            2.0 * (midpoint_x - reference_x) * middle_breadth,
+            2.0 * (right.x_m - reference_x) * right_breadth,
         );
         let transverse_second_bay = simpson(
             (2.0 / 3.0) * left_breadth.powi(3),
@@ -781,9 +785,9 @@ pub fn calculate_sectional_reference(
         )]);
     }
 
-    let lcb = first_x.value() / volume;
+    let lcb = reference_x + first_x.value() / volume;
     let vcb = first_z.value() / volume;
-    let lcf = waterplane_first_x.value() / aw;
+    let lcf = reference_x + waterplane_first_x.value() / aw;
     let longitudinal_second = {
         let mut sum = CompensatedSum::default();
         for index in 0..sections.sections.len() - 1 {
@@ -943,6 +947,44 @@ pub fn compare_with_polyhedral_hydrostatics(
     }
 
     let mut identity_errors = Vec::new();
+    let observed_values = [
+        sectional.displacement_volume_m3,
+        sectional.displacement_mass_kg,
+        sectional.displacement_tonnes,
+        sectional.longitudinal_centre_of_buoyancy_m,
+        sectional.transverse_centre_of_buoyancy_m,
+        sectional.vertical_centre_of_buoyancy_below_waterplane_m,
+        sectional.waterplane_area_m2,
+        sectional.longitudinal_centre_of_flotation_m,
+        sectional.transverse_centre_of_flotation_m,
+        sectional.transverse_waterplane_second_moment_m4,
+        sectional.longitudinal_waterplane_second_moment_m4,
+        sectional.waterplane_product_of_inertia_m4,
+        sectional.transverse_metacentric_radius_bm_t_m,
+        sectional.longitudinal_metacentric_radius_bm_l_m,
+        sectional.tonnes_per_centimetre_immersion,
+        polyhedral.displacement_volume_m3,
+        polyhedral.displacement_mass_kg,
+        polyhedral.displacement_tonnes,
+        polyhedral.longitudinal_centre_of_buoyancy_m,
+        polyhedral.transverse_centre_of_buoyancy_m,
+        polyhedral.vertical_centre_of_buoyancy_below_waterplane_m,
+        polyhedral.waterplane_area_m2,
+        polyhedral.longitudinal_centre_of_flotation_m,
+        polyhedral.transverse_centre_of_flotation_m,
+        polyhedral.transverse_waterplane_second_moment_m4,
+        polyhedral.longitudinal_waterplane_second_moment_m4,
+        polyhedral.waterplane_product_of_inertia_m4,
+        polyhedral.transverse_metacentric_radius_bm_t_m,
+        polyhedral.longitudinal_metacentric_radius_bm_l_m,
+        polyhedral.tonnes_per_centimetre_immersion,
+    ];
+    if observed_values.iter().any(|value| !value.is_finite()) {
+        return Err(violation(
+            "comparison_non_finite",
+            "sectional or polyhedral result contains a non-finite observable",
+        ));
+    }
     if sectional.candidate_id != polyhedral.candidate_id {
         identity_errors.push("candidate IDs differ".to_owned());
     }
