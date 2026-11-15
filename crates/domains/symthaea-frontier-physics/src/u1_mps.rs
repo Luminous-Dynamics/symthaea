@@ -3188,14 +3188,24 @@ impl U1MpsTruncationLedger {
                 "Hamiltonian projection operator-error bound",
             ));
         }
+        // The global reference state may already differ from the current MPS
+        // by prior certified error e. Its norm is therefore bounded by
+        // ||psi_ref|| <= ||psi_current|| + e. Gate and Hamiltonian model
+        // approximation defects act on that reference state, not merely on
+        // the current approximate state.
+        let current_state_norm = pre_gate_norm_squared.sqrt();
+        let reference_state_norm_upper =
+            current_state_norm + prior_bound.unwrap_or(0.0);
+        let reference_state_norm_squared =
+            reference_state_norm_upper * reference_state_norm_upper;
         let (gate_operator_norm_upper, gate_quality_error) =
             gate_quality_error_bounds_from_residuals(
                 gate_unitarity_residual,
                 gate_charge_residual,
-                pre_gate_norm_squared,
+                reference_state_norm_squared,
             )?;
-        let hamiltonian_projection_error = hamiltonian_projection_operator_error_upper_bound
-            * pre_gate_norm_squared.sqrt();
+        let hamiltonian_projection_error =
+            hamiltonian_projection_operator_error_upper_bound * reference_state_norm_upper;
         if !receipt.qualifies(tolerance) {
             self.record_local(diagnostics)?;
             self.canonical_gauge_receipt_count = self
@@ -3439,8 +3449,13 @@ impl U1TeBDLayer {
             let evolved_pair = pair.apply_gate(&entry.gate, policy.tolerance)?;
             let truncation = evolved_pair.split_truncated(policy)?;
             let prior_global_bound = truncation_ledger.global_state_error_bound_upper;
+            let current_state_norm = gauge_receipt.output_norm_squared.sqrt();
+            let reference_state_norm_upper =
+                current_state_norm + prior_global_bound.unwrap_or(0.0);
+            let reference_state_norm_squared =
+                reference_state_norm_upper * reference_state_norm_upper;
             let (gate_operator_norm_upper, gate_quality_error_upper_bound) =
-                gate_quality_error_bounds(&entry.gate, gauge_receipt.output_norm_squared)?;
+                gate_quality_error_bounds(&entry.gate, reference_state_norm_squared)?;
             let global_projection_error_upper_bound = truncation.reconstruction_l2_residual
                 * gauge_receipt.exterior_operator_norm_product_upper_bound();
             truncation_ledger.record_with_canonical_gauge_and_gate(
@@ -5940,6 +5955,82 @@ mod tests {
         assert_eq!(qualified_cases, CASES);
         assert!(compression_cases > CASES / 3);
         assert_eq!(nontrivial_gauge_cases, CASES);
+    }
+
+
+    #[test]
+    fn gate_quality_and_hamiltonian_projection_bounds_use_prior_reference_norm() {
+        let mut state = canonical_w_state();
+        let receipt = state.canonicalize_for_bond(0, 1.0e-10).unwrap();
+        assert!(receipt.qualifies(1.0e-10));
+        let pair = U1TwoSiteState::from_adjacent_tensors(
+            &state.tensors()[0],
+            &state.tensors()[1],
+            1.0e-12,
+        )
+        .unwrap();
+        let diagnostics = pair
+            .apply_gate(&U1TwoSiteGate::identity(), 1.0e-12)
+            .unwrap()
+            .split_truncated(U1TwoSiteTruncationPolicy {
+                max_bond_dimension: 8,
+                relative_singular_value_cutoff: 0.0,
+                tolerance: 1.0e-12,
+            })
+            .unwrap();
+
+        let prior_error_bound = 0.25;
+        let pre_gate_norm_squared = receipt.output_norm_squared;
+        let reference_norm_upper = pre_gate_norm_squared.sqrt() + prior_error_bound;
+        let expected_reference_norm_squared = reference_norm_upper * reference_norm_upper;
+        let (_, expected_gate_quality_error) = super::gate_quality_error_bounds_from_residuals(
+            1.0e-3,
+            0.0,
+            expected_reference_norm_squared,
+        )
+        .unwrap();
+        let (_, approximate_only_gate_error) =
+            super::gate_quality_error_bounds_from_residuals(1.0e-3, 0.0, pre_gate_norm_squared)
+                .unwrap();
+
+        let mut ledger = U1MpsTruncationLedger {
+            gate_count: 1,
+            global_state_error_bound_qualified: true,
+            global_state_error_bound_upper: Some(prior_error_bound),
+            ..U1MpsTruncationLedger::default()
+        };
+        ledger
+            .record_with_gate_error_bounds(
+                &diagnostics,
+                &receipt,
+                1.0e-3,
+                0.0,
+                2.0e-3,
+                pre_gate_norm_squared,
+                1.0e-10,
+            )
+            .unwrap();
+
+        assert!(
+            (ledger.cumulative_gate_quality_l2_error_bound - expected_gate_quality_error).abs()
+                <= 1.0e-12
+        );
+        assert!(
+            ledger.cumulative_gate_quality_l2_error_bound > approximate_only_gate_error,
+            "prior error must enlarge the reference-state norm used by gate quality bounds"
+        );
+        assert!(
+            (ledger.cumulative_hamiltonian_projection_l2_error_bound
+                - 2.0e-3 * reference_norm_upper)
+                .abs()
+                <= 1.0e-12
+        );
+        assert!(
+            ledger.global_state_error_bound_upper.unwrap()
+                >= prior_error_bound * 1.0
+                    + expected_gate_quality_error
+                    + 2.0e-3 * reference_norm_upper
+        );
     }
 
 }
