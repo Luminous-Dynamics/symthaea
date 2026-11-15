@@ -666,3 +666,23 @@ The source models plasma-based routes from biogas to syngas and downstream Fisch
 This is a plant-level techno-economic model, not a physical demonstration or observed product price. Its 44% metric is not plasma coupling efficiency. The favourable-cost result depends on source-specific power price, location, capacity-factor and process assumptions.
 
 Benchmark consequence: preserve complete syngas quality, biogas/feed boundary, grid-side electricity, power conversion, reactor/plant auxiliaries, capacity factor, renewable supply profile, CAPEX/OPEX, maintenance, coproducts and downstream integration. A plasma route only beats the incumbent if it produces the same accepted syngas service at lower risk-adjusted lifecycle cost under matched assumptions.
+
+
+## 9.16 Liquid-metal fusion-blanket MHD: new SAM/NekRS reference — 2026-11-15
+
+Hua et al., *MHD capabilities in SAM and NekRS for fusion liquid metal blanket applications*, Fusion Engineering and Design (September 2026), DOI https://doi.org/10.1016/j.fusengdes.2026.115888.
+
+The paper presents:
+- reduced-order high-Hartmann / high-interaction-parameter MHD modelling in system code SAM;
+- full MHD CFD capability in NekRS;
+- analytical verification for conducting square ducts in uniform magnetic fields;
+- code-to-code comparisons;
+- validation against historical ALEX measurements for square and round ducts under applied/non-uniform magnetic fields.
+
+The paper states that insulating-duct capability and validation against ALEX insulating round-duct experiments remain future work. Therefore this is a valuable source-pinned duct V&V baseline, not a blanket qualification or a validated insulating-wall result.
+
+### Benchmark implication
+
+Reproduce each source case with exact geometry, electrical wall condition, conductivity ratio, Hartmann / Reynolds / interaction parameters, applied-field profile, boundary conditions, model closure, solver revision and experimental uncertainty. Compare pressure drop, flow distribution and thermal observables separately. Hold out at least one field profile or geometry for transfer testing. Keep SAM reduced-order output, NekRS high-fidelity output and ALEX measurements as three distinct evidence records.
+
+The source register adds `FUSION-BLANKET-MHD-SAM-NEKRS-ALEX-2026` plus negative controls against model/evidence substitution and extrapolation to insulating/full-blanket designs.
