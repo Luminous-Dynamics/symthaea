@@ -9,6 +9,7 @@ Select an exact raw JSON value token using a verifier-supplied RFC 6901 JSON Poi
 ## Contract
 
 - Uses serde_json borrowed RawValue support; it does not implement a new JSON grammar.
+- Selects from the original wire bytes. It does not canonicalize the transcript before deriving offsets; RFC 8785/JCS or any other normalization must be a separate, explicitly versioned semantic mode because it changes the byte representation.
 - Rejects duplicate decoded object member names anywhere in the document, including escaped spellings that decode to the same key.
 - Enforces body size, nesting, node count, container count, key length and scalar token bounds.
 - Supports RFC 6901 tilde-zero and tilde-one pointer escapes and canonical array indices.
@@ -65,5 +66,7 @@ This standalone research tool is intentionally outside the root Symthaea workspa
 - thiserror 2.0.18
 
 The profile compares decoded JSON object keys by exact Unicode scalar sequence; it performs no Unicode normalization. Escaped JSON spellings are decoded by serde_json before duplicate detection, so two spellings that decode to the same key are rejected.
+
+The strict HTTP helper currently accepts only a single HTTP/1.1 status-200 JSON response with one Content-Length, an exact application/json media type and no content/transfer encoding. It does not prove request-response ordinal pairing; that remains a caller-owned requirement. HTTP/2, chunked transfer, compression, 1xx/206 responses and pipelining are unsupported by this profile.
 
 The tool does not claim compatibility with every parser or provider schema. Its parser identity is explicit and must be bound in the verifier request. The raw body supplied to this API must be the exact representation whose offsets are being referenced; compressed/chunked/decoded derivatives require a separately qualified mapping step.
