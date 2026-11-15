@@ -7,8 +7,8 @@ use symthaea_marine_geometry::{
     section::SectionFamilyArtifact,
     sectional_hydrostatics::{
         calculate_sectional_reference, compare_with_polyhedral_hydrostatics,
-        SectionalCrossCheckReport, SectionalCrossCheckTolerance,
-        SectionalHydrostaticsReference,
+        verify_sectional_cross_check_report_integrity, SectionalCrossCheckReport,
+        SectionalCrossCheckTolerance, SectionalHydrostaticsReference,
     },
 };
 
@@ -87,6 +87,8 @@ fn run() -> Result<i32, String> {
         &request.tolerance,
     )
     .map_err(|error| format!("cross-check could not be evaluated: {error:#?}"))?;
+    verify_sectional_cross_check_report_integrity(&comparison)
+        .map_err(|error| format!("cross-check receipt verification failed: {error:#?}"))?;
 
     let exit_code = match comparison.disposition {
         symthaea_marine_geometry::sectional_hydrostatics::CrossCheckDisposition::Consistent => 0,
