@@ -355,24 +355,84 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
+        "status",
         "value",
         "unit",
         "coverage_or_method"
       ],
       "properties": {
+        "status": {
+          "enum": [
+            "QUANTIFIED",
+            "NOT_QUANTIFIED"
+          ]
+        },
         "value": {
-          "type": "number",
+          "type": [
+            "number",
+            "null"
+          ],
           "minimum": 0
         },
         "unit": {
-          "type": "string",
-          "minLength": 1
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "coverage_or_method": {
           "type": "string",
           "minLength": 3
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "NOT_QUANTIFIED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              },
+              "unit": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "QUANTIFIED"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "number",
+                "minimum": 0
+              },
+              "unit": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
     },
     "view": {
       "type": "object",
