@@ -74,12 +74,15 @@ cargo fmt --manifest-path Cargo.toml -- --check
 cargo test --manifest-path Cargo.toml
 cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
 cargo run --manifest-path Cargo.toml --bin verify_validation_domain_corpus
+cargo run --manifest-path Cargo.toml --bin compare_solver_outputs
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
 The independent compiler corpus binary checks fixture shape and required case identities without calling the compiler implementation. The current compiler corpus has 26 rows: 5 expected review-eligible, 7 blocked, 6 indeterminate and 8 schema-rejected. The compiler core has 32 authored Rust unit tests, including one that applies all 26 compiler corpus mutations to the actual compiler. The observable-dependence module adds 11 authored tests for per-output dependency overlap, source aliases, incomplete inventories, conflicting identities and deterministic ordering. The candidate-funnel module adds 16 authored tests for full stage matrices, missing/duplicate records, skip reasons, pipeline transitions, explicit audit overrides, failure/non-convergence and exact-vs-partial recall. The validation-domain module adds 16 authored tests for calibration/test/holdout separation, source and episode overlap, leakage, measurement class, metrology provenance, model revision and domain applicability; it also executes all 16 frozen split-integrity cases. The cross-solver comparison module adds 15 authored tests for matched-case output admission, normalization identity, run-status refusal, dependency disclosure, and covariance-receipt binding. Total authored Rust test declarations across the current five source modules: 90. These are authored test cases, not executed test results.
 
 The separate validation-domain inventory binary checks fixture structure without calling the split validator. Its 16 synthetic cases contain 3 expected acceptances and 13 expected refusals.
+
+The `compare_solver_outputs` binary is an executable synthetic matched-case example. It compares a declared PROCESS-like output (1200 MW) against a D0FUS-like output (1185 MW) for one frozen candidate and service boundary. The expected disposition is descriptive-only because cross-covariance is deliberately unknown. The example verifies the output comparison and refuses to manufacture inferential significance or a physical-validation claim. These values are synthetic fixtures, not PROCESS or D0FUS solver runs.
 
 ## Claim ceiling
 
