@@ -11,14 +11,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use super::decision_opportunity::{
+    IncumbentFrontierPoint, ObjectiveDefinition, ObjectiveDirection, ObjectiveValue,
+    epsilon_dominates, epsilon_equivalent, is_epsilon_frontier_extension, valid_objective_vector,
+};
 use super::{
     AuditError, AuditOutcome, RejectAuditPlan, audit_rejected_candidates,
     upper_hypergeometric_population_successes,
-};
-use super::decision_opportunity::{
-    IncumbentFrontierPoint, ObjectiveDefinition, ObjectiveValue, ObjectiveDirection,
-    epsilon_dominates, epsilon_equivalent, is_epsilon_frontier_extension,
-    valid_objective_vector,
 };
 
 pub const SCENARIO_OPPORTUNITY_VERSION: &str = "fusion-scenario-opportunity/0.1";
@@ -378,16 +377,11 @@ pub fn audit_scenario_opportunities(
             scenario_upper_totals[index] = checked_add(scenario_upper_totals[index], upper_u64)?;
             scenario_population_totals[index] =
                 checked_add(scenario_population_totals[index], population_u64)?;
-            scenario_sample_totals[index] =
-                checked_add(scenario_sample_totals[index], sample_u64)?;
-            scenario_observed_opportunity_totals[index] = checked_add(
-                scenario_observed_opportunity_totals[index],
-                counts.0,
-            )?;
-            scenario_observed_unresolved_totals[index] = checked_add(
-                scenario_observed_unresolved_totals[index],
-                counts.2,
-            )?;
+            scenario_sample_totals[index] = checked_add(scenario_sample_totals[index], sample_u64)?;
+            scenario_observed_opportunity_totals[index] =
+                checked_add(scenario_observed_opportunity_totals[index], counts.0)?;
+            scenario_observed_unresolved_totals[index] =
+                checked_add(scenario_observed_unresolved_totals[index], counts.2)?;
 
             scenario_stratum_reports[index].push(ScenarioStratumAuditReport {
                 stratum_id: base_stratum.stratum_id.clone(),
@@ -913,10 +907,7 @@ fn classify_union(dispositions: &[ScenarioDisposition]) -> UnionOpportunityDispo
     }
 }
 
-fn increment_counts(
-    counts: &mut (u64, u64, u64),
-    disposition: ScenarioDisposition,
-) {
+fn increment_counts(counts: &mut (u64, u64, u64), disposition: ScenarioDisposition) {
     match disposition {
         ScenarioDisposition::ConfirmedOpportunity => counts.0 += 1,
         ScenarioDisposition::ConfirmedNoOpportunity => counts.1 += 1,
@@ -924,10 +915,7 @@ fn increment_counts(
     }
 }
 
-fn increment_union_counts(
-    counts: &mut (u64, u64, u64),
-    disposition: UnionOpportunityDisposition,
-) {
+fn increment_union_counts(counts: &mut (u64, u64, u64), disposition: UnionOpportunityDisposition) {
     match disposition {
         UnionOpportunityDisposition::OpportunityInAtLeastOneScenario => counts.0 += 1,
         UnionOpportunityDisposition::NoOpportunityInAnyScenario => counts.1 += 1,
@@ -1004,7 +992,11 @@ mod tests {
         ]
     }
 
-    fn scenario(scenario_id: &str, frontier: Vec<IncumbentFrontierPoint>, digest_char: char) -> ScenarioDefinition {
+    fn scenario(
+        scenario_id: &str,
+        frontier: Vec<IncumbentFrontierPoint>,
+        digest_char: char,
+    ) -> ScenarioDefinition {
         ScenarioDefinition {
             scenario_id: scenario_id.to_string(),
             scenario_sha256: digest(digest_char),
@@ -1090,7 +1082,11 @@ mod tests {
         }
     }
 
-    fn rejected_bundle(candidate_id: &str, nominal: ScenarioEvaluation, stress: ScenarioEvaluation) -> CandidateScenarioBundle {
+    fn rejected_bundle(
+        candidate_id: &str,
+        nominal: ScenarioEvaluation,
+        stress: ScenarioEvaluation,
+    ) -> CandidateScenarioBundle {
         CandidateScenarioBundle {
             candidate_id: candidate_id.to_string(),
             evaluations: vec![nominal, stress],
@@ -1117,7 +1113,8 @@ mod tests {
             "rejected-2".to_string(),
             "rejected-3".to_string(),
         ];
-        let selected = deterministic_audit_sample_ids("reject-all", &rejected_ids, 4, seed).unwrap();
+        let selected =
+            deterministic_audit_sample_ids("reject-all", &rejected_ids, 4, seed).unwrap();
         let primary_outcomes = BTreeMap::from([
             ("rejected-0", AuditOutcome::ConfirmedFeasible),
             ("rejected-1", AuditOutcome::ConfirmedInfeasible),
@@ -1297,10 +1294,7 @@ mod tests {
         let report = audit_scenario_opportunities(&test_plan).unwrap();
         assert_eq!(report.union.rejected_opportunities_observed, 2);
         assert_eq!(report.union.rejected_unresolved_observed, 1);
-        assert_eq!(
-            report.scenarios[1].rejected_unresolved_observed,
-            2
-        );
+        assert_eq!(report.scenarios[1].rejected_unresolved_observed, 2);
     }
 
     #[test]
@@ -1331,7 +1325,9 @@ mod tests {
     #[test]
     fn scenario_order_is_part_of_the_bundle_identity() {
         let mut test_plan = plan();
-        test_plan.rejected_strata[0].bundles[0].evaluations.swap(0, 1);
+        test_plan.rejected_strata[0].bundles[0]
+            .evaluations
+            .swap(0, 1);
         let errors = audit_scenario_opportunities(&test_plan).unwrap_err();
         assert!(errors.iter().any(|error| matches!(
             error,
@@ -1345,10 +1341,11 @@ mod tests {
         test_plan.rejected_strata[0].bundles[0].evaluations[0].reference_outcome =
             AuditOutcome::ConfirmedInfeasible;
         let errors = audit_scenario_opportunities(&test_plan).unwrap_err();
-        assert!(errors.iter().any(|error| matches!(
-            error,
-            ScenarioOpportunityError::PrimaryOutcomeMismatch(_)
-        )));
+        assert!(
+            errors
+                .iter()
+                .any(|error| matches!(error, ScenarioOpportunityError::PrimaryOutcomeMismatch(_)))
+        );
     }
 
     #[test]
@@ -1357,10 +1354,11 @@ mod tests {
         test_plan.accepted_bundles[0].evaluations[0].evidence_ref =
             "a-different-primary-run".to_string();
         let errors = audit_scenario_opportunities(&test_plan).unwrap_err();
-        assert!(errors.iter().any(|error| matches!(
-            error,
-            ScenarioOpportunityError::PrimaryEvidenceMismatch(_)
-        )));
+        assert!(
+            errors
+                .iter()
+                .any(|error| matches!(error, ScenarioOpportunityError::PrimaryEvidenceMismatch(_)))
+        );
     }
 
     #[test]
@@ -1383,26 +1381,32 @@ mod tests {
     #[test]
     fn scenario_frontiers_must_be_nondominated_and_non_equivalent() {
         let mut test_plan = plan();
-        test_plan.scenarios[0].incumbent_frontier.push(IncumbentFrontierPoint {
-            candidate_id: "duplicate-tradeoff".to_string(),
-            objectives: objective_values(100.5, 0.905),
-        });
+        test_plan.scenarios[0]
+            .incumbent_frontier
+            .push(IncumbentFrontierPoint {
+                candidate_id: "duplicate-tradeoff".to_string(),
+                objectives: objective_values(100.5, 0.905),
+            });
         let errors = audit_scenario_opportunities(&test_plan).unwrap_err();
-        assert!(errors.iter().any(|error| matches!(
-            error,
-            ScenarioOpportunityError::InvalidScenarioFrontier(_)
-        )));
+        assert!(
+            errors
+                .iter()
+                .any(|error| matches!(error, ScenarioOpportunityError::InvalidScenarioFrontier(_)))
+        );
     }
 
     #[test]
     fn wrong_objective_units_or_order_are_rejected() {
         let mut test_plan = plan();
-        test_plan.accepted_bundles[0].evaluations[0].objectives.swap(0, 1);
+        test_plan.accepted_bundles[0].evaluations[0]
+            .objectives
+            .swap(0, 1);
         let errors = audit_scenario_opportunities(&test_plan).unwrap_err();
-        assert!(errors.iter().any(|error| matches!(
-            error,
-            ScenarioOpportunityError::InvalidObjectiveVector { .. }
-        )));
+        assert!(
+            errors
+                .iter()
+                .any(|error| matches!(error, ScenarioOpportunityError::InvalidObjectiveVector { .. }))
+        );
     }
 
     #[test]
@@ -1410,26 +1414,23 @@ mod tests {
         let mut test_plan = plan();
         test_plan.rejected_strata[0].bundles.swap(0, 1);
         let errors = audit_scenario_opportunities(&test_plan).unwrap_err();
-        assert!(errors.iter().any(|error| matches!(
-            error,
-            ScenarioOpportunityError::RejectedBundleIdentityMismatch { .. }
-        )));
+        assert!(
+            errors
+                .iter()
+                .any(|error| matches!(error, ScenarioOpportunityError::RejectedBundleIdentityMismatch { .. }))
+        );
     }
 
     #[test]
     fn familywise_error_is_allocated_across_union_and_scenario_strata() {
         let report = audit_scenario_opportunities(&plan()).unwrap();
         assert_eq!(report.simultaneous_bound_count, 3);
+        assert!((report.union.per_hypothesis_error_probability - (0.05 / 3.0)).abs() < 1e-12);
         assert!(
-            (report.union.per_hypothesis_error_probability - (0.05 / 3.0)).abs() < 1e-12
+            (report.scenarios[0].per_hypothesis_error_probability - (0.05 / 3.0)).abs() < 1e-12
         );
         assert!(
-            (report.scenarios[0].per_hypothesis_error_probability - (0.05 / 3.0)).abs()
-                < 1e-12
-        );
-        assert!(
-            (report.scenarios[1].per_hypothesis_error_probability - (0.05 / 3.0)).abs()
-                < 1e-12
+            (report.scenarios[1].per_hypothesis_error_probability - (0.05 / 3.0)).abs() < 1e-12
         );
     }
 
