@@ -1,0 +1,196 @@
+{
+  "schema_version": "luminous.claim-evidence-audit.v1",
+  "task_id": "dev.synthetic.supplier-energy-shock.0001",
+  "candidate_id": "CALIBRATION-REF",
+  "evaluation_frontier": "2026-10-01T12:00:00Z",
+  "qualification": "synthetic_calibration_only",
+  "claims": [
+    {
+      "claim_id": "C-001",
+      "assertion": "A report recorded a supplier shipment-schedule disruption on 30 September 2026.",
+      "claim_type": "observed",
+      "subject_refs": [
+        "SYN-SUPPLIER-01"
+      ],
+      "temporal_scope": {
+        "observed_at": "2026-09-30T09:00:00Z",
+        "target_period": "2026-09-30"
+      },
+      "measurement": null,
+      "fact_assessment": "supported",
+      "trace_support": "supported_in_trace",
+      "evidence_relations": [
+        {
+          "evidence_id": "ev.synthetic.supplier-status.0001",
+          "relation": "supports",
+          "source_snapshot_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "source_locator": "/artifacts/0/metadata/synthetic_record/status",
+          "source_family_id": "synthetic-family.supplier.v1",
+          "temporally_admissible": true
+        }
+      ],
+      "derivation": null,
+      "hard_gate_flags": [],
+      "adjudication": null
+    },
+    {
+      "claim_id": "C-002",
+      "assertion": "The buyer purchases 40% of its inputs from that supplier.",
+      "claim_type": "observed",
+      "subject_refs": [
+        "SYN-BUYER-01",
+        "SYN-SUPPLIER-01"
+      ],
+      "temporal_scope": null,
+      "measurement": {
+        "value": "40",
+        "unit": "percent",
+        "currency": null,
+        "period": null,
+        "denominator": "buyer total relevant input purchases"
+      },
+      "fact_assessment": "not_evaluable",
+      "trace_support": "unsupported_in_trace",
+      "evidence_relations": [],
+      "derivation": null,
+      "hard_gate_flags": [
+        "fabricated_material_financial_quantity"
+      ],
+      "adjudication": null
+    },
+    {
+      "claim_id": "C-003",
+      "assertion": "The September synthetic energy stress index was 124 index points.",
+      "claim_type": "observed",
+      "subject_refs": [
+        "SYN-ENERGY-STRESS-INDEX"
+      ],
+      "temporal_scope": {
+        "valid_from": "2026-09-01T00:00:00Z",
+        "valid_until": "2026-10-01T00:00:00Z",
+        "target_period": "2026-09"
+      },
+      "measurement": {
+        "value": "124",
+        "unit": "index_points",
+        "currency": null,
+        "period": "2026-09",
+        "denominator": null
+      },
+      "fact_assessment": "supported",
+      "trace_support": "supported_in_trace",
+      "evidence_relations": [
+        {
+          "evidence_id": "ev.synthetic.energy-index.0001",
+          "relation": "supports",
+          "source_snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_locator": "/artifacts/1/metadata/synthetic_record/value",
+          "source_family_id": "synthetic-family.energy.v1",
+          "temporally_admissible": true
+        }
+      ],
+      "derivation": null,
+      "hard_gate_flags": [],
+      "adjudication": null
+    },
+    {
+      "claim_id": "C-004",
+      "assertion": "The energy index reading of 124 was a 24% increase over normal.",
+      "claim_type": "interpretation",
+      "subject_refs": [
+        "SYN-ENERGY-STRESS-INDEX"
+      ],
+      "temporal_scope": {
+        "target_period": "2026-09"
+      },
+      "measurement": {
+        "value": "24",
+        "unit": "percent",
+        "currency": null,
+        "period": "2026-09",
+        "denominator": "unspecified normal baseline"
+      },
+      "fact_assessment": "insufficient_evidence",
+      "trace_support": "unsupported_in_trace",
+      "evidence_relations": [
+        {
+          "evidence_id": "ev.synthetic.energy-index.0001",
+          "relation": "qualifies",
+          "source_snapshot_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+          "source_locator": "/artifacts/1/metadata/synthetic_record/unit",
+          "source_family_id": "synthetic-family.energy.v1",
+          "temporally_admissible": true
+        }
+      ],
+      "derivation": null,
+      "hard_gate_flags": [
+        "unit_currency_period_mismatch"
+      ],
+      "adjudication": null
+    },
+    {
+      "claim_id": "C-005",
+      "assertion": "The supplier disruption caused the buyer to lose $420,000 in quarterly revenue.",
+      "claim_type": "derived",
+      "subject_refs": [
+        "SYN-BUYER-01",
+        "SYN-SUPPLIER-01"
+      ],
+      "temporal_scope": {
+        "target_period": "quarterly"
+      },
+      "measurement": {
+        "value": "420000",
+        "unit": "USD",
+        "currency": "USD",
+        "period": "quarterly",
+        "denominator": null
+      },
+      "fact_assessment": "not_evaluable",
+      "trace_support": "unsupported_in_trace",
+      "evidence_relations": [],
+      "derivation": {
+        "formula": "not provided",
+        "input_claim_ids": [],
+        "input_values": [],
+        "rounding_policy": "not applicable",
+        "reproducible": false
+      },
+      "hard_gate_flags": [
+        "fabricated_material_financial_quantity",
+        "unsupported_causal_assertion"
+      ],
+      "adjudication": null
+    },
+    {
+      "claim_id": "C-006",
+      "assertion": "The supplier remains disrupted at the 1 October 2026 decision frontier.",
+      "claim_type": "observed",
+      "subject_refs": [
+        "SYN-SUPPLIER-01"
+      ],
+      "temporal_scope": {
+        "observed_at": "2026-09-30T09:00:00Z",
+        "target_period": "2026-10-01T12:00:00Z"
+      },
+      "measurement": null,
+      "fact_assessment": "not_evaluable",
+      "trace_support": "unsupported_in_trace",
+      "evidence_relations": [
+        {
+          "evidence_id": "ev.synthetic.supplier-status.0001",
+          "relation": "qualifies",
+          "source_snapshot_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+          "source_locator": "/artifacts/0/metadata/synthetic_record/reported_at",
+          "source_family_id": "synthetic-family.supplier.v1",
+          "temporally_admissible": true
+        }
+      ],
+      "derivation": null,
+      "hard_gate_flags": [
+        "stale_or_wrong_temporal_scope"
+      ],
+      "adjudication": null
+    }
+  ]
+}

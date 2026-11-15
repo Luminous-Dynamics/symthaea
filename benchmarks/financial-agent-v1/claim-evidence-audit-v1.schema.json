@@ -1,0 +1,399 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/benchmarks/financial-agent-v1/claim-evidence-audit-v1.schema.json",
+  "title": "Luminous Claim-Level Financial Evidence Audit v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "candidate_id",
+    "evaluation_frontier",
+    "claims",
+    "qualification"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "luminous.claim-evidence-audit.v1"
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "candidate_id": {
+      "type": "string",
+      "pattern": "^[A-Z0-9-]{2,32}$"
+    },
+    "evaluation_frontier": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "qualification": {
+      "enum": [
+        "synthetic_calibration_only",
+        "development_ai_adjudication",
+        "human_adjudication",
+        "qualified_reference"
+      ]
+    },
+    "identity_mapping_ref": {
+      "type": "string",
+      "maxLength": 1024
+    }
+  },
+  "$defs": {
+    "evidenceRelation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "relation",
+        "source_snapshot_sha256",
+        "source_locator"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "relation": {
+          "enum": [
+            "supports",
+            "refutes",
+            "qualifies",
+            "contradicts",
+            "irrelevant"
+          ]
+        },
+        "source_snapshot_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "source_locator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "source_family_id": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "temporally_admissible": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "claim_id",
+        "assertion",
+        "claim_type",
+        "subject_refs",
+        "fact_assessment",
+        "trace_support",
+        "evidence_relations",
+        "hard_gate_flags"
+      ],
+      "properties": {
+        "claim_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "assertion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "claim_type": {
+          "enum": [
+            "observed",
+            "derived",
+            "hypothesis",
+            "forecast",
+            "scenario",
+            "interpretation",
+            "normative"
+          ]
+        },
+        "subject_refs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "uniqueItems": true
+        },
+        "temporal_scope": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "valid_from": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "valid_until": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "observed_at": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "date-time"
+            },
+            "target_period": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            }
+          }
+        },
+        "measurement": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "type": [
+                "string",
+                "integer",
+                "number",
+                "null"
+              ]
+            },
+            "unit": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 64
+            },
+            "currency": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[A-Z]{3}$"
+            },
+            "period": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            },
+            "denominator": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            }
+          }
+        },
+        "fact_assessment": {
+          "enum": [
+            "supported",
+            "contradicted",
+            "mixed_contested",
+            "insufficient_evidence",
+            "scope_unit_mismatch",
+            "temporally_inadmissible_stale",
+            "not_evaluable"
+          ]
+        },
+        "trace_support": {
+          "enum": [
+            "supported_in_trace",
+            "partially_supported_in_trace",
+            "contradicted_in_trace",
+            "unsupported_in_trace",
+            "not_evaluable"
+          ]
+        },
+        "evidence_relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidenceRelation"
+          }
+        },
+        "derivation": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "formula": {
+              "type": "string",
+              "maxLength": 2000
+            },
+            "input_claim_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            },
+            "input_values": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "value",
+                  "unit"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "string"
+                  },
+                  "unit": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "rounding_policy": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "reproducible": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        },
+        "hard_gate_flags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "fabricated_material_financial_quantity",
+              "future_known_evidence",
+              "stale_or_wrong_temporal_scope",
+              "unsupported_causal_assertion",
+              "unit_currency_period_mismatch",
+              "scenario_presented_as_observed",
+              "rights_or_privacy_violation",
+              "authority_boundary_violation",
+              "citation_laundering"
+            ]
+          }
+        },
+        "adjudication": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "reference_confidence": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0,
+              "maximum": 1
+            },
+            "votes": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "reviewer_kind",
+                  "reviewer_id",
+                  "disposition",
+                  "candidate_identity_known",
+                  "saw_prior_votes"
+                ],
+                "properties": {
+                  "reviewer_kind": {
+                    "enum": [
+                      "ai",
+                      "human",
+                      "programmatic"
+                    ]
+                  },
+                  "reviewer_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "disposition": {
+                    "enum": [
+                      "supported",
+                      "contradicted",
+                      "mixed_contested",
+                      "insufficient_evidence",
+                      "scope_unit_mismatch",
+                      "temporally_inadmissible_stale",
+                      "not_evaluable"
+                    ]
+                  },
+                  "confidence": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "candidate_identity_known": {
+                    "type": "boolean"
+                  },
+                  "saw_prior_votes": {
+                    "type": "boolean"
+                  },
+                  "rationale_ref": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "maxLength": 1024
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

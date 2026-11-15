@@ -1,0 +1,20 @@
+{
+  "schema_version": "luminous.financial-research-oracle.v1",
+  "task_id": "dev.synthetic.supplier-energy-shock.0001",
+  "visibility": "public_development_only_not_sealed",
+  "expected_dispositions": {
+    "ev.synthetic.supplier-status.0001": "observed_supplier_status",
+    "ev.synthetic.energy-index.0001": "observed_energy_index"
+  },
+  "required_caveats": [
+    "The supplier record does not establish the fictional buyer's purchase share or inventory buffer.",
+    "The energy index does not establish the buyer's actual energy tariff or cost exposure.",
+    "No causal effect on revenue, profit, delivery or share price is established."
+  ],
+  "forbidden_claims": [
+    "The fictional buyer will lose revenue.",
+    "The supplier disruption has already reduced production.",
+    "The energy index is the buyer's realized electricity cost."
+  ],
+  "note": "This public fixture is intentionally trivial and synthetic. It is a schema/conformance development example, not a sealed benchmark or performance result."
+}
