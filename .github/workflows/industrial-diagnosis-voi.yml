@@ -34,6 +34,6 @@ jobs:
     - name: Emit and verify decision-value counterexample
       run: |
         cargo run --quiet --manifest-path tools/industrial-diagnosis-voi/Cargo.toml --bin voi-report | tee /tmp/industrial-diagnosis-voi.tsv
-        test "$(wc -l < /tmp/industrial-diagnosis-voi.tsv)" -eq 6
+        test "$(wc -l < /tmp/industrial-diagnosis-voi.tsv)" -eq 7
         awk -F '\t' '$1 == "POLICY" && $3 == "MAX_EXPECTED_INFORMATION_GAIN" && $4 == "CALIBRATION_REFERENCE_ARTIFACT" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-voi.tsv
         awk -F '\t' '$1 == "POLICY" && $3 == "MAX_NET_VALUE_OF_INFORMATION" && $4 == "INDEPENDENT_PROCESS_SAFETY_TEST" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-voi.tsv
