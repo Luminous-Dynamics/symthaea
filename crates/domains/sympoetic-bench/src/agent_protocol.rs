@@ -62,7 +62,7 @@ pub struct HistoryEvent {
     pub kind: String,
     pub content: String,
     pub trust_class: String,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub evidence_refs: Vec<String>,
 }
 
@@ -109,11 +109,11 @@ pub struct AgentDecision {
     pub why_required: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocked_on: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub content: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub limitations: Vec<String>,
 }
 
@@ -324,6 +324,7 @@ impl AgentProtocolGuard {
                 ensure_no_tool_fields(decision)?;
                 if decision.reason.is_some()
                     || decision.content.is_some()
+                    || !decision.evidence_refs.is_empty()
                     || !decision.blocked_on.is_empty()
                     || !decision.limitations.is_empty()
                 {
@@ -337,6 +338,7 @@ impl AgentProtocolGuard {
                 if decision.question.is_some()
                     || decision.why_required.is_some()
                     || decision.content.is_some()
+                    || !decision.evidence_refs.is_empty()
                     || !decision.limitations.is_empty()
                 {
                     bail!("defer contains fields belonging to another decision type");
@@ -431,9 +433,14 @@ impl AgentProtocolGuard {
                 }
                 if observation.tool_name.is_some()
                     || observation.status.is_some()
+                    || observation.content.is_some()
+                    || observation.structured_result.is_some()
+                    || observation.error.is_some()
                     || observation.observation_digest.is_some()
+                    || observation.precondition_digest.is_some()
                     || observation.postcondition_digest.is_some()
                     || observation.external_side_effect.is_some()
+                    || observation.reversible.is_some()
                 {
                     bail!("execution_reconciled contains tool-observation-only fields");
                 }
