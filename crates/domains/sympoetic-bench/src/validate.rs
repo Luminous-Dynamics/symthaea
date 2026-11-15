@@ -19,6 +19,7 @@ const SCENARIO_DOMAINS: &[&str] = &[
     "longitudinal_adaptation",
     "partner_coordination",
     "adaptive_intervention",
+    "collaborative_learning",
 ];
 const DIFFICULTIES: &[&str] = &["introductory", "moderate", "advanced"];
 const SPLITS: &[&str] = &["development", "pilot", "confirmatory_locked"];
@@ -669,6 +670,9 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         ("unnecessary_intervention_rate", scorecard.scores.unnecessary_intervention_rate),
         ("missed_critical_intervention_rate", scorecard.scores.missed_critical_intervention_rate),
         ("intervention_regret", scorecard.scores.intervention_regret),
+        ("participant_capability_gain_delta", scorecard.scores.participant_capability_gain_delta),
+        ("delayed_retention_gain_delta", scorecard.scores.delayed_retention_gain_delta),
+        ("transfer_gain_delta", scorecard.scores.transfer_gain_delta),
     ] {
         validate_optional_unit_interval(name, value)?;
     }
@@ -680,6 +684,19 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
             bail!("quality_matched_diversity_ratio must be finite and non-negative");
         }
     }
+
+    for (name, value) in [
+        ("participant_capability_gain_delta", scorecard.scores.participant_capability_gain_delta),
+        ("delayed_retention_gain_delta", scorecard.scores.delayed_retention_gain_delta),
+        ("transfer_gain_delta", scorecard.scores.transfer_gain_delta),
+    ] {
+        if let Some(value) = value {
+            if !value.is_finite() || !(-2.0..=2.0).contains(&value) {
+                bail!("{name} must be finite and in [-2, 2]");
+            }
+        }
+    }
+
     if let Some(value) = scorecard.scores.participant_agency_mean {
         if !value.is_finite() || !(1.0..=7.0).contains(&value) {
             bail!("participant_agency_mean must be finite and in [1, 7]");
