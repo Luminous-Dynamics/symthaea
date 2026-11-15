@@ -335,7 +335,10 @@ fn validate_membership_changes(previous: &TeamCycle, current: &TeamCycle) -> Res
     }
 
     if previous.memory_policy != current.memory_policy
-        && !required_change("memory_policy_changed", &current.members[0].principal_id)
+        && !current
+            .changes
+            .iter()
+            .any(|change| change.change_type == "memory_policy_changed")
     {
         bail!("cycle {} changed memory policy without memory_policy_changed event", current.cycle_index);
     }
