@@ -29,7 +29,7 @@ Interpretation:
 
 ### 2.2 Chronic-wound synthesis
 
-Yuan et al. (2026), Journal of Tissue Viability, reviewed 12 RCTs involving 477 participants. The authors report improvements in wound-area and healing outcomes, while highlighting substantial technology and methodological heterogeneity.
+Yuan et al. (2026), Journal of Tissue Viability, reviewed 12 RCTs involving 477 participants. The authors report improvements in wound-area and healing outcomes, while highlighting substantial technology and methodological heterogeneity. A separate March 2026 randomized, open-label multicentre trial in 60 adults with chronic venous leg ulcers provides an important counterpoint: air-based CAPJ had a greater numerical wound-area reduction at week 17 (-72.9% versus -56.7%), but the difference was not statistically significant (P=0.30); complete healing was 42.9% versus 30.4% (P=0.361). Immediate microbial burden fell, but the trial did not demonstrate statistically significant superiority on the primary wound-area endpoint. Non-significance is not evidence of equivalence or proof of no benefit. This strengthens the need for indication-specific and device-specific evidence rather than a universal positive CAP claim.
 
 Source: DOI 10.1016/j.jtv.2026.101017.
 
@@ -47,7 +47,7 @@ Do not treat microbial-load changes as equivalent to complete wound closure, rec
 
 NIPP-RD III is a Phase III randomized, double-blind, placebo-controlled study protocol for non-invasive physical plasma to prevent radiation dermatitis during breast-cancer radiotherapy.
 
-Source: DRKS00032560, https://pubmed.ncbi.nlm.nih.gov/40108640/.
+Source: DRKS00032560 (registry last updated 8 October 2026), https://drks.de/search/en/trial/DRKS00032560/details.
 
 This is prevention of treatment-associated skin injury. It is not a tumour-treatment result. Protocol publication is not a Phase III result.
 
@@ -82,6 +82,14 @@ A 2026 systematic review/meta-analysis covering more than 400 studies discusses 
 Source: DOI 10.1016/j.redox.2026.104162.
 
 This is a proposed framework, not a universal validated clinical dose standard. It is nevertheless a valuable research direction because device settings alone cannot describe biological exposure.
+
+### 2.9 Existing medical device reference: kINPen MED
+
+The INPTDAT technology catalogue identifies kINPen MED as a commercially available Class IIa medical device used in clinical practice for chronic wounds and pathogen-induced skin diseases. The catalogue lists a nonthermal argon APPJ, below 3.5 W power, 1 MHz frequency, 4–6 standard L/min argon flow and 35–38 °C temperature. This is an incumbent hardware/clinical-integration reference, not a matched efficacy result or independent Luminous measurement.
+
+Source: https://www.inptdat.de/kinpen%C2%AE-med.
+
+Competitive implication: Luminous should not claim to invent a medical plasma jet. The opportunity is to benchmark dose reconstructability, treatment-area throughput, gas burden, serviceability and biological/clinical outcomes against existing systems under identical indications and protocols.
 
 ## 3. Paradigm shifts
 
@@ -221,6 +229,8 @@ The initial implementation only registers public research and audits source/clai
 
 - Strohal et al. (2025): https://doi.org/10.12968/jowc.2025.0207
 - Yuan et al. (2026): https://doi.org/10.1016/j.jtv.2026.101017
+- Henares et al. (2026), venous-ulcer CAPJ RCT: https://doi.org/10.1097/GOX.0000000000007553
+- kINPen MED institutional catalogue: https://www.inptdat.de/kinpen%C2%AE-med
 - DFU-specific meta-analysis, PMID 41264397: https://pubmed.ncbi.nlm.nih.gov/41264397/
 - NIPP-RD III protocol, DRKS00032560: https://pubmed.ncbi.nlm.nih.gov/40108640/
 - Hegde et al. (2026): https://doi.org/10.1155/ijod/7100799
