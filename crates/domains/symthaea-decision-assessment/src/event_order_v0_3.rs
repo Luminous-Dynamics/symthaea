@@ -1327,6 +1327,250 @@ pub fn generate_clocked_observation_persistence_schedule(
     Ok(schedule)
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BitemporalProjectionReport {
+    pub disposition: EventTraceDisposition,
+    pub envelope: Option<BitemporalEventEnvelope>,
+    pub reason_codes: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ProjectionFault {
+    Indeterminate(&'static str),
+    Critical(&'static str),
+}
+
+fn resolve_owner_qualified_time(
+    schedule: &VirtualSchedule,
+    mapping_action_id: &str,
+    local_timestamp_ns: u64,
+    source_clock_domain_id: &str,
+    receipt_ref: &str,
+    receipt_sha256: &str,
+    resolutions: &BTreeMap<(String, u64), QualifiedEventTime>,
+) -> Result<QualifiedEventTime, ProjectionFault> {
+    let mapping_action = schedule.actions.iter().find(|action| action.action_id == mapping_action_id)
+        .ok_or(ProjectionFault::Critical("CLOCK_MAPPING_ACTION_NOT_FOUND"))?;
+    let (clock_domain, valid_from, valid_through, mapped_ref, mapped_sha, qualification) =
+        match &mapping_action.action {
+            ScheduleAction::ClockAdvance {
+                clock_domain, mapping_valid_from_ns, mapping_valid_through_ns,
+                mapping_receipt_ref, mapping_receipt_sha256, qualification, ..
+            } => (
+                clock_domain.as_str(),
+                *mapping_valid_from_ns,
+                *mapping_valid_through_ns,
+                mapping_receipt_ref.as_str(),
+                mapping_receipt_sha256.as_str(),
+                *qualification,
+            ),
+            _ => return Err(ProjectionFault::Critical("MAPPING_REFERENCE_NOT_CLOCK_ADVANCE")),
+        };
+
+    if clock_domain != source_clock_domain_id || mapped_ref != receipt_ref || mapped_sha != receipt_sha256 {
+        return Err(ProjectionFault::Critical("CLOCK_MAPPING_RECEIPT_BINDING_MISMATCH"));
+    }
+    if qualification != GateState::Pass {
+        return Err(ProjectionFault::Indeterminate("CLOCK_MAPPING_QUALIFICATION_UNRESOLVED"));
+    }
+    if valid_from > valid_through {
+        return Err(ProjectionFault::Indeterminate("CLOCK_MAPPING_VALIDITY_INTERVAL_INVALID"));
+    }
+    if local_timestamp_ns < valid_from {
+        return Err(ProjectionFault::Indeterminate("CLOCK_TIMESTAMP_BEFORE_MAPPING_VALIDITY"));
+    }
+    if local_timestamp_ns > valid_through {
+        return Err(ProjectionFault::Indeterminate("CLOCK_TIMESTAMP_AFTER_MAPPING_VALIDITY"));
+    }
+
+    let qualified = resolutions.get(&(mapping_action_id.to_owned(), local_timestamp_ns))
+        .cloned()
+        .ok_or(ProjectionFault::Indeterminate("OWNER_QUALIFIED_TIME_RESOLUTION_MISSING"))?;
+    if qualified.source_clock_domain_id != source_clock_domain_id
+        || qualified.mapping_receipt_ref != receipt_ref
+        || qualified.mapping_receipt_sha256 != receipt_sha256
+    {
+        return Err(ProjectionFault::Critical("OWNER_TIME_RESOLUTION_BINDING_MISMATCH"));
+    }
+    match compare_qualified_event_times(&qualified, &qualified).order {
+        crate::EventOrder::Overlapping => Ok(qualified),
+        crate::EventOrder::Unknown => Err(ProjectionFault::Indeterminate("OWNER_TIME_RESOLUTION_UNQUALIFIED")),
+        crate::EventOrder::Inconsistent | crate::EventOrder::Before | crate::EventOrder::After => {
+            Err(ProjectionFault::Critical("OWNER_TIME_RESOLUTION_INVALID"))
+        }
+    }
+}
+
+fn projection_failure(fault: ProjectionFault) -> BitemporalProjectionReport {
+    match fault {
+        ProjectionFault::Indeterminate(code) => BitemporalProjectionReport {
+            disposition: EventTraceDisposition::Indeterminate,
+            envelope: None,
+            reason_codes: vec![code.to_owned()],
+        },
+        ProjectionFault::Critical(code) => BitemporalProjectionReport {
+            disposition: EventTraceDisposition::CriticalFailure,
+            envelope: None,
+            reason_codes: vec![code.to_owned()],
+        },
+    }
+}
+
+/// Project a single event, observer and store lineage into the v0.2
+/// bitemporal envelope. Owner-normalized times are supplied separately and
+/// keyed by exact mapping action ID plus source-local timestamp. This function
+/// never promotes simulator action time into owner time and never performs
+/// clock normalization or receipt authentication itself.
+pub fn project_bitemporal_event(
+    schedule: &VirtualSchedule,
+    event_id: &str,
+    observer_id: &str,
+    store_id: &str,
+    resolutions: &BTreeMap<(String, u64), QualifiedEventTime>,
+) -> Result<BitemporalProjectionReport, ReplayError> {
+    validate_schedule(schedule)?;
+
+    let produced: Vec<_> = schedule.actions.iter().filter(|action| {
+        matches!(&action.action, ScheduleAction::EventProduced { event_id: candidate, .. } if candidate == event_id)
+    }).collect();
+    if produced.len() != 1 {
+        return Ok(if produced.is_empty() {
+            projection_failure(ProjectionFault::Indeterminate("EVENT_PRODUCTION_EVIDENCE_MISSING"))
+        } else {
+            projection_failure(ProjectionFault::Critical("EVENT_PRODUCTION_CARDINALITY_INVALID"))
+        });
+    }
+
+    let observations: Vec<_> = schedule.actions.iter().filter(|action| {
+        matches!(&action.action, ScheduleAction::EventObserved {
+            event_id: candidate, observer_id: observer, ..
+        } if candidate == event_id && observer == observer_id)
+    }).collect();
+    if observations.len() != 1 {
+        return Ok(if observations.is_empty() {
+            projection_failure(ProjectionFault::Indeterminate("FIRST_OBSERVATION_EVIDENCE_MISSING"))
+        } else {
+            projection_failure(ProjectionFault::Critical("FIRST_OBSERVATION_CARDINALITY_INVALID"))
+        });
+    }
+
+    let persistence_records: Vec<_> = schedule.actions.iter().filter(|action| {
+        matches!(&action.action, ScheduleAction::EventPersisted {
+            event_id: candidate, observer_id: observer, store_id: store, ..
+        } if candidate == event_id && observer == observer_id && store == store_id)
+    }).collect();
+    if persistence_records.len() != 1 {
+        return Ok(if persistence_records.is_empty() {
+            projection_failure(ProjectionFault::Indeterminate("DURABLE_RECORD_EVIDENCE_MISSING"))
+        } else {
+            projection_failure(ProjectionFault::Critical("DURABLE_RECORD_CARDINALITY_INVALID"))
+        });
+    }
+
+    let observed_time = match &observations[0].action {
+        ScheduleAction::EventObserved {
+            clock_domain, clock_mapping_action_id, observed_at_ns,
+            observation_receipt_ref, observation_receipt_sha256, qualification, ..
+        } => {
+            if *qualification != GateState::Pass {
+                return Ok(projection_failure(ProjectionFault::Indeterminate("OBSERVATION_QUALIFICATION_UNRESOLVED")));
+            }
+            match resolve_owner_qualified_time(
+                schedule, clock_mapping_action_id, *observed_at_ns, clock_domain,
+                observation_receipt_ref, observation_receipt_sha256, resolutions,
+            ) {
+                Ok(value) => value,
+                Err(fault) => return Ok(projection_failure(fault)),
+            }
+        }
+        _ => unreachable!("filtered observation action"),
+    };
+
+    let persisted_time = match &persistence_records[0].action {
+        ScheduleAction::EventPersisted {
+            clock_domain, clock_mapping_action_id, persisted_at_ns,
+            persistence_receipt_ref, persistence_receipt_sha256, qualification, ..
+        } => {
+            if *qualification != GateState::Pass {
+                return Ok(projection_failure(ProjectionFault::Indeterminate("PERSISTENCE_QUALIFICATION_UNRESOLVED")));
+            }
+            match resolve_owner_qualified_time(
+                schedule, clock_mapping_action_id, *persisted_at_ns, clock_domain,
+                persistence_receipt_ref, persistence_receipt_sha256, resolutions,
+            ) {
+                Ok(value) => value,
+                Err(fault) => return Ok(projection_failure(fault)),
+            }
+        }
+        _ => unreachable!("filtered persistence action"),
+    };
+
+    let occurred_at = match &produced[0].action {
+        ScheduleAction::EventProduced {
+            clock_domain, clock_mapping_action_id, source_timestamp_ns, ..
+        } => {
+            let mapping = schedule.actions.iter().find(|action| action.action_id == *clock_mapping_action_id);
+            match mapping.map(|action| &action.action) {
+                Some(ScheduleAction::ClockAdvance { mapping_receipt_ref, mapping_receipt_sha256, .. }) => {
+                    resolve_owner_qualified_time(
+                        schedule, clock_mapping_action_id, *source_timestamp_ns, clock_domain,
+                        mapping_receipt_ref, mapping_receipt_sha256, resolutions,
+                    ).ok()
+                }
+                _ => None,
+            }
+        }
+        _ => None,
+    };
+
+    let mut reasons = BTreeSet::new();
+    if occurred_at.is_none() {
+        reasons.insert("OCCURRENCE_TIME_NOT_OWNER_QUALIFIED".to_owned());
+    }
+
+    let order = compare_qualified_event_times(&observed_time, &persisted_time).order;
+    let (disposition, capture_qualification) = match order {
+        crate::EventOrder::Before => (EventTraceDisposition::Safe, GateState::Pass),
+        crate::EventOrder::Overlapping | crate::EventOrder::Unknown => {
+            reasons.insert("OBSERVATION_PERSISTENCE_ORDER_UNRESOLVED".to_owned());
+            (EventTraceDisposition::Indeterminate, GateState::Indeterminate)
+        }
+        crate::EventOrder::After | crate::EventOrder::Inconsistent => {
+            reasons.insert("PERSISTENCE_NOT_AFTER_OBSERVATION".to_owned());
+            (EventTraceDisposition::CriticalFailure, GateState::Fail)
+        }
+    };
+
+    let superseded: Vec<_> = schedule.actions.iter().filter_map(|action| {
+        if let ScheduleAction::EventSuperseded { event_id: current, superseded_event_id } = &action.action {
+            (current == event_id).then_some(superseded_event_id.clone())
+        } else {
+            None
+        }
+    }).collect();
+    if superseded.len() > 1 {
+        reasons.insert("EVENT_SUPERSESSION_CARDINALITY_INVALID".to_owned());
+        return Ok(BitemporalProjectionReport {
+            disposition: EventTraceDisposition::CriticalFailure,
+            envelope: None,
+            reason_codes: reasons.into_iter().collect(),
+        });
+    }
+
+    Ok(BitemporalProjectionReport {
+        disposition,
+        envelope: Some(BitemporalEventEnvelope {
+            event_id: event_id.to_owned(),
+            occurred_at,
+            first_observed_at: observed_time,
+            durably_recorded_at: persisted_time,
+            capture_qualification,
+            supersedes_event_id: superseded.into_iter().next(),
+        }),
+        reason_codes: reasons.into_iter().collect(),
+    })
+}
+
 /// Generate a deterministic stop/cancellation/effect-commit race. The
 /// attempt starts before the stop trigger; both schedules then contain a
 /// cancellation request, the selected acknowledgement/commit order, an
