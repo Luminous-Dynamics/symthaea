@@ -38,7 +38,7 @@ Every result intended for comparison must identify:
 - Runtime environment, hardware class, sampling settings, and random seeds.
 - Complete event trace or a consented, privacy-minimised trace digest.
 - Output artifact digest and scoring implementation version.
-- Human-rater protocol, rater agreement, uncertainty intervals, and missing-data rules.
+- Human-rater protocol, raw and chance-corrected rater agreement (Cohen's kappa/Krippendorff's alpha), uncertainty intervals, and missing-data rules.
 - One metric-level evidence receipt for each reported score, binding the value to its scorer, sample unit/count, method revision and source references.
 - Cost, latency, human time, and interaction burden.
 
