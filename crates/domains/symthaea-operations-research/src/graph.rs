@@ -195,6 +195,47 @@ mod tests {
     }
 
     #[test]
+    fn exact_dijkstra_returns_distance_and_edge_provenance() {
+        let adjacency = vec![
+            vec![(1, 4_u64, 10_usize), (2, 1_u64, 11_usize)],
+            vec![(3, 1_u64, 13_usize)],
+            vec![(1, 2_u64, 12_usize), (3, 5_u64, 14_usize)],
+            vec![],
+        ];
+        let tree = dijkstra_u64(&adjacency, 0).expect("valid graph");
+
+        assert_eq!(tree.distances, vec![Some(0), Some(3), Some(1), Some(4)]);
+        assert_eq!(tree.predecessor_nodes[1], Some(2));
+        assert_eq!(tree.predecessor_edges[1], Some(12));
+        assert_eq!(tree.predecessor_nodes[3], Some(1));
+        assert_eq!(tree.predecessor_edges[3], Some(13));
+    }
+
+    #[test]
+    fn exact_dijkstra_preserves_unreachable_nodes() {
+        let adjacency = vec![vec![(1, 1_u64, 7_usize)], vec![], vec![]];
+        let tree = dijkstra_u64(&adjacency, 0).expect("valid graph");
+
+        assert_eq!(tree.distances, vec![Some(0), Some(1), None]);
+        assert_eq!(tree.predecessor_nodes[2], None);
+        assert_eq!(tree.predecessor_edges[2], None);
+    }
+
+    #[test]
+    fn exact_dijkstra_rejects_out_of_range_neighbors() {
+        let adjacency = vec![vec![(2, 1_u64, 0_usize)], vec![]];
+        let error = dijkstra_u64(&adjacency, 0).expect_err("invalid neighbor");
+        assert_eq!(
+            error,
+            DijkstraError::InvalidNeighbor {
+                from: 0,
+                to: 2,
+                node_count: 2,
+            }
+        );
+    }
+
+    #[test]
     fn unreachable_node_is_infinite() {
         // Node 1 has no outgoing edges; from source 3 nothing is reachable.
         let d = dijkstra(&sample_graph(), 3);
