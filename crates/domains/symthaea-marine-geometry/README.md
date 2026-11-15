@@ -6,6 +6,18 @@ Deterministic candidate manifests and a deliberately narrow Rust geometry-admiss
 
 A separate implementation increment is under development on branch `research/marine-section-generator-g2a-20261115` for issue #12338. It accepts bounded, normalized keel-to-sheer half-section control polylines at strictly ordered x/L stations and deterministically samples physical starboard-side sections in metres. The section-family artifact carries separate BLAKE3 digests for the normalized source specification and generated sample coordinates, along with dimensions and frame metadata. The input is bounded to 512 stations, 128 controls per station, 64 subdivisions per segment, and 1,000,000 output points. It is a parametric section baseline, not a completed hull loft, watertight vessel surface, spline fairing or validated naval-architecture generator.
 
+## G2b waterplane-capped surface loft
+
+G2b is under development for [issue #12357](https://github.com/Luminous-Dynamics/symthaea/issues/12357) on the stacked branch `research/marine-waterplane-loft-g2b-20261115`.
+
+It turns a versioned section-family artifact into a deterministic closed triangle mesh for the **displacement volume below the declared design waterplane**. The port side is mirrored from the starboard samples, longitudinal station strips are connected, a waterplane cap closes the top, and planar bow/stern end caps close the volume. The first implementation accepts only convex section rings with identical point counts at each station. It rejects unsupported/non-convex input rather than healing or resampling it.
+
+The waterplane cap is not a deck surface or a freeboard model. This output is a watertight displacement-volume mesh, not a full neutral CAD hull, smooth surface, hydrostatic qualification, self-intersection certification, DFM pass or hydrodynamic result.
+
+A separate CLI accepts a request containing `section_family` and `profile`:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-waterplane-loft -- loft-request.json --output /tmp/lofted-displacement.json
+
 ## Research benchmark protocol
 
 The matched external comparison, metrics, uncertainty policy, target ladder, and implementation sequence are specified in [BENCHMARK_PROTOCOL.md](./BENCHMARK_PROTOCOL.md). It is a frozen research protocol and target set, not a claim that the current crate generates hulls or has achieved hydrodynamic performance.
