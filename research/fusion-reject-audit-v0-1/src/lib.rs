@@ -228,9 +228,7 @@ pub fn audit_rejected_candidates(
         errors.push(AuditError::InvalidRecallTarget);
     }
     if !is_sha256(&plan.frozen_universe.manifest_sha256) {
-        errors.push(AuditError::InvalidSha256(
-            "frozen_universe.manifest_sha256",
-        ));
+        errors.push(AuditError::InvalidSha256("frozen_universe.manifest_sha256"));
     }
     if !is_sha256(&plan.accepted.manifest_sha256) {
         errors.push(AuditError::InvalidSha256("accepted.manifest_sha256"));
@@ -295,14 +293,10 @@ pub fn audit_rejected_candidates(
                 ));
             }
             if accepted_set.contains(candidate_id) {
-                errors.push(AuditError::DuplicateCandidateId(
-                    candidate_id.clone(),
-                ));
+                errors.push(AuditError::DuplicateCandidateId(candidate_id.clone()));
             }
             if !rejected_set.insert(candidate_id.clone()) {
-                errors.push(AuditError::DuplicateCandidateId(
-                    candidate_id.clone(),
-                ));
+                errors.push(AuditError::DuplicateCandidateId(candidate_id.clone()));
             }
         }
 
@@ -316,8 +310,7 @@ pub fn audit_rejected_candidates(
         }
 
         if stratum.sample_size <= stratum.rejected_candidate_ids.len()
-            && stratum.rejected_candidate_ids.len()
-                >= stratum.samples.len()
+            && stratum.rejected_candidate_ids.len() >= stratum.samples.len()
             && stratum.samples.len() == stratum.sample_size
             && !stratum.rejected_candidate_ids.is_empty()
         {
@@ -525,9 +518,7 @@ fn validate_sorted_unique(
         }
         if let Some(last) = previous {
             if candidate_id.as_str() <= last {
-                errors.push(AuditError::UnsortedCandidatePopulation(
-                    label.to_string(),
-                ));
+                errors.push(AuditError::UnsortedCandidatePopulation(label.to_string()));
                 break;
             }
         }
@@ -642,15 +633,13 @@ fn hypergeometric_log_cdf_at_most(
 
     for successes in minimum..=last {
         let failures = sample_size - successes;
-        let log_probability = log_choose(
-            population_successes,
-            successes,
-            log_factorials,
-        ) + log_choose(
-            population_size - population_successes,
-            failures,
-            log_factorials,
-        ) - log_denominator;
+        let log_probability = log_choose(population_successes, successes, log_factorials)
+            + log_choose(
+                population_size - population_successes,
+                failures,
+                log_factorials,
+            )
+            - log_denominator;
         total = log_add_exp(total, log_probability);
     }
     total.min(0.0)
@@ -783,10 +772,7 @@ mod tests {
         }
     }
 
-    fn plan(
-        accepted: Vec<AcceptedCandidate>,
-        strata: Vec<RejectStratum>,
-    ) -> RejectAuditPlan {
+    fn plan(accepted: Vec<AcceptedCandidate>, strata: Vec<RejectStratum>) -> RejectAuditPlan {
         let mut universe = accepted
             .iter()
             .map(|candidate| candidate.candidate_id.clone())
@@ -915,13 +901,7 @@ mod tests {
             AuditOutcome::Inconclusive,
             AuditOutcome::ConfirmedInfeasible,
         ];
-        let selected = samples(
-            "edge",
-            &population,
-            6,
-            0x5eed_f00d_cafe_babe,
-            &outcomes,
-        );
+        let selected = samples("edge", &population, 6, 0x5eed_f00d_cafe_babe, &outcomes);
         let accepted = (0..100)
             .map(|index| accepted_candidate(index, AuditOutcome::ConfirmedFeasible))
             .collect();
@@ -940,20 +920,8 @@ mod tests {
         let population_a = ids("a", 200);
         let population_b = ids("b", 200);
         let outcomes = vec![AuditOutcome::ConfirmedInfeasible; 20];
-        let samples_a = samples(
-            "a",
-            &population_a,
-            20,
-            0x5eed_f00d_cafe_babe,
-            &outcomes,
-        );
-        let samples_b = samples(
-            "b",
-            &population_b,
-            20,
-            0x5eed_f00d_cafe_babe,
-            &outcomes,
-        );
+        let samples_a = samples("a", &population_a, 20, 0x5eed_f00d_cafe_babe, &outcomes);
+        let samples_b = samples("b", &population_b, 20, 0x5eed_f00d_cafe_babe, &outcomes);
         let accepted = (0..1_000)
             .map(|index| accepted_candidate(index, AuditOutcome::ConfirmedFeasible))
             .collect();
@@ -973,8 +941,7 @@ mod tests {
         .unwrap();
 
         assert!(
-            two.strata[0].upper_missed_feasible_rate
-                > one.strata[0].upper_missed_feasible_rate
+            two.strata[0].upper_missed_feasible_rate > one.strata[0].upper_missed_feasible_rate
         );
         assert_eq!(
             two.strata[0].per_stratum_error_probability,
@@ -985,12 +952,9 @@ mod tests {
     #[test]
     fn deterministic_sample_is_reproducible_and_seed_sensitive() {
         let population = ids("candidate", 100);
-        let first =
-            deterministic_audit_sample_ids("stratum", &population, 20, 0x1111).unwrap();
-        let replay =
-            deterministic_audit_sample_ids("stratum", &population, 20, 0x1111).unwrap();
-        let other =
-            deterministic_audit_sample_ids("stratum", &population, 20, 0x2222).unwrap();
+        let first = deterministic_audit_sample_ids("stratum", &population, 20, 0x1111).unwrap();
+        let replay = deterministic_audit_sample_ids("stratum", &population, 20, 0x1111).unwrap();
+        let other = deterministic_audit_sample_ids("stratum", &population, 20, 0x2222).unwrap();
 
         assert_eq!(first, replay);
         assert_ne!(first, other);
@@ -1078,7 +1042,9 @@ mod tests {
     fn a_candidate_missing_from_the_frozen_partition_is_rejected() {
         let accepted = vec![accepted_candidate(0, AuditOutcome::ConfirmedFeasible)];
         let mut plan = plan(accepted, vec![]);
-        plan.frozen_universe.candidate_ids.push("ghost-candidate".to_string());
+        plan.frozen_universe
+            .candidate_ids
+            .push("ghost-candidate".to_string());
         plan.frozen_universe.candidate_ids.sort();
 
         let errors = audit_rejected_candidates(&plan).unwrap_err();
@@ -1091,15 +1057,10 @@ mod tests {
     #[test]
     fn accepted_and_rejected_candidate_overlap_is_rejected() {
         let accepted = vec![accepted_candidate(0, AuditOutcome::ConfirmedFeasible)];
-        let rejected = vec![
-            "accepted-0000".to_string(),
-            "rejected-0001".to_string(),
-        ];
-        let errors = audit_rejected_candidates(&plan(
-            accepted,
-            vec![stratum("edge", rejected, 0, vec![])],
-        ))
-        .unwrap_err();
+        let rejected = vec!["accepted-0000".to_string(), "rejected-0001".to_string()];
+        let errors =
+            audit_rejected_candidates(&plan(accepted, vec![stratum("edge", rejected, 0, vec![])]))
+                .unwrap_err();
 
         assert!(errors.iter().any(|error| matches!(
             error,
@@ -1111,10 +1072,7 @@ mod tests {
     fn seed_commitment_must_precede_audit_outcomes() {
         let accepted = vec![accepted_candidate(0, AuditOutcome::ConfirmedFeasible)];
         let population = ids("core", 4);
-        let mut invalid = plan(
-            accepted,
-            vec![stratum("core", population, 0, vec![])],
-        );
+        let mut invalid = plan(accepted, vec![stratum("core", population, 0, vec![])]);
         invalid.seed_committed_before_outcomes = false;
 
         let errors = audit_rejected_candidates(&invalid).unwrap_err();
