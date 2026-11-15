@@ -1,0 +1,15 @@
+[package]
+name = "symthaea-sailcraft-cognition"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "Evidence-aware sailcraft HDC perception and temporal-state research"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[dependencies]
+symthaea-core = { path = "../../core/symthaea-core" }
+symthaea-sailcraft = { path = "../symthaea-sailcraft" }
+
+[lints.rust]
+unsafe_code = "forbid"
