@@ -40,12 +40,47 @@ pub struct LoftedHullArtifact {
     pub source_spec_digest_blake3: String,
     pub sampled_sections_digest_blake3: String,
     pub mesh_digest_blake3: String,
+    pub loft_manifest_digest_blake3: String,
     pub side_face_range: FaceRange,
     pub waterplane_face_range: FaceRange,
     pub end_cap_face_range: FaceRange,
     pub candidate: CandidateInput,
     pub admission_report: AdmissionReport,
 }
+
+#[derive(Serialize)]
+struct LoftArtifactIdentity<'a> {
+    artifact_schema_version: u32,
+    generator: &'a str,
+    cap_semantics: &'a str,
+    source_spec_digest_blake3: &'a str,
+    sampled_sections_digest_blake3: &'a str,
+    mesh_digest_blake3: &'a str,
+    side_face_range: FaceRange,
+    waterplane_face_range: FaceRange,
+    end_cap_face_range: FaceRange,
+    candidate_id: &'a str,
+}
+
+fn compute_loft_manifest_digest(
+    artifact: &LoftedHullArtifact,
+) -> Result<String, serde_json::Error> {
+    let identity = LoftArtifactIdentity {
+        artifact_schema_version: artifact.artifact_schema_version,
+        generator: &artifact.generator,
+        cap_semantics: &artifact.cap_semantics,
+        source_spec_digest_blake3: &artifact.source_spec_digest_blake3,
+        sampled_sections_digest_blake3: &artifact.sampled_sections_digest_blake3,
+        mesh_digest_blake3: &artifact.mesh_digest_blake3,
+        side_face_range: artifact.side_face_range,
+        waterplane_face_range: artifact.waterplane_face_range,
+        end_cap_face_range: artifact.end_cap_face_range,
+        candidate_id: &artifact.candidate.candidate_id,
+    };
+    let bytes = serde_json::to_vec(&identity)?;
+    Ok(blake3::hash(&bytes).to_hex().to_string())
+}
+
 
 fn violation(
     violations: &mut Vec<LoftViolation>,
@@ -398,6 +433,85 @@ fn section_centre(section: &crate::section::SampledSection) -> [f64; 3] {
     ]
 }
 
+/// Verify that the mesh bytes and the face-region metadata are bound to
+/// the stored geometry and loft-manifest digests.
+pub fn verify_loft_artifact_integrity(
+    artifact: &LoftedHullArtifact,
+) -> Result<(), Vec<LoftViolation>> {
+    let mut violations = Vec::new();
+    match compute_geometry_digest(&artifact.candidate.geometry) {
+        Ok(actual)
+            if actual.eq_ignore_ascii_case(&artifact.candidate.geometry_digest_blake3)
+                && actual.eq_ignore_ascii_case(&artifact.mesh_digest_blake3) => {}
+        Ok(_) => violation(
+            &mut violations,
+            "mesh_digest",
+            "candidate geometry does not match the mesh digest references",
+        ),
+        Err(error) => violation(
+            &mut violations,
+            "mesh_digest",
+            format!("candidate geometry cannot be serialized: {error}"),
+        ),
+    }
+    match compute_loft_manifest_digest(artifact) {
+        Ok(actual) if actual.eq_ignore_ascii_case(&artifact.loft_manifest_digest_blake3) => {}
+        Ok(_) => violation(
+            &mut violations,
+            "loft_manifest_digest",
+            "loft metadata or face-region references do not match the manifest digest",
+        ),
+        Err(error) => violation(
+            &mut violations,
+            "loft_manifest_digest",
+            format!("loft manifest cannot be serialized: {error}"),
+        ),
+    }
+
+    let face_count = artifact.candidate.geometry.faces.len();
+    let ranges = [
+        artifact.side_face_range,
+        artifact.waterplane_face_range,
+        artifact.end_cap_face_range,
+    ];
+    let mut covered = vec![false; face_count];
+    for range in ranges {
+        match range.first_face.checked_add(range.face_count) {
+            Some(end) if end <= face_count => {
+                for index in range.first_face..end {
+                    if covered[index] {
+                        violation(
+                            &mut violations,
+                            "face_region_overlap",
+                            format!("face {index} appears in multiple semantic ranges"),
+                        );
+                        break;
+                    }
+                    covered[index] = true;
+                }
+            }
+            _ => violation(
+                &mut violations,
+                "face_region_bounds",
+                "a semantic face range exceeds the candidate mesh",
+            ),
+        }
+    }
+    if covered.iter().any(|value| !value) {
+        violation(
+            &mut violations,
+            "face_region_coverage",
+            "semantic face ranges do not cover every mesh face",
+        );
+    }
+
+    if violations.is_empty() {
+        Ok(())
+    } else {
+        Err(violations)
+    }
+}
+
 /// Loft a validated section family into a deterministic closed displacement
 /// volume capped at z=0 (the design waterplane).
 ///
@@ -611,19 +725,28 @@ pub fn loft_waterplane_capped_hull(
     };
     let admission_report = admit(&candidate);
 
-    Ok(LoftedHullArtifact {
+    let mut artifact = LoftedHullArtifact {
         artifact_schema_version: LOFT_SCHEMA_VERSION,
         generator: "symthaea-marine-waterplane-loft-v1".into(),
         cap_semantics: "closed-displacement-volume-at-design-waterplane-z0".into(),
         source_spec_digest_blake3: sections.source_spec_digest_blake3.clone(),
         sampled_sections_digest_blake3: sections.sampled_sections_digest_blake3.clone(),
         mesh_digest_blake3: geometry_digest_blake3,
+        loft_manifest_digest_blake3: String::new(),
         side_face_range,
         waterplane_face_range,
         end_cap_face_range,
         candidate,
         admission_report,
-    })
+    };
+    artifact.loft_manifest_digest_blake3 = compute_loft_manifest_digest(&artifact)
+        .map_err(|error| {
+            vec![LoftViolation {
+                code: "loft_manifest_digest".into(),
+                detail: format!("could not serialize loft artifact identity: {error}"),
+            }]
+        })?;
+    Ok(artifact)
 }
 
 #[cfg(test)]
@@ -799,6 +922,15 @@ mod tests {
             result.admission_report.disposition,
             Disposition::AdmissibleForProfile
         );
+    }
+
+    #[test]
+    fn face_ranges_are_bound_to_the_loft_manifest_digest() {
+        let mut result = loft_waterplane_capped_hull(&artifact(), profile()).unwrap();
+        assert!(verify_loft_artifact_integrity(&result).is_ok());
+        result.waterplane_face_range.face_count += 1;
+        let error = verify_loft_artifact_integrity(&result).unwrap_err();
+        assert!(error.iter().any(|item| item.code == "loft_manifest_digest"));
     }
 
     #[test]
