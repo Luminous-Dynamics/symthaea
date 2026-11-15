@@ -217,7 +217,76 @@
         "modeled_vibrational_state_temperature_k": 4300,
         "modeled_n2_vibrational_population_v4_to_v8_fraction": 0.118
       },
-      "source_conclusion": "The integrated plasma-electrolysis membrane-electrode assembly uses a microstructured nonthermal surface discharge to vibrationally excite N2 near a gas-diffusion cathode. Across 14 screened metals, silver gave 7.7 ± 0.8 nmol NH3 s−1 cm−2 and 86 ± 14% electrochemical Faradaic efficiency at −0.54 V vs RHE, atmospheric pressure and room temperature. Plasma/electrolysis on-off controls and 15N2 labeling support attribution to supplied nitrogen. The source reports modeling and in situ spectroscopy that support vibrational-state engineering, but does not supply a complete plant-level energy yield or lifetime."
+      "source_conclusion": "The integrated plasma-electrolysis membrane-electrode assembly uses a microstructured nonthermal surface discharge to vibrationally excite N2 near a gas-diffusion cathode. Across 14 screened metals, silver gave 7.7 ± 0.8 nmol NH3 s−1 cm−2 and 86 ± 14% electrochemical Faradaic efficiency at −0.54 V vs RHE, atmospheric pressure and room temperature. Plasma/electrolysis on-off controls and 15N2 labeling support attribution to supplied nitrogen. The source reports modeling and in situ spectroscopy that support vibrational-state engineering, but does not supply a complete plant-level energy yield or lifetime.",
+      "state_transfer_evidence": {
+        "chain_id": "NH3-PLASMA-N2V-TO-CATALYST-001",
+        "physical_observations": [
+          {
+            "observation": "15N2 isotope labeling and plasma/electrolysis on-off controls",
+            "evidence_class": "PUBLISHED_EXPERIMENTAL_CONTROL",
+            "supports": "attribution of nitrogen in measured NH3 product to supplied N2 and the coupled operating configuration",
+            "does_not_establish": "quantitative state-resolved N2(v) population at the catalyst interface"
+          },
+          {
+            "observation": "in-situ Raman evidence of N-N-containing surface intermediates during coupled operation",
+            "evidence_class": "PUBLISHED_IN_SITU_SPECTROSCOPY",
+            "supports": "presence of source-reported surface intermediates under the coupled experimental condition",
+            "does_not_establish": "absolute interfacial N2(v) flux, state-resolved surface coverage or whole-system catalytic rate attribution by itself"
+          },
+          {
+            "observation": "NH3 area-normalized production rate and electrochemical Faradaic efficiency",
+            "evidence_class": "PUBLISHED_EXPERIMENTAL_PRODUCT_OBSERVATION",
+            "reported_values": {
+              "ammonia_rate_nmol_s_cm2": 7.7,
+              "ammonia_rate_uncertainty_nmol_s_cm2": 0.8,
+              "electrochemical_faradaic_efficiency_percent": 86,
+              "electrochemical_faradaic_efficiency_uncertainty_percent": 14
+            },
+            "supports": "source-specific measured product rate and electrochemical FE for the reported Ag configuration",
+            "does_not_establish": "full-grid-to-accepted-NH3 energy yield, long-term lifetime or transferable performance on a different reactor"
+          }
+        ],
+        "model_derived_estimates": [
+          {
+            "metric": "effective_N2_vibrational_state_temperature",
+            "value": 4300,
+            "unit": "K",
+            "evidence_class": "MODEL_DERIVED",
+            "model_scope": "source-reported plasma kinetic interpretation",
+            "interface_direct_measurement": false
+          },
+          {
+            "metric": "N2_population_in_v4_to_v8",
+            "value": 0.118,
+            "unit": "fraction",
+            "evidence_class": "MODEL_DERIVED",
+            "model_scope": "source-reported state-population estimate",
+            "interface_direct_measurement": false
+          },
+          {
+            "metric": "transport_persistence_toward_cathode",
+            "value": "source-modelled persistence",
+            "unit": "qualitative",
+            "evidence_class": "MODEL_DERIVED_TRANSPORT",
+            "model_scope": "source-reported transport modelling from discharge toward membrane/catalyst region",
+            "interface_direct_measurement": false
+          }
+        ],
+        "not_established": [
+          "calibrated, state-resolved N2(v) distribution measured at the catalyst interface",
+          "absolute interfacial flux for each N2 vibrational state",
+          "independent experimental transfer/survival coefficient from discharge exit to catalyst",
+          "causal rate increment attributable uniquely to N2 vibrational excitation after matched thermal, electrical, catalyst and transport controls",
+          "full-chain accepted NH3 energy yield and cost"
+        ],
+        "claim_policy": {
+          "model_derived_population_must_not_be_relabelled_physical_measurement": true,
+          "discharge_exit_population_must_not_be_substituted_for_interface_population": true,
+          "raman_intermediate_signal_must_not_be_substituted_for_quantitative_state_flux": true,
+          "isotope_attribution_is_not_equivalent_to_state_resolved_mechanism_proof": true,
+          "faradaic_efficiency_is_not_equivalent_to_full_system_energy_efficiency": true
+        }
+      }
     },
     {
       "case_id": "METHANE-PYROLYSIS-HEATING-REVIEW-2026",
@@ -2480,6 +2549,26 @@
       "control_id": "NC-057",
       "condition": "Count recirculated/recovered heat and reaction enthalpy twice, or accept a heat balance outside the declared uncertainty/tolerance.",
       "expected_disposition": "REJECT_THERMAL_BALANCE_NONCLOSURE"
+    },
+    {
+      "control_id": "NC-061",
+      "condition": "Relabel the source-modelled 4,300 K effective N2 vibrational temperature or 11.8% v=4 to v=8 population as a directly measured, calibrated catalyst-interface population.",
+      "expected_disposition": "REJECT_MODEL_EVIDENCE_PROMOTED_TO_PHYSICAL_MEASUREMENT"
+    },
+    {
+      "control_id": "NC-062",
+      "condition": "Use the discharge-exit N2(v) estimate as the catalyst-interface N2(v) population or flux without direct interface measurement or an independently qualified transport measurement operator.",
+      "expected_disposition": "BLOCKED_UNQUALIFIED_INTERFACE_TRANSFER"
+    },
+    {
+      "control_id": "NC-063",
+      "condition": "Treat an in-situ Raman N-N intermediate signature as a quantitative measurement of state-resolved N2(v) flux or absolute catalyst surface coverage.",
+      "expected_disposition": "REJECT_MEASURAND_SUBSTITUTION"
+    },
+    {
+      "control_id": "NC-064",
+      "condition": "Treat 15N2 product attribution, electrochemical Faradaic efficiency or an area-normalized NH3 rate as proof of full-chain causal improvement per grid kWh without matched plasma/electrolysis controls and full-system energy meters.",
+      "expected_disposition": "BLOCKED_INCOMPLETE_CAUSAL_AND_ENERGY_BOUNDARY"
     }
   ],
   "derived_reference_checks": [
@@ -2698,6 +2787,33 @@
         "comparison_must_report_measurement_uncertainty_and_grouped_repeats": true
       },
       "rationale": "The September 2026 microwave NH3 study identifies heat-balance losses and an insulating sleeve of cold NH3 as an improvement pathway. This target tests whether integrated thermal management can reduce net grid-to-accepted-H2 specific energy by at least 15% while retaining >99% conversion and at least 150 g/h in the same operating point. It is a stretch target; the cited 150 g/h paper point is 92.4% conversion, so all three target attributes must be demonstrated together rather than borrowed across source points."
+    },
+    {
+      "target_id": "NH3-PLASMA-N2V-TRANSFER-CAUSAL-001",
+      "lane": "AMMONIA_N2_VIBRATIONAL_TRANSFER",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026"
+      ],
+      "metric_thresholds": {
+        "all_required_evidence_gates_must_hold": true,
+        "state_resolved_interface_population_or_qualified_operator_required": true,
+        "discharge_to_interface_transfer_uncertainty_required": true,
+        "isotope_attributed_product_control_required": true,
+        "matched_thermal_and_electrical_controls_required": true,
+        "full_grid_to_accepted_nh3_boundary_required": true
+      },
+      "claim_guards": {
+        "direct_catalyst_interface_state_measurement_or_independently_validated_measurement_operator_required": true,
+        "modelled_state_temperature_remains_model_evidence": true,
+        "measured_intermediate_and_quantitative_flux_remain_distinct_measurands": true,
+        "plasma_only_and_electrolysis_only_controls_required": true,
+        "isotope_product_attribution_required_for_nitrogen_source_claim": true,
+        "catalyst_lot_and_surface_identity_must_match": true,
+        "all_energy_inputs_and_accepted_product_separation_included": true,
+        "no_claim_of_unique_vibrational_causality_without_matched_thermal_controls": true
+      },
+      "rationale": "Test the missing bridge in the 2026 plasma-electrocatalytic ammonia paper: whether a state-resolved N2(v) population generated upstream is actually delivered to the catalyst interface and causally contributes to isotope-attributed NH3 under matched controls. This is an evidence/causal qualification target, not a numerical performance result."
     }
   ]
 }
