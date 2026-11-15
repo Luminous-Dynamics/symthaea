@@ -144,6 +144,7 @@ pub enum ScalarTradeoffDisposition {
     ScalarPreferenceAgreesWithDominance,
     ScalarPreferenceHidesOmittedObjectiveTradeoff,
     ScalarPreferenceBetweenEquivalentVectors,
+    ScalarAndVectorDominanceInconsistent,
     NotComparable,
 }
 
@@ -461,7 +462,7 @@ pub fn compare_pair(
         | (DominanceRelation::SecondDominatesFirst, ScalarPreference::First) => {
             // This should be impossible when Q_ENG and the vector use the same
             // availability and EBI values. Keep it visible as a contract defect.
-            ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff
+            ScalarTradeoffDisposition::ScalarAndVectorDominanceInconsistent
         }
         (DominanceRelation::Equivalent, ScalarPreference::Tie) => {
             ScalarTradeoffDisposition::NoScalarPreference
@@ -495,7 +496,8 @@ pub fn extract_pareto_front(
     profile: &ObjectiveComparisonProfile,
     candidates: &[CandidateObjectiveVector],
 ) -> ParetoFrontReport {
-    let mut diagnostics = validate_profile(profile);
+    let profile_diagnostics = validate_profile(profile);
+    let mut diagnostics = profile_diagnostics.clone();
     let mut seen = BTreeSet::new();
     let mut statuses = Vec::with_capacity(candidates.len());
 
@@ -509,6 +511,7 @@ pub fn extract_pareto_front(
 
     for candidate in candidates {
         let mut candidate_diagnostics = validate_candidate(profile, candidate);
+        candidate_diagnostics.extend(profile_diagnostics.iter().copied());
         if duplicate_ids.contains(candidate.candidate_id.as_str()) {
             candidate_diagnostics.push(ComparisonDiagnostic::DuplicateCandidateIdentity);
         }
