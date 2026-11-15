@@ -35,6 +35,7 @@ fn base_event(id: &str, sequence: u64, event_type: &str) -> TraceEvent {
         attribution: Vec::new(),
         annotation: None,
         reconciled_status: None,
+        reconciliation_state_digest: None,
     }
 }
 
@@ -182,6 +183,7 @@ fn unknown_tool_outcome_blocks_next_tool_invocation_until_reconciled() {
     reconciled.actor = "environment".to_owned();
     reconciled.parent_event_ids.push("tool-result-unknown".to_owned());
     reconciled.reconciled_status = Some("not_executed".to_owned());
+    reconciled.reconciliation_state_digest = Some(digest('f'));
     invocation.sequence = 2;
     invocation.elapsed_ms = 20;
     invocation.parent_event_ids.push("reconciled".to_owned());
