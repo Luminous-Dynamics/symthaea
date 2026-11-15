@@ -2,7 +2,7 @@
 
 Rust validation and measurement core for SympoeticBench v0.1, including a proposal-only agent decision protocol guard.
 
-This package is intentionally small and deterministic. It does not call a model, run a human-subject study, or assign creativity scores from an LLM judge. It validates benchmark inputs and evidence records, and exposes metrics whose assumptions are explicit. The 17-scenario development corpus includes partner coordination, adaptive intervention, capability amplification, epistemic resilience, and persistent-team scenarios.
+This package is intentionally small and deterministic. It does not call a model, run a human-subject study, or assign creativity scores from an LLM judge. It validates benchmark inputs and evidence records, and exposes metrics whose assumptions are explicit. The 18-scenario development corpus includes partner coordination, adaptive intervention, capability amplification, epistemic resilience, persistent-team coordination, and distributional learning scenarios.
 
 ## Commands
 
@@ -72,6 +72,7 @@ The `trajectory` module validates multi-cycle team receipts, prior-cycle digests
 - `marginal_contribution_impact`: full artifact quality minus quality from an identifiable counterfactual replay without the contribution. Non-identifiable replays return unavailable rather than an invented score.
 - `exact_shapley_values`: allocates a bounded outcome across up to 12 contributors using a complete, identifiable (2^n) coalition table; missing coalitions are rejected.
 - `participant_capability_amplification`: independent-arm, participant-cluster bootstrap of pre/post learning gains versus a matched control. Delayed retention and transfer use the same estimator with their respective held-out assessment scores.
+- `summarize_capability_amplification_by_stratum`: reports treatment-control gain intervals and negative individual-gain rates separately for preregistered baseline task-capability strata. It does not infer demographic groups or hide harmed strata in a pooled mean.
 - `paired_cluster_bootstrap_difference`: seeded percentile bootstrap over one pre-aggregated value per participant cluster. It must not be used to treat conversation turns as independent samples.
 
 ## Status and limitations
