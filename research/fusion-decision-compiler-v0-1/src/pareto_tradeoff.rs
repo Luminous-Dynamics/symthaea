@@ -426,6 +426,10 @@ pub fn compare_pair(
     let mut second_diagnostics = validate_candidate(profile, second);
     first_diagnostics.extend(profile_diagnostics.iter().copied());
     second_diagnostics.extend(profile_diagnostics.iter().copied());
+    if first.candidate_id == second.candidate_id {
+        first_diagnostics.push(ComparisonDiagnostic::DuplicateCandidateIdentity);
+        second_diagnostics.push(ComparisonDiagnostic::DuplicateCandidateIdentity);
+    }
 
     let first_q_eng = q_eng(first);
     let second_q_eng = q_eng(second);
@@ -869,6 +873,22 @@ mod tests {
         assert!(report.first_diagnostics.contains(&ComparisonDiagnostic::NonFiniteObjective(
             ObjectiveDimension::WholeLifeCost
         )));
+    }
+
+    #[test]
+    fn pairwise_comparison_rejects_reused_candidate_identity() {
+        let profile = profile();
+        let first = candidate("same", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
+        let mut second = candidate("same", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
+        second.candidate_revision = "same-r2".to_string();
+        let report = compare_pair(&profile, &first, &second);
+        assert_eq!(report.dominance, DominanceRelation::NotComparable);
+        assert!(report.first_diagnostics.contains(
+            &ComparisonDiagnostic::DuplicateCandidateIdentity
+        ));
+        assert!(report.second_diagnostics.contains(
+            &ComparisonDiagnostic::DuplicateCandidateIdentity
+        ));
     }
 
     #[test]
