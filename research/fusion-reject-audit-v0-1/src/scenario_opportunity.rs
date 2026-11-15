@@ -1536,9 +1536,7 @@ mod tests {
     #[test]
     fn one_solver_run_cannot_be_counted_as_multiple_candidate_scenario_evaluations() {
         let mut test_plan = plan();
-        let duplicate_run = test_plan.accepted_bundles[0].evaluations[0]
-            .run_id
-            .clone();
+        let duplicate_run = test_plan.accepted_bundles[0].evaluations[0].run_id.clone();
         test_plan.rejected_strata[0].bundles[0].evaluations[0].run_id = duplicate_run.clone();
         let errors = audit_scenario_opportunities(&test_plan).unwrap_err();
         assert!(errors.iter().any(|error| matches!(
