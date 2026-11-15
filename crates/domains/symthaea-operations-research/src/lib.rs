@@ -37,5 +37,6 @@ pub use cell_eligibility::{
     ClearanceSnapshot, EligibilityReason, EligibilityReasonCode, EligibilityReport,
     EligibilitySeverity, EligibilityStatus, EvidenceRecord, EvidenceStatus, MaterialLotSnapshot,
     MaterialLotStatus, OperationRequirement, ProcessConfigurationSnapshot, ProfileStatus,
-    SkillQualificationSnapshot, SnapshotResolution, UtilityCapacitySnapshot, UtilityRequirement,
+    SkillQualificationSnapshot, SkillRequirement, SnapshotResolution, UtilityCapacitySnapshot,
+    UtilityRequirement,
 };
