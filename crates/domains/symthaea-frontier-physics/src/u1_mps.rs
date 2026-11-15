@@ -3174,6 +3174,9 @@ impl U1MpsTruncationLedger {
         )
     }
 
+    // If the current MPS already carries a certified prior error e, every
+    // later operator/model defect must be scaled by the reference-state norm
+    // upper bound ||psi_current|| + e, not by ||psi_current|| alone.
     fn record_with_gate_error_bounds(
         &mut self,
         diagnostics: &U1TwoSiteTruncationDiagnostics,
