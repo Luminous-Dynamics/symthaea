@@ -571,6 +571,21 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                     owner_time_ref.clock_mapping_action_id.clone(),
                 ));
             }
+            let payload_clock_reference = match &scheduled.action {
+                ScheduleAction::EventProduced { clock_mapping_action_id, source_timestamp_ns, .. } =>
+                    Some((clock_mapping_action_id.as_str(), *source_timestamp_ns)),
+                ScheduleAction::EventObserved { clock_mapping_action_id, observed_at_ns, .. } =>
+                    Some((clock_mapping_action_id.as_str(), *observed_at_ns)),
+                ScheduleAction::EventPersisted { clock_mapping_action_id, persisted_at_ns, .. } =>
+                    Some((clock_mapping_action_id.as_str(), *persisted_at_ns)),
+                _ => None,
+            };
+            if payload_clock_reference.is_some_and(|(mapping_id, timestamp)| {
+                mapping_id != owner_time_ref.clock_mapping_action_id
+                    || timestamp != owner_time_ref.local_timestamp_ns
+            }) {
+                return Err(ReplayError::ActionEvidenceMismatch("owner_time_payload_binding"));
+            }
         }
 
         if let Some(evidence) = &scheduled.evidence {
@@ -4367,6 +4382,29 @@ mod tests {
             matches!(record.action, ScheduleAction::EventObserved { .. })
                 && record.disposition == SchedulerDisposition::ClockTimestampBeyondQualifiedTick
         }));
+    }
+
+    #[test]
+    fn owner_time_sidecar_must_match_native_event_clock_fields() {
+        let mut schedule = generate_clocked_observation_persistence_schedule(0x2026_1127)
+            .expect("clocked schedule");
+        let observation = schedule.actions.iter_mut().find(|action| {
+            matches!(action.action, ScheduleAction::EventObserved { .. })
+        }).expect("observation");
+        let (mapping_id, timestamp) = match &observation.action {
+            ScheduleAction::EventObserved { clock_mapping_action_id, observed_at_ns, .. } => {
+                (clock_mapping_action_id.clone(), *observed_at_ns)
+            }
+            _ => unreachable!("selected observation"),
+        };
+        observation.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: mapping_id,
+            local_timestamp_ns: timestamp + 1,
+        });
+        assert!(matches!(
+            validate_schedule(&schedule),
+            Err(ReplayError::ActionEvidenceMismatch("owner_time_payload_binding"))
+        ));
     }
 
     #[test]
