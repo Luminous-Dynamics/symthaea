@@ -239,7 +239,7 @@ fn assess_receipt(
     minimum_observed_at: Option<&DateTime<FixedOffset>>,
 ) -> Result<ReceiptAssessment, String> {
     let label = format!("{kind} receipt");
-    let obligation_id = required_str(receipt, "obligation_id", &label)?.to_owned();
+    required_str(receipt, "obligation_id", &label)?;
     let source_epoch = required_u64(receipt, "source_epoch", &label)?;
     let source_state = state_history
         .get(source_epoch as usize)
@@ -1105,6 +1105,32 @@ mod tests {
         assert!(result.epochs[0].false_resurrection_obligations.contains(&"build-repro".to_owned()));
         assert!(result.epochs[0].stale_carryover_obligations.contains(&"build-repro".to_owned()));
         assert!(result.epochs[0].missing_required_revalidation_obligations.contains(&"build-repro".to_owned()));
+    }
+
+    #[test]
+    fn reused_receipt_context_must_match_its_declared_source_epoch() {
+        let mut value = fixture_value();
+        let fresh = value["candidate_traces"][0]["checkpoints"][1]["fresh_receipts"]
+            .as_array_mut().expect("fresh receipts");
+        let index = fresh.iter().position(|receipt| {
+            receipt["obligation_id"].as_str() == Some("build-repro")
+        }).expect("epoch-two build receipt");
+        let mut forged = fresh.remove(index);
+        forged["source_epoch"] = json!(1);
+        forged["context"] = value["candidate_view"]["interventions"][1]["after"].clone();
+        value["candidate_traces"][0]["checkpoints"][1]["reused_receipts"]
+            .as_array_mut().expect("reused receipts")
+            .push(forged);
+
+        let report = report_for(&value);
+        let result = trace(&report, "conformant-sequence");
+        assert!(result.epochs[1].false_resurrection_obligations.contains(&"build-repro".to_owned()));
+        assert!(result.epochs[1].missing_required_revalidation_obligations.contains(&"build-repro".to_owned()));
+        assert!(result.epochs[1].unsupported_current_claims.contains(&"build-repro".to_owned()));
+        assert!(result.epochs[1].invalid_reuse_receipts.iter().any(|receipt| {
+            receipt.obligation_id == "build-repro"
+                && receipt.reasons.contains(&"receipt_source_context_mismatch:runner_image_digest".to_owned())
+        }));
     }
 
     #[test]
