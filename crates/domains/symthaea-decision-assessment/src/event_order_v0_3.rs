@@ -201,12 +201,15 @@ pub enum SchedulerDisposition {
     EventTimeRegression,
     StaleClockMappingReference,
     ClockMappingUnqualified,
+    ClockMappingRejected,
     ClockMappingExpired,
     ClockMappingNotYetValid,
     ClockMappingValidityInvalid,
     ClockTimestampBeyondQualifiedTick,
     ObservationUnqualified,
+    ObservationRejected,
     PersistenceUnqualified,
+    PersistenceRejected,
     ConflictingObservation,
     ConflictingPersistence,
     ConflictingAcknowledgement,
@@ -535,7 +538,9 @@ fn classify_clock_mapping(
         return Some(SchedulerDisposition::StaleClockMappingReference);
     }
     let mapping = mapping?;
-    if mapping.qualification != GateState::Pass {
+    if mapping.qualification == GateState::Fail {
+        Some(SchedulerDisposition::ClockMappingRejected)
+    } else if mapping.qualification != GateState::Pass {
         Some(SchedulerDisposition::ClockMappingUnqualified)
     } else if mapping.valid_from_ns > mapping.valid_through_ns {
         Some(SchedulerDisposition::ClockMappingValidityInvalid)
@@ -736,6 +741,8 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                     SchedulerDisposition::PreconditionViolation
                 } else if let Some(disposition) = mapping_disposition {
                     disposition
+                } else if *qualification == GateState::Fail {
+                    SchedulerDisposition::ObservationRejected
                 } else if *qualification != GateState::Pass {
                     SchedulerDisposition::ObservationUnqualified
                 } else if let Some(previous) = observation_receipts.get(&key) {
@@ -777,6 +784,8 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                     SchedulerDisposition::PreconditionViolation
                 } else if let Some(disposition) = mapping_disposition {
                     disposition
+                } else if *qualification == GateState::Fail {
+                    SchedulerDisposition::PersistenceRejected
                 } else if *qualification != GateState::Pass {
                     SchedulerDisposition::PersistenceUnqualified
                 } else if let Some(previous) = persistence_receipts.get(&persistence) {
@@ -1357,13 +1366,14 @@ fn resolve_owner_qualified_time(
 ) -> Result<QualifiedEventTime, ProjectionFault> {
     let mapping_action = schedule.actions.iter().find(|action| action.action_id == mapping_action_id)
         .ok_or(ProjectionFault::Critical("CLOCK_MAPPING_ACTION_NOT_FOUND"))?;
-    let (clock_domain, valid_from, valid_through, mapped_ref, mapped_sha, qualification) =
+    let (clock_domain, local_tick_ns, valid_from, valid_through, mapped_ref, mapped_sha, qualification) =
         match &mapping_action.action {
             ScheduleAction::ClockAdvance {
                 clock_domain, mapping_valid_from_ns, mapping_valid_through_ns,
                 mapping_receipt_ref, mapping_receipt_sha256, qualification, ..
             } => (
                 clock_domain.as_str(),
+                *local_tick_ns,
                 *mapping_valid_from_ns,
                 *mapping_valid_through_ns,
                 mapping_receipt_ref.as_str(),
@@ -1376,6 +1386,9 @@ fn resolve_owner_qualified_time(
     if clock_domain != source_clock_domain_id || mapped_ref != receipt_ref || mapped_sha != receipt_sha256 {
         return Err(ProjectionFault::Critical("CLOCK_MAPPING_RECEIPT_BINDING_MISMATCH"));
     }
+    if qualification == GateState::Fail {
+        return Err(ProjectionFault::Critical("CLOCK_MAPPING_QUALIFICATION_FAILED"));
+    }
     if qualification != GateState::Pass {
         return Err(ProjectionFault::Indeterminate("CLOCK_MAPPING_QUALIFICATION_UNRESOLVED"));
     }
@@ -1387,6 +1400,9 @@ fn resolve_owner_qualified_time(
     }
     if local_timestamp_ns > valid_through {
         return Err(ProjectionFault::Indeterminate("CLOCK_TIMESTAMP_AFTER_MAPPING_VALIDITY"));
+    }
+    if local_timestamp_ns > local_tick_ns {
+        return Err(ProjectionFault::Indeterminate("CLOCK_TIMESTAMP_AFTER_MAPPING_SAMPLE"));
     }
 
     let qualified = resolutions.get(&(mapping_action_id.to_owned(), local_timestamp_ns))
@@ -1491,6 +1507,9 @@ pub fn project_bitemporal_event(
             clock_domain, clock_mapping_action_id, observed_at_ns,
             observation_receipt_ref, observation_receipt_sha256, qualification, ..
         } => {
+            if *qualification == GateState::Fail {
+                return Ok(projection_failure(ProjectionFault::Critical("OBSERVATION_QUALIFICATION_FAILED")));
+            }
             if *qualification != GateState::Pass {
                 return Ok(projection_failure(ProjectionFault::Indeterminate("OBSERVATION_QUALIFICATION_UNRESOLVED")));
             }
@@ -1510,6 +1529,9 @@ pub fn project_bitemporal_event(
             clock_domain, clock_mapping_action_id, persisted_at_ns,
             persistence_receipt_ref, persistence_receipt_sha256, qualification, ..
         } => {
+            if *qualification == GateState::Fail {
+                return Ok(projection_failure(ProjectionFault::Critical("PERSISTENCE_QUALIFICATION_FAILED")));
+            }
             if *qualification != GateState::Pass {
                 return Ok(projection_failure(ProjectionFault::Indeterminate("PERSISTENCE_QUALIFICATION_UNRESOLVED")));
             }
