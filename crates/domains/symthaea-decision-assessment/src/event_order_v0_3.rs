@@ -959,4 +959,108 @@ mod tests {
                 && record.disposition == SchedulerDisposition::Applied
         }));
     }
+
+    #[test]
+    fn policy_revision_requires_a_new_exact_discharge() {
+        let mut schedule = generate_delivery_schedule(41, 2).expect("valid schedule");
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let t = 20_000;
+        let obligation = "stop-revision-test";
+        push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::StopTriggered {
+            obligation_id: obligation.to_owned(), policy_revision: "policy-v1".to_owned(),
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 1, ScheduleAction::StopDischarged {
+            obligation_id: obligation.to_owned(), policy_revision: "policy-v1".to_owned(),
+            receipt_ref: "receipt-v1".to_owned(), receipt_sha256: "a".repeat(64),
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 2, ScheduleAction::StopPolicyRevised {
+            obligation_id: obligation.to_owned(), policy_revision: "policy-v2".to_owned(),
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 3, ScheduleAction::StopDischarged {
+            obligation_id: obligation.to_owned(), policy_revision: "policy-v1".to_owned(),
+            receipt_ref: "stale-receipt".to_owned(), receipt_sha256: "b".repeat(64),
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 4, ScheduleAction::StopDischarged {
+            obligation_id: obligation.to_owned(), policy_revision: "policy-v2".to_owned(),
+            receipt_ref: "receipt-v2".to_owned(), receipt_sha256: "c".repeat(64),
+        });
+        let report = replay_virtual_schedule(&schedule).expect("replay");
+        let discharge_dispositions: Vec<_> = report.records.iter().filter_map(|record| {
+            if matches!(record.action, ScheduleAction::StopDischarged { .. }) {
+                Some(record.disposition)
+            } else {
+                None
+            }
+        }).collect();
+        assert_eq!(discharge_dispositions, vec![
+            SchedulerDisposition::Applied,
+            SchedulerDisposition::PreconditionViolation,
+            SchedulerDisposition::Applied,
+        ]);
+    }
+
+    #[test]
+    fn crash_blocks_persistence_until_restart() {
+        let mut schedule = generate_delivery_schedule(43, 2).expect("valid schedule");
+        let event_id = "event-000000".to_owned();
+        let observer = "worker-after-reconnect".to_owned();
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let t = 20_000;
+        push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::EventObserved {
+            event_id: event_id.clone(), observer_id: observer.clone(),
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 1, ScheduleAction::ProcessCrashed {
+            process_id: observer.clone(),
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 2, ScheduleAction::EventPersisted {
+            event_id: event_id.clone(), observer_id: observer.clone(), store_id: "store-1".to_owned(),
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 3, ScheduleAction::ProcessRestarted {
+            process_id: observer.clone(),
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 4, ScheduleAction::EventPersisted {
+            event_id, observer_id: observer, store_id: "store-1".to_owned(),
+        });
+        let report = replay_virtual_schedule(&schedule).expect("replay");
+        let persistence_dispositions: Vec<_> = report.records.iter().filter_map(|record| {
+            if matches!(record.action, ScheduleAction::EventPersisted { .. }) {
+                Some(record.disposition)
+            } else {
+                None
+            }
+        }).collect();
+        assert_eq!(persistence_dispositions, vec![
+            SchedulerDisposition::BlockedByCrashedRecipient,
+            SchedulerDisposition::Applied,
+        ]);
+    }
+
+    #[test]
+    fn duplicate_cancel_acknowledgement_is_not_a_second_success() {
+        let mut schedule = generate_delivery_schedule(47, 1).expect("valid schedule");
+        let mut ordinal = schedule.actions.iter().map(|item| item.ordinal).max().unwrap_or(0) + 1;
+        let t = 20_000;
+        let operation_id = "cancel-op".to_owned();
+        let attempt_id = "cancel-attempt".to_owned();
+        push_action(&mut schedule.actions, &mut ordinal, t, ScheduleAction::CancellationRequested {
+            operation_id: operation_id.clone(), attempt_id: attempt_id.clone(),
+        });
+        for offset in 1..=2 {
+            push_action(&mut schedule.actions, &mut ordinal, t + offset, ScheduleAction::CancellationAcknowledged {
+                operation_id: operation_id.clone(), attempt_id: attempt_id.clone(), accepted: true,
+            });
+        }
+        let report = replay_virtual_schedule(&schedule).expect("replay");
+        let ack_dispositions: Vec<_> = report.records.iter().filter_map(|record| {
+            if matches!(record.action, ScheduleAction::CancellationAcknowledged { .. }) {
+                Some(record.disposition)
+            } else {
+                None
+            }
+        }).collect();
+        assert_eq!(ack_dispositions, vec![
+            SchedulerDisposition::Applied,
+            SchedulerDisposition::Duplicate,
+        ]);
+    }
 }
