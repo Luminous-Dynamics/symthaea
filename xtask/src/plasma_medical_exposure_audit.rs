@@ -125,12 +125,13 @@ fn check_measurement(measurement: &Value) -> Option<Assessment> {
                     return Some(blocked("CALIBRATION_NOT_VALID"));
                 }
                 Some("IN_DATE") => {
-                    if !nonempty_string(calibration.and_then(|c| c.get("calibration_id"))
-                        .and_then(|v| Some(v))) {
+                    if !nonempty_string(calibration.and_then(|c| c.get("calibration_id")))
+                        || !nonempty_string(calibration.and_then(|c| c.get("valid_from")))
+                        || !nonempty_string(calibration.and_then(|c| c.get("valid_until")))
+                    {
                         return Some(blocked("CALIBRATION_REFERENCE_MISSING"));
                     }
-                    let certificate = calibration
-                        .and_then(|c| get_str(c, "certificate_sha256"));
+                    let certificate = calibration.and_then(|c| get_str(c, "certificate_sha256"));
                     if !is_sha256(certificate) {
                         return Some(blocked("CALIBRATION_CERTIFICATE_MISSING"));
                     }
@@ -202,7 +203,7 @@ fn check_measurement(measurement: &Value) -> Option<Assessment> {
     None
 }
 
-fn all_measurements(value: Option<&Value>) -> Result<(), Assessment> {
+fn all_measurements(value: Option<&Value>) -> std::result::Result<(), Assessment> {
     let measurements = value
         .and_then(Value::as_array)
         .ok_or_else(|| blocked("MEASUREMENT_ARRAY_MISSING"))?;
@@ -345,7 +346,7 @@ fn audit_record(record: &Value) -> Assessment {
             "container_material",
             "container_lot_id",
         ];
-        if required.iter().any(|key| !nonempty_string(lineage.get(key)))
+        if required.iter().any(|key| !nonempty_string(lineage.get(*key)))
             || !has_number(lineage.get("elapsed_minutes_at_application"))
         {
             return blocked("PAW_STABILITY_LINEAGE_INCOMPLETE");
@@ -414,7 +415,7 @@ fn audit_record(record: &Value) -> Assessment {
             "endpoint_definition",
             "analysis_plan_ref",
         ];
-        if required.iter().any(|key| !nonempty_string(clinical.and_then(|c| c.get(key))))
+        if required.iter().any(|key| !nonempty_string(clinical.and_then(|c| c.get(*key))))
             || !has_number(clinical.and_then(|c| c.get("follow_up_days")))
         {
             return blocked("CLINICAL_CONTEXT_INCOMPLETE");
