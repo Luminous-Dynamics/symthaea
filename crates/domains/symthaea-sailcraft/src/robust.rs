@@ -955,11 +955,20 @@ mod tests {
     #[test]
     fn downwind_boundary_uncertainty_does_not_receive_a_false_tack_label() {
         let mut input = request();
-        input.wind.value.as_mut().unwrap().from_direction.half_width_deg = 5.0;
+        input
+            .wind
+            .value
+            .as_mut()
+            .unwrap()
+            .from_direction
+            .half_width_deg = 5.0;
         let result = evaluate_robust_route_candidates(&polar(), input);
-        assert!(result.candidates.iter().all(|candidate| {
-            candidate.true_wind_angle_deg.upper < 180.0
-        }));
+        assert!(
+            result
+                .candidates
+                .iter()
+                .all(|candidate| { candidate.true_wind_angle_deg.upper < 180.0 })
+        );
     }
 
     #[test]
@@ -967,11 +976,26 @@ mod tests {
         let candidate = RobustCourseCandidate {
             heading_deg: 45.0,
             tack_side: TackSide::Port,
-            true_wind_angle_deg: ScalarInterval { lower: 45.0, upper: 55.0 },
-            boat_speed_mps: ScalarInterval { lower: 2.0, upper: 3.0 },
-            boat_velocity_made_good_mps: ScalarInterval { lower: 1.0, upper: 2.0 },
-            current_velocity_made_good_mps: ScalarInterval { lower: -0.1, upper: 0.1 },
-            ground_velocity_made_good_mps: ScalarInterval { lower: 0.9, upper: 2.1 },
+            true_wind_angle_deg: ScalarInterval {
+                lower: 45.0,
+                upper: 55.0,
+            },
+            boat_speed_mps: ScalarInterval {
+                lower: 2.0,
+                upper: 3.0,
+            },
+            boat_velocity_made_good_mps: ScalarInterval {
+                lower: 1.0,
+                upper: 2.0,
+            },
+            current_velocity_made_good_mps: ScalarInterval {
+                lower: -0.1,
+                upper: 0.1,
+            },
+            ground_velocity_made_good_mps: ScalarInterval {
+                lower: 0.9,
+                upper: 2.1,
+            },
         };
         assert_eq!(
             uniquely_dominant_tack(Some(candidate), None, Some(2.1), None),
