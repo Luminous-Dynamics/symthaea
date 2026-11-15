@@ -3349,7 +3349,7 @@ mod tests {
             ),
         );
 
-        let cancellation_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 2.5_f64 as u64, 105);
+        let cancellation_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 2_500, 105);
         push_action(
             &mut actions,
             &mut ordinal,
