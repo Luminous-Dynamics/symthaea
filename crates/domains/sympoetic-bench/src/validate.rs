@@ -20,6 +20,7 @@ const SCENARIO_DOMAINS: &[&str] = &[
     "partner_coordination",
     "adaptive_intervention",
     "collaborative_learning",
+    "epistemic_resilience",
 ];
 const DIFFICULTIES: &[&str] = &["introductory", "moderate", "advanced"];
 const SPLITS: &[&str] = &["development", "pilot", "confirmatory_locked"];
@@ -52,6 +53,16 @@ const EVENT_KINDS: &[&str] = &[
     "independent_assessment",
     "retention_check",
     "independent_transfer",
+    "confidence_assessment",
+    "claim_verification",
+    "source_attribution",
+    "belief_revision",
+    "contradiction_resolution",
+    "human_planning",
+    "human_monitoring",
+    "human_reflection",
+    "independent_reasoning_attempt",
+    "ai_core_step_supplied",
 ];
 const SCORING_MODES: &[&str] = &["binary", "ordinal", "human_rating", "trace_audit"];
 const CONSENT_VALUES: &[&str] = &["not_applicable", "task_only", "explicit_opt_in"];
@@ -84,6 +95,16 @@ const TRACE_EVENT_TYPES: &[&str] = &[
     "independent_assessment",
     "retention_assessment",
     "transfer_assessment",
+    "confidence_assessment",
+    "claim_verification",
+    "source_attribution",
+    "belief_revision",
+    "contradiction_resolution",
+    "human_planning",
+    "human_monitoring",
+    "human_reflection",
+    "independent_reasoning_attempt",
+    "ai_core_step_supplied",
 ];
 
 const INTERVENTION_ACTIONS: &[&str] = &[
