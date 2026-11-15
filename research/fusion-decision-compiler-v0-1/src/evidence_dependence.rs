@@ -186,11 +186,8 @@ pub fn compare_observable_dependencies(
 
         let first_dependencies = dependencies_for(first, observable_id);
         let second_dependencies = dependencies_for(second, observable_id);
-        let mut shared_dependencies = find_shared_dependencies(
-            observable_id,
-            &first_dependencies,
-            &second_dependencies,
-        );
+        let mut shared_dependencies =
+            find_shared_dependencies(observable_id, &first_dependencies, &second_dependencies);
 
         shared_dependencies.sort_by(|left, right| {
             (
@@ -242,9 +239,7 @@ pub fn compare_observable_dependencies(
     Ok(assessments)
 }
 
-fn validate_manifest(
-    manifest: &RunDependencyManifest,
-) -> Vec<DependencyValidationError> {
+fn validate_manifest(manifest: &RunDependencyManifest) -> Vec<DependencyValidationError> {
     let mut errors = Vec::new();
     if manifest.run_id.trim().is_empty() {
         errors.push(DependencyValidationError::EmptyRunId);
@@ -354,7 +349,10 @@ fn validate_cross_manifest_kinds(
                     } else {
                         format!(
                             "payload:{}",
-                            left.dependency.content_sha256.as_deref().unwrap_or_default()
+                            left.dependency
+                                .content_sha256
+                                .as_deref()
+                                .unwrap_or_default()
                         )
                     },
                 ));
@@ -626,12 +624,7 @@ mod tests {
             &["psi"],
             vec![binding(
                 "psi",
-                dependency(
-                    "dataset-a",
-                    "v1",
-                    DependencyKind::InputDataset,
-                    None,
-                ),
+                dependency("dataset-a", "v1", DependencyKind::InputDataset, None),
             )],
         );
         let second = manifest(
@@ -640,12 +633,7 @@ mod tests {
             &["psi"],
             vec![binding(
                 "psi",
-                dependency(
-                    "dataset-b",
-                    "v1",
-                    DependencyKind::InputDataset,
-                    None,
-                ),
+                dependency("dataset-b", "v1", DependencyKind::InputDataset, None),
             )],
         );
 
@@ -658,20 +646,7 @@ mod tests {
 
     #[test]
     fn missing_inventory_completeness_never_becomes_independence() {
-        let first = manifest(
-            "run-a",
-            &["psi"],
-            &[],
-            vec![binding(
-                "psi",
-                dependency(
-                    "dataset-a",
-                    "v1",
-                    DependencyKind::InputDataset,
-                    None,
-                ),
-            )],
-        );
+        let first = manifest("run-a", &["psi"], &[], vec![binding("psi", dependency("dataset-a", "v1", DependencyKind::InputDataset, None))]);
         let second = manifest("run-b", &["psi"], &["psi"], Vec::new());
 
         let result = compare_one(&first, &second, "psi");
@@ -691,18 +666,8 @@ mod tests {
             DependencyKind::CalibrationDataset,
             None,
         );
-        let first = manifest(
-            "run-a",
-            &["q95"],
-            &[],
-            vec![binding("q95", shared.clone())],
-        );
-        let second = manifest(
-            "run-b",
-            &["q95"],
-            &["q95"],
-            vec![binding("q95", shared)],
-        );
+        let first = manifest("run-a", &["q95"], &[], vec![binding("q95", shared.clone())]);
+        let second = manifest("run-b", &["q95"], &["q95"], vec![binding("q95", shared)]);
 
         let result = compare_one(&first, &second, "q95");
         assert_eq!(
@@ -741,12 +706,12 @@ mod tests {
         );
         let second = manifest("run-b", &["psi"], &["psi"], Vec::new());
 
-        let errors = compare_observable_dependencies(&first, &second, &["psi".into()])
-            .unwrap_err();
-        assert!(errors.iter().any(|error| matches!(
-            error,
-            DependencyValidationError::InvalidContentSha256
-        )));
+        let errors = compare_observable_dependencies(&first, &second, &["psi".into()]).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| matches!(error, DependencyValidationError::InvalidContentSha256))
+        );
         assert!(errors.iter().any(|error| matches!(
             error,
             DependencyValidationError::DuplicateDependencyBinding { .. }
@@ -762,21 +727,11 @@ mod tests {
             vec![
                 binding(
                     "psi",
-                    dependency(
-                        "shared-z",
-                        "v1",
-                        DependencyKind::InputDataset,
-                        None,
-                    ),
+                    dependency("shared-z", "v1", DependencyKind::InputDataset, None),
                 ),
                 binding(
                     "psi",
-                    dependency(
-                        "shared-a",
-                        "v1",
-                        DependencyKind::CalibrationDataset,
-                        None,
-                    ),
+                    dependency("shared-a", "v1", DependencyKind::CalibrationDataset, None),
                 ),
             ],
         );
@@ -787,48 +742,28 @@ mod tests {
             vec![
                 binding(
                     "psi",
-                    dependency(
-                        "shared-a",
-                        "v2",
-                        DependencyKind::CalibrationDataset,
-                        None,
-                    ),
+                    dependency("shared-a", "v2", DependencyKind::CalibrationDataset, None),
                 ),
                 binding(
                     "psi",
-                    dependency(
-                        "shared-z",
-                        "v2",
-                        DependencyKind::InputDataset,
-                        None,
-                    ),
+                    dependency("shared-z", "v2", DependencyKind::InputDataset, None),
                 ),
             ],
         );
 
-        let result = compare_observable_dependencies(
-            &first,
-            &second,
-            &["q95".into(), "psi".into()],
-        )
-        .unwrap();
+        let result =
+            compare_observable_dependencies(&first, &second, &["q95".into(), "psi".into()])
+                .unwrap();
         assert_eq!(result[0].observable_id, "psi");
         assert_eq!(result[1].observable_id, "q95");
         assert_eq!(result[0].shared_dependencies.len(), 2);
-        assert_eq!(
-            result[0].shared_dependencies[0].first_node_id,
-            "shared-a"
-        );
-        assert_eq!(
-            result[0].shared_dependencies[1].first_node_id,
-            "shared-z"
-        );
+        assert_eq!(result[0].shared_dependencies[0].first_node_id, "shared-a");
+        assert_eq!(result[0].shared_dependencies[1].first_node_id, "shared-z");
     }
     #[test]
     fn comparing_a_run_to_itself_is_rejected() {
         let run = manifest("run-a", &["psi"], &["psi"], Vec::new());
-        let errors = compare_observable_dependencies(&run, &run, &["psi".into()])
-            .unwrap_err();
+        let errors = compare_observable_dependencies(&run, &run, &["psi".into()]).unwrap_err();
         assert!(errors.iter().any(|error| matches!(
             error,
             DependencyValidationError::DuplicateRunIdentity(run_id) if run_id == "run-a"
@@ -843,12 +778,7 @@ mod tests {
             &["psi"],
             vec![binding(
                 "psi",
-                dependency(
-                    "ambiguous-source",
-                    "v1",
-                    DependencyKind::InputDataset,
-                    None,
-                ),
+                dependency("ambiguous-source", "v1", DependencyKind::InputDataset, None),
             )],
         );
         let second = manifest(
@@ -865,12 +795,10 @@ mod tests {
                 ),
             )],
         );
-        let errors = compare_observable_dependencies(&first, &second, &["psi".into()])
-            .unwrap_err();
+        let errors = compare_observable_dependencies(&first, &second, &["psi".into()]).unwrap_err();
         assert!(errors.iter().any(|error| matches!(
             error,
             DependencyValidationError::ConflictingDependencyKind(_)
         )));
     }
-
 }
