@@ -493,7 +493,9 @@ pub fn validate_trace(
             }
             "contradiction_resolution" => {
                 if event.parent_event_ids.len() < 2 {
-                    bail!("contradiction_resolution requires at least two prior claim/evidence parents");
+                    bail!(
+                        "contradiction_resolution needs at least two prior claim/evidence parents"
+                    );
                 }
             }
             "human_planning"
@@ -501,7 +503,7 @@ pub fn validate_trace(
             | "human_reflection"
             | "independent_reasoning_attempt" => {
                 if event.actor != "human" {
-                    bail!("human cognitive-process events must identify the human participant as actor");
+                    bail!("human cognitive-process events must use the human actor");
                 }
             }
             "ai_core_step_supplied" => {
@@ -511,7 +513,7 @@ pub fn validate_trace(
             }
             "intervention_decision" => {
                 if event.actor != "agent" {
-                    bail!("intervention_decision events must identify the evaluated agent as actor");
+                    bail!("intervention_decision events must use the evaluated agent as actor");
                 }
                 let action = event
                     .intervention_action
@@ -571,7 +573,7 @@ pub fn validate_trace(
                     || event.reconciliation_state_digest.is_some()
                     || event.intervention_action.is_some()
                 {
-                    bail!("tool_result must not contain reconciliation or intervention-only fields");
+                    bail!("tool_result cannot contain reconciliation or intervention fields");
                 }
                 if execution.status == "unknown" {
                     if awaiting_reconciliation.is_some() {
@@ -593,7 +595,7 @@ pub fn validate_trace(
                 }
                 if !matches!(event.actor.as_str(), "tool" | "environment" | "evaluator") {
                     bail!(
-                        "execution reconciliation must be independently observed, not self-attested by an agent"
+                        "execution reconciliation must be independently observed"
                     );
                 }
                 if event.tool_execution.is_some() {
@@ -791,12 +793,27 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         ("transfer_gain_delta", scorecard.scores.transfer_gain_delta),
         ("agent_confidence_brier_score", scorecard.scores.agent_confidence_brier_score),
         ("agent_expected_calibration_error", scorecard.scores.agent_expected_calibration_error),
-        ("agent_metacognitive_sensitivity_auc", scorecard.scores.agent_metacognitive_sensitivity_auc),
-        ("agent_selective_accuracy_at_80pct_coverage", scorecard.scores.agent_selective_accuracy_at_80pct_coverage),
+        (
+            "agent_metacognitive_sensitivity_auc",
+            scorecard.scores.agent_metacognitive_sensitivity_auc,
+        ),
+        (
+            "agent_selective_accuracy_at_80pct_coverage",
+            scorecard.scores.agent_selective_accuracy_at_80pct_coverage,
+        ),
         ("participant_confidence_brier_score", scorecard.scores.participant_confidence_brier_score),
-        ("participant_expected_calibration_error", scorecard.scores.participant_expected_calibration_error),
-        ("participant_metacognitive_sensitivity_auc", scorecard.scores.participant_metacognitive_sensitivity_auc),
-        ("participant_selective_accuracy_at_80pct_coverage", scorecard.scores.participant_selective_accuracy_at_80pct_coverage),
+        (
+            "participant_expected_calibration_error",
+            scorecard.scores.participant_expected_calibration_error,
+        ),
+        (
+            "participant_metacognitive_sensitivity_auc",
+            scorecard.scores.participant_metacognitive_sensitivity_auc,
+        ),
+        (
+            "participant_selective_accuracy_at_80pct_coverage",
+            scorecard.scores.participant_selective_accuracy_at_80pct_coverage,
+        ),
         ("human_planning_rate", scorecard.scores.human_planning_rate),
         ("human_first_attempt_rate", scorecard.scores.human_first_attempt_rate),
         ("human_monitoring_rate", scorecard.scores.human_monitoring_rate),
@@ -841,7 +858,7 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
     ) {
         if (synergy + gap).abs() > 1e-6 {
             bail!(
-                "synergy_delta and collaboration_gap must be sign-consistent when computed from the same matched comparison"
+                "synergy_delta and collaboration_gap must have opposite signs"
             );
         }
     }
