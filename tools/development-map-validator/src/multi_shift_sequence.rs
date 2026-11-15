@@ -44,6 +44,7 @@ pub struct MultiShiftEpochReport {
     pub stale_carryover_obligations: Vec<String>,
     pub future_evidence_leakage_obligations: Vec<String>,
     pub unsupported_current_claims: Vec<String>,
+    pub invalid_fresh_receipts: Vec<ReceiptIssue>,
     pub invalid_reuse_receipts: Vec<ReceiptIssue>,
     pub critical_false_resurrection_count: usize,
     pub required_revalidation_units: usize,
@@ -100,7 +101,6 @@ struct ReceiptAssessment {
     reasons: Vec<String>,
     context_mismatch_dimensions: Vec<String>,
     unavailable_at_cutoff: bool,
-    is_fresh: bool,
 }
 
 fn required_str<'a>(value: &'a Value, key: &str, label: &str) -> Result<&'a str, String> {
@@ -293,7 +293,6 @@ fn assess_receipt(
         reasons,
         context_mismatch_dimensions,
         unavailable_at_cutoff,
-        is_fresh,
     })
 }
 
@@ -374,7 +373,6 @@ fn validate_event_sequence(
     let mut previous_state = baseline.clone();
     let mut previous_event_time: Option<DateTime<FixedOffset>> = None;
     let mut previous_available_at: Option<DateTime<FixedOffset>> = None;
-    let mut introduced_by_epoch = BTreeMap::<u64, BTreeSet<String>>::new();
 
     for (index, event) in events.iter().enumerate() {
         let label = format!("candidate_view.interventions[{index}]");
@@ -426,10 +424,6 @@ fn validate_event_sequence(
                 "{label}.newly_introduced_obligations does not match obligation introduced_epoch values"
             ));
         }
-        for id in &introduced {
-            introduced_by_epoch.entry(epoch).or_default().insert(id.clone());
-        }
-
         sequence.push((event_id, after.clone(), event_time.clone(), available_at.clone()));
         previous_state = after.clone();
         previous_event_time = Some(event_time);
@@ -590,6 +584,7 @@ fn score_trace(
         let mut false_resurrection = BTreeSet::new();
         let mut stale_carryover = BTreeSet::new();
         let mut future_leakage = BTreeSet::new();
+        let mut invalid_fresh_receipts = Vec::new();
         let mut invalid_reuse_receipts = Vec::new();
 
         for (kind, receipts) in [("fresh", fresh_receipts), ("reused", reused_receipts)] {
@@ -619,12 +614,27 @@ fn score_trace(
                     },
                 )?;
 
+                if declared_current.contains(&id) && assessment.unavailable_at_cutoff {
+                    future_leakage.insert(id.clone());
+                }
                 if kind == "fresh" {
                     if assessment.reasons.is_empty() {
                         valid_fresh.insert(id.clone());
                         if assessment.outcome == "pass" {
                             fresh_pass.insert(id.clone());
                         }
+                    } else {
+                        let mut reasons = assessment.reasons.clone();
+                        if assessment.outcome != "pass" {
+                            reasons.push(format!("non_passing_outcome:{}", assessment.outcome));
+                        }
+                        reasons.sort();
+                        reasons.dedup();
+                        invalid_fresh_receipts.push(ReceiptIssue {
+                            obligation_id: id,
+                            receipt_kind: "fresh".to_owned(),
+                            reasons,
+                        });
                     }
                 } else if assessment.reasons.is_empty() && assessment.outcome == "pass" {
                     valid_reused_pass.insert(id.clone());
@@ -636,9 +646,6 @@ fn score_trace(
                         && !assessment.context_mismatch_dimensions.is_empty()
                     {
                         stale_carryover.insert(id.clone());
-                    }
-                    if declared_current.contains(&id) && assessment.unavailable_at_cutoff {
-                        future_leakage.insert(id.clone());
                     }
                     if !assessment.reasons.is_empty() || assessment.outcome != "pass" {
                         let mut reasons = assessment.reasons.clone();
@@ -694,6 +701,7 @@ fn score_trace(
             stale_carryover_obligations: stale_carryover.iter().cloned().collect(),
             future_evidence_leakage_obligations: future_leakage.iter().cloned().collect(),
             unsupported_current_claims: unsupported_current.iter().cloned().collect(),
+            invalid_fresh_receipts,
             invalid_reuse_receipts,
             critical_false_resurrection_count: critical_false_resurrections,
             required_revalidation_units: required.len(),
@@ -733,7 +741,6 @@ fn score_restoration_control(
     bundle: &Value,
     candidate_view: &Value,
     obligations: &BTreeMap<String, Obligation>,
-    final_sequence_state: &Value,
     sequence_len: usize,
 ) -> Result<MultiShiftRestorationReport, String> {
     let control = bundle
@@ -758,12 +765,6 @@ fn score_restoration_control(
     if !states_equal(final_state, baseline) {
         return Err("restoration control must restore all declared baseline identity dimensions".to_owned());
     }
-    if !states_equal(final_state, final_sequence_state) {
-        // The restoration control is deliberately an independent matched arm,
-        // not the terminal state of the shifted trace.
-        let _ = final_sequence_state;
-    }
-
     let decision_cutoff = parse_time(control, "decision_cutoff", "restoration_control")?;
     let active = unique_string_set(control, "active_obligation_ids", "restoration_control")?;
     for id in &active {
@@ -920,7 +921,7 @@ pub fn score_multi_shift_sequence_json(input: &str) -> Result<MultiShiftSequence
         .map(|item| &item.1)
         .ok_or_else(|| "sequence has no terminal state".to_owned())?;
     let restoration_control =
-        score_restoration_control(&bundle, candidate_view, &obligations, final_state, sequence.len())?;
+        score_restoration_control(&bundle, candidate_view, &obligations, sequence.len())?;
 
     Ok(MultiShiftSequenceReport {
         scenario_id,
