@@ -33,6 +33,8 @@ One composite "verified" flag would hide which part of the evidence chain was ac
 
 A valid signature proves attribution to a signing key and integrity of the signed bytes. Workload identity and policy connect that key to a claimed actor. An execution attestation is evidence about a run, not a mathematical proof that the software did what the issuer says. An independent regrade and task-validity gate are still needed.
 
+The verifier must also enforce role consistency across fields: `agent_observation` requires an agent producer; `runner_execution` requires a runner; `independent_regrade` requires an independent grader; and `authority_decision` requires an authority service. The JSON Schema validates field shapes but does not itself prove this cross-field policy or issuer identity.
+
 The verifier should emit separate outcomes, not a generic "trusted" boolean:
 - statement signature valid;
 - issuer/workload identity valid for the claimed role;
@@ -47,7 +49,7 @@ The verifier should emit separate outcomes, not a generic "trusted" boolean:
 
 ## 3. Reuse the in-toto statement and envelope model
 
-The machine-readable schema added in this branch defines an **EGDDM execution-receipt predicate**, not a new envelope.
+The machine-readable schema added in this branch defines an **EGDDM execution-receipt predicate**, not a new envelope. A [synthetic predicate example](fixtures/egddm-execution-receipt-predicate-v0.1.synthetic.json) demonstrates the fields; its identities and digests are placeholders, and it contains no signature or transparency receipt.
 
 The intended layering is:
 
