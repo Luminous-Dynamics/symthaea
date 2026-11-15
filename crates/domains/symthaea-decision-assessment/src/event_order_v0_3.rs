@@ -4357,6 +4357,7 @@ mod tests {
             },
             ActionEvidence::AttemptStart { retry_of_attempt_id: None },
         );
+        let request_action_id = format!("action-{ordinal:06}");
         push_action(
             &mut actions,
             &mut ordinal,
@@ -4366,6 +4367,13 @@ mod tests {
                 attempt_id: attempt_id.clone(),
             },
         );
+        let request_action = actions.iter_mut()
+            .find(|action| action.action_id == request_action_id)
+            .expect("cancellation request action");
+        request_action.owner_time_ref = Some(ActionClockTimeReference {
+            clock_mapping_action_id: mapping_id.clone(),
+            local_timestamp_ns: 125,
+        });
         let acknowledgement_action_id = push_clocked_action(
             &mut actions,
             &mut ordinal,
@@ -4387,6 +4395,10 @@ mod tests {
         resolutions.insert(
             (mapping_id.clone(), 100),
             qualified_resolution_from_fixture(&actions, &mapping_id, 100, 1_000),
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 125),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 125, 1_025),
         );
         resolutions.insert(
             (mapping_id.clone(), 150),
