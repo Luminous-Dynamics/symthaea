@@ -2,7 +2,7 @@ use mel_music_audio_continuity_harness::{
     AudioBoundaryKindV1, AudioBoundaryPolicyV1, AudioGateVerdictV1,
     AudioSequenceRequestV1, AudioSequenceStepV1, AudioUpstreamGatesV1,
     FrameWindowV1, PcmAudioArtifactV1, PcmEncodingV1, PcmFormatV1,
-    evaluate_audio_sequence_v1, pcm_audio_sha256_v1,
+    audio_operation_plan_sha256_v1, evaluate_audio_sequence_v1, pcm_audio_sha256_v1,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,18 +17,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .map(|index| ((index as i32 * 97 % 20_000) - 10_000) as i16)
             .collect(),
     };
-    let source_sha = pcm_audio_sha256_v1(&source)?;
-    let request = AudioSequenceRequestV1 {
-        schema_version: "mel-music-audio-sequence-v1".to_owned(),
-        session_id: "synthetic-eight-step-audio-session".to_owned(),
-        source_lineage_sha256: format!("{:064x}", 1),
-        source_audio_sha256: source_sha.clone(),
-        operation_plan_sha256: format!("{:064x}", 2),
-        expected_step_count: 8,
-        format,
-        frame_count: source.frame_count()?,
-    };
-
     let mut current = source.clone();
     let mut steps = Vec::new();
     for sequence in 1..=8_u8 {
@@ -77,6 +65,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         current = output;
     }
 
+    let request = AudioSequenceRequestV1 {
+        schema_version: "mel-music-audio-sequence-v1".to_owned(),
+        session_id: "synthetic-eight-step-audio-session".to_owned(),
+        source_lineage_sha256: format!("{:064x}", 1),
+        source_audio_sha256: pcm_audio_sha256_v1(&source)?,
+        operation_plan_sha256: audio_operation_plan_sha256_v1(&steps)?,
+        expected_step_count: 8,
+        format,
+        frame_count: source.frame_count()?,
+    };
     let result = evaluate_audio_sequence_v1(&request, &source, &steps)?;
     if result.accepted_step_count != 8 {
         return Err("synthetic 8-step audio contract did not qualify".into());
