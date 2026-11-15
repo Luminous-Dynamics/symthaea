@@ -352,6 +352,41 @@ Report:
 
 The implementation must not hide long-gap error behind an average across easy short intervals.
 
+### T1.1 — the observation process is itself a temporal signal
+
+Do not treat irregularity, missingness and timestamp patterns as disposable preprocessing artifacts. Recent work such as ISHN (IEEE Transactions on Industrial Informatics, early access, 14 September 2026) explicitly models binary observation-mask co-occurrence structure as a source of temporal and cross-variable information. BITS likewise finds that model rankings depend on missing-rate, missing-pattern complexity, irregularity and skewness, and that error-based and non-error-based metrics can rank methods differently.
+
+For Symthaea, the observation process should be represented as a **second, provenance-bearing process** alongside measured values:
+
+- value and measurement unit;
+- event/capture timestamp and clock domain;
+- receive/availability timestamp and transport delay;
+- per-variable observation mask;
+- time-since-last-valid-observation;
+- source identity, sensor health and missingness reason where known;
+- sampling/action policy identity where observable and permitted.
+
+Candidate encodings to compare (do not enable by assumption):
+
+1. Value-only input with conventional imputation.
+2. Value + explicit observation mask + age/time-since-observation.
+3. HDC-bound variable/source/time roles with a separate observation-event memory.
+4. Co-observation graph/hypergraph or sparse mask-attention model (ISHN-style comparator).
+5. Joint value/mask/time model with an explicit missing-not-at-random or sensor-policy context class.
+
+Required missingness regimes:
+
+- MCAR, MAR and controlled MNAR where the missingness mechanism is known to the evaluator;
+- burst loss, sensor outage, delayed delivery, asynchronous modalities and clock skew;
+- sampling-policy shifts and missingness patterns correlated with the target;
+- out-of-family sensor/missingness mechanisms.
+
+The agent must not receive evaluator-only labels, outage schedules or hidden missingness-mechanism parameters. A mask may be predictive because it reveals the sampling policy rather than the underlying physical state; report those cases separately and test policy-shift transfer. Never silently treat "not observed" as an observed zero or as "state unchanged."
+
+Report value-prediction skill, mask-only predictive skill, joint skill, calibration, worst-regime error, missingness-mechanism identification, policy-shift robustness, observation age and complete sensing/compute cost separately. Include mask-shuffled and timestamp-shifted negative controls.
+
+This lane should be coordinated with #9700 and active sensing #9817. It is not permission for the model to invent observations or infer a causal physical mechanism from missingness correlation alone.
+
 ### T2 — compositional HDC
 
 Test role/filler and temporal composition with held-out combinations:
