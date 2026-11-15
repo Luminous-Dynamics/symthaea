@@ -11,10 +11,8 @@ use crate::{DrivingObservationReceipt, FusedDrivingInput};
 
 pub const CAMERA_POLICY_MANIFEST_SCHEMA_VERSION: u32 = 1;
 
-const INPUT_SCHEMA_DESCRIPTION: &str =
-    "symthaea-camera-driving-fused-input-v1|ContinuousHV|dimension=16384|fusion=weighted-visual-and-proprioceptive|receipt-bound=true";
-const ACTION_SCHEMA_DESCRIPTION: &str =
-    "symthaea-vehicle-command-v1|order=steering,throttle,brake|steering=[-1,1]|throttle=[0,1]|brake=[0,1]";
+const INPUT_SCHEMA_DESCRIPTION: &str = "symthaea-camera-driving-fused-input-v1|ContinuousHV|dimension=16384|fusion=weighted-visual-and-proprioceptive|receipt-bound=true";
+const ACTION_SCHEMA_DESCRIPTION: &str = "symthaea-vehicle-command-v1|order=steering,throttle,brake|steering=[-1,1]|throttle=[0,1]|brake=[0,1]";
 
 fn digest_hex(bytes: &[u8]) -> String {
     let digest = Sha256::digest(bytes);
@@ -192,7 +190,8 @@ impl CameraDrivingPolicyManifest {
                 bytes.extend_from_slice(&value.to_bits().to_le_bytes());
             }
             bytes
-        }) != receipt.fused_policy_input_sha256 {
+        }) != receipt.fused_policy_input_sha256
+        {
             return Err(CameraPolicyCompatibilityError::PolicyInputDigestMismatch);
         }
 
@@ -228,15 +227,19 @@ impl CameraDrivingPolicyManifest {
         if self.visual_weight_ppm != receipt.visual_weight_ppm {
             return Err(CameraPolicyCompatibilityError::VisualWeightMismatch);
         }
-        if self.hdc_dimension != receipt.hdc_dimension || observation.policy_input.dim() != receipt.hdc_dimension {
+        if self.hdc_dimension != receipt.hdc_dimension
+            || observation.policy_input.dim() != receipt.hdc_dimension
+        {
             return Err(CameraPolicyCompatibilityError::HdcDimensionMismatch);
         }
         if receipt.width > self.maximum_frame_width || receipt.height > self.maximum_frame_height {
             return Err(CameraPolicyCompatibilityError::FrameDimensionsExceeded);
         }
         if self.maximum_capture_delivery_age_us == 0
-            || receipt.upstream_render_completed_timestamp_us < receipt.upstream_capture_timestamp_us
-            || receipt.upstream_delivered_timestamp_us < receipt.upstream_render_completed_timestamp_us
+            || receipt.upstream_render_completed_timestamp_us
+                < receipt.upstream_capture_timestamp_us
+            || receipt.upstream_delivered_timestamp_us
+                < receipt.upstream_render_completed_timestamp_us
             || receipt.upstream_delivered_timestamp_us < receipt.upstream_capture_timestamp_us
         {
             return Err(CameraPolicyCompatibilityError::InvalidTimestampOrder);
@@ -293,7 +296,12 @@ mod tests {
     use super::*;
     use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
-    fn fixture() -> (CameraDrivingPolicyManifest, Vec<u8>, FusedDrivingInput, String) {
+    fn fixture() -> (
+        CameraDrivingPolicyManifest,
+        Vec<u8>,
+        FusedDrivingInput,
+        String,
+    ) {
         let checkpoint_bytes = b"synthetic-camera-conditioned-checkpoint-v1".to_vec();
         let scope_sha = "a".repeat(64);
         let policy_input = ContinuousHV::random(HDC_DIMENSION, 1234);
@@ -392,7 +400,10 @@ mod tests {
         (
             manifest,
             checkpoint_bytes,
-            FusedDrivingInput { policy_input, receipt },
+            FusedDrivingInput {
+                policy_input,
+                receipt,
+            },
             scope_sha,
         )
     }
@@ -411,7 +422,10 @@ mod tests {
     fn legacy_or_wrong_checkpoint_bytes_do_not_pass_camera_gate() {
         let (manifest, _, input, scope) = fixture();
         let error = manifest.validate_for(b"legacy-proprioceptive-checkpoint", &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::CheckpointDigestMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::CheckpointDigestMismatch)
+        );
     }
 
     #[test]
@@ -426,7 +440,10 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.camera_calibration_sha256 = "0".repeat(64);
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::CameraCalibrationMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::CameraCalibrationMismatch)
+        );
     }
 
     #[test]
@@ -434,7 +451,10 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.camera_id = "rear-camera".into();
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::CameraIdentityMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::CameraIdentityMismatch)
+        );
     }
 
     #[test]
@@ -442,7 +462,10 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.simulator_revision = "sim-r2".into();
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::SimulatorRevisionMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::SimulatorRevisionMismatch)
+        );
     }
 
     #[test]
@@ -458,7 +481,10 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.visual_weight_ppm = 500_000;
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::VisualWeightMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::VisualWeightMismatch)
+        );
     }
 
     #[test]
@@ -466,7 +492,10 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.privilege_profile = CameraPolicyPrivilegeProfile::Unknown;
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::UnknownPrivilegeProfile));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::UnknownPrivilegeProfile)
+        );
     }
 
     #[test]
@@ -474,7 +503,10 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.vision_config_sha256 = "0".repeat(64);
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::VisionConfigMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::VisionConfigMismatch)
+        );
     }
 
     #[test]
@@ -482,7 +514,10 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.vehicle_encoder_seed_sha256 = "0".repeat(64);
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::EncoderSeedMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::EncoderSeedMismatch)
+        );
     }
 
     #[test]
@@ -490,7 +525,10 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.fused_input_schema_sha256 = "0".repeat(64);
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::InputSchemaMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::InputSchemaMismatch)
+        );
     }
 
     #[test]
@@ -498,7 +536,10 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.action_output_schema_sha256 = "0".repeat(64);
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::ActionSchemaMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::ActionSchemaMismatch)
+        );
     }
 
     #[test]
@@ -506,7 +547,10 @@ mod tests {
         let (mut manifest, bytes, input, scope) = fixture();
         manifest.hdc_dimension = 8_192;
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::HdcDimensionMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::HdcDimensionMismatch)
+        );
     }
 
     #[test]
@@ -515,7 +559,10 @@ mod tests {
         input.receipt.vision_training_steps_after = 1;
         input.receipt.receipt_sha256 = crate::digest_receipt(&input.receipt);
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::VisionLearningNotFrozen));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::VisionLearningNotFrozen)
+        );
     }
 
     #[test]
@@ -523,7 +570,10 @@ mod tests {
         let (manifest, bytes, mut input, scope) = fixture();
         input.receipt.upstream_renderer_revision = "renderer-r2".into();
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::ReceiptCommitmentMismatch));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::ReceiptCommitmentMismatch)
+        );
     }
 
     #[test]
@@ -540,6 +590,9 @@ mod tests {
         input.receipt.upstream_delivered_timestamp_us = 1_200;
         input.receipt.receipt_sha256 = crate::digest_receipt(&input.receipt);
         let error = manifest.validate_for(&bytes, &input, &scope);
-        assert_eq!(error, Err(CameraPolicyCompatibilityError::CaptureDeliveryAgeExceeded));
+        assert_eq!(
+            error,
+            Err(CameraPolicyCompatibilityError::CaptureDeliveryAgeExceeded)
+        );
     }
 }
