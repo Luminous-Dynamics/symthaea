@@ -80,6 +80,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if result.accepted_step_count != 8 {
         return Err("synthetic 8-step audio contract did not qualify".into());
     }
+    if result.final_source_changed_frame_count != 128
+        || result.cumulative_authorized_frame_count != 128
+    {
+        return Err("synthetic 8-step cumulative drift ledger is inconsistent".into());
+    }
     verify_audio_sequence_report_v1(&request, &source, &steps, &result)?;
     println!("{}", serde_json::to_string_pretty(&result)?);
     Ok(())
