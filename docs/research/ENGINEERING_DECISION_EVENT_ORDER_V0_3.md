@@ -48,6 +48,9 @@ Targets are preregistered objectives, not measured results.
 | Completeness | 100% missing, stale, or unresolved inventory blocks | Decision frontier |
 | Determinism | 100% byte-identical replay for fixed seed, generator, build and input | Replay |
 | Permutation | 100% canonical report invariance under action delivery permutation | Schedule equivalence class |
+| Clocked bitemporality | 100% separate source/observer/store clock identity; no simulator-time substitution | Event/observer/store triple |
+| Owner mapping | 100% missing, stale, failed, out-of-validity or substituted mapping blocks projection | Exact mapping-action/timestamp key |
+| Capture order | 100% unknown/overlapping observation→durability order remains Indeterminate; reverse order is critical | Bitemporal envelope |
 | Five-way ordering | ≥95% on blinded, independently adjudicated traces | Independent schedule lineage |
 | False hold | Proposed ≤5% only after adequate eligible-ACT denominator | Paired ACT/HOLD case |
 | Performance | Report p50/p95 assessment latency, event/s, peak memory, generation cost, shrink iterations and replay time | Fixed hardware/build/corpus |
@@ -92,7 +95,7 @@ A deterministic generator creates event → delivery → observer clock/observat
 
 Missing owner time is Indeterminate; explicit owner FAIL, substituted clock identity or receipt mismatch is CriticalFailure. It does not normalize source clocks, authenticate signatures or trust roots, or infer durable time from simulator time. Occurrence time remains optional if no independently qualified occurrence-time resolution is supplied. The projected envelope is suitable for the v0.2 bitemporal visibility evaluator; attempt lineage, scoped stops and complete attempt inventory are not yet reconstructed by this adapter.
 
-The v0.3.1 branch has 24 authored module unit tests and six Proptest properties (256 cases each configured; 1,536 potential property cases). These are source counts, not executed results.
+The v0.3.1 branch has 24 authored module unit tests, six Proptest properties (256 cases each configured; 1,536 potential property cases), and one frozen integration known-answer fixture at `benchmarks/engineering-change-impact/event-order-v0.3.1-clocked-observation-persistence.json`. The fixture contains seven schedule actions and is linked through the v0.3.1 JSON Schema. These are source counts and a frozen input, not executed results.
 
 ## Known limitations / next increment
 
