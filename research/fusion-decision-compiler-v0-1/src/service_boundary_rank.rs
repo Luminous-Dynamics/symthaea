@@ -28,6 +28,7 @@ pub enum ServiceRankingMetric {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NetServiceDisposition {
     NetImport,
+    NoNetExport,
     NetExportBelowReserve,
     NetExportQualified,
 }
@@ -57,13 +58,14 @@ pub struct CandidateServiceInput {
 pub struct ServiceBoundaryRankingProfile {
     pub service_boundary_ref: String,
     pub unit_ref: String,
-    pub sign_convention_ref: String,
+    pub power_sign_convention_ref: String,
+    pub lifecycle_sign_convention_ref: String,
     pub lifecycle_horizon_ref: String,
     pub lifecycle_horizon_seconds: u64,
     pub cost_currency_ref: String,
     pub cost_scope_ref: String,
     pub required_net_export_reserve_mwe: f64,
-    pub numerical_tolerance_mw: f64,
+    pub numerical_tolerance_mwh: f64,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -99,6 +101,7 @@ pub enum ServiceBoundaryRankError {
     EmptyCostEvidence,
     EmptyProfileIdentity,
     InvalidReserve,
+    ReserveMismatch,
     InvalidTolerance,
     EmptyCandidateSet,
 }
@@ -189,10 +192,11 @@ pub fn compare_service_boundary_rankings(
         return Err(errors);
     }
 
-    let findings: Vec<CandidateServiceFinding> = candidates
+    let mut findings: Vec<CandidateServiceFinding> = candidates
         .iter()
         .map(|candidate| build_finding(profile, candidate))
         .collect();
+    findings.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
 
     let rankings = vec![
         ranking(&findings, ServiceRankingMetric::PlasmaGainQ, |row| row.plasma_gain_q),
@@ -231,7 +235,10 @@ fn validate_profile(
     if profile.unit_ref != "MWe" {
         errors.push(ServiceBoundaryRankError::UnitMismatch);
     }
-    if profile.sign_convention_ref != "gross-and-load-positive-net-export-positive-v1" {
+    if profile.power_sign_convention_ref != "gross-and-load-positive-net-export-positive-v1"
+        || profile.lifecycle_sign_convention_ref
+            != "net-export-positive-import-negative-v1"
+    {
         errors.push(ServiceBoundaryRankError::SignConventionMismatch);
     }
     if profile.lifecycle_horizon_seconds == 0 {
@@ -242,7 +249,7 @@ fn validate_profile(
     {
         errors.push(ServiceBoundaryRankError::InvalidReserve);
     }
-    if !profile.numerical_tolerance_mw.is_finite() || profile.numerical_tolerance_mw < 0.0 {
+    if !profile.numerical_tolerance_mwh.is_finite() || profile.numerical_tolerance_mwh < 0.0 {
         errors.push(ServiceBoundaryRankError::InvalidTolerance);
     }
     errors
@@ -283,10 +290,15 @@ fn validate_candidate(
     {
         errors.push(ServiceBoundaryRankError::UnitMismatch);
     }
-    if candidate.power_run.sign_convention_ref != profile.sign_convention_ref
-        || candidate.power_profile.sign_convention_ref != profile.sign_convention_ref
+    if candidate.power_run.sign_convention_ref != profile.power_sign_convention_ref
+        || candidate.power_profile.sign_convention_ref != profile.power_sign_convention_ref
     {
         errors.push(ServiceBoundaryRankError::SignConventionMismatch);
+    }
+    if candidate.power_profile.required_net_export_reserve_mw
+        != profile.required_net_export_reserve_mwe
+    {
+        errors.push(ServiceBoundaryRankError::ReserveMismatch);
     }
 
     let recomputed = super::plant_service_gate::evaluate_plant_power_balance(
@@ -325,15 +337,17 @@ fn validate_candidate(
     if lifecycle.unit_ref != profile.unit_ref {
         errors.push(ServiceBoundaryRankError::LifecycleUnitMismatch);
     }
-    if lifecycle.sign_convention_ref != profile.sign_convention_ref {
+    if lifecycle.sign_convention_ref != profile.lifecycle_sign_convention_ref {
         errors.push(ServiceBoundaryRankError::LifecycleSignConventionMismatch);
     }
     if lifecycle.horizon_ref != profile.lifecycle_horizon_ref {
         errors.push(ServiceBoundaryRankError::LifecycleHorizonMismatch);
     }
     if lifecycle.horizon_seconds != Some(profile.lifecycle_horizon_seconds)
-        || lifecycle.horizon_end_second - lifecycle.horizon_start_second
-            != profile.lifecycle_horizon_seconds
+        || lifecycle
+            .horizon_end_second
+            .checked_sub(lifecycle.horizon_start_second)
+            != Some(profile.lifecycle_horizon_seconds)
     {
         errors.push(ServiceBoundaryRankError::LifecycleHorizonLengthMismatch);
     }
@@ -357,7 +371,7 @@ fn validate_candidate(
             || import < 0.0
         {
             errors.push(ServiceBoundaryRankError::LifecycleMetricsInvalid);
-        } else if (signed - (export - import)).abs() > profile.numerical_tolerance_mw
+        } else if (signed - (export - import)).abs() > profile.numerical_tolerance_mwh
         {
             errors.push(ServiceBoundaryRankError::LifecycleEnergyIdentityMismatch);
         }
@@ -403,12 +417,18 @@ fn build_finding(
     let export = lifecycle.export_energy_mwh.expect("validated lifecycle has export");
     let import = lifecycle.import_energy_mwh.expect("validated lifecycle has import");
 
-    let net_service_disposition = if net < 0.0 {
-        NetServiceDisposition::NetImport
-    } else if net < profile.required_net_export_reserve_mwe {
-        NetServiceDisposition::NetExportBelowReserve
-    } else {
-        NetServiceDisposition::NetExportQualified
+    let net_service_disposition = match power.disposition {
+        PowerBalanceDisposition::NetImport => NetServiceDisposition::NetImport,
+        PowerBalanceDisposition::NoNetExport => NetServiceDisposition::NoNetExport,
+        PowerBalanceDisposition::NetExportBelowReserve => {
+            NetServiceDisposition::NetExportBelowReserve
+        }
+        PowerBalanceDisposition::NetExportQualifiedForDeclaredBoundary => {
+            NetServiceDisposition::NetExportQualified
+        }
+        PowerBalanceDisposition::NotEvaluable | PowerBalanceDisposition::BalanceInconsistent => {
+            unreachable!("validated power report cannot have a non-admissible disposition")
+        }
     };
 
     CandidateServiceFinding {
@@ -543,13 +563,14 @@ mod tests {
         ServiceBoundaryRankingProfile {
             service_boundary_ref: "plant-terminal-net-electric-v1".to_string(),
             unit_ref: "MWe".to_string(),
-            sign_convention_ref: "gross-and-load-positive-net-export-positive-v1".to_string(),
+            power_sign_convention_ref: "gross-and-load-positive-net-export-positive-v1".to_string(),
+            lifecycle_sign_convention_ref: "net-export-positive-import-negative-v1".to_string(),
             lifecycle_horizon_ref: "synthetic-10000-second-horizon-v1".to_string(),
             lifecycle_horizon_seconds: 10_000,
             cost_currency_ref: "MUSD_2026".to_string(),
             cost_scope_ref: "discounted-whole-life-cost-v1".to_string(),
             required_net_export_reserve_mwe: 0.0,
-            numerical_tolerance_mw: 0.001,
+            numerical_tolerance_mwh: 0.001,
         }
     }
 
