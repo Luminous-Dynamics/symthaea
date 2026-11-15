@@ -3,8 +3,8 @@ use fusion_decision_compiler_contract::plant_service_gate::{
     evaluate_plant_power_balance,
 };
 use fusion_decision_compiler_contract::robust_net_export::{
-    NetExportBoundMethod, NetExportLowerBoundReceipt, RobustNetExportDisposition,
-    RobustNetExportProfile, evaluate_robust_net_export,
+    NetExportBoundMethod, NetExportEvidenceClass, NetExportLowerBoundReceipt,
+    RobustNetExportDisposition, RobustNetExportProfile, evaluate_robust_net_export,
 };
 
 fn sha(character: char) -> String {
@@ -89,6 +89,7 @@ fn main() {
             sign_convention_ref: profile.sign_convention_ref.clone(),
             lower_bound_mwe: lower_bound,
             one_sided_coverage_level: 0.95,
+            evidence_class: NetExportEvidenceClass::SyntheticFixture,
             coverage_scope_ref: "synthetic-single-reserve-test-v1".to_string(),
             method: NetExportBoundMethod::JointCovarianceContrast,
             method_ref: "synthetic-joint-net-power-contrast-v1".to_string(),
@@ -132,11 +133,10 @@ fn main() {
             report.disposition
         );
 
-        let expected = if lower_bound < profile.required_net_export_reserve_mw {
-            RobustNetExportDisposition::RobustlyBelowReserve
-        } else {
-            RobustNetExportDisposition::RobustlyAboveReserve
-        };
+        // Synthetic receipts are deliberately prevented from making a
+        // robust qualification claim, even when their numeric bound clears
+        // the reserve threshold.
+        let expected = RobustNetExportDisposition::SyntheticOnly;
         if report.disposition != expected {
             eprintln!("robust net export fixture did not match its expected reserve disposition");
             std::process::exit(1);
