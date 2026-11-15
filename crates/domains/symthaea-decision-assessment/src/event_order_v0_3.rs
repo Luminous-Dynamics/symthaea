@@ -2401,6 +2401,9 @@ pub fn project_action_history(
     let mut terminal_actions = BTreeMap::<(String, String), (&ScheduledAction, QualifiedEventTime, OwnerReceiptAssessment)>::new();
     let mut commits = Vec::new();
     let mut commit_times = BTreeMap::<(String, String), Vec<QualifiedEventTime>>::new();
+    let mut terminal_receipts = Vec::<ProjectedTerminalReconciliation>::new();
+    let mut stop_evidence = Vec::<ProjectedStopEvidence>::new();
+    let mut inventory_attestations = Vec::<ProjectedInventoryAttestation>::new();
     let mut cancellation_acknowledgements = Vec::new();
 
     for action in &canonical_actions {
