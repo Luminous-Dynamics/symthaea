@@ -25,7 +25,7 @@ It returns exactly one of:
 - `Blocked`: a known requirement is violated or known to be absent from a complete snapshot.
 - `Indeterminate`: required evidence or owner facts are missing, unknown, or supplied through an incomplete snapshot.
 
-The evaluator checks profile lifecycle and validity, exact product/pattern/process revisions, the requested operation and process configuration, asset state/capability/tooling/calibration, operator skill/availability/qualification, material-lot admission/envelope, utility units/capacity/availability, required clearances, and an evidenced inspection plan.
+The evaluator checks profile lifecycle and validity, profile qualification plus independent verification evidence, exact product/pattern/process/capability revisions, the requested operation and process configuration, asset state/capability/tooling/calibration, operator skill/availability/qualification, material-lot admission/envelope, utility units/capacity/availability, required clearances, and an evidenced inspection plan.
 
 Reasons carry stable enum codes and subject references. Evidence references are sorted and deduplicated in the report. Duplicate matching owner references are rejected instead of allowing input order to select a favourable record.
 
