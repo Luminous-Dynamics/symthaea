@@ -109,6 +109,16 @@ In addition to hull/propulsor interaction, compare conventional open propellers,
 
 Primary system outcome: energy per equivalent useful service, for example delivered tonne-nautical-mile or mission energy per completed harbour-assist task. Freeze the propulsion/electrical boundary, payload, service level, route, speeds, weather and reserve policy. Include annual operability and service availability across specified seasonal/sea-state distributions.
 
+### P3: manoeuvring and low-GM vessel dynamics
+
+Use the ITTC/SIMMAN benchmark cases for KVLCC1/KVLCC2, KCS and DTMB 5415 where raw data and reuse rights permit. Include free-running turning circles and zig-zag manoeuvres plus captive PMM/CMT test cases in deep and shallow water. Report trajectories, forces/moments, overshoot angles, tactical diameter, advance, transfer and speed loss with experimental and numerical uncertainty.
+
+Do not treat 3-DOF planar manoeuvring as a universal reference. The ITTC benchmark procedure reports that 3-DOF methods were inadequate for KCS manoeuvring predictions and notes that heel/roll inclusion is important for low-GM vessels; select at least a 4-DOF model where those couplings matter. The added DOF must be justified by the vessel/loading regime and independently checked rather than added as decoration.
+
+### P4: seakeeping screening calibration
+
+For AI screening, report both predicted screening operability and independently reevaluated operability on the selected candidate and parent baseline. The 2026 AI-assisted study evaluated multiple onboard locations, operational areas, seasons, speeds and relative wave headings; its screen's best candidate was reported at 99.05%, while independent BEM verification reported 95.55% versus 84.90% for the parent hull evaluated with the same solver. This is a strong example of why the screen-to-validation gap, rank stability, calibration and final decision regret must be measured separately. Treat all percentages as study-specific.
+
 ### M: manufacturing, maintenance and environment
 
 Report process-specific DFM dispositions; plate/section developability; forming and welding constraints; block split; assembly sequence; lifting, transport and yard envelope; access to inspection, repair and cleaning; corrosion/coating; fatigue; maintainability and lifecycle materials/energy. Track radiated noise, cavitation noise/erosion, biofouling, emissions, marine pollution and lifecycle greenhouse gas where the data are available. Missing required evidence is UNKNOWN, not PASS.
@@ -133,7 +143,7 @@ Report:
 | V2 | Calm-water hull hydrodynamics | KCS, KVLCC2, Series 60, DTMB 5415 where data and reuse rights permit |
 | V3 | Propulsion and wake | Open-water propeller, self-propulsion and 3D propeller-plane measurements |
 | V4 | Seakeeping | Regular/irregular-wave RAOs, added resistance, motions and the KVLCC2 ten-facility campaign |
-| V5 | Integrated mission and operability | Hull + appendages + propulsor + motor/drive + energy + route + environment |
+| V5 | Integrated mission, manoeuvring and operability | Hull + appendages + propulsor + motor/drive + energy + route + environment + manoeuvring/heel dynamics |
 | V6 | Manufacturing and service | Independent Symtropy DFM, assembly, transport, inspection and repair disposition |
 | V7 | Physical experiments | Towing tank, PIV, load cells, cavitation tunnel, strain and instrumented model |
 | V8 | Operational validation | Mission-matched full-scale trials, deterioration, maintenance and lifecycle outcomes |
