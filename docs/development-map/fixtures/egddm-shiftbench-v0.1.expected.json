@@ -1,0 +1,52 @@
+{
+  "fixture_id": "synthetic:egddm-shiftbench-selective-revalidation-v0.1",
+  "status": "hand_derived_known_answer_not_executed",
+  "expected": {
+    "clean": {
+      "retained_functionality": 1,
+      "active_requirement_conformance": 1,
+      "impact_precision": null,
+      "impact_recall": null,
+      "stale_active_receipts": 0,
+      "total_revalidation_cost_units": 0,
+      "full_rerun_reference_units": 2,
+      "revalidation_savings_fraction": 1,
+      "final_checkpoint_success": true,
+      "active_obligation_seconds": 1800,
+      "unverified_obligation_seconds": 240,
+      "critical_active_obligation_seconds": 900,
+      "critical_unverified_obligation_seconds": 120,
+      "time_weighted_requirement_conformance": 0.8666666666666667,
+      "critical_time_weighted_conformance": 0.8666666666666667,
+      "recovery_event_count": 2,
+      "max_unverified_gap_seconds": 120,
+      "max_critical_unverified_gap_seconds": 120
+    },
+    "shifted": {
+      "retained_functionality": 1,
+      "active_requirement_conformance": 1,
+      "impact_precision": 1,
+      "impact_recall": 1,
+      "stale_active_receipts": 0,
+      "missing_active_receipts": [],
+      "critical_unverified": [],
+      "total_revalidation_cost_units": 2,
+      "full_rerun_reference_units": 3,
+      "revalidation_savings_fraction": 0.3333333333333333,
+      "final_checkpoint_success": true,
+      "active_obligation_seconds": 2100,
+      "unverified_obligation_seconds": 600,
+      "critical_active_obligation_seconds": 1200,
+      "critical_unverified_obligation_seconds": 480,
+      "time_weighted_requirement_conformance": 0.7142857142857143,
+      "critical_time_weighted_conformance": 0.6,
+      "recovery_event_count": 4,
+      "max_unverified_gap_seconds": 180,
+      "max_critical_unverified_gap_seconds": 180
+    },
+    "paired_success": true,
+    "retained_functionality_delta": 0,
+    "active_requirement_conformance_delta": 0
+  },
+  "claim_ceiling": "Hand-derived synthetic expected values only. No Rust compilation, test execution, agent rollout, receipt authentication, source observation, or external adjudication is claimed. Longitudinal exposure values are independently calculated from the synthetic observation/availability times; they are not measured production exposure or an empirically validated safety metric."
+}

@@ -1,0 +1,259 @@
+{
+  "schema_version": "0.1.0",
+  "scenario_id": "egddm-shiftbench-selective-revalidation-001",
+  "repository_full_name": "synthetic/decision-api",
+  "initial_snapshot": {
+    "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+  },
+  "obligations": [
+    {
+      "obligation_id": "api-contract",
+      "check_id": "api-compatibility",
+      "critical": true
+    },
+    {
+      "obligation_id": "build-repro",
+      "check_id": "reproducible-build",
+      "critical": false
+    },
+    {
+      "obligation_id": "audit-requirement",
+      "check_id": "audit-log-contract",
+      "critical": true
+    }
+  ],
+  "arms": [
+    {
+      "arm_id": "clean",
+      "condition": "clean",
+      "epochs": [
+        {
+          "epoch": 0,
+          "observed_at": "2026-11-15T07:00:00Z",
+          "snapshot": {
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "change_kind": "initial",
+          "affected_obligation_ids": [],
+          "active_obligation_ids": [
+            "api-contract",
+            "build-repro"
+          ]
+        },
+        {
+          "epoch": 1,
+          "observed_at": "2026-11-15T07:10:00Z",
+          "snapshot": {
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "change_kind": "none",
+          "affected_obligation_ids": [],
+          "active_obligation_ids": [
+            "api-contract",
+            "build-repro"
+          ]
+        }
+      ],
+      "checkpoints": [
+        {
+          "epoch": 0,
+          "predicted_affected_obligation_ids": [],
+          "receipts": [
+            {
+              "receipt_id": "clean-epoch0-api",
+              "obligation_id": "api-contract",
+              "check_id": "api-compatibility",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "bac71f2fa4b205f3f62417af671a3df1e006b9d19421f0757bb98772d8012177",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
+            },
+            {
+              "receipt_id": "clean-epoch0-build",
+              "obligation_id": "build-repro",
+              "check_id": "reproducible-build",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "bc5c3e6e1bd3bb4c4d84f277b125c20e91655673f9b41a5cd7467b4f57c885e2",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
+            }
+          ],
+          "revalidation_cost_units": 0,
+          "checkpoint_at": "2026-11-15T07:05:00Z"
+        },
+        {
+          "epoch": 1,
+          "predicted_affected_obligation_ids": [],
+          "receipts": [
+            {
+              "receipt_id": "clean-epoch0-api",
+              "obligation_id": "api-contract",
+              "check_id": "api-compatibility",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "bac71f2fa4b205f3f62417af671a3df1e006b9d19421f0757bb98772d8012177",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
+            },
+            {
+              "receipt_id": "clean-epoch0-build",
+              "obligation_id": "build-repro",
+              "check_id": "reproducible-build",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "bc5c3e6e1bd3bb4c4d84f277b125c20e91655673f9b41a5cd7467b4f57c885e2",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
+            }
+          ],
+          "revalidation_cost_units": 0,
+          "checkpoint_at": "2026-11-15T07:15:00Z"
+        }
+      ]
+    },
+    {
+      "arm_id": "shifted",
+      "condition": "shifted",
+      "epochs": [
+        {
+          "epoch": 0,
+          "observed_at": "2026-11-15T07:00:00Z",
+          "snapshot": {
+            "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "change_kind": "initial",
+          "affected_obligation_ids": [],
+          "active_obligation_ids": [
+            "api-contract",
+            "build-repro"
+          ]
+        },
+        {
+          "epoch": 1,
+          "observed_at": "2026-11-15T07:10:00Z",
+          "snapshot": {
+            "revision": "dddddddddddddddddddddddddddddddddddddddd",
+            "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+            "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          },
+          "change_kind": "dependency_api",
+          "affected_obligation_ids": [
+            "api-contract"
+          ],
+          "active_obligation_ids": [
+            "api-contract",
+            "build-repro",
+            "audit-requirement"
+          ]
+        }
+      ],
+      "checkpoints": [
+        {
+          "epoch": 0,
+          "predicted_affected_obligation_ids": [],
+          "receipts": [
+            {
+              "receipt_id": "shifted-epoch0-api",
+              "obligation_id": "api-contract",
+              "check_id": "api-compatibility",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "3224e7523f44cb2e21fb9cd97d27365e98110a4e3dbe7b4945fad450fd8dd200",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
+            },
+            {
+              "receipt_id": "shifted-epoch0-build",
+              "obligation_id": "build-repro",
+              "check_id": "reproducible-build",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "38b87b38ad9005dff8e968aeb26a61f3d211db1ad6ca3f0a1212aede8025b4c4",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
+            }
+          ],
+          "revalidation_cost_units": 0,
+          "checkpoint_at": "2026-11-15T07:05:00Z"
+        },
+        {
+          "epoch": 1,
+          "predicted_affected_obligation_ids": [
+            "api-contract"
+          ],
+          "receipts": [
+            {
+              "receipt_id": "shifted-epoch1-api",
+              "obligation_id": "api-contract",
+              "check_id": "api-compatibility",
+              "outcome": "pass",
+              "source_epoch": 1,
+              "revision": "dddddddddddddddddddddddddddddddddddddddd",
+              "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "d57028cf1d7d672d75973d83e1d03d75c6e4c4f2139e22c9e95ad2aae9842fde",
+              "observed_at": "2026-11-15T07:12:00Z",
+              "available_at": "2026-11-15T07:13:00Z"
+            },
+            {
+              "receipt_id": "shifted-epoch0-build",
+              "obligation_id": "build-repro",
+              "check_id": "reproducible-build",
+              "outcome": "pass",
+              "source_epoch": 0,
+              "revision": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "38b87b38ad9005dff8e968aeb26a61f3d211db1ad6ca3f0a1212aede8025b4c4",
+              "observed_at": "2026-11-15T07:01:00Z",
+              "available_at": "2026-11-15T07:02:00Z"
+            },
+            {
+              "receipt_id": "shifted-epoch1-audit",
+              "obligation_id": "audit-requirement",
+              "check_id": "audit-log-contract",
+              "outcome": "pass",
+              "source_epoch": 1,
+              "revision": "dddddddddddddddddddddddddddddddddddddddd",
+              "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+              "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+              "receipt_digest": "321c3f014abe5fb97e652db603378bc81d279468a076e5f89043ff52a137a8e0",
+              "observed_at": "2026-11-15T07:12:00Z",
+              "available_at": "2026-11-15T07:13:00Z"
+            }
+          ],
+          "revalidation_cost_units": 2,
+          "checkpoint_at": "2026-11-15T07:15:00Z"
+        }
+      ]
+    }
+  ]
+}
