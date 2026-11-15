@@ -264,7 +264,7 @@
       ],
       "luminous_reproduction": false,
       "coproduct_accounting": {
-        "policy": "REVIEW_LEVEL_NO_SPECIFIC_CREDIT_ASSUMPTION",
+        "policy": "NO_SOURCE_COPRODUCT_CREDIT_REPORTED",
         "credit_claim_status": "SOURCE_MODEL_ONLY",
         "carbon_product_qualification_status": "NOT_VALIDATED",
         "carbon_market_capacity_status": "NOT_VALIDATED",
@@ -1354,44 +1354,100 @@
         {
           "metric": "ammonia_conversion",
           "value": 0.99,
-          "qualifier": "near-complete conversion; source reports above 99% for the high-conversion operating point",
+          "qualifier": "lower bound; source reports above 99% for the high-conversion operating point",
           "unit": "fraction"
         },
         {
           "metric": "hydrogen_energy_yield",
           "value": 45,
-          "qualifier": "reported for the near-complete conversion operating point",
+          "qualifier": "paired with the >99% conversion operating point",
           "unit": "g_H2/kWh_electric"
+        },
+        {
+          "metric": "hydrogen_energy_cost",
+          "value": 242,
+          "qualifier": "paired with the >99% conversion operating point",
+          "unit": "kJ/mol_H2"
+        },
+        {
+          "metric": "ammonia_conversion",
+          "value": 0.924,
+          "qualifier": "paired with the 150 g/h production-rate operating point",
+          "unit": "fraction"
+        },
+        {
+          "metric": "hydrogen_energy_yield",
+          "value": 50,
+          "qualifier": "paired with the 92.4% conversion / 150 g/h operating point",
+          "unit": "g_H2/kWh_electric"
+        },
+        {
+          "metric": "hydrogen_energy_cost",
+          "value": 217,
+          "qualifier": "paired with the 92.4% conversion / 150 g/h operating point",
+          "unit": "kJ/mol_H2"
         },
         {
           "metric": "hydrogen_production_rate",
           "value": 150,
-          "qualifier": "reported hydrogen production rate for the near-complete conversion operating point",
+          "qualifier": "paired with the 92.4% conversion / 50 g/kWh operating point, not the >99% conversion point",
           "unit": "g_H2/hour"
         },
         {
           "metric": "ammonia_conversion",
           "value": 0.76,
-          "qualifier": "operating point associated with the highest reported hydrogen energy yield; not the near-complete conversion point",
+          "qualifier": "operating point associated with the highest reported hydrogen energy yield; distinct from the high-conversion and high-throughput points",
           "unit": "fraction"
         },
         {
           "metric": "hydrogen_energy_yield",
           "value": 51,
-          "qualifier": "highest reported hydrogen energy yield at the 76% conversion operating point",
+          "qualifier": "highest reported hydrogen energy yield at 76% conversion",
           "unit": "g_H2/kWh_electric"
+        },
+        {
+          "metric": "hydrogen_energy_cost",
+          "value": 210,
+          "qualifier": "lowest reported energy cost at 76% conversion",
+          "unit": "kJ/mol_H2"
         }
       ],
-      "source_conclusion": "The study reports above 99% NH3 conversion at an H2 energy yield of 45 g/kWh and a production rate of 150 g/h. Its highest energy yield is 51 g/kWh at 76% NH3 conversion. It develops a 2D-axisymmetric coupled multiphysics/chemistry model to investigate the mechanism and process performance.",
+      "source_conclusion": "The paper reports three distinct operating points: >99% NH3 conversion at 45 g H2/kWh and 242 kJ/mol; 150 g H2/h at 92.4% conversion, 50 g H2/kWh and 217 kJ/mol; and its highest energy yield of 51 g H2/kWh with lowest energy cost of 210 kJ/mol at 76% conversion. These points must remain separately paired; the 150 g/h result is not the >99% conversion point.",
       "comparison_status": "SOURCE_SPECIFIC_TWO_OPERATING_POINTS_NOT_MATCHED_TO_OTHER_STUDIES",
       "blockers": [
-        "The highest energy-yield operating point (76% conversion) is not the near-complete conversion point (>99%); preserve them as separate Pareto points.",
+        "The >99% conversion / 45 g per kWh, 92.4% conversion / 150 g per hour / 50 g per kWh, and 76% conversion / 51 g per kWh results are three distinct operating points and must not be mixed.",
         "The reported energy yield must be traced to its exact electrical meter boundary and must not be assumed to be complete wall-plug-to-purified-H2 performance.",
         "Product separation, purification, compression, cooling, auxiliaries, startup, downtime and lifetime remain to be reconciled.",
         "The atmospheric pure-NH3 reactor differs from the 2025 atmospheric NH3/N2 torch and the 2025 reduced-pressure pure-NH3 reactor; no direct ranking is permitted.",
         "The coupled model is source-reported model evidence, not a Luminous simulation or independent validation."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "operating_points": [
+        {
+          "operating_point_id": "NH3-MW-ATM-HIGH-CONVERSION",
+          "ammonia_conversion_lower_bound_fraction": 0.99,
+          "hydrogen_energy_yield_g_H2_per_kWh": 45,
+          "hydrogen_energy_cost_kJ_per_mol": 242,
+          "hydrogen_production_rate_g_per_hour": null,
+          "qualifier": "near-complete conversion point; source reports >99% NH3 conversion"
+        },
+        {
+          "operating_point_id": "NH3-MW-ATM-HIGH-THROUGHPUT",
+          "ammonia_conversion_fraction": 0.924,
+          "hydrogen_energy_yield_g_H2_per_kWh": 50,
+          "hydrogen_energy_cost_kJ_per_mol": 217,
+          "hydrogen_production_rate_g_per_hour": 150,
+          "qualifier": "source-reported 150 g/h production-rate point at 92.4% conversion"
+        },
+        {
+          "operating_point_id": "NH3-MW-ATM-HIGH-ENERGY-YIELD",
+          "ammonia_conversion_fraction": 0.76,
+          "hydrogen_energy_yield_g_H2_per_kWh": 51,
+          "hydrogen_energy_cost_kJ_per_mol": 210,
+          "hydrogen_production_rate_g_per_hour": null,
+          "qualifier": "highest reported H2 energy yield and lowest energy cost, at a distinct 76% conversion point"
+        }
+      ]
     },
     {
       "case_id": "NH3-CRACK-WARM-RANS-TURBULENCE-2026",
@@ -2412,14 +2468,17 @@
       "evidence_class": "DERIVED_ARITHMETIC_FROM_PUBLISHED_HYDROGEN_ENERGY_YIELD",
       "inputs": {
         "near_complete_conversion_energy_yield_g_H2_per_kWh": 45,
-        "best_energy_yield_g_H2_per_kWh": 51
+        "best_energy_yield_g_H2_per_kWh": 51,
+        "intermediate_92_4_percent_energy_yield_g_H2_per_kWh": 50
       },
       "derivation": {
         "near_complete_conversion_specific_energy_kWh_per_kg_H2": 22.22222222222222,
         "best_energy_yield_specific_energy_kWh_per_kg_H2": 19.607843137254903,
-        "relative_specific_energy_reduction_at_76_percent_conversion": 0.11764705882352944
+        "relative_specific_energy_reduction_at_76_percent_conversion": 0.11764705882352944,
+        "intermediate_92_4_percent_specific_energy_kWh_per_kg_H2": 20,
+        "relative_specific_energy_reduction_at_92_4_percent_conversion": 0.1
       },
-      "interpretation": "The reciprocal of the reported specific H2 energy yield gives approximately 22.22 kWh/kg H2 at the >99% conversion point and 19.61 kWh/kg H2 at the 76% conversion point. The latter uses about 11.8% less energy per kg H2 on this source's reported basis, but it is a different conversion point. Neither value is assumed to be a complete wall-plug-to-purified-H2 boundary. These two points form a source-specific energy-yield/conversion trade-off and must be retained as separate Pareto points, not collapsed into a single optimum.",
+      "interpretation": "The three source-specific reciprocals are approximately 22.22 kWh/kg H2 at >99% conversion (45 g/kWh), 20.00 kWh/kg H2 at 92.4% conversion and 150 g/h (50 g/kWh), and 19.61 kWh/kg H2 at 76% conversion (51 g/kWh). The high-throughput point is not the >99% point, and the best energy-yield point is not the high-conversion point. These numbers retain the source's reported energy basis and are not assumed to be complete wall-plug-to-purified-H2 performance.",
       "luminous_measurement": false
     }
   ]
