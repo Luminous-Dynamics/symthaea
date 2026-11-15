@@ -43,3 +43,6 @@ jobs:
 
       - name: Run synthetic decision-opportunity example
         run: cargo run --manifest-path research/fusion-reject-audit-v0-1/Cargo.toml --bin audit_decision_opportunities
+
+      - name: Run synthetic scenario-opportunity example
+        run: cargo run --manifest-path research/fusion-reject-audit-v0-1/Cargo.toml --bin audit_scenario_opportunities

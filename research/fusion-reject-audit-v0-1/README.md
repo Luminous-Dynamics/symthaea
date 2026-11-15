@@ -91,6 +91,35 @@ The report preserves the frozen universe, accepted-population, objective, opport
 
 The module adds 15 authored Rust unit tests for frontier extension, the feasibility/opportunity recall distinction, hard/inconclusive/out-of-domain results, epsilon dominance/equivalence, vector units/order, missing/retained sample identities, baseline frontier consistency, zero-sample conservatism, exact accepted/rejected solver-evidence binding and cross-metric OOD consistency. Across the original 15 rejected-candidate-audit tests and these 15 new authored tests, the crate contains 30 authored Rust tests. This is a source inventory, not a claim that the new tests have executed.
 
+
+## Simultaneous scenario opportunity audit
+
+The follow-on scenario_opportunity module extends the single-frontier audit to a **frozen family of operating scenarios**. It reuses the same candidate universe, accepted/rejected partition, sample identities, exact hypergeometric inversion, Bonferroni correction and canonical epsilon-frontier predicate. It does not add a second sampler or UQ engine.
+
+For each scenario it reports a distinct conditional opportunity-recall lower bound. It also reports an **any-scenario union**: a candidate is a confirmed union opportunity when any required scenario confirms one; it is a confirmed union non-opportunity only when every scenario confirms no opportunity. If no scenario confirms an opportunity but one or more results are unresolved, the union remains unresolved. This prevents a nominally attractive result from hiding a stressed-scenario opportunity or unknown.
+
+The input freezes:
+- an ordered scenario manifest and per-scenario input/configuration digests;
+- an exact incumbent frontier and digest per scenario;
+- common objective IDs, units, directions and epsilons;
+- one primary scenario whose accepted/sample outcome and evidence receipt must match the base audit;
+- complete accepted bundles and one complete scenario bundle per sampled rejected candidate in exact sample draw order.
+
+The simultaneous familywise bound count is C × (S + 2), where C is the number of rejected strata and S the number of frozen scenarios: one inherited feasibility bound, one any-scenario union bound, and one bound for every scenario/stratum pair. A single Bonferroni allocation is applied across all of them. The feasibility, scenario-wise and union results therefore receive simultaneous coverage at the declared familywise confidence level; they are not separate uncorrected 95% intervals.
+
+Out-of-domain, failed, non-converged, unsupported, inconclusive and missing scenario evaluations remain unresolved. Missing/changed scenarios, frontiers, objectives, primary receipts or sample order are refused or require a new campaign. The report carries the exact scenario, objective, opportunity-rule, universe, accepted-population, frontier, stratum and selection-receipt identities. It also preserves an ordered run/evidence-reference entry for every accepted and sampled candidate/scenario evaluation, plus the sampling algorithm and confidence-bound method identifiers.
+
+### Scope limits
+
+- The union metric means “could change the decision in at least one predeclared scenario”; it is not a probabilistic expectation across scenarios.
+- The scenario set is finite and frozen. It does not certify conditions outside the declared scenario family.
+- No scenario-weighted scalar or average is inferred. No global Pareto-front or bounded regret claim is emitted.
+- The audit consumes exact declared scenario results; it does not run PROCESS, D0FUS, FUSE.jl or a physical solver.
+- Synthetic examples verify the software contract only.
+
+The module adds 17 authored Rust tests covering nominal/stress opportunities, union classification, missing/reordered scenario bundles, primary outcome/evidence binding, globally unique run/evidence references, out-of-domain refusal, frontier validity, objective units/order, sample identity, simultaneous alpha allocation and zero-sample conservatism. The scenario runner exercises a synthetic two-scenario family. Its example intentionally includes a candidate that extends the frontier only under stress and an unresolved out-of-domain result. These are authored contract tests and synthetic outputs, not physical validation.
+
+
 ## Run
 
 ```sh
@@ -99,6 +128,7 @@ cargo test --manifest-path Cargo.toml
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 cargo run --manifest-path Cargo.toml --bin audit_rejected_candidates
 cargo run --manifest-path Cargo.toml --bin audit_decision_opportunities
+cargo run --manifest-path Cargo.toml --bin audit_scenario_opportunities
 ```
 
 ## Claim ceiling
