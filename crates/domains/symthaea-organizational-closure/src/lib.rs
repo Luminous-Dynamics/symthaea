@@ -20,6 +20,7 @@
 use serde::{Deserialize, Serialize};
 use sha2::{Digest as ShaDigest, Sha256};
 use std::collections::{BTreeMap, BTreeSet};
+pub mod algorithmic_residual;
 pub mod assay;
 pub mod experiment_design;
 pub mod identity;
@@ -28,6 +29,14 @@ pub mod reconfiguration;
 pub mod semantic_continuity;
 pub mod viability;
 
+pub use algorithmic_residual::{
+    AgentEvidenceReceipt, AlgorithmGraphOutput, CausalGraph, EdgeEditOperation,
+    EvidenceBackedEdgeEdit, EvidenceKind, EvidenceReceiptOracle, EvidenceReceiptStatus,
+    GraphQualityMetrics, ResidualDirectedEdge, ResidualDiscoveryOracle,
+    ResidualDiscoveryReport, ResidualDiscoveryScenario, ResidualDiscoveryTrace,
+    ResidualFinding, ResidualFindingCode, ResidualQualification,
+    evaluate_algorithmic_residual,
+};
 pub use assay::{
     AssayAdequacyReport, AssayFinding, AssayFindingCode, AssayId, AssayObservation, CandidateModel,
     ModelId, ModelPairAssessment, evaluate_assay_adequacy,
