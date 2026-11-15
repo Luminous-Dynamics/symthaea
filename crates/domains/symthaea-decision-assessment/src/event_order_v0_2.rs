@@ -54,6 +54,25 @@ pub struct QualifiedEventTime {
     pub interval: EventTimeIntervalNs,
 }
 
+impl QualifiedClockMapping {
+    /// Bind an already-normalized interval to this owner-qualified mapping.
+    /// The interval is not transformed here; the owner adapter must perform
+    /// and qualify the actual source-to-basis conversion.
+    pub fn bind_normalized_interval(&self, interval: EventTimeIntervalNs) -> QualifiedEventTime {
+        QualifiedEventTime {
+            source_clock_domain_id: self.source_clock_domain_id.clone(),
+            time_basis_id: self.target_time_basis_id.clone(),
+            mapping_receipt_ref: self.mapping_receipt_ref.clone(),
+            mapping_receipt_sha256: self.mapping_receipt_sha256.clone(),
+            mapping_qualification: self.qualification,
+            mapping_valid_from_unix_ns: self.valid_from_unix_ns,
+            mapping_valid_through_unix_ns: self.valid_through_unix_ns,
+            max_interval_width_ns: self.max_interval_width_ns,
+            interval,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ClockOrderAssessment {
     pub order: EventOrder,
@@ -296,6 +315,8 @@ pub fn validate_attempt_lifecycle(
     let mut indeterminate = false;
     let mut by_id: BTreeMap<&str, &OperationAttemptRecord> = BTreeMap::new();
     let mut event_ids = BTreeSet::new();
+    let mut roots_by_logical_operation = BTreeMap::<String, String>::new();
+    let mut retry_children = BTreeMap::<String, String>::new();
 
     for attempt in attempts {
         let logical_id = attempt.identity.logical_operation_id.trim();
@@ -303,6 +324,26 @@ pub fn validate_attempt_lifecycle(
         if logical_id.is_empty() || attempt_id.is_empty() {
             critical = true;
             reasons.insert("ATTEMPT_IDENTITY_INVALID".to_owned());
+        }
+        match attempt.identity.retry_of_attempt_id.as_deref() {
+            None => {
+                if roots_by_logical_operation
+                    .insert(logical_id.to_owned(), attempt_id.to_owned())
+                    .is_some()
+                {
+                    critical = true;
+                    reasons.insert(format!("MULTIPLE_ROOT_ATTEMPTS_FOR_LOGICAL_OPERATION:{logical_id}"));
+                }
+            }
+            Some(parent_id) => {
+                if retry_children
+                    .insert(parent_id.to_owned(), attempt_id.to_owned())
+                    .is_some()
+                {
+                    critical = true;
+                    reasons.insert(format!("ATTEMPT_RETRY_FORK:{parent_id}"));
+                }
+            }
         }
         if by_id.insert(attempt.identity.attempt_id.as_str(), attempt).is_some() {
             critical = true;
@@ -498,6 +539,9 @@ pub struct StopDischargeReceipt {
     pub receipt_ref: String,
     pub receipt_sha256: String,
     pub qualification: GateState,
+    /// Owner-native qualification that the complete in-flight attempt inventory
+    /// in this obligation's scope was reconciled at discharge time.
+    pub in_flight_reconciliation: GateState,
     /// Relation of the trigger event to the discharge event.
     pub trigger_to_discharge_order: EventOrder,
 }
@@ -545,7 +589,21 @@ pub fn assess_start_under_stop_obligations(
         reasons.insert("START_LOGICAL_OPERATION_ID_INVALID".to_owned());
     }
 
-    let attempts_report = validate_attempt_lifecycle(prior_attempts);
+    // Validate only prior attempts relevant to this start: its own logical
+    // operation plus the union of scopes belonging to applicable obligations.
+    // An unrelated in-flight operation must not poison an independent scope.
+    let relevant_prior_attempts = prior_attempts
+        .iter()
+        .filter(|attempt| {
+            attempt.identity.logical_operation_id == logical_operation_id
+                || obligations.iter().any(|obligation| {
+                    obligation.scope.applies_to(logical_operation_id)
+                        && obligation.scope.applies_to(&attempt.identity.logical_operation_id)
+                })
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let attempts_report = validate_attempt_lifecycle(&relevant_prior_attempts);
     match attempts_report.disposition {
         EventTraceDisposition::CriticalFailure => {
             critical = true;
@@ -557,7 +615,7 @@ pub fn assess_start_under_stop_obligations(
         }
         EventTraceDisposition::Safe => {}
     }
-    for attempt in prior_attempts.iter().filter(|attempt| {
+    for attempt in relevant_prior_attempts.iter().filter(|attempt| {
         attempt.identity.logical_operation_id == logical_operation_id
     }) {
         if !attempt_is_reconciled(attempt) {
@@ -646,14 +704,20 @@ pub fn assess_start_under_stop_obligations(
             }
         }
 
-        for attempt in prior_attempts.iter().filter(|attempt| {
-            obligation.scope.applies_to(&attempt.identity.logical_operation_id)
-        }) {
-            if !attempt_is_reconciled(attempt) {
+        match discharge.in_flight_reconciliation {
+            GateState::Pass => {}
+            GateState::Fail => {
                 critical = true;
                 reasons.insert(format!(
-                    "STOP_DISCHARGE_WITH_UNRECONCILED_ATTEMPT:{}:{}",
-                    obligation.obligation_id, attempt.identity.attempt_id
+                    "STOP_DISCHARGE_IN_FLIGHT_RECONCILIATION_FAILED:{}",
+                    obligation.obligation_id
+                ));
+            }
+            GateState::Indeterminate | GateState::NotApplicable => {
+                indeterminate = true;
+                reasons.insert(format!(
+                    "STOP_DISCHARGE_IN_FLIGHT_RECONCILIATION_UNRESOLVED:{}",
+                    obligation.obligation_id
                 ));
             }
         }
@@ -746,6 +810,7 @@ mod tests {
                 receipt_ref: format!("synthetic://discharge/{id}"),
                 receipt_sha256: "b".repeat(64),
                 qualification: GateState::Pass,
+                in_flight_reconciliation: GateState::Pass,
                 trigger_to_discharge_order: EventOrder::Before,
             }),
         }
@@ -915,15 +980,24 @@ mod tests {
     }
 
     #[test]
-    fn stop_discharge_cannot_cover_an_unreconciled_attempt_in_its_scope() {
-        let attempts = vec![attempt("robot-7", "attempt-pending", None, "start-pending", None, None)];
-        let obligation = scoped_obligation("obligation-a", "robot-7");
-        let report = assess_start_under_stop_obligations("robot-7", &attempts, &[obligation]);
+    fn stop_discharge_requires_owner_qualification_of_the_in_flight_inventory() {
+        let mut obligation = scoped_obligation("obligation-a", "robot-7");
+        obligation.discharge.as_mut().unwrap().in_flight_reconciliation = GateState::Fail;
+        let report = assess_start_under_stop_obligations("robot-7", &[], &[obligation]);
         assert!(!report.start_permitted_by_stop_contract);
         assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
         assert!(report.reason_codes.iter().any(|reason| {
-            reason == "STOP_DISCHARGE_WITH_UNRECONCILED_ATTEMPT:obligation-a:attempt-pending"
+            reason == "STOP_DISCHARGE_IN_FLIGHT_RECONCILIATION_FAILED:obligation-a"
         }));
+    }
+
+    #[test]
+    fn unrelated_pending_attempt_does_not_block_an_unrelated_scoped_start() {
+        let unrelated = attempt("robot-9", "attempt-pending", None, "start-pending", None, None);
+        let obligation = scoped_obligation("obligation-a", "robot-7");
+        let report = assess_start_under_stop_obligations("robot-8", &[unrelated], &[obligation]);
+        assert!(report.start_permitted_by_stop_contract);
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
     }
 
     #[test]
@@ -946,6 +1020,35 @@ mod tests {
         assert!(report.reason_codes.iter().any(|reason| {
             reason == "STOP_DISCHARGE_RECEIPT_BINDING_INVALID:obligation-a"
         }));
+    }
+
+    #[test]
+    fn retry_lineage_cannot_fork_or_create_multiple_roots() {
+        let root_a = attempt("pump-1", "root-a", None, "start-root-a", None, None);
+        let root_b = attempt("pump-1", "root-b", None, "start-root-b", None, None);
+        let report = validate_attempt_lifecycle(&[root_a.clone(), root_b]);
+        assert!(report.reason_codes.iter().any(|reason| {
+            reason == "MULTIPLE_ROOT_ATTEMPTS_FOR_LOGICAL_OPERATION:pump-1"
+        }));
+
+        let child_a = attempt(
+            "pump-1",
+            "child-a",
+            Some("root-a"),
+            "start-child-a",
+            None,
+            Some(EventOrder::Before),
+        );
+        let child_b = attempt(
+            "pump-1",
+            "child-b",
+            Some("root-a"),
+            "start-child-b",
+            None,
+            Some(EventOrder::Before),
+        );
+        let report = validate_attempt_lifecycle(&[root_a, child_a, child_b]);
+        assert!(report.reason_codes.iter().any(|reason| reason == "ATTEMPT_RETRY_FORK:root-a"));
     }
 
     #[test]

@@ -72,7 +72,7 @@ Each discharge must independently bind:
 - owner qualification PASS;
 - trigger definitely BEFORE discharge.
 
-A discharge receipt for obligation A cannot discharge obligation B. A scoped obligation cannot block unrelated operations. A discharge is critical-invalid if any prior attempt in its scope remains unreconciled or its terminal reconciliation is not qualified. Multiple applicable obligations compose conjunctively: every one must be discharged.
+A discharge receipt for obligation A cannot discharge obligation B. A scoped obligation cannot block unrelated operations. The discharge receipt also carries owner-native in-flight-reconciliation qualification for the exact scope at discharge time; FAIL is critical and an unresolved result blocks. This avoids confusing an operation that began after discharge with one that was already in flight when discharge was evaluated. The start gate separately blocks an unresolved prior attempt for the same logical operation. Multiple applicable obligations compose conjunctively: every one must be discharged.
 
 start_permitted_by_stop_contract is an eligibility result only. It never grants effect authority and does not enforce a command at the executor boundary.
 
@@ -88,9 +88,11 @@ The source includes unit tests for:
 - observed + recorded visibility at K;
 - exact NOT_APPLIED retry lineage;
 - retry before reconciliation;
+- multiple roots and retry forks are rejected;
 - duplicate start and terminal cardinality;
 - independent overlapping stop obligations;
-- unresolved attempt preventing discharge;
+- owner in-flight-inventory qualification required for discharge;
+- unrelated pending attempts do not block independent scoped starts;
 - unrelated operation outside a scoped stop;
 - exact obligation/policy receipt binding;
 - attempt-report invariance under delivery permutation.
