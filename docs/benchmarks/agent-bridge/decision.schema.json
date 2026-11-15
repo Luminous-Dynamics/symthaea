@@ -1,0 +1,218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/agent-bridge-decision-0.1.json",
+  "title": "Symthaea agent decision",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "kind",
+        "turn_id",
+        "run_id",
+        "decision_id",
+        "action",
+        "call_id",
+        "tool_name",
+        "arguments",
+        "idempotency_key",
+        "purpose"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "symthaea-agent-bridge/0.1"
+        },
+        "kind": {
+          "const": "agent_decision"
+        },
+        "turn_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "const": "tool_call"
+        },
+        "call_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tool_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "idempotency_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "kind",
+        "turn_id",
+        "run_id",
+        "decision_id",
+        "action",
+        "question",
+        "why_required"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "symthaea-agent-bridge/0.1"
+        },
+        "kind": {
+          "const": "agent_decision"
+        },
+        "turn_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "const": "ask"
+        },
+        "question": {
+          "type": "string",
+          "minLength": 1
+        },
+        "why_required": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "kind",
+        "turn_id",
+        "run_id",
+        "decision_id",
+        "action",
+        "reason",
+        "blocked_on"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "symthaea-agent-bridge/0.1"
+        },
+        "kind": {
+          "const": "agent_decision"
+        },
+        "turn_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "const": "defer"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "blocked_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_version",
+        "kind",
+        "turn_id",
+        "run_id",
+        "decision_id",
+        "action",
+        "content"
+      ],
+      "properties": {
+        "protocol_version": {
+          "const": "symthaea-agent-bridge/0.1"
+        },
+        "kind": {
+          "const": "agent_decision"
+        },
+        "turn_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "const": "final_answer"
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "limitations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  ]
+}

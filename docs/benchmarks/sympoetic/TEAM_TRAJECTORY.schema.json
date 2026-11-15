@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sympoetic-team-trajectory-0.1.json",
+  "title": "SympoeticBench persistent team trajectory",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "team_id",
+    "cycles"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sympoetic-team-trajectory/0.1"
+    },
+    "team_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cycles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "schema_version",
+          "team_id",
+          "cycle_index",
+          "run_id",
+          "scenario_id",
+          "team_state_before_digest",
+          "team_state_after_digest",
+          "artifact_digest",
+          "outcome_digest",
+          "memory_policy",
+          "members",
+          "changes",
+          "cycle_digest"
+        ],
+        "properties": {
+          "schema_version": {
+            "const": "sympoetic-team-cycle/0.1"
+          },
+          "cycle_index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scenario_id": {
+            "type": "string",
+            "pattern": "^SP-[A-Z]{3}-[0-9]{3}$"
+          },
+          "prior_cycle_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "team_state_before_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "team_state_after_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "artifact_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "outcome_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "memory_policy": {
+            "enum": [
+              "none",
+              "task_only",
+              "team_opt_in_persistent"
+            ]
+          },
+          "consent_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "members": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "principal_id",
+                "participant_type",
+                "role",
+                "authority_digest",
+                "memory_consent"
+              ],
+              "properties": {
+                "principal_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "participant_type": {
+                  "enum": [
+                    "human",
+                    "agent"
+                  ]
+                },
+                "role": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "authority_digest": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "memory_consent": {
+                  "enum": [
+                    "not_applicable",
+                    "task_only",
+                    "explicit_opt_in"
+                  ]
+                },
+                "model_snapshot": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "change_id",
+                "change_type",
+                "actor_principal_id",
+                "subject_principal_id"
+              ],
+              "properties": {
+                "change_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "change_type": {
+                  "enum": [
+                    "member_added",
+                    "member_removed",
+                    "role_changed",
+                    "authority_changed",
+                    "memory_policy_changed",
+                    "memory_consent_changed",
+                    "model_snapshot_changed"
+                  ]
+                },
+                "actor_principal_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "subject_principal_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          },
+          "cycle_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "team_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "cycle_index": {
+                  "const": 0
+                }
+              },
+              "required": [
+                "cycle_index"
+              ]
+            },
+            "then": {
+              "not": {
+                "required": [
+                  "prior_cycle_digest"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "cycle_index": {
+                  "minimum": 1
+                }
+              },
+              "required": [
+                "cycle_index"
+              ]
+            },
+            "then": {
+              "required": [
+                "prior_cycle_digest"
+              ]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "memory_policy": {
+                  "const": "team_opt_in_persistent"
+                }
+              },
+              "required": [
+                "memory_policy"
+              ]
+            },
+            "then": {
+              "required": [
+                "consent_digest"
+              ],
+              "properties": {
+                "members": {
+                  "items": {
+                    "properties": {
+                      "memory_consent": {
+                        "const": "explicit_opt_in"
+                      }
+                    },
+                    "required": [
+                      "memory_consent"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

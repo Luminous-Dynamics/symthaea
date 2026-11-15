@@ -1,0 +1,82 @@
+{
+  "schema_version": "sympoetic-team-trajectory/0.1",
+  "team_id": "team-pseudonym-01",
+  "cycles": [
+    {
+      "schema_version": "sympoetic-team-cycle/0.1",
+      "team_id": "team-pseudonym-01",
+      "cycle_index": 0,
+      "run_id": "run-cycle-0",
+      "scenario_id": "SP-LON-001",
+      "team_state_before_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "team_state_after_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "artifact_digest": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "outcome_digest": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "memory_policy": "none",
+      "members": [
+        {
+          "principal_id": "human-01",
+          "participant_type": "human",
+          "role": "team_lead",
+          "authority_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "memory_consent": "not_applicable"
+        },
+        {
+          "principal_id": "agent-01",
+          "participant_type": "agent",
+          "role": "investigator",
+          "authority_digest": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "memory_consent": "task_only",
+          "model_snapshot": "symthaea@sha256:fixture"
+        }
+      ],
+      "changes": [],
+      "cycle_digest": "bcd03b5cdf5b838435fcffe9c2438982d337727cda96ae2884bc0b6f33789423"
+    },
+    {
+      "schema_version": "sympoetic-team-cycle/0.1",
+      "team_id": "team-pseudonym-01",
+      "cycle_index": 1,
+      "run_id": "run-cycle-1",
+      "scenario_id": "SP-LON-001",
+      "prior_cycle_digest": "bcd03b5cdf5b838435fcffe9c2438982d337727cda96ae2884bc0b6f33789423",
+      "team_state_before_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "team_state_after_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+      "artifact_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+      "outcome_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+      "memory_policy": "none",
+      "members": [
+        {
+          "principal_id": "human-01",
+          "participant_type": "human",
+          "role": "team_lead",
+          "authority_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "memory_consent": "not_applicable"
+        },
+        {
+          "principal_id": "agent-01",
+          "participant_type": "agent",
+          "role": "verifier",
+          "authority_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+          "memory_consent": "task_only",
+          "model_snapshot": "symthaea@sha256:fixture"
+        }
+      ],
+      "changes": [
+        {
+          "change_id": "change-role-1",
+          "change_type": "role_changed",
+          "actor_principal_id": "human-01",
+          "subject_principal_id": "agent-01"
+        },
+        {
+          "change_id": "change-authority-1",
+          "change_type": "authority_changed",
+          "actor_principal_id": "human-01",
+          "subject_principal_id": "agent-01"
+        }
+      ],
+      "cycle_digest": "058327cd888305b6590a40788b8fba9d730e3ad24875d0d05f121639d73a3876"
+    }
+  ]
+}

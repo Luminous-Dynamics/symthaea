@@ -1,0 +1,19 @@
+[package]
+name = "sympoetic-bench"
+version = "0.1.0"
+edition.workspace = true
+rust-version = "1.94"
+license.workspace = true
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+description = "Evidence-qualified human-AI co-creation benchmark and trace validator"
+keywords = ["benchmark", "human-ai", "collaboration", "provenance"]
+categories = ["science", "development-tools"]
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
