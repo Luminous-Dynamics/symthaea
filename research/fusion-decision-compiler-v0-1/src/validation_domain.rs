@@ -447,13 +447,12 @@ fn validate_pair_overlap(
             second_record_id: holdout.record_id.clone(),
         });
     }
-    let test_episodes: BTreeSet<&str> = test_stand
-        .episode_ids
-        .iter()
-        .map(String::as_str)
-        .collect();
     for episode in &holdout.episode_ids {
-        if test_episodes.contains(episode.as_str()) {
+        if test_stand
+            .episode_ids
+            .iter()
+            .any(|test_episode| test_episode == episode)
+        {
             errors.push(ValidationDomainError::ReusedEpisodeIdentity {
                 episode_id: episode.clone(),
                 first_record_id: test_stand.record_id.clone(),
