@@ -50,7 +50,7 @@ Metrics remain separate. There is no composite turn-taking score.
 
 ## Deterministic controls
 
-Fifteen unit tests are authored for:
+Eighteen unit tests are authored for:
 1. perfect four-action trace and effect windows;
 2. ParseFailure distinct from WAIT;
 3. ambiguous action sets without forced truth;
@@ -65,7 +65,10 @@ Fifteen unit tests are authored for:
 12. duplicate effect frame;
 13. post-YIELD non-WAIT leakage;
 14. policy-state chain and immutable identity binding;
-15. deterministic report replay and tamper rejection.
+15. deterministic report replay and tamper rejection;
+16. always-WAIT and always-RESPOND negative baseline controls;
+17. monotonic runner-clock regression independent of sample-frame time;
+18. false-action emission latency retained in effect-latency statistics.
 
 A synthetic five-chunk example covers WAIT → RESPOND → CONTINUE → YIELD → WAIT, with sample-frame effect windows and monotonic runner latency. The workflow runs it in two fresh processes and requires byte-identical JSON reports.
 
