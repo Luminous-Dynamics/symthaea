@@ -65,6 +65,16 @@ fn update_string(hasher: &mut Sha256, value: &str) {
     hasher.update(value.as_bytes());
 }
 
+fn privilege_profile_name(value: CameraPolicyPrivilegeProfile) -> &'static str {
+    match value {
+        CameraPolicyPrivilegeProfile::NoPrivilegedInputs => "NO_PRIVILEGED_INPUTS",
+        CameraPolicyPrivilegeProfile::PrivilegedExpert => "PRIVILEGED_EXPERT",
+        CameraPolicyPrivilegeProfile::GroundTruthPerception => "GROUND_TRUTH_PERCEPTION",
+        CameraPolicyPrivilegeProfile::MixedDeclared => "MIXED_DECLARED",
+        CameraPolicyPrivilegeProfile::Unknown => "UNKNOWN",
+    }
+}
+
 impl AppliedActionTrainingReceipt {
     /// Canonical, domain-separated digest over every receipt field except the
     /// digest itself. This checks internal consistency, not issuer identity.
@@ -82,7 +92,7 @@ impl AppliedActionTrainingReceipt {
         update_string(&mut hasher, &self.action_schema_sha256);
         update_string(&mut hasher, self.source_kind.canonical_name());
         update_string(&mut hasher, &self.source_identity);
-        update_string(&mut hasher, &format!("{:?}", self.privilege_profile));
+        update_string(&mut hasher, privilege_profile_name(self.privilege_profile));
         hasher.update(self.action.steering.to_bits().to_le_bytes());
         hasher.update(self.action.throttle.to_bits().to_le_bytes());
         hasher.update(self.action.brake.to_bits().to_le_bytes());
@@ -104,6 +114,7 @@ pub struct ValidatedAppliedActionLabel {
     pub clock_id: String,
     pub tick: u64,
     pub applied_timestamp_us: u64,
+    pub dt_seconds: f32,
     pub source_kind: AppliedActionSourceKind,
     pub source_identity: String,
     pub privilege_profile: CameraPolicyPrivilegeProfile,
@@ -116,6 +127,8 @@ pub enum TrainingLabelError {
     MissingIdentity,
     IdentityTooLong,
     InvalidReceiptDigest,
+    ObservationReceiptMismatch,
+    InvalidObservationDeltaTime,
     ActionSchemaMismatch,
     MissingAppliedActionReference,
     AppliedActionReferenceMismatch,
@@ -191,6 +204,12 @@ pub fn validate_applied_action_training_label(
     }
 
     let receipt: &DrivingObservationReceipt = &observation.receipt;
+    if receipt.receipt_sha256 != crate::digest_receipt(receipt) {
+        return Err(TrainingLabelError::ObservationReceiptMismatch);
+    }
+    if receipt.derived_dt_us == 0 {
+        return Err(TrainingLabelError::InvalidObservationDeltaTime);
+    }
     let (
         Some(reference_id),
         Some(reference_sha256),
@@ -252,6 +271,7 @@ pub fn validate_applied_action_training_label(
         clock_id: label.clock_id.clone(),
         tick: label.tick,
         applied_timestamp_us: label.applied_timestamp_us,
+        dt_seconds: (receipt.derived_dt_us as f64 / 1_000_000.0) as f32,
         source_kind: label.source_kind,
         source_identity: label.source_identity.clone(),
         privilege_profile: label.privilege_profile,
@@ -384,6 +404,7 @@ mod tests {
         assert_eq!(validated.target.throttle, 0.6);
         assert_eq!(validated.target.brake, 0.0);
         assert_eq!(validated.tick, TICK);
+        assert_eq!(validated.dt_seconds, 0.01);
         assert_eq!(validated.source_kind, AppliedActionSourceKind::ClassicalController);
     }
 
@@ -427,21 +448,40 @@ mod tests {
     #[test]
     fn wrong_episode_agent_clock_and_tick_are_rejected() {
         let valid = label();
-        let observation = fused_input(&valid);
 
-        let mut wrong_episode = valid.clone();
-        wrong_episode.episode_id = "another-episode".into();
-        wrong_episode.receipt_sha256 = wrong_episode.calculated_receipt_sha256();
+        let mut wrong_episode_observation = fused_input(&valid);
+        wrong_episode_observation.receipt.identity.episode_id = "another-episode".into();
+        wrong_episode_observation.receipt.receipt_sha256 =
+            crate::digest_receipt(&wrong_episode_observation.receipt);
         assert_eq!(
-            validate_applied_action_training_label(&observation, &wrong_episode).unwrap_err(),
-            TrainingLabelError::AppliedActionReferenceMismatch
+            validate_applied_action_training_label(&wrong_episode_observation, &valid).unwrap_err(),
+            TrainingLabelError::EpisodeMismatch
         );
 
-        let mut wrong_tick = valid.clone();
-        wrong_tick.tick += 1;
-        wrong_tick.receipt_sha256 = wrong_tick.calculated_receipt_sha256();
+        let mut wrong_agent_observation = fused_input(&valid);
+        wrong_agent_observation.receipt.identity.agent_id = "another-agent".into();
+        wrong_agent_observation.receipt.receipt_sha256 =
+            crate::digest_receipt(&wrong_agent_observation.receipt);
         assert_eq!(
-            validate_applied_action_training_label(&observation, &wrong_tick).unwrap_err(),
+            validate_applied_action_training_label(&wrong_agent_observation, &valid).unwrap_err(),
+            TrainingLabelError::AgentMismatch
+        );
+
+        let mut wrong_clock_observation = fused_input(&valid);
+        wrong_clock_observation.receipt.upstream_clock_id = "another-clock".into();
+        wrong_clock_observation.receipt.receipt_sha256 =
+            crate::digest_receipt(&wrong_clock_observation.receipt);
+        assert_eq!(
+            validate_applied_action_training_label(&wrong_clock_observation, &valid).unwrap_err(),
+            TrainingLabelError::ClockMismatch
+        );
+
+        let mut wrong_tick_observation = fused_input(&valid);
+        wrong_tick_observation.receipt.upstream_applied_action_tick = Some(TICK + 1);
+        wrong_tick_observation.receipt.receipt_sha256 =
+            crate::digest_receipt(&wrong_tick_observation.receipt);
+        assert_eq!(
+            validate_applied_action_training_label(&wrong_tick_observation, &valid).unwrap_err(),
             TrainingLabelError::TickMismatch
         );
     }
