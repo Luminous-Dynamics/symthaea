@@ -39,7 +39,7 @@
       "critical_unverified_obligation_seconds": 420,
       "time_weighted_requirement_conformance": 0.7714285714285715,
       "critical_time_weighted_conformance": 0.65,
-      "recovery_event_count": 3,
+      "recovery_event_count": 4,
       "max_unverified_gap_seconds": 180
     },
     "paired_success": true,
