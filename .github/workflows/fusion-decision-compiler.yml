@@ -43,3 +43,6 @@ jobs:
 
       - name: Independent validation-domain corpus inventory
         run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin verify_validation_domain_corpus
+
+      - name: Run synthetic matched-case cross-solver comparison
+        run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin compare_solver_outputs
