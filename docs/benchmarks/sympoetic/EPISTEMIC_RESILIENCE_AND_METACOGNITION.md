@@ -113,7 +113,7 @@ Blind trace coding can record, at each meaningful reasoning opportunity:
 - Human verification of an AI-supplied core step.
 - Human reflection after the task.
 
-Report the rates independently. Do not create a single "cognitive sovereignty score" without validation. Delegating a low-value subtask is not inherently harmful; substitution of a learning-critical reasoning step is a different intervention.
+Report the rates independently. In particular, report **AI core-step supply rate** (AI supplied a core step / all reasoning opportunities) separately from **AI core-step substitution rate** (AI supplied a core step before a human attempt / AI-supplied core steps) and **human verification rate** (AI-supplied core steps independently checked by the human / AI-supplied core steps). These denominators answer different questions. Do not create a single "cognitive sovereignty score" without validation. Delegating a low-value subtask is not inherently harmful; substitution of a learning-critical reasoning step is a different intervention.
 
 The Rust implementation `summarize_cognitive_process` reports these denominators explicitly and returns unavailable values when the relevant opportunity count is zero.
 
