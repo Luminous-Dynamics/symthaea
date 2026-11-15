@@ -250,5 +250,6 @@
     "Pressure reference and elevation datum are identical across both station planes.",
     "No station-6 shortcut, nozzle parallel-outflow assumption, NVR, interaction efficiency or overall propulsion efficiency is asserted.",
     "Station 7 has deliberately reversed normal projection relative to the declared +xi orientation."
-  ]
+  ],
+  "maximum_observation_skew_ms": 0
 }
