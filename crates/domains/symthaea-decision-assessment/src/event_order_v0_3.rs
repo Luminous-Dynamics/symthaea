@@ -15,11 +15,15 @@ use thiserror::Error;
 
 use crate::{EventTraceDisposition, GateState};
 use crate::event_order_v0_2::{
-    BitemporalEventEnvelope, QualifiedEventTime, compare_qualified_event_times,
+    AttemptHistoryInventory, AttemptIdentity, AttemptStopDischargeRelation,
+    AttemptTerminalReconciliation, BitemporalEventEnvelope, OperationAttemptRecord,
+    QualifiedEventTime, ScopedStopObligation, StopDischargeReceipt, StopScope,
+    assess_start_under_stop_obligations, compare_qualified_event_times,
+    validate_attempt_lifecycle,
 };
 
-pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3.1";
-pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.2";
+pub const SCHEDULE_SCHEMA_VERSION: &str = "symthaea.event-order-schedule.v0.3.2";
+pub const GENERATOR_VERSION: &str = "symthaea.event-order-generator.v0.3.3";
 pub const MAX_GENERATED_EVENTS: usize = 4_096;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,10 +38,55 @@ pub struct VirtualSchedule {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ActionEvidence {
+    AttemptStart {
+        retry_of_attempt_id: Option<String>,
+    },
+    EffectCommit {
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+    CancellationAcknowledgement {
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+    TerminalReconciliation {
+        exact_start_action_id: String,
+        qualification: GateState,
+    },
+    StopTrigger {
+        scope: StopScope,
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+    StopPolicyRevision {
+        scope: StopScope,
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+    StopDischarge {
+        scope: StopScope,
+        inventory_frontier_event_id: String,
+        attempt_manifest_sha256: String,
+    },
+    InventoryAttestation {
+        scope: StopScope,
+        inventory_frontier_event_id: String,
+        attempt_manifest_sha256: String,
+        receipt_ref: String,
+        receipt_sha256: String,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ScheduledAction {
     pub action_id: String,
     pub at_ns: u64,
     pub ordinal: u64,
+    #[serde(default)]
+    pub owner_time_ref: Option<ActionClockTimeReference>,
+    #[serde(default)]
+    pub evidence: Option<ActionEvidence>,
     pub action: ScheduleAction,
 }
 
@@ -164,6 +213,11 @@ pub enum ScheduleAction {
         event_id: String,
         superseded_event_id: String,
     },
+    AttemptInventoryAttested {
+        scope: StopScope,
+        inventory_frontier_event_id: String,
+        attempt_manifest_sha256: String,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -200,6 +254,8 @@ pub enum SchedulerDisposition {
     ClockRegression,
     EventTimeRegression,
     StaleClockMappingReference,
+    OwnerTimeMissing,
+    OwnerTimeUnqualified,
     ClockMappingUnqualified,
     ClockMappingRejected,
     ClockMappingExpired,
@@ -225,6 +281,8 @@ pub struct ReplayRecord {
     pub action_id: String,
     pub at_ns: u64,
     pub ordinal: u64,
+    pub owner_time_ref: Option<ActionClockTimeReference>,
+    pub evidence: Option<ActionEvidence>,
     pub disposition: SchedulerDisposition,
     pub action: ScheduleAction,
 }
@@ -983,6 +1041,8 @@ fn push_action(
         action_id: format!("action-{ordinal:06}"),
         at_ns,
         ordinal,
+        owner_time_ref: None,
+        evidence: None,
         action,
     });
 }
