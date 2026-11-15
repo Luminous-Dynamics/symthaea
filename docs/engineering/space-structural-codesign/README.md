@@ -144,7 +144,7 @@ V0.1 can emit only:
 - `ThinRotatingRingV0_1` using the exact Symtropy ring model-profile reference;
 - `UniformRadialSpokeV0_1` using the exact Symtropy spoke model-profile reference.
 
-The emitted proposal binds caller-supplied request, mission, candidate, geometry, material, process-batch (when present), load-case, frame, model-profile and backend references. It pins the reviewed draft Symtropy source commit `540fe6d2fc2fd99daa5277cbc2fe768db722cda9`, declares draft maturity/claim ceiling, and sets solver execution, execution authority, design-release authority and mesh use to false.
+The emitted proposal binds caller-supplied request, mission, candidate, geometry, material, process-batch (when present), load-case, frame, model-profile and backend references. Symtropy's receiving-side [SPACE-STRUCT-ADMISSION-001 #5376](https://github.com/Luminous-Dynamics/symtropy/issues/5376) checks the exact mission and process/batch references against its own admission context, in addition to candidate/geometry/material/load/frame/model/backend identities. It pins the reviewed draft Symtropy source commit `540fe6d2fc2fd99daa5277cbc2fe768db722cda9`, declares draft maturity/claim ceiling, and sets solver execution, execution authority, design-release authority and mesh use to false.
 
 The emitter abstains on unsupported profiles/physics/observables, malformed identities, profile/backend substitution, non-synthetic use of the draft profile, generic/unresolved material evidence, and off-Earth batch properties not admitted by a qualified material profile. It never invents artifact digests: the canonical artifact owner must supply them and the Symtropy receiver must independently resolve/check them.
 
