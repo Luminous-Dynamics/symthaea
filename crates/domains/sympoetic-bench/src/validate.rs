@@ -17,6 +17,7 @@ const SCENARIO_DOMAINS: &[&str] = &[
     "repair",
     "consent_governance",
     "longitudinal_adaptation",
+    "partner_coordination",
 ];
 const DIFFICULTIES: &[&str] = &["introductory", "moderate", "advanced"];
 const SPLITS: &[&str] = &["development", "pilot", "confirmatory_locked"];
