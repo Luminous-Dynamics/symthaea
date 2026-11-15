@@ -1473,6 +1473,60 @@ mod tests {
         assert!(proposal.assignments.is_empty());
     }
 
+
+    #[test]
+    fn soft_selector_does_not_treat_unknown_module_availability_as_available() {
+        let (mut profile, placement) = module("urn:example:module:cut", 0, vec![capability("urn:example:capability:cut")]);
+        profile.availability = ModuleAvailability::Unknown;
+        let proposal = propose_soft_reallocation(
+            "urn:example:facility:atelier-01",
+            NOW,
+            &[placement.module_ref],
+            &[profile],
+            SnapshotResolution::Complete,
+            &[demand("urn:example:operation:cut", "urn:example:capability:cut")],
+            &[],
+        );
+        assert_eq!(proposal.status, PlanStatus::Indeterminate);
+        assert!(proposal.assignments.is_empty());
+    }
+
+    #[test]
+    fn soft_selector_marks_incomplete_module_pool_indeterminate_even_with_candidate() {
+        let (profile, placement) = module("urn:example:module:cut", 0, vec![capability("urn:example:capability:cut")]);
+        let proposal = propose_soft_reallocation(
+            "urn:example:facility:atelier-01",
+            NOW,
+            &[placement.module_ref],
+            &[profile],
+            SnapshotResolution::Partial,
+            &[demand("urn:example:operation:cut", "urn:example:capability:cut")],
+            &[],
+        );
+        assert_eq!(proposal.status, PlanStatus::Indeterminate);
+        assert_eq!(proposal.assignments.len(), 1);
+    }
+
+    #[test]
+    fn soft_selector_counts_removed_operations_as_changes() {
+        let (profile, placement) = module("urn:example:module:cut", 0, vec![]);
+        let proposal = propose_soft_reallocation(
+            "urn:example:facility:atelier-01",
+            NOW,
+            &[placement.module_ref],
+            &[profile],
+            SnapshotResolution::Complete,
+            &[],
+            &[OperationAssignment {
+                operation_ref: "urn:example:operation:removed".to_owned(),
+                module_ref: "urn:example:module:cut".to_owned(),
+            }],
+        );
+        assert_eq!(proposal.status, PlanStatus::FeasibleForQualification);
+        assert_eq!(proposal.changed_assignment_count, 1);
+        assert!(proposal.assignments.is_empty());
+    }
+
     #[test]
     fn initial_configuration_is_feasible_only_for_qualification() {
         let (profile, placement) = module("urn:example:module:cut", 0, vec![capability("urn:example:capability:cut")]);
