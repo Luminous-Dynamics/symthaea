@@ -176,6 +176,8 @@ pub enum SchedulerDisposition {
     ClockRegression,
     EventTimeRegression,
     StaleClockMappingReference,
+    ClockMappingUnqualified,
+    ClockMappingExpired,
     ConflictingAcknowledgement,
     ConflictingReconciliation,
     ConflictingEffectCommit,
@@ -261,8 +263,8 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
 
     let mut action_ids = BTreeSet::new();
     let mut ordinals = BTreeSet::new();
-    let mut clock_ticks = BTreeMap::<ClockSeriesKey, u64>::new();
-    let mut clock_mapping_action_history = BTreeMap::<ClockSeriesKey, BTreeSet<String>>::new();
+    let mut clock_mapping_action_history =
+        BTreeMap::<ClockSeriesKey, BTreeMap<String, ClockMappingState>>::new();
     let mut produced_events = BTreeSet::<String>::new();
     let mut delivery_ids = BTreeSet::<String>::new();
 
@@ -277,7 +279,8 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
         match &scheduled.action {
             ScheduleAction::ClockAdvance {
                 clock_domain, basis_id, epoch, scale, unit, local_tick_ns,
-                calibration_id, mapping_receipt_ref, mapping_receipt_sha256, ..
+                calibration_id, mapping_valid_through_ns, mapping_receipt_ref,
+                mapping_receipt_sha256, qualification, ..
             } => {
                 require_id(clock_domain, "clock_domain")?;
                 require_id(basis_id, "basis_id")?;
@@ -291,11 +294,17 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(mapping_receipt_ref, "mapping_receipt_ref")?;
                 require_sha256(mapping_receipt_sha256, "mapping_receipt_sha256")?;
                 let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
-                clock_ticks.insert(key.clone(), *local_tick_ns);
                 clock_mapping_action_history
                     .entry(key)
                     .or_default()
-                    .insert(scheduled.action_id.clone());
+                    .insert(
+                        scheduled.action_id.clone(),
+                        ClockMappingState {
+                            local_tick_ns: *local_tick_ns,
+                            valid_through_ns: *mapping_valid_through_ns,
+                            qualification: *qualification,
+                        },
+                    );
             }
             ScheduleAction::EventProduced {
                 event_id, clock_domain, basis_id, epoch, scale, unit,
@@ -309,18 +318,17 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
                 require_id(unit, "unit")?;
                 require_id(clock_mapping_action_id, "clock_mapping_action_id")?;
                 let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
-                let latest_tick = clock_ticks
+                let mapping = clock_mapping_action_history
                     .get(&key)
-                    .ok_or_else(|| ReplayError::MissingClock(clock_domain.clone()))?;
-                if !clock_mapping_action_history
-                    .get(&key)
-                    .is_some_and(|history| history.contains(clock_mapping_action_id))
-                {
-                    return Err(ReplayError::InvalidCausalPredecessor(
-                        clock_mapping_action_id.clone(),
-                    ));
-                }
-                if source_timestamp_ns > latest_tick {
+                    .and_then(|history| history.get(clock_mapping_action_id))
+                    .ok_or_else(|| {
+                        if clock_mapping_action_history.contains_key(&key) {
+                            ReplayError::InvalidCausalPredecessor(clock_mapping_action_id.clone())
+                        } else {
+                            ReplayError::MissingClock(clock_domain.clone())
+                        }
+                    })?;
+                if source_timestamp_ns > &mapping.local_tick_ns {
                     return Err(ReplayError::EventBeyondClock(event_id.clone()));
                 }
                 if !produced_events.insert(event_id.clone()) {
@@ -409,6 +417,13 @@ pub fn validate_schedule(schedule: &VirtualSchedule) -> Result<(), ReplayError> 
     Ok(())
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ClockMappingState {
+    local_tick_ns: u64,
+    valid_through_ns: u64,
+    qualification: GateState,
+}
+
 type ClockSeriesKey = (String, String, String, String, String);
 
 fn clock_series_key(
@@ -490,8 +505,8 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let mut partitioned = BTreeSet::<String>::new();
     let mut crashed = BTreeSet::<String>::new();
     let mut produced = BTreeSet::<String>::new();
-    let mut clock_ticks = BTreeMap::<ClockSeriesKey, u64>::new();
     let mut active_clock_mapping_ids = BTreeMap::<ClockSeriesKey, String>::new();
+    let mut clock_mapping_states = BTreeMap::<String, ClockMappingState>::new();
     let mut event_times = BTreeMap::<ClockSeriesKey, u64>::new();
     let mut delivered = BTreeSet::<(String, String)>::new();
     let mut observed = BTreeSet::<(String, String)>::new();
@@ -509,12 +524,24 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     for scheduled in ordered_actions(schedule) {
         let disposition = match &scheduled.action {
             ScheduleAction::ClockAdvance {
-                clock_domain, basis_id, epoch, scale, unit, local_tick_ns, ..
+                clock_domain, basis_id, epoch, scale, unit, local_tick_ns,
+                mapping_valid_through_ns, qualification, ..
             } => {
                 let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
-                let previous = clock_ticks.insert(key.clone(), *local_tick_ns);
-                active_clock_mapping_ids.insert(key, scheduled.action_id.clone());
-                if previous.is_some_and(|tick| *local_tick_ns < tick) {
+                let previous_mapping_id = active_clock_mapping_ids.insert(key, scheduled.action_id.clone());
+                let previous_tick = previous_mapping_id
+                    .as_ref()
+                    .and_then(|id| clock_mapping_states.get(id))
+                    .map(|mapping| mapping.local_tick_ns);
+                clock_mapping_states.insert(
+                    scheduled.action_id.clone(),
+                    ClockMappingState {
+                        local_tick_ns: *local_tick_ns,
+                        valid_through_ns: *mapping_valid_through_ns,
+                        qualification: *qualification,
+                    },
+                );
+                if previous_tick.is_some_and(|tick| *local_tick_ns < tick) {
                     SchedulerDisposition::ClockRegression
                 } else {
                     SchedulerDisposition::Applied
@@ -527,9 +554,14 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                 produced.insert(event_id.clone());
                 let key = clock_series_key(clock_domain, basis_id, epoch, scale, unit);
                 let current_mapping = active_clock_mapping_ids.get(&key);
+                let mapping = clock_mapping_states.get(clock_mapping_action_id);
                 let previous = event_times.insert(key, *source_timestamp_ns);
-                if current_mapping != Some(clock_mapping_action_id) {
+                if current_mapping != Some(clock_mapping_action_id) || mapping.is_none() {
                     SchedulerDisposition::StaleClockMappingReference
+                } else if mapping.is_some_and(|mapping| mapping.qualification != GateState::Pass) {
+                    SchedulerDisposition::ClockMappingUnqualified
+                } else if mapping.is_some_and(|mapping| *source_timestamp_ns > mapping.valid_through_ns) {
+                    SchedulerDisposition::ClockMappingExpired
                 } else if previous.is_some_and(|timestamp| *source_timestamp_ns < timestamp) {
                     SchedulerDisposition::EventTimeRegression
                 } else {
@@ -782,6 +814,102 @@ fn push_action(
         ordinal,
         action,
     });
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClockMappingFault {
+    Unqualified,
+    Expired,
+    StaleReference,
+}
+
+/// Generate a single-event clock-mapping fault without asserting that the
+/// supplied mapping is trustworthy. Faults remain valid schedule inputs and
+/// are classified by replay against the exact mapping action reference.
+pub fn generate_clock_mapping_fault_schedule(
+    seed: u64,
+    fault: ClockMappingFault,
+) -> VirtualSchedule {
+    let mut actions = Vec::new();
+    let mut ordinal = 0_u64;
+    let first_mapping_action_id = format!("action-{ordinal:06}");
+    let (first_qualification, first_valid_through_ns) = match fault {
+        ClockMappingFault::Unqualified => (GateState::Indeterminate, 100),
+        ClockMappingFault::Expired => (GateState::Pass, 50),
+        ClockMappingFault::StaleReference => (GateState::Pass, 100),
+    };
+    push_action(
+        &mut actions,
+        &mut ordinal,
+        1,
+        ScheduleAction::ClockAdvance {
+            clock_domain: "clock-source".to_owned(),
+            basis_id: "basis-source".to_owned(),
+            epoch: "epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            local_tick_ns: 100,
+            offset_ns: 0,
+            uncertainty_ns: 100,
+            calibration_id: format!("cal-{seed:016x}-first"),
+            mapping_valid_through_ns: first_valid_through_ns,
+            mapping_receipt_ref: format!("synthetic://mapping/{seed:016x}/first"),
+            mapping_receipt_sha256: "1".repeat(64),
+            qualification: first_qualification,
+        },
+    );
+    let mut event_mapping_action_id = first_mapping_action_id.clone();
+    if fault == ClockMappingFault::StaleReference {
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::ClockAdvance {
+                clock_domain: "clock-source".to_owned(),
+                basis_id: "basis-source".to_owned(),
+                epoch: "epoch-0".to_owned(),
+                scale: "tai".to_owned(),
+                unit: "nanoseconds".to_owned(),
+                local_tick_ns: 110,
+                offset_ns: 0,
+                uncertainty_ns: 50,
+                calibration_id: format!("cal-{seed:016x}-second"),
+                mapping_valid_through_ns: 200,
+                mapping_receipt_ref: format!("synthetic://mapping/{seed:016x}/second"),
+                mapping_receipt_sha256: "2".repeat(64),
+                qualification: GateState::Pass,
+            },
+        );
+    }
+    let event_at = if fault == ClockMappingFault::StaleReference { 3 } else { 2 };
+    let event_time = if fault == ClockMappingFault::Expired { 75 } else { 80 };
+    push_action(
+        &mut actions,
+        &mut ordinal,
+        event_at,
+        ScheduleAction::EventProduced {
+            event_id: format!("event-{seed:016x}"),
+            clock_domain: "clock-source".to_owned(),
+            basis_id: "basis-source".to_owned(),
+            epoch: "epoch-0".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            clock_mapping_action_id: event_mapping_action_id.clone(),
+            source_timestamp_ns: event_time,
+            causal_predecessors: Vec::new(),
+        },
+    );
+    VirtualSchedule {
+        schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+        generator_version: GENERATOR_VERSION.to_owned(),
+        seed,
+        scenario_family: match fault {
+            ClockMappingFault::Unqualified => "clock_mapping_unqualified".to_owned(),
+            ClockMappingFault::Expired => "clock_mapping_expired".to_owned(),
+            ClockMappingFault::StaleReference => "clock_mapping_stale_reference".to_owned(),
+        },
+        actions,
+    }
 }
 
 /// Generate a frozen-replay-friendly event-production and network-delivery
@@ -1465,6 +1593,24 @@ mod tests {
             SchedulerDisposition::Duplicate,
             SchedulerDisposition::ConflictingReconciliation,
         ]);
+    }
+
+    #[test]
+    fn clock_mapping_fault_generator_preserves_three_distinct_failures() {
+        let cases = [
+            (ClockMappingFault::Unqualified, SchedulerDisposition::ClockMappingUnqualified),
+            (ClockMappingFault::Expired, SchedulerDisposition::ClockMappingExpired),
+            (ClockMappingFault::StaleReference, SchedulerDisposition::StaleClockMappingReference),
+        ];
+        for (fault, expected) in cases {
+            let schedule = generate_clock_mapping_fault_schedule(0x2026_1115, fault);
+            validate_schedule(&schedule).expect("fault schedule remains structurally valid");
+            let report = replay_virtual_schedule(&schedule).expect("fault schedule replays");
+            assert!(report.records.iter().any(|record| {
+                matches!(record.action, ScheduleAction::EventProduced { .. })
+                    && record.disposition == expected
+            }));
+        }
     }
 
     #[test]
