@@ -8,6 +8,7 @@ on:
       - "xtask/src/plasma_energy_audit.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
+      - "xtask/plasma-audit-harness/**"
       - "data/research/plasma_energy_reference_cases_v0_1.json"
       - "data/research/hts_fusion_magnet_reference_cases_v0_1.json"
       - "data/research/thermal_store_accounting_fixtures_v0_1.json"
@@ -17,6 +18,7 @@ on:
       - "xtask/src/plasma_energy_audit.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
+      - "xtask/plasma-audit-harness/**"
       - "data/research/plasma_energy_reference_cases_v0_1.json"
       - "data/research/hts_fusion_magnet_reference_cases_v0_1.json"
       - "data/research/thermal_store_accounting_fixtures_v0_1.json"
@@ -36,67 +38,13 @@ jobs:
         uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt, clippy
-      - name: Format audit module and export exact Rust 1.96 output
-        shell: bash
-        run: |
-          set -euo pipefail
-          rustfmt --edition 2024 xtask/src/plasma_energy_audit.rs
-          echo "PLASMA_AUDIT_RUSTFMT_BEGIN"
-          base64 -w0 xtask/src/plasma_energy_audit.rs
-          echo
-          echo "PLASMA_AUDIT_RUSTFMT_END"
-      - name: Prepare isolated xtask audit harness
-        shell: bash
-        run: |
-          set -euo pipefail
-          AUDIT_DIR="$RUNNER_TEMP/plasma-energy-audit"
-          mkdir -p "$AUDIT_DIR/src"
-          cp Cargo.lock "$AUDIT_DIR/Cargo.lock"
-          cat > "$AUDIT_DIR/Cargo.toml" <<'EOF'
-          [package]
-          name = "xtask"
-          version = "0.1.0"
-          edition = "2024"
-
-          [workspace]
-
-          [dependencies]
-          serde = { version = "1.0", features = ["derive"] }
-          serde_json = "1.0"
-          clap = { version = "4.4", features = ["derive"] }
-          anyhow = "1.0"
-          csv = "1.3"
-          sha2 = "0.10"
-          toml = "0.8"
-          EOF
-          cat > "$AUDIT_DIR/src/lib.rs" <<EOF
-          #[path = "$GITHUB_WORKSPACE/xtask/src/plasma_energy_audit.rs"]
-          pub mod plasma_energy_audit;
-          EOF
-          cat > "$AUDIT_DIR/src/main.rs" <<'EOF'
-          use std::path::Path;
-
-          fn main() -> anyhow::Result<()> {
-              let report = xtask::plasma_energy_audit::run_audit(
-                  Path::new("data/research/plasma_energy_reference_cases_v0_1.json"),
-                  Path::new("data/research/hts_fusion_magnet_reference_cases_v0_1.json"),
-                  Path::new("data/research/thermal_store_accounting_fixtures_v0_1.json"),
-              )?;
-              xtask::plasma_energy_audit::print_report(&report, true)
-          }
-          EOF
-      - name: Resolve isolated harness lockfile offline
-        run: cargo generate-lockfile --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml"
-      - name: Export resolved isolated harness lockfile
-        shell: bash
-        run: |
-          echo "PLASMA_AUDIT_LOCK_BEGIN"
-          base64 -w0 "$RUNNER_TEMP/plasma-energy-audit/Cargo.lock"
-          echo
-          echo "PLASMA_AUDIT_LOCK_END"
+      - name: Format check of audit module
+        run: rustfmt --edition 2024 --check xtask/src/plasma_energy_audit.rs
+      - name: Format check of isolated harness
+        run: cargo fmt --manifest-path xtask/plasma-audit-harness/Cargo.toml -- --check
       - name: Unit tests for the exact xtask audit module
-        run: cargo test --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --locked
+        run: cargo test --manifest-path xtask/plasma-audit-harness/Cargo.toml --locked
       - name: Strict Clippy for the exact xtask audit module
-        run: cargo clippy --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --all-targets --locked --offline -- -D warnings
+        run: cargo clippy --manifest-path xtask/plasma-audit-harness/Cargo.toml --all-targets --locked -- -D warnings
       - name: Audit frozen plasma and thermal source corpora
-        run: cargo run --manifest-path "$RUNNER_TEMP/plasma-energy-audit/Cargo.toml" --locked --offline
+        run: cargo run --manifest-path xtask/plasma-audit-harness/Cargo.toml --locked
