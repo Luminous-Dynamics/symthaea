@@ -245,7 +245,9 @@
         "suspected_cause_families",
         "claimed_current_obligations",
         "blocked_obligations",
-        "uses_prior_evidence"
+        "uses_prior_evidence",
+        "observation_ids_used",
+        "claimed_independent_source_count"
       ],
       "properties": {
         "decision_id": {
@@ -287,6 +289,18 @@
         },
         "uses_prior_evidence": {
           "type": "boolean"
+        },
+        "observation_ids_used": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "claimed_independent_source_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     },
