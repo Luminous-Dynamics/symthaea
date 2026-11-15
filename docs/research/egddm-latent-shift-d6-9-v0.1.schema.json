@@ -297,7 +297,8 @@
         "trace_id",
         "episode_id",
         "probe_requests",
-        "decisions"
+        "decisions",
+        "probe_responses"
       ],
       "properties": {
         "trace_id": {
@@ -320,6 +321,12 @@
           "items": {
             "$ref": "#/$defs/decision"
           }
+        },
+        "probe_responses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/observation"
+          }
         }
       }
     },
@@ -330,7 +337,7 @@
         "visibility",
         "truth_kind",
         "hidden_event_time",
-        "hidden_availability_time",
+        "first_sufficient_observation_available_at",
         "changed_dimensions",
         "affected_obligations",
         "unaffected_obligations",
@@ -347,9 +354,6 @@
           ]
         },
         "hidden_event_time": {
-          "$ref": "#/$defs/time"
-        },
-        "hidden_availability_time": {
           "$ref": "#/$defs/time"
         },
         "changed_dimensions": {
@@ -383,6 +387,9 @@
               "type": "string"
             }
           }
+        },
+        "first_sufficient_observation_available_at": {
+          "$ref": "#/$defs/time"
         }
       }
     },
