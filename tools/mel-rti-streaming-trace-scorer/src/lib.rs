@@ -617,12 +617,7 @@ pub fn score_streaming_session_v1(
     let mut effect_frame_errors = Vec::new();
     let mut scored_chunks = Vec::with_capacity(chunks.len());
 
-    for (index, ((chunk, label), prediction)) in chunks
-        .iter()
-        .zip(truth)
-        .zip(predictions)
-        .enumerate()
-    {
+    for ((chunk, label), prediction) in chunks.iter().zip(truth).zip(predictions) {
         let latency = prediction
             .decision_at_ns
             .saturating_sub(prediction.chunk_received_at_ns);
@@ -710,7 +705,6 @@ pub fn score_streaming_session_v1(
             effect_frame_error: effect_error,
             effect_window_success,
         });
-        let _ = index;
     }
 
     let mut leakage_chunks = BTreeSet::new();
@@ -929,6 +923,43 @@ mod tests {
     }
 
     #[test]
+    fn always_wait_baseline_is_not_mistaken_for_a_contingent_policy() {
+        let req = request();
+        let chunks = chunks();
+        let truth = truth();
+        let mut predictions = predictions(&req);
+        for prediction in &mut predictions {
+            prediction.decision = PredictedTurnDecisionV1::Wait;
+            prediction.effect_frame = None;
+            prediction.effect_at_ns = None;
+            prediction.parse_failure_sha256 = None;
+        }
+        let report = run(&req, &chunks, &truth, &predictions).unwrap();
+        assert_eq!(report.summary.top1_accuracy_bp, Some(4_000));
+        assert_eq!(report.summary.wait_false_activation_count, 0);
+        assert_eq!(report.summary.effect_window_success_count, 0);
+        assert_eq!(report.summary.effect_window_success_bp, Some(0));
+    }
+
+    #[test]
+    fn always_respond_baseline_false_activates_during_wait() {
+        let req = request();
+        let chunks = chunks();
+        let truth = truth();
+        let mut predictions = predictions(&req);
+        for (index, prediction) in predictions.iter_mut().enumerate() {
+            prediction.decision = PredictedTurnDecisionV1::Respond;
+            prediction.effect_frame = Some((index as u64 + 1) * 20 + 1);
+            prediction.effect_at_ns = Some(prediction.decision_at_ns + 20);
+            prediction.parse_failure_sha256 = None;
+        }
+        let report = run(&req, &chunks, &truth, &predictions).unwrap();
+        assert_eq!(report.summary.wait_false_activation_count, 2);
+        assert_eq!(report.summary.effect_window_eligible_count, 2);
+        assert_eq!(report.summary.effect_window_success_count, 1);
+    }
+
+    #[test]
     fn parse_failure_is_not_counted_as_wait() {
         let req = request();
         let chunks = chunks();
@@ -1004,6 +1035,20 @@ mod tests {
         assert_eq!(
             run(&req, &chunks, &truth, &predictions),
             Err(StreamScorerErrorV1::DecisionBeforeReceipt)
+        );
+    }
+
+    #[test]
+    fn monotonic_runner_clock_regression_is_rejected_independently_of_audio_time() {
+        let req = request();
+        let chunks = chunks();
+        let truth = truth();
+        let mut predictions = predictions(&req);
+        predictions[2].chunk_received_at_ns = predictions[1].chunk_received_at_ns - 1;
+        predictions[2].decision_at_ns = predictions[2].chunk_received_at_ns + 1;
+        assert_eq!(
+            run(&req, &chunks, &truth, &predictions),
+            Err(StreamScorerErrorV1::ClockRegression)
         );
     }
 
