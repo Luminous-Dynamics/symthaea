@@ -177,14 +177,14 @@ fn sha256_hex(bytes: &[u8]) -> String {
 
 fn receipt_digest(
     scenario: &ShiftScenario,
-    arm: &ShiftArm,
+    arm_id: &str,
     receipt: &CheckReceipt,
 ) -> Result<String, String> {
     let material = ReceiptMaterial {
         schema_version: &scenario.schema_version,
         scenario_id: &scenario.scenario_id,
         repository_full_name: &scenario.repository_full_name,
-        arm_id: &arm.arm_id,
+        arm_id,
         receipt_id: &receipt.receipt_id,
         obligation_id: &receipt.obligation_id,
         check_id: &receipt.check_id,
@@ -379,7 +379,7 @@ fn validate_scenario(scenario: &ShiftScenario) -> Result<(), String> {
                     return Err(format!("receipt {} was not available at the checkpoint cutoff", receipt.receipt_id));
                 }
                 if !valid_hex(&receipt.receipt_digest, &[64])
-                    || receipt_digest(scenario, arm, receipt)? != receipt.receipt_digest.to_ascii_lowercase()
+                    || receipt_digest(scenario, &arm.arm_id, receipt)? != receipt.receipt_digest.to_ascii_lowercase()
                 {
                     return Err(format!("receipt {} digest mismatch", receipt.receipt_id));
                 }
@@ -577,6 +577,7 @@ mod tests {
         let digest_scenario = scenario.clone();
         let shifted = scenario.arms.iter_mut()
             .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
+        let arm_id = shifted.arm_id.clone();
         let checkpoint = shifted.checkpoints.last_mut().expect("final checkpoint");
         let receipt = checkpoint.receipts.iter_mut()
             .find(|receipt| receipt.obligation_id == "api-contract").expect("api receipt");
@@ -585,7 +586,7 @@ mod tests {
         receipt.revision = source.revision.clone();
         receipt.tree_oid = source.tree_oid.clone();
         receipt.configuration_world_digest = source.configuration_world_digest.clone();
-        receipt.receipt_digest = receipt_digest(&digest_scenario, shifted, receipt).expect("reseal test receipt");
+        receipt.receipt_digest = receipt_digest(&digest_scenario, &arm_id, receipt).expect("reseal test receipt");
         let report = evaluate_shift_scenario(&scenario).expect("trace remains structurally valid");
         let shifted_score = report.arm_scores.iter()
             .find(|score| score.condition == ArmCondition::Shifted).expect("shifted score");
@@ -614,6 +615,7 @@ mod tests {
         let digest_scenario = scenario.clone();
         let shifted = scenario.arms.iter_mut()
             .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
+        let arm_id = shifted.arm_id.clone();
         let receipt = shifted.checkpoints.last_mut().expect("final checkpoint").receipts.iter_mut()
             .find(|receipt| receipt.obligation_id == "audit-requirement").expect("audit receipt");
         receipt.source_epoch = 0;
@@ -678,9 +680,10 @@ mod tests {
         let digest_scenario = scenario.clone();
         let clean = scenario.arms.iter_mut()
             .find(|arm| arm.condition == ArmCondition::Clean).expect("clean arm");
+        let arm_id = clean.arm_id.clone();
         let mut duplicate = clean.checkpoints[0].receipts[0].clone();
         duplicate.receipt_id = "duplicate-receipt".to_owned();
-        duplicate.receipt_digest = receipt_digest(&digest_scenario, clean, &duplicate).expect("reseal");
+        duplicate.receipt_digest = receipt_digest(&digest_scenario, &arm_id, &duplicate).expect("reseal");
         clean.checkpoints[0].receipts.push(duplicate);
         assert!(evaluate_shift_scenario(&scenario).is_err());
     }
