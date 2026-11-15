@@ -52,3 +52,11 @@ The `identity` module evaluates a finite labelled transition-system relation bet
 A pass is relative to the declared finite models and action/observation alphabet. It is not universal behavioral equivalence, a metaphysical identity claim, or proof that the candidate was authorized or actually executed. Governance and evidence continuity still require the external authority and authenticated runtime-receipt planes.
 
 Focused API: `evaluate_operational_continuity(baseline, candidate, policy)`.
+
+## Stochastic sequential assay pilot
+
+The `bernoulli_sequential` module adds a two-arm Bernoulli pilot with a time-uniform Hoeffding confidence sequence. It separates evaluator-only arm probabilities from agent-visible scenarios, requires assignment/delivery/isolation/observation evidence, charges every attempted sample against budgets, rejects premature claims and post-boundary sampling, and records coverage/false-positive scoring against hidden truth after the episode closes.
+
+The confidence sequence allocates alpha/2 to each arm and spends each arm's error budget across qualified sample counts in proportion to 1/n^2. It is valid only for iid Bernoulli observations with predictable allocation and qualified sampling. Any unavailable or rejected evidence blocks a qualified conclusion; the module does not authenticate the receipts themselves.
+
+This is not a general causal estimator, does not establish statistical power from a single episode, and does not cover drift, interference, outcome-dependent missingness, noncompliance estimands or multiple endpoints. Run the package's independent locked-workspace format, check, test and Clippy commands before treating the implementation as validated.
