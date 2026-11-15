@@ -184,9 +184,9 @@ Composition requires `r(t+s) = r(t) r(s)`. Under continuity and `r(0)=1`, the sc
 
 One way to preserve the interpretation of \`sigma_base\` as the interpolation fraction at \`dt = tau\` is to define a rate:
 
-\\[\\lambda=-\\frac{\\ln(1-\\sigma_{\\mathrm{base}})}{\\tau},\\qquad
-\\sigma_{\\mathrm{rate}}(\\Delta t)=1-e^{-\\lambda\\Delta t}
-=1-(1-\\sigma_{\\mathrm{base}})^{\\Delta t/\\tau}.\\]
+\[\lambda=-\frac{\ln(1-\sigma_{\mathrm{base}})}{\tau},\qquad
+\sigma_{\mathrm{rate}}(\Delta t)=1-e^{-\lambda\Delta t}
+=1-(1-\sigma_{\mathrm{base}})^{\Delta t/\tau}.\]
 
 Let \`a = gate_activation * gating_steepness\`. Since \`sigma_base = sigmoid(a)\`, the identity \`-ln(1 - sigmoid(a)) = softplus(a)\` gives a better numerical implementation:
 
