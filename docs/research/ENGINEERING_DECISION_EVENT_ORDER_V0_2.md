@@ -141,3 +141,14 @@ Report confusion matrices, risk/coverage, disposition/reason code distribution, 
 ## 10. Nonclaims
 
 This kernel does not authenticate a clock mapping receipt; it consumes the owner qualification. It does not prove event completeness, physical sensor integrity, source honesty, physical safety, transaction linearizability or industrial superiority. Synthetic tests are regression controls, not population reliability evidence.
+
+
+## 11. Generated property tests
+
+The integration test target `tests/event_order_v0_2_properties.rs` uses Proptest for generated interval and attempt-chain properties, with shrinking of counterexamples. It covers:
+
+- antisymmetry of the five-way comparator for valid same-basis intervals;
+- translation invariance when both event intervals and their shared validity window shift by the same amount;
+- attempt-lifecycle report invariance under reverse and rotated delivery orders for generated valid retry chains.
+
+The properties complement the named unit cases; they do not simulate a real network, physical clock, executor, or owner verifier. On failure, preserve the Proptest seed and minimized counterexample with the exact commit. A passing property target is still not evidence of production clock calibration or physical event completeness.

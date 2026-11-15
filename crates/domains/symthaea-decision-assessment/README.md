@@ -92,3 +92,10 @@ These tests are authored but are not qualified as passed until executed at the e
 ## Event-order benchmark protocol
 
 The full methodology, baselines, metrics and claim boundaries for the distributed stop/effect evaluator are documented in [ENGINEERING_DECISION_EVENT_ORDER_V0_1.md](../../../docs/research/ENGINEERING_DECISION_EVENT_ORDER_V0_1.md). The protocol distinguishes effect-before-trigger from effect-after-trigger, uses five-way partial-order results, requires an independently bound stop-disposition receipt, and treats unknown operation outcomes as pending. The fixture has eleven synthetic traces. `action-event-order-mutations-v0.1.json` adds 26 preregistered mutation controls (not executed outcomes). The Rust reference suite now has twelve test functions, including canonical digest, independent ordering, delivery permutation, malformed trace, receipt-binding, operation chronology, cancellation-order and mutation-manifest integrity controls. These remain authored, not compiled/executed, until exact-head toolchain evidence is recorded.
+
+
+## Event-order v0.2 contract kernel
+
+The additive `event_order_v0_2` module introduces explicit time-basis descriptors, qualified interval comparison, bitemporal visibility at decision frontier K, attempt identity and exact start/terminal/retry event bindings, and independently scoped stop obligations. Stop discharges commit to the exact in-flight inventory frontier and canonical attempt-manifest digest. These are owner-qualified inputs, not signature verification or effect authority. See [ENGINEERING_DECISION_EVENT_ORDER_V0_2.md](../../../docs/research/ENGINEERING_DECISION_EVENT_ORDER_V0_2.md).
+
+Generated properties live in `tests/event_order_v0_2_properties.rs`; they are authored, not executed, until exact-head Rust toolchain evidence is recorded.
