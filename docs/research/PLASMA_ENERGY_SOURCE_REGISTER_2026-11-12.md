@@ -792,3 +792,8 @@ The 7 July 2026 JACS study, *Plasma-Electrocatalytic Nitrogen Reduction for Ammo
 These are valuable reactor-level mechanism and selectivity results, not a complete plant energy metric. The 2026 industrial roadmap separately reports plasma-ammonia synthesis energy yields around 0.3–3 g NH3/kWh and about 127 g NH3/kWh for Haber–Bosch, but explicitly notes that the stated comparison excludes hydrogen-production energy. Neither the JACS area-normalized rate nor its electrochemical Faradaic efficiency can be promoted into full-chain grid-to-ammonia efficiency.
 
 A third machine-readable target, `NH3-PLASMA-SYNTHESIS-FULL-CHAIN-001`, requires at least 3 g accepted NH3/kWh after including hydrogen generation, plasma and electrolysis power, gas/feed handling and product separation, with a matched Haber–Bosch baseline under the same H2-energy boundary. This is a research target, not an achieved result.
+
+
+## 9.19 Power-to-X biogas reforming stretch target
+
+`BIOGAS-PLASMA-SYNGAS-COST-001` binds the September 2026 biogas-to-syngas source case to a falsifiable challenge: <= EUR 600/t accepted syngas while maintaining >=44% plant efficiency at the same operating point. The target requires matched syngas composition/quality, complete grid-side plant energy, electricity price and capacity-factor scenario, downstream product service and no speculative coproduct credit. It is a research goal, not a result or a direct reuse of the source's separate favourable-cost and baseline-efficiency numbers.
