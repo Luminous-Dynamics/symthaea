@@ -1408,6 +1408,26 @@ mod tests {
                 "ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh": 3.0,
                 "all_thresholds_must_hold_at_same_operating_point": true
             })
+        } else if lane == "AMMONIA_N2_VIBRATIONAL_TRANSFER" {
+            serde_json::json!({
+                "all_required_evidence_gates_must_hold": true,
+                "state_resolved_interface_population_or_qualified_operator_required": true,
+                "discharge_to_interface_transfer_uncertainty_required": true,
+                "isotope_attributed_product_control_required": true,
+                "matched_thermal_and_electrical_controls_required": true,
+                "full_grid_to_accepted_nh3_boundary_required": true
+            })
+        } else if lane == "AMMONIA_N2_VIBRATIONAL_TRANSFER" {
+            serde_json::json!({
+                "direct_catalyst_interface_state_measurement_or_independently_validated_measurement_operator_required": true,
+                "modelled_state_temperature_remains_model_evidence": true,
+                "measured_intermediate_and_quantitative_flux_remain_distinct_measurands": true,
+                "plasma_only_and_electrolysis_only_controls_required": true,
+                "isotope_product_attribution_required_for_nitrogen_source_claim": true,
+                "catalyst_lot_and_surface_identity_must_match": true,
+                "all_energy_inputs_and_accepted_product_separation_included": true,
+                "no_claim_of_unique_vibrational_causality_without_matched_thermal_controls": true
+            })
         } else if lane == "AMMONIA_CRACKING_THERMAL_INTEGRATION" {
             serde_json::json!({
                 "ammonia_conversion_min_fraction": 0.99,
@@ -1522,6 +1542,51 @@ mod tests {
                 .to_string()
                 .contains("hydrogen_generation_energy_included")
         );
+    }
+
+    #[test]
+    fn source_manifest_accepts_n2_vibrational_transfer_target() {
+        let source = minimal_benchmark_target_manifest("AMMONIA_N2_VIBRATIONAL_TRANSFER");
+        let summary = audit_source_value(&source, "n2-vibrational-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_n2_vibrational_target_without_interface_gate() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_N2_VIBRATIONAL_TRANSFER");
+        source["benchmark_targets"][0]["claim_guards"]
+            ["direct_catalyst_interface_state_measurement_or_independently_validated_measurement_operator_required"] =
+            serde_json::json!(false);
+        let error = audit_source_value(&source, "n2-vibrational-target.json").unwrap_err();
+        assert!(error.to_string().contains("direct_catalyst_interface_state_measurement"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_modelled_n2_population_promoted_to_interface_measurement() {
+        let mut source: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        )).unwrap();
+        let case = source["cases"].as_array_mut().unwrap().iter_mut().find(|item| {
+            item["case_id"] == "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026"
+        }).unwrap();
+        case["state_transfer_evidence"]["model_derived_estimates"][0]
+            ["interface_direct_measurement"] = serde_json::json!(true);
+        let error = audit_source_value(&source, "n2-vibrational-source.json").unwrap_err();
+        assert!(error.to_string().contains("cannot claim a direct catalyst-interface measurement"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_missing_n2_isotope_attribution_control() {
+        let mut source: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        )).unwrap();
+        let case = source["cases"].as_array_mut().unwrap().iter_mut().find(|item| {
+            item["case_id"] == "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026"
+        }).unwrap();
+        case["state_transfer_evidence"]["physical_observations"][0]["observation"] =
+            serde_json::json!("on/off controls only");
+        let error = audit_source_value(&source, "n2-vibrational-source.json").unwrap_err();
+        assert!(error.to_string().contains("preserve 15N2 attribution"));
     }
 
     #[test]
@@ -2114,6 +2179,94 @@ fn validate_co2_counterflow_operating_points(case: &Value, display_name: &str) -
     Ok(())
 }
 
+fn validate_nh3_n2_vibrational_transfer_case(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: NH3 N2 vibrational transfer evidence");
+    let state = case
+        .get("state_transfer_evidence")
+        .with_context(|| format!("{context}: state_transfer_evidence is missing"))?;
+    let physical = state
+        .get("physical_observations")
+        .and_then(Value::as_array)
+        .filter(|items| !items.is_empty())
+        .with_context(|| format!("{context}: physical_observations must be a non-empty array"))?;
+    let model = state
+        .get("model_derived_estimates")
+        .and_then(Value::as_array)
+        .filter(|items| !items.is_empty())
+        .with_context(|| format!("{context}: model_derived_estimates must be a non-empty array"))?;
+
+    ensure!(
+        physical.iter().any(|item| {
+            item.get("evidence_class").and_then(Value::as_str)
+                == Some("PUBLISHED_EXPERIMENTAL_CONTROL")
+                && item.get("observation").and_then(Value::as_str)
+                    .is_some_and(|value| value.contains("15N2"))
+        }),
+        "{context}: source must preserve 15N2 attribution as an experimental control"
+    );
+    ensure!(
+        physical.iter().any(|item| {
+            item.get("evidence_class").and_then(Value::as_str)
+                == Some("PUBLISHED_IN_SITU_SPECTROSCOPY")
+                && item.get("observation").and_then(Value::as_str)
+                    .is_some_and(|value| value.to_ascii_lowercase().contains("raman"))
+        }),
+        "{context}: in-situ Raman intermediate observation must remain separate physical evidence"
+    );
+    ensure!(
+        physical.iter().any(|item| {
+            item.get("evidence_class").and_then(Value::as_str)
+                == Some("PUBLISHED_EXPERIMENTAL_PRODUCT_OBSERVATION")
+        }),
+        "{context}: product rate/FE must remain source-classified experimental observations"
+    );
+
+    for (metric, expected) in [
+        ("effective_N2_vibrational_state_temperature", 4300.0),
+        ("N2_population_in_v4_to_v8", 0.118),
+    ] {
+        let entry = model.iter().find(|item| {
+            item.get("metric").and_then(Value::as_str) == Some(metric)
+        }).with_context(|| format!("{context}: missing model-derived metric {metric}"))?;
+        ensure!(
+            entry.get("evidence_class").and_then(Value::as_str) == Some("MODEL_DERIVED"),
+            "{context}: {metric} must remain MODEL_DERIVED, not a physical measurement"
+        );
+        ensure!(
+            entry.get("interface_direct_measurement").and_then(Value::as_bool) == Some(false),
+            "{context}: {metric} cannot claim a direct catalyst-interface measurement"
+        );
+        ensure!(
+            entry.get("value").and_then(Value::as_f64)
+                .is_some_and(|value| close_f64(value, expected)),
+            "{context}: {metric} source-pinned model estimate changed"
+        );
+    }
+
+    let policy = state.get("claim_policy")
+        .with_context(|| format!("{context}: claim_policy is missing"))?;
+    for key in [
+        "model_derived_population_must_not_be_relabelled_physical_measurement",
+        "discharge_exit_population_must_not_be_substituted_for_interface_population",
+        "raman_intermediate_signal_must_not_be_substituted_for_quantitative_state_flux",
+        "isotope_attribution_is_not_equivalent_to_state_resolved_mechanism_proof",
+        "faradaic_efficiency_is_not_equivalent_to_full_system_energy_efficiency",
+    ] {
+        ensure!(
+            policy.get(key).and_then(Value::as_bool) == Some(true),
+            "{context}: missing evidence-separation policy {key}"
+        );
+    }
+    ensure!(
+        state.get("not_established").and_then(Value::as_array).is_some_and(|items| {
+            items.iter().any(|item| item.as_str()
+                .is_some_and(|value| value.contains("catalyst interface")))
+        }),
+        "{context}: missing explicit statement that catalyst-interface state is not established"
+    );
+    Ok(())
+}
+
 fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifestSummary> {
     let programme = root
         .get("programme")
@@ -2197,6 +2350,9 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
 
         if case_id == "NH3-CRACK-MW-ATM-MECHANISM-2026" {
             validate_nh3_operating_points(case, display_name)?;
+        }
+        if case_id == "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026" {
+            validate_nh3_n2_vibrational_transfer_case(case, display_name)?;
         }
         let lane = case.get("lane").and_then(Value::as_str);
         if lane == Some("METHANE_PYROLYSIS") {
@@ -2576,6 +2732,37 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     ensure!(
                         guards.get(key).and_then(Value::as_bool) == Some(true),
                         "{display_name}: ammonia thermal-integration target {target_id} is missing required guard {key}"
+                    );
+                }
+            }
+            "AMMONIA_N2_VIBRATIONAL_TRANSFER" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                for key in [
+                    "all_required_evidence_gates_must_hold",
+                    "state_resolved_interface_population_or_qualified_operator_required",
+                    "discharge_to_interface_transfer_uncertainty_required",
+                    "isotope_attributed_product_control_required",
+                    "matched_thermal_and_electrical_controls_required",
+                    "full_grid_to_accepted_nh3_boundary_required",
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: N2 vibrational-transfer target {target_id} is missing required metric gate {key}"
+                    );
+                }
+                for key in [
+                    "direct_catalyst_interface_state_measurement_or_independently_validated_measurement_operator_required",
+                    "modelled_state_temperature_remains_model_evidence",
+                    "measured_intermediate_and_quantitative_flux_remain_distinct_measurands",
+                    "plasma_only_and_electrolysis_only_controls_required",
+                    "isotope_product_attribution_required_for_nitrogen_source_claim",
+                    "catalyst_lot_and_surface_identity_must_match",
+                    "all_energy_inputs_and_accepted_product_separation_included",
+                    "no_claim_of_unique_vibrational_causality_without_matched_thermal_controls",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: N2 vibrational-transfer target {target_id} is missing claim guard {key}"
                     );
                 }
             }
