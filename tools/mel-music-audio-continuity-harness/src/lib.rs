@@ -178,6 +178,13 @@ pub struct AudioBoundaryMeasurementV1 {
 pub struct AudioStepEvaluationV1 {
     pub sequence: u8,
     pub step_id: String,
+    pub operation_id: String,
+    pub instruction_sha256: String,
+    pub source_lineage_sha256: String,
+    pub edit_regions: Vec<FrameWindowV1>,
+    pub transition_support: Vec<FrameWindowV1>,
+    pub boundary_policy: AudioBoundaryPolicyV1,
+    pub upstream_gates: AudioUpstreamGatesV1,
     pub parent_audio_sha256: String,
     pub output_audio_sha256: String,
     pub authorized_frame_count: u64,
@@ -208,6 +215,7 @@ pub enum AudioSequenceDispositionV1 {
 #[serde(deny_unknown_fields)]
 pub struct AudioSequenceEvaluationV1 {
     pub schema_version: String,
+    pub request: AudioSequenceRequestV1,
     pub session_id: String,
     pub disposition: AudioSequenceDispositionV1,
     pub expected_step_count: u8,
@@ -232,6 +240,7 @@ pub struct AudioSequenceEvaluationV1 {
 pub enum AudioContinuityErrorV1 {
     InvalidRequest,
     InvalidDigest,
+    OperationPlanMismatch,
     InvalidFormat,
     InvalidSampleLayout,
     FrameCountMismatch,
@@ -256,6 +265,7 @@ impl fmt::Display for AudioContinuityErrorV1 {
         f.write_str(match self {
             Self::InvalidRequest => "audio sequence request schema, identity or length is invalid",
             Self::InvalidDigest => "a required SHA-256 digest is malformed",
+            Self::OperationPlanMismatch => "frozen operation-plan digest does not match the submitted steps",
             Self::InvalidFormat => "PCM format is invalid or changed during the session",
             Self::InvalidSampleLayout => "interleaved PCM sample layout is invalid",
             Self::FrameCountMismatch => "audio frame count changed during the session",
@@ -478,9 +488,66 @@ fn count_authorized_frames(support: &[FrameWindowV1]) -> u64 {
     support.iter().map(|window| window.end_frame - window.start_frame).sum()
 }
 
+#[derive(Serialize)]
+struct AudioOperationPlanStepV1<'a> {
+    schema_version: &'a str,
+    sequence: u8,
+    step_id: &'a str,
+    operation_id: &'a str,
+    instruction_sha256: &'a str,
+    source_lineage_sha256: &'a str,
+    parent_audio_sha256: &'a str,
+    output_audio_sha256: &'a str,
+    edit_regions: &'a [FrameWindowV1],
+    transition_support: &'a [FrameWindowV1],
+    boundary_policy: AudioBoundaryPolicyV1,
+    upstream_gates: AudioUpstreamGatesV1,
+    candidate_attempt_count: u16,
+    failed_candidate_attempt_count: u16,
+    render_call_count: u16,
+    retry_count: u16,
+    manual_intervention_count: u16,
+}
+
+/// Hash the complete immutable edit plan without duplicating raw audio bytes;
+/// parent/output artifact hashes commit to the actual PCM payloads.
+pub fn audio_operation_plan_sha256_v1(
+    steps: &[AudioSequenceStepV1],
+) -> Result<String, AudioContinuityErrorV1> {
+    let projection: Vec<AudioOperationPlanStepV1<'_>> = steps.iter().map(|step| {
+        AudioOperationPlanStepV1 {
+            schema_version: &step.schema_version,
+            sequence: step.sequence,
+            step_id: &step.step_id,
+            operation_id: &step.operation_id,
+            instruction_sha256: &step.instruction_sha256,
+            source_lineage_sha256: &step.source_lineage_sha256,
+            parent_audio_sha256: &step.parent_audio_sha256,
+            output_audio_sha256: &step.output_audio_sha256,
+            edit_regions: &step.edit_regions,
+            transition_support: &step.transition_support,
+            boundary_policy: step.boundary_policy,
+            upstream_gates: step.upstream_gates,
+            candidate_attempt_count: step.candidate_attempt_count,
+            failed_candidate_attempt_count: step.failed_candidate_attempt_count,
+            render_call_count: step.render_call_count,
+            retry_count: step.retry_count,
+            manual_intervention_count: step.manual_intervention_count,
+        }
+    }).collect();
+    let bytes = serde_json::to_vec(&projection)
+        .map_err(|_| AudioContinuityErrorV1::SerializationFailure)?;
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous.mel.audio-operation-plan.v1");
+    hasher.update([0]);
+    hasher.update(bytes);
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct AudioReportPayloadV1 {
     schema_version: String,
+    request: AudioSequenceRequestV1,
     session_id: String,
     disposition: AudioSequenceDispositionV1,
     expected_step_count: u8,
@@ -519,6 +586,10 @@ pub fn evaluate_audio_sequence_v1(
         if !valid_sha256(digest) {
             return Err(AudioContinuityErrorV1::InvalidDigest);
         }
+    }
+    let actual_plan_sha256 = audio_operation_plan_sha256_v1(steps)?;
+    if actual_plan_sha256 != request.operation_plan_sha256 {
+        return Err(AudioContinuityErrorV1::OperationPlanMismatch);
     }
     validate_format(request.format)?;
     let source_frames = source.frame_count()?;
@@ -668,6 +739,13 @@ pub fn evaluate_audio_sequence_v1(
         reports.push(AudioStepEvaluationV1 {
             sequence: step.sequence,
             step_id: step.step_id.clone(),
+            operation_id: step.operation_id.clone(),
+            instruction_sha256: step.instruction_sha256.clone(),
+            source_lineage_sha256: step.source_lineage_sha256.clone(),
+            edit_regions: step.edit_regions.clone(),
+            transition_support: step.transition_support.clone(),
+            boundary_policy: step.boundary_policy,
+            upstream_gates: step.upstream_gates,
             parent_audio_sha256: current_sha.clone(),
             output_audio_sha256: actual_output_sha.clone(),
             authorized_frame_count: count_authorized_frames(&support),
@@ -695,6 +773,7 @@ pub fn evaluate_audio_sequence_v1(
 
     let payload = AudioReportPayloadV1 {
         schema_version: "mel-music-audio-sequence-report-v1".to_owned(),
+        request: request.clone(),
         session_id: request.session_id.clone(),
         disposition,
         expected_step_count: request.expected_step_count,
@@ -722,6 +801,7 @@ pub fn evaluate_audio_sequence_v1(
 
     Ok(AudioSequenceEvaluationV1 {
         schema_version: "mel-music-audio-sequence-report-v1".to_owned(),
+        request: payload.request,
         session_id: payload.session_id,
         disposition,
         expected_step_count: request.expected_step_count,
