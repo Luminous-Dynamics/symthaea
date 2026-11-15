@@ -40,6 +40,7 @@ pub struct TeamTrajectory {
 #[serde(deny_unknown_fields)]
 pub struct TeamCycle {
     pub schema_version: String,
+    pub team_id: String,
     pub cycle_index: u64,
     pub run_id: String,
     pub scenario_id: String,
@@ -117,6 +118,9 @@ pub fn validate_trajectory(
     for (position, cycle) in trajectory.cycles.iter().enumerate() {
         if cycle.schema_version != CYCLE_SCHEMA {
             bail!("cycle {position}: unsupported team cycle schema version");
+        }
+        if cycle.team_id != trajectory.team_id {
+            bail!("cycle {position}: team_id does not match the parent trajectory");
         }
         if cycle.cycle_index != position as u64 {
             bail!(
