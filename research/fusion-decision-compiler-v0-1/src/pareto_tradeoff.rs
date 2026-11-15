@@ -400,13 +400,6 @@ fn worse_dimensions(
     ObjectiveDimension::ALL
         .into_iter()
         .filter(|dimension| {
-            if matches!(
-                dimension,
-                ObjectiveDimension::OperationalAvailability
-                    | ObjectiveDimension::EngineeringBurdenIndex
-            ) {
-                return false;
-            }
             let Some(winner_value) = objective_value(winner, *dimension).map(|item| item.value)
             else {
                 return false;
@@ -470,7 +463,7 @@ pub fn compare_pair(
         (DominanceRelation::Equivalent, _) => {
             ScalarTradeoffDisposition::ScalarPreferenceBetweenEquivalentVectors
         }
-        (DominanceRelation::NonDominatedTradeoff, _) => {
+        (DominanceRelation::NonDominatedTradeoff, ScalarPreference::First | ScalarPreference::Second) => {
             ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff
         }
         (_, ScalarPreference::Tie) => ScalarTradeoffDisposition::NoScalarPreference,
@@ -699,6 +692,40 @@ mod tests {
             report.scalar_tradeoff,
             ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff
         );
+    }
+
+    #[test]
+    fn q_eng_ratio_can_trade_availability_for_ebi() {
+        let profile = profile();
+        let lower_availability = candidate(
+            "lower-availability",
+            8_000.0,
+            12_000.0,
+            0.80,
+            500.0,
+            300.0,
+            0.20,
+            25.0,
+        );
+        let higher_availability = candidate(
+            "higher-availability",
+            12_000.0,
+            8_000.0,
+            0.95,
+            650.0,
+            350.0,
+            0.40,
+            15.0,
+        );
+        let report = compare_pair(&profile, &lower_availability, &higher_availability);
+        assert_eq!(report.scalar_preference, ScalarPreference::First);
+        assert_eq!(report.dominance, DominanceRelation::NonDominatedTradeoff);
+        assert!(report
+            .scalar_winner_worse_dimensions
+            .contains(&ObjectiveDimension::OperationalAvailability));
+        assert!(report
+            .scalar_winner_worse_dimensions
+            .contains(&ObjectiveDimension::LifetimeNetElectricEnergyMwh));
     }
 
     #[test]
