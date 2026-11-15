@@ -530,14 +530,22 @@ pub fn verify_loft_artifact_integrity(
         );
     }
 
+    let side_end = artifact
+        .side_face_range
+        .first_face
+        .checked_add(artifact.side_face_range.face_count);
+    let waterplane_end = artifact
+        .waterplane_face_range
+        .first_face
+        .checked_add(artifact.waterplane_face_range.face_count);
+    let end_cap_end = artifact
+        .end_cap_face_range
+        .first_face
+        .checked_add(artifact.end_cap_face_range.face_count);
     if artifact.side_face_range.first_face != 0
-        || artifact.waterplane_face_range.first_face
-            != artifact.side_face_range.first_face + artifact.side_face_range.face_count
-        || artifact.end_cap_face_range.first_face
-            != artifact.waterplane_face_range.first_face
-                + artifact.waterplane_face_range.face_count
-        || artifact.end_cap_face_range.first_face + artifact.end_cap_face_range.face_count
-            != face_count
+        || side_end != Some(artifact.waterplane_face_range.first_face)
+        || waterplane_end != Some(artifact.end_cap_face_range.first_face)
+        || end_cap_end != Some(face_count)
     {
         violation(
             &mut violations,
