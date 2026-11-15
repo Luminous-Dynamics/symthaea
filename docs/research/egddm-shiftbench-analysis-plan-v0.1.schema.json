@@ -144,7 +144,8 @@
         "baseline_candidates",
         "candidate",
         "primary_comparator_selection",
-        "ablation_comparisons"
+        "ablation_comparisons",
+        "lower_bound_references"
       ],
       "properties": {
         "baseline_candidates": {
@@ -163,6 +164,14 @@
           "minLength": 20
         },
         "ablation_comparisons": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "lower_bound_references": {
           "type": "array",
           "minItems": 2,
           "uniqueItems": true,
