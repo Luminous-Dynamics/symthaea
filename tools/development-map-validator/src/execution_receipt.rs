@@ -23,9 +23,13 @@ pub struct ExpectedReceiptContext {
     pub revision_oid: String,
     pub tree_oid: String,
     pub configuration_world_digest: String,
+    pub subject_digests: Vec<String>,
     pub obligation_id: String,
     pub check_id: String,
     pub claim_kind: String,
+    pub workload_identity: String,
+    pub identity_provider: String,
+    pub authority_policy_digest: String,
     #[serde(default)]
     pub expected_outcome: Option<String>,
 }
@@ -140,7 +144,7 @@ fn validate_linked_statement_reference(
         report.error(&format!("{path}.statement_digest"), "expected a SHA-256 digest object");
     }
     match digest_value(&reference["subject_digest"]) {
-        Some(linked_subject) if outer_subject_digests.iter().any(|d| d == linked_subject) => {}
+        Some(linked_subject) if outer_subject_digests.iter().any(|d| d.eq_ignore_ascii_case(linked_subject)) => {}
         Some(_) => report.error(
             &format!("{path}.subject_digest"),
             "linked statement subject does not match any enclosing Statement subject",
@@ -273,6 +277,30 @@ pub fn verify_execution_receipt_json(
             "policy.configuration_world_digest",
             "receipt configuration differs from expected policy",
         );
+    }
+    let mut expected_subject_digests = policy.subject_digests.clone();
+    expected_subject_digests.sort();
+    expected_subject_digests.dedup();
+    let mut actual_subject_digests = outer_subject_digests.clone();
+    actual_subject_digests.sort();
+    actual_subject_digests.dedup();
+    if expected_subject_digests.is_empty()
+        || expected_subject_digests.iter().any(|digest| !valid_hex(digest, 64))
+        || expected_subject_digests != actual_subject_digests
+    {
+        report.error("policy.subject_digests", "enclosing Statement subjects differ from the exact expected digest set");
+    }
+    if string_at(predicate, &["producer", "workload_identity"]) != Some(policy.workload_identity.as_str()) {
+        report.error("policy.workload_identity", "producer workload identity differs from expected policy");
+    }
+    if string_at(predicate, &["producer", "identity_provider"]) != Some(policy.identity_provider.as_str()) {
+        report.error("policy.identity_provider", "producer identity provider differs from expected policy");
+    }
+    let authority_policy_digest = digest_value(
+        at(predicate, &["authority", "policy_digest"]).unwrap_or(&Value::Null),
+    );
+    if authority_policy_digest != Some(policy.authority_policy_digest.as_str()) {
+        report.error("policy.authority_policy_digest", "authority policy digest differs from expected policy");
     }
 
     let obligation_id = string_at(predicate, &["obligation", "obligation_id"]).unwrap_or("");
@@ -440,9 +468,13 @@ mod tests {
             "revision_oid": predicate["subject_scope"]["revision_oid"],
             "tree_oid": predicate["subject_scope"]["tree_oid"],
             "configuration_world_digest": predicate["subject_scope"]["configuration_world_digest"]["value"],
+            "subject_digests": value["subject"].as_array().unwrap().iter().map(|s| s["digest"]["sha256"].as_str().unwrap()).collect::<Vec<_>>(),
             "obligation_id": predicate["obligation"]["obligation_id"],
             "check_id": predicate["obligation"]["check_id"],
             "claim_kind": predicate["claim_kind"],
+            "workload_identity": predicate["producer"]["workload_identity"],
+            "identity_provider": predicate["producer"]["identity_provider"],
+            "authority_policy_digest": predicate["authority"]["policy_digest"]["value"],
             "expected_outcome": predicate["obligation"]["outcome"]
         })).unwrap()
     }
@@ -520,6 +552,38 @@ mod tests {
         let mut value: Value = serde_json::from_str(RUNNER_TEST).unwrap();
         value["predicate"]["obligation"]["check_id"] = json!("different-check");
         assert!(!verify(&value.to_string()).valid);
+    }
+
+    #[test]
+    fn rejects_subject_digest_not_expected_by_policy() {
+        let mut policy: Value = serde_json::from_str(&policy_for(RUNNER_TEST)).unwrap();
+        policy["subject_digests"] = json!(["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"]);
+        let report = verify_execution_receipt_json(RUNNER_TEST, &policy.to_string()).unwrap();
+        assert!(!report.valid);
+    }
+
+    #[test]
+    fn rejects_workload_identity_not_expected_by_policy() {
+        let mut policy: Value = serde_json::from_str(&policy_for(RUNNER_TEST)).unwrap();
+        policy["workload_identity"] = json!("spiffe://untrusted.example/runner");
+        let report = verify_execution_receipt_json(RUNNER_TEST, &policy.to_string()).unwrap();
+        assert!(!report.valid);
+    }
+
+    #[test]
+    fn rejects_identity_provider_not_expected_by_policy() {
+        let mut policy: Value = serde_json::from_str(&policy_for(RUNNER_TEST)).unwrap();
+        policy["identity_provider"] = json!("untrusted-idp");
+        let report = verify_execution_receipt_json(RUNNER_TEST, &policy.to_string()).unwrap();
+        assert!(!report.valid);
+    }
+
+    #[test]
+    fn rejects_authority_policy_digest_not_expected_by_policy() {
+        let mut policy: Value = serde_json::from_str(&policy_for(RUNNER_TEST)).unwrap();
+        policy["authority_policy_digest"] = json!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
+        let report = verify_execution_receipt_json(RUNNER_TEST, &policy.to_string()).unwrap();
+        assert!(!report.valid);
     }
 
     #[test]
