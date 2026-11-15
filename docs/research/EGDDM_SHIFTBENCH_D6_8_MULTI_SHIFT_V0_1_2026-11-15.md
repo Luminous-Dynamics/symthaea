@@ -2,7 +2,7 @@
 
 **Version:** 0.1  
 **Date:** 2026-11-15  
-**Status:** Research protocol and synthetic evaluator fixture authored. No Rust implementation, schema-engine run, compiled tests, agent trial, blinded corpus, or external validation is claimed.
+**Status:** Research protocol, evaluator-bundle schema, synthetic input/expected-output fixtures, Rust evaluator module, and CLI wiring authored. Rust compilation/tests, Draft 2020-12 schema-engine validation, CI, agent trials, independent adjudication, and external validation are not claimed.
 
 ## 1. Research question
 
@@ -10,7 +10,7 @@ Can an engineering agent maintain a correct, current, independently supportable 
 
 D6.6 measures minimum revalidation from a single intervention using evaluator-side labels. D6.7 (#12352) owns independent impact adjudication, common-cause dependency provenance, and measured per-check cost distributions. D6.8 adds a benchmark dimension: **sequence-level evidence continuity and recovery path dependence**.
 
-This branch is deliberately protocol-and-fixture first. It composes the existing D6 validator and revalidation-oracle path. It does not create another generic evidence graph, temporal ledger, event store, attestation format, cost service, or authority service.
+This branch composes the existing D6 validator and revalidation-oracle path. It does not create another generic evidence graph, temporal ledger, event store, attestation format, cost service, or authority service. The v0.1 synthetic bundle includes candidate and evaluator surfaces for reproducibility; a real corpus must export them as separately access-controlled and separately digested artifacts.
 
 ## 2. Why single-shift recovery is insufficient
 
@@ -98,14 +98,18 @@ The evaluator bundle at `docs/development-map/fixtures/egddm-multi-shift-sequenc
 - exact known-answer expected sets and summary counts.
 
 Expected required revalidation:
-- event 1: API compatibility + new audit logging;
+- event 1: build reproducibility (source-tree dependency) + API compatibility + new audit logging;
 - event 2: build reproducibility + API compatibility + audit logging, due to shared runner-image drift;
 - event 3: build reproducibility + API compatibility + audit logging + release authority, due to source/runner and policy/issuer context changes;
 - documentation-format remains reusable because none of its declared dependencies change.
 
-The conformant trace refreshes exactly the nine required obligation/event pairs (2 + 3 + 4), with no false resurrection or unnecessary checks. The adversarial trace refreshes only three obligations at event 3 and improperly reuses the old release-authority receipt; the expected report records one critical false resurrection and one required obligation without a fresh pass. The true-restoration control requires zero checks under its explicit full-identity reuse rule.
+The conformant trace refreshes exactly ten required obligation/event pairs (3 + 3 + 4), with no false resurrection or unnecessary checks. The adversarial trace refreshes nine of ten required pairs: at event 3 it improperly reuses the old release-authority receipt. The expected report records one critical false resurrection, one stale carryover, one required obligation without a fresh pass, and one unsupported current claim. The true-restoration control requires zero checks under its explicit full-identity reuse rule.
 
 These are synthetic fixture calculations. They are not Rust test results, independent adjudication, agent performance, measured cost, or empirical savings.
+
+The evaluator also recomputes a simple dependency-implied impact set from the changed identity dimensions and each obligation's declared dependency dimensions. Synthetic gold labels must match that set exactly. If a future overlay is marked independently adjudicated, the evaluator reports dependency-only and gold-only residuals rather than silently rewriting either side. This comparison is a diagnostic baseline, not a causal-completeness theorem.
+
+Every receipt's declared context is checked against the state at its `source_epoch` as well as the current state. This blocks a candidate from relabelling an old receipt with current context fields while keeping an old source epoch. It remains semantic consistency checking, not cryptographic execution authentication.
 
 ## 8. Controls and validity pilot
 
@@ -168,11 +172,15 @@ Initial deterministic target: 100% expected disposition on the synthetic positiv
 
 These benchmarks are complementary, not directly score-comparable. D6.8's proposed contribution is repeated exogenous changes plus independently scoped evidence/authority validity, false resurrection, critical exposure, and selective recovery. A superiority claim requires a matched experiment, not cross-leaderboard comparison.
 
-## 12. Validation status and claim ceiling
+## 12. Implementation and validation status
 
-- Research issue #12389 is open.
-- This branch is based on D6.6 PR #12351's source branch and contains only the initial D6.8 protocol, JSON schema, and synthetic evaluator bundle.
-- No Rust D6.8 module or CLI command is implemented in this increment.
-- No Rust compiler/Cargo run, schema-engine validation, CI qualification, real task admission, independent human adjudication, model rollout, or external replication is claimed.
+- Research issue #12389 is open; draft PR #12391 carries this work.
+- The branch is based on D6.6 PR #12351's source branch.
+- Added `tools/development-map-validator/src/multi_shift_sequence.rs`, exported it from `lib.rs`, and wired the `multi-shift-sequence <bundle.json>` CLI command in `main.rs`.
+- Added the input bundle schema, deterministic input fixture, output report schema, and full expected-output fixture.
+- Authored Rust tests for full known-answer equality, false resurrection, stale dependency reuse, forged source-epoch context, future evidence, restoration, failed fresh checks, duplicate receipts, broken event chains, missing gold reasons, and synthetic/independent impact-label disagreement.
+- A separate JavaScript audit reproduced the fixture's derived-impact sets and trace counts: conformant 10/10 required fresh checks; adversarial 9/10 with one critical false resurrection; full-identity restoration reused all four eligible baseline receipts. The same audit found zero dependency/gold-set residuals in the synthetic fixture.
+- The JSON files were parsed and fetched back from the branch. This is not Draft 2020-12 schema validation.
+- This environment has no `rustc`, `cargo`, `rustfmt`, or `nix`. Rust compilation/tests, formatting, Clippy, schema-engine validation, CI qualification, real task admission, independent human adjudication, model rollout, measured costs, and external replication have not been executed.
 
-**Claim ceiling:** this increment specifies a synthetic multi-shift evaluator case and its intended semantics. It does not establish gold-label truth, complete causal impact, production assurance, universal minimal revalidation, model improvement, or a SOTA advantage.
+**Claim ceiling:** the increment supplies a deterministic multi-shift evaluator and synthetic known-answer case. It does not authenticate execution or authority, independently adjudicate the gold overlay, prove complete causal impact, establish production assurance, measure cost-optimality, demonstrate model improvement, or establish a SOTA advantage.
