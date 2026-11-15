@@ -100,12 +100,40 @@ No patient-level data or protected health information belongs in this repository
 | NKI-Rockland Sample | Exploratory normative modelling and cross-sectional / longitudinal brain-behaviour analyses | Not a randomized treatment-response cohort; verify each data release and use terms |
 | Human Connectome Project Young Adult | Healthy-reference and acquisition / site robustness research | Healthy volunteer cohort, not a clinical treatment-outcome dataset |
 | OpenNeuro BIDS datasets | Reproducible task-specific fMRI / EEG replication; screen each dataset individually | Dataset count is not a quality guarantee; check task, licence, consent, sample size and metadata |
-| CAN-BIND-01 | High-value depression research candidate: multimodal neuroimaging, EEG, clinical and biological measures over treatment visits | Controlled Brain-CODE access; confirm the exact cohort, intervention arms, follow-up, endpoint definitions and permitted uses before protocol lock |
+| CAN-BIND-01 | 211 participants with MDD plus 112 healthy controls; structural, resting/task fMRI, diffusion MRI, EEG, clinical and molecular measures; baseline and Phase 1 Weeks 2–8 | Controlled Brain-CODE access; the exact treatment arm, timepoint, primary endpoint and inclusion manifest must be pinned before protocol lock |
 | EMBARC | Randomized sertraline / placebo treatment-response research candidate | Controlled NIMH NDA access; confirm which imaging and clinical modalities are available in the requested release; do not infer modality availability from study descriptions |
 
 Use synthetic data only for software development, schema validation and known-answer tests. Synthetic data must never be included in the empirical cohort results table.
 
-## 6. Reproducible experiment design
+## 6. Current public comparator envelope
+
+These are useful published comparators, not a directly comparable leaderboard. They use different cohorts, endpoints, validation designs and outcome definitions. Reproduction on the identical cohort and split is required before any numerical head-to-head claim.
+
+| Published comparator | Design and reported result | Interpretation for NeuroTwin |
+|---|---|---|
+| CAN-BIND-01 multimodal response prediction | The original cohort has 211 MDD participants and 112 healthy controls. For an 8-week response endpoint defined as at least 50% MADRS reduction, models adding week-2 predictors had mean balanced accuracy around 0.619 across the reported methods; the best reported models reached 0.66. The inclusion of week-2 clinical variables was especially important. | A strong practical baseline: establish how much clinical follow-up alone contributes before asserting that neural modalities or HDC add value. Dataset access is controlled through Brain-CODE. |
+| EMBARC reward-task fMRI | In a randomized EMBARC analysis with 222 participants (106 sertraline, 116 placebo), task-fMRI reward measures plus clinical/demographic features were used for treatment-specific response prediction; the sertraline model reported R-squared of 0.48. | A treatment-specific comparator, but not directly comparable with the CAN-BIND balanced-accuracy result. Reproduce the same endpoint and evaluation design, and examine the uncertainty and treatment-arm interaction. |
+| EMBARC multimodal graph learning | A later study using resting fMRI and EEG connectivity in 130 sertraline-treated and 135 placebo-treated participants reported R-squared values of 0.24 and 0.20 respectively. | A graph/multimodal comparator. It demonstrates that architectural complexity alone does not guarantee larger predictive performance; test feature contribution and transportability. |
+| Transdiagnostic functional-connectivity prediction | In 181 people randomized across CBT, SSRI or supportive therapy, baseline whole-brain connectivity predicted multidimensional symptom change with r=0.37 under 10-fold participant validation; cross-diagnosis r=0.24 and cross-treatment correlations ranged from 0.28 to 0.39. | A useful comparator for broad symptom trajectories, not proof that the model selects the optimal treatment for an individual. Its evaluation should not be equated with an external-site validation. |
+| Connectome-conditioned Digital Twin Brain | A 2026 study with 228 participants reported strong predictions on selected task behaviours and BOLD signals, but reaction-time generalization to unseen participants was substantially weaker than within-person prediction. | A model-architecture comparator for task behaviour / BOLD forecasting, not a demonstrated clinical treatment-response twin. |
+
+### What “beat SOTA” must mean here
+
+There is no single universal SOTA score for personalized clinical connectomics. The studies above answer different questions. Do not rank AUROC, balanced accuracy, R-squared and correlation as if they were the same metric.
+
+For each target task, the Symthaea claim must pass all of these:
+
+1. Reproduce a published comparator on its original compatible cohort and split, or clearly state why exact reproduction is impossible.
+2. Compare clinical-only, imaging-only, connectome-only, multimodal, graph, HDC and CfC/LTC arms on identical participants and the same endpoint.
+3. Use participant-grouped nested validation and a locked external site/cohort; no test-fold preprocessing, feature selection or threshold tuning.
+4. Report calibration and uncertainty, not only discrimination or correlation.
+5. Demonstrate incremental value over clinical-only data. If clinical variables explain the gain, acknowledge that and do not market the neural model as the cause.
+6. For treatment selection, estimate treatment-effect heterogeneity in randomized data. A treatment-outcome predictor trained on a mixed treatment cohort is not by itself a treatment-selection model.
+7. Establish prospective decision benefit and patient-relevant outcomes before clinical use.
+
+The most important initial challenge is not to surpass a large neural network. It is to show that neural/connectome data add reliable value beyond strong clinical predictors, and that this improvement survives external validation.
+
+## 7. Reproducible experiment design
 
 Before training:
 
@@ -125,7 +153,7 @@ Minimum split regimes:
 - Forward-in-time validation for future outcome prediction.
 - A separately governed external cohort that was not used for feature, model or threshold selection.
 
-## 7. Matched baselines and model ladder
+## 8. Matched baselines and model ladder
 
 Every model must use the same cohort, endpoint, split, feature availability and tuning budget.
 
@@ -138,7 +166,7 @@ Every model must use the same cohort, endpoint, split, feature availability and 
 
 Do not select Symthaea merely because it is novel. If it cannot beat a robust clinical-only baseline on external data, retain the simpler model.
 
-## 8. Benchmark metrics
+## 9. Benchmark metrics
 
 | Task | Primary metrics | Required supporting metrics |
 |---|---|---|
@@ -153,7 +181,7 @@ Do not select Symthaea merely because it is novel. If it cannot beat a robust cl
 
 All metrics need uncertainty intervals and sample counts. Bootstrap at the participant or cluster level, not the scan/timepoint level. Do not report accuracy alone. Do not optimize thresholds on the lockbox.
 
-## 9. Qualification gates and target thresholds
+## 10. Qualification gates and target thresholds
 
 Do not invent a universal numeric AUROC target before the endpoint, population and prevalence are fixed. The target is a prespecified, statistically supported improvement over a credible baseline with clinical utility.
 
@@ -167,7 +195,7 @@ Do not invent a universal numeric AUROC target before the endpoint, population a
 
 A claim of superiority requires the lower confidence bound of a paired, preregistered external comparison to exceed the prespecified margin, plus acceptable calibration and meaningful decision benefit. Otherwise report equivalence, uncertainty or failure.
 
-## 10. Symthaea-specific research hypotheses
+## 11. Symthaea-specific research hypotheses
 
 These are hypotheses to falsify, not established advantages:
 
@@ -178,26 +206,31 @@ These are hypotheses to falsify, not established advantages:
 
 No assumption that Φ, IIT-inspired indicators or artificial “consciousness” measures are clinical biomarkers. Keep them outside the primary model and clinical endpoint until independently validated for a clearly defined construct.
 
-## 11. Safety, ethics and intended-use boundary
+## 12. Safety, ethics and intended-use boundary
 
 This programme is for research. It does not diagnose, prescribe, select or adjust medication, determine suicide risk, recommend neuromodulation settings, or replace clinician judgment. Mental-health and substance-use data require especially careful governance. Any crisis screening or safety workflow needs qualified clinical ownership and a functioning local escalation pathway; a model confidence score is not a safety plan.
 
 Before human-subject research: obtain appropriate institutional ethics / IRB review, data-use permissions, data protection impact assessment where applicable, clinical governance, preregistration and a documented adverse-event / incident process. Regulatory classification depends on intended use and jurisdiction; do not claim HIPAA, GDPR, FDA or other compliance from technical controls alone.
 
-## 12. Sources to pin in the experiment registry
+## 13. Sources to pin in the experiment registry
 
 - Digital Twin Brain (2026): https://pubmed.ncbi.nlm.nih.gov/?term=Digital+Twin+Brain+Generating+Multitask+Behavior+from+Connectomes
 - External validation in neuroimaging prediction (Nature Methods, 27 May 2026): https://www.nature.com/search?q=external%20validation%20neuroimaging%20prediction
 - Data leakage in connectome-based machine learning: https://www.nature.com/search?q=Data%20leakage%20inflates%20prediction%20performance%20connectome
 - PROBAST+AI (BMJ, 2025): https://www.bmj.com/content/388/bmj-2024-082505
 - IMDRF Good Machine Learning Practice (2025): https://www.imdrf.org/documents/good-machine-learning-practice-medical-device-development-guiding-principles
+- CAN-BIND-01 dataset card and controlled access: https://portal.conp.ca/dataset?id=projects%2Fbraincode_CAN-BIND_Biomarkers_for_Depression_Baseline_Data_Release
+- CAN-BIND-01 multimodal response prediction: https://pmc.ncbi.nlm.nih.gov/articles/PMC10482706/
+- EMBARC reward-task treatment response: https://pubmed.ncbi.nlm.nih.gov/34916068/
+- EMBARC multimodal graph-learning result: https://pubmed.ncbi.nlm.nih.gov/40164695/
+- Transdiagnostic functional-connectivity treatment outcome prediction: https://jamanetwork.com/journals/jamanetworkopen/fullarticle/2838443
 - HCP Young Adult: https://www.humanconnectome.org/study/hcp-young-adult
 - NKI-Rockland Sample: https://fcon_1000.projects.nitrc.org/indi/enhanced/
 - OpenNeuro: https://openneuro.org/
 - CAN-BIND: https://canbind.ca/
 - EMBARC / NIMH NDA: https://nda.nih.gov/
 
-## 13. Immediate next experiments
+## 14. Immediate next experiments
 
 1. Correct the synthetic-vs-empirical labeling and fail-closed input parsing in the existing cortical benchmark.
 2. Requalify the C. elegans embedded topology as a synthetic fixture, then add a versioned empirical data import with explicit source attribution before making biological claims.
