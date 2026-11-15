@@ -68,6 +68,15 @@ The typed protocol contract lives in `agent_protocol.rs`; the normative schemas 
 
 The `trajectory` module validates multi-cycle team receipts, prior-cycle digests, team-state continuity, explicit membership/role/authority changes, memory-policy changes, and per-member consent. The CLI command is `validate-trajectory`. This verifies recorded continuity claims; it is not a collective-intelligence estimator.
 
+## Inter-rater reliability
+
+The `reliability` module exposes:
+
+- `cohens_kappa_nominal`: two-rater nominal agreement beyond chance, with pairwise missing annotations.
+- `krippendorff_alpha_nominal`: multi-rater nominal agreement with missing annotations.
+
+Both return `None` when the coefficient is undefined. Negative coefficients are preserved; do not clip them to zero. These coefficients measure agreement, not rubric validity or correctness against ground truth. Use blinded adjudication and report sample size and uncertainty separately.
+
 ## Metrics
 
 - `synergy_delta`: joint quality minus the best matched solo quality.
