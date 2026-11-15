@@ -24,7 +24,12 @@ pub fn cohens_kappa_nominal(
     let mut a_counts: BTreeMap<&str, usize> = BTreeMap::new();
     let mut b_counts: BTreeMap<&str, usize> = BTreeMap::new();
 
-    for (index, (a, b)) in rater_a.iter().zip(rater_b).enumerate() {
+    for (index, (a, b)) in rater_a
+        .iter()
+        .copied()
+        .zip(rater_b.iter().copied())
+        .enumerate()
+    {
         if let Some(label) = a {
             if label.trim().is_empty() {
                 bail!("rater A has an empty label at unit {index}");
@@ -90,7 +95,7 @@ pub fn krippendorff_alpha_nominal(
 
     for (item_index, item) in ratings.iter().enumerate() {
         let mut item_counts: BTreeMap<&str, usize> = BTreeMap::new();
-        for label in item.iter().flatten() {
+        for label in item.iter().flatten().copied() {
             if label.trim().is_empty() {
                 bail!("Krippendorff alpha has an empty label on item {item_index}");
             }
@@ -105,7 +110,7 @@ pub fn krippendorff_alpha_nominal(
         }
         let same_ordered_pairs = item_counts
             .values()
-            .map(|count| count * count)
+            .map(|count| *count * *count)
             .sum::<usize>();
         let all_ordered_pairs = item_n * item_n;
         observed_disagreement +=
