@@ -75,6 +75,8 @@ pub struct StateEpoch {
 #[serde(deny_unknown_fields)]
 pub struct AgentCheckpoint {
     pub epoch: u64,
+    /// Exact cutoff at which this checkpoint represents agent-visible state.
+    pub checkpoint_at: String,
     /// Agent prediction of which obligations the change affected.
     pub predicted_affected_obligation_ids: Vec<String>,
     /// One current receipt per obligation, including retained older receipts.
@@ -90,6 +92,10 @@ pub struct CheckReceipt {
     pub check_id: String,
     pub outcome: CheckOutcome,
     pub source_epoch: u64,
+    /// When the check result was observed in its pinned source snapshot.
+    pub observed_at: String,
+    /// When the receipt became available to the evaluated agent.
+    pub available_at: String,
     pub revision: String,
     pub tree_oid: String,
     pub configuration_world_digest: String,
@@ -115,6 +121,8 @@ struct ReceiptMaterial<'a> {
     check_id: &'a str,
     outcome: CheckOutcome,
     source_epoch: u64,
+    observed_at: &'a str,
+    available_at: &'a str,
     revision: &'a str,
     tree_oid: &'a str,
     configuration_world_digest: &'a str,
@@ -182,6 +190,8 @@ fn receipt_digest(
         check_id: &receipt.check_id,
         outcome: receipt.outcome,
         source_epoch: receipt.source_epoch,
+        observed_at: &receipt.observed_at,
+        available_at: &receipt.available_at,
         revision: &receipt.revision,
         tree_oid: &receipt.tree_oid,
         configuration_world_digest: &receipt.configuration_world_digest,
@@ -301,11 +311,21 @@ fn validate_scenario(scenario: &ShiftScenario) -> Result<(), String> {
             return Err(format!("shifted arm {} must include at least one affected obligation", arm.arm_id));
         }
 
+        let mut prior_checkpoint_time: Option<DateTime<FixedOffset>> = None;
         for (index, checkpoint) in arm.checkpoints.iter().enumerate() {
             let epoch = &arm.epochs[index];
             if checkpoint.epoch != epoch.epoch {
                 return Err(format!("arm {} checkpoint {} does not match its epoch", arm.arm_id, index));
             }
+            let checkpoint_time = parse_time(&checkpoint.checkpoint_at)?;
+            let epoch_time = parse_time(&epoch.observed_at)?;
+            if checkpoint_time < epoch_time {
+                return Err(format!("arm {} checkpoint {} predates its epoch observation", arm.arm_id, index));
+            }
+            if prior_checkpoint_time.as_ref().is_some_and(|prior| &checkpoint_time <= prior) {
+                return Err(format!("arm {} checkpoint times must increase strictly", arm.arm_id));
+            }
+            prior_checkpoint_time = Some(checkpoint_time.clone());
             if !checkpoint.revalidation_cost_units.is_finite() || checkpoint.revalidation_cost_units < 0.0 {
                 return Err(format!("arm {} checkpoint {} has invalid revalidation cost", arm.arm_id, index));
             }
@@ -345,6 +365,18 @@ fn validate_scenario(scenario: &ShiftScenario) -> Result<(), String> {
                 }
                 if !source.active_obligation_ids.contains(&receipt.obligation_id) {
                     return Err(format!("receipt {} refers to an obligation that was not active at its source epoch", receipt.receipt_id));
+                }
+                let source_time = parse_time(&source.observed_at)?;
+                let observed_time = parse_time(&receipt.observed_at)?;
+                let available_time = parse_time(&receipt.available_at)?;
+                if observed_time < source_time {
+                    return Err(format!("receipt {} predates its source epoch", receipt.receipt_id));
+                }
+                if observed_time > available_time {
+                    return Err(format!("receipt {} became available before its observation", receipt.receipt_id));
+                }
+                if available_time > checkpoint_time {
+                    return Err(format!("receipt {} was not available at the checkpoint cutoff", receipt.receipt_id));
                 }
                 if !valid_hex(&receipt.receipt_digest, &[64])
                     || receipt_digest(scenario, arm, receipt)? != receipt.receipt_digest.to_ascii_lowercase()
@@ -438,7 +470,9 @@ fn score_arm(scenario: &ShiftScenario, arm: &ShiftArm) -> Result<ArmScore, Strin
     let impact_precision = (predicted > 0).then_some(true_positive as f64 / predicted as f64);
     let impact_recall = (actual > 0).then_some(true_positive as f64 / actual as f64);
 
-    let total_revalidation_cost_units: f64 = arm.checkpoints.iter()
+    // The first checkpoint establishes baseline state; only later work is
+    // counted as revalidation cost.
+    let total_revalidation_cost_units: f64 = arm.checkpoints.iter().skip(1)
         .map(|checkpoint| checkpoint.revalidation_cost_units)
         .sum();
     let full_rerun_reference_units: f64 = arm.epochs.iter().skip(1)
@@ -587,6 +621,32 @@ mod tests {
         receipt.revision = source.revision.clone();
         receipt.tree_oid = source.tree_oid.clone();
         receipt.configuration_world_digest = source.configuration_world_digest.clone();
+        receipt.receipt_digest = receipt_digest(&digest_scenario, shifted, receipt).expect("reseal");
+        assert!(evaluate_shift_scenario(&scenario).is_err());
+    }
+
+    #[test]
+    fn receipt_unavailable_at_checkpoint_is_rejected() {
+        let mut scenario = fixture();
+        let digest_scenario = scenario.clone();
+        let shifted = scenario.arms.iter_mut()
+            .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
+        let receipt = shifted.checkpoints.last_mut().expect("final checkpoint").receipts.iter_mut()
+            .find(|receipt| receipt.obligation_id == "api-contract").expect("api receipt");
+        receipt.available_at = "2026-11-15T07:16:00Z".to_owned();
+        receipt.receipt_digest = receipt_digest(&digest_scenario, shifted, receipt).expect("reseal");
+        assert!(evaluate_shift_scenario(&scenario).is_err());
+    }
+
+    #[test]
+    fn receipt_observation_must_precede_agent_availability() {
+        let mut scenario = fixture();
+        let digest_scenario = scenario.clone();
+        let shifted = scenario.arms.iter_mut()
+            .find(|arm| arm.condition == ArmCondition::Shifted).expect("shifted arm");
+        let receipt = shifted.checkpoints.last_mut().expect("final checkpoint").receipts.iter_mut()
+            .find(|receipt| receipt.obligation_id == "api-contract").expect("api receipt");
+        receipt.observed_at = "2026-11-15T07:14:00Z".to_owned();
         receipt.receipt_digest = receipt_digest(&digest_scenario, shifted, receipt).expect("reseal");
         assert!(evaluate_shift_scenario(&scenario).is_err());
     }
