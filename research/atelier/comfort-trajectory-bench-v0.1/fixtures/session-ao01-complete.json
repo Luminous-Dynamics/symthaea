@@ -1,0 +1,212 @@
+{
+  "schema_version": "atelier.comfort-session/0.1",
+  "protocol_version": "0.1.0",
+  "protocol_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "session_id": "CTS-AO01-0001",
+  "participant_alias": "P-A01",
+  "consent_confirmed": true,
+  "study_phase": "formative",
+  "garment": {
+    "style_id": "AO-01",
+    "variant_id": "quiet-architecture-natural-shoulder",
+    "garment_revision": "v0.1",
+    "pattern_revision": "AO-block-v0.1",
+    "bom_revision": "AO-bom-v0.1",
+    "assembly_plan_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "configuration_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "material_lot_id": "MILLAR-CL225-SWATCH-01"
+  },
+  "trial_arm": {
+    "kind": "atelier"
+  },
+  "session": {
+    "planned_duration_min": 120,
+    "actual_duration_min": 120,
+    "termination_reason": "completed",
+    "observations": [
+      {
+        "time_min": 0,
+        "dimensions": {
+          "tactile": {
+            "status": "observed",
+            "value": 6
+          },
+          "thermal": {
+            "status": "observed",
+            "value": 6
+          },
+          "moisture": {
+            "status": "observed",
+            "value": 6
+          },
+          "fit_pressure": {
+            "status": "observed",
+            "value": 6
+          },
+          "mobility": {
+            "status": "observed",
+            "value": 6
+          },
+          "overall_comfort": {
+            "status": "observed",
+            "value": 6
+          }
+        }
+      },
+      {
+        "time_min": 15,
+        "dimensions": {
+          "tactile": {
+            "status": "observed",
+            "value": 6
+          },
+          "thermal": {
+            "status": "observed",
+            "value": 6
+          },
+          "moisture": {
+            "status": "observed",
+            "value": 6
+          },
+          "fit_pressure": {
+            "status": "observed",
+            "value": 6
+          },
+          "mobility": {
+            "status": "observed",
+            "value": 6
+          },
+          "overall_comfort": {
+            "status": "observed",
+            "value": 6
+          }
+        }
+      },
+      {
+        "time_min": 30,
+        "dimensions": {
+          "tactile": {
+            "status": "observed",
+            "value": 6
+          },
+          "thermal": {
+            "status": "observed",
+            "value": 6
+          },
+          "moisture": {
+            "status": "observed",
+            "value": 6
+          },
+          "fit_pressure": {
+            "status": "observed",
+            "value": 6
+          },
+          "mobility": {
+            "status": "observed",
+            "value": 6
+          },
+          "overall_comfort": {
+            "status": "observed",
+            "value": 6
+          }
+        }
+      },
+      {
+        "time_min": 60,
+        "dimensions": {
+          "tactile": {
+            "status": "observed",
+            "value": 6
+          },
+          "thermal": {
+            "status": "observed",
+            "value": 6
+          },
+          "moisture": {
+            "status": "observed",
+            "value": 6
+          },
+          "fit_pressure": {
+            "status": "observed",
+            "value": 6
+          },
+          "mobility": {
+            "status": "observed",
+            "value": 6
+          },
+          "overall_comfort": {
+            "status": "observed",
+            "value": 6
+          }
+        }
+      },
+      {
+        "time_min": 90,
+        "dimensions": {
+          "tactile": {
+            "status": "observed",
+            "value": 5
+          },
+          "thermal": {
+            "status": "observed",
+            "value": 5
+          },
+          "moisture": {
+            "status": "observed",
+            "value": 5
+          },
+          "fit_pressure": {
+            "status": "observed",
+            "value": 5
+          },
+          "mobility": {
+            "status": "observed",
+            "value": 5
+          },
+          "overall_comfort": {
+            "status": "observed",
+            "value": 5
+          }
+        }
+      },
+      {
+        "time_min": 120,
+        "dimensions": {
+          "tactile": {
+            "status": "observed",
+            "value": 5
+          },
+          "thermal": {
+            "status": "observed",
+            "value": 5
+          },
+          "moisture": {
+            "status": "observed",
+            "value": 5
+          },
+          "fit_pressure": {
+            "status": "observed",
+            "value": 5
+          },
+          "mobility": {
+            "status": "observed",
+            "value": 5
+          },
+          "overall_comfort": {
+            "status": "observed",
+            "value": 5
+          }
+        }
+      }
+    ]
+  },
+  "environment": {
+    "ambient_temp_c": 23.5,
+    "relative_humidity_pct": 48,
+    "underlayer_code": "BASE-COTTON-TEE-01"
+  },
+  "events": [],
+  "instrumentation": {
+    "microclimate_sensor_used": false
+  }
+}
