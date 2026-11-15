@@ -19,7 +19,7 @@ fn main() {
         .enumerate()
         .map(|(index, candidate_id)| {
             let outcome = if index < 2 {
-                AuditOutcome::ConfirmedInfeasible
+                AuditOutcome::ConfirmedFeasible
             } else {
                 AuditOutcome::ConfirmedInfeasible
             };
