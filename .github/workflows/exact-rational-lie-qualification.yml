@@ -1,0 +1,43 @@
+name: Exact rational Lie qualification
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "research/exact-rational-lie-qualification/**"
+      - ".github/workflows/exact-rational-lie-qualification.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/exact-rational-lie-qualification/**"
+      - ".github/workflows/exact-rational-lie-qualification.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: exact-rational-lie-qualification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualification:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --manifest-path research/exact-rational-lie-qualification/Cargo.toml --all -- --check
+      - name: Test
+        run: cargo test --locked --manifest-path research/exact-rational-lie-qualification/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/exact-rational-lie-qualification/Cargo.toml --all-targets -- -D warnings
