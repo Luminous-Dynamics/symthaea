@@ -861,6 +861,40 @@
             "conversion_profile_id",
             "conversion_profile_digest"
           ]
+        },
+        "parser_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "parser_profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "schema_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "schema_profile_digest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "json_pointer": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "duplicate_key_policy": {
+          "const": "reject"
+        },
+        "unicode_policy": {
+          "const": "exact_scalar_sequence_no_normalization"
+        },
+        "lexical_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "lexical_profile_digest": {
+          "$ref": "#/$defs/sha256"
         }
       }
     }
