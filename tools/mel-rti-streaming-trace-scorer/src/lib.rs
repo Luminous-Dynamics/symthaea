@@ -949,13 +949,13 @@ mod tests {
         let mut predictions = predictions(&req);
         for (index, prediction) in predictions.iter_mut().enumerate() {
             prediction.decision = PredictedTurnDecisionV1::Respond;
-            prediction.effect_frame = Some((index as u64 + 1) * 20 + 1);
+            prediction.effect_frame = Some(((index as u64 + 1) * 20 + 1).min(req.total_frames));
             prediction.effect_at_ns = Some(prediction.decision_at_ns + 20);
             prediction.parse_failure_sha256 = None;
         }
         let report = run(&req, &chunks, &truth, &predictions).unwrap();
         assert_eq!(report.summary.wait_false_activation_count, 2);
-        assert_eq!(report.summary.effect_window_eligible_count, 2);
+        assert_eq!(report.summary.effect_eligible_count, 2);
         assert_eq!(report.summary.effect_window_success_count, 1);
     }
 
