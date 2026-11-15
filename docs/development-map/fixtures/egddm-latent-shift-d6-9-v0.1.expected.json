@@ -17,8 +17,8 @@
         "api-compat",
         "build-repro"
       ],
-      "obligation_precision": 1,
-      "obligation_recall": 1,
+      "obligation_precision": 1.0,
+      "obligation_recall": 1.0,
       "unsupported_current_claims": [],
       "unnecessary_invalidations": [],
       "unauthorized_probe_ids": [],
