@@ -25193,3 +25193,11 @@ dependencies = [
 [[package]]
 name = "symthaea-sailcraft"
 version = "0.1.0"
+
+[[package]]
+name = "symthaea-sailcraft-cognition"
+version = "0.1.0"
+dependencies = [
+ "symthaea-core",
+ "symthaea-sailcraft",
+]
