@@ -52,6 +52,7 @@ pub struct AssetSnapshot {
 pub struct ProcessConfigurationSnapshot {
     pub configuration_ref: String,
     pub process_revision_ref: String,
+    pub process_capability_ref: String,
     pub product_revision_ref: String,
     pub pattern_revision_ref: String,
     pub operation_refs: Vec<String>,
@@ -101,6 +102,7 @@ pub struct CellProfileSnapshot {
     pub valid_until_unix_seconds: Option<i64>,
     pub resolution: SnapshotResolution,
     pub qualification_evidence: Vec<EvidenceRecord>,
+    pub independent_verification_evidence: Vec<EvidenceRecord>,
     pub assets: Vec<AssetSnapshot>,
     pub process_configurations: Vec<ProcessConfigurationSnapshot>,
     pub skill_qualifications: Vec<SkillQualificationSnapshot>,
@@ -148,6 +150,8 @@ pub enum EligibilityReasonCode {
     ProfileNotYetValid,
     ProfileValidityUnknown,
     ProfileEvidenceMissing,
+    IndependentVerificationMissing,
+    ProcessCapabilityMismatch,
     EvidenceMissing,
     EvidenceUnknown,
     EvidenceExpired,
@@ -257,6 +261,11 @@ pub fn evaluate_cell_eligibility(
     } else {
         for evidence in &cell.qualification_evidence { out.check_evidence(evidence, at); }
     }
+    if cell.independent_verification_evidence.is_empty() {
+        out.add(EligibilityReasonCode::IndependentVerificationMissing, missing_severity(cell.resolution), &cell.profile_ref);
+    } else {
+        for evidence in &cell.independent_verification_evidence { out.check_evidence(evidence, at); }
+    }
 
     let config = match unique_match(&cell.process_configurations, |candidate| {
         candidate.configuration_ref == requirement.process_configuration_ref
@@ -283,6 +292,9 @@ pub fn evaluate_cell_eligibility(
     }
     if config.process_revision_ref != requirement.process_revision_ref {
         out.add(EligibilityReasonCode::ProcessRevisionMismatch, EligibilitySeverity::Blocked, &config.configuration_ref);
+    }
+    if config.process_capability_ref != requirement.process_capability_ref {
+        out.add(EligibilityReasonCode::ProcessCapabilityMismatch, EligibilitySeverity::Blocked, &config.configuration_ref);
     }
     if config.inspection_plan_ref != requirement.inspection_plan_ref {
         out.add(EligibilityReasonCode::InspectionPlanMismatch, EligibilitySeverity::Blocked, &config.configuration_ref);
@@ -547,6 +559,7 @@ mod tests {
             valid_until_unix_seconds: Some(NOW + 100),
             resolution: SnapshotResolution::Complete,
             qualification_evidence: vec![evidence("urn:example:evidence:profile")],
+            independent_verification_evidence: vec![evidence("urn:example:evidence:independent-profile-review")],
             assets: vec![AssetSnapshot {
                 asset_ref: "urn:example:asset:sewing-machine-01".to_owned(),
                 status: AssetStatus::Available,
@@ -557,6 +570,7 @@ mod tests {
             process_configurations: vec![ProcessConfigurationSnapshot {
                 configuration_ref: "urn:example:configuration:ao-01:r3".to_owned(),
                 process_revision_ref: "urn:example:process:woven-sew:r2".to_owned(),
+                process_capability_ref: "urn:example:capability:lockstitch-woven".to_owned(),
                 product_revision_ref: "urn:example:product:ao-01:r3".to_owned(),
                 pattern_revision_ref: "urn:example:pattern:ao-01:r3".to_owned(),
                 operation_refs: vec!["urn:example:operation:join-shoulder".to_owned()],
@@ -735,6 +749,26 @@ mod tests {
         let report = evaluate_cell_eligibility(&requirement(), &cell);
         assert_eq!(report.status, EligibilityStatus::Blocked);
         assert!(has_code(&report, EligibilityReasonCode::AssetCapabilityMismatch));
+    }
+
+
+    #[test]
+    fn missing_independent_profile_verification_is_blocked_in_complete_snapshot() {
+        let mut cell = qualified_cell();
+        cell.independent_verification_evidence.clear();
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::IndependentVerificationMissing));
+    }
+
+    #[test]
+    fn process_configuration_capability_mismatch_is_blocked() {
+        let mut cell = qualified_cell();
+        cell.process_configurations[0].process_capability_ref =
+            "urn:example:capability:wrong-process".to_owned();
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::ProcessCapabilityMismatch));
     }
 
     #[test]
