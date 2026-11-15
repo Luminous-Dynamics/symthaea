@@ -15,13 +15,13 @@
     {
       "artifact_id": "SYNTH-BODY-PLAN",
       "source_type": "BODY_PLAN",
-      "locator": "docs/research/marine/fixtures/assets/synthetic-body-plan-source.txt",
+      "locator": "docs/research/marine/fixtures/assets/synthetic-body-plan.svg",
       "revision_or_date": "synthetic fixture v0.1",
-      "mime_type": "text/plain",
-      "byte_length": 54,
+      "mime_type": "image/svg+xml",
+      "byte_length": 793,
       "digest": {
         "algorithm": "SHA-256",
-        "hex": "42db2ed98f36c6b5bbc8fff355620584e24fe383f348b9d62b5dbd8eb476a208"
+        "hex": "08af9ce0364e9d98333760daf7c869ddbd12495cf5b87cfe1bacd573062f2d95"
       },
       "rights": {
         "status": "SYNTHETIC_OWNED",
@@ -45,13 +45,13 @@
     {
       "artifact_id": "SYNTH-HALF-BREADTH",
       "source_type": "HALF_BREADTH_PLAN",
-      "locator": "docs/research/marine/fixtures/assets/synthetic-half-breadth-source.txt",
+      "locator": "docs/research/marine/fixtures/assets/synthetic-half-breadth.svg",
       "revision_or_date": "synthetic fixture v0.1",
-      "mime_type": "text/plain",
-      "byte_length": 57,
+      "mime_type": "image/svg+xml",
+      "byte_length": 869,
       "digest": {
         "algorithm": "SHA-256",
-        "hex": "c015687d572f0b31cb030f6b5911cbae5416d1502f091356681f776bab63c04d"
+        "hex": "18e3db68f2f6d42406e652a1e88cc6ddb13cc12b0010c54da42daff467d3e1e4"
       },
       "rights": {
         "status": "SYNTHETIC_OWNED",
