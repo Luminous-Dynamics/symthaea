@@ -714,7 +714,7 @@ fn distributed_event_order_mutation_manifest_is_preregistered_and_well_bound() {
         Some("preregistered_mutation_controls_not_execution_results")
     );
     assert_eq!(
-        mutations["execution_status"].as_str(),
+        mutations["semantics"]["execution_status"].as_str(),
         Some("not_run")
     );
 
