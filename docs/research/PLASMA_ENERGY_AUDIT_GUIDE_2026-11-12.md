@@ -243,3 +243,12 @@ The xtask suite now has 31 authored Rust tests. The merged source register remai
 ## 9.19 Corpus snapshot — 2026-11-15
 
 The audit branch retains six microplasma source cases in addition to the source-register content, for 37 unique cases / 46 unique negative controls / 5 derived checks. Its xtask source contains 31 Rust tests, including source-arithmetic and CO2 counterflow operating-point refusal tests. The focused exact-head workflow is queued; no latest test pass is claimed until it completes.
+
+
+## 9.20 Separate DBD CO2-to-syngas comparator — 2026-11-15
+
+The merged source registry adds a coaxial DBD experiment for humidified CO2-to-syngas (RSC Advances 16 (2026), DOI 10.1039/D5YA00293A). It reports 4.5–23.3% energy efficiency and H2/CO molar ratios of 0.1–0.2 across humidified feeds; a pure-CO2 point is separately reported at 13.3% efficiency and predominantly CO.
+
+This is a different feed/product lane from dry warm-arc CO2-to-CO quenching. H2/CO ratio is not conversion or CO selectivity. Three new controls refuse feed/product comparability errors, pure-feed/humidified-point mixing and metric-semantic substitution.
+
+The audit-branch source corpus now contains **38 source cases / 49 negative controls / 5 derived checks**.
