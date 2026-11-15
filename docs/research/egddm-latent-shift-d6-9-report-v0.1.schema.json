@@ -42,7 +42,9 @@
         "unnecessary_invalidations",
         "unauthorized_probe_ids",
         "probe_cost_units",
-        "correlated_signal_groups_discounted"
+        "correlated_signal_groups_discounted",
+        "premature_detection_decision_ids",
+        "source_correlation_overclaim_decision_ids"
       ],
       "properties": {
         "episode_id": {
@@ -135,6 +137,20 @@
         },
         "correlated_signal_groups_discounted": {
           "type": "boolean"
+        },
+        "premature_detection_decision_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "source_correlation_overclaim_decision_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
         }
       }
     }
