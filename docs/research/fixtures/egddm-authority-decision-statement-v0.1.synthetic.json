@@ -1,0 +1,78 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "synthetic/decision-api/deployment-scope",
+      "digest": {
+        "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+      }
+    }
+  ],
+  "predicateType": "https://luminousdynamics.io/attestations/egddm-execution-receipt/v0.1",
+  "predicate": {
+    "predicate_version": "0.1.0",
+    "receipt_id": "synthetic-deployment-scope-receipt-0001",
+    "claim_kind": "authority_decision",
+    "subject_scope": {
+      "repository_full_name": "synthetic/decision-api",
+      "revision_oid": "dddddddddddddddddddddddddddddddddddddddd",
+      "tree_oid": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "configuration_world_digest": {
+        "algorithm": "sha256",
+        "value": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    },
+    "obligation": {
+      "obligation_id": "deployment-scope",
+      "check_id": "deployment-scope-claim",
+      "check_kind": "policy",
+      "outcome": "pass",
+      "critical": true
+    },
+    "producer": {
+      "role": "authority_service",
+      "workload_identity": "spiffe://synthetic.example/authority_service/0001",
+      "issuer_uri": "https://authority.synthetic.example/",
+      "identity_provider": "synthetic-authority-idp"
+    },
+    "observation": {
+      "started_at": "2026-11-15T08:00:00Z",
+      "completed_at": "2026-11-15T08:00:01Z",
+      "observed_at": "2026-11-15T08:00:01Z",
+      "available_at": "2026-11-15T08:00:02Z",
+      "exit_code": null,
+      "artifact_digests": [
+        {
+          "algorithm": "sha256",
+          "value": "6666666666666666666666666666666666666666666666666666666666666666"
+        }
+      ],
+      "log_digest": {
+        "algorithm": "sha256",
+        "value": "7777777777777777777777777777777777777777777777777777777777777777"
+      }
+    },
+    "authority": {
+      "decision_id": "synthetic-deployment-scope-authority-0001",
+      "policy_digest": {
+        "algorithm": "sha256",
+        "value": "8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "permitted_scope": "synthetic/decision-api@dddddddddddddddddddddddddddddddddddddddd:deployment-scope",
+      "operation": "authorize_deployment_scope",
+      "valid_from": "2026-11-15T07:59:00Z",
+      "valid_until": "2026-11-15T09:00:00Z"
+    },
+    "anti_replay": {
+      "challenge_id": "synthetic-deployment-scope-challenge-0001",
+      "nonce_digest": {
+        "algorithm": "sha256",
+        "value": "9999999999999999999999999999999999999999999999999999999999999999"
+      },
+      "issued_at": "2026-11-15T07:59:00Z",
+      "expires_at": "2026-11-15T08:01:00Z",
+      "single_use": true,
+      "challenge_issuer": "synthetic-challenge-service"
+    }
+  }
+}

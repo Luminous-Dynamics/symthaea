@@ -1,0 +1,16 @@
+{
+  "repository_full_name": "synthetic/decision-api",
+  "revision_oid": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "tree_oid": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "configuration_world_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "subject_digests": [
+    "6666666666666666666666666666666666666666666666666666666666666666"
+  ],
+  "obligation_id": "api-contract",
+  "check_id": "api-compatibility",
+  "claim_kind": "runner_execution",
+  "workload_identity": "spiffe://synthetic.example/runner/job/0001",
+  "identity_provider": "synthetic-workload-idp",
+  "authority_policy_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+  "expected_outcome": "pass"
+}
