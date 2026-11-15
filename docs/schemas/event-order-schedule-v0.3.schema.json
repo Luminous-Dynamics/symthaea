@@ -43,7 +43,7 @@
             "unit": { "$ref": "#/$defs/id" }, "local_tick_ns": { "$ref": "#/$defs/u64" },
             "offset_ns": { "type": "integer" }, "uncertainty_ns": { "$ref": "#/$defs/u64" },
             "calibration_id": { "$ref": "#/$defs/id" }, "mapping_valid_through_ns": { "$ref": "#/$defs/u64" },
-            "mapping_receipt_ref": { "$ref": "#/$defs/id" }, "mapping_receipt_sha256": { "type": "string" },
+            "mapping_receipt_ref": { "$ref": "#/$defs/id" }, "mapping_receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
             "qualification": { "$ref": "#/$defs/gate_state" }
           }
         },
@@ -103,7 +103,7 @@
         {
           "type": "object", "additionalProperties": false,
           "required": ["kind", "obligation_id", "policy_revision", "receipt_ref", "receipt_sha256"],
-          "properties": { "kind": { "const": "stop_discharged" }, "obligation_id": { "$ref": "#/$defs/id" }, "policy_revision": { "$ref": "#/$defs/id" }, "receipt_ref": { "$ref": "#/$defs/id" }, "receipt_sha256": { "type": "string" } }
+          "properties": { "kind": { "const": "stop_discharged" }, "obligation_id": { "$ref": "#/$defs/id" }, "policy_revision": { "$ref": "#/$defs/id" }, "receipt_ref": { "$ref": "#/$defs/id" }, "receipt_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } }
         },
         {
           "type": "object", "additionalProperties": false,
