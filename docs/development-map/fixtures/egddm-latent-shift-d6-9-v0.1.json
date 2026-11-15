@@ -182,7 +182,8 @@
             "obs-cache-miss-spike"
           ]
         ],
-        "first_sufficient_observation_available_at": "2026-11-15T10:04:00Z"
+        "first_sufficient_observation_available_at": "2026-11-15T10:04:00Z",
+        "adjudication_status": "synthetic_known_answer_not_independently_adjudicated"
       },
       "expected_summary": {
         "detected": true,
@@ -349,7 +350,8 @@
             "obs-sham-cache-miss-spike"
           ]
         ],
-        "first_sufficient_observation_available_at": "2026-11-15T10:04:00Z"
+        "first_sufficient_observation_available_at": "2026-11-15T10:04:00Z",
+        "adjudication_status": "synthetic_known_answer_not_independently_adjudicated"
       },
       "expected_summary": {
         "detected": false,
