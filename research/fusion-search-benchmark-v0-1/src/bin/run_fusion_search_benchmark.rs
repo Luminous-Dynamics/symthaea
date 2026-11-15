@@ -1,4 +1,4 @@
-use fusion_search_benchmark::{evaluate_funnel, summarize, Policy, Scenario};
+use fusion_search_benchmark::{Policy, Scenario, evaluate_funnel, summarize};
 
 fn display_metric(value: Option<f64>) -> String {
     value
