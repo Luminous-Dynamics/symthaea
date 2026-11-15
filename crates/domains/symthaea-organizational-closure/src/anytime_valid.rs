@@ -786,12 +786,9 @@ pub fn evaluate_anytime_valid_causal_effects(
     if !findings.is_empty() {
         let qualification = if unavailable_evidence
             && !rejected_evidence
-            && findings.iter().all(|finding| matches!(
-                finding.code,
-                AnytimeValidFindingCode::EvidenceUnavailable
-                    | AnytimeValidFindingCode::MissingClaim
-                    | AnytimeValidFindingCode::DuplicateClaim
-            ))
+            && findings
+                .iter()
+                .all(|finding| finding.code == AnytimeValidFindingCode::EvidenceUnavailable)
         {
             AnytimeValidQualification::Inconclusive
         } else {
@@ -1053,9 +1050,17 @@ mod tests {
         }
         let alpha_arm = 0.025;
         let radius = hoeffding_alpha_spending_radius(1.0, 500, alpha_arm).unwrap();
+        let treatment_interval = CausalEffectInterval::new(
+            (0.9 - radius).max(0.0),
+            (0.9 + radius).min(1.0),
+        );
+        let control_interval = CausalEffectInterval::new(
+            (0.1 - radius).max(0.0),
+            (0.1 + radius).min(1.0),
+        );
         let recomputed = CausalEffectInterval::new(
-            (0.9 - radius) - (0.1 + radius),
-            (0.9 + radius) - (0.1 - radius),
+            treatment_interval.lower - control_interval.upper,
+            treatment_interval.upper - control_interval.lower,
         );
         assert!(recomputed.lower > 0.2);
         let claim = SequentialCausalClaim {
