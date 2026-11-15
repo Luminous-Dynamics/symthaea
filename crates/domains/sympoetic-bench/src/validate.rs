@@ -705,6 +705,20 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         ("participant_capability_gain_delta", scorecard.scores.participant_capability_gain_delta),
         ("delayed_retention_gain_delta", scorecard.scores.delayed_retention_gain_delta),
         ("transfer_gain_delta", scorecard.scores.transfer_gain_delta),
+        ("agent_confidence_brier_score", scorecard.scores.agent_confidence_brier_score),
+        ("agent_expected_calibration_error", scorecard.scores.agent_expected_calibration_error),
+        ("agent_metacognitive_sensitivity_auc", scorecard.scores.agent_metacognitive_sensitivity_auc),
+        ("agent_selective_accuracy_at_80pct_coverage", scorecard.scores.agent_selective_accuracy_at_80pct_coverage),
+        ("participant_confidence_brier_score", scorecard.scores.participant_confidence_brier_score),
+        ("participant_expected_calibration_error", scorecard.scores.participant_expected_calibration_error),
+        ("participant_metacognitive_sensitivity_auc", scorecard.scores.participant_metacognitive_sensitivity_auc),
+        ("participant_selective_accuracy_at_80pct_coverage", scorecard.scores.participant_selective_accuracy_at_80pct_coverage),
+        ("human_planning_rate", scorecard.scores.human_planning_rate),
+        ("human_first_attempt_rate", scorecard.scores.human_first_attempt_rate),
+        ("human_monitoring_rate", scorecard.scores.human_monitoring_rate),
+        ("human_reflection_rate", scorecard.scores.human_reflection_rate),
+        ("ai_core_step_substitution_rate", scorecard.scores.ai_core_step_substitution_rate),
+        ("human_verification_rate", scorecard.scores.human_verification_rate),
     ] {
         if let Some(value) = value {
             if !value.is_finite() || !(-2.0..=2.0).contains(&value) {
