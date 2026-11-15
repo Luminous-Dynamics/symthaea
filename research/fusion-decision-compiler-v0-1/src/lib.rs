@@ -163,12 +163,30 @@ pub struct SolverRun {
     pub dependencies: DeclaredModelDependencies,
 }
 
+/// Typed service metric. The unit is encoded in the variant so target gain,
+/// plasma gain, driver wall-plug gain and net plant electricity are never
+/// silently treated as interchangeable quantities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ServiceMetric {
+    TargetGainDimensionless,
+    PlasmaGainDimensionless,
+    DriverWallPlugGainDimensionless,
+    GrossThermalPowerMegawatt,
+    GrossElectricPowerMegawatt,
+    NetElectricExportPowerMegawatt,
+    UsefulThermalPowerMegawatt,
+    LifetimeNetElectricEnergyMegawattHour,
+    LifetimeUsefulThermalEnergyMegawattHour,
+    AvailabilityFraction,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CandidateInput {
     pub candidate_id: String,
     pub candidate_revision: String,
     pub geometry_sha256: String,
     pub objective_id: String,
+    pub service_metric: ServiceMetric,
     /// Missing service boundary is unknown, never an implicit zero.
     pub service_boundary_ref: Option<String>,
     pub required_regime: String,
@@ -249,6 +267,7 @@ pub struct DecisionBuild {
     pub candidate_id: String,
     pub candidate_revision: String,
     pub objective_id: String,
+    pub service_metric: ServiceMetric,
     pub disposition: CandidateDisposition,
     pub gate_findings: Vec<GateFinding>,
     pub solver_findings: Vec<SolverFinding>,
@@ -410,6 +429,7 @@ pub fn compile_candidate(
         candidate_id: candidate.candidate_id.clone(),
         candidate_revision: candidate.candidate_revision.clone(),
         objective_id: candidate.objective_id.clone(),
+        service_metric: candidate.service_metric,
         disposition,
         gate_findings,
         solver_findings,
@@ -799,6 +819,7 @@ mod tests {
             candidate_revision,
             geometry_sha256: sha('b'),
             objective_id: "service-objective-v1".to_string(),
+            service_metric: ServiceMetric::NetElectricExportPowerMegawatt,
             service_boundary_ref: Some("grid-export-boundary-v1".to_string()),
             required_regime: "tokamak-equilibrium".to_string(),
             required_model_use: ModelUse::SingleStepPrediction,
@@ -848,6 +869,17 @@ mod tests {
         assert_eq!(
             build.claim_ceiling,
             ClaimCeiling::FurtherEngineeringReviewOnly
+        );
+    }
+
+    #[test]
+    fn decision_build_preserves_typed_service_metric() {
+        let mut source = candidate();
+        source.service_metric = ServiceMetric::LifetimeNetElectricEnergyMegawattHour;
+        let build = compile_candidate(&source).unwrap();
+        assert_eq!(
+            build.service_metric,
+            ServiceMetric::LifetimeNetElectricEnergyMegawattHour
         );
     }
 
