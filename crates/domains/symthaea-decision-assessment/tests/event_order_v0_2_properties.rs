@@ -11,8 +11,9 @@ use symthaea_decision_assessment::{
     EventOrder, EventTraceDisposition, GateState, ReconciledOperationOutcome,
 };
 use symthaea_decision_assessment::event_order_v0_2::{
-    AttemptIdentity, AttemptTerminalReconciliation, EventTimeIntervalNs,
-    OperationAttemptRecord, QualifiedEventTime, TimeBasisDescriptor, EventTimeUnit,
+    AttemptIdentity, AttemptStopDischargeRelation, AttemptTerminalReconciliation,
+    EventTimeIntervalNs, OperationAttemptRecord, QualifiedEventTime,
+    TimeBasisDescriptor, EventTimeUnit,
     AttemptHistoryInventory, ScopedStopObligation, StopDischargeReceipt, StopScope,
     assess_start_under_stop_obligations, canonical_attempt_manifest_sha256,
     compare_qualified_event_times, validate_attempt_lifecycle,
@@ -91,6 +92,81 @@ fn attempt_inventory(
         authenticity: GateState::Pass,
         scope_qualification: GateState::Pass,
         completeness: GateState::Pass,
+    }
+}
+
+fn global_obligation(id: usize) -> ScopedStopObligation {
+    let mut obligation = scoped_obligation(id, "placeholder", true);
+    obligation.scope = StopScope::Global;
+    obligation.discharge.as_mut().expect("discharged obligation").scope = StopScope::Global;
+    obligation
+}
+
+fn post_discharge_attempt(
+    logical_operation_id: String,
+    attempt_id: String,
+    start_event_id: String,
+    obligation: &ScopedStopObligation,
+) -> OperationAttemptRecord {
+    let discharge = obligation.discharge.as_ref().expect("discharged obligation");
+    OperationAttemptRecord {
+        identity: AttemptIdentity {
+            logical_operation_id,
+            attempt_id,
+            retry_of_attempt_id: None,
+        },
+        start_event_ids: vec![start_event_id.clone()],
+        terminal_reconciliation_event_ids: Vec::new(),
+        terminal_reconciliation: None,
+        stop_discharge_relations: vec![AttemptStopDischargeRelation {
+            obligation_id: obligation.obligation_id.clone(),
+            discharge_event_id: discharge.event_id.clone(),
+            attempt_start_event_id: start_event_id,
+            discharge_to_start_order: EventOrder::Before,
+            terminal_event_id_at_discharge: None,
+            terminal_to_discharge_order: None,
+        }],
+        retry_predecessor_terminal_event_id: None,
+        retry_predecessor_start_event_id: None,
+        retry_predecessor_terminal_to_start_order: None,
+    }
+}
+
+fn pre_discharge_terminal_attempt(
+    logical_operation_id: String,
+    attempt_id: String,
+    start_event_id: String,
+    terminal_event_id: String,
+    obligation: &ScopedStopObligation,
+) -> OperationAttemptRecord {
+    let discharge = obligation.discharge.as_ref().expect("discharged obligation");
+    let terminal = AttemptTerminalReconciliation {
+        event_id: terminal_event_id.clone(),
+        start_event_id: start_event_id.clone(),
+        outcome: ReconciledOperationOutcome::Applied,
+        qualification: GateState::Pass,
+        start_to_terminal_order: EventOrder::Before,
+    };
+    OperationAttemptRecord {
+        identity: AttemptIdentity {
+            logical_operation_id,
+            attempt_id,
+            retry_of_attempt_id: None,
+        },
+        start_event_ids: vec![start_event_id.clone()],
+        terminal_reconciliation_event_ids: vec![terminal_event_id.clone()],
+        terminal_reconciliation: Some(terminal),
+        stop_discharge_relations: vec![AttemptStopDischargeRelation {
+            obligation_id: obligation.obligation_id.clone(),
+            discharge_event_id: discharge.event_id.clone(),
+            attempt_start_event_id: start_event_id,
+            discharge_to_start_order: EventOrder::After,
+            terminal_event_id_at_discharge: Some(terminal_event_id),
+            terminal_to_discharge_order: Some(EventOrder::Before),
+        }],
+        retry_predecessor_terminal_event_id: None,
+        retry_predecessor_start_event_id: None,
+        retry_predecessor_terminal_to_start_order: None,
     }
 }
 
@@ -314,6 +390,87 @@ proptest! {
             &reversed,
         );
         prop_assert_eq!(forward, reverse);
+    }
+
+ 
+    #[test]
+    fn generated_post_discharge_sibling_operations_may_remain_in_flight(
+        sibling_count in 1usize..12,
+    ) {
+        let obligation = global_obligation(77);
+        let attempts = (0..sibling_count)
+            .map(|index| {
+                post_discharge_attempt(
+                    format!("robot-{index}"),
+                    format!("attempt-{index}"),
+                    format!("start-{index}"),
+                    &obligation,
+                )
+            })
+            .collect::<Vec<_>>();
+        let inventory = attempt_inventory(&attempts, StopScope::Global);
+        let report = assess_start_under_stop_obligations(
+            "robot-new",
+            &attempts,
+            &inventory,
+            &[obligation],
+        );
+        prop_assert!(report.start_permitted_by_stop_contract);
+        prop_assert_eq!(report.disposition, EventTraceDisposition::Safe);
+    }
+
+    #[test]
+    fn generated_pre_discharge_unresolved_sibling_always_blocks(
+        sibling_index in 0usize..16,
+    ) {
+        let obligation = global_obligation(78);
+        let mut attempt = post_discharge_attempt(
+            format!("robot-{sibling_index}"),
+            format!("attempt-{sibling_index}"),
+            format!("start-{sibling_index}"),
+            &obligation,
+        );
+        attempt.stop_discharge_relations[0].discharge_to_start_order = EventOrder::After;
+        let attempts = vec![attempt];
+        let inventory = attempt_inventory(&attempts, StopScope::Global);
+        let report = assess_start_under_stop_obligations(
+            "robot-new",
+            &attempts,
+            &inventory,
+            &[obligation],
+        );
+        prop_assert!(!report.start_permitted_by_stop_contract);
+        prop_assert_eq!(report.disposition, EventTraceDisposition::CriticalFailure);
+        prop_assert!(report.reason_codes.iter().any(|reason| {
+            reason.starts_with("ATTEMPT_UNRESOLVED_AT_STOP_DISCHARGE:")
+        }));
+    }
+
+    #[test]
+    fn generated_pre_discharge_terminally_reconciled_siblings_allow_resume(
+        sibling_count in 1usize..12,
+    ) {
+        let obligation = global_obligation(79);
+        let attempts = (0..sibling_count)
+            .map(|index| {
+                pre_discharge_terminal_attempt(
+                    format!("robot-{index}"),
+                    format!("attempt-{index}"),
+                    format!("start-{index}"),
+                    format!("terminal-{index}"),
+                    &obligation,
+                )
+            })
+            .collect::<Vec<_>>();
+        let inventory = attempt_inventory(&attempts, StopScope::Global);
+        let report = assess_start_under_stop_obligations(
+            "robot-new",
+            &attempts,
+            &inventory,
+            &[obligation],
+        );
+        prop_assert!(report.start_permitted_by_stop_contract);
+        prop_assert_eq!(report.disposition, EventTraceDisposition::Safe);
     }
 
 }

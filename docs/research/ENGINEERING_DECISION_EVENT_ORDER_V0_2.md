@@ -176,3 +176,6 @@ A global in-flight inventory PASS is not enough to classify a later attempt: the
 - Missing, duplicate, substituted or out-of-scope relations are critical.
 
 This composes with the owner's in-flight inventory receipt: the owner qualifies the complete snapshot at discharge; the per-attempt relations prove how the current snapshot's operations relate to that discharge. It allows independent concurrency after discharge without permitting pre-discharge in-flight work to be hidden by a later snapshot.
+
+
+The Proptest target additionally generates multiple concurrent sibling attempts under a global stop scope. It asserts that post-discharge attempts may remain active, any unresolved pre-discharge attempt blocks discharge/start, and a set of pre-discharge attempts with exact terminal-before-discharge reconciliation does not prevent later independent work. These are bounded property targets, not executed network simulations.
