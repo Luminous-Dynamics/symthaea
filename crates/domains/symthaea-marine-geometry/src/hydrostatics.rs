@@ -220,6 +220,44 @@ fn waterplane_integrals(
         }]);
     };
 
+    // Shift waterplane coordinates near the local origin before calculating
+    // second moments. This avoids catastrophic cancellation for large global
+    // coordinate offsets.
+    let mut minimum_x = f64::INFINITY;
+    let mut maximum_x = f64::NEG_INFINITY;
+    let mut minimum_y = f64::INFINITY;
+    let mut maximum_y = f64::NEG_INFINITY;
+    for face_index in range.first_face..end {
+        let face = faces[face_index];
+        for vertex_index in face {
+            let point = vertices[vertex_index as usize];
+            if point.iter().any(|coordinate| !coordinate.is_finite())
+                || point[2].abs() > WATERPLANE_TOLERANCE_M
+            {
+                return Err(vec![HydrostaticViolation {
+                    code: "waterplane_not_at_z0".into(),
+                    detail: format!("waterplane face {face_index} has a non-finite or non-z=0 vertex"),
+                }]);
+            }
+            minimum_x = minimum_x.min(point[0]);
+            maximum_x = maximum_x.max(point[0]);
+            minimum_y = minimum_y.min(point[1]);
+            maximum_y = maximum_y.max(point[1]);
+        }
+    }
+    if !minimum_x.is_finite()
+        || !maximum_x.is_finite()
+        || !minimum_y.is_finite()
+        || !maximum_y.is_finite()
+    {
+        return Err(vec![HydrostaticViolation {
+            code: "waterplane_bounds".into(),
+            detail: "waterplane bounds are not finite".into(),
+        }]);
+    }
+    let reference_x = (minimum_x + maximum_x) * 0.5;
+    let reference_y = (minimum_y + maximum_y) * 0.5;
+
     let mut area = CompensatedSum::default();
     let mut first_x = CompensatedSum::default();
     let mut first_y = CompensatedSum::default();
@@ -233,16 +271,6 @@ fn waterplane_integrals(
         let b = vertices[face[1] as usize];
         let c = vertices[face[2] as usize];
 
-        if [a[2], b[2], c[2]]
-            .iter()
-            .any(|z| !z.is_finite() || z.abs() > WATERPLANE_TOLERANCE_M)
-        {
-            return Err(vec![HydrostaticViolation {
-                code: "waterplane_not_at_z0".into(),
-                detail: format!("waterplane face {face_index} is not in z=0"),
-            }]);
-        }
-
         let triangle_area = triangle_area_xy(a, b, c);
         if !triangle_area.is_finite() || triangle_area <= MINIMUM_POSITIVE_AREA_M2 {
             return Err(vec![HydrostaticViolation {
@@ -251,11 +279,12 @@ fn waterplane_integrals(
             }]);
         }
         area.add(triangle_area);
-        first_x.add(triangle_area * (a[0] + b[0] + c[0]) / 3.0);
-        first_y.add(triangle_area * (a[1] + b[1] + c[1]) / 3.0);
 
-        let xs = [a[0], b[0], c[0]];
-        let ys = [a[1], b[1], c[1]];
+        let xs = [a[0] - reference_x, b[0] - reference_x, c[0] - reference_x];
+        let ys = [a[1] - reference_y, b[1] - reference_y, c[1] - reference_y];
+        first_x.add(triangle_area * (xs[0] + xs[1] + xs[2]) / 3.0);
+        first_y.add(triangle_area * (ys[0] + ys[1] + ys[2]) / 3.0);
+
         let x_square_sum = xs.iter().map(|x| x * x).sum::<f64>();
         let x_pair_sum = xs[0] * xs[1] + xs[1] * xs[2] + xs[2] * xs[0];
         let y_square_sum = ys.iter().map(|y| y * y).sum::<f64>();
@@ -282,13 +311,16 @@ fn waterplane_integrals(
         }]);
     }
 
-    let centroid_x = first_x.value() / total_area;
-    let centroid_y = first_y.value() / total_area;
+    let centroid_x_relative = first_x.value() / total_area;
+    let centroid_y_relative = first_y.value() / total_area;
+    let centroid_x = reference_x + centroid_x_relative;
+    let centroid_y = reference_y + centroid_y_relative;
     let transverse_second_moment =
-        raw_y2.value() - total_area * centroid_y * centroid_y;
+        raw_y2.value() - total_area * centroid_y_relative * centroid_y_relative;
     let longitudinal_second_moment =
-        raw_x2.value() - total_area * centroid_x * centroid_x;
-    let product_of_inertia = raw_xy.value() - total_area * centroid_x * centroid_y;
+        raw_x2.value() - total_area * centroid_x_relative * centroid_x_relative;
+    let product_of_inertia =
+        raw_xy.value() - total_area * centroid_x_relative * centroid_y_relative;
 
     if !centroid_x.is_finite()
         || !centroid_y.is_finite()
