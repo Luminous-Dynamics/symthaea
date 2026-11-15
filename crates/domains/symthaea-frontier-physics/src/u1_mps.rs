@@ -4408,7 +4408,8 @@ mod tests {
     use super::{
         ComplexU1Mps, U1CanonicalGaugeReceipt, U1MpsError, U1MpsErrorBudgetFractions,
         U1MpsErrorBudgetPlan, U1MpsTensor, U1MpsTruncationLedger, U1TeBDGate,
-        U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer, U1TeBDStepResult,
+        U1TeBDGateReceipt, U1TeBDHamiltonianTerm, U1TeBDLayer,
+        U1TeBDLayerErrorBudgetPolicy, U1TeBDStepResult,
         U1TeBDStrangStepper, U1TwoSiteErrorBudgetPolicy, U1TwoSiteGate,
         U1TwoSiteHamiltonian, U1TwoSiteState, U1TwoSiteTruncationPolicy,
         left_isometry_residual, right_isometry_residual,
@@ -6578,6 +6579,153 @@ mod tests {
                     compression: 0.1,
                     time_discretization: 0.1,
                 },
+            ),
+            Err(U1MpsError::InvalidErrorBudget)
+        );
+    }
+
+
+    fn charge_preserving_rotation_gate() -> U1TwoSiteGate {
+        let zero = Complex64::new(0.0, 0.0);
+        let mut matrix = [[zero; 4]; 4];
+        matrix[0][0] = Complex64::new(1.0, 0.0);
+        matrix[1][1] = Complex64::new(0.8, 0.0);
+        matrix[1][2] = Complex64::new(-0.6, 0.0);
+        matrix[2][1] = Complex64::new(0.6, 0.0);
+        matrix[2][2] = Complex64::new(0.8, 0.0);
+        matrix[3][3] = Complex64::new(1.0, 0.0);
+        U1TwoSiteGate::new(matrix, 1.0e-12).unwrap()
+    }
+
+    fn compression_only_plan(total: f64, compression_fraction: f64) -> U1MpsErrorBudgetPlan {
+        U1MpsErrorBudgetPlan::compile(
+            total,
+            U1MpsErrorBudgetFractions {
+                canonicalization: 0.0,
+                gate_quality: 0.0,
+                hamiltonian_projection: 0.0,
+                compression: compression_fraction,
+                time_discretization: 0.0,
+            },
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn tebd_layer_compiles_goal_driven_local_targets_into_a_propagated_compression_budget() {
+        let input = ComplexU1Mps::product_state(&[true, false]).unwrap();
+        let layer =
+            U1TeBDLayer::new(2, 0, vec![U1TeBDGate::new(0, charge_preserving_rotation_gate())])
+                .unwrap();
+        let result = layer
+            .apply_with_error_budget(
+                &input,
+                U1TeBDLayerErrorBudgetPolicy {
+                    max_bond_dimension: 1,
+                    tolerance: 1.0e-12,
+                },
+                compression_only_plan(1.0, 0.8),
+            )
+            .unwrap();
+
+        assert!(result.compression_budget_satisfied);
+        assert_eq!(result.gate_budget_receipts.len(), 1);
+        let receipt = &result.gate_budget_receipts[0];
+        assert_eq!(receipt.bond_index, 0);
+        assert_eq!(receipt.selected_bond_dimension, 1);
+        assert_eq!(receipt.minimum_required_bond_dimension, 1);
+        assert_eq!(receipt.svd_factorization_passes, 1);
+        assert!(receipt.budget_satisfied);
+        assert!(receipt.achieved_local_l2_error <= receipt.requested_local_l2_error);
+        assert!(
+            result.propagated_compression_error_upper_bound
+                <= result.compression_budget_l2_error + 1.0e-12
+        );
+        assert!(result.layer.global_l2_bound_qualified);
+        assert_eq!(result.layer.output_total_charge, 1);
+        assert_eq!(result.layer.truncation_ledger.gate_count(), 1);
+    }
+
+    #[test]
+    fn tebd_layer_error_budget_accounts_for_downstream_gate_norms_and_exterior_maps() {
+        let input = ComplexU1Mps::product_state(&[true, false, true, false]).unwrap();
+        let layer = U1TeBDLayer::new(
+            4,
+            0,
+            vec![
+                U1TeBDGate::new(0, charge_preserving_rotation_gate()),
+                U1TeBDGate::new(2, charge_preserving_rotation_gate()),
+            ],
+        )
+        .unwrap();
+        let result = layer
+            .apply_with_error_budget(
+                &input,
+                U1TeBDLayerErrorBudgetPolicy {
+                    max_bond_dimension: 1,
+                    tolerance: 1.0e-12,
+                },
+                compression_only_plan(2.0, 0.8),
+            )
+            .unwrap();
+
+        assert_eq!(result.gate_budget_receipts.len(), 2);
+        assert!(result.gate_budget_receipts[0].downstream_gate_operator_norm_upper_bound >= 1.0);
+        assert!(result.gate_budget_receipts[1].downstream_gate_operator_norm_upper_bound >= 1.0);
+        assert!(
+            result.gate_budget_receipts.iter().all(|receipt| {
+                receipt.propagated_compression_error_upper_bound
+                    <= result.compression_budget_l2_error / 2.0 + 1.0e-12
+            })
+        );
+        assert!(
+            result.propagated_compression_error_upper_bound
+                <= result.compression_budget_l2_error + 1.0e-12
+        );
+        assert_eq!(result.layer.output_total_charge, 2);
+        assert!(result.layer.global_l2_bound_qualified);
+    }
+
+    #[test]
+    fn tebd_layer_error_budget_fails_when_bond_cap_cannot_meet_allocated_share() {
+        let input = ComplexU1Mps::product_state(&[true, false]).unwrap();
+        let layer =
+            U1TeBDLayer::new(2, 0, vec![U1TeBDGate::new(0, charge_preserving_rotation_gate())])
+                .unwrap();
+        let too_small = compression_only_plan(0.5, 0.8);
+        assert!(matches!(
+            layer.apply_with_error_budget(
+                &input,
+                U1TeBDLayerErrorBudgetPolicy {
+                    max_bond_dimension: 1,
+                    tolerance: 1.0e-12,
+                },
+                too_small
+            ),
+            Err(U1MpsError::TruncationBudgetInfeasible {
+                requested_l2_error,
+                achievable_l2_error,
+                max_bond_dimension: 1,
+            }) if achievable_l2_error > requested_l2_error
+        ));
+    }
+
+    #[test]
+    fn tebd_layer_error_budget_rejects_malformed_compiled_plan() {
+        let input = ComplexU1Mps::product_state(&[true, false]).unwrap();
+        let layer =
+            U1TeBDLayer::new(2, 0, vec![U1TeBDGate::new(0, charge_preserving_rotation_gate())])
+                .unwrap();
+        let mut plan = compression_only_plan(1.0, 0.8);
+        plan.compression_l2_error = f64::NAN;
+        assert_eq!(
+            layer.apply_with_error_budget(
+                &input,
+                U1TeBDLayerErrorBudgetPolicy {
+                    max_bond_dimension: 1,
+                    tolerance: 1.0e-12,
+                },
+                plan
             ),
             Err(U1MpsError::InvalidErrorBudget)
         );
