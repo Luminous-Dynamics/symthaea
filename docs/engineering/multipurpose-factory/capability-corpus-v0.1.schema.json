@@ -169,7 +169,8 @@
             "PUMP_VALVE_MODULE",
             "ROBOTICS_REPLACEMENT_PART",
             "REPAIRED_OR_REMANUFACTURED_UNIT",
-            "OFF_EARTH_NONPRESSURE_MEMBER"
+            "OFF_EARTH_NONPRESSURE_MEMBER",
+            "PROCESS_INTERMEDIATE"
           ]
         },
         "required_capabilities": {
@@ -215,7 +216,8 @@
             "HIGH_VOLTAGE_TEST",
             "TEXTILE_CUT_SEW",
             "METROLOGY_INSPECTION",
-            "REPAIR_REMANUFACTURE"
+            "REPAIR_REMANUFACTURE",
+            "CONTINUOUS_CHEMICAL_PROCESS"
           ]
         },
         "capabilities": {
