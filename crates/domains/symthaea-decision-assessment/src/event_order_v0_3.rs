@@ -3349,39 +3349,6 @@ mod tests {
             ),
         );
 
-        let cancellation_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 2_500, 105);
-        push_action(
-            &mut actions,
-            &mut ordinal,
-            2_501,
-            ScheduleAction::CancellationRequested {
-                operation_id: operation_id.clone(),
-                attempt_id: attempt_id.clone(),
-            },
-        );
-        let cancellation_action_id = push_clocked_action(
-            &mut actions,
-            &mut ordinal,
-            2_502,
-            ScheduleAction::CancellationAcknowledged {
-                operation_id: operation_id.clone(),
-                attempt_id: attempt_id.clone(),
-                accepted: true,
-            },
-            ActionClockTimeReference {
-                clock_mapping_action_id: cancellation_mapping.clone(),
-                local_timestamp_ns: 105,
-            },
-            ActionEvidence::CancellationAcknowledgement {
-                receipt_ref: "synthetic://cancel-ack/1".to_owned(),
-                receipt_sha256: "1".repeat(64),
-            },
-        );
-        resolutions.insert(
-            (cancellation_mapping.clone(), 105),
-            qualified_resolution_from_fixture(&actions, &cancellation_mapping, 105, 1_025),
-        );
-        receipts.insert(cancellation_action_id, passing_owner_receipt());
         let commit_mapping = push_test_clock_mapping(&mut actions, &mut ordinal, 3, 110);
         let commit_action_id = push_clocked_action(
             &mut actions,
@@ -4283,6 +4250,85 @@ mod tests {
     }
 
     #[test]
+    fn cancellation_acknowledgement_does_not_create_not_applied_terminal() {
+        let mut actions = Vec::new();
+        let mut ordinal = 0_u64;
+        let mut resolutions = BTreeMap::new();
+        let mut receipts = BTreeMap::new();
+        let operation_id = "cancelled-operation".to_owned();
+        let attempt_id = "cancelled-attempt".to_owned();
+        let mapping_id = push_test_clock_mapping(&mut actions, &mut ordinal, 1, 200);
+        let start_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            2,
+            ScheduleAction::EffectAttempted {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 100,
+            },
+            ActionEvidence::AttemptStart { retry_of_attempt_id: None },
+        );
+        push_action(
+            &mut actions,
+            &mut ordinal,
+            3,
+            ScheduleAction::CancellationRequested {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+            },
+        );
+        let acknowledgement_action_id = push_clocked_action(
+            &mut actions,
+            &mut ordinal,
+            4,
+            ScheduleAction::CancellationAcknowledged {
+                operation_id: operation_id.clone(),
+                attempt_id: attempt_id.clone(),
+                accepted: true,
+            },
+            ActionClockTimeReference {
+                clock_mapping_action_id: mapping_id.clone(),
+                local_timestamp_ns: 150,
+            },
+            ActionEvidence::CancellationAcknowledgement {
+                receipt_ref: "synthetic://cancel-ack-only".to_owned(),
+                receipt_sha256: "1".repeat(64),
+            },
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 100),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 100, 1_000),
+        );
+        resolutions.insert(
+            (mapping_id.clone(), 150),
+            qualified_resolution_from_fixture(&actions, &mapping_id, 150, 1_050),
+        );
+        receipts.insert(acknowledgement_action_id, passing_owner_receipt());
+        let schedule = VirtualSchedule {
+            schema_version: SCHEDULE_SCHEMA_VERSION.to_owned(),
+            generator_version: GENERATOR_VERSION.to_owned(),
+            seed: 0x2026_1126,
+            scenario_family: "cancel_ack_is_not_terminal_reconciliation".to_owned(),
+            actions,
+        };
+        let report = project_action_history(&schedule, &operation_id, &resolutions, &receipts)
+            .expect("projection assessment");
+        assert_eq!(report.disposition, EventTraceDisposition::Indeterminate);
+        assert_eq!(report.cancellation_acknowledgements.len(), 1);
+        assert!(!report.cancellation_acknowledgements[0].establishes_not_applied);
+        assert!(report.attempts.iter().any(|attempt| {
+            attempt.identity.attempt_id == attempt_id
+                && attempt.terminal_reconciliation.is_none()
+                && attempt.start_event_ids == vec![start_action_id.clone()]
+        }));
+        assert!(report.reason_codes.iter().any(|code| code == "ATTEMPT_OUTCOME_UNRECONCILED:cancelled-attempt"));
+    }
+
+    #[test]
     fn action_history_projection_composes_attempt_stop_and_complete_inventory() {
         let (schedule, resolutions, receipts, expected_manifest) = action_history_fixture();
         validate_schedule(&schedule).expect("valid action-history fixture");
@@ -4303,8 +4349,7 @@ mod tests {
         assert_eq!(report.obligations[0].discharge.as_ref().map(|receipt| receipt.qualification), Some(GateState::Pass));
         assert!(report.start_gate.as_ref().is_some_and(|gate| gate.start_permitted_by_stop_contract));
         assert_eq!(report.effect_commits.len(), 1);
-        assert_eq!(report.cancellation_acknowledgements.len(), 1);
-        assert!(!report.cancellation_acknowledgements[0].establishes_not_applied);
+        assert!(report.cancellation_acknowledgements.is_empty());
         assert_eq!(report.attempts[0].terminal_reconciliation.as_ref().map(|t| t.outcome), Some(ReconciledOperationOutcome::Applied));
     }
 
