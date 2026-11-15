@@ -189,16 +189,18 @@
     {
       "case_id": "B1-NEG-025",
       "name": "Forged eligible claim with unknown asset",
-      "expected_outcome": "RejectedByIndependentVerifier",
       "mutation": "set_report_status=Eligible_after_asset_status_changes_to_Unknown",
-      "reason": "Independent verification must recompute the asset state rather than trust the evaluator's previous result."
+      "reason": "Independent verification must recompute the asset state rather than trust the evaluator's previous result.",
+      "expected_evaluator_claim_status": "Eligible",
+      "expected_verifier_status": "Rejected"
     },
     {
       "case_id": "B1-NEG-026",
       "name": "Forged eligible claim with tampered evidence set",
-      "expected_outcome": "RejectedByIndependentVerifier",
       "mutation": "remove_one_required_evidence_ref_from_eligible_report",
-      "reason": "The independent verifier must reconstruct the evidence set from the snapshot and reject an incomplete claim."
+      "reason": "The independent verifier must reconstruct the evidence set from the snapshot and reject an incomplete claim.",
+      "expected_evaluator_claim_status": "Eligible",
+      "expected_verifier_status": "Rejected"
     }
   ],
   "publication_requirements": [
@@ -207,5 +209,12 @@
     "Run at least 30 repeated randomized input-order permutations for determinism checks.",
     "Use an independent verifier implementation before claiming optimizer-to-verifier agreement.",
     "Do not publish synthetic fixture results as measured factory capability."
-  ]
+  ],
+  "independent_verifier_contract": {
+    "outcomes": [
+      "Verified",
+      "Rejected"
+    ],
+    "rule": "Only a positive Eligible claim can be Verified. Verification independently recomputes the hard predicates and evidence-reference set from the immutable owner-resolved snapshot; it does not call the evaluator."
+  }
 }
