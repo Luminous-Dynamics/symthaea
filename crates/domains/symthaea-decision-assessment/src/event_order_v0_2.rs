@@ -796,18 +796,21 @@ pub fn assess_start_under_stop_obligations(
         reasons.insert("START_LOGICAL_OPERATION_ID_INVALID".to_owned());
     }
 
-    // Validate only prior attempts relevant to this start: its own logical
-    // operation plus the union of scopes belonging to applicable obligations.
-    // An unrelated in-flight operation must not poison an independent scope.
+    // Validate complete-history structural integrity across the supplied snapshot.
+    // A critical identity/lineage defect anywhere in the qualified inventory is
+    // not hidden by filtering to one logical operation.
+    let full_history_report = validate_attempt_lifecycle(prior_attempts);
+    if full_history_report.disposition == EventTraceDisposition::CriticalFailure {
+        critical = true;
+        reasons.insert("ATTEMPT_INVENTORY_CONTAINS_CRITICAL_HISTORY_DEFECT".to_owned());
+    }
+
+    // Retry/active-attempt admissibility is local to the requested logical
+    // operation. A pending sibling operation inside a discharged global scope
+    // is not, by itself, a reason to serialize otherwise independent work.
     let relevant_prior_attempts = prior_attempts
         .iter()
-        .filter(|attempt| {
-            attempt.identity.logical_operation_id == logical_operation_id
-                || obligations.iter().any(|obligation| {
-                    obligation.scope.applies_to(logical_operation_id)
-                        && obligation.scope.applies_to(&attempt.identity.logical_operation_id)
-                })
-        })
+        .filter(|attempt| attempt.identity.logical_operation_id == logical_operation_id)
         .cloned()
         .collect::<Vec<_>>();
     let (inventory_disposition, inventory_reasons) = validate_attempt_inventory(
@@ -1370,6 +1373,83 @@ mod tests {
             canonical_attempt_manifest_sha256(&attempts).unwrap(),
             canonical_attempt_manifest_sha256(&reversed).unwrap()
         );
+    }
+
+    #[test]
+    fn pending_sibling_attempt_does_not_serialize_a_discharged_global_scope() {
+        let sibling = attempt(
+            "robot-a",
+            "attempt-a",
+            None,
+            "start-a",
+            None,
+            None,
+            None,
+        );
+        let attempts = vec![sibling];
+        let inventory = attempt_inventory(&attempts, StopScope::Global, GateState::Pass);
+
+        let scope = StopScope::Global;
+        let trigger = "global-stop-trigger".to_owned();
+        let obligation = ScopedStopObligation {
+            obligation_id: "global-obligation".to_owned(),
+            trigger_event_id: trigger.clone(),
+            policy_revision: "policy-global-v1".to_owned(),
+            scope: scope.clone(),
+            discharge: Some(StopDischargeReceipt {
+                event_id: "global-stop-discharge".to_owned(),
+                obligation_id: "global-obligation".to_owned(),
+                trigger_event_id: trigger,
+                policy_revision: "policy-global-v1".to_owned(),
+                scope,
+                receipt_ref: "synthetic://global-discharge/receipt".to_owned(),
+                receipt_sha256: "b".repeat(64),
+                qualification: GateState::Pass,
+                in_flight_reconciliation: GateState::Pass,
+                in_flight_inventory_frontier_event_id: "global-inventory-frontier".to_owned(),
+                in_flight_attempt_manifest_sha256: "c".repeat(64),
+                trigger_to_discharge_order: EventOrder::Before,
+            }),
+        };
+
+        let report = assess_start_under_stop_obligations(
+            "robot-b",
+            &attempts,
+            &inventory,
+            &[obligation],
+        );
+        assert!(report.start_permitted_by_stop_contract);
+        assert_eq!(report.disposition, EventTraceDisposition::Safe);
+    }
+
+    #[test]
+    fn same_logical_operation_cannot_start_while_its_previous_attempt_is_pending() {
+        let pending = attempt(
+            "robot-a",
+            "attempt-a",
+            None,
+            "start-a",
+            None,
+            None,
+            None,
+        );
+        let attempts = vec![pending];
+        let inventory = attempt_inventory(
+            &attempts,
+            StopScope::LogicalOperations(["robot-a".to_owned()].into_iter().collect()),
+            GateState::Pass,
+        );
+        let report = assess_start_under_stop_obligations(
+            "robot-a",
+            &attempts,
+            &inventory,
+            &[],
+        );
+        assert!(!report.start_permitted_by_stop_contract);
+        assert_eq!(report.disposition, EventTraceDisposition::Indeterminate);
+        assert!(report.reason_codes.iter().any(|reason| {
+            reason == "PRIOR_ATTEMPT_NOT_RECONCILED:attempt-a"
+        }));
     }
 
     #[test]

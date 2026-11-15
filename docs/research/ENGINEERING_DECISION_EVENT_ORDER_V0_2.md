@@ -72,7 +72,7 @@ Each discharge must independently bind:
 - owner qualification PASS;
 - trigger definitely BEFORE discharge.
 
-A discharge receipt for obligation A cannot discharge obligation B. A scoped obligation cannot block unrelated operations. The discharge receipt also carries owner-native in-flight-reconciliation qualification for the exact scope at discharge time; FAIL is critical and an unresolved result blocks. This avoids confusing an operation that began after discharge with one that was already in flight when discharge was evaluated. The start gate separately blocks an unresolved prior attempt for the same logical operation. Multiple applicable obligations compose conjunctively: every one must be discharged.
+A discharge receipt for obligation A cannot discharge obligation B. A scoped obligation cannot block unrelated operations. The discharge receipt also carries owner-native in-flight-reconciliation qualification for the exact scope at discharge time; FAIL is critical and an unresolved result blocks. A complete inventory is checked for critical identity/lineage defects across the supplied snapshot, while active-attempt/retry checks are scoped to the requested logical operation. Thus a pending sibling operation after a qualified discharge does not serialize an independent logical operation; an unresolved attempt of the same logical operation still blocks another start. Multiple applicable obligations compose conjunctively: every one must be discharged.
 
 start_permitted_by_stop_contract is an eligibility result only. It never grants effect authority and does not enforce a command at the executor boundary.
 
