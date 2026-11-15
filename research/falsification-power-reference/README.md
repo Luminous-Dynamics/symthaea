@@ -14,7 +14,7 @@ For each evaluator-declared alternative, provide its expected residual at every 
 
 The crate computes the alternative-specific Gaussian matched-filter noncentrality and best-case power. It then reports every alternative separately, the least-detectable alternative, and whether all alternatives meet the requested power target.
 
-The power envelope intentionally refuses alternatives with different observation counts. A policy cannot receive a better score by quietly spending a larger budget on one alternative.
+The power envelope refuses alternatives with different vector lengths, preventing comparisons with different observation counts. The v0 API does not receive observation IDs, timestamps, sensor identity or cost weights: the calling evaluator must bind identical design IDs/order/units and account for acquisition and execution costs separately.
 
 ## Assumptions and claim ceiling
 
