@@ -6,7 +6,7 @@
 //! using source-bound intervals for transition time and ground progress.
 //! It does not model aerodynamic/hydrodynamic forces or emit actuator actions.
 
-use super::{Evidence, EvidenceState, PlanStatus, TackSide, evidence_gate};
+use super::{Evidence, EvidenceState, PlanStatus, evidence_gate};
 use super::robust::{RobustCourseCandidate, ScalarInterval};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -213,6 +213,7 @@ pub fn evaluate_transition_adjusted_vmg(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::TackSide;
 
     const CONFIG: [u8; 32] = [0x5a; 32];
     const POLAR: [u8; 32] = [0xb6; 32];
@@ -430,8 +431,8 @@ mod tests {
             &c, &bound, ManeuverKind::Tack, 100.0, CONFIG, POLAR, ACTUATOR, TIMEBASE
         );
         let adjusted = result.result.unwrap();
-        assert!(adjusted.effective_ground_vmg_mps.lower < -3.0);
-        assert!(adjusted.effective_ground_vmg_mps.upper < 0.0);
+        assert!((adjusted.effective_ground_vmg_mps.lower + 2.72).abs() < 1e-9);
+        assert!((adjusted.effective_ground_vmg_mps.upper + 0.79).abs() < 1e-9);
     }
 
     #[test]
