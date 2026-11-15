@@ -82,7 +82,18 @@ pub struct AudioBoundaryThresholdV1 {
 #[serde(deny_unknown_fields)]
 pub struct AudioBoundaryRequestV1 {
     pub schema_version: String,
+    pub session_id: String,
+    pub sequence_index: u8,
+    pub step_id: String,
     pub operation_id: String,
+    /// Upstream EVAL-043 symbolic step and EVAL-041/EVAL-035 evidence identities.
+    pub sequence_step_sha256: String,
+    pub realization_receipt_sha256: String,
+    pub byte_materialization_receipt_sha256: String,
+    pub backend_id: String,
+    pub backend_version: String,
+    pub renderer_id: String,
+    pub renderer_version: String,
     pub source_lineage_sha256: String,
     pub operation_plan_sha256: String,
     pub source_pcm_sha256: String,
@@ -131,6 +142,17 @@ pub struct AudioBoundaryResultV1 {
 pub struct AudioBoundaryReceiptPayloadV1 {
     pub schema_version: String,
     pub request_sha256: String,
+    pub session_id: String,
+    pub sequence_index: u8,
+    pub step_id: String,
+    pub operation_id: String,
+    pub sequence_step_sha256: String,
+    pub realization_receipt_sha256: String,
+    pub byte_materialization_receipt_sha256: String,
+    pub backend_id: String,
+    pub backend_version: String,
+    pub renderer_id: String,
+    pub renderer_version: String,
     pub source_pcm_sha256: String,
     pub output_pcm_sha256: String,
     pub frame_count: u64,
@@ -262,12 +284,23 @@ fn region_sha256_v1(
 
 fn validate_request_v1(request: &AudioBoundaryRequestV1) -> Result<(), AudioBoundaryErrorV1> {
     if request.schema_version != AUDIO_BOUNDARY_REQUEST_SCHEMA_V1
+        || request.session_id.trim().is_empty()
+        || request.step_id.trim().is_empty()
         || request.operation_id.trim().is_empty()
+        || request.sequence_index == 0
+        || request.sequence_index > 8
+        || request.backend_id.trim().is_empty()
+        || request.backend_version.trim().is_empty()
+        || request.renderer_id.trim().is_empty()
+        || request.renderer_version.trim().is_empty()
         || request.sample_rate_hz < 8_000
         || request.sample_rate_hz > 384_000
         || request.channel_count == 0
         || request.channel_count > 8
         || request.frame_count < 4
+        || !valid_sha256(&request.sequence_step_sha256)
+        || !valid_sha256(&request.realization_receipt_sha256)
+        || !valid_sha256(&request.byte_materialization_receipt_sha256)
         || !valid_sha256(&request.source_lineage_sha256)
         || !valid_sha256(&request.operation_plan_sha256)
         || !valid_sha256(&request.source_pcm_sha256)
@@ -468,7 +501,17 @@ fn evaluate_boundary_v1(
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 struct AudioBoundaryRequestPayloadV1<'a> {
     schema_version: &'a str,
+    session_id: &'a str,
+    sequence_index: u8,
+    step_id: &'a str,
     operation_id: &'a str,
+    sequence_step_sha256: &'a str,
+    realization_receipt_sha256: &'a str,
+    byte_materialization_receipt_sha256: &'a str,
+    backend_id: &'a str,
+    backend_version: &'a str,
+    renderer_id: &'a str,
+    renderer_version: &'a str,
     source_lineage_sha256: &'a str,
     operation_plan_sha256: &'a str,
     source_pcm_sha256: &'a str,
@@ -484,7 +527,17 @@ struct AudioBoundaryRequestPayloadV1<'a> {
 fn request_sha256_v1(request: &AudioBoundaryRequestV1) -> Result<String, AudioBoundaryErrorV1> {
     let payload = AudioBoundaryRequestPayloadV1 {
         schema_version: &request.schema_version,
+        session_id: &request.session_id,
+        sequence_index: request.sequence_index,
+        step_id: &request.step_id,
         operation_id: &request.operation_id,
+        sequence_step_sha256: &request.sequence_step_sha256,
+        realization_receipt_sha256: &request.realization_receipt_sha256,
+        byte_materialization_receipt_sha256: &request.byte_materialization_receipt_sha256,
+        backend_id: &request.backend_id,
+        backend_version: &request.backend_version,
+        renderer_id: &request.renderer_id,
+        renderer_version: &request.renderer_version,
         source_lineage_sha256: &request.source_lineage_sha256,
         operation_plan_sha256: &request.operation_plan_sha256,
         source_pcm_sha256: &request.source_pcm_sha256,
@@ -574,6 +627,17 @@ pub fn evaluate_audio_edit_boundary_v1(
     let payload = AudioBoundaryReceiptPayloadV1 {
         schema_version: AUDIO_BOUNDARY_RECEIPT_SCHEMA_V1.to_owned(),
         request_sha256: request_sha256_v1(request)?,
+        session_id: request.session_id.clone(),
+        sequence_index: request.sequence_index,
+        step_id: request.step_id.clone(),
+        operation_id: request.operation_id.clone(),
+        sequence_step_sha256: request.sequence_step_sha256.clone(),
+        realization_receipt_sha256: request.realization_receipt_sha256.clone(),
+        byte_materialization_receipt_sha256: request.byte_materialization_receipt_sha256.clone(),
+        backend_id: request.backend_id.clone(),
+        backend_version: request.backend_version.clone(),
+        renderer_id: request.renderer_id.clone(),
+        renderer_version: request.renderer_version.clone(),
         source_pcm_sha256: source_digest,
         output_pcm_sha256: output_digest,
         frame_count: request.frame_count,
@@ -631,7 +695,17 @@ mod tests {
         let protected_digest = region_sha256_v1(source, "protected-head", 0, 3).unwrap();
         AudioBoundaryRequestV1 {
             schema_version: AUDIO_BOUNDARY_REQUEST_SCHEMA_V1.to_owned(),
+            session_id: "session-pcm-001".to_owned(),
+            sequence_index: 1,
+            step_id: "step-pcm-001".to_owned(),
             operation_id: "replace-hit-001".to_owned(),
+            sequence_step_sha256: h(3),
+            realization_receipt_sha256: h(4),
+            byte_materialization_receipt_sha256: h(5),
+            backend_id: "fixture-backend".to_owned(),
+            backend_version: "1.0.0".to_owned(),
+            renderer_id: "fixture-renderer".to_owned(),
+            renderer_version: "1.0.0".to_owned(),
             source_lineage_sha256: h(1),
             operation_plan_sha256: h(2),
             source_pcm_sha256: audio_pcm_sha256_v1(source).unwrap(),
@@ -838,6 +912,40 @@ mod tests {
         assert_eq!(
             evaluate_audio_edit_boundary_v1(&request, &source, &output),
             Err(AudioBoundaryErrorV1::AudioMetadataMismatch)
+        );
+    }
+
+    #[test]
+    fn pcm_receipt_binds_e043_e041_e035_and_backend_identity() {
+        let source = base_mono();
+        let mut output = source.clone();
+        output.samples_interleaved_s32[4] = 45;
+        let request = request_for(&source, &output);
+        let receipt = evaluate_audio_edit_boundary_v1(&request, &source, &output).unwrap();
+        assert_eq!(receipt.payload.session_id, request.session_id);
+        assert_eq!(receipt.payload.sequence_index, request.sequence_index);
+        assert_eq!(receipt.payload.step_id, request.step_id);
+        assert_eq!(receipt.payload.sequence_step_sha256, request.sequence_step_sha256);
+        assert_eq!(receipt.payload.realization_receipt_sha256, request.realization_receipt_sha256);
+        assert_eq!(receipt.payload.byte_materialization_receipt_sha256, request.byte_materialization_receipt_sha256);
+        assert_eq!(receipt.payload.backend_id, request.backend_id);
+        assert_eq!(receipt.payload.renderer_id, request.renderer_id);
+
+        let mut other_step = request.clone();
+        other_step.sequence_step_sha256 = h(99);
+        let other_receipt = evaluate_audio_edit_boundary_v1(&other_step, &source, &output).unwrap();
+        assert_ne!(receipt.payload.request_sha256, other_receipt.payload.request_sha256);
+        assert_ne!(receipt.receipt_sha256, other_receipt.receipt_sha256);
+    }
+
+    #[test]
+    fn missing_or_malformed_upstream_evidence_identity_is_rejected() {
+        let source = base_mono();
+        let mut request = request_for(&source, &source);
+        request.realization_receipt_sha256 = "not-a-digest".to_owned();
+        assert_eq!(
+            evaluate_audio_edit_boundary_v1(&request, &source, &source),
+            Err(AudioBoundaryErrorV1::InvalidRequest)
         );
     }
 
