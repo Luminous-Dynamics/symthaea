@@ -321,6 +321,8 @@ pub struct CapabilityStratumEstimate {
     pub control_negative_gain_rate: f64,
     /// Difference in the fraction of participants whose independent score fell.
     pub negative_gain_rate_difference: f64,
+    pub negative_gain_rate_difference_ci_95_lower: f64,
+    pub negative_gain_rate_difference_ci_95_upper: f64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -411,6 +413,41 @@ pub fn summarize_capability_amplification_by_stratum(
             group.collaborative.negative_gains as f64 / collaborative_n as f64;
         let control_negative_gain_rate =
             group.control.negative_gains as f64 / control_n as f64;
+        let negative_gain_rate_difference =
+            collaborative_negative_gain_rate - control_negative_gain_rate;
+
+        let collaborative_negative = group
+            .collaborative
+            .pre
+            .iter()
+            .zip(&group.collaborative.post)
+            .map(|(pre, post)| (*post < *pre) as u8 as f64)
+            .collect::<Vec<_>>();
+        let control_negative = group
+            .control
+            .pre
+            .iter()
+            .zip(&group.control.post)
+            .map(|(pre, post)| (*post < *pre) as u8 as f64)
+            .collect::<Vec<_>>();
+        let mut rng = StdRng::seed_from_u64(
+            seed
+                .wrapping_add(index as u64)
+                .wrapping_add(0x9e37_79b9_7f4a_7c15),
+        );
+        let mut negative_rate_samples = Vec::with_capacity(draws);
+        for _ in 0..draws {
+            let collaborative_rate = (0..collaborative_negative.len())
+                .map(|_| collaborative_negative[rng.gen_range(0..collaborative_negative.len())])
+                .sum::<f64>()
+                / collaborative_n as f64;
+            let control_rate = (0..control_negative.len())
+                .map(|_| control_negative[rng.gen_range(0..control_negative.len())])
+                .sum::<f64>()
+                / control_n as f64;
+            negative_rate_samples.push(collaborative_rate - control_rate);
+        }
+        negative_rate_samples.sort_by(f64::total_cmp);
 
         estimates.push(CapabilityStratumEstimate {
             baseline_stratum: stratum,
@@ -421,8 +458,15 @@ pub fn summarize_capability_amplification_by_stratum(
             ci_95_upper: estimate.ci_95_upper,
             collaborative_negative_gain_rate,
             control_negative_gain_rate,
-            negative_gain_rate_difference: collaborative_negative_gain_rate
-                - control_negative_gain_rate,
+            negative_gain_rate_difference,
+            negative_gain_rate_difference_ci_95_lower: percentile(
+                &negative_rate_samples,
+                0.025,
+            ),
+            negative_gain_rate_difference_ci_95_upper: percentile(
+                &negative_rate_samples,
+                0.975,
+            ),
         });
     }
 
@@ -1143,6 +1187,18 @@ mod tests {
         assert!((first.strata[0].mean_gain_difference + 0.05).abs() < 1e-12);
         assert!((first.strata[0].collaborative_negative_gain_rate - 1.0 / 3.0).abs() < 1e-12);
         assert_eq!(first.strata[0].control_negative_gain_rate, 0.0);
+        assert!(
+            first.strata[0].negative_gain_rate_difference_ci_95_lower
+                <= first.strata[0].negative_gain_rate_difference
+        );
+        assert!(
+            first.strata[0].negative_gain_rate_difference_ci_95_upper
+                >= first.strata[0].negative_gain_rate_difference
+        );
+        assert_eq!(
+            first.strata[0].negative_gain_rate_difference_ci_95_lower,
+            second.strata[0].negative_gain_rate_difference_ci_95_lower
+        );
         assert_eq!(
             first.strata[0].ci_95_lower,
             second.strata[0].ci_95_lower
