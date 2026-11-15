@@ -1,0 +1,76 @@
+name: Plasma surface virtual-metrology synthetic audit
+
+on:
+  push:
+    branches:
+      - research/plasma-virtual-metrology-v0-1
+    paths:
+      - "xtask/src/plasma_virtual_metrology.rs"
+      - "data/research/plasma_virtual_metrology_fixture_v0_1.json"
+      - ".github/workflows/plasma-virtual-metrology-audit.yml"
+  pull_request:
+    paths:
+      - "xtask/src/plasma_virtual_metrology.rs"
+      - "data/research/plasma_virtual_metrology_fixture_v0_1.json"
+      - ".github/workflows/plasma-virtual-metrology-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@v4
+      - name: Install Rust 1.96 quality tools
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format check of exact VM audit module
+        run: rustfmt --edition 2024 --check xtask/src/plasma_virtual_metrology.rs
+      - name: Prepare isolated virtual-metrology audit harness
+        shell: bash
+        run: |
+          set -euo pipefail
+          AUDIT_DIR="$RUNNER_TEMP/plasma-vm-audit"
+          mkdir -p "$AUDIT_DIR/src"
+          cp Cargo.lock "$AUDIT_DIR/Cargo.lock"
+          cat > "$AUDIT_DIR/Cargo.toml" <<'EOF'
+          [package]
+          name = "xtask"
+          version = "0.1.0"
+          edition = "2024"
+
+          [workspace]
+
+          [dependencies]
+          serde = { version = "1.0", features = ["derive"] }
+          serde_json = "1.0"
+          clap = { version = "4.4", features = ["derive"] }
+          anyhow = "1.0"
+          csv = "1.3"
+          sha2 = "0.10"
+          toml = "0.8"
+          EOF
+          cat > "$AUDIT_DIR/src/lib.rs" <<EOF
+          #[path = "$GITHUB_WORKSPACE/xtask/src/plasma_virtual_metrology.rs"]
+          pub mod plasma_virtual_metrology;
+          EOF
+          cat > "$AUDIT_DIR/src/main.rs" <<'EOF'
+          use std::path::Path;
+
+          fn main() -> anyhow::Result<()> {
+              let report = xtask::plasma_virtual_metrology::run_audit(
+                  Path::new("data/research/plasma_virtual_metrology_fixture_v0_1.json"),
+              )?;
+              xtask::plasma_virtual_metrology::print_report(&report, false)
+          }
+          EOF
+      - name: Unit tests for exact virtual-metrology audit module
+        run: cargo test --manifest-path "$RUNNER_TEMP/plasma-vm-audit/Cargo.toml" --locked
+      - name: Strict Clippy for exact virtual-metrology audit module
+        run: cargo clippy --manifest-path "$RUNNER_TEMP/plasma-vm-audit/Cargo.toml" --all-targets --locked -- -D warnings
+      - name: Audit frozen synthetic virtual-metrology fixture
+        run: cargo run --manifest-path "$RUNNER_TEMP/plasma-vm-audit/Cargo.toml" --locked
