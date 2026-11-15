@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/mel-music-edit-intent-plan-v1.schema.json",
+  "title": "Melothaea Grounded Music Edit Intent Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "plan_id", "instruction_sha256", "source_observation_sha256",
+    "disposition", "selected_occurrence_ids", "selected_event_ids",
+    "protected_event_ids", "target_windows", "parameters", "grounding_evidence",
+    "clarification_candidates", "confidence_bp"
+  ],
+  "properties": {
+    "schema_version": { "const": "mel-music-edit-intent-plan-v1" },
+    "plan_id": { "type": "string", "minLength": 1 },
+    "instruction_sha256": { "$ref": "#/$defs/sha256" },
+    "source_observation_sha256": { "$ref": "#/$defs/sha256" },
+    "disposition": { "enum": ["ready", "needs_clarification", "abstain"] },
+    "operation": { "enum": ["add", "remove", "replace", "adjust_gain", "transpose"] },
+    "selector": { "$ref": "#/$defs/selector" },
+    "selected_occurrence_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "selected_event_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "protected_event_ids": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "target_windows": { "type": "array", "items": { "$ref": "#/$defs/window" } },
+    "parameters": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
+    "grounding_evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+    "clarification_candidates": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "clarification_question": { "type": "string", "minLength": 1 },
+    "abstention_reason": { "type": "string", "minLength": 1 },
+    "confidence_bp": { "type": "integer", "minimum": 0, "maximum": 10000 }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "selector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "semantic_class_id"],
+          "properties": { "kind": { "const": "unique_matching" }, "semantic_class_id": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "semantic_class_id", "ordinal"],
+          "properties": { "kind": { "const": "nth_matching" }, "semantic_class_id": { "type": "string", "minLength": 1 }, "ordinal": { "type": "integer", "minimum": 1, "maximum": 1024 } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "semantic_class_id"],
+          "properties": { "kind": { "const": "all_matching" }, "semantic_class_id": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "semantic_class_id", "anchor_id", "relation"],
+          "properties": {
+            "kind": { "const": "within_anchor" },
+            "semantic_class_id": { "type": "string", "minLength": 1 },
+            "anchor_id": { "type": "string", "minLength": 1 },
+            "relation": { "enum": ["inside", "after", "before"] }
+          }
+        }
+      ]
+    },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["occurrence_id", "start_tick", "end_tick"],
+      "properties": {
+        "occurrence_id": { "type": "string", "minLength": 1 },
+        "start_tick": { "type": "integer", "minimum": 0 },
+        "end_tick": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parameter_id", "value"],
+      "properties": {
+        "parameter_id": { "type": "string", "minLength": 1 },
+        "value": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "integer_value", "unit"],
+              "properties": {
+                "kind": { "const": "scalar" },
+                "integer_value": { "type": "integer" },
+                "unit": { "type": "string", "minLength": 1 }
+              }
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "value"],
+              "properties": {
+                "kind": { "const": "identity" },
+                "value": { "type": "string", "minLength": 1 }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["occurrence_id", "source_observation_sha256", "evidence_receipt_sha256", "evidence_kind", "confidence_bp"],
+      "properties": {
+        "occurrence_id": { "type": "string", "minLength": 1 },
+        "source_observation_sha256": { "$ref": "#/$defs/sha256" },
+        "evidence_receipt_sha256": { "$ref": "#/$defs/sha256" },
+        "evidence_kind": { "enum": ["event_map", "temporal_anchor", "human_annotation", "audio_model_observation"] },
+        "confidence_bp": { "type": "integer", "minimum": 0, "maximum": 10000 }
+      }
+    }
+  }
+}
