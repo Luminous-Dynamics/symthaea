@@ -214,12 +214,14 @@ mod request_bound_tests {
         BalanceProofRequestV1 {
             request_id: [1; 16],
             source_statement_reference_digest: [2; 32],
+            claim_schema_digest: [4; 32],
+            predicate_digest: [5; 32],
             issuer_key_reference_digest: [3; 32],
-            audience_digest: [4; 32],
-            verifier_digest: [5; 32],
-            purpose_digest: [6; 32],
-            policy_digest: [7; 32],
-            verifier_challenge: [8; 32],
+            audience_digest: [6; 32],
+            verifier_digest: [7; 32],
+            purpose_digest: [8; 32],
+            policy_digest: [9; 32],
+            verifier_challenge: [10; 32],
             required_minimum: 500,
         }
     }
@@ -252,6 +254,14 @@ mod request_bound_tests {
 
         let mut changed = request.clone();
         changed.source_statement_reference_digest[0] ^= 1;
+        variants.push(changed);
+
+        let mut changed = request.clone();
+        changed.claim_schema_digest[0] ^= 1;
+        variants.push(changed);
+
+        let mut changed = request.clone();
+        changed.predicate_digest[0] ^= 1;
         variants.push(changed);
 
         let mut changed = request.clone();
