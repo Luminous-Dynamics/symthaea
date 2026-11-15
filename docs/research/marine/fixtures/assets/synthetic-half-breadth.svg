@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="2400" height="1800" viewBox="0 0 2400 1800">
+  <rect width="2400" height="1800" fill="white"/>
+  <g stroke="#999" stroke-width="2" fill="none">
+    <path d="M150 200 H2250 M150 200 V1600" stroke-dasharray="18 12"/>
+    <path d="M150 200 C430 360 660 620 900 760 C1220 900 1540 1020 1850 880 C2050 790 2200 490 2250 200" stroke="#111" stroke-width="8"/>
+    <path d="M150 350 C450 470 720 730 990 870 C1320 1000 1600 1110 1880 980 C2090 880 2220 600 2250 350"/>
+    <path d="M150 500 C500 620 790 850 1080 970 C1390 1090 1650 1190 1910 1070 C2110 980 2230 740 2250 500"/>
+  </g>
+  <g fill="#222" font-family="sans-serif" font-size="42">
+    <text x="80" y="100">SYNTHETIC HALF-BREADTH PLAN — NOT A REAL VESSEL</text>
+    <text x="160" y="1660">Stern datum</text>
+    <text x="1980" y="1660">Bow datum</text>
+  </g>
+</svg>
