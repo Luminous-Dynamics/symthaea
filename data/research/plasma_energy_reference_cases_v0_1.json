@@ -1529,6 +1529,143 @@
         "Individual humidity / feed operating points require separate identities and cannot be collapsed into one representative value."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "METHANE-PYROLYSIS-ARC-PLASMA-TEA-2026",
+      "lane": "METHANE_PYROLYSIS",
+      "evidence_class": "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+      "source": {
+        "title": "Modeling and techno-economic analysis of methane pyrolysis via arc plasma for hydrogen and carbon black production",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2026-03-27",
+        "volume": "221",
+        "article_number": "154181",
+        "doi": "10.1016/j.ijhydene.2026.154181",
+        "url": "https://doi.org/10.1016/j.ijhydene.2026.154181"
+      },
+      "configuration": {
+        "process": "arc-plasma methane pyrolysis",
+        "model": "Aspen Plus process model and discounted-cash-flow techno-economic analysis",
+        "annual_hydrogen_capacity_tonnes": 52000,
+        "estimated_total_capital_cost_usd": 1000000000,
+        "cost_basis_usd_year": 2023
+      },
+      "observations": [
+        {
+          "metric": "specific_energy",
+          "value": 39,
+          "qualifier": "modelled process without on-site power generation; source-specific system boundary",
+          "unit": "kWh/kg_H2"
+        },
+        {
+          "metric": "specific_energy",
+          "value": 32,
+          "qualifier": "modelled process with on-site power generation; preserve the alternate power-generation boundary",
+          "unit": "kWh/kg_H2"
+        },
+        {
+          "metric": "minimum_selling_price_low",
+          "value": 1.1,
+          "qualifier": "source-reported modeled range with carbon-black sales credit",
+          "unit": "USD_2023/kg_H2"
+        },
+        {
+          "metric": "minimum_selling_price_high",
+          "value": 1.36,
+          "qualifier": "source-reported modeled range with carbon-black sales credit",
+          "unit": "USD_2023/kg_H2"
+        },
+        {
+          "metric": "carbon_black_price",
+          "value": 1.8,
+          "qualifier": "source-reported market price reference since 2024; not a guaranteed realized price or grade premium",
+          "unit": "USD/kg_carbon_black"
+        }
+      ],
+      "source_conclusion": "An Aspen Plus and discounted-cash-flow TEA models arc-plasma methane pyrolysis at a commercial-plant scale of about 52 kMT H2 per year. It estimates 39 kWh/kg H2 without on-site power generation and 32 kWh/kg with on-site power generation. With revenue from carbon-black sales, the modeled hydrogen minimum selling price is USD 1.10–1.36/kg H2 (2023 dollars). The result is strongly sensitive to carbon-black price, electricity price and natural-gas price.",
+      "comparison_status": "PUBLISHED_PROCESS_MODEL_AND_TEA_NOT_PHYSICAL_PLANT_PRICE",
+      "blockers": [
+        "The 32 kWh/kg figure includes an on-site power-generation scenario and is not directly comparable to a reactor-only or purchased-grid-energy figure.",
+        "The source's energy boundary must be extracted before comparing with other H2 pathways; PSA, compression, preheat, power conversion and auxiliary loads must be reconciled.",
+        "Carbon-black value is a modeled coproduct credit, not guaranteed revenue; grade, purity, ash, morphology, market capacity, qualification and offtake must be independently established.",
+        "The 2023 USD basis and assumed electricity/natural-gas/carbon-black prices require source-normalized scenario analysis.",
+        "The modeled annual capacity and CAPEX do not constitute a commissioned plant or achieved industrial availability."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "METHANE-PYROLYSIS-LCA-CARBON-CREDIT-2026",
+      "lane": "METHANE_PYROLYSIS",
+      "evidence_class": "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+      "source": {
+        "title": "When does methane pyrolysis become competitive? A life-cycle and total cost assessment of hydrogen pathways",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2026-04-28",
+        "volume": "229",
+        "article_number": "154768",
+        "doi": "10.1016/j.ijhydene.2026.154768",
+        "url": "https://doi.org/10.1016/j.ijhydene.2026.154768"
+      },
+      "configuration": {
+        "functional_unit": "1 kg H2 at plant gate, 200 bar",
+        "boundary": "harmonized cradle-to-gate including feed supply, conversion, PSA and compression",
+        "impact_method": "ReCiPe 2016 midpoint and monetized endpoint damage indicators",
+        "cost_basis": "USD 2024"
+      },
+      "observations": [
+        {
+          "metric": "median_total_cost_hydrogen_smr",
+          "value": 6.6,
+          "qualifier": "source-reported median total cost including monetized environmental damage endpoints",
+          "unit": "USD_2024/kg_H2"
+        },
+        {
+          "metric": "median_total_cost_hydrogen_methane_pyrolysis",
+          "value": 10.8,
+          "qualifier": "source-reported median without avoided carbon-black product credit",
+          "unit": "USD_2024/kg_H2"
+        },
+        {
+          "metric": "median_total_cost_hydrogen_methane_pyrolysis_avoided_product_credit",
+          "value": 4.8,
+          "qualifier": "source-reported median with avoided-product carbon-black credit",
+          "unit": "USD_2024/kg_H2"
+        },
+        {
+          "metric": "methane_pyrolysis_gwp_without_carbon_credit",
+          "value": 12.6,
+          "qualifier": "source-reported kg CO2-equivalent per kg H2 at the reference conversion scenario",
+          "unit": "kg_CO2e/kg_H2"
+        },
+        {
+          "metric": "methane_pyrolysis_gwp_with_avoided_product_credit",
+          "value": 5.1,
+          "qualifier": "source-reported kg CO2-equivalent per kg H2; approaches source's SMR+CCS comparison",
+          "unit": "kg_CO2e/kg_H2"
+        },
+        {
+          "metric": "conversion_threshold_credit_advantage_lost",
+          "value": 50,
+          "qualifier": "approximately 50–55% CH4 conversion threshold below which carbon-black credit no longer preserves the reported advantage",
+          "unit": "percent"
+        },
+        {
+          "metric": "conversion_required_no_credit_smr_parity",
+          "value": 100,
+          "qualifier": "near-complete CH4 conversion required in source model to match SMR without carbon-black avoided-product credit",
+          "unit": "percent"
+        }
+      ],
+      "source_conclusion": "A harmonized cradle-to-gate analysis compares methane pyrolysis with SMR, SMR+CCS and water electrolysis using 1 kg H2 at 200 bar as the functional unit. It finds that cost and environmental competitiveness depend strongly on methane conversion and the carbon coproduct accounting method. Avoided-product carbon-black credit changes the modeled median total cost and GWP ranking, but its advantage is sensitive to conversion and product credit assumptions.",
+      "comparison_status": "HARMONIZED_LCA_TEA_SOURCE_NOT_LUMINOUS_REPRODUCTION",
+      "blockers": [
+        "The source's total cost includes monetized endpoint damages and must not be labeled LCOH or compared directly with a levelized production-price metric.",
+        "Avoided-product credit is conditional on the counterfactual reference carbon-black product and displaced market; it is not equivalent to guaranteed coproduct revenue.",
+        "Carbon-black quality, purity, morphology, ash, market capacity and verified displacement must be evidenced for the declared use.",
+        "Methane leakage, electricity carbon intensity, conversion rate and carbon-yield assumptions strongly affect results.",
+        "The source's 200 bar plant-gate functional unit must remain exact for comparisons."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -1746,6 +1883,36 @@
       "control_id": "NC-CO2-DBD-003",
       "condition": "Use H2/CO molar ratio as a substitute for CO2 conversion or CO product selectivity.",
       "expected_disposition": "REJECT_METRIC_SEMANTICS_MISMATCH"
+    },
+    {
+      "control_id": "NC-031",
+      "condition": "Count all theoretical solid carbon from methane pyrolysis as saleable carbon black without measured grade, purity, morphology, ash, qualification, collected yield and offtake.",
+      "expected_disposition": "REJECT_UNQUALIFIED_COPRODUCT_CREDIT"
+    },
+    {
+      "control_id": "NC-032",
+      "condition": "Use the arc-plasma TEA's 32 kWh/kg H2 with on-site power generation as directly equivalent to 39 kWh/kg H2 without on-site power generation or to a purchased-grid reactor-only meter.",
+      "expected_disposition": "NOT_COMPARABLE_POWER_BOUNDARY_MISMATCH"
+    },
+    {
+      "control_id": "NC-033",
+      "condition": "Rank plasma, microwave and shock-wave methane pyrolysis using conversion alone while omitting hydrogen selectivity, LCOH, carbon yield, heat-transfer performance and complete balance-of-plant energy.",
+      "expected_disposition": "REJECT_INCOMPLETE_MULTI_OBJECTIVE_COMPARISON"
+    },
+    {
+      "control_id": "NC-034",
+      "condition": "Treat the 2026 direct-heating review's Pareto outcome as proof that every plasma process is inferior in every chemistry, scale and operating regime.",
+      "expected_disposition": "REJECT_OVERGENERALIZED_REVIEW_SCOPE"
+    },
+    {
+      "control_id": "NC-035",
+      "condition": "Compare the LCA/total-cost result in USD 2024/kg H2, including monetized damages, directly to the arc-plasma TEA minimum selling price in USD 2023/kg H2 without reconciling currency year, environmental-cost basis and functional unit.",
+      "expected_disposition": "NOT_COMPARABLE_COST_BASIS_MISMATCH"
+    },
+    {
+      "control_id": "NC-036",
+      "condition": "Apply avoided-product carbon-black credits below the source's reported 50–55% methane-conversion range or without a qualified displaced reference product and market-capacity constraint.",
+      "expected_disposition": "BLOCKED_COPRODUCT_COUNTERFACTUAL_NOT_QUALIFIED"
     }
   ],
   "derived_reference_checks": [
