@@ -26,6 +26,7 @@ fn source() -> Result<SourceObservationV1, Box<dyn std::error::Error>> {
         schema_version: SOURCE_OBSERVATION_SCHEMA_V1.to_owned(),
         source_artifact_sha256: h(1),
         source_lineage_sha256: h(2),
+        observation_evidence_receipt_sha256: h(90),
         duration_ticks: 6_000,
         events: vec![
             event("bass-note-1", "bass", 100, 300),
@@ -128,6 +129,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         grounding_evidence: vec![OccurrenceGroundingEvidenceV1 {
             occurrence_id: "guitar-entry-2".to_owned(),
             source_observation_sha256: observation.observation_sha256.clone(),
+            evidence_receipt_sha256: h(600),
             evidence_kind: GroundingEvidenceKindV1::TemporalAnchor,
             confidence_bp: 9_700,
         }],
