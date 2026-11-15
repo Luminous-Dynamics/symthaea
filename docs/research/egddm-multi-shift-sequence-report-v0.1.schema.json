@@ -67,7 +67,9 @@
         "fresh_revalidation_units",
         "over_revalidation_units",
         "under_revalidation_units",
-        "receipt_source_context_mismatch_obligations"
+        "receipt_source_context_mismatch_obligations",
+        "unclaimed_active_obligations",
+        "critical_unclaimed_obligations"
       ],
       "properties": {
         "epoch": {
@@ -279,6 +281,22 @@
             "type": "string",
             "minLength": 1
           }
+        },
+        "unclaimed_active_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "critical_unclaimed_obligations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },
@@ -298,7 +316,9 @@
         "total_future_evidence_leakages",
         "total_unsupported_current_claims",
         "total_direct_dependency_only_impact_labels",
-        "total_gold_only_impact_labels"
+        "total_gold_only_impact_labels",
+        "total_unclaimed_active_obligations",
+        "total_critical_unclaimed_obligations"
       ],
       "properties": {
         "trace_id": {
@@ -352,6 +372,14 @@
           "minimum": 0
         },
         "total_direct_dependency_only_impact_labels": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_unclaimed_active_obligations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_critical_unclaimed_obligations": {
           "type": "integer",
           "minimum": 0
         }
