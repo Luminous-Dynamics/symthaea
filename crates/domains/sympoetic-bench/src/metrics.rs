@@ -589,18 +589,17 @@ pub fn summarize_cognitive_process(
                 "cognitive process observation {index}: verification requires an AI-supplied core step"
             );
         }
-        planned += usize::from(observation.human_planned);
-        attempted_first += usize::from(observation.human_attempted_before_ai);
-        monitored += usize::from(observation.human_monitored);
-        reflected += usize::from(observation.human_reflected);
+        planned += observation.human_planned as usize;
+        attempted_first += observation.human_attempted_before_ai as usize;
+        monitored += observation.human_monitored as usize;
+        reflected += observation.human_reflected as usize;
         if observation.ai_supplied_core_step {
             ai_core_steps += 1;
-            verified_ai_steps += usize::from(observation.human_verified_ai_step);
-            ai_substitution += usize::from(!observation.human_attempted_before_ai);
+            verified_ai_steps += observation.human_verified_ai_step as usize;
+            ai_substitution += (!observation.human_attempted_before_ai) as usize;
         }
     }
 
-    let total = observations.len() as f64;
     let rate = |numerator: usize, denominator: usize| {
         (denominator > 0).then_some(numerator as f64 / denominator as f64)
     };
