@@ -1069,6 +1069,36 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
             ScheduleAction::CancellationAcknowledged {
                 operation_id, attempt_id, accepted,
             } => {
+                let matching_requests = canonical_actions.iter().filter(|candidate| {
+                    matches!(&candidate.action, ScheduleAction::CancellationRequested {
+                        operation_id: request_operation, attempt_id: request_attempt,
+                    } if request_operation == operation_id && request_attempt == attempt_id)
+                        && record_disposition(&candidate.action_id) == Some(SchedulerDisposition::Applied)
+                }).collect::<Vec<_>>();
+                if matching_requests.len() != 1 {
+                    if matching_requests.is_empty() {
+                        critical = true;
+                        reasons.insert(format!("CANCELLATION_ACK_WITHOUT_UNIQUE_REQUEST:{attempt_id}"));
+                    } else {
+                        critical = true;
+                        reasons.insert(format!("CANCELLATION_REQUEST_CARDINALITY_INVALID:{attempt_id}"));
+                    }
+                    continue;
+                }
+                let request_action = matching_requests[0];
+                let requested_at = match action_owner_time(schedule, request_action, time_resolutions) {
+                    Ok(value) => value,
+                    Err(ProjectionFault::Indeterminate(code)) => {
+                        indeterminate = true;
+                        reasons.insert(format!("{code}:{attempt_id}:CANCEL_REQUEST"));
+                        continue;
+                    }
+                    Err(ProjectionFault::Critical(code)) => {
+                        critical = true;
+                        reasons.insert(format!("{code}:{attempt_id}:CANCEL_REQUEST"));
+                        continue;
+                    }
+                };
                 let replay_state = record_disposition(&action.action_id);
                 match replay_state {
                     Some(SchedulerDisposition::Applied) => {}
@@ -1106,25 +1136,38 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
                         continue;
                     }
                 };
-                let owner_time = match action_owner_time(schedule, action, time_resolutions) {
+                let acknowledged_at = match action_owner_time(schedule, action, time_resolutions) {
                     Ok(value) => value,
                     Err(ProjectionFault::Indeterminate(code)) => {
                         indeterminate = true;
-                        reasons.insert(format!("{code}:{attempt_id}"));
+                        reasons.insert(format!("{code}:{attempt_id}:CANCEL_ACK"));
                         continue;
                     }
                     Err(ProjectionFault::Critical(code)) => {
                         critical = true;
-                        reasons.insert(format!("{code}:{attempt_id}"));
+                        reasons.insert(format!("{code}:{attempt_id}:CANCEL_ACK"));
                         continue;
                     }
                 };
+                match event_order_between(&requested_at, &acknowledged_at) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert(format!("CANCELLATION_ACK_PRECEDES_REQUEST:{attempt_id}"));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("CANCELLATION_REQUEST_ACK_ORDER_UNRESOLVED:{attempt_id}"));
+                    }
+                }
                 cancellation_acknowledgements.push(ProjectedCancellationAcknowledgement {
                     action_id: action.action_id.clone(),
+                    request_action_id: request_action.action_id.clone(),
                     logical_operation_id: operation_id.clone(),
                     attempt_id: attempt_id.clone(),
                     accepted: *accepted,
-                    owner_time,
+                    requested_at,
+                    acknowledged_at,
                     receipt_ref,
                     receipt_sha256,
                     receipt_qualification: assessment.receipt_qualification(),
@@ -2150,10 +2193,12 @@ pub struct ProjectedEffectCommit {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProjectedCancellationAcknowledgement {
     pub action_id: String,
+    pub request_action_id: String,
     pub logical_operation_id: String,
     pub attempt_id: String,
     pub accepted: bool,
-    pub owner_time: QualifiedEventTime,
+    pub requested_at: QualifiedEventTime,
+    pub acknowledged_at: QualifiedEventTime,
     pub receipt_ref: String,
     pub receipt_sha256: String,
     pub receipt_qualification: GateState,
