@@ -83,7 +83,7 @@ An unknown operation outcome is not a failed operation, not a successful cancell
 10. out-of-order event delivery does not change the result;
 11. operation begins only after a qualified stop discharge.
 
-The corpus is synthetic and the expected outcomes are preregistered. The source-inventory/trace digest does not prove that a real external system captured every physical event; trace completeness and authenticity remain separate owner qualifications.
+The corpus is synthetic and the expected outcomes are preregistered. `benchmarks/engineering-change-impact/action-event-order-mutations-v0.1.json` defines 26 targeted integrity, ordering, stop-discharge, operation-lifecycle, retry-safety and permutation controls. Its status is `preregistered_mutation_controls_not_execution_results`; none of those mutation controls are claimed as executed. The source-inventory/trace digest does not prove that a real external system captured every physical event; trace completeness and authenticity remain separate owner qualifications.
 
 ## 7. Metrics and proposed targets
 
