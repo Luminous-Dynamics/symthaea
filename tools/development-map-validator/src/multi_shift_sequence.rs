@@ -399,6 +399,19 @@ fn validate_event_sequence(
         if sequence_index != epoch {
             return Err(format!("{label}.sequence_index must be {epoch}"));
         }
+        let event_kind = required_str(event, "event_kind", &label)?;
+        if ![
+            "requirement_change",
+            "shared_runner_change",
+            "source_rollback_and_authority_rotation",
+            "sham",
+            "no_op",
+            "other",
+        ]
+        .contains(&event_kind)
+        {
+            return Err(format!("{label}.event_kind has unsupported value {event_kind:?}"));
+        }
         let event_id = required_str(event, "event_id", &label)?.to_owned();
         if !seen_event_ids.insert(event_id.clone()) {
             return Err(format!("duplicate event_id {event_id:?}"));
@@ -1216,6 +1229,14 @@ mod tests {
         let result = trace(&report, "conformant-sequence");
         assert!(result.epochs[2].reused_current_obligations.contains(&"docs-format".to_owned()));
         assert_eq!(result.epochs[2].false_resurrection_obligations, Vec::<String>::new());
+    }
+
+    #[test]
+    fn rejects_unknown_intervention_kind() {
+        let mut value = fixture_value();
+        value["candidate_view"]["interventions"][0]["event_kind"] = json!("unknown-kind");
+        let error = score_multi_shift_sequence_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("event_kind has unsupported value"));
     }
 
     #[test]
