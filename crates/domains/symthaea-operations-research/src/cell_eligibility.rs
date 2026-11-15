@@ -55,6 +55,9 @@ pub struct ProcessConfigurationSnapshot {
     pub process_capability_ref: String,
     pub product_revision_ref: String,
     pub pattern_revision_ref: String,
+    pub valid_from_unix_seconds: Option<i64>,
+    pub valid_until_unix_seconds: Option<i64>,
+    pub parameter_digest_sha256: String,
     pub operation_refs: Vec<String>,
     pub asset_refs: Vec<String>,
     pub tooling_refs: Vec<String>,
@@ -67,7 +70,16 @@ pub struct ProcessConfigurationSnapshot {
 pub struct SkillQualificationSnapshot {
     pub skill_ref: String,
     pub availability: Availability,
+    /// Number of currently available, qualified people with this skill.
+    /// None means the headcount was not resolved.
+    pub available_qualified_people: Option<u32>,
     pub qualification_evidence: EvidenceRecord,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillRequirement {
+    pub skill_ref: String,
+    pub minimum_people: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -127,8 +139,9 @@ pub struct OperationRequirement {
     pub process_revision_ref: String,
     pub process_capability_ref: String,
     pub process_configuration_ref: String,
+    pub required_parameter_digest_sha256: String,
     pub required_tooling_refs: Vec<String>,
-    pub required_skill_refs: Vec<String>,
+    pub required_skills: Vec<SkillRequirement>,
     pub required_material_lot_refs: Vec<String>,
     pub required_material_envelope_ref: Option<String>,
     pub utility_requirements: Vec<UtilityRequirement>,
@@ -160,6 +173,10 @@ pub enum EligibilityReasonCode {
     EvidenceValidityUnknown,
     ConfigurationMissing,
     ConfigurationOperationMismatch,
+    ConfigurationNotYetValid,
+    ConfigurationExpired,
+    ConfigurationValidityUnknown,
+    ConfigurationDigestMismatch,
     ProductRevisionMismatch,
     PatternRevisionMismatch,
     ProcessRevisionMismatch,
@@ -170,6 +187,8 @@ pub enum EligibilityReasonCode {
     AssetToolingMismatch,
     SkillMissing,
     SkillUnavailable,
+    SkillCoverageInsufficient,
+    SkillCoverageUnknown,
     MaterialLotMissing,
     MaterialLotQuarantined,
     MaterialLotRejected,
@@ -225,6 +244,7 @@ pub fn evaluate_cell_eligibility(
         ("process_revision_ref", requirement.process_revision_ref.as_str()),
         ("process_capability_ref", requirement.process_capability_ref.as_str()),
         ("process_configuration_ref", requirement.process_configuration_ref.as_str()),
+        ("required_parameter_digest_sha256", requirement.required_parameter_digest_sha256.as_str()),
         ("inspection_plan_ref", requirement.inspection_plan_ref.as_str()),
         ("profile_ref", cell.profile_ref.as_str()),
         ("cell_facility_ref", cell.facility_ref.as_str()),
@@ -236,7 +256,7 @@ pub fn evaluate_cell_eligibility(
 
     for (kind, references) in [
         ("required_tooling_ref", requirement.required_tooling_refs.as_slice()),
-        ("required_skill_ref", requirement.required_skill_refs.as_slice()),
+        ("required_skill_ref", requirement.required_skills.iter().map(|skill| skill.skill_ref.clone()).collect::<Vec<_>>().as_slice()),
         ("required_material_lot_ref", requirement.required_material_lot_refs.as_slice()),
         ("required_clearance_ref", requirement.required_clearance_refs.as_slice()),
     ] {
@@ -305,6 +325,19 @@ pub fn evaluate_cell_eligibility(
         }
     };
 
+    match (config.valid_from_unix_seconds, config.valid_until_unix_seconds) {
+        (Some(from), Some(until)) if from <= at && at < until => {}
+        (Some(from), Some(_)) if at < from => out.add(EligibilityReasonCode::ConfigurationNotYetValid, EligibilitySeverity::Blocked, &config.configuration_ref),
+        (Some(_), Some(until)) if at >= until => out.add(EligibilityReasonCode::ConfigurationExpired, EligibilitySeverity::Blocked, &config.configuration_ref),
+        _ => out.add(EligibilityReasonCode::ConfigurationValidityUnknown, EligibilitySeverity::Indeterminate, &config.configuration_ref),
+    }
+    if config.parameter_digest_sha256.trim().is_empty()
+        || requirement.required_parameter_digest_sha256.trim().is_empty()
+    {
+        out.add(EligibilityReasonCode::EmptyRequiredReference, EligibilitySeverity::Indeterminate, &config.configuration_ref);
+    } else if config.parameter_digest_sha256 != requirement.required_parameter_digest_sha256 {
+        out.add(EligibilityReasonCode::ConfigurationDigestMismatch, EligibilitySeverity::Blocked, &config.configuration_ref);
+    }
     if !config.operation_refs.contains(&requirement.operation_ref) {
         out.add(EligibilityReasonCode::ConfigurationOperationMismatch, EligibilitySeverity::Blocked, &requirement.operation_ref);
     }
@@ -327,7 +360,7 @@ pub fn evaluate_cell_eligibility(
     out.check_evidence(&config.inspection_plan_evidence, at);
 
     if config.asset_refs.is_empty() {
-        out.add(EligibilityReasonCode::AssetMissing, EligibilitySeverity::Indeterminate, &config.configuration_ref);
+        out.add(EligibilityReasonCode::AssetMissing, missing_severity(cell.resolution), &config.configuration_ref);
     }
     for asset_ref in &config.asset_refs {
         if asset_ref.trim().is_empty() {
@@ -362,7 +395,8 @@ pub fn evaluate_cell_eligibility(
         out.check_evidence(&asset.calibration_evidence, at);
     }
 
-    for skill_ref in &requirement.required_skill_refs {
+    for skill_requirement in &requirement.required_skills {
+        let skill_ref = &skill_requirement.skill_ref;
         let skill = match unique_match(&cell.skill_qualifications, |candidate| candidate.skill_ref == *skill_ref) {
             Ok(Some(skill)) => skill,
             Ok(None) => {
@@ -375,7 +409,11 @@ pub fn evaluate_cell_eligibility(
             }
         };
         match skill.availability {
-            Availability::Available => {}
+            Availability::Available => match skill.available_qualified_people {
+                Some(people) if people >= skill_requirement.minimum_people => {}
+                Some(_) => out.add(EligibilityReasonCode::SkillCoverageInsufficient, EligibilitySeverity::Blocked, skill_ref),
+                None => out.add(EligibilityReasonCode::SkillCoverageUnknown, EligibilitySeverity::Indeterminate, skill_ref),
+            },
             Availability::Unavailable => out.add(EligibilityReasonCode::SkillUnavailable, EligibilitySeverity::Blocked, skill_ref),
             Availability::Unknown => out.add(EligibilityReasonCode::SkillUnavailable, EligibilitySeverity::Indeterminate, skill_ref),
         }
@@ -563,8 +601,12 @@ mod tests {
             process_revision_ref: "urn:example:process:woven-sew:r2".to_owned(),
             process_capability_ref: "urn:example:capability:lockstitch-woven".to_owned(),
             process_configuration_ref: "urn:example:configuration:ao-01:r3".to_owned(),
+            required_parameter_digest_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
             required_tooling_refs: vec!["urn:example:tooling:folder-01".to_owned()],
-            required_skill_refs: vec!["urn:example:skill:lockstitch-operator".to_owned()],
+            required_skills: vec![SkillRequirement {
+                skill_ref: "urn:example:skill:lockstitch-operator".to_owned(),
+                minimum_people: 1,
+            }],
             required_material_lot_refs: vec!["urn:example:lot:fabric-001".to_owned()],
             required_material_envelope_ref: Some("urn:example:material-envelope:woven-145gsm".to_owned()),
             utility_requirements: vec![UtilityRequirement {
@@ -601,6 +643,9 @@ mod tests {
                 process_capability_ref: "urn:example:capability:lockstitch-woven".to_owned(),
                 product_revision_ref: "urn:example:product:ao-01:r3".to_owned(),
                 pattern_revision_ref: "urn:example:pattern:ao-01:r3".to_owned(),
+                valid_from_unix_seconds: Some(NOW - 100),
+                valid_until_unix_seconds: Some(NOW + 100),
+                parameter_digest_sha256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
                 operation_refs: vec!["urn:example:operation:join-shoulder".to_owned()],
                 asset_refs: vec!["urn:example:asset:sewing-machine-01".to_owned()],
                 tooling_refs: vec!["urn:example:tooling:folder-01".to_owned()],
@@ -611,6 +656,7 @@ mod tests {
             skill_qualifications: vec![SkillQualificationSnapshot {
                 skill_ref: "urn:example:skill:lockstitch-operator".to_owned(),
                 availability: Availability::Available,
+                available_qualified_people: Some(1),
                 qualification_evidence: evidence("urn:example:evidence:skill-qualification"),
             }],
             material_lots: vec![MaterialLotSnapshot {
@@ -781,14 +827,56 @@ mod tests {
 
 
 
+
+    #[test]
+    fn expired_process_configuration_is_blocked() {
+        let mut cell = qualified_cell();
+        cell.process_configurations[0].valid_until_unix_seconds = Some(NOW);
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::ConfigurationExpired));
+    }
+
+    #[test]
+    fn process_configuration_digest_mismatch_is_blocked() {
+        let mut cell = qualified_cell();
+        cell.process_configurations[0].parameter_digest_sha256 =
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned();
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::ConfigurationDigestMismatch));
+    }
+
+    #[test]
+    fn insufficient_qualified_operator_headcount_is_blocked() {
+        let mut req = requirement();
+        req.required_skills[0].minimum_people = 2;
+        let report = evaluate_cell_eligibility(&req, &qualified_cell());
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::SkillCoverageInsufficient));
+    }
+
+    #[test]
+    fn unresolved_qualified_operator_headcount_is_indeterminate() {
+        let mut cell = qualified_cell();
+        cell.skill_qualifications[0].available_qualified_people = None;
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Indeterminate);
+        assert!(has_code(&report, EligibilityReasonCode::SkillCoverageUnknown));
+    }
+
     #[test]
     fn empty_required_reference_cannot_match_empty_owner_reference() {
         let mut req = requirement();
         let mut cell = qualified_cell();
-        req.required_skill_refs.push(String::new());
+        req.required_skills.push(SkillRequirement {
+            skill_ref: String::new(),
+            minimum_people: 1,
+        });
         cell.skill_qualifications.push(SkillQualificationSnapshot {
             skill_ref: String::new(),
             availability: Availability::Available,
+            available_qualified_people: Some(1),
             qualification_evidence: evidence("urn:example:evidence:empty-skill"),
         });
         let report = evaluate_cell_eligibility(&req, &cell);
