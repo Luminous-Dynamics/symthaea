@@ -125,15 +125,23 @@ fn main() {
     println!("contract_version={}", report.contract_version);
     println!("campaign={}", report.campaign_id);
     println!("disposition={:?}", report.disposition);
-    println!("horizon_seconds={}", report.horizon_seconds.unwrap_or_default());
-    println!("available_seconds={}", report.available_seconds.unwrap_or_default());
+    println!(
+        "horizon_seconds={}",
+        report.horizon_seconds.unwrap_or_default()
+    );
+    println!(
+        "available_seconds={}",
+        report.available_seconds.unwrap_or_default()
+    );
     println!(
         "planned_only_unavailable_seconds={}",
         report.planned_only_unavailable_seconds.unwrap_or_default()
     );
     println!(
         "unplanned_only_unavailable_seconds={}",
-        report.unplanned_only_unavailable_seconds.unwrap_or_default()
+        report
+            .unplanned_only_unavailable_seconds
+            .unwrap_or_default()
     );
     println!(
         "concurrent_unavailable_seconds={}",
