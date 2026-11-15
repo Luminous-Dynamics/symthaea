@@ -441,6 +441,7 @@ mod tests {
     #[test]
     fn detects_unnecessary_refresh_of_unaffected_obligation() {
         let mut scenario = fixture_value();
+        scenario["arms"][1]["checkpoints"][1]["receipts"][1]["receipt_id"] = json!("shifted-epoch1-build-overcheck");
         scenario["arms"][1]["checkpoints"][1]["receipts"][1]["source_epoch"] = json!(1);
         refresh_receipt_digest(&mut scenario, 1, 1, 1);
         let report = score_selective_revalidation_oracle_json(&scenario.to_string()).unwrap();
