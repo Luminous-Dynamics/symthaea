@@ -530,6 +530,15 @@ pub fn verify_loft_artifact_integrity(
         );
     }
 
+    let fresh_admission = admit(&artifact.candidate);
+    if fresh_admission != artifact.admission_report {
+        violation(
+            &mut violations,
+            "admission_report_mismatch",
+            "stored geometry admission report does not match a fresh evaluation of the candidate and profile",
+        );
+    }
+
     let side_end = artifact
         .side_face_range
         .first_face
@@ -978,6 +987,15 @@ mod tests {
         let mut result = loft_waterplane_capped_hull(&artifact(), profile()).unwrap();
         assert!(verify_loft_artifact_integrity(&result).is_ok());
         result.waterplane_face_range.face_count += 1;
+        let error = verify_loft_artifact_integrity(&result).unwrap_err();
+        assert!(error.iter().any(|item| item.code == "loft_manifest_digest"));
+    }
+
+    #[test]
+    fn admission_profile_and_report_are_bound_to_the_loft_manifest() {
+        let mut result = loft_waterplane_capped_hull(&artifact(), profile()).unwrap();
+        result.candidate.profile.minimum_face_area_m2 *= 2.0;
+        result.admission_report = admit(&result.candidate);
         let error = verify_loft_artifact_integrity(&result).unwrap_err();
         assert!(error.iter().any(|item| item.code == "loft_manifest_digest"));
     }
