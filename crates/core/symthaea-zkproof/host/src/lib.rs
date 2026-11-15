@@ -235,18 +235,55 @@ mod request_bound_tests {
     }
 
     #[test]
-    fn request_bound_receipt_rejects_audience_substitution() {
+    fn request_bound_receipt_rejects_any_context_substitution() {
         let request = sample_request();
         let prove_info =
             BalanceProofRequestBoundProverV1::prove(1_000, request.clone()).unwrap();
 
-        let mut wrong_request = request;
-        wrong_request.audience_digest[0] ^= 1;
+        let mut variants = Vec::new();
 
-        assert!(
-            BalanceProofRequestBoundProverV1::verify_for_request(&prove_info, &wrong_request)
-                .is_err()
-        );
+        let mut changed = request.clone();
+        changed.request_id[0] ^= 1;
+        variants.push(changed);
+
+        let mut changed = request.clone();
+        changed.source_statement_reference_digest[0] ^= 1;
+        variants.push(changed);
+
+        let mut changed = request.clone();
+        changed.issuer_key_reference_digest[0] ^= 1;
+        variants.push(changed);
+
+        let mut changed = request.clone();
+        changed.audience_digest[0] ^= 1;
+        variants.push(changed);
+
+        let mut changed = request.clone();
+        changed.verifier_digest[0] ^= 1;
+        variants.push(changed);
+
+        let mut changed = request.clone();
+        changed.purpose_digest[0] ^= 1;
+        variants.push(changed);
+
+        let mut changed = request.clone();
+        changed.policy_digest[0] ^= 1;
+        variants.push(changed);
+
+        let mut changed = request.clone();
+        changed.verifier_challenge[0] ^= 1;
+        variants.push(changed);
+
+        let mut changed = request;
+        changed.required_minimum += 1;
+        variants.push(changed);
+
+        for wrong_request in variants {
+            assert!(
+                BalanceProofRequestBoundProverV1::verify_for_request(&prove_info, &wrong_request)
+                    .is_err()
+            );
+        }
     }
 
     #[test]
