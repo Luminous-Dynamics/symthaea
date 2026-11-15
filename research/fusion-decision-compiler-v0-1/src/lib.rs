@@ -182,6 +182,24 @@ pub enum ServiceMetric {
     AvailabilityFraction,
 }
 
+impl ServiceMetric {
+    /// Exact evidence scope required for this objective's declared service boundary.
+    pub const fn boundary_scope_ref(self) -> &'static str {
+        match self {
+            Self::TargetGainDimensionless => "target-gain-boundary",
+            Self::PlasmaGainDimensionless => "plasma-gain-boundary",
+            Self::DriverWallPlugGainDimensionless => "driver-wall-plug-boundary",
+            Self::GrossThermalPowerMegawatt => "gross-thermal-boundary",
+            Self::GrossElectricPowerMegawatt => "gross-electric-boundary",
+            Self::NetElectricExportPowerMegawatt => "net-electric-export-boundary",
+            Self::UsefulThermalPowerMegawatt => "useful-thermal-service-boundary",
+            Self::LifetimeNetElectricEnergyMegawattHour => "lifetime-net-electric-energy-boundary",
+            Self::LifetimeUsefulThermalEnergyMegawattHour => "lifetime-useful-thermal-energy-boundary",
+            Self::AvailabilityFraction => "plant-availability-boundary",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CandidateInput {
     pub candidate_id: String,
@@ -519,7 +537,7 @@ fn validate_candidate(candidate: &CandidateInput) -> Vec<ValidationError> {
                 boundary_ref.to_string(),
             )),
             Some(evidence) => {
-                if evidence.scope_ref != HardGateKind::EnergyBoundary.scope_ref() {
+                if evidence.scope_ref != candidate.service_metric.boundary_scope_ref() {
                     errors.push(ValidationError::ServiceBoundaryScopeMismatch(
                         boundary_ref.to_string(),
                     ));
@@ -784,15 +802,12 @@ mod tests {
     fn candidate() -> CandidateInput {
         let candidate_id = "candidate-a".to_string();
         let candidate_revision = "design-r7".to_string();
-        let evidence: Vec<EvidenceRef> = HardGateKind::REQUIRED
+        let service_metric = ServiceMetric::NetElectricExportPowerMegawatt;
+        let mut evidence: Vec<EvidenceRef> = HardGateKind::REQUIRED
             .iter()
             .enumerate()
             .map(|(index, kind)| EvidenceRef {
-                id: if *kind == HardGateKind::EnergyBoundary {
-                    "grid-export-boundary-v1".to_string()
-                } else {
-                    format!("evidence-{index}")
-                },
+                id: format!("evidence-{index}"),
                 subject_ref: candidate_id.clone(),
                 subject_revision: candidate_revision.clone(),
                 scope_ref: kind.scope_ref().to_string(),
@@ -801,6 +816,15 @@ mod tests {
             })
             .collect();
 
+        evidence.push(EvidenceRef {
+            id: "grid-export-boundary-v1".to_string(),
+            subject_ref: candidate_id.clone(),
+            subject_revision: candidate_revision.clone(),
+            scope_ref: service_metric.boundary_scope_ref().to_string(),
+            content_sha256: sha('f'),
+            class: EvidenceClass::SyntheticFixture,
+        });
+
         let hard_gates = HardGateKind::REQUIRED
             .iter()
             .enumerate()
@@ -808,11 +832,7 @@ mod tests {
                 kind: *kind,
                 state: GateState::Pass,
                 reason_code: None,
-                evidence_ids: vec![if *kind == HardGateKind::EnergyBoundary {
-                    "grid-export-boundary-v1".to_string()
-                } else {
-                    format!("evidence-{index}")
-                }],
+                evidence_ids: vec![format!("evidence-{index}")],
             })
             .collect();
 
@@ -821,7 +841,7 @@ mod tests {
             candidate_revision,
             geometry_sha256: sha('b'),
             objective_id: "service-objective-v1".to_string(),
-            service_metric: ServiceMetric::NetElectricExportPowerMegawatt,
+            service_metric,
             service_boundary_ref: Some("grid-export-boundary-v1".to_string()),
             required_regime: "tokamak-equilibrium".to_string(),
             required_model_use: ModelUse::SingleStepPrediction,
@@ -878,6 +898,10 @@ mod tests {
     fn decision_build_preserves_typed_service_metric() {
         let mut source = candidate();
         source.service_metric = ServiceMetric::LifetimeNetElectricEnergyMegawattHour;
+        let service_evidence = source.evidence.iter_mut()
+            .find(|evidence| evidence.id == "grid-export-boundary-v1")
+            .unwrap();
+        service_evidence.scope_ref = source.service_metric.boundary_scope_ref().to_string();
         let build = compile_candidate(&source).unwrap();
         assert_eq!(
             build.service_metric,
@@ -907,15 +931,29 @@ mod tests {
     }
 
     #[test]
-    fn service_boundary_evidence_must_have_energy_scope() {
+    fn service_boundary_evidence_must_match_typed_metric_scope() {
         let mut source = candidate();
-        source.evidence[0].scope_ref = "component-geometry".to_string();
+        let service_evidence = source.evidence.iter_mut()
+            .find(|evidence| evidence.id == "grid-export-boundary-v1")
+            .unwrap();
+        service_evidence.scope_ref = "gross-thermal-boundary".to_string();
         let errors = compile_candidate(&source).unwrap_err();
         assert!(has_error(
             &errors,
             ValidationError::ServiceBoundaryScopeMismatch(
                 "grid-export-boundary-v1".to_string()
             )
+        ));
+    }
+
+    #[test]
+    fn service_metric_cannot_reuse_a_different_metric_boundary() {
+        let mut source = candidate();
+        source.service_metric = ServiceMetric::LifetimeUsefulThermalEnergyMegawattHour;
+        let errors = compile_candidate(&source).unwrap_err();
+        assert!(has_error(
+            &errors,
+            ValidationError::ServiceBoundaryScopeMismatch("grid-export-boundary-v1".to_string())
         ));
     }
 
