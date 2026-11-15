@@ -2384,23 +2384,25 @@ pub fn project_action_history(
             let _ = (receipt_ref, receipt_sha256);
             let start_to_terminal = event_order_between(start_time, terminal_time);
             let mapped_outcome = match outcome {
-                ReconciliationOutcome::Applied => ReconciledOperationOutcome::Applied,
-                ReconciliationOutcome::NotApplied => ReconciledOperationOutcome::NotApplied,
-                ReconciliationOutcome::Unknown => ReconciledOperationOutcome::NotApplied,
+                ReconciliationOutcome::Applied => Some(ReconciledOperationOutcome::Applied),
+                ReconciliationOutcome::NotApplied => Some(ReconciledOperationOutcome::NotApplied),
+                ReconciliationOutcome::Unknown => None,
             };
-            if outcome == ReconciliationOutcome::Unknown {
+            if let Some(mapped_outcome) = mapped_outcome {
+                let record = AttemptTerminalReconciliation {
+                    event_id: terminal_action.action_id.clone(),
+                    start_event_id: exact_start_action_id,
+                    outcome: mapped_outcome,
+                    qualification,
+                    start_to_terminal_order: start_to_terminal,
+                };
+                attempt_terminal_times.insert(attempt_id.clone(), terminal_time.clone());
+                (Some(record), Some(terminal_time.clone()))
+            } else {
                 indeterminate = true;
                 reasons.insert(format!("TERMINAL_OUTCOME_UNKNOWN:{attempt_id}"));
+                (None, None)
             }
-            let record = AttemptTerminalReconciliation {
-                event_id: terminal_action.action_id.clone(),
-                start_event_id: exact_start_action_id,
-                outcome: mapped_outcome,
-                qualification,
-                start_to_terminal_order: start_to_terminal,
-            };
-            attempt_terminal_times.insert(attempt_id.clone(), terminal_time.clone());
-            (Some(record), Some(terminal_time.clone()))
         } else {
             (None, None)
         };
@@ -2466,7 +2468,11 @@ pub fn project_action_history(
                     }
                 };
                 let _ = (receipt_ref, receipt_sha256, assessment);
-                stop_trigger_actions.insert(obligation_id.clone(), (action, scope.clone(), policy_revision.clone(), owner_time.clone()));
+                if stop_trigger_actions.insert(obligation_id.clone(), (action, scope.clone(), policy_revision.clone(), owner_time.clone())).is_some() {
+                    critical = true;
+                    reasons.insert(format!("DUPLICATE_STOP_TRIGGER:{obligation_id}"));
+                    continue;
+                }
                 latest_policy_actions.insert(obligation_id.clone(), (action, scope, policy_revision.clone(), owner_time));
             }
             ScheduleAction::StopPolicyRevised { obligation_id, policy_revision } => {
@@ -2511,19 +2517,39 @@ pub fn project_action_history(
                         continue;
                     }
                 };
+                let mut revision_is_ordered = true;
                 match event_order_between(trigger_time, &owner_time) {
                     EventOrder::Before => {}
                     EventOrder::After | EventOrder::Inconsistent => {
                         critical = true;
+                        revision_is_ordered = false;
                         reasons.insert(format!("STOP_POLICY_REVISION_PRECEDES_TRIGGER:{obligation_id}"));
                     }
                     EventOrder::Overlapping | EventOrder::Unknown => {
                         indeterminate = true;
+                        revision_is_ordered = false;
                         reasons.insert(format!("STOP_POLICY_REVISION_ORDER_UNRESOLVED:{obligation_id}"));
                     }
                 }
+                if let Some((_previous_action, _previous_scope, _previous_policy, previous_time)) = latest_policy_actions.get(obligation_id) {
+                    match event_order_between(previous_time, &owner_time) {
+                        EventOrder::Before => {}
+                        EventOrder::After | EventOrder::Inconsistent => {
+                            critical = true;
+                            revision_is_ordered = false;
+                            reasons.insert(format!("STOP_POLICY_REVISION_ORDER_CONTRADICTION:{obligation_id}"));
+                        }
+                        EventOrder::Overlapping | EventOrder::Unknown => {
+                            indeterminate = true;
+                            revision_is_ordered = false;
+                            reasons.insert(format!("STOP_POLICY_REVISION_SEQUENCE_UNRESOLVED:{obligation_id}"));
+                        }
+                    }
+                }
                 let _ = (trigger_action, receipt_ref, receipt_sha256, assessment);
-                latest_policy_actions.insert(obligation_id.clone(), (action, scope, policy_revision.clone(), owner_time));
+                if revision_is_ordered {
+                    latest_policy_actions.insert(obligation_id.clone(), (action, scope, policy_revision.clone(), owner_time));
+                }
             }
             ScheduleAction::AttemptInventoryAttested {
                 scope, inventory_frontier_event_id, attempt_manifest_sha256,
@@ -2590,6 +2616,7 @@ pub fn project_action_history(
         }
     }
 
+    let mut discharged_obligation_ids = BTreeSet::new();
     for action in &schedule.actions {
         let ScheduleAction::StopDischarged {
             obligation_id, trigger_action_id, policy_revision_action_id, policy_revision,
@@ -2692,13 +2719,60 @@ pub fn project_action_history(
             in_flight_attempt_manifest_sha256: manifest,
             trigger_to_discharge_order: trigger_order,
         };
+        if !discharged_obligation_ids.insert(obligation_id.clone()) {
+            critical = true;
+            reasons.insert(format!("DUPLICATE_STOP_DISCHARGE:{obligation_id}"));
+            continue;
+        }
+        let inventory_action_id = &inventory_match[0].1;
+        if let Some(inventory_action) = schedule.actions.iter().find(|item| item.action_id == *inventory_action_id) {
+            match action_owner_time(schedule, inventory_action, time_resolutions) {
+                Ok(inventory_time) => match event_order_between(&inventory_time, &discharge_time) {
+                    EventOrder::Before => {}
+                    EventOrder::After | EventOrder::Inconsistent => {
+                        critical = true;
+                        reasons.insert(format!("INVENTORY_ATTESTATION_AFTER_DISCHARGE:{obligation_id}"));
+                    }
+                    EventOrder::Overlapping | EventOrder::Unknown => {
+                        indeterminate = true;
+                        reasons.insert(format!("INVENTORY_ATTESTATION_ORDER_UNRESOLVED:{obligation_id}"));
+                    }
+                },
+                Err(ProjectionFault::Indeterminate(code)) => {
+                    indeterminate = true;
+                    reasons.insert(format!("{code}:{obligation_id}"));
+                }
+                Err(ProjectionFault::Critical(code)) => {
+                    critical = true;
+                    reasons.insert(format!("{code}:{obligation_id}"));
+                }
+            }
+        }
         obligations.push(ScopedStopObligation {
             obligation_id: obligation_id.clone(),
             trigger_event_id: trigger_action.action_id.clone(),
-            policy_revision: trigger_policy.clone(),
+            policy_revision: current_policy.clone(),
             scope,
             discharge: Some(discharge),
         });
+    }
+
+    for (obligation_id, (trigger_action, trigger_scope, _trigger_policy, _trigger_time)) in &stop_trigger_actions {
+        if discharged_obligation_ids.contains(obligation_id) {
+            continue;
+        }
+        let current_policy = latest_policy_actions.get(obligation_id)
+            .map(|entry| entry.2.clone())
+            .unwrap_or_else(|| _trigger_policy.clone());
+        obligations.push(ScopedStopObligation {
+            obligation_id: obligation_id.clone(),
+            trigger_event_id: trigger_action.action_id.clone(),
+            policy_revision: current_policy,
+            scope: trigger_scope.clone(),
+            discharge: None,
+        });
+        indeterminate = true;
+        reasons.insert(format!("STOP_OBLIGATION_UNDISCHARGED:{obligation_id}"));
     }
 
     if inventories.len() != 1 {
@@ -2766,10 +2840,11 @@ pub fn project_action_history(
             } else {
                 (None, None)
             };
+            let attempt_start_event_id = attempts[index].start_event_ids[0].clone();
             attempts[index].stop_discharge_relations.push(AttemptStopDischargeRelation {
                 obligation_id: obligation.obligation_id.clone(),
                 discharge_event_id: discharge.event_id.clone(),
-                attempt_start_event_id: attempts[index].start_event_ids[0].clone(),
+                attempt_start_event_id,
                 discharge_to_start_order: discharge_to_start,
                 terminal_event_id_at_discharge,
                 terminal_to_discharge_order,
