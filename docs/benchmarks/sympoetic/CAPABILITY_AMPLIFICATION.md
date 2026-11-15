@@ -103,11 +103,11 @@ For each stratum, report separately:
 
 - Participant counts and attrition in each condition.
 - Treatment-control difference-in-differences in independent capability gain with a participant-level bootstrap interval.
-- Rate of negative individual gains in the collaboration and control arms.
+- Rate of negative individual gains in the collaboration and control arms, plus a participant-level bootstrap interval for the treatment-control difference in those rates.
 - Delayed retention and transfer contrasts, where the stratum has adequate data.
 - Missingness, assistance dose, time, and assessment-form equivalence.
 
-The Rust function `summarize_capability_amplification_by_stratum` accepts pseudonymous participant records with a preregistered baseline stratum and either `collaborative` or `control` condition. It returns a separate gain estimate and confidence interval for each stratum, plus the negative-gain rates for both arms. It rejects duplicate participant IDs and strata with fewer than two participants in either arm instead of silently merging or imputing them.
+The Rust function `summarize_capability_amplification_by_stratum` accepts pseudonymous participant records with a preregistered baseline stratum and either `collaborative` or `control` condition. It returns a separate gain estimate and confidence interval for each stratum, negative-gain rates for both arms, and a bootstrap interval for the difference in negative-gain rates. It rejects duplicate participant IDs and strata with fewer than two participants in either arm instead of silently merging or imputing them.
 
 Strata are based on baseline task performance, not inferred demographic identity or sensitive traits. Their cut points must be fixed before outcomes; report multiple comparisons and treat subgroup effects as exploratory unless the study is powered and preregistered for them.
 
