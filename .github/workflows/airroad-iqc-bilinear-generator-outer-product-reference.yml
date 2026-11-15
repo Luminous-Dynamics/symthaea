@@ -1,0 +1,46 @@
+name: AIRROAD IQC Bilinear Generator Outer Product Reference
+
+on:
+  pull_request:
+    paths:
+      - "docs/research/AIRROAD_IQC_BILINEAR_GENERATOR_OUTER_PRODUCT_001_V0_1.md"
+      - "docs/research/fixtures/airroad-iqc-bilinear-generator-outer-product-v0.1.json"
+      - "tools/airroad-iqc-bilinear-generator-outer-product/verify_bilinear_product_cover.py"
+      - ".github/workflows/airroad-iqc-bilinear-generator-outer-product-reference.yml"
+  push:
+    branches:
+      - research/airroad-iqc-bilinear-generator-outer-product-v0.1
+    paths:
+      - "docs/research/AIRROAD_IQC_BILINEAR_GENERATOR_OUTER_PRODUCT_001_V0_1.md"
+      - "docs/research/fixtures/airroad-iqc-bilinear-generator-outer-product-v0.1.json"
+      - "tools/airroad-iqc-bilinear-generator-outer-product/verify_bilinear_product_cover.py"
+      - ".github/workflows/airroad-iqc-bilinear-generator-outer-product-reference.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: airroad-iqc-bilinear-generator-outer-product-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-bilinear-product-containment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compile and execute Equation 65 product oracle
+        run: |
+          python3 -m py_compile \
+            tools/airroad-iqc-bilinear-generator-outer-product/verify_bilinear_product_cover.py
+          python3 \
+            tools/airroad-iqc-bilinear-generator-outer-product/verify_bilinear_product_cover.py
+      - name: Validate exact fixture JSON
+        run: |
+          python3 -m json.tool \
+            docs/research/fixtures/airroad-iqc-bilinear-generator-outer-product-v0.1.json \
+            > /dev/null
