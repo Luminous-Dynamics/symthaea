@@ -95,6 +95,7 @@ pub enum DecisionOpportunityError {
     MissingAcceptedEvaluation(String),
     UnexpectedAcceptedEvaluation(String),
     AcceptedOutcomeMismatch(String),
+    OutOfDomainOutcomeMustBeUnresolved(String),
     DuplicateStratumEvaluations(String),
     MissingStratumEvaluations(String),
     UnexpectedStratumEvaluations(String),
@@ -296,6 +297,16 @@ pub fn audit_decision_opportunities(
                 evaluation.candidate_id.clone(),
             ));
         }
+        if !evaluation.within_declared_domain
+            && matches!(
+                evaluation.reference_outcome,
+                AuditOutcome::ConfirmedFeasible | AuditOutcome::ConfirmedInfeasible
+            )
+        {
+            errors.push(DecisionOpportunityError::OutOfDomainOutcomeMustBeUnresolved(
+                evaluation.candidate_id.clone(),
+            ));
+        }
         let needs_objectives = evaluation.reference_outcome == AuditOutcome::ConfirmedFeasible
             && evaluation.within_declared_domain;
         if !evaluation.objectives.is_empty()
@@ -388,6 +399,16 @@ pub fn audit_decision_opportunities(
                     stratum_id: (*stratum_id).to_string(),
                     sample_index,
                 });
+            }
+            if !evaluation.within_declared_domain
+                && matches!(
+                    evaluation.reference_outcome,
+                    AuditOutcome::ConfirmedFeasible | AuditOutcome::ConfirmedInfeasible
+                )
+            {
+                errors.push(DecisionOpportunityError::OutOfDomainOutcomeMustBeUnresolved(
+                    evaluation.candidate_id.clone(),
+                ));
             }
             let needs_objectives =
                 evaluation.reference_outcome == AuditOutcome::ConfirmedFeasible
@@ -910,7 +931,7 @@ mod tests {
             if evaluation.candidate_id == "rejected-2" {
                 *evaluation = non_objective_eval(
                     "rejected-2",
-                    AuditOutcome::ConfirmedInfeasible,
+                    AuditOutcome::Inconclusive,
                     false,
                 );
             }
@@ -926,8 +947,7 @@ mod tests {
             .position(|sample| sample.candidate_id == "rejected-2")
             .unwrap();
         test_plan.base_plan.strata[0].samples[sample_1].outcome = AuditOutcome::NonConverged;
-        test_plan.base_plan.strata[0].samples[sample_2].outcome =
-            AuditOutcome::ConfirmedInfeasible;
+        test_plan.base_plan.strata[0].samples[sample_2].outcome = AuditOutcome::Inconclusive;
 
         let report = audit_decision_opportunities(&test_plan).unwrap();
         assert_eq!(report.rejected_unresolved_observed, 2);
@@ -1019,6 +1039,20 @@ mod tests {
         assert!(report.conditional_opportunity_recall_lower_bound.is_some());
         assert_eq!(report.decision_rule, DECISION_RULE);
         assert_eq!(report.campaign_id, "campaign-1");
+    }
+
+    #[test]
+    fn out_of_domain_cannot_be_used_as_a_confirmed_feasibility_label() {
+        let mut test_plan = plan();
+        test_plan.rejected_evaluations[0].evaluations[0] =
+            non_objective_eval("rejected-0", AuditOutcome::ConfirmedInfeasible, false);
+        test_plan.base_plan.strata[0].samples[0].outcome = AuditOutcome::ConfirmedInfeasible;
+        let errors = audit_decision_opportunities(&test_plan).unwrap_err();
+        assert!(errors.iter().any(|error| matches!(
+            error,
+            DecisionOpportunityError::OutOfDomainOutcomeMustBeUnresolved(candidate_id)
+                if candidate_id == "rejected-0"
+        )));
     }
 
     #[test]
