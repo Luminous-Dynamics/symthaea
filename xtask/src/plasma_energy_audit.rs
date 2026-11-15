@@ -1190,6 +1190,15 @@ mod tests {
     }
 
     #[test]
+    fn source_manifest_rejects_duplicate_co2_operating_point_ids() {
+        let mut source = co2_counterflow_source_manifest();
+        source["cases"][0]["configurations"][1]["id"] =
+            serde_json::json!("counterflow-magd-792w");
+        let error = audit_source_value(&source, "co2-counterflow.json").unwrap_err();
+        assert!(error.to_string().contains("duplicate configuration ID"));
+    }
+
+    #[test]
     fn source_manifest_rejects_duplicate_case_and_control_ids() {
         let duplicate_case = serde_json::json!({
             "programme": "TEST",
