@@ -1049,7 +1049,7 @@ mod tests {
     fn revoked_consent_is_rejected_even_when_outcome_matches() {
         let mut baseline = transition();
         baseline.consent = Some(consent());
-        let candidate = baseline.clone();
+        let mut candidate = baseline.clone();
         candidate.consent.as_mut().unwrap().status = ConsentStatus::Revoked;
         let policy = SemanticContinuityPolicy {
             consent_required_for_actions: ["refresh".into()].into(),
