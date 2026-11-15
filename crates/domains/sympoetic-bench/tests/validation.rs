@@ -96,6 +96,19 @@ fn fixture_metric_evidence(metric_name: &str, value: f64) -> MetricEvidence {
     }
 }
 
+fn sync_metric_evidence(scorecard: &mut Scorecard, metric_name: &str, value: f64) {
+    let receipt = scorecard
+        .metric_evidence
+        .iter_mut()
+        .find(|receipt| receipt.metric_name == metric_name)
+        .unwrap();
+    receipt.value = value;
+    receipt.numerator = None;
+    receipt.denominator = None;
+    receipt.ci_lower = None;
+    receipt.ci_upper = None;
+}
+
 fn base_scorecard() -> Scorecard {
     let scores = Scores {
         task_quality: Some(0.8),
@@ -475,6 +488,9 @@ fn attribution_f1_must_match_precision_and_recall() {
     scorecard.scores.attribution_precision = Some(0.8);
     scorecard.scores.attribution_recall = Some(0.8);
     scorecard.scores.attribution_f1 = Some(0.5);
+    sync_metric_evidence(&mut scorecard, "attribution_precision", 0.8);
+    sync_metric_evidence(&mut scorecard, "attribution_recall", 0.8);
+    sync_metric_evidence(&mut scorecard, "attribution_f1", 0.5);
     assert!(validate_scorecard(&scorecard).is_err());
 }
 
@@ -493,9 +509,13 @@ fn scorecard_accepts_negative_capability_gain_deltas_and_rejects_out_of_range_va
     scorecard.scores.participant_capability_gain_delta = Some(-0.2);
     scorecard.scores.delayed_retention_gain_delta = Some(-0.1);
     scorecard.scores.transfer_gain_delta = Some(0.05);
+    sync_metric_evidence(&mut scorecard, "participant_capability_gain_delta", -0.2);
+    sync_metric_evidence(&mut scorecard, "delayed_retention_gain_delta", -0.1);
+    sync_metric_evidence(&mut scorecard, "transfer_gain_delta", 0.05);
     validate_scorecard(&scorecard).unwrap();
 
     scorecard.scores.participant_capability_gain_delta = Some(2.1);
+    sync_metric_evidence(&mut scorecard, "participant_capability_gain_delta", 2.1);
     assert!(validate_scorecard(&scorecard).is_err());
 }
 
@@ -505,9 +525,13 @@ fn scorecard_validates_confidence_and_cognitive_process_measures() {
     scorecard.scores.agent_metacognitive_sensitivity_auc = Some(0.94);
     scorecard.scores.participant_confidence_brier_score = Some(0.12);
     scorecard.scores.ai_core_step_substitution_rate = Some(0.18);
+    sync_metric_evidence(&mut scorecard, "agent_metacognitive_sensitivity_auc", 0.94);
+    sync_metric_evidence(&mut scorecard, "participant_confidence_brier_score", 0.12);
+    sync_metric_evidence(&mut scorecard, "ai_core_step_substitution_rate", 0.18);
     validate_scorecard(&scorecard).unwrap();
 
     scorecard.scores.agent_expected_calibration_error = Some(1.1);
+    sync_metric_evidence(&mut scorecard, "agent_expected_calibration_error", 1.1);
     assert!(validate_scorecard(&scorecard).is_err());
 }
 
