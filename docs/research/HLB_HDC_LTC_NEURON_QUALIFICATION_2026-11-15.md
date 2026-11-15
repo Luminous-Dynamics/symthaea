@@ -156,7 +156,7 @@ moves the state even though no time elapsed. This violates the expected continuo
 - call `evolve_closed_form(0.0, input)`;
 - assert state identity to a declared floating-point tolerance;
 - repeat over seeds, dimensions, activations and network layers;
-- test `dt\to0^+) for continuity and reject or explicitly define negative `dt`.
+- test `dt -> 0+` for continuity and reject or explicitly define negative `dt`.
 
 A candidate alternative is:
 
