@@ -1,0 +1,317 @@
+{
+  "schema_version": "0.1.0",
+  "record_id": "SYNTHETIC-LEGACY-HULL-0001",
+  "evidence_class": "SYNTHETIC",
+  "status": "INCOMPLETE",
+  "created_utc": "2026-11-15T20:10:00Z",
+  "vessel_identity": {
+    "vessel_name": null,
+    "yard_hull_number": null,
+    "imo_number": null,
+    "vessel_class": "synthetic single-screw cargo hull",
+    "identity_status": "SYNTHETIC"
+  },
+  "source_artifacts": [
+    {
+      "artifact_id": "SYNTH-BODY-PLAN",
+      "source_type": "BODY_PLAN",
+      "locator": "docs/research/marine/fixtures/assets/synthetic-body-plan.svg",
+      "revision_or_date": "synthetic fixture v0.1",
+      "mime_type": "image/svg+xml",
+      "byte_length": 793,
+      "digest": {
+        "algorithm": "SHA-256",
+        "hex": "08af9ce0364e9d98333760daf7c869ddbd12495cf5b87cfe1bacd573062f2d95"
+      },
+      "rights": {
+        "status": "SYNTHETIC_OWNED",
+        "review_required": false,
+        "permitted_operations": [
+          "VIEW",
+          "MEASURE",
+          "TRANSFORM",
+          "DERIVE",
+          "PUBLISH_METADATA"
+        ],
+        "restrictions_reference": null
+      },
+      "acquisition": {
+        "method": "SYNTHETIC_GENERATION",
+        "acquired_utc": "2026-11-15T20:00:00Z",
+        "acquired_by": "benchmark-fixture-generator",
+        "original_preserved": true
+      }
+    },
+    {
+      "artifact_id": "SYNTH-HALF-BREADTH",
+      "source_type": "HALF_BREADTH_PLAN",
+      "locator": "docs/research/marine/fixtures/assets/synthetic-half-breadth.svg",
+      "revision_or_date": "synthetic fixture v0.1",
+      "mime_type": "image/svg+xml",
+      "byte_length": 869,
+      "digest": {
+        "algorithm": "SHA-256",
+        "hex": "18e3db68f2f6d42406e652a1e88cc6ddb13cc12b0010c54da42daff467d3e1e4"
+      },
+      "rights": {
+        "status": "SYNTHETIC_OWNED",
+        "review_required": false,
+        "permitted_operations": [
+          "VIEW",
+          "MEASURE",
+          "TRANSFORM",
+          "DERIVE",
+          "PUBLISH_METADATA"
+        ],
+        "restrictions_reference": null
+      },
+      "acquisition": {
+        "method": "SYNTHETIC_GENERATION",
+        "acquired_utc": "2026-11-15T20:00:00Z",
+        "acquired_by": "benchmark-fixture-generator",
+        "original_preserved": true
+      }
+    }
+  ],
+  "views": [
+    {
+      "view_id": "VIEW-BODY-PLAN-01",
+      "source_artifact_id": "SYNTH-BODY-PLAN",
+      "view_type": "BODY_PLAN",
+      "page_index": 0,
+      "pixel_dimensions": {
+        "width": 2400,
+        "height": 1800
+      },
+      "dpi_x": 300,
+      "dpi_y": 300,
+      "page_rotation_deg": 0,
+      "scan_skew_deg": 0,
+      "coordinate_frame_id": "BODY-PLAN-FRAME",
+      "calibration": {
+        "status": "SYNTHETIC_KNOWN_ANSWER",
+        "units": "m",
+        "anchors": [
+          {
+            "pixel": {
+              "x_px": 100,
+              "y_px": 900
+            },
+            "engineering_coordinate": -5,
+            "uncertainty": {
+              "status": "QUANTIFIED",
+              "value": 0.005,
+              "unit": "m",
+              "coverage_or_method": "synthetic known-answer calibration uncertainty"
+            },
+            "source_note": "synthetic port reference point",
+            "engineering_axis": "TRANSVERSE"
+          },
+          {
+            "pixel": {
+              "x_px": 2300,
+              "y_px": 900
+            },
+            "engineering_coordinate": 5,
+            "uncertainty": {
+              "status": "QUANTIFIED",
+              "value": 0.005,
+              "unit": "m",
+              "coverage_or_method": "synthetic known-answer calibration uncertainty"
+            },
+            "source_note": "synthetic starboard reference point",
+            "engineering_axis": "TRANSVERSE"
+          }
+        ],
+        "residual_uncertainty": {
+          "status": "QUANTIFIED",
+          "value": 0.01,
+          "unit": "m",
+          "coverage_or_method": "synthetic calibration residual"
+        }
+      }
+    },
+    {
+      "view_id": "VIEW-HALF-BREADTH-01",
+      "source_artifact_id": "SYNTH-HALF-BREADTH",
+      "view_type": "HALF_BREADTH_PLAN",
+      "page_index": 0,
+      "pixel_dimensions": {
+        "width": 2400,
+        "height": 1800
+      },
+      "dpi_x": 300,
+      "dpi_y": 300,
+      "page_rotation_deg": 0,
+      "scan_skew_deg": 0,
+      "coordinate_frame_id": "HALF-BREADTH-FRAME",
+      "calibration": {
+        "status": "SYNTHETIC_KNOWN_ANSWER",
+        "units": "m",
+        "anchors": [
+          {
+            "pixel": {
+              "x_px": 150,
+              "y_px": 200
+            },
+            "engineering_coordinate": 0,
+            "uncertainty": {
+              "status": "QUANTIFIED",
+              "value": 0.005,
+              "unit": "m",
+              "coverage_or_method": "synthetic known-answer calibration uncertainty"
+            },
+            "source_note": "synthetic stern datum",
+            "engineering_axis": "LONGITUDINAL"
+          },
+          {
+            "pixel": {
+              "x_px": 2250,
+              "y_px": 200
+            },
+            "engineering_coordinate": 100,
+            "uncertainty": {
+              "status": "QUANTIFIED",
+              "value": 0.005,
+              "unit": "m",
+              "coverage_or_method": "synthetic known-answer calibration uncertainty"
+            },
+            "source_note": "synthetic bow datum",
+            "engineering_axis": "LONGITUDINAL"
+          }
+        ],
+        "residual_uncertainty": {
+          "status": "QUANTIFIED",
+          "value": 0.01,
+          "unit": "m",
+          "coverage_or_method": "synthetic calibration residual"
+        }
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraint_id": "C-LENGTH-001",
+      "kind": "DIMENSION",
+      "source_artifact_id": "SYNTH-HALF-BREADTH",
+      "view_id": "VIEW-HALF-BREADTH-01",
+      "source_locator": "synthetic note: overall length",
+      "value": 100,
+      "unit": "m",
+      "uncertainty": {
+        "status": "QUANTIFIED",
+        "value": 0.01,
+        "unit": "m",
+        "coverage_or_method": "synthetic exact-dimension envelope"
+      },
+      "interpretation_status": "SYNTHETIC"
+    },
+    {
+      "constraint_id": "C-STATION-012-A",
+      "kind": "STATION_POSITION",
+      "source_artifact_id": "SYNTH-HALF-BREADTH",
+      "view_id": "VIEW-HALF-BREADTH-01",
+      "source_locator": "synthetic station 12",
+      "value": 12,
+      "unit": "m",
+      "uncertainty": {
+        "status": "QUANTIFIED",
+        "value": 0.02,
+        "unit": "m",
+        "coverage_or_method": "synthetic exact-dimension envelope"
+      },
+      "interpretation_status": "SYNTHETIC"
+    },
+    {
+      "constraint_id": "C-STATION-012-B",
+      "kind": "STATION_POSITION",
+      "source_artifact_id": "SYNTH-BODY-PLAN",
+      "view_id": "VIEW-BODY-PLAN-01",
+      "source_locator": "synthetic station 12 annotation",
+      "value": 12.4,
+      "unit": "m",
+      "uncertainty": {
+        "status": "QUANTIFIED",
+        "value": 0.02,
+        "unit": "m",
+        "coverage_or_method": "synthetic conflicting annotation"
+      },
+      "interpretation_status": "SYNTHETIC"
+    }
+  ],
+  "conflicts": [
+    {
+      "conflict_id": "CONFLICT-STATION-012",
+      "subject": "station 12 longitudinal location",
+      "constraint_ids": [
+        "C-STATION-012-A",
+        "C-STATION-012-B"
+      ],
+      "description": "Synthetic negative control: two views disagree on station 12 location beyond their declared uncertainty envelopes.",
+      "status": "SYNTHETIC_NEGATIVE_CONTROL",
+      "resolution_basis": null
+    }
+  ],
+  "unresolved_regions": [
+    {
+      "region_id": "REGION-BOW-01",
+      "view_id": "VIEW-HALF-BREADTH-01",
+      "region_type": "OCCLUDED",
+      "bounds_px": {
+        "x_min": 2050,
+        "y_min": 120,
+        "x_max": 2290,
+        "y_max": 650
+      },
+      "reason": "Synthetic bow region is occluded; no unique stem curvature can be inferred from this view.",
+      "severity": "CRITICAL",
+      "must_review": true
+    }
+  ],
+  "candidate_reconstructions": [
+    {
+      "candidate_id": "CANDIDATE-POINT-CLOUD-001",
+      "representation": "POINT_CLOUD",
+      "artifact_locator": "docs/research/marine/fixtures/assets/synthetic-candidate-point-cloud.json",
+      "digest": {
+        "algorithm": "SHA-256",
+        "hex": "6010783b2c76f21ba160fd04e1a12968b0926ea8a548d619142db72d8d86811f"
+      },
+      "units": "m",
+      "coordinate_frame_id": "VESSEL-LOCAL-X-FWD-Y-STARBOARD-Z-UP",
+      "source_artifact_ids": [
+        "SYNTH-BODY-PLAN",
+        "SYNTH-HALF-BREADTH"
+      ],
+      "pipeline": {
+        "method": "synthetic constraint interpolation baseline",
+        "version": "0.1.0",
+        "configuration_digest": {
+          "algorithm": "SHA-256",
+          "hex": "fda7c066b674b9883adaa2cbc29cc51916c35f87d4ce498453a2620e4016364a"
+        }
+      },
+      "uncertainty_status": "PARTIAL",
+      "geometry_admission": "NOT_EVALUATED",
+      "as_built_status": "NOT_ESTABLISHED_BY_DRAWING_RECONSTRUCTION"
+    }
+  ],
+  "review": {
+    "state": "NOT_REVIEWED",
+    "required_actions": [
+      "Resolve the contradictory station-12 observations using an authoritative source or retain both as unresolved.",
+      "Acquire an unoccluded bow/stem view or preserve bow geometry as uncertain.",
+      "Do not promote the point cloud to a CAD surface or as-built geometry."
+    ],
+    "reviewed_by": null,
+    "reviewed_utc": null
+  },
+  "claim_ceiling": [
+    "NOT_AS_BUILT_EVIDENCE",
+    "NOT_STRUCTURAL_QUALIFICATION",
+    "NOT_HYDRODYNAMIC_QUALIFICATION",
+    "NOT_STABILITY_OR_CLASS_APPROVAL",
+    "NOT_MANUFACTURING_AUTHORIZATION",
+    "NOT_OPERATIONAL_AUTHORITY"
+  ]
+}
