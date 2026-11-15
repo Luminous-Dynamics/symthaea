@@ -801,6 +801,7 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
         ("human_first_attempt_rate", scorecard.scores.human_first_attempt_rate),
         ("human_monitoring_rate", scorecard.scores.human_monitoring_rate),
         ("human_reflection_rate", scorecard.scores.human_reflection_rate),
+        ("ai_core_step_supply_rate", scorecard.scores.ai_core_step_supply_rate),
         ("ai_core_step_substitution_rate", scorecard.scores.ai_core_step_substitution_rate),
         ("human_verification_rate", scorecard.scores.human_verification_rate),
     ] {
