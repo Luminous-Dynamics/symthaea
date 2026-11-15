@@ -937,6 +937,11 @@ pub enum MusicEditMaterializationIssueV1 {
     },
     ReceiptNotCanonicalOrder,
     ReceiptDigestMismatch,
+    AudioArtifactNotFound { sample_id: String, role: MusicEditMaterializedArtifactRoleV1 },
+    AudioArtifactAmbiguous { sample_id: String, role: MusicEditMaterializedArtifactRoleV1 },
+    AudioArtifactRoleUnsupported { role: MusicEditMaterializedArtifactRoleV1 },
+    InvalidAudioMaterializationRoot { path: String },
+    InvalidPcmWav { path: String, reason: String },
 }
 
 fn materialization_domain_hash(domain: &[u8], bytes: &[u8]) -> String {
@@ -1772,6 +1777,478 @@ pub fn verify_music_edit_materialization_receipt_v1(
         _ => issues.push(MusicEditMaterializationIssueV1::ReceiptDigestMismatch),
     }
     issues
+}
+
+/// Opaque result of reopening and decoding one exact WAV artifact named by an
+/// EVAL-035 materialization receipt. It cannot be deserialized into a verified
+/// token. The raw container digest, receipt digest and canonical PCM digest
+/// remain separately available to downstream evidence systems.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct MusicEditVerifiedPcmWavV1 {
+    sample_id: String,
+    source_lineage_sha256: String,
+    role: MusicEditMaterializedArtifactRoleV1,
+    materialization_receipt_sha256: String,
+    container_sha256: String,
+    container_byte_len: u64,
+    sample_rate_hz: u32,
+    channels: u16,
+    frame_count: u64,
+    data_chunk_offset: u64,
+    data_chunk_byte_len: u64,
+    pcm_sha256: String,
+    samples: Vec<i16>,
+    token_sha256: String,
+}
+
+impl MusicEditVerifiedPcmWavV1 {
+    pub fn sample_id(&self) -> &str { &self.sample_id }
+    pub fn source_lineage_sha256(&self) -> &str { &self.source_lineage_sha256 }
+    pub fn role(&self) -> &MusicEditMaterializedArtifactRoleV1 { &self.role }
+    pub fn materialization_receipt_sha256(&self) -> &str { &self.materialization_receipt_sha256 }
+    pub fn container_sha256(&self) -> &str { &self.container_sha256 }
+    pub fn container_byte_len(&self) -> u64 { self.container_byte_len }
+    pub fn sample_rate_hz(&self) -> u32 { self.sample_rate_hz }
+    pub fn channels(&self) -> u16 { self.channels }
+    pub fn frame_count(&self) -> u64 { self.frame_count }
+    pub fn data_chunk_offset(&self) -> u64 { self.data_chunk_offset }
+    pub fn data_chunk_byte_len(&self) -> u64 { self.data_chunk_byte_len }
+    pub fn pcm_sha256(&self) -> &str { &self.pcm_sha256 }
+    pub fn samples(&self) -> &[i16] { &self.samples }
+    pub fn token_sha256(&self) -> &str { &self.token_sha256 }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DecodedPcmWavV1 {
+    sample_rate_hz: u32,
+    channels: u16,
+    frame_count: u64,
+    data_chunk_offset: u64,
+    data_chunk_byte_len: u64,
+    samples: Vec<i16>,
+}
+
+#[derive(Serialize)]
+struct VerifiedPcmWavCommitmentV1<'a> {
+    sample_id: &'a str,
+    source_lineage_sha256: &'a str,
+    role: &'a MusicEditMaterializedArtifactRoleV1,
+    materialization_receipt_sha256: &'a str,
+    container_sha256: &'a str,
+    container_byte_len: u64,
+    sample_rate_hz: u32,
+    channels: u16,
+    frame_count: u64,
+    data_chunk_offset: u64,
+    data_chunk_byte_len: u64,
+    pcm_sha256: &'a str,
+}
+
+fn invalid_wav(path: &str, reason: impl Into<String>) -> MusicEditMaterializationIssueV1 {
+    MusicEditMaterializationIssueV1::InvalidPcmWav {
+        path: path.to_owned(),
+        reason: reason.into(),
+    }
+}
+
+fn wav_u16(bytes: &[u8], offset: usize) -> Option<u16> {
+    let end = offset.checked_add(2)?;
+    let value: [u8; 2] = bytes.get(offset..end)?.try_into().ok()?;
+    Some(u16::from_le_bytes(value))
+}
+
+fn wav_u32(bytes: &[u8], offset: usize) -> Option<u32> {
+    let end = offset.checked_add(4)?;
+    let value: [u8; 4] = bytes.get(offset..end)?.try_into().ok()?;
+    Some(u32::from_le_bytes(value))
+}
+
+/// Strict PCM-WAV v1 decoder. It accepts RIFF/WAVE, format tag 1, signed
+/// 16-bit little-endian mono/stereo PCM, and a single fmt/data chunk. Unknown
+/// ancillary chunks are skipped with RIFF padding; no resampling, gain change,
+/// channel conversion or sample normalization occurs.
+fn decode_pcm_wav_s16le_v1(
+    bytes: &[u8],
+    relative_path: &str,
+) -> Result<DecodedPcmWavV1, MusicEditMaterializationIssueV1> {
+    if bytes.len() < 12 || &bytes[0..4] != b"RIFF" || &bytes[8..12] != b"WAVE" {
+        return Err(invalid_wav(relative_path, "missing RIFF/WAVE signature"));
+    }
+    let declared_riff_size = wav_u32(bytes, 4)
+        .ok_or_else(|| invalid_wav(relative_path, "truncated RIFF size"))? as usize;
+    let riff_end = 8_usize
+        .checked_add(declared_riff_size)
+        .ok_or_else(|| invalid_wav(relative_path, "RIFF size overflow"))?;
+    if declared_riff_size < 4 || riff_end != bytes.len() {
+        return Err(invalid_wav(relative_path, "RIFF size does not match exact container length"));
+    }
+
+    let mut offset = 12_usize;
+    let mut format: Option<(u16, u16, u32, u32, u16, u16)> = None;
+    let mut data_range: Option<(usize, usize)> = None;
+
+    while offset < riff_end {
+        let header_end = offset
+            .checked_add(8)
+            .ok_or_else(|| invalid_wav(relative_path, "chunk header offset overflow"))?;
+        if header_end > riff_end {
+            return Err(invalid_wav(relative_path, "truncated RIFF chunk header"));
+        }
+        let chunk_id = &bytes[offset..offset + 4];
+        let chunk_size = wav_u32(bytes, offset + 4)
+            .ok_or_else(|| invalid_wav(relative_path, "truncated RIFF chunk length"))?
+            as usize;
+        let data_start = header_end;
+        let data_end = data_start
+            .checked_add(chunk_size)
+            .ok_or_else(|| invalid_wav(relative_path, "RIFF chunk length overflow"))?;
+        if data_end > riff_end {
+            return Err(invalid_wav(relative_path, "RIFF chunk exceeds declared container"));
+        }
+
+        if chunk_id == b"fmt " {
+            if format.is_some() {
+                return Err(invalid_wav(relative_path, "duplicate fmt chunk"));
+            }
+            if chunk_size != 16 {
+                return Err(invalid_wav(relative_path, "PCM v1 requires a 16-byte fmt chunk"));
+            }
+            let audio_format = wav_u16(bytes, data_start)
+                .ok_or_else(|| invalid_wav(relative_path, "truncated WAVE format tag"))?;
+            let channels = wav_u16(bytes, data_start + 2)
+                .ok_or_else(|| invalid_wav(relative_path, "truncated WAVE channel count"))?;
+            let sample_rate = wav_u32(bytes, data_start + 4)
+                .ok_or_else(|| invalid_wav(relative_path, "truncated WAVE sample rate"))?;
+            let byte_rate = wav_u32(bytes, data_start + 8)
+                .ok_or_else(|| invalid_wav(relative_path, "truncated WAVE byte rate"))?;
+            let block_align = wav_u16(bytes, data_start + 12)
+                .ok_or_else(|| invalid_wav(relative_path, "truncated WAVE block alignment"))?;
+            let bits_per_sample = wav_u16(bytes, data_start + 14)
+                .ok_or_else(|| invalid_wav(relative_path, "truncated WAVE sample width"))?;
+
+            if audio_format != 1 {
+                return Err(invalid_wav(relative_path, "only uncompressed PCM format tag 1 is supported"));
+            }
+            if !(1..=2).contains(&channels) {
+                return Err(invalid_wav(relative_path, "only mono/stereo PCM is supported"));
+            }
+            if !(8_000..=192_000).contains(&sample_rate) {
+                return Err(invalid_wav(relative_path, "sample rate is outside the supported range"));
+            }
+            if bits_per_sample != 16 {
+                return Err(invalid_wav(relative_path, "only signed 16-bit PCM is supported"));
+            }
+            let expected_block_align = channels
+                .checked_mul(2)
+                .ok_or_else(|| invalid_wav(relative_path, "block alignment overflow"))?;
+            let expected_byte_rate = sample_rate
+                .checked_mul(u32::from(expected_block_align))
+                .ok_or_else(|| invalid_wav(relative_path, "byte rate overflow"))?;
+            if block_align != expected_block_align {
+                return Err(invalid_wav(relative_path, "block alignment disagrees with channel/sample width"));
+            }
+            if byte_rate != expected_byte_rate {
+                return Err(invalid_wav(relative_path, "byte rate disagrees with sample rate/block alignment"));
+            }
+            format = Some((
+                audio_format,
+                channels,
+                sample_rate,
+                byte_rate,
+                block_align,
+                bits_per_sample,
+            ));
+        } else if chunk_id == b"data" {
+            if data_range.is_some() {
+                return Err(invalid_wav(relative_path, "duplicate data chunk"));
+            }
+            if format.is_none() {
+                return Err(invalid_wav(relative_path, "data chunk precedes the required fmt chunk"));
+            }
+            if chunk_size == 0 {
+                return Err(invalid_wav(relative_path, "empty PCM data chunk"));
+            }
+            data_range = Some((data_start, data_end));
+        }
+
+        let padded_end = data_end
+            .checked_add(chunk_size % 2)
+            .ok_or_else(|| invalid_wav(relative_path, "RIFF padding overflow"))?;
+        if padded_end > riff_end {
+            return Err(invalid_wav(relative_path, "missing RIFF odd-byte chunk padding"));
+        }
+        offset = padded_end;
+    }
+
+    if offset != riff_end {
+        return Err(invalid_wav(relative_path, "RIFF chunk traversal did not end at container boundary"));
+    }
+    let Some((_audio_format, channels, sample_rate_hz, _byte_rate, block_align, _bits)) = format
+    else {
+        return Err(invalid_wav(relative_path, "missing fmt chunk"));
+    };
+    let Some((data_start, data_end)) = data_range else {
+        return Err(invalid_wav(relative_path, "missing data chunk"));
+    };
+    let data_len = data_end - data_start;
+    if !data_len.is_multiple_of(usize::from(block_align)) {
+        return Err(invalid_wav(relative_path, "PCM data length is not a whole number of frames"));
+    }
+
+    let samples = bytes[data_start..data_end]
+        .chunks_exact(2)
+        .map(|pair| i16::from_le_bytes([pair[0], pair[1]]))
+        .collect::<Vec<_>>();
+    let frame_count = u64::try_from(data_len / usize::from(block_align))
+        .map_err(|_| invalid_wav(relative_path, "frame count overflow"))?;
+    if frame_count == 0 {
+        return Err(invalid_wav(relative_path, "PCM file contains no frames"));
+    }
+
+    Ok(DecodedPcmWavV1 {
+        sample_rate_hz,
+        channels,
+        frame_count,
+        data_chunk_offset: u64::try_from(data_start)
+            .map_err(|_| invalid_wav(relative_path, "data offset overflow"))?,
+        data_chunk_byte_len: u64::try_from(data_len)
+            .map_err(|_| invalid_wav(relative_path, "data length overflow"))?,
+        samples,
+    })
+}
+
+fn pcm_samples_sha256_v1(
+    sample_rate_hz: u32,
+    channels: u16,
+    frame_count: u64,
+    samples: &[i16],
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(b"luminous.mel.pcm-audio-artifact.v1\0");
+    hasher.update(sample_rate_hz.to_le_bytes());
+    hasher.update([channels as u8]);
+    hasher.update([16]);
+    hasher.update(frame_count.to_le_bytes());
+    for sample in samples {
+        hasher.update(sample.to_le_bytes());
+    }
+    format!("{:x}", hasher.finalize())
+}
+
+fn verified_pcm_wav_token_sha256_v1(
+    payload: &VerifiedPcmWavCommitmentV1<'_>,
+) -> Result<String, MusicEditMaterializationIssueV1> {
+    let encoded = serde_json::to_vec(payload)
+        .map_err(|_| MusicEditMaterializationIssueV1::SerializationError)?;
+    Ok(materialization_domain_hash(b"verified-pcm-wav-token", &encoded))
+}
+
+/// Reopen, rehash and decode one audio artifact from an already materialized
+/// EVAL-035 receipt. The receipt is replayed against its manifest and map first;
+/// the actual opened bytes are then rehashed again before any samples are
+/// emitted. Only SourceAudio/TargetAudio roles are admissible.
+pub fn materialize_verified_pcm_wav_v1(
+    root: &Path,
+    receipt: &MusicEditMaterializationReceiptV1,
+    manifest: &MusicEditDatasetManifestV1,
+    artifact_map: &MusicEditArtifactMapV1,
+    sample_id: &str,
+    role: MusicEditMaterializedArtifactRoleV1,
+    limits: MusicEditMaterializationLimitsV1,
+) -> Result<MusicEditVerifiedPcmWavV1, Vec<MusicEditMaterializationIssueV1>> {
+    let receipt_issues = verify_music_edit_materialization_receipt_v1(receipt, manifest, artifact_map);
+    if !receipt_issues.is_empty() {
+        return Err(receipt_issues);
+    }
+    if !matches!(
+        role,
+        MusicEditMaterializedArtifactRoleV1::SourceAudio
+            | MusicEditMaterializedArtifactRoleV1::TargetAudio
+    ) {
+        return Err(vec![
+            MusicEditMaterializationIssueV1::AudioArtifactRoleUnsupported { role },
+        ]);
+    }
+    if sample_id.trim().is_empty() {
+        return Err(vec![MusicEditMaterializationIssueV1::AudioArtifactNotFound {
+            sample_id: sample_id.to_owned(),
+            role,
+        }]);
+    }
+    let matching = receipt
+        .artifacts
+        .iter()
+        .filter(|artifact| {
+            artifact.sample_id.as_deref() == Some(sample_id) && artifact.role == role
+        })
+        .collect::<Vec<_>>();
+    if matching.is_empty() {
+        return Err(vec![MusicEditMaterializationIssueV1::AudioArtifactNotFound {
+            sample_id: sample_id.to_owned(),
+            role,
+        }]);
+    }
+    if matching.len() != 1 {
+        return Err(vec![MusicEditMaterializationIssueV1::AudioArtifactAmbiguous {
+            sample_id: sample_id.to_owned(),
+            role,
+        }]);
+    }
+    let artifact = matching[0];
+    let Some(lineage) = artifact.source_lineage_sha256.as_deref() else {
+        return Err(vec![MusicEditMaterializationIssueV1::AudioArtifactNotFound {
+            sample_id: sample_id.to_owned(),
+            role,
+        }]);
+    };
+    let manifest_row = manifest.rows.iter().find(|row| row.sample_id == sample_id);
+    if !manifest_row.is_some_and(|row| row.source_lineage_sha256 == lineage && Some(row.split) == artifact.split) {
+        return Err(vec![MusicEditMaterializationIssueV1::ReceiptArtifactMismatch {
+            sample_id: Some(sample_id.to_owned()),
+            role,
+        }]);
+    }
+
+    if limits.max_artifact_bytes == 0 || limits.max_total_bytes == 0 {
+        return Err(vec![MusicEditMaterializationIssueV1::ArtifactTooLarge {
+            path: artifact.relative_path.clone(),
+            observed: artifact.byte_len,
+            limit: limits.max_artifact_bytes,
+        }]);
+    }
+    let root_metadata = fs::symlink_metadata(root).map_err(|_| {
+        vec![MusicEditMaterializationIssueV1::FilesystemError {
+            path: root.display().to_string(),
+            operation: "audio_root_symlink_metadata".to_owned(),
+        }]
+    })?;
+    if root_metadata.file_type().is_symlink() || !root_metadata.is_dir() {
+        return Err(vec![
+            MusicEditMaterializationIssueV1::InvalidAudioMaterializationRoot {
+                path: root.display().to_string(),
+            },
+        ]);
+    }
+    let canonical_root = fs::canonicalize(root).map_err(|_| {
+        vec![MusicEditMaterializationIssueV1::FilesystemError {
+            path: root.display().to_string(),
+            operation: "audio_root_canonicalize".to_owned(),
+        }]
+    })?;
+    let path = resolve_materialization_path(
+        &canonical_root,
+        &artifact.relative_path,
+        Some(sample_id),
+        role.clone(),
+    )
+    .map_err(|issue| vec![issue])?;
+    let mut file = File::open(&path).map_err(|_| {
+        vec![MusicEditMaterializationIssueV1::FilesystemError {
+            path: artifact.relative_path.clone(),
+            operation: "audio_open".to_owned(),
+        }]
+    })?;
+    let before = file.metadata().map_err(|_| {
+        vec![MusicEditMaterializationIssueV1::FilesystemError {
+            path: artifact.relative_path.clone(),
+            operation: "audio_metadata_before_read".to_owned(),
+        }]
+    })?;
+    if !before.is_file() || before.len() == 0 || before.len() > limits.max_artifact_bytes {
+        return Err(vec![MusicEditMaterializationIssueV1::ArtifactTooLarge {
+            path: artifact.relative_path.clone(),
+            observed: before.len(),
+            limit: limits.max_artifact_bytes,
+        }]);
+    }
+    if before.len() != artifact.byte_len {
+        return Err(vec![MusicEditMaterializationIssueV1::ReceiptArtifactMismatch {
+            sample_id: Some(sample_id.to_owned()),
+            role,
+        }]);
+    }
+    let before_modified = before.modified().ok();
+    let capacity = usize::try_from(before.len()).map_err(|_| {
+        vec![MusicEditMaterializationIssueV1::ArtifactTooLarge {
+            path: artifact.relative_path.clone(),
+            observed: before.len(),
+            limit: limits.max_artifact_bytes,
+        }]
+    })?;
+    let mut bytes = Vec::with_capacity(capacity);
+    file.read_to_end(&mut bytes).map_err(|_| {
+        vec![MusicEditMaterializationIssueV1::FilesystemError {
+            path: artifact.relative_path.clone(),
+            operation: "audio_read".to_owned(),
+        }]
+    })?;
+    let after = file.metadata().map_err(|_| {
+        vec![MusicEditMaterializationIssueV1::FilesystemError {
+            path: artifact.relative_path.clone(),
+            operation: "audio_metadata_after_read".to_owned(),
+        }]
+    })?;
+    let after_modified = after.modified().ok();
+    if u64::try_from(bytes.len()).ok() != Some(artifact.byte_len)
+        || after.len() != artifact.byte_len
+        || (before_modified.is_some() && after_modified.is_some() && before_modified != after_modified)
+    {
+        return Err(vec![MusicEditMaterializationIssueV1::FileChangedDuringRead {
+            path: artifact.relative_path.clone(),
+        }]);
+    }
+    let container_sha256 = format!("{:x}", Sha256::digest(&bytes));
+    if container_sha256 != artifact.sha256 {
+        return Err(vec![MusicEditMaterializationIssueV1::DigestMismatch {
+            sample_id: Some(sample_id.to_owned()),
+            role,
+            path: artifact.relative_path.clone(),
+            expected: artifact.sha256.clone(),
+            actual: container_sha256,
+        }]);
+    }
+
+    let decoded = decode_pcm_wav_s16le_v1(&bytes, &artifact.relative_path)
+        .map_err(|issue| vec![issue])?;
+    let pcm_sha256 = pcm_samples_sha256_v1(
+        decoded.sample_rate_hz,
+        decoded.channels,
+        decoded.frame_count,
+        &decoded.samples,
+    );
+    let mut verified = MusicEditVerifiedPcmWavV1 {
+        sample_id: sample_id.to_owned(),
+        source_lineage_sha256: lineage.to_owned(),
+        role: artifact.role.clone(),
+        materialization_receipt_sha256: receipt.receipt_sha256.clone(),
+        container_sha256,
+        container_byte_len: artifact.byte_len,
+        sample_rate_hz: decoded.sample_rate_hz,
+        channels: decoded.channels,
+        frame_count: decoded.frame_count,
+        data_chunk_offset: decoded.data_chunk_offset,
+        data_chunk_byte_len: decoded.data_chunk_byte_len,
+        pcm_sha256,
+        samples: decoded.samples,
+        token_sha256: String::new(),
+    };
+    let commitment = VerifiedPcmWavCommitmentV1 {
+        sample_id: &verified.sample_id,
+        source_lineage_sha256: &verified.source_lineage_sha256,
+        role: &verified.role,
+        materialization_receipt_sha256: &verified.materialization_receipt_sha256,
+        container_sha256: &verified.container_sha256,
+        container_byte_len: verified.container_byte_len,
+        sample_rate_hz: verified.sample_rate_hz,
+        channels: verified.channels,
+        frame_count: verified.frame_count,
+        data_chunk_offset: verified.data_chunk_offset,
+        data_chunk_byte_len: verified.data_chunk_byte_len,
+        pcm_sha256: &verified.pcm_sha256,
+    };
+    verified.token_sha256 =
+        verified_pcm_wav_token_sha256_v1(&commitment).map_err(|issue| vec![issue])?;
+    Ok(verified)
 }
 
 #[cfg(test)]
