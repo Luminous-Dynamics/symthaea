@@ -44,6 +44,8 @@ The direct leakage control only detects the known planted direct-target channel 
 
 The target-mapping function consumes a caller-supplied `verified_randomness` field and a response-commitment digest, but it does **not** verify a drand signature, trust root, timestamp, or response-before-target chronology. Those remain the separate responsibilities of SCI-PSI-003. Its frozen known-answer vector maps the specified test beacon/context/response commitment to target index 2 under both four- and five-choice mappings; independent target selection for actual experiments must use the complete versioned manifest and verifier receipts.
 
+The known-answer inputs use Quicknet chain hash `52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971`, scheme `bls-unchained-g1-rfc9380`, round 1000, the published example's signature-derived randomness `fe290beca10872ef2fb164d2aa4442de4566183ec51c56ff3cd603d930e54fdd`, and the SHA-256 digest of the synthetic response-commitment string `sympsi-response-commitment-000042`. The frozen SHA-256 target transcript is `cd4ed4b3a8ab1da6185ea3a535bd6b87b71862f606a9d03cc5a388e8b854bde6`; its unbiased 4-way and 5-way outputs are both zero-based index 2. The drand input values are from the published [drandite-core Quicknet verification example](https://docs.rs/drandite-core/latest/drandite_core/), not a live experiment.
+
 ## Reproduce
 
 Run from the repository root. Use the exact commit being qualified:
