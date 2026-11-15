@@ -846,6 +846,26 @@ mod tests {
             .find(|term| term.observable == PowerObservable::GrossElectric)
             .unwrap()
             .value_mw = 130.0;
+        row.power_run.output_sha256 = sha('g');
+        row.plasma_gain_output_sha256 = sha('g');
+        row.lifecycle_report.segment_receipts
+            .iter_mut()
+            .for_each(|segment| segment.output_sha256 = sha('g'));
+        row.lifecycle_report_sha256 = sha('D');
+        row.lifecycle_report.signed_net_energy_mwh = Some(-7.0 * 1500.0 / 3600.0);
+        row.lifecycle_report.export_energy_mwh = Some(0.0);
+        row.lifecycle_report.import_energy_mwh = Some(7.0 * 1500.0 / 3600.0);
+        for state in &mut row.lifecycle_report.energy_by_state {
+            if state.state == PowerOperatingState::PowerGeneration {
+                state.signed_net_energy_mwh = 0.0;
+                state.export_energy_mwh = 0.0;
+                state.import_energy_mwh = 0.0;
+            } else if state.state == PowerOperatingState::PlannedMaintenance {
+                state.signed_net_energy_mwh = -7.0 * 1500.0 / 3600.0;
+                state.export_energy_mwh = 0.0;
+                state.import_energy_mwh = 7.0 * 1500.0 / 3600.0;
+            }
+        }
         row.power_report = evaluate_plant_power_balance(&row.power_profile, &row.power_run);
         assert_eq!(
             compare_service_boundary_rankings(&profile(), &candidates)
