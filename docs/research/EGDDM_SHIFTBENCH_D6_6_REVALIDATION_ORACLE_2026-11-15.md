@@ -79,7 +79,7 @@ The command first invokes the D6 trace validator, then computes the oracle metri
 - over/under/set-distance units;
 - oracle savings ceiling, observed refresh fraction, precision and recall.
 
-The module authors tests for the committed known-answer fixture, clean-arm behavior, unnecessary refresh, missing required refresh, fresh failure versus missing refresh, unknown gold obligation, unknown receipt obligation, future source epoch, duplicate active IDs, and malformed scenario.
+The module authors 12 tests for the committed known-answer fixture, clean-arm behavior, unnecessary refresh, missing required refresh, fresh failure versus missing refresh, unknown gold obligation, unknown receipt obligation, future source epoch, duplicate active IDs, malformed scenario and claim-ceiling behavior.
 
 ## 5. Synthetic known answer
 
