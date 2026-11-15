@@ -151,10 +151,9 @@ fn base_scorecard() -> Scorecard {
     };
     let metric_evidence = scores
         .entries()
+        .unwrap()
         .into_iter()
-        .filter_map(|(metric_name, value)| {
-            value.map(|value| fixture_metric_evidence(metric_name, value))
-        })
+        .map(|(metric_name, value)| fixture_metric_evidence(&metric_name, value))
         .collect();
 
     Scorecard {
@@ -742,13 +741,9 @@ fn scorecard_rejects_unrecognized_and_auxiliary_only_scorer_kinds() {
 #[test]
 fn canonical_score_table_and_metric_evidence_receipts_have_one_to_one_coverage() {
     let scorecard = base_scorecard();
-    let entries = scorecard.scores.entries();
-    let populated_count = entries
-        .iter()
-        .filter(|(_, value)| value.is_some())
-        .count();
+    let entries = scorecard.scores.entries().unwrap();
     assert_eq!(entries.len(), 37);
-    assert_eq!(populated_count, scorecard.metric_evidence.len());
+    assert_eq!(entries.len(), scorecard.metric_evidence.len());
 
     for (index, (name, _)) in entries.iter().enumerate() {
         assert!(
