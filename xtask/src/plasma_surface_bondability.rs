@@ -736,7 +736,7 @@ mod tests {
     }
 
     #[test]
-    fn 2026_pp_epoxy_source_pairing_is_pinned() {
+    fn source_2026_pp_epoxy_pairing_is_pinned() {
         let case = surface_reference_case("SURF-THERMOPLASTIC-ARGON-NITROGEN-2026");
         let observations = case["selected_reported_observations"].as_array().unwrap();
         let pp_epoxy = observations
@@ -756,7 +756,7 @@ mod tests {
     }
 
     #[test]
-    fn 2026_pp_adhesive_counterexample_is_pinned() {
+    fn source_2026_pp_adhesive_counterexample_is_pinned() {
         let case = surface_reference_case("SURF-THERMOPLASTIC-ARGON-NITROGEN-2026");
         let observations = case["selected_reported_observations"].as_array().unwrap();
         let pp_flexi = observations
@@ -774,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    fn 2026_surface_source_does_not_claim_lifetime_or_physical_reproduction() {
+    fn source_2026_surface_does_not_claim_lifetime_or_physical_reproduction() {
         let case = surface_reference_case("SURF-THERMOPLASTIC-ARGON-NITROGEN-2026");
         assert_eq!(case["luminous_reproduction"], false);
         let experiment = &case["experiment"];
@@ -788,7 +788,7 @@ mod tests {
     }
 
     #[test]
-    fn 2026_surface_damage_thresholds_are_source_pinned() {
+    fn source_2026_surface_damage_thresholds_are_pinned() {
         let case = surface_reference_case("SURF-THERMOPLASTIC-ARGON-NITROGEN-2026");
         let damage = &case["experiment"]["nitrogen_overexposure_damage"];
         assert_eq!(damage["pp_first_visible_burning_head_speed_mm_per_min"], 500);
