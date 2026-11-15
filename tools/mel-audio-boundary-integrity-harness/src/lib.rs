@@ -287,9 +287,9 @@ fn validate_request_v1(request: &AudioBoundaryRequestV1) -> Result<(), AudioBoun
         prior_end = window.end_frame;
     }
 
-    let mut previous_region: Option<&str> = None;
+    let mut protected_ids = BTreeSet::new();
     let mut previous_region_end = 0_u64;
-    for region in &request.protected_regions {
+    for (index, region) in request.protected_regions.iter().enumerate() {
         if region.region_id.trim().is_empty()
             || region.start_frame >= region.end_frame
             || region.end_frame > request.frame_count
@@ -297,8 +297,8 @@ fn validate_request_v1(request: &AudioBoundaryRequestV1) -> Result<(), AudioBoun
         {
             return Err(AudioBoundaryErrorV1::InvalidRegion);
         }
-        if previous_region.is_some_and(|prior| prior >= region.region_id.as_str())
-            || region.start_frame < previous_region_end
+        if !protected_ids.insert(region.region_id.as_str())
+            || (index > 0 && region.start_frame < previous_region_end)
         {
             return Err(AudioBoundaryErrorV1::NonCanonicalProtectedRegions);
         }
@@ -307,7 +307,6 @@ fn validate_request_v1(request: &AudioBoundaryRequestV1) -> Result<(), AudioBoun
         }) {
             return Err(AudioBoundaryErrorV1::ProtectedRegionOverlapsEditSupport);
         }
-        previous_region = Some(region.region_id.as_str());
         previous_region_end = region.end_frame;
     }
 
@@ -533,7 +532,6 @@ pub fn evaluate_audio_edit_boundary_v1(
         return Err(AudioBoundaryErrorV1::OutputDigestMismatch);
     }
 
-    let changed_frame_count = changed_frame_count_and_validate_support(request, source, output)?;
     let mut protected_results = Vec::with_capacity(request.protected_regions.len());
     for region in &request.protected_regions {
         let source_region = region_sha256_v1(
@@ -560,6 +558,7 @@ pub fn evaluate_audio_edit_boundary_v1(
             return Err(AudioBoundaryErrorV1::ProtectedRegionMismatch);
         }
     }
+    let changed_frame_count = changed_frame_count_and_validate_support(request, source, output)?;
 
     let mut boundary_results = Vec::with_capacity(request.boundaries.len());
     for boundary in &request.boundaries {
@@ -705,7 +704,7 @@ mod tests {
         request.expected_output_pcm_sha256 = audio_pcm_sha256_v1(&output).unwrap();
         assert_eq!(
             evaluate_audio_edit_boundary_v1(&request, &source, &output),
-            Err(AudioBoundaryErrorV1::UnauthorizedFrameMutation)
+            Err(AudioBoundaryErrorV1::ProtectedRegionMismatch)
         );
     }
 
@@ -730,7 +729,12 @@ mod tests {
 
     #[test]
     fn channel_specific_seam_failure_is_not_averaged_away() {
-        let source = audio(vec![0, 0, 10, 10, 20, 20, 30, 30, 40, 40, 50, 50], 2);
+        let mut samples = Vec::new();
+        for frame in 0..12_i32 {
+            samples.push(frame * 10);
+            samples.push(frame * 10);
+        }
+        let source = audio(samples, 2);
         let mut output = source.clone();
         output.samples_interleaved_s32[6] = 2_000_000;
         let mut request = request_for(&source, &output);
