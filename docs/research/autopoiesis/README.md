@@ -1,5 +1,6 @@
 # Autopoiesis and Organizational Autonomy Research
 
+- [Reproducible Bernoulli Monte Carlo calibration](AOBENCH_BERNOULLI_MONTE_CARLO_CALIBRATION_2026-11-15.md) — deterministic SplitMix64, order-independent per-episode seeds, balanced anytime policy and complete stratified episode artifacts; tracked by [AOBENCH-013C #12248](https://github.com/Luminous-Dynamics/symthaea/issues/12248).
 - [Stochastic Bernoulli suite-level operating metrics](AOBENCH_BERNOULLI_SUITE_METRICS_2026-11-15.md) — Wilson intervals for null false positives, qualified power, final/all-look coverage and process qualification; tracked by [AOBENCH-013B #12217](https://github.com/Luminous-Dynamics/symthaea/issues/12217).
 - [Stochastic Bernoulli anytime-valid sequential assay](AOBENCH_STOCHASTIC_BERNOULLI_ANYTIME_EVALUATOR_2026-11-15.md) — two-arm iid Bernoulli pilot with alpha-spent Hoeffding confidence sequences, evidence-qualified observations, explicit optional stopping and evaluator-only oracle scoring; tracked by [AOBENCH-013A #12213](https://github.com/Luminous-Dynamics/symthaea/issues/12213), under [AOBENCH-013 #12197](https://github.com/Luminous-Dynamics/symthaea/issues/12197).
 
