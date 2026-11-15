@@ -126,7 +126,12 @@ pub fn validate_shiftbench_admission_json(input: &str) -> Result<AdmissionReport
     if !["synthetic", "curated"].contains(&str_at(&manifest, &["fixture_kind"]).unwrap_or("")) {
         report.error("fixture_kind", "must be synthetic or curated");
     }
-    check_object_keys(&manifest["intervention"], &["family", "position", "control_class"], "intervention", &mut report);
+    check_object_keys(
+        &manifest["intervention"],
+        &["family", "position", "position_percentile", "control_class"],
+        "intervention",
+        &mut report,
+    );
     check_object_keys(
         &manifest["repository_snapshot"],
         &["repository_full_name", "revision_oid", "tree_oid", "configuration_world_digest"],
@@ -181,8 +186,29 @@ pub fn validate_shiftbench_admission_json(input: &str) -> Result<AdmissionReport
     if !FAMILIES.contains(&family) {
         report.error("intervention.family", "unsupported intervention family");
     }
-    if !["early", "middle", "late"].contains(&str_at(&manifest, &["intervention", "position"]).unwrap_or("")) {
-        report.error("intervention.position", "must be early, middle, or late");
+    let position = str_at(&manifest, &["intervention", "position"]).unwrap_or("");
+    if !["early", "middle", "late"].contains(&position) {
+        report.error("intervention.position", "must be early, middle, or late aggregate");
+    }
+    let position_percentile = manifest.pointer("/intervention/position_percentile")
+        .and_then(Value::as_u64);
+    let expected_phase = match position_percentile {
+        Some(10 | 20 | 30) => Some("early"),
+        Some(40 | 50 | 60) => Some("middle"),
+        Some(70 | 80 | 90) => Some("late"),
+        _ => {
+            report.error(
+                "intervention.position_percentile",
+                "must be one of 10, 20, 30, 40, 50, 60, 70, 80 or 90",
+            );
+            None
+        }
+    };
+    if expected_phase.is_some_and(|phase| phase != position) {
+        report.error(
+            "intervention.position",
+            "aggregate phase does not match the exact intervention percentile",
+        );
     }
     if !["target_intervention", "sham", "positive_control", "negative_control", "common_cause_control"]
         .contains(&str_at(&manifest, &["intervention", "control_class"]).unwrap_or(""))
@@ -438,6 +464,21 @@ mod tests {
     fn rejects_invalid_intervention_position() {
         let mut v: Value = serde_json::from_str(VALID).unwrap();
         v["intervention"]["position"] = json!("whenever");
+        assert!(!check(&v).valid);
+    }
+
+    #[test]
+    fn rejects_position_percentile_outside_nine_point_schedule() {
+        let mut v: Value = serde_json::from_str(VALID).unwrap();
+        v["intervention"]["position_percentile"] = json!(35);
+        assert!(!check(&v).valid);
+    }
+
+    #[test]
+    fn rejects_position_aggregate_mismatch() {
+        let mut v: Value = serde_json::from_str(VALID).unwrap();
+        v["intervention"]["position"] = json!("late");
+        v["intervention"]["position_percentile"] = json!(50);
         assert!(!check(&v).valid);
     }
 
