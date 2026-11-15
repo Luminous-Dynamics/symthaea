@@ -1,7 +1,6 @@
 use fusion_reject_audit::{
     AcceptedFeasibleCandidate, AcceptedFeasibleManifest, AuditOutcome, RejectAuditPlan,
-    RejectStratum, audit_rejected_candidates,
-    deterministic_audit_sample_ids,
+    RejectStratum, audit_rejected_candidates, deterministic_audit_sample_ids,
 };
 
 fn digest(character: char) -> String {
@@ -62,7 +61,10 @@ fn main() {
         Ok(report) => {
             println!("method={}", report.bound_method);
             println!("sampling={}", report.sampling_algorithm);
-            println!("familywise_confidence={:.3}", report.familywise_confidence_level);
+            println!(
+                "familywise_confidence={:.3}",
+                report.familywise_confidence_level
+            );
             println!("rejected_population={}", report.total_rejected_population);
             println!("audited_candidates={}", report.total_audited_candidates);
             println!(
