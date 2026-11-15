@@ -177,6 +177,8 @@ pub enum EligibilityReasonCode {
     ConfigurationExpired,
     ConfigurationValidityUnknown,
     ConfigurationDigestMismatch,
+    InvalidConfigurationDigest,
+    InvalidSkillHeadcountRequirement,
     ProductRevisionMismatch,
     PatternRevisionMismatch,
     ProcessRevisionMismatch,
@@ -254,9 +256,16 @@ pub fn evaluate_cell_eligibility(
         }
     }
 
+    for skill in &requirement.required_skills {
+        if skill.skill_ref.trim().is_empty() {
+            out.add(EligibilityReasonCode::EmptyRequiredReference, EligibilitySeverity::Indeterminate, "required_skill_ref");
+        }
+        if skill.minimum_people == 0 {
+            out.add(EligibilityReasonCode::InvalidSkillHeadcountRequirement, EligibilitySeverity::Blocked, &skill.skill_ref);
+        }
+    }
     for (kind, references) in [
         ("required_tooling_ref", requirement.required_tooling_refs.as_slice()),
-        ("required_skill_ref", requirement.required_skills.iter().map(|skill| skill.skill_ref.clone()).collect::<Vec<_>>().as_slice()),
         ("required_material_lot_ref", requirement.required_material_lot_refs.as_slice()),
         ("required_clearance_ref", requirement.required_clearance_refs.as_slice()),
     ] {
@@ -335,6 +344,10 @@ pub fn evaluate_cell_eligibility(
         || requirement.required_parameter_digest_sha256.trim().is_empty()
     {
         out.add(EligibilityReasonCode::EmptyRequiredReference, EligibilitySeverity::Indeterminate, &config.configuration_ref);
+    } else if !is_sha256_hex(&config.parameter_digest_sha256)
+        || !is_sha256_hex(&requirement.required_parameter_digest_sha256)
+    {
+        out.add(EligibilityReasonCode::InvalidConfigurationDigest, EligibilitySeverity::Blocked, &config.configuration_ref);
     } else if config.parameter_digest_sha256 != requirement.required_parameter_digest_sha256 {
         out.add(EligibilityReasonCode::ConfigurationDigestMismatch, EligibilitySeverity::Blocked, &config.configuration_ref);
     }
@@ -504,6 +517,10 @@ where
     } else {
         Ok(first)
     }
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
 fn contains_all(available: &[String], required: &[String]) -> bool {
@@ -827,6 +844,25 @@ mod tests {
 
 
 
+
+
+    #[test]
+    fn malformed_parameter_digest_is_blocked() {
+        let mut cell = qualified_cell();
+        cell.process_configurations[0].parameter_digest_sha256 = "not-a-sha256".to_owned();
+        let report = evaluate_cell_eligibility(&requirement(), &cell);
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::InvalidConfigurationDigest));
+    }
+
+    #[test]
+    fn zero_minimum_operator_count_is_blocked() {
+        let mut req = requirement();
+        req.required_skills[0].minimum_people = 0;
+        let report = evaluate_cell_eligibility(&req, &qualified_cell());
+        assert_eq!(report.status, EligibilityStatus::Blocked);
+        assert!(has_code(&report, EligibilityReasonCode::InvalidSkillHeadcountRequirement));
+    }
 
     #[test]
     fn expired_process_configuration_is_blocked() {
