@@ -24,6 +24,7 @@
 //! ```
 
 pub mod cell_eligibility;
+pub mod cell_eligibility_verifier;
 pub mod graph;
 pub mod inventory;
 pub mod queue;
@@ -39,4 +40,9 @@ pub use cell_eligibility::{
     MaterialLotStatus, OperationRequirement, ProcessConfigurationSnapshot, ProfileStatus,
     SkillQualificationSnapshot, SkillRequirement, SnapshotResolution, UtilityCapacitySnapshot,
     UtilityRequirement,
+};
+
+pub use cell_eligibility_verifier::{
+    verify_eligible_claim, EligibleClaimVerification, VerificationFinding,
+    VerificationFindingCode, VerificationStatus,
 };
