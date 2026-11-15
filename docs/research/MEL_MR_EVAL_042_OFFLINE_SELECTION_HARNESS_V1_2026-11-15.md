@@ -20,7 +20,7 @@ This first implementation makes the selection trajectory reproducible and makes 
 - Candidate counts are bounded at 128. Supported adaptive-round declarations are 1/2/4/8 and backend portfolios 1/2/4. Each materialized candidate must identify a declared round; observed distinct backends may not exceed the declared portfolio.
 - Every assigned slot remains in the denominator, including failed-before-render, render-failed, timed-out, malformed and unrendered slots.
 - Actual render attempts are counted against the frozen render budget. Duplicate output digests are reported rather than silently deduplicated.
-- Policies: deterministic random; best-of-N similarity, loudness and prompt-alignment; mean ensemble; uncertainty-penalized ensemble; and hard-gate-first Pareto selection.
+- Policies: deterministic random; fixed-pool first-improvement greedy similarity; best-of-N similarity, loudness and prompt-alignment; mean ensemble; uncertainty-penalized ensemble; and hard-gate-first Pareto selection.
 - Hard-gate-first does not convert rights, integrity, preservation, edit execution, source lineage or missing evidence into weighted preferences. All six declared gates must be Verified before the candidate enters its Pareto pool; Rejected and Unknown are not admissible.
 - Stable tie-breaking, deterministic seed handling, full-pool SHA-256 commitment and replay verification of the policy outcome.
 - Separate hidden-truth evaluation reports the selected human-outcome vector, shortcut family and hard-gate false acceptance. A gate result marked Verified against hidden invalid truth is explicitly counted as a false accept.
