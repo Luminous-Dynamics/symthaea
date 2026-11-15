@@ -5,6 +5,8 @@ on:
     paths:
       - "tools/mel-music-sequence-integrity-harness/**"
       - "benchmarks/mel/schemas/music-edit-sequence-v1.schema.json"
+      - "benchmarks/mel/schemas/music-symbolic-patch-v1.schema.json"
+      - "benchmarks/mel/schemas/music-symbolic-branch-merge-v1.schema.json"
       - "docs/research/MEL_MR_EVAL_043_MULTI_STEP_EDIT_INTEGRITY_V1_2026-11-15.md"
       - "docs/research/MEL_COMPETITIVE_RESEARCH_HARMONY_AND_SESSION_EDITING_V1_2026-11-15.md"
       - ".github/workflows/mel-music-sequence-integrity.yml"
@@ -38,8 +40,11 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Validate sequence schema
-        run: python3 -m json.tool benchmarks/mel/schemas/music-edit-sequence-v1.schema.json >/dev/null
+      - name: Validate sequence and symbolic operation schemas
+        run: |
+          python3 -m json.tool benchmarks/mel/schemas/music-edit-sequence-v1.schema.json >/dev/null
+          python3 -m json.tool benchmarks/mel/schemas/music-symbolic-patch-v1.schema.json >/dev/null
+          python3 -m json.tool benchmarks/mel/schemas/music-symbolic-branch-merge-v1.schema.json >/dev/null
 
       - name: Stage standalone sequence harness outside workspace
         shell: bash
@@ -84,6 +89,8 @@ jobs:
           sha256sum tools/mel-music-sequence-integrity-harness/examples/eight_step_session.rs > "$evidence/example.sha256"
           sha256sum tools/mel-music-sequence-integrity-harness/examples/reversibility_and_commutativity.rs > "$evidence/reversibility-example.sha256"
           sha256sum benchmarks/mel/schemas/music-edit-sequence-v1.schema.json > "$evidence/schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-symbolic-patch-v1.schema.json > "$evidence/symbolic-patch-schema.sha256"
+          sha256sum benchmarks/mel/schemas/music-symbolic-branch-merge-v1.schema.json > "$evidence/symbolic-branch-merge-schema.sha256"
           sha256sum "$(dirname "$MEL_SEQUENCE_MANIFEST")/Cargo.lock" > "$evidence/Cargo.lock.sha256"
           cp "$(dirname "$MEL_SEQUENCE_MANIFEST")/Cargo.lock" "$evidence/Cargo.lock"
           printf 'exact_head=%s\n' "$MEL_SEQUENCE_REVISION" > "$evidence/source-identities.txt"
