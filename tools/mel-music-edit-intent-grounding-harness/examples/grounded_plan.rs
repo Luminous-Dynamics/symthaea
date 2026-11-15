@@ -66,6 +66,7 @@ fn source() -> Result<SourceObservationV1, Box<dyn std::error::Error>> {
                 end_tick: 1_600,
                 event_ids: vec!["guitar-note-1".to_owned()],
                 anchor_ids: vec!["chorus-1".to_owned()],
+                evidence_receipt_sha256: h(101),
             },
             SourceOccurrenceV1 {
                 occurrence_id: "guitar-entry-2".to_owned(),
@@ -74,6 +75,8 @@ fn source() -> Result<SourceObservationV1, Box<dyn std::error::Error>> {
                 end_tick: 4_500,
                 event_ids: vec!["guitar-note-2".to_owned()],
                 anchor_ids: vec!["chorus-2".to_owned()],
+                evidence_receipt_sha256: h(103),
+                evidence_receipt_sha256: h(102),
             },
             SourceOccurrenceV1 {
                 occurrence_id: "snare-hit-1".to_owned(),
@@ -129,7 +132,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         grounding_evidence: vec![OccurrenceGroundingEvidenceV1 {
             occurrence_id: "guitar-entry-2".to_owned(),
             source_observation_sha256: observation.observation_sha256.clone(),
-            evidence_receipt_sha256: h(600),
+            evidence_receipt_sha256: h(102),
             evidence_kind: GroundingEvidenceKindV1::TemporalAnchor,
             confidence_bp: 9_700,
         }],
