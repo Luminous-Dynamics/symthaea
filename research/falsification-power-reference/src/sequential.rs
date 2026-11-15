@@ -306,7 +306,7 @@ impl PredictableGaussianEProcess {
         }
 
         let increment =
-            likelihood_ratio_increment(pending.residuals[0], observed_residual, self.sigma)?;
+            likelihood_ratio_increment(pending.residuals[0], observed_residual, pending.sigma)?;
         let next_log_e_value = self.log_e_value + increment;
         if !next_log_e_value.is_finite() {
             return Err(SequentialError::NumericalOverflow);
@@ -592,6 +592,27 @@ mod tests {
         let result = process.observe("obs-1", "sha256:decision-1", 0.20).unwrap();
         assert!((result.log_e_value - 0.853_333_333_333_333_3).abs() < 1.0e-12);
         assert_eq!(result.observations, 1);
+    }
+
+    #[test]
+    fn predictable_per_observation_sigma_is_used_in_the_likelihood_ratio() {
+        let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
+        process
+            .commit_prediction_with_sigma("obs-1", "sha256:decision-1", 0.24, 0.15)
+            .unwrap();
+        let first = process
+            .observe("obs-1", "sha256:decision-1", 0.20)
+            .unwrap();
+
+        process
+            .commit_prediction_with_sigma("obs-2", "sha256:decision-2", 0.24, 0.30)
+            .unwrap();
+        let second = process
+            .observe("obs-2", "sha256:decision-2", 0.20)
+            .unwrap();
+
+        assert!((first.log_e_value - 0.853_333_333_333_333_3).abs() < 1.0e-12);
+        assert!((second.log_e_value - 1.066_666_666_666_666_7).abs() < 1.0e-12);
     }
 
     #[test]
