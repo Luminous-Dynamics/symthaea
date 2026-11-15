@@ -24,6 +24,7 @@ The benchmark is motivated by a problem in current evaluation: artifact quality 
 - **RQ9 — Capability amplification:** Does collaboration improve the participant's independent capability, delayed retention, and transfer to new tasks versus matched controls?
 - **RQ10 — Epistemic resilience:** Does the collaboration preserve the distinction between fact, belief, report, inference, and unknown; maintain provenance; and revise confidence appropriately when evidence changes?
 - **RQ11 — Cognitive sovereignty:** Does AI assistance preserve observable human planning, monitoring, first attempts, verification, and reflection rather than substituting for learning-critical reasoning?
+- **RQ12 — Distributional capability:** Does collaboration benefit participants across preregistered baseline-capability strata, or does a positive pooled average conceal groups experiencing negative independent-learning gains?
 
 ## 3. Constructs and operational measurements
 
@@ -91,7 +92,7 @@ Test explicit opt-in, scope changes, revocation, deletion requests, and limits o
 
 Measure whether a participant becomes more capable independently after collaboration. Use a baseline pretest, a non-identical immediate post-test without AI assistance, a delayed retention test, and a transfer task in a new context. The primary estimand is the difference-in-differences between the collaboration arm's pre/post gain and a matched control arm's pre/post gain. Report delayed retention and transfer separately.
 
-The participant must complete independent assessments without AI hints, tools, or hidden assistance. Test forms, difficulty, time budgets, scoring rubrics, and assistance exposure must be preregistered and matched. Do not infer learning from joint artifact quality, confidence alone, or one immediate post-test. See [Capability Amplification](CAPABILITY_AMPLIFICATION.md) for the full experimental protocol and statistical design.
+The participant must complete independent assessments without AI hints, tools, or hidden assistance. Test forms, difficulty, time budgets, scoring rubrics, and assistance exposure must be preregistered and matched. Pre-register baseline task-capability strata before post-test outcomes are inspected; report treatment-control gain, confidence intervals, attrition, and negative individual-gain rates per stratum. Underfilled strata remain unavailable rather than being merged post hoc. Do not infer learning from joint artifact quality, confidence alone, or one immediate post-test, and do not interpret task-performance strata as demographic or sensitive identity groups. See [Capability Amplification](CAPABILITY_AMPLIFICATION.md) for the full experimental protocol and statistical design.
 
 ### 3.11 Epistemic resilience and metacognitive sensitivity
 
