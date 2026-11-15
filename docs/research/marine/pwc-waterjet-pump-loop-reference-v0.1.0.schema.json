@@ -32,7 +32,9 @@
       "required": [
         "document",
         "revision",
-        "test_type"
+        "effective_year",
+        "test_type",
+        "scope_note"
       ],
       "properties": {
         "document": {
