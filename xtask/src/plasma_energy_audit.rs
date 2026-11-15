@@ -1626,15 +1626,27 @@ fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()>
         );
     }
 
-    let find_point = |expected_id: &str| -> Result<&Value> {
-        points
-            .iter()
-            .find(|point| point.get("operating_point_id").and_then(Value::as_str) == Some(expected_id))
-            .with_context(|| format!("{context}: missing required operating point {expected_id}"))
-    };
-    let high_conversion = find_point("NH3-MW-ATM-HIGH-CONVERSION")?;
-    let high_throughput = find_point("NH3-MW-ATM-HIGH-THROUGHPUT")?;
-    let high_yield = find_point("NH3-MW-ATM-HIGH-ENERGY-YIELD")?;
+    let high_conversion = points
+        .iter()
+        .find(|point| {
+            point.get("operating_point_id").and_then(Value::as_str)
+                == Some("NH3-MW-ATM-HIGH-CONVERSION")
+        })
+        .with_context(|| format!("{context}: missing high-conversion operating point"))?;
+    let high_throughput = points
+        .iter()
+        .find(|point| {
+            point.get("operating_point_id").and_then(Value::as_str)
+                == Some("NH3-MW-ATM-HIGH-THROUGHPUT")
+        })
+        .with_context(|| format!("{context}: missing high-throughput operating point"))?;
+    let high_yield = points
+        .iter()
+        .find(|point| {
+            point.get("operating_point_id").and_then(Value::as_str)
+                == Some("NH3-MW-ATM-HIGH-ENERGY-YIELD")
+        })
+        .with_context(|| format!("{context}: missing high-energy-yield operating point"))?;
 
     let conversion_lower_bound = required_f64(
         high_conversion,
