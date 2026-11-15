@@ -87,7 +87,8 @@
               "artifact_created",
               "artifact_revised",
               "evaluator_annotation",
-              "session_end"
+              "session_end",
+              "execution_reconciled"
             ]
           },
           "parent_event_ids": {
@@ -219,6 +220,13 @@
           },
           "annotation": {
             "type": "string"
+          },
+          "reconciled_status": {
+            "enum": [
+              "success",
+              "failure",
+              "not_executed"
+            ]
           }
         }
       }
