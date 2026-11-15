@@ -401,7 +401,7 @@ pub fn canonical_schedule_bytes(schedule: &VirtualSchedule) -> Result<Vec<u8>, R
 }
 
 pub fn canonical_schedule_sha256(schedule: &VirtualSchedule) -> Result<String, ReplayError> {
-    Ok(sha256_hex(&canonical_schedule_bytes(schedule)?))
+    Ok(sha256_domain_hex(b"symthaea.event-order.schedule.v0.3\\0", &canonical_schedule_bytes(schedule)?))
 }
 
 /// Replay a schedule in virtual time. The output records schedule intent and
@@ -566,7 +566,7 @@ pub fn replay_virtual_schedule(schedule: &VirtualSchedule) -> Result<ReplayRepor
     let persisted_count = persisted.len();
     Ok(ReplayReport {
         schedule_sha256,
-        replay_sha256: sha256_hex(&replay_bytes),
+        replay_sha256: sha256_domain_hex(b"symthaea.event-order.replay.v0.3\\0", &replay_bytes),
         event_count,
         delivery_count,
         observed_count,
@@ -788,8 +788,11 @@ where
     Ok(current)
 }
 
-fn sha256_hex(bytes: &[u8]) -> String {
-    let digest = Sha256::digest(bytes);
+fn sha256_domain_hex(domain: &[u8], bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(domain);
+    hasher.update(bytes);
+    let digest = hasher.finalize();
     let mut output = String::with_capacity(64);
     for byte in digest {
         use std::fmt::Write;
