@@ -218,3 +218,53 @@ The design should align with, but must not claim conformity merely by referencin
 ## Claim ceiling
 
 This specification defines a profile and benchmark protocol. It does not establish a real partner's capability, a surveyed facility, safe occupancy, statutory compliance, accepted production capacity, labour productivity, commercial viability, environmental benefit, or actual performance improvement. Synthetic examples remain synthetic. A profile is not a machine command channel.
+
+
+## Industry operating benchmarks and competitive position
+
+### What the field already does
+
+- **DITF Digital Textile Micro Factory:** the German Institutes of Textile and Fiber Research describe a digitally networked design-to-finished-product chain using 3D simulation and production integration, aimed at individualized production near the customer. This is the closest architectural comparator for Atelier's design-to-production model.
+- **Rodinia Generation and OMIMAI:** the EU Textiles Ecosystem Platform's June 2026 microfactory overview identifies these as commercial applications of digitally enabled, local/on-demand microfactory concepts. Treat company throughput and turnaround claims as vendor claims until independently reproduced.
+- **JACK Technology + Siemens:** Siemens' 11 June 2026 announcement says JACK is targeting efficiency improvements of up to 30% through its software, digital-engineering and robotics collaboration. This is an announced target, not a verified achieved result.
+- **Integrated apparel equipment ecosystems:** JACK's 2026 company filing describes an integrated chain spanning fabric/trim storage, intelligent cutting and inspection, cut-part supermarkets, AI-supported sewing/hanging lines, post-sewing sorting and finished-goods warehousing. It reports manufacturer-specific results and investments; these are not an independently matched Atelier benchmark.
+- **Conventional garment-line performance:** individual published apparel studies report very different OEE, availability, performance and quality values. One TQM sewing-line case reports OEE moving from 59.97% to 62.90%; a separate digital/lean study reports company-specific OEE movements from 42.91% to 52.27% and 59.47% to 67.30%. These are individual case studies, not an industry-wide distribution or universal target.
+
+### How Atelier should compare
+
+Do not compare our synthetic throughput to a vendor's "garments per day", a study's simulated shirt line, or a standard-minute calculation unless product complexity, style, size mix, material, order size, staffing, paid hours, shift calendar, quality definition, downtime boundary and inspection scope match.
+
+For every external comparison, publish a comparability record:
+
+1. Product-family and construction similarity.
+2. Material and lot assumptions.
+3. Batch/order size and product mix.
+4. Available paid labour-hours and skill mix.
+5. Machine count, model/capabilities and uptime boundary.
+6. Quality definition: first-pass yield, defect units, DHU, rework and final acceptance.
+7. Time boundary: scheduled, attended, operating and productive time.
+8. Facility/partner boundary, freight and queue time.
+9. Measurement method, source, sample size and uncertainty.
+10. Evidence class: independently measured, paper-reported simulation, company-reported or vendor-announced target.
+
+Report garment-industry measures (SAM/SMV, earned minutes, line efficiency, DHU, first-pass yield, rework and accepted output) beside general manufacturing measures (availability, performance, quality, OEE, OTIF, P50/P95 lead time and WIP). Keep formulas and time denominators explicit. Do not treat OEE as a universal proxy for garment quality or worker wellbeing.
+
+### Where we can credibly aim to lead
+
+1. **Capability correctness:** no operation assigned to an asset/configuration/skill set whose evidence is missing, mismatched, expired or suspended.
+2. **Product-level adaptability:** measure time from a signed product revision or mix change to the first independently accepted unit, including setup, qualification, ramp loss and scrap.
+3. **Distributed partner equivalence:** identical operation, lot, inspection and evidence semantics across owned and partner facilities, with site-specific qualifications.
+4. **Quality-preserving flexibility:** demonstrate lower reconfiguration time without a transient spike in defects, rework, worker overload or traceability gaps.
+5. **Resilience:** show that alternative qualified routes can absorb a machine outage, skill bottleneck, supplier quarantine or local power interruption without silently dropping inspection or changing the approved product.
+6. **Lifecycle continuity:** connect accepted production to repair, returns, component recovery and verified downstream disposition.
+
+The ambition is not "highest nominal garments per hour". It is a production network that can explain why a route is eligible, prove which configuration made each accepted product, detect when that proof has expired, and recover without discarding quality or worker safeguards.
+
+### Additional comparator references
+
+- [DITF Digital Textile Micro Factory](https://www.ditf.de/en/index/more-information/microfactory/articles/digital-textile-microfactory/)
+- [EU Textiles Ecosystem Platform — Digitalisation and textile microfactories (29 June 2026)](https://transition-pathways.europa.eu/textiles/best-practices/digitalisation-lever-sustainability-example-textile-microfactories)
+- [Siemens — JACK Technology collaboration (11 June 2026)](https://news.siemens.com/sr-rs/siemens-jack-technology/)
+- [JACK Technology 2026 company filing](https://static.cninfo.com.cn/finalpage/2026-04-29/1225226963.PDF)
+- [Apparel sewing-line TQM case study (2024)](https://doi.org/10.1155/2024/6697213)
+- [Apparel OEE, lean and digital integration case study](https://onlinelibrary.wiley.com/doi/full/10.1002/eng2.70162)
