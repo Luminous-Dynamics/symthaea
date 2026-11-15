@@ -448,6 +448,138 @@ fn scorecard_validates_confidence_and_cognitive_process_measures() {
 }
 
 #[test]
+fn confidence_assessment_requires_pre_feedback_confidence_and_valid_actor() {
+    let mut confidence = base_event("confidence", 0, "confidence_assessment");
+    confidence.actor = "human".to_owned();
+    confidence.confidence = Some(0.7);
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "confidence-valid".to_owned(),
+        scenario_id: "SP-EPI-001".to_owned(),
+        trace_digest: None,
+        events: vec![confidence.clone()],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_ok());
+
+    confidence.confidence = None;
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "confidence-missing".to_owned(),
+        scenario_id: "SP-EPI-001".to_owned(),
+        trace_digest: None,
+        events: vec![confidence],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_err());
+}
+
+#[test]
+fn epistemic_source_and_revision_events_require_provenance_links() {
+    let source = base_event("source", 0, "assistant_proposal");
+    let mut attribution = base_event("attribution", 1, "source_attribution");
+    attribution.attribution.push(sympoetic_bench::model::Attribution {
+        contributor: "external_source".to_owned(),
+        contribution_type: "fact".to_owned(),
+        artifact_ref: "source:maintenance-log-1".to_owned(),
+        attribution_confidence: 1.0,
+        permission_ref: None,
+    });
+    let mut revision = base_event("revision", 2, "belief_revision");
+    revision.parent_event_ids.push("source".to_owned());
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "epistemic-linked".to_owned(),
+        scenario_id: "SP-EPI-001".to_owned(),
+        trace_digest: None,
+        events: vec![source.clone(), attribution, revision],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_ok());
+
+    let mut missing_link = base_event("revision-unlinked", 1, "belief_revision");
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "epistemic-unlinked".to_owned(),
+        scenario_id: "SP-EPI-001".to_owned(),
+        trace_digest: None,
+        events: vec![source, missing_link.clone()],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_err());
+
+    missing_link.event_type = "source_attribution".to_owned();
+    missing_link.parent_event_ids.clear();
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "epistemic-no-attribution".to_owned(),
+        scenario_id: "SP-EPI-001".to_owned(),
+        trace_digest: None,
+        events: vec![missing_link],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_err());
+}
+
+#[test]
+fn contradiction_resolution_requires_two_prior_claims() {
+    let first = base_event("claim-a", 0, "assistant_proposal");
+    let second = base_event("claim-b", 1, "assistant_challenge");
+    let mut resolution = base_event("resolution", 2, "contradiction_resolution");
+    resolution.actor = "agent".to_owned();
+    resolution.parent_event_ids = vec!["claim-a".to_owned(), "claim-b".to_owned()];
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "contradiction-two-claims".to_owned(),
+        scenario_id: "SP-EPI-001".to_owned(),
+        trace_digest: None,
+        events: vec![first.clone(), second.clone(), resolution],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_ok());
+
+    let mut invalid = base_event("resolution-one-parent", 1, "contradiction_resolution");
+    invalid.parent_event_ids.push("claim-a".to_owned());
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "contradiction-one-claim".to_owned(),
+        scenario_id: "SP-EPI-001".to_owned(),
+        trace_digest: None,
+        events: vec![first, invalid],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_err());
+}
+
+#[test]
+fn cognitive_process_trace_events_enforce_human_and_agent_actors() {
+    let mut planning = base_event("planning", 0, "human_planning");
+    planning.actor = "human".to_owned();
+    let mut ai_step = base_event("ai-step", 1, "ai_core_step_supplied");
+    ai_step.actor = "agent".to_owned();
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "cognitive-actors-valid".to_owned(),
+        scenario_id: "SP-EPI-001".to_owned(),
+        trace_digest: None,
+        events: vec![planning.clone(), ai_step],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_ok());
+
+    planning.actor = "agent".to_owned();
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "cognitive-actors-invalid".to_owned(),
+        scenario_id: "SP-EPI-001".to_owned(),
+        trace_digest: None,
+        events: vec![planning],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_err());
+}
+
+#[test]
 fn clean_scorecard_validates() {
     validate_scorecard(&base_scorecard()).unwrap();
 }
