@@ -70,8 +70,12 @@ fn run() -> Result<(), String> {
                 scenario.scenario_id,
                 scenario.profile,
                 scenario.naive_fixed_1_over_k.empirical_rate,
-                scenario.global_conditional_target_randomization.empirical_rate,
-                scenario.block_conditional_target_randomization.empirical_rate
+                scenario
+                    .global_conditional_target_randomization
+                    .empirical_rate,
+                scenario
+                    .block_conditional_target_randomization
+                    .empirical_rate
             );
         }
         if !envelope.receipt.all_controls_passed {
