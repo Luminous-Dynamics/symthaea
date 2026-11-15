@@ -1786,6 +1786,34 @@ impl NetworkStateSnapshot {
         self.neuron_states.first().map(|hv| hv.values.len())
     }
 
+    /// Compare only the state vectors and cached layer outputs, deliberately
+    /// excluding per-neuron clocks/call counters. A zero-duration transition
+    /// may preserve the mathematical state while still recording an attempted
+    /// update; callers should qualify those bookkeeping semantics separately.
+    pub fn state_values_approx_eq(&self, other: &Self, eps: f32) -> bool {
+        if self.neuron_states.len() != other.neuron_states.len()
+            || self.layer_outputs.len() != other.layer_outputs.len()
+        {
+            return false;
+        }
+        let hv_eq = |a: &ContinuousHV, b: &ContinuousHV| {
+            a.values.len() == b.values.len()
+                && a.values
+                    .iter()
+                    .zip(b.values.iter())
+                    .all(|(x, y)| (x - y).abs() <= eps)
+        };
+        self.neuron_states
+            .iter()
+            .zip(other.neuron_states.iter())
+            .all(|(a, b)| hv_eq(a, b))
+            && self
+                .layer_outputs
+                .iter()
+                .zip(other.layer_outputs.iter())
+                .all(|(a, b)| hv_eq(a, b))
+    }
+
     /// Element-wise approximate equality of two snapshots (states, layer
     /// outputs, and evolution clocks). The formal test surface for
     /// "this operation does not perturb evolution state".
