@@ -104,7 +104,8 @@
               "unit": "m",
               "coverage_or_method": "synthetic known-answer calibration uncertainty"
             },
-            "source_note": "synthetic port reference point"
+            "source_note": "synthetic port reference point",
+            "engineering_axis": "TRANSVERSE"
           },
           {
             "pixel": {
@@ -118,7 +119,8 @@
               "unit": "m",
               "coverage_or_method": "synthetic known-answer calibration uncertainty"
             },
-            "source_note": "synthetic starboard reference point"
+            "source_note": "synthetic starboard reference point",
+            "engineering_axis": "TRANSVERSE"
           }
         ],
         "residual_uncertainty": {
@@ -159,7 +161,8 @@
               "unit": "m",
               "coverage_or_method": "synthetic known-answer calibration uncertainty"
             },
-            "source_note": "synthetic stern datum"
+            "source_note": "synthetic stern datum",
+            "engineering_axis": "LONGITUDINAL"
           },
           {
             "pixel": {
@@ -173,7 +176,8 @@
               "unit": "m",
               "coverage_or_method": "synthetic known-answer calibration uncertainty"
             },
-            "source_note": "synthetic bow datum"
+            "source_note": "synthetic bow datum",
+            "engineering_axis": "LONGITUDINAL"
           }
         ],
         "residual_uncertainty": {
