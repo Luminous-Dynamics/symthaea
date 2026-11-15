@@ -626,12 +626,13 @@ Two September 2026 publications materially improve the ammonia cracking benchmar
 
 Quiroz Marnef et al., *Microwave plasma-based NH3 decomposition: Reaching optimum performance by understanding the mechanisms*, International Journal of Hydrogen Energy 265 (2026), DOI https://doi.org/10.1016/j.ijhydene.2026.156912.
 
-The paper reports:
-- near-complete conversion (>99%) with H2 energy yield of 45 g/kWh and production rate of 150 g/h;
-- a distinct best energy-yield point of 51 g/kWh at 76% NH3 conversion;
+The paper reports three separate operating points:
+- >99% conversion at 45 g H2/kWh and 242 kJ/mol;
+- 150 g H2/h at 92.4% conversion, 50 g H2/kWh and 217 kJ/mol;
+- best energy yield of 51 g H2/kWh and lowest energy cost of 210 kJ/mol at 76% conversion.
 - a 2D-axisymmetric model coupling gas dynamics, heat transfer, electromagnetic waves and chemical reactions.
 
-Reciprocal energy-yield arithmetic gives approximately 22.22 kWh/kg H2 at the >99% conversion point and 19.61 kWh/kg H2 at the 76% conversion point. These are two operating points, not one combined performance claim. The energy-yield optimum must not inherit the high-conversion result.
+Reciprocal energy-yield arithmetic gives approximately 22.22 kWh/kg H2 at >99% conversion, 20.00 kWh/kg H2 at the 92.4% / 150 g/h point, and 19.61 kWh/kg H2 at 76% conversion. These are three operating points, not one combined performance claim. The 150 g/h result must not inherit the >99% conversion value, and the energy-yield optimum must not inherit the high-conversion result.
 
 The reported yield basis must be checked against complete wall-plug input, hydrogen separation/purification, compression, cooling, auxiliaries, startup, downtime and lifetime before system-level ranking. This atmospheric pure-NH3 case differs from the 2025 atmospheric NH3/N2 torch and reduced-pressure pure-NH3 study.
 
