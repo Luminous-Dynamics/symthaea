@@ -260,6 +260,8 @@ pub struct Scores {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub human_reflection_rate: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai_core_step_supply_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_core_step_substitution_rate: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub human_verification_rate: Option<f64>,
