@@ -384,7 +384,7 @@ fn score_arm(scenario: &ShiftScenario, arm: &ShiftArm) -> Result<ArmScore, Strin
     let receipts = latest_receipts(final_checkpoint);
 
     let still_active_baseline: Vec<_> = baseline_passed.iter()
-        .filter(|id| final_epoch.active_obligation_ids.iter().any(|active| active == **id))
+        .filter(|id| final_epoch.active_obligation_ids.iter().any(|active| active.as_str() == **id))
         .copied()
         .collect();
     let mut retained = 0usize;
