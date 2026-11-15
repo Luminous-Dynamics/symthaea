@@ -1,6 +1,6 @@
 use std::{env, fs, path::PathBuf, process};
 
-use symthaea_marine_geometry::{admit, compute_geometry_digest, CandidateInput, Disposition};
+use symthaea_marine_geometry::{CandidateInput, Disposition, admit, compute_geometry_digest};
 
 const USAGE: &str = concat!(
     "Usage: marine-geometry-admit [--digest-only] <candidate.json> [--report <report.json>]\n",
