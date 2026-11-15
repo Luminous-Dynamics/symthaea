@@ -1154,6 +1154,31 @@ mod tests {
             source_timestamp_ns: 50,
             causal_predecessors: Vec::new(),
         });
+        push_action(&mut schedule.actions, &mut ordinal, t + 2, ScheduleAction::ClockAdvance {
+            clock_domain: "clock-a".to_owned(),
+            basis_id: "basis-clock-a".to_owned(),
+            epoch: "epoch-1".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            local_tick_ns: 5,
+            offset_ns: 0,
+            uncertainty_ns: 10,
+            calibration_id: "calibration-new-epoch".to_owned(),
+            mapping_valid_through_ns: 100,
+            mapping_receipt_ref: "synthetic://mapping/new-epoch".to_owned(),
+            mapping_receipt_sha256: "e".repeat(64),
+            qualification: GateState::Indeterminate,
+        });
+        push_action(&mut schedule.actions, &mut ordinal, t + 3, ScheduleAction::EventProduced {
+            event_id: "event-new-epoch".to_owned(),
+            clock_domain: "clock-a".to_owned(),
+            basis_id: "basis-clock-a".to_owned(),
+            epoch: "epoch-1".to_owned(),
+            scale: "tai".to_owned(),
+            unit: "nanoseconds".to_owned(),
+            source_timestamp_ns: 5,
+            causal_predecessors: Vec::new(),
+        });
         validate_schedule(&schedule).expect("fault schedule must remain structurally valid");
         let report = replay_virtual_schedule(&schedule).expect("fault schedule replays");
         assert!(report.records.iter().any(|record| {
@@ -1161,6 +1186,10 @@ mod tests {
         }));
         assert!(report.records.iter().any(|record| {
             record.disposition == SchedulerDisposition::EventTimeRegression
+        }));
+        assert!(report.records.iter().any(|record| {
+            matches!(&record.action, ScheduleAction::EventProduced { event_id, .. } if event_id == "event-new-epoch")
+                && record.disposition == SchedulerDisposition::Applied
         }));
     }
 
