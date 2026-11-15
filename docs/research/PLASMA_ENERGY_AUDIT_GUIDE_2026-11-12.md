@@ -168,3 +168,17 @@ A fifth miniaturized-device source case records the Leibniz Institute's portable
 
 
 The 2026 miniature helium APPJ article annotates its 2 L/min helium use at approximately £0.2/min under its stated supply-cost basis. At that stated rate, sustained operation would be roughly £12 per operating hour; this is the paper's source-specific estimate, not a universal helium price. This makes gas autonomy and gas consumed per useful output first-order miniature-device metrics, not footnotes.
+
+
+## 9.14 Derived source arithmetic audit — 2026-11-15
+
+The offline source auditor now validates the machine-readable `derived_reference_checks` array rather than merely ignoring it. For each derived check it requires a unique identity, a `DERIVED_ARITHMETIC_*` evidence class, non-empty inputs and derivation, an interpretation/claim ceiling, and `luminous_measurement=false`. When a source_case_id is provided, it must resolve to a registered source case.
+
+The ammonia microwave check `NH3-MW-ENERGY-YIELD-TO-SPECIFIC-ENERGY-2026` receives an independent arithmetic oracle:
+- specific energy = 1000 / reported H2 energy yield (g/kWh);
+- expected results: 22.222... kWh/kg H2 at 45 g/kWh and 19.6078... kWh/kg H2 at 51 g/kWh;
+- relative reduction = 1 - (45 / 51), while preserving the fact that the two values belong to distinct NH3 conversion operating points.
+
+Negative tests mutate the reported derivation, source-case link and Luminous-measurement flag to ensure the source audit refuses them.
+
+The combined source register on this branch now contains 31 plasma source cases, 33 negative controls and 5 derived checks. The register retains the six microplasma source cases unique to this branch in addition to the two 2026 ammonia cases added from the source-register lineage.
