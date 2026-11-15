@@ -53,8 +53,7 @@
       "static_dependency_traversal",
       "temporal_replay_only",
       "temporal_replay_plus_evidence_acquisition",
-      "expert_maintainer",
-      "selective_revalidation_oracle"
+      "expert_maintainer"
     ],
     "candidate": "full_egddm",
     "primary_comparator_selection": "select strongest eligible baseline on validation pilot and freeze before held-out evaluation",
@@ -62,6 +61,10 @@
       "temporal_replay_only",
       "temporal_replay_plus_evidence_acquisition",
       "full_egddm"
+    ],
+    "lower_bound_references": [
+      "full_rerun_reference",
+      "gold_label_minimum_selective_revalidation_set"
     ]
   },
   "primary_estimand": {
