@@ -1,0 +1,303 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "PLASMA-MEDICAL-001",
+  "generated_date": "2026-11-15",
+  "claim_ceiling": "SYNTHETIC_EVIDENCE_CLAIM_AUDIT_ONLY_NO_CLINICAL_DECISION_OR_DEVICE_AUTHORITY",
+  "counts_expected": {
+    "SUPPORTED": 11,
+    "REJECTED": 11,
+    "BLOCKED": 7
+  },
+  "cases": [
+    {
+      "id": "WOUND_RCT_EXACT_HUMAN_SIGNAL",
+      "source_id": "WOUND-CAP-RCT-STROHAL-2025",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "CHRONIC_WOUNDS",
+      "requested_scope": "chronic_wounds_cap_plus_best_practice_care_vs_placebo_plus_best_practice_care_study_specific",
+      "requested_claim": "HUMAN_COMPARATIVE_SIGNAL",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "Exact study-specific modality, indication and scope with a human comparative trial."
+    },
+    {
+      "id": "WOUND_RCT_PROMOTED_TO_ESTABLISHED_EFFICACY",
+      "source_id": "WOUND-CAP-RCT-STROHAL-2025",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "CHRONIC_WOUNDS",
+      "requested_scope": "chronic_wounds_cap_plus_best_practice_care_vs_placebo_plus_best_practice_care_study_specific",
+      "requested_claim": "CLINICAL_EFFECTIVENESS_ESTABLISHED",
+      "expected_disposition": "REJECTED",
+      "rationale": "One 70-participant study cannot establish broad clinical effectiveness."
+    },
+    {
+      "id": "WOUND_RCT_TRANSFERRED_TO_VENOUS_ULCERS",
+      "source_id": "WOUND-CAP-RCT-STROHAL-2025",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "VENOUS_LEG_ULCERS",
+      "requested_scope": "chronic_wounds_cap_plus_best_practice_care_vs_placebo_plus_best_practice_care_study_specific",
+      "requested_claim": "HUMAN_COMPARATIVE_SIGNAL",
+      "expected_disposition": "BLOCKED",
+      "rationale": "Indication mismatch requires a separately qualified evidence bridge."
+    },
+    {
+      "id": "WOUND_META_EXACT_REVIEW_SIGNAL",
+      "source_id": "WOUND-CAP-SRMA-YUAN-2026",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "CHRONIC_WOUNDS",
+      "requested_scope": "chronic_wounds_rcts_2010_to_2025_review_specific",
+      "requested_claim": "SYSTEMATIC_REVIEW_SIGNAL",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "Review-level signal is represented at its own evidence level and scope."
+    },
+    {
+      "id": "DFU_META_GENERALIZED_TO_ALL_WOUNDS",
+      "source_id": "DFU-CAP-SRMA-2025-2026",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "CHRONIC_WOUNDS",
+      "requested_scope": "diabetic_foot_ulcers_three_rcts_107_participants_126_ulcers_review_specific",
+      "requested_claim": "SYSTEMATIC_REVIEW_SIGNAL",
+      "expected_disposition": "BLOCKED",
+      "rationale": "DFU-specific evidence cannot silently become all-chronic-wound evidence."
+    },
+    {
+      "id": "DFU_META_EXACT_REVIEW_SIGNAL",
+      "source_id": "DFU-CAP-SRMA-2025-2026",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "DIABETIC_FOOT_ULCERS",
+      "requested_scope": "diabetic_foot_ulcers_three_rcts_107_participants_126_ulcers_review_specific",
+      "requested_claim": "SYSTEMATIC_REVIEW_SIGNAL",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "Exact diabetic-foot-ulcer review scope is preserved."
+    },
+    {
+      "id": "NIPP_RD_III_PROTOCOL_EXISTS",
+      "source_id": "RADIATION-DERMATITIS-NIPP-RD-III-PROTOCOL",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "BREAST_RADIOTHERAPY_DERMATITIS_PREVENTION",
+      "requested_scope": "nipp_rd_iii_protocol_specific_breast_radiotherapy_prevention",
+      "requested_claim": "TRIAL_PROTOCOL_EXISTS",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The source supports existence of a protocol, not its outcome."
+    },
+    {
+      "id": "NIPP_RD_III_PROTOCOL_AS_EFFICACY_RESULT",
+      "source_id": "RADIATION-DERMATITIS-NIPP-RD-III-PROTOCOL",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "BREAST_RADIOTHERAPY_DERMATITIS_PREVENTION",
+      "requested_scope": "nipp_rd_iii_protocol_specific_breast_radiotherapy_prevention",
+      "requested_claim": "HUMAN_COMPARATIVE_SIGNAL",
+      "expected_disposition": "REJECTED",
+      "rationale": "A trial protocol contains no efficacy result."
+    },
+    {
+      "id": "DENTAL_REVIEW_PRECLINICAL_DOMINANT_SUMMARY",
+      "source_id": "DENTAL-CAPP-SR-HEGDE-2026",
+      "requested_modality": "DIRECT_CAP_AND_PAL",
+      "requested_indication": "DENTISTRY",
+      "requested_scope": "dental_capp_systematic_review_19_studies_11_in_vitro_7_animal_1_human_rct",
+      "requested_claim": "PRECLINICAL_DOMINANT_EVIDENCE_SUMMARY",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The claim preserves the review's predominantly preclinical evidence composition."
+    },
+    {
+      "id": "DENTAL_REVIEW_AS_ROUTINE_CLINICAL_EFFECTIVENESS",
+      "source_id": "DENTAL-CAPP-SR-HEGDE-2026",
+      "requested_modality": "DIRECT_CAP_AND_PAL",
+      "requested_indication": "DENTISTRY",
+      "requested_scope": "dental_capp_systematic_review_19_studies_11_in_vitro_7_animal_1_human_rct",
+      "requested_claim": "CLINICAL_EFFECTIVENESS_ESTABLISHED",
+      "expected_disposition": "REJECTED",
+      "rationale": "The review explicitly says routine clinical evidence remains preliminary."
+    },
+    {
+      "id": "ONCOLOGY_PHASE_I_SAFETY_FEASIBILITY",
+      "source_id": "ONCOLOGY-CHCP-PHASE-I-NCT04267575",
+      "requested_modality": "INTRAOPERATIVE_DIRECT_CAP",
+      "requested_indication": "SOLID_TUMOUR_SURGICAL_MARGIN_ADJUNCT",
+      "requested_scope": "phase_i_intraoperative_chcp_after_macroscopic_resection_advanced_or_recurrent_solid_tumours",
+      "requested_claim": "HUMAN_SAFETY_FEASIBILITY_SIGNAL",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The claim is limited to the specific Phase I safety/feasibility context."
+    },
+    {
+      "id": "ONCOLOGY_PHASE_I_PROMOTED_TO_CANCER_EFFICACY",
+      "source_id": "ONCOLOGY-CHCP-PHASE-I-NCT04267575",
+      "requested_modality": "INTRAOPERATIVE_DIRECT_CAP",
+      "requested_indication": "SOLID_TUMOUR_SURGICAL_MARGIN_ADJUNCT",
+      "requested_scope": "phase_i_intraoperative_chcp_after_macroscopic_resection_advanced_or_recurrent_solid_tumours",
+      "requested_claim": "CLINICAL_ANTITUMOUR_EFFICACY_ESTABLISHED",
+      "expected_disposition": "REJECTED",
+      "rationale": "A small Phase I safety study does not establish antitumour efficacy."
+    },
+    {
+      "id": "ONCOLOGY_IDE_MISSTATED_AS_MARKETING_APPROVAL",
+      "source_id": "ONCOLOGY-CHCP-PHASE-I-NCT04267575",
+      "requested_modality": "INTRAOPERATIVE_DIRECT_CAP",
+      "requested_indication": "SOLID_TUMOUR_SURGICAL_MARGIN_ADJUNCT",
+      "requested_scope": "phase_i_intraoperative_chcp_after_macroscopic_resection_advanced_or_recurrent_solid_tumours",
+      "requested_claim": "FDA_MARKETING_AUTHORIZATION",
+      "expected_disposition": "REJECTED",
+      "rationale": "IDE authorization to investigate is not FDA marketing clearance or approval."
+    },
+    {
+      "id": "PAW_PHASE_I_PROTOCOL_EXISTS",
+      "source_id": "PAW-DFU-PHASE-I-PROTOCOL-2026",
+      "requested_modality": "PLASMA_ACTIVATED_WATER",
+      "requested_indication": "DIABETIC_FOOT_ULCER_WOUND_RINSE",
+      "requested_scope": "phase_i_randomized_double_blind_paw_wound_rinse_protocol_20_participants",
+      "requested_claim": "TRIAL_PROTOCOL_EXISTS",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The source supports protocol existence only."
+    },
+    {
+      "id": "PAW_PROTOCOL_PROMOTED_TO_HUMAN_EFFICACY",
+      "source_id": "PAW-DFU-PHASE-I-PROTOCOL-2026",
+      "requested_modality": "PLASMA_ACTIVATED_WATER",
+      "requested_indication": "DIABETIC_FOOT_ULCER_WOUND_RINSE",
+      "requested_scope": "phase_i_randomized_double_blind_paw_wound_rinse_protocol_20_participants",
+      "requested_claim": "HUMAN_COMPARATIVE_SIGNAL",
+      "expected_disposition": "REJECTED",
+      "rationale": "A protocol is not a clinical result."
+    },
+    {
+      "id": "DOSE_FRAMEWORK_PROPOSAL",
+      "source_id": "CAP-DOSE-DUAL-INDEX-REVIEW-2026",
+      "requested_modality": "CROSS_MODALITY_DOSIMETRY_REVIEW",
+      "requested_indication": "CAP_BIOLOGICAL_DOSIMETRY",
+      "requested_scope": "2020_to_2025_cap_dose_review_over_400_studies_dual_index_proposal",
+      "requested_claim": "DOSE_FRAMEWORK_PROPOSED",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The review proposes the dual-index framework but does not validate a universal dose."
+    },
+    {
+      "id": "DOSE_FRAMEWORK_PROMOTED_TO_UNIVERSAL_STANDARD",
+      "source_id": "CAP-DOSE-DUAL-INDEX-REVIEW-2026",
+      "requested_modality": "CROSS_MODALITY_DOSIMETRY_REVIEW",
+      "requested_indication": "CAP_BIOLOGICAL_DOSIMETRY",
+      "requested_scope": "2020_to_2025_cap_dose_review_over_400_studies_dual_index_proposal",
+      "requested_claim": "UNIVERSAL_VALIDATED_CLINICAL_DOSE_STANDARD",
+      "expected_disposition": "REJECTED",
+      "rationale": "The framework is proposed, not a validated universal clinical standard."
+    },
+    {
+      "id": "DIRECT_CAP_TRANSFERRED_TO_PAW",
+      "source_id": "WOUND-CAP-RCT-STROHAL-2025",
+      "requested_modality": "PLASMA_ACTIVATED_WATER",
+      "requested_indication": "CHRONIC_WOUNDS",
+      "requested_scope": "chronic_wounds_cap_plus_best_practice_care_vs_placebo_plus_best_practice_care_study_specific",
+      "requested_claim": "HUMAN_COMPARATIVE_SIGNAL",
+      "expected_disposition": "BLOCKED",
+      "rationale": "Direct CAP evidence cannot transfer to PAW without an explicit modality-specific bridge."
+    },
+    {
+      "id": "UNKNOWN_SOURCE_ID",
+      "source_id": "UNKNOWN-UNREGISTERED-SOURCE",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "CHRONIC_WOUNDS",
+      "requested_scope": "unknown_scope",
+      "requested_claim": "HUMAN_COMPARATIVE_SIGNAL",
+      "expected_disposition": "BLOCKED",
+      "rationale": "Unknown source cannot support a clinical claim."
+    },
+    {
+      "id": "DOSE_REVIEW_TRANSFERRED_TO_BLOOD_PLASMA",
+      "source_id": "CAP-DOSE-DUAL-INDEX-REVIEW-2026",
+      "requested_modality": "BLOOD_PLASMA",
+      "requested_indication": "BLOOD_PLASMA_TRANSFUSION",
+      "requested_scope": "blood_plasma",
+      "requested_claim": "DOSE_FRAMEWORK_PROPOSED",
+      "expected_disposition": "BLOCKED",
+      "rationale": "Ionized-gas plasma research is not blood plasma medicine."
+    },
+    {
+      "id": "DFU_META_TRANSFERRED_TO_UNRELATED_DEVICE_SCOPE",
+      "source_id": "DFU-CAP-SRMA-2025-2026",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "DIABETIC_FOOT_ULCERS",
+      "requested_scope": "all_devices_all_protocols",
+      "requested_claim": "SYSTEMATIC_REVIEW_SIGNAL",
+      "expected_disposition": "BLOCKED",
+      "rationale": "Review results cannot be transferred to every device/protocol."
+    },
+    {
+      "id": "WOUND_RCT_ESTABLISHED_SURVIVAL_BENEFIT",
+      "source_id": "WOUND-CAP-RCT-STROHAL-2025",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "CHRONIC_WOUNDS",
+      "requested_scope": "chronic_wounds_cap_plus_best_practice_care_vs_placebo_plus_best_practice_care_study_specific",
+      "requested_claim": "SURVIVAL_BENEFIT_ESTABLISHED",
+      "expected_disposition": "REJECTED",
+      "rationale": "A wound-area and healing study does not establish survival benefit."
+    },
+    {
+      "id": "VLU_RCT_EXACT_NON_SUPERIORITY_RESULT",
+      "source_id": "VLU-CAPJ-RCT-HENARES-2026",
+      "requested_modality": "DIRECT_CAP_APPJ_AIR",
+      "requested_indication": "CHRONIC_VENOUS_LEG_ULCERS",
+      "requested_scope": "multicentre_open_label_randomized_60_adults_nonhealing_vlu_air_cap_jet_vs_standard_care_17_week",
+      "requested_claim": "HUMAN_COMPARATIVE_RESULT_NOT_STATISTICALLY_SUPERIOR",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The claim preserves the actual non-significant primary-endpoint result and immediate microbial findings."
+    },
+    {
+      "id": "VLU_RCT_PROMOTED_TO_STATISTICAL_SUPERIORITY",
+      "source_id": "VLU-CAPJ-RCT-HENARES-2026",
+      "requested_modality": "DIRECT_CAP_APPJ_AIR",
+      "requested_indication": "CHRONIC_VENOUS_LEG_ULCERS",
+      "requested_scope": "multicentre_open_label_randomized_60_adults_nonhealing_vlu_air_cap_jet_vs_standard_care_17_week",
+      "requested_claim": "CLINICAL_SUPERIORITY_ESTABLISHED",
+      "expected_disposition": "REJECTED",
+      "rationale": "The primary wound-area superiority test was not statistically significant."
+    },
+    {
+      "id": "VLU_RCT_NON_SIGNIFICANCE_PROMOTED_TO_EQUIVALENCE",
+      "source_id": "VLU-CAPJ-RCT-HENARES-2026",
+      "requested_modality": "DIRECT_CAP_APPJ_AIR",
+      "requested_indication": "CHRONIC_VENOUS_LEG_ULCERS",
+      "requested_scope": "multicentre_open_label_randomized_60_adults_nonhealing_vlu_air_cap_jet_vs_standard_care_17_week",
+      "requested_claim": "CLINICAL_EQUIVALENCE_ESTABLISHED",
+      "expected_disposition": "REJECTED",
+      "rationale": "Failure to demonstrate superiority does not establish equivalence or non-inferiority."
+    },
+    {
+      "id": "VLU_RCT_TRANSFERRED_TO_DIABETIC_FOOT_ULCERS",
+      "source_id": "VLU-CAPJ-RCT-HENARES-2026",
+      "requested_modality": "DIRECT_CAP_APPJ_AIR",
+      "requested_indication": "DIABETIC_FOOT_ULCERS",
+      "requested_scope": "multicentre_open_label_randomized_60_adults_nonhealing_vlu_air_cap_jet_vs_standard_care_17_week",
+      "requested_claim": "HUMAN_COMPARATIVE_RESULT_NOT_STATISTICALLY_SUPERIOR",
+      "expected_disposition": "BLOCKED",
+      "rationale": "Venous-ulcer evidence cannot be transferred to diabetic foot ulcers without an explicit clinical evidence bridge."
+    },
+    {
+      "id": "NIPP_RD_III_RECRUITMENT_COMPLETE_STATUS",
+      "source_id": "RADIATION-DERMATITIS-NIPP-RD-III-PROTOCOL",
+      "requested_modality": "DIRECT_CAP",
+      "requested_indication": "BREAST_RADIOTHERAPY_DERMATITIS_PREVENTION",
+      "requested_scope": "nipp_rd_iii_protocol_specific_breast_radiotherapy_prevention",
+      "requested_claim": "TRIAL_RECRUITMENT_COMPLETE_STATUS",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The registry reports recruitment complete, study continuing and a final sample size of 141; no Phase III result is claimed."
+    },
+    {
+      "id": "KINPEN_MED_CATALOGUE_SPECIFICATION",
+      "source_id": "KINPEN-MED-DEVICE-CATALOGUE-2026",
+      "requested_modality": "DIRECT_APPJ_ARGON",
+      "requested_indication": "CHRONIC_WOUNDS_AND_PATHOGEN_INDUCED_SKIN_DISEASES",
+      "requested_scope": "kinpen_med_inptdat_catalogue_class_iia_power_below_3_5w_1mhz_argon_4_to_6_slm_temp_35_to_38c",
+      "requested_claim": "DEVICE_CATALOGUE_SPECIFICATION_ONLY",
+      "expected_disposition": "SUPPORTED",
+      "rationale": "The claim is limited to the specifications and device status listed in the institutional catalogue."
+    },
+    {
+      "id": "KINPEN_MED_SPECIFICATION_PROMOTED_TO_EFFICACY",
+      "source_id": "KINPEN-MED-DEVICE-CATALOGUE-2026",
+      "requested_modality": "DIRECT_APPJ_ARGON",
+      "requested_indication": "CHRONIC_WOUNDS_AND_PATHOGEN_INDUCED_SKIN_DISEASES",
+      "requested_scope": "kinpen_med_inptdat_catalogue_class_iia_power_below_3_5w_1mhz_argon_4_to_6_slm_temp_35_to_38c",
+      "requested_claim": "CLINICAL_EFFECTIVENESS_ESTABLISHED",
+      "expected_disposition": "REJECTED",
+      "rationale": "Device catalogue specifications do not establish comparative clinical efficacy."
+    }
+  ]
+}
