@@ -290,7 +290,22 @@ fn invalid_scenario(
     findings: Vec<ModelRefinementFinding>,
     consistent_ids: Vec<HypothesisId>,
 ) -> ModelRefinementReport {
-    report(ModelRefinementReportInput {\n    qualification: ModelRefinementQualification::Inconclusive,\n    model_adequacy: ModelAdequacyStatus::Unresolved,\n    consistent_ids: consistent_ids,\n    trace: trace,\n    qualified_trials: 0,\n    cost: 0,\n    risk: 0,\n    validation_count: 0,\n    validation_predictions: 0,\n    validation_correct: 0,\n    model_inadequacy_detected: false,\n    safe_defer: false,\n    refinement_accepted: false,\n    findings: findings,\n})
+    report(ModelRefinementReportInput {
+    qualification: ModelRefinementQualification::Inconclusive,
+    model_adequacy: ModelAdequacyStatus::Unresolved,
+    consistent_ids: consistent_ids,
+    trace: trace,
+    qualified_trials: 0,
+    cost: 0,
+    risk: 0,
+    validation_count: 0,
+    validation_predictions: 0,
+    validation_correct: 0,
+    model_inadequacy_detected: false,
+    safe_defer: false,
+    refinement_accepted: false,
+    findings: findings,
+})
 }
 
 /// Evaluate model-class adequacy and any proposed extension.
@@ -635,14 +650,44 @@ pub fn evaluate_model_refinement(
                 | ModelRefinementFindingCode::TrialBudgetExceeded
         )
     }) {
-        return report(ModelRefinementReportInput {\n    qualification: ModelRefinementQualification::NotQualified,\n    model_adequacy: ModelAdequacyStatus::Unresolved,\n    consistent_ids: Vec::new(),\n    trace: trace,\n    qualified_trials: qualified_trials.len(),\n    cost: total_cost,\n    risk: total_risk,\n    validation_count: scenario.validation_probe_ids.len(),\n    validation_predictions: 0,\n    validation_correct: 0,\n    model_inadequacy_detected: false,\n    safe_defer: false,\n    refinement_accepted: false,\n    findings: findings,\n});
+        return report(ModelRefinementReportInput {
+    qualification: ModelRefinementQualification::NotQualified,
+    model_adequacy: ModelAdequacyStatus::Unresolved,
+    consistent_ids: Vec::new(),
+    trace: trace,
+    qualified_trials: qualified_trials.len(),
+    cost: total_cost,
+    risk: total_risk,
+    validation_count: scenario.validation_probe_ids.len(),
+    validation_predictions: 0,
+    validation_correct: 0,
+    model_inadequacy_detected: false,
+    safe_defer: false,
+    refinement_accepted: false,
+    findings: findings,
+});
     }
 
     if unresolved_evidence {
-        return report(ModelRefinementReportInput {\n    qualification: ModelRefinementQualification::Inconclusive,\n    model_adequacy: ModelAdequacyStatus::Unresolved,\n    consistent_ids: Vec::new(),\n    trace: trace,\n    qualified_trials: qualified_trials.len(),\n    cost: total_cost,\n    risk: total_risk,\n    validation_count: scenario.validation_probe_ids.len(),\n    validation_predictions: 0,\n    validation_correct: 0,\n    model_inadequacy_detected: false,\n    safe_defer: matches!(
+        return report(ModelRefinementReportInput {
+    qualification: ModelRefinementQualification::Inconclusive,
+    model_adequacy: ModelAdequacyStatus::Unresolved,
+    consistent_ids: Vec::new(),
+    trace: trace,
+    qualified_trials: qualified_trials.len(),
+    cost: total_cost,
+    risk: total_risk,
+    validation_count: scenario.validation_probe_ids.len(),
+    validation_predictions: 0,
+    validation_correct: 0,
+    model_inadequacy_detected: false,
+    safe_defer: matches!(
                 trace.decision,
                 ModelAdequacyDecision::DeferAsUnresolved { .. }
-            ),\n    refinement_accepted: false,\n    findings: findings,\n});
+            ),
+    refinement_accepted: false,
+    findings: findings,
+});
     }
 
     let consistent_models: Vec<&CandidateMechanismModel> = models
@@ -672,12 +717,42 @@ pub fn evaluate_model_refinement(
                     None,
                     "agent retained the known model class although no model explains the trace",
                 );
-                report(ModelRefinementReportInput {\n    qualification: ModelRefinementQualification::NotQualified,\n    model_adequacy: ModelAdequacyStatus::Falsified,\n    consistent_ids: consistent_ids,\n    trace: trace,\n    qualified_trials: qualified_trials.len(),\n    cost: total_cost,\n    risk: total_risk,\n    validation_count: scenario.validation_probe_ids.len(),\n    validation_predictions: 0,\n    validation_correct: 0,\n    model_inadequacy_detected: true,\n    safe_defer: false,\n    refinement_accepted: false,\n    findings: findings,\n})
+                report(ModelRefinementReportInput {
+    qualification: ModelRefinementQualification::NotQualified,
+    model_adequacy: ModelAdequacyStatus::Falsified,
+    consistent_ids: consistent_ids,
+    trace: trace,
+    qualified_trials: qualified_trials.len(),
+    cost: total_cost,
+    risk: total_risk,
+    validation_count: scenario.validation_probe_ids.len(),
+    validation_predictions: 0,
+    validation_correct: 0,
+    model_inadequacy_detected: true,
+    safe_defer: false,
+    refinement_accepted: false,
+    findings: findings,
+})
             } else {
                 findings.retain(|finding| {
                     finding.code != ModelRefinementFindingCode::ExistingModelStillFitsTrace
                 });
-                report(ModelRefinementReportInput {\n    qualification: ModelRefinementQualification::Qualified,\n    model_adequacy: ModelAdequacyStatus::NotFalsified,\n    consistent_ids: consistent_ids,\n    trace: trace,\n    qualified_trials: qualified_trials.len(),\n    cost: total_cost,\n    risk: total_risk,\n    validation_count: scenario.validation_probe_ids.len(),\n    validation_predictions: 0,\n    validation_correct: 0,\n    model_inadequacy_detected: false,\n    safe_defer: false,\n    refinement_accepted: false,\n    findings: findings,\n})
+                report(ModelRefinementReportInput {
+    qualification: ModelRefinementQualification::Qualified,
+    model_adequacy: ModelAdequacyStatus::NotFalsified,
+    consistent_ids: consistent_ids,
+    trace: trace,
+    qualified_trials: qualified_trials.len(),
+    cost: total_cost,
+    risk: total_risk,
+    validation_count: scenario.validation_probe_ids.len(),
+    validation_predictions: 0,
+    validation_correct: 0,
+    model_inadequacy_detected: false,
+    safe_defer: false,
+    refinement_accepted: false,
+    findings: findings,
+})
             }
         }
         ModelAdequacyDecision::DeferAsUnresolved { rationale: _ } => {
@@ -685,7 +760,22 @@ pub fn evaluate_model_refinement(
                 findings.retain(|finding| {
                     finding.code != ModelRefinementFindingCode::NoExistingModelFitsTrace
                 });
-                report(ModelRefinementReportInput {\n    qualification: ModelRefinementQualification::Inconclusive,\n    model_adequacy: ModelAdequacyStatus::Falsified,\n    consistent_ids: consistent_ids,\n    trace: trace,\n    qualified_trials: qualified_trials.len(),\n    cost: total_cost,\n    risk: total_risk,\n    validation_count: scenario.validation_probe_ids.len(),\n    validation_predictions: 0,\n    validation_correct: 0,\n    model_inadequacy_detected: true,\n    safe_defer: true,\n    refinement_accepted: false,\n    findings: findings,\n})
+                report(ModelRefinementReportInput {
+    qualification: ModelRefinementQualification::Inconclusive,
+    model_adequacy: ModelAdequacyStatus::Falsified,
+    consistent_ids: consistent_ids,
+    trace: trace,
+    qualified_trials: qualified_trials.len(),
+    cost: total_cost,
+    risk: total_risk,
+    validation_count: scenario.validation_probe_ids.len(),
+    validation_predictions: 0,
+    validation_correct: 0,
+    model_inadequacy_detected: true,
+    safe_defer: true,
+    refinement_accepted: false,
+    findings: findings,
+})
             } else {
                 findings.retain(|finding| {
                     finding.code != ModelRefinementFindingCode::ExistingModelStillFitsTrace
@@ -697,7 +787,22 @@ pub fn evaluate_model_refinement(
                     None,
                     "agent deferred despite at least one model explaining the complete discovery trace",
                 );
-                report(ModelRefinementReportInput {\n    qualification: ModelRefinementQualification::NotQualified,\n    model_adequacy: ModelAdequacyStatus::NotFalsified,\n    consistent_ids: consistent_ids,\n    trace: trace,\n    qualified_trials: qualified_trials.len(),\n    cost: total_cost,\n    risk: total_risk,\n    validation_count: scenario.validation_probe_ids.len(),\n    validation_predictions: 0,\n    validation_correct: 0,\n    model_inadequacy_detected: false,\n    safe_defer: false,\n    refinement_accepted: false,\n    findings: findings,\n})
+                report(ModelRefinementReportInput {
+    qualification: ModelRefinementQualification::NotQualified,
+    model_adequacy: ModelAdequacyStatus::NotFalsified,
+    consistent_ids: consistent_ids,
+    trace: trace,
+    qualified_trials: qualified_trials.len(),
+    cost: total_cost,
+    risk: total_risk,
+    validation_count: scenario.validation_probe_ids.len(),
+    validation_predictions: 0,
+    validation_correct: 0,
+    model_inadequacy_detected: false,
+    safe_defer: false,
+    refinement_accepted: false,
+    findings: findings,
+})
             }
         }
         ModelAdequacyDecision::ExpandModelClass { proposal } => {
@@ -712,7 +817,22 @@ pub fn evaluate_model_refinement(
                     None,
                     "a supplied model remains consistent; expansion is unsupported by the evidence",
                 );
-                return report(ModelRefinementReportInput {\n    qualification: ModelRefinementQualification::NotQualified,\n    model_adequacy: ModelAdequacyStatus::NotFalsified,\n    consistent_ids: consistent_ids,\n    trace: trace,\n    qualified_trials: qualified_trials.len(),\n    cost: total_cost,\n    risk: total_risk,\n    validation_count: scenario.validation_probe_ids.len(),\n    validation_predictions: 0,\n    validation_correct: 0,\n    model_inadequacy_detected: false,\n    safe_defer: false,\n    refinement_accepted: false,\n    findings: findings,\n});
+                return report(ModelRefinementReportInput {
+    qualification: ModelRefinementQualification::NotQualified,
+    model_adequacy: ModelAdequacyStatus::NotFalsified,
+    consistent_ids: consistent_ids,
+    trace: trace,
+    qualified_trials: qualified_trials.len(),
+    cost: total_cost,
+    risk: total_risk,
+    validation_count: scenario.validation_probe_ids.len(),
+    validation_predictions: 0,
+    validation_correct: 0,
+    model_inadequacy_detected: false,
+    safe_defer: false,
+    refinement_accepted: false,
+    findings: findings,
+});
             }
 
             let proposal_id = &proposal.hypothesis.id;
@@ -839,11 +959,26 @@ pub fn evaluate_model_refinement(
             } else {
                 ModelAdequacyStatus::Falsified
             };
-            report(ModelRefinementReportInput {\n    qualification: if accepted {
+            report(ModelRefinementReportInput {
+    qualification: if accepted {
                     ModelRefinementQualification::Qualified
                 } else {
                     ModelRefinementQualification::NotQualified
-                },\n    model_adequacy: final_adequacy,\n    consistent_ids: consistent_ids,\n    trace: trace,\n    qualified_trials: qualified_trials.len(),\n    cost: total_cost,\n    risk: total_risk,\n    validation_count: scenario.validation_probe_ids.len(),\n    validation_predictions: validation_predictions,\n    validation_correct: validation_correct,\n    model_inadequacy_detected: true,\n    safe_defer: false,\n    refinement_accepted: accepted,\n    findings: findings,\n})
+                },
+    model_adequacy: final_adequacy,
+    consistent_ids: consistent_ids,
+    trace: trace,
+    qualified_trials: qualified_trials.len(),
+    cost: total_cost,
+    risk: total_risk,
+    validation_count: scenario.validation_probe_ids.len(),
+    validation_predictions: validation_predictions,
+    validation_correct: validation_correct,
+    model_inadequacy_detected: true,
+    safe_defer: false,
+    refinement_accepted: accepted,
+    findings: findings,
+})
         }
     }
 }
