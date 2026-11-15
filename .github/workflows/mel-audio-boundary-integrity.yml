@@ -20,7 +20,7 @@ jobs:
       - name: Check out exact pull request head
         uses: actions/checkout@v4
         with:
-          ref: \${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
 
       - name: Verify exact pull request head
@@ -28,7 +28,7 @@ jobs:
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
           echo "MEL_AUDIO_BOUNDARY_REVISION=$actual" >> "$GITHUB_ENV"
 
@@ -89,7 +89,7 @@ jobs:
       - name: Upload audio-boundary qualification evidence
         uses: actions/upload-artifact@v4
         with:
-          name: mel-audio-boundary-\${{ github.event.pull_request.head.sha || github.sha }}
-          path: \${{ runner.temp }}/mel-audio-boundary-evidence/
+          name: mel-audio-boundary-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/mel-audio-boundary-evidence/
           if-no-files-found: error
           retention-days: 90
