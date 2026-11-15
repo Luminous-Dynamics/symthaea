@@ -219,6 +219,14 @@ pub struct Scores {
     pub partner_order_sensitivity: Option<f64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub handoff_recovery_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intervention_appropriateness: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unnecessary_intervention_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub missed_critical_intervention_rate: Option<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intervention_regret: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
