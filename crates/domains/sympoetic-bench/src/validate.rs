@@ -148,8 +148,8 @@ pub fn validate_scenario(scenario: &Scenario) -> Result<()> {
     if scenario.task_brief.trim().len() < 30 {
         bail!("{}: task_brief must contain at least 30 characters", scenario.scenario_id);
     }
-    if scenario.duration_minutes == 0 || scenario.duration_minutes > 180 {
-        bail!("{}: duration_minutes must be in 1..=180", scenario.scenario_id);
+    if !(5..=180).contains(&scenario.duration_minutes) {
+        bail!("{}: duration_minutes must be in 5..=180", scenario.scenario_id);
     }
     if scenario.constraints.is_empty()
         || scenario.required_capabilities.is_empty()
@@ -612,6 +612,14 @@ pub fn validate_scorecard(scorecard: &Scorecard) -> Result<()> {
     }
     if let Some(value) = scorecard.scores.partner_order_sensitivity {
         validate_optional_unit_interval("partner_order_sensitivity", Some(value))?;
+    }
+    if let (Some(synergy), Some(gap)) = (
+        scorecard.scores.synergy_delta,
+        scorecard.scores.collaboration_gap,
+    ) {
+        if (synergy + gap).abs() > 1e-6 {
+            bail!("synergy_delta and collaboration_gap must be sign-consistent when computed from the same matched comparison");
+        }
     }
     if let (Some(precision), Some(recall), Some(f1)) = (
         scorecard.scores.attribution_precision,
