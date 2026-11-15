@@ -157,6 +157,7 @@ pub enum ComparisonDiagnostic {
     EmptyEbiNormalization,
     EmptyUncertaintyBasis,
     EmptyCandidateIdentity,
+    DuplicateCandidateIdentity,
     EmptyObjectiveReceipt,
     InvalidObjectiveReceiptDigest,
     ProfileIdentityMismatch,
@@ -313,14 +314,11 @@ fn validate_candidate(
             ObjectiveDimension::WholeLifeCost
             | ObjectiveDimension::PlannedDowntimeHours
             | ObjectiveDimension::UnplannedDowntimeHours
-            | ObjectiveDimension::EngineeringBurdenIndex
             | ObjectiveDimension::NetExportBoundWidthMwe => value.value < 0.0,
+            ObjectiveDimension::EngineeringBurdenIndex => value.value <= 0.0,
             ObjectiveDimension::LifetimeNetElectricEnergyMwh => false,
         };
         if invalid_range {
-            diagnostics.push(ComparisonDiagnostic::InvalidObjectiveRange(dimension));
-        }
-        if dimension == ObjectiveDimension::EngineeringBurdenIndex && value.value <= 0.0 {
             diagnostics.push(ComparisonDiagnostic::InvalidObjectiveRange(dimension));
         }
     }
@@ -472,11 +470,7 @@ pub fn compare_pair(
             ScalarTradeoffDisposition::ScalarPreferenceBetweenEquivalentVectors
         }
         (DominanceRelation::NonDominatedTradeoff, _) => {
-            if scalar_winner_worse_dimensions.is_empty() {
-                ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff
-            } else {
-                ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff
-            }
+            ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff
         }
         (_, ScalarPreference::Tie) => ScalarTradeoffDisposition::NoScalarPreference,
     };
@@ -505,14 +499,19 @@ pub fn extract_pareto_front(
     let mut seen = BTreeSet::new();
     let mut statuses = Vec::with_capacity(candidates.len());
 
+    let mut duplicate_ids = BTreeSet::new();
     for candidate in candidates {
         if !seen.insert(candidate.candidate_id.as_str()) {
-            diagnostics.push(ComparisonDiagnostic::EmptyCandidateIdentity);
+            diagnostics.push(ComparisonDiagnostic::DuplicateCandidateIdentity);
+            duplicate_ids.insert(candidate.candidate_id.as_str());
         }
     }
 
     for candidate in candidates {
-        let candidate_diagnostics = validate_candidate(profile, candidate);
+        let mut candidate_diagnostics = validate_candidate(profile, candidate);
+        if duplicate_ids.contains(candidate.candidate_id.as_str()) {
+            candidate_diagnostics.push(ComparisonDiagnostic::DuplicateCandidateIdentity);
+        }
         let base_status = match candidate.eligibility {
             CandidateEligibility::BlockedByHardGate => ParetoFrontStatus::BlockedByHardGate,
             CandidateEligibility::UnknownHardGate => ParetoFrontStatus::UnknownHardGate,
@@ -540,7 +539,7 @@ pub fn extract_pareto_front(
                 continue;
             }
             if dominance(&candidates[second_index], &candidates[first_index])
-                == DominanceRelation::SecondDominatesFirst
+                == DominanceRelation::FirstDominatesSecond
             {
                 statuses[first_index]
                     .dominated_by
@@ -664,7 +663,7 @@ mod tests {
     }
 
     #[test]
-    fn q_eng_is_invariant_to_joint_positive_scaling_of_ebi_and_availability_is_not_expected() {
+    fn q_eng_scales_inversely_with_ebi() {
         let baseline = calculate_q_eng(0.8, 0.4).unwrap().q_eng;
         let scaled_ebi = calculate_q_eng(0.8, 0.8).unwrap().q_eng;
         assert_eq!(scaled_ebi, baseline / 2.0);
