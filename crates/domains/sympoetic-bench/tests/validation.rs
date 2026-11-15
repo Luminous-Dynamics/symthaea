@@ -1,6 +1,9 @@
 use sympoetic_bench::{
     Scorecard, Trace,
-    metrics::{collaboration_gap, handoff_recovery_rate, partner_order_sensitivity, synergy_delta},
+    metrics::{
+        collaboration_gap, handoff_recovery_rate, partner_order_sensitivity, synergy_delta,
+        summarize_interventions, InterventionRecord,
+    },
     validate::{validate_corpus, validate_scorecard, validate_trace},
 };
 use sympoetic_bench::model::{
@@ -36,6 +39,7 @@ fn base_event(id: &str, sequence: u64, event_type: &str) -> TraceEvent {
         annotation: None,
         reconciled_status: None,
         reconciliation_state_digest: None,
+        intervention_action: None,
     }
 }
 
@@ -102,6 +106,93 @@ fn base_scorecard() -> Scorecard {
         },
         notes: None,
     }
+}
+
+#[test]
+fn intervention_decisions_are_explicit_and_traceable() {
+    let mut decision = base_event("decision-ask", 0, "intervention_decision");
+    decision.actor = "agent".to_owned();
+    decision.intervention_action = Some("ask".to_owned());
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "trace-intervention".to_owned(),
+        scenario_id: "SP-INT-001".to_owned(),
+        trace_digest: None,
+        events: vec![decision],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_ok());
+}
+
+#[test]
+fn intervention_decision_requires_a_valid_action_and_agent_actor() {
+    let missing_action = base_event("decision-missing", 0, "intervention_decision");
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "trace-intervention-missing".to_owned(),
+        scenario_id: "SP-INT-001".to_owned(),
+        trace_digest: None,
+        events: vec![missing_action],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_err());
+
+    let mut invalid_action = base_event("decision-invalid", 0, "intervention_decision");
+    invalid_action.intervention_action = Some("always_talk".to_owned());
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "trace-intervention-invalid".to_owned(),
+        scenario_id: "SP-INT-001".to_owned(),
+        trace_digest: None,
+        events: vec![invalid_action],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_err());
+
+    let mut wrong_actor = base_event("decision-wrong-actor", 0, "intervention_decision");
+    wrong_actor.intervention_action = Some("step_back".to_owned());
+    wrong_actor.actor = "human".to_owned();
+    let trace = Trace {
+        schema_version: "sympoetic-trace/0.1".to_owned(),
+        run_id: "trace-intervention-wrong-actor".to_owned(),
+        scenario_id: "SP-INT-001".to_owned(),
+        trace_digest: None,
+        events: vec![wrong_actor],
+    };
+    let bytes = serde_json::to_vec(&trace).unwrap();
+    assert!(validate_trace(&trace, &bytes).is_err());
+}
+
+#[test]
+fn intervention_adjudications_produce_burden_and_missed_warning_rates() {
+    let records = [
+        InterventionRecord {
+            appropriate: true,
+            unnecessary: false,
+            critical_opportunity: true,
+            critical_missed: false,
+            counterfactual_regret: Some(0.1),
+        },
+        InterventionRecord {
+            appropriate: false,
+            unnecessary: true,
+            critical_opportunity: false,
+            critical_missed: false,
+            counterfactual_regret: Some(0.3),
+        },
+        InterventionRecord {
+            appropriate: false,
+            unnecessary: false,
+            critical_opportunity: true,
+            critical_missed: true,
+            counterfactual_regret: None,
+        },
+    ];
+    let summary = summarize_interventions(&records).unwrap();
+    assert_eq!(summary.decision_count, 3);
+    assert_eq!(summary.critical_opportunity_count, 2);
+    assert!((summary.unnecessary_intervention_rate.unwrap() - 1.0 / 3.0).abs() < 1e-12);
+    assert!((summary.missed_critical_intervention_rate.unwrap() - 0.5).abs() < 1e-12);
 }
 
 #[test]
