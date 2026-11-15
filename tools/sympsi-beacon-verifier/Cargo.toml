@@ -1,0 +1,17 @@
+[package]
+name = "sympsi-beacon-verifier"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Offline pinned-Quicknet drand signature verification for SYMPsi research"
+
+# Standalone package: it does not change or exclude root workspace members.
+[workspace]
+resolver = "2"
+
+[dependencies]
+drandite-core = "=0.1.0"
+
+[dev-dependencies]
+hex-literal = "=0.4.1"
