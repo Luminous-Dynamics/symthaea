@@ -15,6 +15,7 @@ It does **not** establish freshness, that the beacon was published at the schedu
 | Genesis seed | `f477d5c89f21a17c863a7f937c6a6d15859414d2be09cd448d4279af331c5d3e` |
 | Genesis timestamp | 1692803367 Unix seconds |
 | Period | 3 seconds |
+| Trust-root manifest SHA-256 | `8a74f38b67081c9483f2a640fc4ac8d0275318d758a7c6f9cb7b1ffc374485c4` |
 | Test vector | Quicknet round 1000 |
 
 The profile pins scheme ID separately because drand's chain hash does not include the scheme ID. The crate is pinned to `drandite-core = 0.1.0`; this is a prototype dependency, not a statement that the dependency has received an independent cryptographic audit. Dependency license, source provenance, maintenance and cryptographic implementation review remain P0 items in SCI-PSI-003.
@@ -27,7 +28,13 @@ From repository root:
     cargo test --manifest-path tools/sympsi-beacon-verifier/Cargo.toml
     cargo clippy --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --all-targets -- -D warnings
 
-    cargo run --manifest-path tools/sympsi-beacon-verifier/Cargo.toml --       --requested-round 1000       --input tools/sympsi-beacon-verifier/fixtures/quicknet-round-1000.json       --out /tmp/sympsi-quicknet-round-1000-verification.json
+    GIT_HEAD="$(git rev-parse HEAD)"
+
+    cargo run --manifest-path tools/sympsi-beacon-verifier/Cargo.toml -- \
+      --requested-round 1000 \
+      --git-head "$GIT_HEAD" \
+      --input tools/sympsi-beacon-verifier/fixtures/quicknet-round-1000.json \
+      --out /tmp/sympsi-quicknet-round-1000-verification.json
 
 The output directory must not already contain the receipt. Input JSON is strict: only `round`, `randomness`, and `signature` fields are accepted for this unchained profile.
 
