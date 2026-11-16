@@ -109,8 +109,8 @@ Their result is general for a fixed valid terminal test; this module implements 
 
 ### Executed paired frontier (exact head)
 
-Exact source head: 950d80181d043470357863d43256519cb1b025c6  
-Focused workflow: https://github.com/Luminous-Dynamics/symthaea/actions/runs/43821865007  
+Exact source head: e9770b48170016e51b270b0bcfdd67a95c5604c2  
+Focused workflow run #41: https://github.com/Luminous-Dynamics/symthaea/actions/runs/43822231600  
 Rust 1.96.0: rustfmt PASS; all-target tests PASS; both calibration binaries PASS; artifacts uploaded; strict Clippy PASS. The crate and binaries ran 36 tests in total (32 library, two sequential-binary, two Gaussian-calibration-binary tests).
 
 The paired 20,000-path / 80-look fixed Gaussian campaign at alpha 0.05 (d=0.22, sigma=0.80) gave:
