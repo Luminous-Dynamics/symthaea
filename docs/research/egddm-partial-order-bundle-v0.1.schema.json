@@ -1,0 +1,412 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-partial-order-bundle-v0.1.schema.json",
+  "title": "EGDDM D6.10 partial-order bundle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundle_id",
+    "bundle_visibility",
+    "candidate_view",
+    "gold_overlay",
+    "candidate_traces"
+  ],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_visibility": {
+      "const": "evaluator_only_never_candidate_visible"
+    },
+    "candidate_view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "events",
+        "branches",
+        "obligations",
+        "receipts"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event_id",
+              "event_time",
+              "available_at",
+              "branch_id",
+              "event_kind",
+              "effect_dimensions"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "event_time": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "available_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "branch_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "event_kind": {
+                "enum": [
+                  "baseline",
+                  "source_change",
+                  "contract_change",
+                  "policy_change",
+                  "configuration_change",
+                  "rollback",
+                  "merge",
+                  "observation",
+                  "other"
+                ]
+              },
+              "effect_dimensions": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "branches": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "branch_id",
+              "parent_branch_ids",
+              "event_ids",
+              "is_join",
+              "merge_event_id",
+              "context_digest"
+            ],
+            "properties": {
+              "branch_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "parent_branch_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "event_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "is_join": {
+                "type": "boolean"
+              },
+              "merge_event_id": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "context_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "obligations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "obligation_id",
+              "critical",
+              "dependency_dimensions"
+            ],
+            "properties": {
+              "obligation_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "critical": {
+                "type": "boolean"
+              },
+              "dependency_dimensions": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        },
+        "receipts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "receipt_id",
+              "obligation_id",
+              "branch_id",
+              "scope",
+              "context_digest",
+              "source_event_ids",
+              "outcome",
+              "observed_at",
+              "available_at",
+              "valid_until"
+            ],
+            "properties": {
+              "receipt_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "obligation_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "branch_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "scope": {
+                "enum": [
+                  "branch_only",
+                  "descendants"
+                ]
+              },
+              "context_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "source_event_ids": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "outcome": {
+                "enum": [
+                  "pass",
+                  "fail",
+                  "unknown"
+                ]
+              },
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "available_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "valid_until": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        }
+      }
+    },
+    "gold_overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adjudication_status",
+        "happens_before_edges",
+        "commuting_pairs",
+        "non_commuting_pairs",
+        "join_required_obligations"
+      ],
+      "properties": {
+        "adjudication_status": {
+          "const": "synthetic_known_answer_not_independently_adjudicated"
+        },
+        "happens_before_edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pair"
+          }
+        },
+        "commuting_pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pair"
+          }
+        },
+        "non_commuting_pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pair"
+          }
+        },
+        "join_required_obligations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "branch_id",
+              "obligation_ids"
+            ],
+            "properties": {
+              "branch_id": {
+                "type": "string"
+              },
+              "obligation_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "candidate_traces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "asserted_happens_before_edges",
+          "claimed_confluent_pairs",
+          "branch_decisions",
+          "join_requalifications"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "asserted_happens_before_edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/pair"
+            }
+          },
+          "claimed_confluent_pairs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/pair"
+            }
+          },
+          "branch_decisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "branch_id",
+                "decision_cutoff",
+                "considered_event_ids",
+                "claimed_current_obligations",
+                "receipt_ids"
+              ],
+              "properties": {
+                "branch_id": {
+                  "type": "string"
+                },
+                "decision_cutoff": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "considered_event_ids": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "claimed_current_obligations": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "receipt_ids": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "join_requalifications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "branch_id",
+                "fresh_receipt_ids"
+              ],
+              "properties": {
+                "branch_id": {
+                  "type": "string"
+                },
+                "fresh_receipt_ids": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pair": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
