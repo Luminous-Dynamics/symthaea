@@ -18,6 +18,22 @@ A separate CLI accepts a request containing `section_family` and `profile`:
 
     cargo run --locked -p symthaea-marine-geometry --bin marine-waterplane-loft -- loft-request.json --output /tmp/lofted-displacement.json
 
+## G3a neutral CAD translation evidence contract
+
+The G3a contract is under development for [issue #12376](https://github.com/Luminous-Dynamics/symthaea/issues/12376) on branch `research/marine-cad-interop-g3a-20261115`. It defines typed source/STEP digests, explicit geometry semantics, representation kind, AP242 edition, exporter/importer family/build/configuration identities, tolerance profiles, required checks, measured metrics and a deterministic receipt digest.
+
+The initial qualification profile accepts released ISO 10303-242:2025 Edition 4; it does not silently promote AP214 or the Edition 5 committee draft. Full-external-hull semantics require explicit deck/freeboard representation and an exact B-rep target. G2b displacement-volume shells remain a distinct semantic class.
+
+Verify a receipt from the workspace root:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-cad-receipt-verify -- translation-receipt.json
+
+Exit codes: 0 = qualified within the declared profile; 1 = not qualified/incomplete; 2 = CLI, I/O or parse error.
+
+The contract is not a STEP parser/writer or CAD kernel. It validates receipt completeness and consistency; real file conversion and independent B-rep validation belong to later G3b/G3c backend adapters.
+
+See [CAD_INTEROP_PROTOCOL.md](./CAD_INTEROP_PROTOCOL.md) for the standard/version policy, representation semantics, validation metrics, negative controls and cross-kernel benchmark sequence.
+
 ## Research benchmark protocol
 
 The matched external comparison, metrics, uncertainty policy, target ladder, and implementation sequence are specified in [BENCHMARK_PROTOCOL.md](./BENCHMARK_PROTOCOL.md). It is a frozen research protocol and target set, not a claim that the current crate generates hulls or has achieved hydrodynamic performance.
