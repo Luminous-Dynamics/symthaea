@@ -50,7 +50,7 @@ impl CandidateSelectionPolicy for DevelopmentSelector {
         Ok(SelectionObservation {
             decision,
             consumed_evidence_ids: vec!["development-fold-01".to_owned()],
-            all_in_cost_units: 3.0,
+            selector_cost_units: 3.0,
         })
     }
 }
