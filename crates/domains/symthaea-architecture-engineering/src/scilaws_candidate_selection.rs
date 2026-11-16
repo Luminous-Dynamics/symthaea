@@ -45,6 +45,7 @@ pub enum ScilawsSelectionError {
     InvalidDevelopmentRmse { candidate_id: String },
     InvalidComplexity { candidate_id: String },
     CampaignMismatch,
+    TaskManifestMismatch,
     LiveCandidateMissingEvaluatorRecord(String),
     EvaluatorCandidateMissingLiveRecord(String),
     CandidateModelDigestMismatch(String),
@@ -83,6 +84,7 @@ impl fmt::Display for ScilawsSelectionError {
                 write!(f, "symbolic complexity is invalid for candidate {candidate_id}")
             }
             Self::CampaignMismatch => write!(f, "live and evaluator campaign IDs differ"),
+            Self::TaskManifestMismatch => write!(f, "live and evaluator task-manifest digests differ"),
             Self::LiveCandidateMissingEvaluatorRecord(id) => {
                 write!(f, "live candidate has no evaluator record: {id}")
             }
@@ -460,10 +462,11 @@ pub fn audit_real_candidate_selection(
 ) -> Result<ScilawsRealSelectionAudit, ScilawsSelectionError> {
     live.validate()?;
     evaluator.validate()?;
-    if live.campaign_id != evaluator.campaign_id
-        || live.task_manifest_sha256 != evaluator.task_manifest_sha256
-    {
+    if live.campaign_id != evaluator.campaign_id {
         return Err(ScilawsSelectionError::CampaignMismatch);
+    }
+    if live.task_manifest_sha256 != evaluator.task_manifest_sha256 {
+        return Err(ScilawsSelectionError::TaskManifestMismatch);
     }
 
     let live_by_id = live
@@ -575,7 +578,7 @@ pub fn audit_real_candidate_selection(
         .unwrap_or_else(|| (0, Vec::new()));
 
     let duplicate_model_artifact_groups = live.duplicate_model_artifact_groups();
-    let attempt_results = evaluator
+    let mut attempt_results = evaluator
         .candidates
         .iter()
         .map(|candidate| {
@@ -598,6 +601,7 @@ pub fn audit_real_candidate_selection(
             }
         })
         .collect::<Vec<_>>();
+    attempt_results.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
 
     let best_available_s_n = evaluator
         .candidates
@@ -922,6 +926,12 @@ mod tests {
             }
         );
         assert_eq!(audit.audit_sha256.len(), 64);
+        assert_eq!(audit.best_available_s_n, Some(0.90));
+        assert_eq!(audit.best_available_s_v, Some(0.82));
+        assert_eq!(audit.submitted_s_n, Some(0.70));
+        assert_eq!(audit.submitted_s_v, Some(0.80));
+        assert_eq!(audit.s_n_regret, Some(0.20));
+        assert_eq!(audit.s_v_regret, Some(0.02));
     }
 
     #[test]
@@ -1044,6 +1054,60 @@ mod tests {
             live.duplicate_model_artifact_groups(),
             vec![vec!["first".to_owned(), "second".to_owned()]]
         );
+    }
+
+    #[test]
+    fn mismatched_task_manifests_fail_closed() {
+        let live = live_packet(vec![live_candidate("a", 'a', 0.1)], Some("a"));
+        let mut evaluator = evaluator_pool(vec![evaluator_candidate(
+            "a",
+            'a',
+            Some(0.8),
+            Some(0.8),
+            true,
+            true,
+            EvaluatorCandidateStatus::Complete,
+            '1',
+        )]);
+        evaluator.task_manifest_sha256 = digest('e');
+        assert_eq!(
+            audit_real_candidate_selection(&live, &evaluator).err(),
+            Some(ScilawsSelectionError::TaskManifestMismatch)
+        );
+    }
+
+    #[test]
+    fn json_audit_replays_deterministically_from_separate_packets() {
+        let live = live_packet(
+            vec![live_candidate("a", 'a', 0.1), live_candidate("b", 'b', 0.2)],
+            Some("a"),
+        );
+        let evaluator = evaluator_pool(vec![
+            evaluator_candidate("a", 'a', Some(0.8), Some(0.9), true, true, EvaluatorCandidateStatus::Complete, '1'),
+            evaluator_candidate("b", 'b', Some(0.9), Some(0.7), true, true, EvaluatorCandidateStatus::Complete, '2'),
+        ]);
+        let live_json = serde_json::to_string(&live).unwrap();
+        let evaluator_json = serde_json::to_string(&evaluator).unwrap();
+        let first = audit_real_candidate_selection_json(&live_json, &evaluator_json).unwrap();
+        let replay = audit_real_candidate_selection_json(&live_json, &evaluator_json).unwrap();
+        assert_eq!(first, replay);
+        assert!(first.contains("\"s_n_regret\": 0.09999999999999998"));
+    }
+
+    #[test]
+    fn live_selector_policy_metadata_is_required_and_digest_bound() {
+        let mut live = live_packet(vec![live_candidate("a", 'a', 0.1)], Some("a"));
+        live.selector_policy_id.clear();
+        assert_eq!(
+            live.validate(),
+            Err(ScilawsSelectionError::InvalidSelectorPolicyId)
+        );
+        live.selector_policy_id = "fixture-selector-v1".to_owned();
+        live.selection_trace_sha256 = "not-a-digest".to_owned();
+        assert!(matches!(
+            live.validate(),
+            Err(ScilawsSelectionError::InvalidDigest { .. })
+        ));
     }
 
     #[test]
