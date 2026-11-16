@@ -851,31 +851,32 @@ fn score_causal_order(
     let mut missing = BTreeSet::new();
     let mut wrong_direction = BTreeSet::new();
 
-    for left in nodes {
-        for right in nodes.range((std::ops::Bound::Excluded(left), std::ops::Bound::Unbounded)) {
-            let gold_lr = gold_closure.contains(&(left.clone(), right.clone()));
-            let gold_rl = gold_closure.contains(&(right.clone(), left.clone()));
-            let candidate_lr = candidate_closure.contains(&(left.clone(), right.clone()));
-            let candidate_rl = candidate_closure.contains(&(right.clone(), left.clone()));
+    let ordered_nodes: Vec<&String> = nodes.iter().collect();
+    for (index, left) in ordered_nodes.iter().enumerate() {
+        for right in ordered_nodes.iter().skip(index + 1) {
+            let gold_lr = gold_closure.contains(&((*left).clone(), (*right).clone()));
+            let gold_rl = gold_closure.contains(&((*right).clone(), (*left).clone()));
+            let candidate_lr = candidate_closure.contains(&((*left).clone(), (*right).clone()));
+            let candidate_rl = candidate_closure.contains(&((*right).clone(), (*left).clone()));
 
             if gold_lr {
                 if candidate_lr {
-                    correct.insert((left.clone(), right.clone()));
+                    correct.insert(((*left).clone(), (*right).clone()));
                 } else if candidate_rl {
-                    wrong_direction.insert((left.clone(), right.clone()));
+                    wrong_direction.insert(((*left).clone(), (*right).clone()));
                 } else {
-                    missing.insert((left.clone(), right.clone()));
+                    missing.insert(((*left).clone(), (*right).clone()));
                 }
             } else if gold_rl {
                 if candidate_rl {
-                    correct.insert((right.clone(), left.clone()));
+                    correct.insert(((*right).clone(), (*left).clone()));
                 } else if candidate_lr {
-                    wrong_direction.insert((left.clone(), right.clone()));
+                    wrong_direction.insert(((*left).clone(), (*right).clone()));
                 } else {
-                    missing.insert((right.clone(), left.clone()));
+                    missing.insert(((*right).clone(), (*left).clone()));
                 }
             } else if candidate_lr || candidate_rl {
-                false_serialization.insert((left.clone(), right.clone()));
+                false_serialization.insert(((*left).clone(), (*right).clone()));
             }
         }
     }
