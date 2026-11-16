@@ -2467,7 +2467,16 @@ mod tests {
         let source = serde_json::json!({
             "programme": "TEST",
             "claim_ceiling": "SOURCE_ONLY",
-            "evidence_classes": ["PUBLISHED_LAB_EXPERIMENT"],
+            "evidence_classes": [
+                "PUBLISHED_LAB_EXPERIMENT",
+                "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+                "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+                "PUBLISHED_NUMERICAL_STUDY",
+                "MANUFACTURER_REPORTED_OPERATIONAL_CLAIM",
+                "MANUFACTURER_PRODUCT_CLAIM",
+                "GOVERNMENT_RESEARCH_FACILITY_DESCRIPTION",
+                "GOVERNMENT_ROADMAP"
+            ],
             "cases": [{
                 "case_id": "case-1",
                 "evidence_class": "MANUFACTURER_GUARANTEE",
@@ -2735,8 +2744,10 @@ mod tests {
     #[test]
     fn source_manifest_accepts_pulsed_plasma_methane_full_chain_target() {
         let mut source = minimal_benchmark_target_manifest("METHANE_PYROLYSIS_PULSED_HEATING");
-        source["cases"][0]["case_id"] = serde_json::json!("CH4-PLASMA-PULSED-HEATING-REGEN-2026");
-        append_registered_source_case(&mut source, "CH4-PLASMA-PULSED-HEATING-REGEN-2026");
+        replace_placeholder_with_registered_source_case(
+            &mut source,
+            "CH4-PLASMA-PULSED-HEATING-REGEN-2026",
+        );
         append_registered_source_case(&mut source, "METHANE-PYROLYSIS-HEATING-REVIEW-2026");
         source["benchmark_targets"][0]["comparator_case_ids"] = serde_json::json!([
             "CH4-PLASMA-PULSED-HEATING-REGEN-2026",
@@ -2749,7 +2760,10 @@ mod tests {
     #[test]
     fn source_manifest_accepts_ammonia_dynamic_flex_target_with_matched_haber_bosch_baselines() {
         let mut source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY");
-        source["cases"][0]["case_id"] = serde_json::json!("NH3-HB-ROBUST-LOAD-FLEX-2026");
+        replace_placeholder_with_registered_source_case(
+            &mut source,
+            "NH3-HB-ROBUST-LOAD-FLEX-2026",
+        );
         append_registered_source_case(&mut source, "NH3-HB-FATIGUE-YEAR-SCHEDULING-2026");
         append_registered_source_case(&mut source, "NH3-P2A-THREE-LEVEL-DISPATCH-2026");
         source["benchmark_targets"][0]["comparator_case_ids"] = serde_json::json!([
@@ -2764,7 +2778,12 @@ mod tests {
     #[test]
     fn source_manifest_rejects_plasma_source_ramp_substituted_for_accepted_nh3_ramp() {
         let mut source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY");
-        source["cases"][0]["case_id"] = serde_json::json!("NH3-HB-ROBUST-LOAD-FLEX-2026");
+        replace_placeholder_with_registered_source_case(
+            &mut source,
+            "NH3-HB-ROBUST-LOAD-FLEX-2026",
+        );
+        append_registered_source_case(&mut source, "NH3-HB-FATIGUE-YEAR-SCHEDULING-2026");
+        append_registered_source_case(&mut source, "NH3-P2A-THREE-LEVEL-DISPATCH-2026");
         source["benchmark_targets"][0]["comparator_case_ids"] = serde_json::json!([
             "NH3-HB-ROBUST-LOAD-FLEX-2026",
             "NH3-HB-FATIGUE-YEAR-SCHEDULING-2026",
@@ -3070,17 +3089,33 @@ mod tests {
         );
     }
 
-    fn append_registered_source_case(source: &mut Value, case_id: &str) {
+    fn registered_source_case(case_id: &str) -> Value {
         let registered: Value = serde_json::from_str(include_str!(
             "../../data/research/plasma_energy_reference_cases_v0_1.json"
         )).unwrap();
-        let case = registered["cases"]
+        registered["cases"]
             .as_array()
             .unwrap()
             .iter()
             .find(|item| item["case_id"] == case_id)
             .unwrap_or_else(|| panic!("registered comparator case missing: {case_id}"))
-            .clone();
+            .clone()
+    }
+
+    fn replace_placeholder_with_registered_source_case(source: &mut Value, case_id: &str) {
+        let case = registered_source_case(case_id);
+        let cases = source["cases"].as_array_mut().unwrap();
+        if let Some(index) = cases.iter().position(|item| item["case_id"] == "case-1") {
+            cases[index] = case;
+        } else if let Some(index) = cases.iter().position(|item| item["case_id"] == case_id) {
+            cases[index] = case;
+        } else {
+            cases.push(case);
+        }
+    }
+
+    fn append_registered_source_case(source: &mut Value, case_id: &str) {
+        let case = registered_source_case(case_id);
         let cases = source["cases"].as_array_mut().unwrap();
         if !cases.iter().any(|item| item["case_id"] == case_id) {
             cases.push(case);
