@@ -2,9 +2,9 @@ use fusion_decision_compiler_contract::lifecycle_service_ledger::{
     LifecycleEvidenceClass, OutageCategory, ServiceImpact,
 };
 use fusion_decision_compiler_contract::maintenance_choreography::{
-    AccessAssessmentDisposition, AccessCertificateBinding, MaintenancePhase, MaintenanceSchedulePlan,
-    MaintenanceTask, RenewableResource, ResourceDemand, exact_small_instance_makespan,
-    generate_maintenance_schedule, validate_maintenance_schedule,
+    AccessAssessmentDisposition, AccessCertificateBinding, MaintenancePhase,
+    MaintenanceSchedulePlan, MaintenanceTask, RenewableResource, ResourceDemand,
+    exact_small_instance_makespan, generate_maintenance_schedule, validate_maintenance_schedule,
 };
 
 fn sha(character: char) -> String {
