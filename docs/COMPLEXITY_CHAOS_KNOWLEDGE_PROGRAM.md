@@ -289,3 +289,87 @@ A result can be better in latency or energy but worse in forecast horizon or sta
 ---
 
 **Decision:** build Symthaea's complexity/chaos knowledge as an evidence-qualified, executable capability. The first technical win is to make existing estimators trustworthy and their outputs scientifically interpretable; the next win is to test whether HDC + continuous dynamics + measured multiscale organization adds a reproducible capability that simpler models do not.
+
+
+
+## Frontier literature addendum — verified 2026-11-16
+
+The following work changes Symthaea's research priorities. The findings are paper-specific, not general performance guarantees.
+
+### 1. Generalized holographic reduced representations (GHRR), DATE 2026
+
+The DATE 2026 paper *Scalable Symbolic Reasoning with Matrix-Based Brain-Inspired Representations and Vector-Space Acceleration* reports non-commutative matrix binding for GHRR, intended to encode order, directionality, sequences, graphs and hierarchies without permutation logic. It then proposes vector-space flattening and a custom complex-valued ASIC datapath. The paper reports 1.36x–1.56x throughput and 16.2x–18.6x energy-efficiency improvements against its PyTorch/RTX 4090 comparison.
+
+**Implication for Symthaea:** build an isolated GHRR benchmark adapter and test whether non-commutative binding improves temporal/graph compositionality over current HRR/FHRR/TPR/MAP/BSC representations. Compare memory, dimension, numerical stability, expressivity, retrieval, training and energy. Reproduce the paper-specific acceleration claim only with equivalent hardware/workloads; it is not a blanket HDC speed claim.
+
+Reference: https://doi.org/10.23919/DATE69613.2026.11539261
+
+### 2. Quantum hyperdimensional computing (QHDC), 2026
+
+The 2026 QHDC paper reports a quantum-native mapping of hypervector operations and a physical implementation on a 156-qubit IBM Heron r3 processor for symbolic analogical reasoning and supervised classification. It reports a near-500x simulation speedup against selected variational quantum circuit / quantum SVM baselines, while explicitly distinguishing current quantum utility from demonstrated quantum advantage over the best classical algorithms. It also identifies LCU/OAA bundling circuit depth and gate count as important scaling constraints.
+
+**Implication for Symthaea:** this is a quantum-computing architecture direction, not post-quantum cryptography. Use it to expand the representation/hardware research map, but do not claim quantum advantage, deploy a quantum dependency, or infer PQC security. Replication must compare against strong classical HDC and conventional ML, not only selected QML baselines.
+
+Reference: https://www.nature.com/articles/s44335-026-00064-6
+
+### 3. HDC benchmarking warning, 2025 comparative review
+
+The 2025 HDC classification review compares multiple HD/VSA methods over seven commonly used datasets and a 121-dataset UCI subset. It notes that inconsistent benchmarks had hindered comparison, and reports that off-the-shelf methods can surpass HDC approaches in some classification settings.
+
+**Implication for Symthaea:** avoid comparing only against weaker or poorly tuned baselines. Use matched splits, multiple seeds, strong conventional ML baselines, equal hyperparameter budgets, and report quality and compute/energy. Hyperdimensional robustness or few-shot behavior may be the differentiator, but must be measured for the task.
+
+Reference: https://doi.org/10.1007/s10462-025-11181-2
+
+### 4. Information dynamics for complex systems, Physics Reports 2025
+
+The 2025 review covers Shannon and relative entropy, mutual information, active information storage, transfer entropy, information decomposition, statistical complexity and effective network inference. It also discusses limitations: data requirements can be substantial, estimation assumptions matter, and algorithmic/Kolmogorov complexity is generally not computable exactly; Lempel–Ziv is a heuristic rather than a universal complexity meter.
+
+**Implication for Symthaea:** extend from static entropy features to time-resolved information flow, storage, modification and multivariate structure. Use bias-corrected estimators, surrogate controls, sample-size curves, confidence intervals and interventions before causal claims. Do not turn a single entropy value into a universal complexity or consciousness score.
+
+Reference: https://doi.org/10.1016/j.physrep.2025.09.007
+
+### 5. Critical transitions and tipping cascades, National Science Review 2026
+
+The 2026 review distinguishes bifurcation-induced, noise-induced and rate-induced tipping and reviews early-warning indicators based on critical slowing down alongside their limitations. It emphasizes interactions and cascades between coupled subsystems, while noting data quantity, heterogeneity and methodological robustness as continuing challenges.
+
+**Implication for Symthaea:** represent local subsystem regimes and cross-system coupling explicitly. Benchmark early-warning lead time, false alarms and missed transitions under different forcing/noise regimes. A single “distance from edge of chaos” scalar is not an adequate phase map.
+
+Reference: https://doi.org/10.1093/nsr/nwag478
+
+### 6. Autopoietic self-maintenance, BioSystems 2026
+
+The 2026 article *Experimental probes of autopoietic self-maintenance* emphasizes the difference between causal autopoietic closure and its formal/experimental proxies; its reaction-network example distinguishes causal closure from measured resilience.
+
+**Implication for Symthaea/Symtropy/HHLF:** survival after perturbation, repair scripts, homeostasis scores or an animation continuing to run are not enough. Artificial-life experiments need to test whether a network of processes regenerates the components and boundary conditions that sustain the network, under explicit resource and intervention constraints.
+
+Reference: https://doi.org/10.1016/j.biosystems.2026.105928
+
+### 7. Reservoir computing research agenda, Nature Communications 2024
+
+The 2024 perspective surveys theory, algorithms and experimental realization of reservoir computing, and describes unresolved challenges for large-scale adoption. It recognizes chaotic time-series prediction as a promising application while calling for more work on precision, speed, interpretability and practical systems.
+
+**Implication for Symthaea:** compare current ESN/reservoir and CfC/LTC systems across matched chaotic and non-chaotic regimes. Measure autonomous rollout and distributional fidelity, not teacher-forced one-step error alone.
+
+Reference: https://doi.org/10.1038/s41467-024-45187-1
+
+### 8. PQC migration is an independent engineering track
+
+NIST IR 8547 was finalized on 2026-10-27 as transition guidance for moving from quantum-vulnerable cryptographic algorithms to post-quantum standards. NIST IR 8610 (2026-05-14) reports nine additional signature candidates advancing to a third evaluation round.
+
+**Implication:** continue PQC migration on standardized, reviewed algorithms independently of HHLF/QHDC research. Quantum-computing research and cryptography designed to resist quantum adversaries are different disciplines.
+
+References:
+- https://csrc.nist.gov/pubs/ir/8547/final
+- https://csrc.nist.gov/pubs/ir/8610/final
+
+### Revised research priorities
+
+1. Validate existing estimators before expanding feature count.
+2. Add GHRR/non-commutative binding as a narrow comparative representation experiment.
+3. Add a qualified information-dynamics layer with estimator-bias and surrogate controls.
+4. Build task-conditioned phase maps for stability, criticality, chaos, resource use and robustness.
+5. Test cross-scale causal influence with interventions, not correlational graphs alone.
+6. Test autopoietic closure as an independent artificial-life hypothesis.
+7. Keep QHDC, HHLF cryptography and standardized PQC deployment in separate categories.
+
+**Status:** literature watch and research implications only. No result in this addendum has been reproduced by Symthaea.
