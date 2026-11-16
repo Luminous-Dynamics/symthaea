@@ -99,3 +99,30 @@ Exit codes: 0 = admissible for the declared mesh profile; 1 = a typed non-admiss
 6. Exact artifact/evidence receipts for #11513, #11442, Mycelix #5968 and Sol-Atlas #809.
 
 No CFD, manufacturing or physical-test claim is made by this G0/G1 implementation.
+
+## G2f full external envelope input contract
+
+G2f is a separate representation from G2a/G2b. G2a/G2b describes keel-to-waterline sections and a loading/design-waterline-capped displacement volume. G2f describes the full external envelope: underwater bottom, topsides/freeboard, deck, deck-edge seams, waterline intersections, bow/stem and stern/transom regions, explicit openings and separately versioned external components.
+
+The G2f-a typed input validator is exposed by `full_envelope`. It checks schema-v1 typed input semantics and computes a deterministic source-spec digest; it does **not** generate a surface, mesh, B-rep or displacement shell:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-full-envelope-validate -- docs/research/marine/fixtures/marine-full-envelope-box-001.json --output /tmp/full-envelope-report.json
+
+Exit codes: 0 = valid input contract; 1 = incomplete/unsupported input; 2 = rejected specification; 3 = CLI, I/O or parse error. The JSON report retains the exact disposition and issue codes. A valid input contract is not a geometry-admission or naval-engineering pass.
+
+The canonical G2f-a schema and fixture are:
+- `docs/research/marine/schemas/marine-full-envelope-spec.schema.json`
+- `docs/research/marine/fixtures/marine-full-envelope-box-001.json`
+- `docs/research/marine/MARINE-FULL-ENVELOPE-G2F-A.md`
+
+Symmetric port geometry must be explicitly declared as derived by reflection; asymmetric geometry must supply a separate port profile. The deck is a separate surface definition. Pointed bow/stern sections may collapse to one deck crown point; they may not be forced into a rectangular deck section.
+
+For the synthetic prismatic fixture, the analytical displacement below z=0 is 12,000 m³ and the external envelope including its declared triangular deck crown is 20,500 m³. These are fixture values, not measurements or mesh-generator results.
+
+The next G2f implementation stages remain distinct:
+1. **G2f-b:** loft bottom and topside external surfaces with named breaklines and shared seam identities.
+2. **G2f-c:** close the deck, stem and transom; reconcile all surface regions and boundary loops.
+3. **G2f-d:** intersect that one full external envelope with multiple loading waterplanes to derive separate displacement shells.
+4. **G2f-e:** exchange the external envelope and each derived displacement shell independently through AP242 and independent CAD-kernel re-import.
+
+No G2f-a validator result establishes self-intersection freedom, hull fairness, waterline quality, hydrostatic equilibrium, stability, strength, seakeeping, CFD, cavitation, DFM, class approval or seaworthiness.
