@@ -1363,7 +1363,7 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             }
             "CO2_DBD_MODEL_GENERALIZATION" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
-                for ( (key, expected) in [
+                for (key, expected) in [
                     ("published_mean_publication_grouped_5fold_hybrid_r2", 0.441),
                     ("published_best_fold_publication_grouped_5fold_hybrid_r2", 0.791),
                     ("published_worst_fold_publication_grouped_5fold_hybrid_r2", 0.024),
