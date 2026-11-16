@@ -1,0 +1,49 @@
+name: SENSE-TAC-001B Synthetic Tactile Fault Oracle
+
+on:
+  push:
+    paths:
+      - "docs/research/SENSE-TAC-001B.md"
+      - "docs/research/fixtures/SENSE_TAC_001B*"
+      - "tools/sense-tac-001b-oracle/**"
+      - ".github/workflows/sense-tac-001b-oracle.yml"
+  pull_request:
+    paths:
+      - "docs/research/SENSE-TAC-001B.md"
+      - "docs/research/fixtures/SENSE_TAC_001B*"
+      - "tools/sense-tac-001b-oracle/**"
+      - ".github/workflows/sense-tac-001b-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sense-tac-001b-oracle-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  synthetic-oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.96, rustfmt and Clippy
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Verify tracked fixture blob identities
+        shell: bash
+        run: |
+          test "$(git hash-object docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.json)" = "e9349751590c4a3a28f4be81a5a11f8170ef2212"
+          test "$(git hash-object docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.schema.json)" = "7b531325c1c8f105879dd80e0ba6016555a4b645"
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
+      - name: Check formatting
+        run: cargo fmt --manifest-path tools/sense-tac-001b-oracle/Cargo.toml --all -- --check
+      - name: Run offline mutation tests
+        run: cargo test --locked --offline --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
+      - name: Run strict Clippy
+        run: cargo clippy --locked --offline --manifest-path tools/sense-tac-001b-oracle/Cargo.toml --all-targets -- -D warnings
+      - name: Validate tracked corpus
+        run: cargo run --locked --offline --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
