@@ -141,8 +141,7 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
                 )?;
             }
 
-            let observed =
-                null_conditional_mean + scenario.shift() + SIGMA * rng.standard_normal();
+            let observed = null_conditional_mean + scenario.shift() + SIGMA * rng.standard_normal();
 
             if conditional_first_crossing.is_none() {
                 let update = conditional.observe(&conditional_id, &conditional_digest, observed)?;
