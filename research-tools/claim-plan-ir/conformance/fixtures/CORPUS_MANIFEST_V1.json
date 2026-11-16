@@ -251,15 +251,16 @@
       "id": "timestamp-unknown-offset-001",
       "line_number": 15,
       "class": "rfc3339_unknown_local_offset",
-      "expected_disposition": "preserve_unknown_offset_not_equal_to_known_utc",
+      "expected_disposition": "preserve_unknown_local_offset_with_equal_utc_instant",
       "conversion": {
         "unknown": "2026-11-16T07:30:00-00:00",
         "known": "2026-11-16T07:30:00Z",
-        "expected_same_instant": false,
+        "expected_same_instant": true,
         "expected_offset_state": "unknown_local_offset",
-        "profile_dependency": "RFC 3339 section 4.3 semantics must be preserved"
+        "profile_dependency": "RFC 3339 section 4.3 semantics must be preserved",
+        "expected_known_reference_state": "utc_reference"
       },
-      "rationale": "-00:00 denotes an unknown local offset, not a known UTC offset.",
+      "rationale": "Both timestamps identify the same UTC instant. -00:00 preserves the fact that the local offset is unknown; Z expresses UTC as the preferred reference point.",
       "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
       "byte_length": 70,
       "sha256": "cbee7314c58c92fe5f7c310860018d0daf3ca02b560698fc7d8612e09d984a04"
@@ -343,6 +344,10 @@
     "independent_rust_parser": "not_run",
     "differential_fuzz": "not_run",
     "performance_benchmark": "not_run",
-    "tls_session_or_proof": "not_run"
+    "tls_session_or_proof": "not_run",
+    "standards_adjudication": {
+      "status": "profile_rule_corrected_against_RFC3339_section_4_3",
+      "note": "-00:00 means UTC time is known while local offset is unknown; preserve the metadata distinction without treating it as a different instant."
+    }
   }
 }
