@@ -98,13 +98,25 @@ fn nonempty(value: &str) -> bool {
 fn validate_receipt(receipt: &SelectionReceipt) -> Result<(), ReceiptError> {
     for (name, value) in [
         ("receipt_id", receipt.receipt_id.as_str()),
-        ("candidate_set_digest", receipt.candidate_set_digest.as_str()),
-        ("evidence_snapshot_digest", receipt.evidence_snapshot_digest.as_str()),
+        (
+            "candidate_set_digest",
+            receipt.candidate_set_digest.as_str(),
+        ),
+        (
+            "evidence_snapshot_digest",
+            receipt.evidence_snapshot_digest.as_str(),
+        ),
         ("policy_id", receipt.policy_id.as_str()),
         ("policy_version", receipt.policy_version.as_str()),
-        ("policy_config_digest", receipt.policy_config_digest.as_str()),
+        (
+            "policy_config_digest",
+            receipt.policy_config_digest.as_str(),
+        ),
         ("random_stream_id", receipt.random_stream_id.as_str()),
-        ("selected_candidate_id", receipt.selected_candidate_id.as_str()),
+        (
+            "selected_candidate_id",
+            receipt.selected_candidate_id.as_str(),
+        ),
     ] {
         if !nonempty(value) {
             return Err(ReceiptError::EmptyReceiptField(name));
@@ -129,7 +141,9 @@ fn validate_receipt(receipt: &SelectionReceipt) -> Result<(), ReceiptError> {
             return Err(ReceiptError::EmptyCandidateId);
         }
         if !ids.insert(candidate.candidate_id.as_str()) {
-            return Err(ReceiptError::DuplicateCandidate(candidate.candidate_id.clone()));
+            return Err(ReceiptError::DuplicateCandidate(
+                candidate.candidate_id.clone(),
+            ));
         }
         if !nonempty(&candidate.external_gate_receipt_id) {
             return Err(ReceiptError::EmptyGateReceipt);
@@ -139,7 +153,9 @@ fn validate_receipt(receipt: &SelectionReceipt) -> Result<(), ReceiptError> {
             || !candidate.selection_probability.is_finite()
             || !(0.0..=1.0).contains(&candidate.selection_probability)
         {
-            return Err(ReceiptError::InvalidProbability(candidate.candidate_id.clone()));
+            return Err(ReceiptError::InvalidProbability(
+                candidate.candidate_id.clone(),
+            ));
         }
 
         if candidate.admitted {
@@ -148,10 +164,14 @@ fn validate_receipt(receipt: &SelectionReceipt) -> Result<(), ReceiptError> {
             selection_sum += candidate.selection_probability;
         } else {
             if candidate.target_probability > PROBABILITY_TOLERANCE {
-                return Err(ReceiptError::IneligibleTargetMass(candidate.candidate_id.clone()));
+                return Err(ReceiptError::IneligibleTargetMass(
+                    candidate.candidate_id.clone(),
+                ));
             }
             if candidate.selection_probability > PROBABILITY_TOLERANCE {
-                return Err(ReceiptError::IneligibleSelectionMass(candidate.candidate_id.clone()));
+                return Err(ReceiptError::IneligibleSelectionMass(
+                    candidate.candidate_id.clone(),
+                ));
             }
         }
 
@@ -167,7 +187,9 @@ fn validate_receipt(receipt: &SelectionReceipt) -> Result<(), ReceiptError> {
         return Err(ReceiptError::TargetDistributionNotNormalized(target_sum));
     }
     if (selection_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
-        return Err(ReceiptError::SelectionDistributionNotNormalized(selection_sum));
+        return Err(ReceiptError::SelectionDistributionNotNormalized(
+            selection_sum,
+        ));
     }
 
     let Some(selected) = selected else {
@@ -204,12 +226,18 @@ pub fn select_uniform_audit_candidate(
         return Err(ReceiptError::EmptyCandidateSet);
     }
 
-    let admitted: Vec<&Candidate> = candidates.iter().filter(|candidate| candidate.admitted).collect();
+    let admitted: Vec<&Candidate> = candidates
+        .iter()
+        .filter(|candidate| candidate.admitted)
+        .collect();
     if admitted.is_empty() {
         return Err(ReceiptError::NoAdmissibleCandidates);
     }
 
-    let target_sum: f64 = admitted.iter().map(|candidate| candidate.target_probability).sum();
+    let target_sum: f64 = admitted
+        .iter()
+        .map(|candidate| candidate.target_probability)
+        .sum();
     if (target_sum - 1.0).abs() > PROBABILITY_TOLERANCE {
         return Err(ReceiptError::TargetDistributionNotNormalized(target_sum));
     }
@@ -236,7 +264,11 @@ pub fn select_uniform_audit_candidate(
                 admitted: candidate.admitted,
                 external_gate_receipt_id: candidate.external_gate_receipt_id.clone(),
                 target_probability: candidate.target_probability,
-                selection_probability: if candidate.admitted { uniform_probability } else { 0.0 },
+                selection_probability: if candidate.admitted {
+                    uniform_probability
+                } else {
+                    0.0
+                },
             })
             .collect(),
     };
@@ -280,7 +312,9 @@ pub fn importance_weight(
         return Err(ReceiptError::InvalidWeight);
     }
     if target_probability > 0.0 && selection_probability == 0.0 {
-        return Err(ReceiptError::NoPositivitySupport("positive target mass has zero selection probability".to_string()));
+        return Err(ReceiptError::NoPositivitySupport(
+            "positive target mass has zero selection probability".to_string(),
+        ));
     }
     if target_probability == 0.0 {
         return Ok(0.0);
@@ -360,7 +394,11 @@ mod tests {
         for seed in 1..100 {
             let selected = receipt(seed);
             assert_ne!(selected.selected_candidate_id, "blocked");
-            let blocked = selected.candidates.iter().find(|candidate| candidate.candidate_id == "blocked").unwrap();
+            let blocked = selected
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == "blocked")
+                .unwrap();
             assert_eq!(blocked.selection_probability, 0.0);
         }
     }
@@ -372,7 +410,9 @@ mod tests {
 
     #[test]
     fn different_seed_changes_at_least_one_selection_in_fixture_range() {
-        let selected: BTreeSet<String> = (1..20).map(|seed| receipt(seed).selected_candidate_id).collect();
+        let selected: BTreeSet<String> = (1..20)
+            .map(|seed| receipt(seed).selected_candidate_id)
+            .collect();
         assert_eq!(selected.len(), 2);
     }
 
@@ -382,7 +422,10 @@ mod tests {
         assert_eq!(value.candidates.len(), 3);
         assert_eq!(value.candidate_set_digest, "sha256:candidate-set");
         assert_eq!(value.evidence_snapshot_digest, "sha256:evidence-snapshot");
-        assert!(value.candidates.iter().all(|candidate| !candidate.external_gate_receipt_id.is_empty()));
+        assert!(value
+            .candidates
+            .iter()
+            .all(|candidate| !candidate.external_gate_receipt_id.is_empty()));
     }
 
     #[test]
@@ -408,7 +451,11 @@ mod tests {
     #[test]
     fn receipt_rejects_distribution_mass_on_a_blocked_action() {
         let mut value = receipt(44);
-        let blocked = value.candidates.iter_mut().find(|candidate| candidate.candidate_id == "blocked").unwrap();
+        let blocked = value
+            .candidates
+            .iter_mut()
+            .find(|candidate| candidate.candidate_id == "blocked")
+            .unwrap();
         blocked.selection_probability = 0.1;
         assert!(matches!(
             validate_receipt(&value),
@@ -420,9 +467,17 @@ mod tests {
     fn receipt_rejects_missing_positive_probability_support() {
         let mut value = receipt(44);
         let selected = value.selected_candidate_id.clone();
-        let chosen = value.candidates.iter_mut().find(|candidate| candidate.candidate_id == selected).unwrap();
+        let chosen = value
+            .candidates
+            .iter_mut()
+            .find(|candidate| candidate.candidate_id == selected)
+            .unwrap();
         chosen.selection_probability = 0.0;
-        let other = value.candidates.iter_mut().find(|candidate| candidate.candidate_id != selected && candidate.admitted).unwrap();
+        let other = value
+            .candidates
+            .iter_mut()
+            .find(|candidate| candidate.candidate_id != selected && candidate.admitted)
+            .unwrap();
         other.selection_probability = 1.0;
         value.selected_candidate_id = selected;
         assert!(matches!(
@@ -434,8 +489,14 @@ mod tests {
     #[test]
     fn effective_sample_size_rejects_invalid_weights() {
         assert_eq!(effective_sample_size(&[]), Err(ReceiptError::EmptyWeights));
-        assert_eq!(effective_sample_size(&[1.0, f64::NAN]), Err(ReceiptError::NonFiniteWeight));
-        assert_eq!(effective_sample_size(&[1.0, -1.0]), Err(ReceiptError::InvalidWeight));
+        assert_eq!(
+            effective_sample_size(&[1.0, f64::NAN]),
+            Err(ReceiptError::NonFiniteWeight)
+        );
+        assert_eq!(
+            effective_sample_size(&[1.0, -1.0]),
+            Err(ReceiptError::InvalidWeight)
+        );
     }
 
     #[test]
