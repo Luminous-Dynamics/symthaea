@@ -146,6 +146,10 @@ For JSON source claims, the simplest auditable path is:
 
 A different order may be specified, including canonicalize-before-extraction as in Scribe, but then it must include the semantic node-origin map in §4.4. Canonicalizing first does not remove the need to prove which original source field was used.
 
+### 5.1 Stage identity and HTTP extraction split
+
+The operation registry distinguishes `http_message_extract` (selecting the response/message from the authenticated transcript representation) from `http_body_extract` (selecting the entity-body range from that message). These are not interchangeable: the former binds response ordinal/direction; the latter binds framing/header interpretation and body coordinates. A transformation must not silently combine them into one uninspectable parser call.
+
 ## 6. HTTP transformation requirements
 
 HTTP framing and content decoding are separate stages. A profile must state its supported protocol/version and reject unsupported ambiguity. At minimum, tests must cover:
