@@ -914,9 +914,18 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                 "{display_name}: derived check {check_id} references unknown source case {source_case_id}"
             );
         }
+        if let Some(reference_case_id) = check.get("reference_case_id").and_then(Value::as_str) {
+            ensure!(
+                case_ids.contains(reference_case_id),
+                "{display_name}: derived check {check_id} references unknown reference case {reference_case_id}"
+            );
+        }
 
         if check_id == "NH3-MW-ENERGY-YIELD-TO-SPECIFIC-ENERGY-2026" {
             validate_nh3_energy_yield_check(check, display_name)?;
+        }
+        if check_id == "NH3-PLASMA-TO-SOEC-HB-ENERGY-GAP-2026" {
+            validate_nh3_synthesis_energy_gap_check(check, root, display_name)?;
         }
     }
 
@@ -1093,6 +1102,62 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                         .and_then(Value::as_f64)
                         .is_some_and(|value| value.is_finite() && value > 0.0),
                     "{display_name}: ammonia synthesis target {target_id} has invalid plant-gate energy-yield threshold"
+                );
+            }
+            "AMMONIA_SYNTHESIS_COMPETITIVENESS" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics
+                        .get("all_thresholds_must_hold_at_same_operating_point")
+                        .and_then(Value::as_bool)
+                        == Some(true),
+                    "{display_name}: ammonia competitiveness target {target_id} must bind thresholds to one operating point"
+                );
+                let baseline = required_f64(
+                    metrics,
+                    "integrated_soec_hb_reference_specific_energy_kWh_per_kg_NH3",
+                    &format!("{display_name}: {target_id}"),
+                )?;
+                let candidate_max = required_f64(
+                    metrics,
+                    "plasma_candidate_max_specific_energy_kWh_per_kg_NH3",
+                    &format!("{display_name}: {target_id}"),
+                )?;
+                let improvement = required_f64(
+                    metrics,
+                    "required_improvement_vs_integrated_reference_fraction",
+                    &format!("{display_name}: {target_id}"),
+                )?;
+                ensure!(
+                    close_f64(baseline, 8.14),
+                    "{display_name}: ammonia competitiveness target {target_id} must retain the 8.14 kWh/kg modeled SOEC-HB reference"
+                );
+                ensure!(
+                    improvement >= 0.10 && improvement < 1.0,
+                    "{display_name}: ammonia competitiveness target {target_id} must require at least a 10% improvement"
+                );
+                ensure!(
+                    candidate_max <= baseline * (1.0 - improvement),
+                    "{display_name}: ammonia competitiveness target {target_id} candidate limit does not beat the matched SOEC-HB reference by the required margin"
+                );
+                for key in [
+                    "plant_gate_grid_to_accepted_nh3_boundary_required",
+                    "hydrogen_generation_nitrogen_separation_and_all_balance_of_plant_included",
+                    "same_nh3_purity_pressure_and_delivery_contract_required",
+                    "baseline_exclusions_wind_farm_storage_ammonia_storage_and_transport_explicit",
+                    "desalination_and_feedwater_conditioning_boundary_reconciled",
+                    "availability_capacity_factor_and_duty_cycle_matched",
+                    "no_faraday_efficiency_or_area_rate_substitutes_for_full_chain_energy",
+                    "no_superiority_claim_before_source_data_reconstruction_and_uncertainty_analysis",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: ammonia competitiveness target {target_id} is missing required full-chain gate {key}"
+                    );
+                }
+                ensure!(
+                    comparators.iter().any(|value| value.as_str() == Some("NH3-SOEC-HB-OFFSHORE-2026")),
+                    "{display_name}: ammonia competitiveness target {target_id} must reference the integrated SOEC-HB baseline"
                 );
             }
             "AMMONIA_CRACKING_THERMAL_INTEGRATION" => {
@@ -1498,6 +1563,132 @@ fn validate_nh3_energy_yield_check(check: &Value, display_name: &str) -> Result<
     ensure!(
         close_f64(actual_reduction, expected_reduction),
         "{context}: 76-percent relative specific-energy reduction is inconsistent with the source points"
+    );
+    Ok(())
+}
+
+fn case_observation_value(case: &Value, metric: &str) -> Option<f64> {
+    case.get("observations")?
+        .as_array()?
+        .iter()
+        .find(|observation| observation.get("metric").and_then(Value::as_str) == Some(metric))?
+        .get("value")?
+        .as_f64()
+}
+
+fn validate_nh3_synthesis_energy_gap_check(
+    check: &Value,
+    root: &Value,
+    display_name: &str,
+) -> Result<()> {
+    let context = format!("{display_name}: NH3 plasma-to-SOEC-HB source metric audit");
+    ensure!(
+        check.get("source_case_id").and_then(Value::as_str)
+            == Some("NH3-GAS-LIQUID-PLASMA-ELECTROCATALYTIC-TANDEM-2026"),
+        "{context}: source_case_id must identify the gas-liquid plasma tandem source"
+    );
+    ensure!(
+        check.get("reference_case_id").and_then(Value::as_str)
+            == Some("NH3-SOEC-HB-OFFSHORE-2026"),
+        "{context}: reference_case_id must identify the integrated SOEC-HB source"
+    );
+    ensure!(
+        check.get("comparison_status").and_then(Value::as_str)
+            == Some("NOT_COMPARABLE_BOUNDARIES_UNRESOLVED"),
+        "{context}: source values must remain NOT_COMPARABLE until boundaries are reconciled"
+    );
+
+    let cases = root
+        .get("cases")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: source cases array is missing"))?;
+    let plasma_case = cases.iter().find(|case| {
+        case.get("case_id").and_then(Value::as_str)
+            == Some("NH3-GAS-LIQUID-PLASMA-ELECTROCATALYTIC-TANDEM-2026")
+    }).with_context(|| format!("{context}: gas-liquid plasma source case is missing"))?;
+    let soec_case = cases.iter().find(|case| {
+        case.get("case_id").and_then(Value::as_str)
+            == Some("NH3-SOEC-HB-OFFSHORE-2026")
+    }).with_context(|| format!("{context}: SOEC-HB reference case is missing"))?;
+    let jacs_case = cases.iter().find(|case| {
+        case.get("case_id").and_then(Value::as_str)
+            == Some("NH3-PLASMA-ELECTROCATALYSIS-JACS-2026")
+    }).with_context(|| format!("{context}: JACS area-rate source case is missing"))?;
+
+    let inputs = check.get("inputs")
+        .with_context(|| format!("{context}: inputs are missing"))?;
+    let derivation = check.get("derivation")
+        .with_context(|| format!("{context}: derivation is missing"))?;
+    let plasma_energy = required_f64(inputs, "plasma_tandem_specific_energy_kWh_per_kg_NH3", &context)?;
+    let soec_energy = required_f64(inputs, "soec_hb_model_specific_energy_kWh_per_kg_NH3", &context)?;
+    let area_rate = required_f64(inputs, "jacs_area_rate_nmol_NH3_per_s_per_cm2", &context)?;
+    let molar_mass = required_f64(inputs, "ammonia_molar_mass_g_per_mol", &context)?;
+    ensure!(
+        plasma_energy > 0.0 && soec_energy > 0.0 && area_rate > 0.0 && molar_mass > 0.0,
+        "{context}: source inputs must be positive"
+    );
+    ensure!(
+        close_f64(
+            case_observation_value(plasma_case, "specific_energy_consumption").unwrap_or(f64::NAN),
+            plasma_energy
+        ),
+        "{context}: plasma energy input does not match the source case"
+    );
+    ensure!(
+        close_f64(
+            case_observation_value(soec_case, "specific_electrical_energy").unwrap_or(f64::NAN),
+            soec_energy
+        ),
+        "{context}: SOEC-HB energy input does not match the source case"
+    );
+    ensure!(
+        close_f64(
+            case_observation_value(jacs_case, "ammonia_area_production_rate").unwrap_or(f64::NAN),
+            area_rate
+        ),
+        "{context}: JACS area-rate input does not match the source case"
+    );
+
+    let expected_plasma_yield = 1000.0 / plasma_energy;
+    let expected_soec_yield = 1000.0 / soec_energy;
+    let expected_ratio = plasma_energy / soec_energy;
+    let expected_area_productivity =
+        area_rate * 1.0e-9 * molar_mass * 86_400.0 * 10_000.0 / 1000.0;
+    let expected_area_for_tonne = 1000.0 / expected_area_productivity;
+
+    let actual_plasma_yield = required_f64(derivation, "plasma_tandem_yield_g_NH3_per_kWh", &context)?;
+    let actual_soec_yield = required_f64(derivation, "soec_hb_yield_g_NH3_per_kWh", &context)?;
+    let actual_ratio = required_f64(derivation, "source_metric_energy_intensity_ratio", &context)?;
+    let actual_area_productivity = required_f64(
+        derivation,
+        "jacs_area_productivity_kg_NH3_per_m2_per_day",
+        &context,
+    )?;
+    let actual_area_for_tonne = required_f64(
+        derivation,
+        "active_area_m2_for_1_tonne_NH3_per_day_at_jacs_rate",
+        &context,
+    )?;
+
+    ensure!(
+        close_f64(actual_plasma_yield, expected_plasma_yield),
+        "{context}: plasma specific-energy reciprocal is inconsistent"
+    );
+    ensure!(
+        close_f64(actual_soec_yield, expected_soec_yield),
+        "{context}: SOEC-HB specific-energy reciprocal is inconsistent"
+    );
+    ensure!(
+        close_f64(actual_ratio, expected_ratio),
+        "{context}: source metric energy-intensity ratio is inconsistent"
+    );
+    ensure!(
+        close_f64(actual_area_productivity, expected_area_productivity),
+        "{context}: JACS geometric area productivity conversion is inconsistent"
+    );
+    ensure!(
+        close_f64(actual_area_for_tonne, expected_area_for_tonne),
+        "{context}: JACS geometric active-area extrapolation is inconsistent"
     );
     Ok(())
 }
@@ -2139,6 +2330,64 @@ mod tests {
         );
     }
 
+    fn nh3_synthesis_energy_gap_manifest() -> Value {
+        serde_json::json!({
+            "programme": "PLASMA-ENERGY-001",
+            "claim_ceiling": "SOURCE_REGISTER_ONLY",
+            "evidence_classes": [
+                "PUBLISHED_LAB_EXPERIMENT",
+                "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS"
+            ],
+            "cases": [
+                {
+                    "case_id": "NH3-GAS-LIQUID-PLASMA-ELECTROCATALYTIC-TANDEM-2026",
+                    "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+                    "luminous_reproduction": false,
+                    "comparison_status": "NOT_COMPARABLE_BOUNDARIES_UNRESOLVED",
+                    "source": {"url": "https://doi.org/10.1002/aic.70407"},
+                    "observations": [{"metric":"specific_energy_consumption","value":1161.0}]
+                },
+                {
+                    "case_id": "NH3-SOEC-HB-OFFSHORE-2026",
+                    "evidence_class": "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+                    "luminous_reproduction": false,
+                    "source": {"url": "https://doi.org/10.1016/j.ijhydene.2026.155184"},
+                    "observations": [{"metric":"specific_electrical_energy","value":8.14}]
+                },
+                {
+                    "case_id": "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026",
+                    "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+                    "luminous_reproduction": false,
+                    "source": {"url": "https://doi.org/10.1021/jacs.6c04148"},
+                    "observations": [{"metric":"ammonia_area_production_rate","value":7.7}]
+                }
+            ],
+            "derived_reference_checks": [{
+                "check_id":"NH3-PLASMA-TO-SOEC-HB-ENERGY-GAP-2026",
+                "source_case_id":"NH3-GAS-LIQUID-PLASMA-ELECTROCATALYTIC-TANDEM-2026",
+                "reference_case_id":"NH3-SOEC-HB-OFFSHORE-2026",
+                "comparison_status":"NOT_COMPARABLE_BOUNDARIES_UNRESOLVED",
+                "evidence_class":"DERIVED_ARITHMETIC_FROM_PUBLISHED_AMMONIA_SYSTEM_METRICS",
+                "luminous_measurement":false,
+                "inputs":{
+                    "plasma_tandem_specific_energy_kWh_per_kg_NH3":1161.0,
+                    "soec_hb_model_specific_energy_kWh_per_kg_NH3":8.14,
+                    "jacs_area_rate_nmol_NH3_per_s_per_cm2":7.7,
+                    "ammonia_molar_mass_g_per_mol":17.03052
+                },
+                "derivation":{
+                    "plasma_tandem_yield_g_NH3_per_kWh":1000.0/1161.0,
+                    "soec_hb_yield_g_NH3_per_kWh":1000.0/8.14,
+                    "source_metric_energy_intensity_ratio":1161.0/8.14,
+                    "jacs_area_productivity_kg_NH3_per_m2_per_day":7.7e-9*17.03052*86400.0*10000.0/1000.0,
+                    "active_area_m2_for_1_tonne_NH3_per_day_at_jacs_rate":1000.0/(7.7e-9*17.03052*86400.0*10000.0/1000.0)
+                },
+                "interpretation":"Derived arithmetic only; boundaries remain unresolved."
+            }],
+            "negative_controls":[{"control_id":"NC-TEST","expected_disposition":"NOT_COMPARABLE"}]
+        })
+    }
+
     fn nh3_energy_yield_source_manifest() -> Value {
         serde_json::json!({
             "programme": "PLASMA-ENERGY-001",
@@ -2197,6 +2446,61 @@ mod tests {
                 "expected_disposition": "REJECT_OPERATING_POINT_MISMATCH"
             }]
         })
+    }
+
+    #[test]
+    fn source_manifest_accepts_nh3_plasma_to_soec_hb_gap_arithmetic_without_claiming_comparability() {
+        let source = nh3_synthesis_energy_gap_manifest();
+        let summary = audit_source_value(&source, "nh3-synthesis-gap.json").unwrap();
+        assert_eq!(summary.case_count, 3);
+        assert_eq!(summary.derived_reference_check_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_wrong_nh3_source_energy_intensity_ratio() {
+        let mut source = nh3_synthesis_energy_gap_manifest();
+        source["derived_reference_checks"][0]["derivation"]["source_metric_energy_intensity_ratio"] =
+            serde_json::json!(10.0);
+        let error = audit_source_value(&source, "nh3-synthesis-gap.json").unwrap_err();
+        assert!(error.to_string().contains("source metric energy-intensity ratio"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_nh3_source_gap_promoted_to_comparable() {
+        let mut source = nh3_synthesis_energy_gap_manifest();
+        source["derived_reference_checks"][0]["comparison_status"] =
+            serde_json::json!("COMPARABLE");
+        let error = audit_source_value(&source, "nh3-synthesis-gap.json").unwrap_err();
+        assert!(error.to_string().contains("must remain NOT_COMPARABLE"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_wrong_jacs_geometric_scale_extrapolation() {
+        let mut source = nh3_synthesis_energy_gap_manifest();
+        source["derived_reference_checks"][0]["derivation"]
+            ["active_area_m2_for_1_tonne_NH3_per_day_at_jacs_rate"] = serde_json::json!(100.0);
+        let error = audit_source_value(&source, "nh3-synthesis-gap.json").unwrap_err();
+        assert!(error.to_string().contains("geometric active-area extrapolation"));
+    }
+
+    #[test]
+    fn ammonia_synthesis_competitiveness_target_requires_ten_percent_full_chain_gain() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS_COMPETITIVENESS");
+        source["benchmark_targets"][0]["comparator_case_ids"] =
+            serde_json::json!(["NH3-SOEC-HB-OFFSHORE-2026"]);
+        let summary = audit_source_value(&source, "nh3-competitiveness-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn ammonia_synthesis_competitiveness_target_rejects_intermediate_three_g_per_kwh_as_parity() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS_COMPETITIVENESS");
+        source["benchmark_targets"][0]["metric_thresholds"]["plasma_candidate_max_specific_energy_kWh_per_kg_NH3"] =
+            serde_json::json!(333.333);
+        source["benchmark_targets"][0]["comparator_case_ids"] =
+            serde_json::json!(["NH3-SOEC-HB-OFFSHORE-2026"]);
+        let error = audit_source_value(&source, "nh3-competitiveness-target.json").unwrap_err();
+        assert!(error.to_string().contains("does not beat the matched SOEC-HB reference"));
     }
 
     #[test]
@@ -2457,6 +2761,13 @@ mod tests {
                 "ammonia_plant_gate_energy_yield_min_g_NH3_per_kWh": 3.0,
                 "all_thresholds_must_hold_at_same_operating_point": true
             })
+        } else if lane == "AMMONIA_SYNTHESIS_COMPETITIVENESS" {
+            serde_json::json!({
+                "integrated_soec_hb_reference_specific_energy_kWh_per_kg_NH3": 8.14,
+                "plasma_candidate_max_specific_energy_kWh_per_kg_NH3": 7.32,
+                "required_improvement_vs_integrated_reference_fraction": 0.10,
+                "all_thresholds_must_hold_at_same_operating_point": true
+            })
         } else if lane == "AMMONIA_N2_VIBRATIONAL_TRANSFER" {
             serde_json::json!({
                 "all_required_evidence_gates_must_hold": true,
@@ -2497,6 +2808,17 @@ mod tests {
                 "gas_feed_and_product_separation_energy_included": true,
                 "accepted_nh3_product_purity_and_pressure_contract_required": true,
                 "matched_haber_bosch_baseline_includes_hydrogen_energy": true
+            })
+        } else if lane == "AMMONIA_SYNTHESIS_COMPETITIVENESS" {
+            serde_json::json!({
+                "plant_gate_grid_to_accepted_nh3_boundary_required": true,
+                "hydrogen_generation_nitrogen_separation_and_all_balance_of_plant_included": true,
+                "same_nh3_purity_pressure_and_delivery_contract_required": true,
+                "baseline_exclusions_wind_farm_storage_ammonia_storage_and_transport_explicit": true,
+                "desalination_and_feedwater_conditioning_boundary_reconciled": true,
+                "availability_capacity_factor_and_duty_cycle_matched": true,
+                "no_faraday_efficiency_or_area_rate_substitutes_for_full_chain_energy": true,
+                "no_superiority_claim_before_source_data_reconstruction_and_uncertainty_analysis": true
             })
         } else if lane == "AMMONIA_N2_VIBRATIONAL_TRANSFER" {
             serde_json::json!({
