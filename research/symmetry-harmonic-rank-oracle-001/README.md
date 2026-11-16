@@ -38,7 +38,7 @@ Example:
 
     cargo run --locked --manifest-path research/symmetry-harmonic-rank-oracle-001/Cargo.toml --example template_ambiguity
 
-The degree-2 template for C3 is also consistent with several larger cyclic and proper rotational-dihedral candidates. Extending to degree 3 separates C3 from those hypotheses. The example prints both results rather than hiding the ambiguity.
+The degree-2 C3 template `[1,1,1]` is also consistent with C4, C5 and C6; degree 3 is the first distinguishing degree within that cyclic family. A separate test demonstrates the distinct degree-2 D3 template `[1,0,1]`, which is ambiguous across D3, D4, D5 and D6. The example prints the cyclic ambiguity and its cutoff resolution rather than hiding it.
 
 ## Reproduction
 
