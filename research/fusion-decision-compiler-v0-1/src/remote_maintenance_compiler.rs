@@ -951,14 +951,9 @@ fn validate_action_ordering(
             diagnostics,
         );
     }
-    for test in &integrity_tests {
-        require_all(
-            test,
-            &reconnects,
-            DfrmDiagnostic::IntegrityTestBeforeReconnect,
-            diagnostics,
-        );
-    }
+    // Each interface's integrity test is required to follow its own
+    // reconnection in validate_interface_bindings. Independent interfaces may
+    // reconnect and test in parallel; a cross-product ordering is too strict.
     for requalify in &requalifications {
         require_all(
             requalify,
@@ -1530,6 +1525,17 @@ mod tests {
         assert_eq!(
             report.claim_ceiling,
             "declared maintenance-procedure completeness only"
+        );
+    }
+
+    #[test]
+    fn independent_interface_reconnections_and_integrity_tests_may_run_in_parallel() {
+        let report = compile_remote_maintenance_plan(&base_plan());
+        assert_eq!(
+            report.disposition,
+            DfrmDisposition::ValidDeclaredProcedure,
+            "independent connector test paths should not be cross-serialized: {:?}",
+            report.diagnostics
         );
     }
 
