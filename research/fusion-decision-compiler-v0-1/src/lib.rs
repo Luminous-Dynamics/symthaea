@@ -10,6 +10,7 @@ pub mod cross_solver_comparison;
 pub mod evidence_dependence;
 pub mod pareto_tradeoff;
 pub mod plant_service_gate;
+pub mod robust_net_export;
 pub mod screening_funnel;
 pub mod validation_domain;
 
