@@ -951,18 +951,23 @@ mod tests {
     #[test]
     fn pure_pitch_clipping_reproduces_the_linear_prismatic_displacement() {
         let mut request = box_request();
-        request.attitude.waterplane_offset_m = -1.0;
         request.attitude.pitch_rad = 0.02;
+        request.attitude.waterplane_offset_m =
+            -0.5 * request.source_spec.principal_dimensions.length_m
+                * request.attitude.pitch_rad.sin();
         let receipt = evaluate_static_attitude(&request).unwrap();
+        let expected_lcb_m =
+            50.0 - (1250.0 / 9.0) * request.attitude.pitch_rad.tan();
         assert!(
             (receipt.displacement_volume_m3 - 12_000.0).abs() < 1.0e-7,
             "unexpected displaced volume: {:.12}",
             receipt.displacement_volume_m3
         );
         assert!(
-            (receipt.center_of_buoyancy_body_m.x_m - 47.222_222_222_222_22).abs() < 1.0e-8,
-            "unexpected LCB: {:.12}",
-            receipt.center_of_buoyancy_body_m.x_m
+            (receipt.center_of_buoyancy_body_m.x_m - expected_lcb_m).abs() < 1.0e-8,
+            "unexpected LCB: {:.12} (expected {:.12})",
+            receipt.center_of_buoyancy_body_m.x_m,
+            expected_lcb_m
         );
         assert!(receipt.center_of_buoyancy_body_m.y_m.abs() < 1.0e-8);
     }
