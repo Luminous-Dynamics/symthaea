@@ -146,6 +146,8 @@ The 1.5×/2× figures are programme targets chosen for a stringent prospective c
 
 ## 8. Next executable increment
 
+The follow-on sealed comparison is tracked in [ISRU-MATERIAL-DOE-002 #12483](https://github.com/Luminous-Dynamics/symthaea/issues/12483); it will compare the current disagreement heuristic with noise-aware EIG, cost-aware value of information, GP-BO and constrained/safe BO under held-out batches and variable campaign conditions.
+
 - Add true cost/noise/fidelity-aware Bayesian EIG and GP-BO baselines, using held-out worlds inaccessible to the selectors.
 - Add many seeded randomized trials, paired uncertainty analysis and bootstrap confidence intervals.
 - Replace the heuristic space-spread sequence with actual Latin-hypercube and Sobol designs.
