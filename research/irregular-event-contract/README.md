@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Seventy-three Rust test functions are authored (16 core event contract, 12 bitemporal revision, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter tests, 17 source-watermark tests) for delayed-observation non-leakage,
+Seventy-seven Rust test functions are authored (28 event/bitemporal contract, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter, 21 source-watermark tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
@@ -167,11 +167,16 @@ remain unchanged. The caller must also append the raw event to the bitemporal
 event ledger; the watermark module records the breach receipt, not the
 authoritative event itself.
 
-Seventeen source-authored watermark tests cover empty progress, multi-source
+Twenty-one source-authored watermark tests cover empty progress, multi-source
 minimum progress, exclusive boundaries, as-known progress, late-breach
 reopening, terminal streams, generation and monotonicity, atomic batches,
-idempotent event arrivals, and deterministic rebuild/digest parity. No Rust
-build or test has run.
+idempotent event arrivals, evidence-bound completeness and breach receipts,
+unqualified arrivals without a visible watermark, and deterministic
+rebuild/digest parity. A completeness or late-breach result now returns the
+exact supporting progress identity, generation, sequence, transaction time,
+and policy digest. Events received before any progress claim are recorded as
+`NoPriorProgress`, not `OnTime`; an absent watermark cannot certify timeliness.
+No Rust build or test has run.
 
 
 The source watermark adversarial evaluation fixture is
