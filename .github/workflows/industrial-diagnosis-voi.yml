@@ -2,12 +2,12 @@ name: Active Industrial Diagnosis VoI
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "research/industrial-diagnosis-voi-v0-1" ]
     paths:
       - "tools/industrial-diagnosis-voi/**"
       - ".github/workflows/industrial-diagnosis-voi.yml"
   push:
-    branches: [ "main" ]
+    branches: [ "main", "research/industrial-diagnosis-sequential-voi-v0-1" ]
     paths:
       - "tools/industrial-diagnosis-voi/**"
       - ".github/workflows/industrial-diagnosis-voi.yml"
