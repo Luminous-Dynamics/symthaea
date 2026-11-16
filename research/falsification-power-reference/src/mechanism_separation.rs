@@ -73,6 +73,7 @@ pub struct IdentifiabilityEnvelopeReport {
     pub equivalence_class_count: usize,
     pub total_mechanism_pairs: usize,
     pub irreducible_equivalent_pair_count: usize,
+    pub distinguishable_mechanism_pair_count: usize,
     pub irreducible_equivalent_pair_fraction: f64,
     pub equivalence_classes: Vec<MechanismEquivalenceClass>,
     pub max_total_observations: usize,
@@ -450,6 +451,7 @@ pub fn compute_identifiability_envelope(
             equivalence_class_count,
             total_mechanism_pairs,
             irreducible_equivalent_pair_count,
+            distinguishable_mechanism_pair_count: 0,
             irreducible_equivalent_pair_fraction,
             equivalence_classes,
             max_total_observations,
@@ -463,8 +465,12 @@ pub fn compute_identifiability_envelope(
         });
     }
 
-    let class_pairs = choose_two(equivalence_class_count);
-    let pairwise_alpha = familywise_alpha / class_pairs as f64;
+    // Bonferroni counts every cross-class mechanism pair, not merely class
+    // pairs: a class may contain multiple evaluator-equivalent mechanisms.
+    let distinguishable_mechanism_pair_count =
+        total_mechanism_pairs - irreducible_equivalent_pair_count;
+    let pairwise_alpha =
+        familywise_alpha / distinguishable_mechanism_pair_count as f64;
     if !pairwise_alpha.is_finite() || pairwise_alpha <= 1.0e-12 {
         return Err(SeparationError::InvalidAlpha);
     }
@@ -503,6 +509,7 @@ pub fn compute_identifiability_envelope(
         equivalence_class_count,
         total_mechanism_pairs,
         irreducible_equivalent_pair_count,
+        distinguishable_mechanism_pair_count,
         irreducible_equivalent_pair_fraction,
         equivalence_classes,
         max_total_observations,
@@ -638,6 +645,27 @@ mod tests {
         ).unwrap();
         assert!(three.pairwise_alpha < two.pairwise_alpha);
         assert!(three.required_pairwise_information > two.required_pairwise_information);
+    }
+
+    #[test]
+    fn bonferroni_counts_cross_class_mechanism_pairs_not_only_class_pairs() {
+        let report = compute_identifiability_envelope(
+            vec![action("probe", 1.0, 1.0, 1.0e-12)],
+            vec![
+                mechanism("a1", &[0.0]),
+                mechanism("a2", &[0.0]),
+                mechanism("b1", &[1.0]),
+                mechanism("b2", &[1.0]),
+            ],
+            0.05,
+            0.80,
+            16,
+        )
+        .unwrap();
+        assert_eq!(report.equivalence_class_count, 2);
+        assert_eq!(report.irreducible_equivalent_pair_count, 2);
+        assert_eq!(report.distinguishable_mechanism_pair_count, 4);
+        assert_eq!(report.pairwise_alpha, 0.0125);
     }
 
     #[test]
