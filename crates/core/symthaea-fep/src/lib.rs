@@ -144,6 +144,11 @@ pub mod generative_model;
 pub mod haptic_semantic_binder;
 pub mod hierarchical;
 pub mod markov_blanket;
+pub mod observation_event;
+pub use observation_event::{
+    MissingnessReason, ObservationDimensionV1, ObservationEventError, ObservationEventV1,
+    ObservationLikelihoodV1,
+};
 mod motor;
 mod td_learning;
 pub mod types;
