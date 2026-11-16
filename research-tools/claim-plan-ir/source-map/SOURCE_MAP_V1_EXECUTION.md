@@ -18,10 +18,14 @@ The positive control intentionally uses an identity content decoder and a simple
 
 - The synthetic transcript is merely a byte fixture with a placeholder session/commitment identity; no cryptographic source witness is present.
 - The synthetic HTTP extraction map is a hand-authored range fixture, not the result of an HTTP parser.
-- The current sample's JCS source and canonical byte offsets happen to coincide. A second fixture must reorder members / change whitespace and demonstrate a non-identity node-origin map.
+- The first end-to-end bundle's JCS output happens to be byte-identical to its source. A separate non-identity fixture now covers member reordering and whitespace: source `{"name":"A", "age":30}` (22 bytes) canonicalizes to `{"age":30,"name":"A"}` (21 bytes); `/name` maps from source `[8,11)` to canonical `[17,20)`. Its node-origin map preserves the same raw token digest across the two coordinate spaces.
 - The bundle's type/predicate digests are synthetic binding values; this does not execute a ZK program.
 - The JSON Schema was checked for JSON parseability, required-property shape coverage and local $ref resolution. A full Draft 2020-12 schema engine was not run.
 - The source-map checker itself still needs exact-branch runtime execution and independent review. Syntax inspection alone is not an execution result.
+
+## Non-identity JCS vector
+
+The separate `JCS_NONIDENTITY_V1.json` vector and `verify_nonidentity_jcs_map.mjs` exercise the case where canonicalization changes both total length and selected-node offset. The local independent smoke model recomputed the source, canonical, token and node-map SHA-256 values; checked that both byte ranges contain the same raw token; checked the restricted known-answer JCS subset; and rejected all eight mutation controls. The committed Node runner has only been syntax-checked, not runtime-executed from the exact branch.
 
 ## Next conformance increments
 
