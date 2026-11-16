@@ -52,7 +52,7 @@ No composite score may trade a critical unsupported claim, future-evidence leak,
 
 The fixture contains:
 - two events with identical event timestamps but an explicit causal edge, which must remain ordered;
-- disjoint dependency changes in two branches, which are concurrent and marked commuting;
+- disjoint dependency changes in two branches with different wall-clock timestamps, which remain concurrent and are marked commuting;
 - overlapping policy changes in the same branches, which are concurrent but marked non-commuting;
 - a backdated observation whose availability is later than an earlier branch decision cutoff;
 - a branch-A receipt attempted on sibling branch B;
