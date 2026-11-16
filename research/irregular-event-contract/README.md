@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Eighty Rust test functions are authored (28 event/bitemporal contract, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter, 24 source-watermark tests) for delayed-observation non-leakage,
+Eighty-one Rust test functions are authored (28 event/bitemporal contract, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter, 25 source-watermark tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. The standalone crate was first exercised by a pinned Rust 1.96 workflow: dependency resolution and changed-module formatting succeeded, then whole-crate compilation exposed four real type errors. Those have been corrected. The latest exact-head test and Clippy results remain pending; no test pass or dataset score is claimed.
@@ -165,12 +165,11 @@ remain unchanged. The caller must also append the raw event to the bitemporal
 event ledger; the watermark module records the breach receipt, not the
 authoritative event itself.
 
-Twenty-four source-authored watermark tests cover empty progress, multi-source
+Twenty-five source-authored watermark tests cover empty progress, multi-source
 minimum progress, exclusive boundaries, as-known progress, late-breach
 reopening, terminal streams, generation and monotonicity, atomic batches,
 idempotent event arrivals, evidence-bound completeness and breach receipts,
-unqualified arrivals without a visible watermark, and deterministic
-rebuild/digest parity. A completeness or late-breach result now returns the
+unqualified arrivals without a visible watermark, historical index pruning of future-known receipts, and deterministic rebuild/digest parity. A completeness or late-breach result now returns the
 exact supporting progress identity, generation, sequence, transaction time,
 and policy digest. Events received before any progress claim are recorded as
 `NoPriorProgress`, not `OnTime`; an absent watermark cannot certify timeliness.
@@ -216,3 +215,6 @@ separate from leaderboard accuracy. It preserves the H2O site / GitHub README
 FEV-Bench disagreement and the 15 Nov 2026 TSFM.ai MASE-skill snapshot.
 The comparator registry hashes this fixture in the exact-head workflow.
 No model checkpoint or external baseline has been reproduced.
+
+
+The breach index is keyed by source identity, event time and receipt/knowledge time. A historical `known_at` query prunes future receipts inside the ordered range lookup instead of visiting them and filtering afterward. A regression checks zero candidates before the first breach, one candidate at the first receipt and three after all receipts, with full replay/index parity.
