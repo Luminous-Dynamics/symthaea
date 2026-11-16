@@ -232,9 +232,8 @@ impl LiveSelectionPacket {
         Ok(())
     }
 
-    /// Returns semantic-duplicate groups without dropping attempts. Equality is
-    /// by the caller-supplied canonical ScientificModel digest, never by raw
-    /// source text or candidate ID.
+    /// Returns byte-identical canonical model-artifact groups without dropping
+    /// attempts. This is content identity, not a claim of semantic equivalence.
     pub fn duplicate_model_artifact_groups(&self) -> Vec<Vec<String>> {
         let mut groups = BTreeMap::<&str, Vec<String>>::new();
         for candidate in &self.candidates {
@@ -948,7 +947,7 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_semantic_candidates_are_retained_and_flagged() {
+    fn duplicate_model_artifacts_are_retained_and_flagged() {
         let live = live_packet(
             vec![live_candidate("first", 'a', 0.1), live_candidate("second", 'a', 0.2)],
             Some("first"),
