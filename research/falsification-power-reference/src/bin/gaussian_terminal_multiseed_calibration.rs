@@ -239,6 +239,7 @@ fn seed_json(result: &SeedResult) -> String {
             "\"paths\":{},",
             "\"terminal_np_rejection_rate\":{:.8},",
             "\"terminal_np_wilson95\":[{:.8},{:.8}],",
+            "\"analytic_terminal_np_power\":{:.8},",
             "\"induced_stop_policies\":[{}],",
             "\"terminal_induced_mismatches\":{}",
             "}}"
@@ -286,6 +287,7 @@ fn scenario_json(
         pooled.terminal_np_rejections as f64 / total_paths as f64,
         terminal_low,
         terminal_high,
+        analytic_power,
         policy_json(&pooled, total_paths),
         pooled.terminal_induced_mismatches,
         per_seed
