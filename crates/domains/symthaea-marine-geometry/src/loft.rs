@@ -992,7 +992,8 @@ pub fn loft_waterplane_capped_hull(
 mod tests {
     use super::*;
     use crate::section::{
-        generate_section_artifact, SectionControlPoint, SectionHullSpec, SectionStation,
+        generate_section_artifact, LongitudinalEndCondition, LongitudinalEndConditions,
+        SectionControlPoint, SectionHullSpec, SectionStation,
     };
     use crate::{CoordinateFrame, Disposition};
 
@@ -1027,6 +1028,7 @@ mod tests {
                 handedness: "right-handed".into(),
             },
             samples_per_segment: 4,
+            longitudinal_end_conditions: LongitudinalEndConditions::default(),
             stations: vec![
                 SectionStation {
                     x_over_length: 0.0,
@@ -1087,6 +1089,7 @@ mod tests {
                 handedness: "right-handed".into(),
             },
             samples_per_segment: 1,
+            longitudinal_end_conditions: LongitudinalEndConditions::default(),
             stations: vec![
                 SectionStation {
                     x_over_length: 0.0,
@@ -1117,6 +1120,7 @@ mod tests {
                 handedness: "right-handed".into(),
             },
             samples_per_segment: 1,
+            longitudinal_end_conditions: LongitudinalEndConditions::default(),
             stations: vec![
                 SectionStation {
                     x_over_length: 0.0,
