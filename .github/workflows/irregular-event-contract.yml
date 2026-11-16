@@ -65,6 +65,7 @@ jobs:
 
       - name: Check formatting for changed Rust modules and benchmark
         run: |
+          rustfmt --edition 2024 --check research/irregular-event-contract/src/clock.rs
           rustfmt --edition 2024 --check research/irregular-event-contract/src/watermarks.rs
           rustfmt --edition 2024 --check research/irregular-event-contract/src/bin/watermark_scaling.rs
 
