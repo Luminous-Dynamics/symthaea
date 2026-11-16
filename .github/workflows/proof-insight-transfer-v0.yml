@@ -23,7 +23,7 @@ jobs:
       - name: Install pinned Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.96.0
+          toolchain: 1.100.0
           components: rustfmt, clippy
       - name: Stage indexer as an isolated validation crate
         shell: bash
