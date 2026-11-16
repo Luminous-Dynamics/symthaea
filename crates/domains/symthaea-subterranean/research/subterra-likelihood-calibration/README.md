@@ -1,6 +1,6 @@
 # Subterra likelihood calibration reference v0.1
 
-A dependency-free Rust research package for estimating finite categorical observation likelihoods from independently labelled cave-site cases and scoring the estimates on disjoint calibration/evaluation sites.
+A standalone Rust research package with one local dependency on the Subterra EVSI reference for estimating finite categorical observation likelihoods from independently labelled cave-site cases, scoring the estimates on disjoint calibration/evaluation sites and converting fully supported likelihood tables into EVSI inputs.
 
 ## Why this exists
 
