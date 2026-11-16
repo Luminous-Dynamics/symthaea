@@ -198,7 +198,8 @@ fn run_seed(
 
         let terminal = design.evaluate_prefix(&observations)?;
         let terminal_np_reject = terminal.conditional_rejection_probability >= 0.5;
-        if terminal.conditional_rejection_probability != if terminal_np_reject { 1.0 } else { 0.0 } {
+        if terminal.conditional_rejection_probability != if terminal_np_reject { 1.0 } else { 0.0 }
+        {
             counts.terminal_induced_mismatches += 1;
         }
         if terminal_np_reject {
