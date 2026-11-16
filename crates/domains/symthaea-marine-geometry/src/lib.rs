@@ -8,6 +8,7 @@
 pub mod full_envelope;
 pub mod loft;
 pub mod section;
+pub mod static_attitude;
 pub mod sectional_reference;
 
 use serde::{Deserialize, Serialize};
