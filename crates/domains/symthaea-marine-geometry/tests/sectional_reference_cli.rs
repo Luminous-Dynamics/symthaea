@@ -122,7 +122,6 @@ fn cli_returns_typed_rejection_for_non_positive_density() {
     );
 }
 
-
 #[test]
 fn cli_independently_verifies_a_loading_sweep_receipt() {
     let request = fixture_path("marine-full-envelope-loading-sweep-001.json");
