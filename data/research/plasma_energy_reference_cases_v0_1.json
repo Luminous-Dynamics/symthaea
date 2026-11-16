@@ -2955,7 +2955,8 @@
         "jacs_area_productivity_kg_NH3_per_m2_per_day": 0.11330064345599998,
         "active_area_m2_for_1_tonne_NH3_per_day_at_jacs_rate": 8826.075205727737
       },
-      "interpretation": "This is arithmetic over two different published source metrics, not a matched performance comparison. The gas-liquid tandem paper reports 1,161 kWh/kg NH3 (~0.861 g/kWh), while a separate 2026 integrated SOEC-HB plant model reports 8.14 kWh/kg NH3 (~122.85 g/kWh), a nominal 142.6x source-metric gap. Their boundaries and product contracts must be reconstructed before claiming a head-to-head gap. Separately, the JACS 2026 area rate of 7.7 nmol/s/cm2 corresponds to approximately 0.1133 kg NH3/m2/day, implying roughly 8,826 m2 active area per tonne/day at that rate. This geometric extrapolation is arithmetic only, not a scalability prediction; it omits packing, current distribution, mass transfer, degradation and balance-of-plant."
+      "interpretation": "This is arithmetic over two different published source metrics, not a matched performance comparison. The gas-liquid tandem paper reports 1,161 kWh/kg NH3 (~0.861 g/kWh), while a separate 2026 integrated SOEC-HB plant model reports 8.14 kWh/kg NH3 (~122.85 g/kWh), a nominal 142.6x source-metric gap. Their boundaries and product contracts must be reconstructed before claiming a head-to-head gap. Separately, the JACS 2026 area rate of 7.7 nmol/s/cm2 corresponds to approximately 0.1133 kg NH3/m2/day, implying roughly 8,826 m2 active area per tonne/day at that rate. This geometric extrapolation is arithmetic only, not a scalability prediction; it omits packing, current distribution, mass transfer, degradation and balance-of-plant.",
+      "comparison_status": "NOT_COMPARABLE_BOUNDARIES_UNRESOLVED"
     }
   ],
   "benchmark_targets": [
