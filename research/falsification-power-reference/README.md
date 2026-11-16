@@ -156,3 +156,16 @@ Interpretation:
 - The naive repeated test appears cheapest and most powerful, but its ~29.8% null rejection makes it invalid under repeated looks.
 
 The terminal NP method is an evaluator oracle because it knows the correct discrepancy direction and frozen design. This is not a Symthaea agent result or an unknown-mechanism discovery score. Final artifact archive SHA-256: a45b26b33efb0c1caa1140c06da4411705534e187a867775bf783e01d5f982ef; report JSON SHA-256: 3ce1b598bf5ff280ace6d4c8901b2df36ce4ea08a02e1d2d70f6d757d2b0b67f.
+
+
+## Finite-action mechanism separation oracle
+
+The mechanism_separation module computes exact finite action-response equivalence classes (canonicalizing signed zero only) for a finite mechanism set, then exhaustively searches bounded replicate vectors for the minimum-cost schedule that separates all distinct classes under a conservative Bonferroni family-wise Gaussian LR requirement across every cross-class mechanism pair.
+
+- Frozen action inputs carry known sigma, replicate cost and a separate exact response signature for numerical signature buckets.
+- Mechanisms in one signature class remain set-valued; no number of repeats of the declared actions can distinguish them under this evaluator contract.
+- Distinct classes produce a family-wise pairwise alpha and required information threshold.
+- TargetAchievable returns the minimum-cost schedule; BudgetInsufficient is distinct from SingleEquivalenceClass.
+- Exact v0 bounds are six actions, twelve mechanisms and sixteen total observations.
+
+This is an evaluator-side identifiability ceiling, not a posterior, selector, general adaptive test or physical measurement model. See docs/research/FINITE_ACTION_IDENTIFIABILITY_ENVELOPE_V0_2026-11-16.md.
