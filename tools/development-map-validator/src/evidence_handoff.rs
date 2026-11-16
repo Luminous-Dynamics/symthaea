@@ -854,6 +854,16 @@ fn score_trace(
     for extra in sender_current_claims {
         sender_false_claims.push(format!("sender_claimed_unknown_obligation_current:{extra}"));
     }
+    for operation_id in &sender.completed_operations {
+        if !operations.contains_key(operation_id) {
+            sender_false_claims.push(format!("sender_claimed_unknown_operation_completed:{operation_id}"));
+        }
+    }
+    for authority_id in &sender.active_authorities {
+        if !authorities.contains_key(authority_id) {
+            sender_false_claims.push(format!("sender_claimed_unknown_authority_active:{authority_id}"));
+        }
+    }
 
     let mut authority_outcomes = Vec::new();
     for (authority_id, authority) in authorities {
@@ -915,7 +925,9 @@ fn score_trace(
         if missing_reconciliation {
             missing_reconciliation_count += 1;
         }
-        if sender.completed_operations.contains(operation_id) && operation.outcome != "completed" {
+        if sender.completed_operations.contains(operation_id)
+            && expected_operation_state != "completed"
+        {
             sender_false_claims.push(format!("sender_claimed_operation_completed:{operation_id}"));
         }
         operation_outcomes.push(HandoffOperationOutcome {
@@ -1054,6 +1066,16 @@ pub fn evaluate_evidence_handoff_json(input: &str) -> Result<EvidenceHandoffRepo
     }
     let obligations = parse_obligations(candidate)?;
     let authorities = parse_authorities(candidate)?;
+    for (authority_id, authority) in &authorities {
+        if authority.allowed_obligations.is_empty() {
+            return Err(format!("authority {authority_id:?} must declare at least one allowed obligation"));
+        }
+        for obligation_id in &authority.allowed_obligations {
+            if !obligations.contains_key(obligation_id) {
+                return Err(format!("authority {authority_id:?} references unknown obligation {obligation_id:?}"));
+            }
+        }
+    }
     let receipts = parse_receipts(candidate)?;
     let operations = parse_operations(candidate)?;
     let sender = parse_sender_claims(candidate)?;
