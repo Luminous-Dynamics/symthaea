@@ -2486,6 +2486,7 @@ mod tests {
     #[test]
     fn ammonia_synthesis_competitiveness_target_requires_ten_percent_full_chain_gain() {
         let mut source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS_COMPETITIVENESS");
+        source["cases"][0]["case_id"] = serde_json::json!("NH3-SOEC-HB-OFFSHORE-2026");
         source["benchmark_targets"][0]["comparator_case_ids"] =
             serde_json::json!(["NH3-SOEC-HB-OFFSHORE-2026"]);
         let summary = audit_source_value(&source, "nh3-competitiveness-target.json").unwrap();
@@ -2495,6 +2496,7 @@ mod tests {
     #[test]
     fn ammonia_synthesis_competitiveness_target_rejects_intermediate_three_g_per_kwh_as_parity() {
         let mut source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS_COMPETITIVENESS");
+        source["cases"][0]["case_id"] = serde_json::json!("NH3-SOEC-HB-OFFSHORE-2026");
         source["benchmark_targets"][0]["metric_thresholds"]["plasma_candidate_max_specific_energy_kWh_per_kg_NH3"] =
             serde_json::json!(333.333);
         source["benchmark_targets"][0]["comparator_case_ids"] =
