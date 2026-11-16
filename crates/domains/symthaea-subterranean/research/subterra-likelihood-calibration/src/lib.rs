@@ -55,6 +55,7 @@ pub struct CalibrationDataset {
 pub enum CalibrationError {
     EmptyDatasetId,
     EmptyHypothesisSet,
+    EmptyHypothesisId,
     MissingUnknownHypothesis,
     DuplicateHypothesisId(String),
     EmptyActionSet,
@@ -72,6 +73,7 @@ pub enum CalibrationError {
     UnknownHypothesis { case_id: String, hypothesis_id: String },
     UnknownOutcome { case_id: String, action_id: String, outcome_id: String },
     NoTrainingCases,
+    InvalidLikelihoodTable,
     InvalidDirichletAlpha,
     InvalidMinimumTrainingSites,
     CannotScoreTrainingSplit,
@@ -109,6 +111,9 @@ impl CalibrationDataset {
         }
         if self.hypothesis_ids.is_empty() {
             return Err(CalibrationError::EmptyHypothesisSet);
+        }
+        if self.hypothesis_ids.iter().any(|id| !nonempty(id)) {
+            return Err(CalibrationError::EmptyHypothesisId);
         }
         if !self.hypothesis_ids.iter().any(|id| id == UNKNOWN_HYPOTHESIS_ID) {
             return Err(CalibrationError::MissingUnknownHypothesis);
@@ -353,10 +358,45 @@ impl CalibrationDataset {
         if split == DataSplit::Training {
             return Err(CalibrationError::CannotScoreTrainingSplit);
         }
-        if table.dataset_id != self.dataset_id || !table.training_split_only {
-            return Err(CalibrationError::NumericalOverflow(
-                "likelihood table provenance mismatch",
-            ));
+        if table.dataset_id != self.dataset_id
+            || !table.training_split_only
+            || table.estimator_id != "dirichlet-categorical-v0.1"
+            || !table.dirichlet_alpha.is_finite()
+            || table.dirichlet_alpha <= 0.0
+            || table.minimum_training_sites == 0
+        {
+            return Err(CalibrationError::InvalidLikelihoodTable);
+        }
+        let expected_cells = self.actions.len() * self.hypothesis_ids.len();
+        if table.cells.len() != expected_cells {
+            return Err(CalibrationError::InvalidLikelihoodTable);
+        }
+        let mut seen_cells = BTreeSet::new();
+        for cell in &table.cells {
+            let Some(action) = self.actions.iter().find(|a| a.action_id == cell.action_id) else {
+                return Err(CalibrationError::InvalidLikelihoodTable);
+            };
+            if !self.hypothesis_ids.contains(&cell.hypothesis_id)
+                || cell.outcome_ids != action.outcome_ids
+                || !seen_cells.insert((cell.action_id.as_str(), cell.hypothesis_id.as_str()))
+            {
+                return Err(CalibrationError::InvalidLikelihoodTable);
+            }
+            match &cell.probabilities {
+                Some(probabilities) => {
+                    let sum = probabilities.iter().sum::<f64>();
+                    if probabilities.len() != cell.outcome_ids.len()
+                        || probabilities.iter().any(|p| !p.is_finite() || *p < 0.0 || *p > 1.0)
+                        || !sum.is_finite()
+                        || (sum - 1.0).abs() > 1.0e-9
+                        || cell.training_sample_count < table.minimum_training_sites
+                    {
+                        return Err(CalibrationError::InvalidLikelihoodTable);
+                    }
+                }
+                None if cell.training_sample_count < table.minimum_training_sites => {}
+                None => return Err(CalibrationError::InvalidLikelihoodTable),
+            }
         }
 
         let cases = self
@@ -646,8 +686,8 @@ mod tests {
         let tunnel = table.cell("gpr", "tunnel").unwrap();
         assert_eq!(tunnel.training_sample_count, 3);
         let probabilities = tunnel.probabilities.as_ref().unwrap();
-        assert!((probabilities[0] - 0.7).abs() < 1.0e-12);
-        assert!((probabilities[1] - 0.3).abs() < 1.0e-12);
+        assert!((probabilities[0] - 0.625).abs() < 1.0e-12);
+        assert!((probabilities[1] - 0.375).abs() < 1.0e-12);
         assert!(table.training_split_only);
     }
 
@@ -675,6 +715,26 @@ mod tests {
         assert_eq!(report.coverage_fraction, 1.0);
         assert!(report.mean_brier.is_finite() && report.mean_brier >= 0.0);
         assert!(report.mean_negative_log_likelihood.is_finite());
+    }
+
+    #[test]
+    fn insufficient_training_support_reduces_holdout_coverage() {
+        let mut data = dataset();
+        data.cases.retain(|case| case.case_id != "u2");
+        data.cases.push(case(
+            "eval-unknown",
+            "site-eval-unknown",
+            "gpr",
+            "unknown",
+            "no_signal",
+            DataSplit::Evaluation,
+        ));
+        let table = data.fit_likelihoods(0.5, 2).unwrap();
+        let report = data.score_holdout(&table, DataSplit::Evaluation).unwrap();
+        assert_eq!(report.total_cases, 3);
+        assert_eq!(report.scored_cases, 2);
+        assert_eq!(report.unscored_cases, 1);
+        assert!((report.coverage_fraction - (2.0 / 3.0)).abs() < 1.0e-12);
     }
 
     #[test]
