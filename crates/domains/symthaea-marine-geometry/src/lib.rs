@@ -6,6 +6,7 @@
 //! checker, CFD solver, or vessel-approval system.
 
 pub mod full_envelope;
+pub mod full_envelope_mesh;
 pub mod loft;
 pub mod section;
 pub mod sectional_reference;
