@@ -337,11 +337,11 @@ The calibration package's one-row-per-site/action rule is safe but intentionally
 
 The auditor forms connected components using site ID, physical acquisition lineage and caller-declared shared-cause episode IDs. It reports row/site/acquisition/component denominators and refuses a split assignment that separates a declared group. It does **not** prove statistical independence between components or detect undeclared confounders.
 
-A 2026 *Earth and Planetary Science Letters* analysis reports that ignoring hierarchical geoscience structure can inflate F1 by more than 20 percentage points in its case studies (DOI 10.1016/j.epsl.2026.120250). A November 2026 review likewise emphasizes grouped and blocked validation for small experimental data nested within specimens, tools and batches (DOI 10.3390/info17111095). These results reinforce why Subterra should lead with site-/episode-disjoint evaluation rather than random-row splits; they are not Subterra benchmark results.
+A 2026 *Earth and Planetary Science Letters* short communication documents performance inflation from leakage in hierarchically structured geoscience data (DOI 10.1016/j.epsl.2026.120250). A November 2026 review likewise synthesizes evidence that row-wise validation can overstate generalization for measurements nested within specimens, tools and batches (DOI 10.3390/info17111095). These results reinforce why Subterra should lead with site-/episode-disjoint evaluation rather than random-row splits; they are not Subterra benchmark results, and their effect sizes should not be transferred to Subterra.
 
 ### Current authored state
 
-- `subterra-dependence-audit/`: 25 authored tests.
+- `subterra-dependence-audit/`: 28 authored tests, including 10 paired component-bootstrap tests and 3 multi-acquisition lineage tests.
 - Six standalone packages are now listed in the verification script.
 - This package is a raw-manifest preflight only. It does not rewrite the current likelihood-calibration dataset or claim integrated hierarchical estimation.
 - Rust formatting, compilation, tests and Clippy remain unexecuted until the six-package script runs on a Rust-equipped environment.

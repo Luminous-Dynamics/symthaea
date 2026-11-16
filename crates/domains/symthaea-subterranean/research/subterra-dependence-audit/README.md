@@ -27,7 +27,7 @@ Run with the Subterra standalone-package script:
 
 `bash crates/domains/symthaea-subterranean/research/verify-subterra-reference-packages.sh`
 
-There are 15 authored unit tests. Formatting, compilation, test execution and Clippy status must be reported separately.
+There are 28 authored unit tests. Formatting, compilation, test execution and Clippy status must be reported separately.
 
 ## Paired dependency-component bootstrap
 

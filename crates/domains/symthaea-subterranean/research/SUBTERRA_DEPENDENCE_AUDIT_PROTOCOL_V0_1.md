@@ -111,4 +111,4 @@ Standalone package:
 - Exact component/group counts and maximum component size.
 - 28 authored tests, including 10 paired cluster-bootstrap cases and 3 multi-acquisition lineage cases.
 
-The package is AUTHORED, not compiled or executed in the current environment. It does not estimate correlations, calculate effective sample size, bootstrap uncertainty, detect undeclared causes, authenticate IDs, or integrate with the likelihood fitter. Those are follow-on work, not implied capabilities.
+The package is AUTHORED, not compiled or executed in the current environment. It does not estimate correlations or effective sample size, detect undeclared causes, authenticate IDs, or integrate with the likelihood fitter. Those are follow-on work, not implied capabilities.
