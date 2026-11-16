@@ -21,8 +21,8 @@ const COMPARISON_TOLERANCE: f64 = 1.0e-10;
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelScenario {
     pub model_id: String,
-    /// Same hypothesis / decision / action schema across models. Priors and
-    /// conditional observation likelihoods may differ.
+    /// Same hypothesis / decision / candidate action schema across models.
+    /// Priors, outcome likelihoods and externally supplied gate dispositions may differ.
     pub problem: PlanningProblem,
 }
 
@@ -423,7 +423,7 @@ mod tests {
     fn selects_only_when_worst_case_value_is_positive() {
         let models = vec![
             model("nominal", [0.9, 0.1, 0.5]),
-            model("degraded", [0.8, 0.2, 0.5]),
+            model("degraded", [0.85, 0.15, 0.5]),
         ];
         let report =
             select_robust_measurement(&models, budget(), prices(), 0.0).unwrap();
@@ -539,7 +539,7 @@ mod tests {
     #[test]
     fn threshold_can_force_abstention() {
         let report = select_robust_measurement(
-            &[model("nominal", [0.9, 0.1, 0.5]), model("degraded", [0.8, 0.2, 0.5])],
+            &[model("nominal", [0.9, 0.1, 0.5]), model("degraded", [0.85, 0.15, 0.5])],
             budget(),
             prices(),
             100.0,
