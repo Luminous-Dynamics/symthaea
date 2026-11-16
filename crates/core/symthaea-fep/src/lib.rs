@@ -146,8 +146,9 @@ pub mod hierarchical;
 pub mod markov_blanket;
 pub mod observation_event;
 pub use observation_event::{
-    MissingnessReason, ObservationDimensionV1, ObservationEventError, ObservationEventV1,
-    ObservationLikelihoodV1, ObservationNoiseModelV1, ObservationPredictionDimensionV1,
+    MissingnessReason, ObservationBeliefGradientV1, ObservationDimensionV1, ObservationEventError,
+    ObservationEventV1, ObservationLikelihoodV1, ObservationNoiseModelV1,
+    ObservationPredictionDimensionV1,
     ObservationPredictionV1, SourceHealthV1,
 };
 mod motor;
