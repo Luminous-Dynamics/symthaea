@@ -1,6 +1,6 @@
 use std::{env, fs, path::PathBuf, process};
 
-use symthaea_marine_geometry::section::{generate_section_artifact, SectionHullSpec};
+use symthaea_marine_geometry::section::{SectionHullSpec, generate_section_artifact};
 
 const USAGE: &str = concat!(
     "Usage: marine-section-generate <section-spec.json> [--output <artifact.json>]\n",
@@ -36,8 +36,8 @@ fn run() -> Result<i32, String> {
     }
 
     let input = input.ok_or_else(|| USAGE.to_string())?;
-    let bytes = fs::read(&input)
-        .map_err(|error| format!("cannot read {}: {error}", input.display()))?;
+    let bytes =
+        fs::read(&input).map_err(|error| format!("cannot read {}: {error}", input.display()))?;
     let specification: SectionHullSpec = serde_json::from_slice(&bytes)
         .map_err(|error| format!("invalid section specification: {error}"))?;
     let artifact = generate_section_artifact(&specification)
