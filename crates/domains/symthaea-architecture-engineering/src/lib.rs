@@ -26,6 +26,7 @@ pub mod matched_campaign;
 pub mod offer_set;
 pub mod offer_set_evidence;
 pub mod pareto_objectives;
+pub mod scilaws_candidate_selection;
 pub mod pareto_anytime;
 pub mod pareto_noisy_observations;
 pub mod pareto_benchmarks;
