@@ -1,0 +1,84 @@
+name: SENSE-TAC-001B Synthetic Tactile Fault Oracle
+
+on:
+  push:
+    paths:
+      - "docs/research/SENSE-TAC-001B.md"
+      - "docs/research/fixtures/SENSE_TAC_001B*"
+      - "tools/sense-tac-001b-oracle/**"
+      - ".github/workflows/sense-tac-001b-oracle.yml"
+  pull_request:
+    paths:
+      - "docs/research/SENSE-TAC-001B.md"
+      - "docs/research/fixtures/SENSE_TAC_001B*"
+      - "tools/sense-tac-001b-oracle/**"
+      - ".github/workflows/sense-tac-001b-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sense-tac-001b-oracle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  synthetic-oracle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          persist-credentials: true
+      - name: Install Rust 1.96, rustfmt and Clippy
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+      - name: Verify tracked fixture blob identities
+        shell: bash
+        run: |
+          test "$(git hash-object docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.json)" = "e9349751590c4a3a28f4be81a5a11f8170ef2212"
+          test "$(git hash-object docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.schema.json)" = "7b531325c1c8f105879dd80e0ba6016555a4b645"
+      - name: Resolve the exact locked dependency graph
+        run: cargo generate-lockfile --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
+      - name: Format Rust oracle sources
+        run: cargo fmt --manifest-path tools/sense-tac-001b-oracle/Cargo.toml --all
+      - name: Upload canonical lock and formatted source receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: sense-tac-001b-tested-source-and-lock
+          path: |
+            tools/sense-tac-001b-oracle/Cargo.lock
+            tools/sense-tac-001b-oracle/src/lib.rs
+          if-no-files-found: error
+          retention-days: 3
+      - name: Verify formatting
+        run: cargo fmt --manifest-path tools/sense-tac-001b-oracle/Cargo.toml --all -- --check
+      - name: Fetch locked dependencies
+        run: cargo fetch --locked --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
+      - name: Run offline mutation tests
+        run: cargo test --locked --offline --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
+      - name: Run strict Clippy
+        run: cargo clippy --locked --offline --manifest-path tools/sense-tac-001b-oracle/Cargo.toml --all-targets -- -D warnings
+      - name: Validate tracked corpus
+        run: cargo run --locked --offline --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
+      - name: Commit the exact generated files that were tested
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        env:
+          TARGET_BRANCH: ${{ github.head_ref }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/sense-tac-001b-oracle/Cargo.lock tools/sense-tac-001b-oracle/src/lib.rs
+          if git diff --cached --quiet; then
+            echo "generated_files_already_current=true"
+          else
+            git commit -m "chore(sense): commit runner-resolved lock and rustfmt output"
+            git push origin "HEAD:${TARGET_BRANCH}"
+          fi
+          test "$(git rev-parse HEAD:tools/sense-tac-001b-oracle/Cargo.lock)" = "$(git hash-object tools/sense-tac-001b-oracle/Cargo.lock)"
+          test "$(git rev-parse HEAD:tools/sense-tac-001b-oracle/src/lib.rs)" = "$(git hash-object tools/sense-tac-001b-oracle/src/lib.rs)"
+          echo "committed_tested_source_lock_blobs=true"
