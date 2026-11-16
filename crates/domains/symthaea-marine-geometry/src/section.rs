@@ -949,6 +949,28 @@ mod tests {
         assert!(errors.iter().any(|item| item.code == "section_family_manifest_digest"));
     }
 
+
+    #[test]
+    fn collapsed_endpoint_semantics_are_checked_even_after_manifest_rebinding() {
+        let mut spec = valid_spec();
+        spec.schema_version = 2;
+        spec.longitudinal_end_conditions.bow =
+            LongitudinalEndCondition::CollapsedCentreline;
+        spec.stations[0].half_breadth_fraction = 0.0;
+        let mut artifact = generate_section_artifact(&spec).unwrap();
+
+        artifact.sections[0].keel_to_sheer_m[2][1] = 0.125;
+        artifact.sampled_sections_digest_blake3 =
+            compute_sampled_sections_digest(&artifact.sections).unwrap();
+        artifact.section_family_manifest_digest_blake3 =
+            compute_section_family_manifest_digest(&artifact).unwrap();
+
+        let errors = verify_section_family_artifact_integrity(&artifact).unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|item| item.code == "collapsed_end_geometry"));
+    }
+
     #[test]
     fn legacy_v1_planar_section_specs_remain_supported() {
         let mut spec = valid_spec();
