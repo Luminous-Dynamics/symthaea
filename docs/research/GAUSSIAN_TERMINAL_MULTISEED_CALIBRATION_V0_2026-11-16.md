@@ -77,7 +77,7 @@ A passing workflow establishes only implementation and Monte Carlo calibration f
 
 ## 7. Exact-head calibration result (2026-11-16)
 
-<Verified> Exact PR head `eadfdca561b50fda49ba5f61591e08071aaf9b04` passed the focused workflow:
+Exact PR head `eadfdca561b50fda49ba5f61591e08071aaf9b04` passed the focused workflow:
 - pinned Rust 1.96 and rustfmt;
 - all-target Rust tests;
 - the existing sequential null/alternative campaign and receipt upload;
