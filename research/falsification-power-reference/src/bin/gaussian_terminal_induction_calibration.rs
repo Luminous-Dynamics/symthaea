@@ -14,7 +14,12 @@ const HORIZON: usize = 80;
 const ALPHA: f64 = 0.05;
 const DISCREPANCY: f64 = 0.22;
 const SIGMA: f64 = 0.80;
-const INDUCED_STOP_THRESHOLD: f64 = 0.90;
+const INDUCED_STOP_THRESHOLDS: [f64; 3] = [0.75, 0.90, 0.99];
+const RANDOMIZER_SALTS: [u64; 3] = [
+    0xa5a5_5a5a_1234_9876,
+    0x6a09_e667_f3bc_c909,
+    0xbb67_ae85_84ca_a73b,
+];
 const Z_CRITICAL_ONE_SIDED_05: f64 = 1.644_853_626_951_472_2;
 const WILSON_Z_95: f64 = 1.959_963_984_540_054;
 const ROOT_SEED: u64 = 0x4f1b_bcdd_6a09_e667;
@@ -80,13 +85,19 @@ impl SplitMix64 {
 }
 
 #[derive(Default)]
+struct StopPolicyCounts {
+    threshold: f64,
+    randomized_rejections: u64,
+    early_stops: u64,
+    total_stop_looks: u64,
+}
+
+#[derive(Default)]
 struct Counts {
     terminal_np_rejections: u64,
-    induced_randomized_rejections: u64,
+    induced_policies: Vec<StopPolicyCounts>,
     e_process_crossings: u64,
     naive_repeated_rejections: u64,
-    induced_early_stops: u64,
-    induced_stop_looks: u64,
     e_process_first_crossing_looks: u64,
     e_process_crossers: u64,
     terminal_induced_mismatches: u64,
@@ -108,16 +119,25 @@ fn wilson_95(successes: u64, trials: u64) -> (f64, f64) {
 fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
     let design =
         GaussianTerminalInducedTest::new(ALPHA, vec![DISCREPANCY; HORIZON], vec![SIGMA; HORIZON])?;
-    let mut counts = Counts::default();
+    let mut counts = Counts {
+        induced_policies: INDUCED_STOP_THRESHOLDS
+            .iter()
+            .copied()
+            .map(|threshold| StopPolicyCounts {
+                threshold,
+                ..StopPolicyCounts::default()
+            })
+            .collect(),
+        ..Counts::default()
+    };
 
     for path in 0..PATHS {
         let seed = ROOT_SEED ^ scenario.seed_offset() ^ path.wrapping_mul(0xd6e8_feb8_6659_fd93);
         let mut observation_rng = SplitMix64::new(seed);
-        let mut randomizer_rng = SplitMix64::new(seed ^ 0xa5a5_5a5a_1234_9876);
         let mut e_process = PredictableGaussianEProcess::new(SIGMA, ALPHA)?;
         let mut observations = Vec::with_capacity(HORIZON);
         let mut cumulative_standardized = 0.0;
-        let mut induced_stop = None;
+        let mut induced_stops = vec![None; INDUCED_STOP_THRESHOLDS.len()];
         let mut e_process_first_crossing = None;
         let mut naive_rejected = false;
 
@@ -147,11 +167,12 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
             }
 
             let induced = design.evaluate_prefix(&observations)?;
-            if induced_stop.is_none()
-                && (induced.conditional_rejection_probability >= INDUCED_STOP_THRESHOLD
-                    || look == HORIZON)
-            {
-                induced_stop = Some(induced);
+            for (policy_index, threshold) in INDUCED_STOP_THRESHOLDS.iter().copied().enumerate() {
+                if induced_stops[policy_index].is_none()
+                    && (induced.conditional_rejection_probability >= threshold || look == HORIZON)
+                {
+                    induced_stops[policy_index] = Some(induced);
+                }
             }
         }
 
@@ -165,13 +186,18 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
             counts.terminal_np_rejections += 1;
         }
 
-        let stop = induced_stop.expect("the fixed horizon always produces a stop value");
-        if stop.observations < HORIZON {
-            counts.induced_early_stops += 1;
-        }
-        counts.induced_stop_looks += stop.observations as u64;
-        if stop.randomized_reject(randomizer_rng.uniform())? {
-            counts.induced_randomized_rejections += 1;
+        for (policy_index, policy) in counts.induced_policies.iter_mut().enumerate() {
+            let stop = induced_stops[policy_index]
+                .expect("the fixed horizon always produces a stop value");
+            if stop.observations < HORIZON {
+                policy.early_stops += 1;
+            }
+            policy.total_stop_looks += stop.observations as u64;
+            let mut randomizer_rng =
+                SplitMix64::new(seed ^ RANDOMIZER_SALTS[policy_index]);
+            if stop.randomized_reject(randomizer_rng.uniform())? {
+                policy.randomized_rejections += 1;
+            }
         }
 
         if e_process_first_crossing.is_some() {
@@ -190,15 +216,38 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
 
 fn emit_counts(scenario: Scenario, counts: &Counts, expected_terminal_power: f64) {
     let (terminal_low, terminal_high) = wilson_95(counts.terminal_np_rejections, PATHS);
-    let (induced_low, induced_high) = wilson_95(counts.induced_randomized_rejections, PATHS);
     let (e_low, e_high) = wilson_95(counts.e_process_crossings, PATHS);
     let (naive_low, naive_high) = wilson_95(counts.naive_repeated_rejections, PATHS);
-    let mean_stop_look = counts.induced_stop_looks as f64 / PATHS as f64;
     let mean_e_crossing_look = if counts.e_process_crossers == 0 {
         0.0
     } else {
         counts.e_process_first_crossing_looks as f64 / counts.e_process_crossers as f64
     };
+    let policy_json = counts
+        .induced_policies
+        .iter()
+        .map(|policy| {
+            let (low, high) = wilson_95(policy.randomized_rejections, PATHS);
+            format!(
+                concat!(
+                    "{{",
+                    "\"stop_threshold\":{:.4},",
+                    "\"randomized_rejection_rate\":{:.8},",
+                    "\"randomized_rejection_wilson95\":[{:.8},{:.8}],",
+                    "\"early_stop_rate\":{:.8},",
+                    "\"mean_stop_look\":{:.4}",
+                    "}}"
+                ),
+                policy.threshold,
+                policy.randomized_rejections as f64 / PATHS as f64,
+                low,
+                high,
+                policy.early_stops as f64 / PATHS as f64,
+                policy.total_stop_looks as f64 / PATHS as f64
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
 
     println!(
         concat!(
@@ -208,10 +257,7 @@ fn emit_counts(scenario: Scenario, counts: &Counts, expected_terminal_power: f64
             "\"horizon\":{},",
             "\"terminal_np_rejection_rate\":{:.8},",
             "\"terminal_np_wilson95\":[{:.8},{:.8}],",
-            "\"induced_randomized_rejection_rate\":{:.8},",
-            "\"induced_randomized_wilson95\":[{:.8},{:.8}],",
-            "\"induced_early_stop_rate\":{:.8},",
-            "\"induced_mean_stop_look\":{:.4},",
+            "\"induced_stop_policies\":[{}],",
             "\"e_process_crossing_rate\":{:.8},",
             "\"e_process_wilson95\":[{:.8},{:.8}],",
             "\"e_process_mean_crossing_look\":{:.4},",
@@ -227,11 +273,7 @@ fn emit_counts(scenario: Scenario, counts: &Counts, expected_terminal_power: f64
         counts.terminal_np_rejections as f64 / PATHS as f64,
         terminal_low,
         terminal_high,
-        counts.induced_randomized_rejections as f64 / PATHS as f64,
-        induced_low,
-        induced_high,
-        counts.induced_early_stops as f64 / PATHS as f64,
-        mean_stop_look,
+        policy_json,
         counts.e_process_crossings as f64 / PATHS as f64,
         e_low,
         e_high,
@@ -243,7 +285,6 @@ fn emit_counts(scenario: Scenario, counts: &Counts, expected_terminal_power: f64
         counts.terminal_induced_mismatches
     );
 }
-
 fn main() -> Result<(), Box<dyn Error>> {
     let design =
         GaussianTerminalInducedTest::new(ALPHA, vec![DISCREPANCY; HORIZON], vec![SIGMA; HORIZON])?;
@@ -259,7 +300,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "\"nominal_alpha\":{:.8},",
             "\"paths_per_scenario\":{},",
             "\"maximum_looks\":{},",
-            "\"induced_stop_threshold\":{:.8},",
+            "\"induced_stop_thresholds\":[{:.4},{:.4},{:.4}],"
             "\"design_information\":{:.8},",
             "\"analytic_terminal_np_power\":{:.8},",
             "\"claim\":\"paired synthetic calibration diagnostic for a frozen simple Gaussian design only\",",
@@ -269,7 +310,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         ALPHA,
         PATHS,
         HORIZON,
-        INDUCED_STOP_THRESHOLD,
+        INDUCED_STOP_THRESHOLDS[0],
+        INDUCED_STOP_THRESHOLDS[1],
+        INDUCED_STOP_THRESHOLDS[2],
         design.total_information(),
         design.terminal_power()
     );
