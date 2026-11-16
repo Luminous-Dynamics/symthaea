@@ -461,8 +461,11 @@ pub fn match_signature(
         .checked_mul(2)
         .and_then(|value| value.checked_sub(1))
         .ok_or(TemplateErrorV1::ArithmeticOverflow)?;
+    // One complete family sweep finds the first divergence; a second
+    // complete sweep compares every candidate with the observed signature.
     let required_work = candidate_count
         .checked_mul(observed.len())
+        .and_then(|value| value.checked_mul(2))
         .ok_or(TemplateErrorV1::ArithmeticOverflow)?;
     if required_work > budget.maximum_work_units {
         return Err(TemplateErrorV1::WorkBudgetExceeded {
@@ -487,6 +490,8 @@ pub fn match_signature(
             matches.push(*hypothesis);
         }
     }
+
+    matches.sort();
 
     let status = match matches.len() {
         0 => MatchStatusV1::NoMatch,
