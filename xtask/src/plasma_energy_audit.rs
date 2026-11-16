@@ -675,6 +675,328 @@ pub fn print_report(report: &AuditReport, as_json: bool) -> Result<()> {
     Ok(())
 }
 
+
+fn observation_value<'a>(case: &'a Value, metric: &str, unit: &str) -> Result<&'a Value> {
+    case.get("observations")
+        .and_then(Value::as_array)
+        .and_then(|observations| observations.iter().find(|item| {
+            item.get("metric").and_then(Value::as_str) == Some(metric)
+                && item.get("unit").and_then(Value::as_str) == Some(unit)
+        }))
+        .with_context(|| format!("missing observation {metric} [{unit}]"))
+}
+
+fn validate_nh3_diluent_case(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: NH3 diluent source qualification");
+    ensure!(
+        case.get("technology_family").and_then(Value::as_str) == Some("PLASMA"),
+        "{context}: source must remain classified as plasma"
+    );
+    ensure!(
+        case.get("configuration").and_then(|value| value.get("peak_metrics_pairing_status"))
+            .and_then(Value::as_str) == Some("UNPAIRED_DIFFERENT_OPERATING_CONDITIONS"),
+        "{context}: 58% conversion and 1.8 g/kWh peak must remain unpaired"
+    );
+    ensure!(
+        case.get("configuration").and_then(|value| value.get("peak_metrics_must_not_be_combined"))
+            .and_then(Value::as_bool) == Some(true),
+        "{context}: source must forbid combining unpaired peak metrics"
+    );
+    let conversion = observation_value(case, "ammonia_conversion", "fraction")?;
+    let yield_point = observation_value(case, "hydrogen_energy_yield", "g_H2/kWh")?;
+    ensure!(
+        conversion.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value, 0.58)),
+        "{context}: preserve the source-reported up-to-58% conversion"
+    );
+    ensure!(
+        yield_point.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value, 1.8)),
+        "{context}: preserve the source-reported 1.8 g/kWh peak yield"
+    );
+    let conversion_qualifier = conversion.get("qualifier").and_then(Value::as_str).unwrap_or_default();
+    let yield_qualifier = yield_point.get("qualifier").and_then(Value::as_str).unwrap_or_default();
+    ensure!(
+        conversion_qualifier.contains("different operating condition")
+            && yield_qualifier.contains("different operating condition"),
+        "{context}: both maxima must explicitly remain on different operating conditions"
+    );
+    ensure!(
+        case.get("configuration").and_then(|value| value.get("feedstock"))
+            .and_then(Value::as_str).is_some_and(|value| value.contains("Ar") && value.contains("He") && value.contains("N2") && value.contains("O2")),
+        "{context}: preserve the full diluent matrix"
+    );
+    Ok(())
+}
+
+fn validate_nh3_thermal_plant_case(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: non-plasma NH3 thermal plant comparator");
+    ensure!(
+        case.get("technology_family").and_then(Value::as_str) == Some("NON_PLASMA_THERMAL_CATALYTIC"),
+        "{context}: thermal/catalytic incumbent must not be classified as plasma"
+    );
+    ensure!(
+        case.get("configuration").and_then(|value| value.get("non_plasma_incumbent"))
+            .and_then(Value::as_bool) == Some(true),
+        "{context}: explicit non-plasma incumbent flag is required"
+    );
+    for (metric, unit, expected) in [
+        ("heat_recovery_fraction_of_thermodynamic_limit", "fraction", 0.9456),
+        ("net_energy_consumption", "kJ/mol_NH3", 36.79),
+        ("hydrogen_production_cost", "USD/kg_H2", 6.44),
+    ] {
+        let value = observation_value(case, metric, unit)?;
+        ensure!(
+            value.get("value").and_then(Value::as_f64).is_some_and(|actual| close_f64(actual, expected)),
+            "{context}: preserve source value for {metric}"
+        );
+    }
+    ensure!(
+        case.get("comparison_status").and_then(Value::as_str)
+            == Some("PUBLISHED_THERMAL_PLANT_TEA_NOT_MATCHED_TO_PLASMA_SERVICE_BOUNDARY"),
+        "{context}: plant TEA must remain unmatched until product and energy boundaries are normalized"
+    );
+    Ok(())
+}
+
+fn validate_biogas_reforming_incumbent(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: harmonized non-plasma biogas incumbent");
+    ensure!(
+        case.get("technology_family").and_then(Value::as_str) == Some("NON_PLASMA_THERMOCHEMICAL"),
+        "{context}: incumbent must be classified as non-plasma thermochemical"
+    );
+    let config = case.get("configuration").context("biogas configuration missing")?;
+    ensure!(
+        config.get("system_boundary").and_then(Value::as_str)
+            == Some("gate-to-gate from biogas purification through hydrogen production and purification to 99.9% H2"),
+        "{context}: exact gate-to-gate system boundary must remain explicit"
+    );
+    ensure!(
+        config.get("product_purity_fraction").and_then(Value::as_f64).is_some_and(|value| close_f64(value, 0.999)),
+        "{context}: retain the 99.9% accepted-H2 purity boundary"
+    );
+    ensure!(
+        config.get("plant_lifetime_years").and_then(Value::as_u64) == Some(20)
+            && config.get("capacity_factor_fraction").and_then(Value::as_f64).is_some_and(|value| close_f64(value, 0.90))
+            && config.get("currency_year").and_then(Value::as_u64) == Some(2025),
+        "{context}: retain 20-year life, 90% capacity factor and 2025 USD basis"
+    );
+    ensure!(
+        config.get("method").and_then(Value::as_str).is_some_and(|value| value.contains("10,000-iteration Monte Carlo")),
+        "{context}: preserve the source's uncertainty method"
+    );
+    let routes = case.get("route_results").and_then(Value::as_array)
+        .with_context(|| format!("{context}: four-route results are missing"))?;
+    ensure!(routes.len() == 4, "{context}: expected SR, POX, ATR and DR route results");
+    for (route, mean, p10, p90) in [
+        ("steam_reforming",5.21,4.32,6.10),
+        ("partial_oxidation",5.47,4.57,6.41),
+        ("autothermal_reforming",5.82,4.90,6.72),
+        ("dry_reforming",6.10,5.08,7.22),
+    ] {
+        let row=routes.iter().find(|value| value.get("route").and_then(Value::as_str)==Some(route))
+            .with_context(|| format!("{context}: missing route {route}"))?;
+        for (field, expected) in [
+            ("lcoh_mean_usd_2025_per_kg_h2",mean),
+            ("p10",p10),
+            ("p90",p90),
+        ] {
+            ensure!(
+                row.get(field).and_then(Value::as_f64).is_some_and(|actual| close_f64(actual,expected)),
+                "{context}: {route} {field} does not match the source register"
+            );
+        }
+    }
+    Ok(())
+}
+
+fn validate_methane_review_reference(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: methane review-derived non-plasma reference");
+    ensure!(
+        case.get("technology_family").and_then(Value::as_str).is_some_and(|value| value.starts_with("NON_PLASMA_")),
+        "{context}: review-derived reference must retain its non-plasma technology class"
+    );
+    ensure!(
+        case.get("configuration").and_then(|value| value.get("non_plasma_reference"))
+            .and_then(Value::as_bool) == Some(true),
+        "{context}: explicit non-plasma reference flag is required"
+    );
+    let metric = |name: &str, unit: &str| observation_value(case,name,unit);
+    let conversion = metric("methane_conversion","fraction")?;
+    let cost = metric("levelized_cost_hydrogen","USD/kg_H2")?;
+    if case.get("case_id").and_then(Value::as_str)==Some("METHANE-PYROLYSIS-SHOCK-WAVE-REFERENCE-2026") {
+        ensure!(
+            conversion.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value,0.92))
+                && cost.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value,0.70)),
+            "{context}: preserve the shock-wave 92% / USD 0.70 Pareto point"
+        );
+        ensure!(
+            case.get("technology_family").and_then(Value::as_str)==Some("NON_PLASMA_SHOCK_WAVE"),
+            "{context}: shock-wave reference class changed"
+        );
+    } else {
+        let selectivity=metric("hydrogen_selectivity","fraction")?;
+        ensure!(
+            conversion.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value,0.91))
+                && selectivity.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value,0.99))
+                && cost.get("value").and_then(Value::as_f64).is_some_and(|value| close_f64(value,1.09)),
+            "{context}: preserve the microwave 91% / 99% / USD 1.09 Pareto point"
+        );
+        ensure!(
+            case.get("technology_family").and_then(Value::as_str)==Some("NON_PLASMA_MICROWAVE_HEATING"),
+            "{context}: microwave heating must not be promoted to microwave plasma"
+        );
+        ensure!(
+            case.get("configuration").and_then(|value| value.get("heating_mode_as_classified_by_review"))
+                .and_then(Value::as_str).is_some_and(|value| value.contains("do not infer")),
+            "{context}: explicit microwave-heating versus microwave-plasma distinction required"
+        );
+    }
+    Ok(())
+}
+
+fn validate_plasma_process_selection_target(
+    target: &Value,
+    known_case_ids: &BTreeSet<String>,
+    display_name: &str,
+) -> Result<()> {
+    let target_id=target.get("target_id").and_then(Value::as_str).unwrap_or("unknown-target");
+    let context=format!("{display_name}: process-selection target {target_id}");
+    let metrics=target.get("metric_thresholds").context("process-selection metrics missing")?;
+    ensure!(
+        required_f64(metrics,"minimum_chemistry_groups",&context)? >= 3.0
+            && required_f64(metrics,"minimum_routes_per_group",&context)? >= 2.0
+            && required_f64(metrics,"minimum_non_plasma_incumbent_per_group",&context)? >= 1.0,
+        "{context}: requires at least three chemistry groups, two routes and one non-plasma incumbent per group"
+    );
+    ensure!(
+        required_f64(metrics,"minimum_monte_carlo_draws_per_decision",&context)? >= 10000.0
+            && close_f64(required_f64(metrics,"maximum_false_feasible_rate",&context)?,0.0)
+            && close_f64(required_f64(metrics,"maximum_unsupported_route_rankings",&context)?,0.0)
+            && required_f64(metrics,"minimum_high_fidelity_budget_reduction_fraction",&context)? >= 0.25,
+        "{context}: Monte Carlo, false-feasible, unsupported-ranking or budget-reduction threshold weakened"
+    );
+    for key in [
+        "all_ranked_candidates_share_same_service_contract",
+        "route_metrics_remain_pareto_not_scalarized",
+    ] {
+        ensure!(
+            metrics.get(key).and_then(Value::as_bool)==Some(true),
+            "{context}: missing non-compensatory selection metric guard {key}"
+        );
+    }
+    let guards=target.get("claim_guards").and_then(Value::as_object)
+        .context("process-selection claim guards missing")?;
+    for key in [
+        "no_plasma_preference_or_plasma_only_candidate_set",
+        "all_routes_bind_to_one_accepted_product_and_service_contract_per_chemistry",
+        "matched_feedstock_and_impurity_envelope_required",
+        "full_grid_or_fuel_to_accepted_product_boundary_required",
+        "currency_year_functional_unit_and_cost_basis_match_required",
+        "source_evidence_classes_remain_separate",
+        "every_metric_binds_to_one_exact_source_operating_point",
+        "all_operating_point_pairing_discrepancies_remain_unresolved_until_source_reconciled",
+        "hard_product_and_safety_constraints_are_non_compensatory",
+        "missing_hard_constraint_or_boundary_forces_blocked_or_not_comparable",
+        "uncertainty_draws_use_pinned_seed_and_common_exogenous_scenarios_for_paired_route_comparison",
+        "robust_pareto_membership_and_regret_intervals_reported",
+        "decision_can_abstain_and_request_highest_value_next_measurement",
+        "no_credit_baseline_required_for_all_coproduct_dependent_route_economics",
+        "carbon_black_credit_requires_product_grade_market_capacity_and_offtake",
+        "lcoh_syngas_price_and_specific_energy_never_compared_without_functional_unit_normalization",
+        "review_derived_pareto_points_never_promoted_to_single_physical_experiments",
+        "microwave_heating_never_assumed_to_mean_microwave_plasma",
+        "thermal_heat_recovery_credited_only_from_measured_or_source_qualified_useful_duty",
+    ] {
+        ensure!(
+            guards.get(key).and_then(Value::as_bool)==Some(true),
+            "{context}: required claim guard {key} is absent or weakened"
+        );
+    }
+    let required_baselines=target.get("baseline_algorithms").and_then(Value::as_array)
+        .context("process-selection baseline algorithms missing")?;
+    for required in [
+        "BEST_QUALIFIED_INCUMBENT_ONLY",
+        "FIXED_WEIGHTED_SUM",
+        "TOPSIS",
+        "RANDOM_SPACE_FILLING",
+        "UNCERTAINTY_ONLY",
+        "ROBUST_PARETO_WITH_ABSTENTION",
+    ] {
+        ensure!(
+            required_baselines.iter().any(|value| value.as_str()==Some(required)),
+            "{context}: missing baseline algorithm {required}"
+        );
+    }
+    let groups=target.get("candidate_groups").and_then(Value::as_array)
+        .context("process-selection candidate_groups missing")?;
+    ensure!(
+        groups.len() >= required_f64(metrics,"minimum_chemistry_groups",&context)? as usize,
+        "{context}: fewer chemistry groups than the declared minimum"
+    );
+    let mut group_ids=BTreeSet::new();
+    let mut all_route_ids=BTreeSet::new();
+    for group in groups {
+        let group_id=group.get("group_id").and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .context("process-selection group has no ID")?;
+        ensure!(group_ids.insert(group_id.to_owned()),"{context}: duplicate group {group_id}");
+        ensure!(
+            group.get("common_service_status").and_then(Value::as_str)==Some("NOT_YET_MATCHED"),
+            "{context}: source candidates must remain NOT_YET_MATCHED until boundaries are reconciled"
+        );
+        let routes=group.get("candidate_routes").and_then(Value::as_array)
+            .context("process-selection candidate routes missing")?;
+        ensure!(
+            routes.len() >= required_f64(metrics,"minimum_routes_per_group",&context)? as usize,
+            "{context}: group {group_id} has too few route candidates"
+        );
+        let mut has_plasma=false;
+        let mut non_plasma=0_usize;
+        let mut local_ids=BTreeSet::new();
+        for route in routes {
+            let case_id=route.get("case_id").and_then(Value::as_str)
+                .filter(|value| !value.trim().is_empty())
+                .context("process-selection route has no case ID")?;
+            ensure!(
+                known_case_ids.contains(case_id),
+                "{context}: route {case_id} is not a registered source case"
+            );
+            ensure!(
+                local_ids.insert(case_id.to_owned()) && all_route_ids.insert(case_id.to_owned()),
+                "{context}: duplicate route source ID {case_id}"
+            );
+            let technology=route.get("technology_class").and_then(Value::as_str)
+                .context("process-selection route technology class missing")?;
+            match technology {
+                "PLASMA" => has_plasma=true,
+                "NON_PLASMA_THERMAL_CATALYTIC" | "NON_PLASMA_THERMOCHEMICAL"
+                    | "NON_PLASMA_SHOCK_WAVE" | "NON_PLASMA_MICROWAVE_HEATING"
+                    | "NON_PLASMA_SYSTEM_TEA" => non_plasma+=1,
+                other => anyhow::bail!("{context}: unsupported technology class {other}"),
+            }
+        }
+        ensure!(has_plasma,"{context}: group {group_id} has no explicit plasma candidate");
+        ensure!(
+            non_plasma >= required_f64(metrics,"minimum_non_plasma_incumbent_per_group",&context)? as usize,
+            "{context}: group {group_id} lacks a non-plasma incumbent"
+        );
+    }
+    let comparator_ids=target.get("comparator_case_ids").and_then(Value::as_array)
+        .context("process-selection comparator IDs missing")?;
+    for case_id in all_route_ids {
+        ensure!(
+            comparator_ids.iter().any(|value| value.as_str()==Some(case_id.as_str())),
+            "{context}: candidate route {case_id} is missing from comparator_case_ids"
+        );
+    }
+    let credit_policies=target.get("credit_policies").and_then(Value::as_array)
+        .context("process-selection credit policies missing")?;
+    ensure!(
+        credit_policies.iter().any(|value| value.as_str()==Some("NO_CREDIT")),
+        "{context}: mandatory NO_CREDIT policy is missing"
+    );
+    Ok(())
+}
+
 fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifestSummary> {
     let programme = root
         .get("programme")
@@ -770,6 +1092,20 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
 
         if case_id == "NH3-CRACK-MW-ATM-MECHANISM-2026" {
             validate_nh3_operating_points(case, display_name)?;
+        }
+        if case_id == "NH3-PLASMA-DILUENTS-NSP-2026" {
+            validate_nh3_diluent_case(case, display_name)?;
+        }
+        if case_id == "NH3-THERMAL-HEAT-INTEGRATED-PLANT-TEA-2026" {
+            validate_nh3_thermal_plant_case(case, display_name)?;
+        }
+        if case_id == "BIOGAS-REFORMING-THERMOCHEMICAL-HARMONIZED-TEA-2026" {
+            validate_biogas_reforming_incumbent(case, display_name)?;
+        }
+        if case_id == "METHANE-PYROLYSIS-SHOCK-WAVE-REFERENCE-2026"
+            || case_id == "METHANE-PYROLYSIS-MICROWAVE-REFERENCE-2026"
+        {
+            validate_methane_review_reference(case, display_name)?;
         }
         if case_id.starts_with("NH3-") && (
             case_id == "NH3-PLASMA-DUAL-MEMBRANE-PEDMADS-2025"
@@ -1570,6 +1906,9 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     comparators.iter().any(|value| value.as_str() == Some("CO2-CYCLIC-REFORMING-GASIFICATION-2026")),
                     "{display_name}: cyclic carbon target {target_id} must reference the published cycle experiment"
                 );
+            }
+            "PLASMA_PROCESS_PATHWAY_SELECTION" => {
+                validate_plasma_process_selection_target(target, &case_ids, display_name)?;
             }
             "PLASMA_POWER_TO_X_BIOGAS_REFORMING" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
@@ -4929,6 +5268,91 @@ mod tests {
                 .to_string()
                 .contains("electricity_price_and_capacity_factor_scenario_required")
         );
+    }
+
+
+    #[test]
+    fn source_manifest_accepts_plasma_pathway_selection_with_non_plasma_incumbents() {
+        let source = frozen_source_manifest();
+        let summary = audit_source_value(&source, "pathway-selection.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 15);
+        assert_eq!(summary.case_count, 66);
+    }
+
+    #[test]
+    fn pathway_selection_rejects_a_plasma_only_chemistry_group() {
+        let mut source=frozen_source_manifest();
+        let target=source["benchmark_targets"].as_array_mut().unwrap().iter_mut()
+            .find(|value| value["target_id"]=="PLASMA-PROCESS-PATHWAY-SELECTION-001").unwrap();
+        target["candidate_groups"][0]["candidate_routes"].as_array_mut().unwrap()
+            .retain(|route| route["technology_class"]=="PLASMA");
+        let error=audit_source_value(&source,"pathway-selection.json").unwrap_err();
+        assert!(error.to_string().contains("lacks a non-plasma incumbent"));
+    }
+
+    #[test]
+    fn pathway_selection_rejects_missing_same_service_guard() {
+        let mut source=frozen_source_manifest();
+        let target=source["benchmark_targets"].as_array_mut().unwrap().iter_mut()
+            .find(|value| value["target_id"]=="PLASMA-PROCESS-PATHWAY-SELECTION-001").unwrap();
+        target["claim_guards"]["all_routes_bind_to_one_accepted_product_and_service_contract_per_chemistry"]=
+            serde_json::json!(false);
+        let error=audit_source_value(&source,"pathway-selection.json").unwrap_err();
+        assert!(error.to_string().contains("all_routes_bind_to_one_accepted_product"));
+    }
+
+    #[test]
+    fn pathway_selection_rejects_less_than_ten_thousand_paired_scenarios() {
+        let mut source=frozen_source_manifest();
+        let target=source["benchmark_targets"].as_array_mut().unwrap().iter_mut()
+            .find(|value| value["target_id"]=="PLASMA-PROCESS-PATHWAY-SELECTION-001").unwrap();
+        target["metric_thresholds"]["minimum_monte_carlo_draws_per_decision"]=serde_json::json!(9999);
+        let error=audit_source_value(&source,"pathway-selection.json").unwrap_err();
+        assert!(error.to_string().contains("Monte Carlo, false-feasible"));
+    }
+
+    #[test]
+    fn pathway_selection_requires_no_credit_policy() {
+        let mut source=frozen_source_manifest();
+        let target=source["benchmark_targets"].as_array_mut().unwrap().iter_mut()
+            .find(|value| value["target_id"]=="PLASMA-PROCESS-PATHWAY-SELECTION-001").unwrap();
+        target["credit_policies"]=serde_json::json!(["ALLOCATION","AVOIDED_PRODUCT_CREDIT"]);
+        let error=audit_source_value(&source,"pathway-selection.json").unwrap_err();
+        assert!(error.to_string().contains("mandatory NO_CREDIT"));
+    }
+
+    #[test]
+    fn ammonia_diluent_source_keeps_peak_conversion_and_yield_unpaired() {
+        let case=frozen_case("NH3-PLASMA-DILUENTS-NSP-2026");
+        validate_nh3_diluent_case(&case,"nh3-diluent.json").unwrap();
+    }
+
+    #[test]
+    fn ammonia_diluent_source_rejects_cross_pairing_of_peak_metrics() {
+        let mut case=frozen_case("NH3-PLASMA-DILUENTS-NSP-2026");
+        case["configuration"]["peak_metrics_pairing_status"]=serde_json::json!("SAME_OPERATING_POINT");
+        let error=validate_nh3_diluent_case(&case,"nh3-diluent.json").unwrap_err();
+        assert!(error.to_string().contains("must remain unpaired"));
+    }
+
+    #[test]
+    fn harmonized_biogas_source_keeps_product_boundary_and_four_routes() {
+        let case=frozen_case("BIOGAS-REFORMING-THERMOCHEMICAL-HARMONIZED-TEA-2026");
+        validate_biogas_reforming_incumbent(&case,"biogas-incumbent.json").unwrap();
+    }
+
+    #[test]
+    fn harmonized_biogas_source_rejects_missing_99_9_percent_product_boundary() {
+        let mut case=frozen_case("BIOGAS-REFORMING-THERMOCHEMICAL-HARMONIZED-TEA-2026");
+        case["configuration"]["product_purity_fraction"]=serde_json::json!(0.98);
+        let error=validate_biogas_reforming_incumbent(&case,"biogas-incumbent.json").unwrap_err();
+        assert!(error.to_string().contains("99.9% accepted-H2 purity"));
+    }
+
+    #[test]
+    fn methane_microwave_reference_is_not_promoted_to_microwave_plasma() {
+        let case=frozen_case("METHANE-PYROLYSIS-MICROWAVE-REFERENCE-2026");
+        validate_methane_review_reference(&case,"methane-reference.json").unwrap();
     }
 
     #[test]
