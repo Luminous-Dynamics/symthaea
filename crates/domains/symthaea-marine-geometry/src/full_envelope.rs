@@ -1620,7 +1620,10 @@ mod tests {
         stern_deck_port.z_m = stern_port_sheer.z_m;
 
         let report = validate_full_envelope_spec(&spec);
-        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert_eq!(
+            report.disposition,
+            FullEnvelopeDisposition::ValidInputContract
+        );
         assert!(report.issues.is_empty());
     }
 
