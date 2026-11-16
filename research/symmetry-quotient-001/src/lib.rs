@@ -1115,7 +1115,7 @@ mod tests {
                     .flat_map(|copy| {
                         permutation
                             .iter()
-                            .map(move |image| copy * candidates_per_copy + image)
+                            .map(move |image| copy * candidates_per_copy + *image)
                     })
                     .collect()
             })
@@ -1138,13 +1138,14 @@ mod tests {
     fn invariant_problem(action: &FiniteActionV1) -> (SearchProblemV1, Vec<BTreeSet<usize>>) {
         let candidate_count = action.permutations[0].len();
         let oracle = exhaustive_oracle(action, candidate_count);
-        let mut semantics = vec![semantics(0, 0, "unassigned", "unassigned"); candidate_count];
+        let mut candidate_semantics =
+            vec![semantics(0, 0, "unassigned", "unassigned"); candidate_count];
         for (orbit_index, orbit) in oracle.iter().enumerate() {
             let orbit_cost = orbit_index as i64;
             let boundary = format!("boundary-orbit-{orbit_index}");
             let output = format!("output-orbit-{orbit_index}");
             for candidate in orbit {
-                semantics[*candidate] = semantics(
+                candidate_semantics[*candidate] = semantics(
                     orbit_cost,
                     orbit.len() as i64,
                     &boundary,
@@ -1159,7 +1160,7 @@ mod tests {
             SearchProblemV1 {
                 problem_id: format!("task-{}", action.action_id),
                 candidate_ids,
-                semantics,
+                semantics: candidate_semantics,
             },
             oracle,
         )
