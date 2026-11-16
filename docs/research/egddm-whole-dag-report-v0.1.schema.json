@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-whole-dag-report-v0.1.schema.json",
+  "title": "EGDDM D6.13 whole-DAG report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "event_count",
+    "admissible_world_count",
+    "pair_count",
+    "trusted_edge_count",
+    "forbidden_pair_count",
+    "traces",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "adjudication_status": {
+      "type": "string"
+    },
+    "event_count": {
+      "type": "integer"
+    },
+    "admissible_world_count": {
+      "type": "integer"
+    },
+    "pair_count": {
+      "type": "integer"
+    },
+    "trusted_edge_count": {
+      "type": "integer"
+    },
+    "forbidden_pair_count": {
+      "type": "integer"
+    },
+    "claim_ceiling": {
+      "type": "string"
+    },
+    "traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "observation_boundary_claim",
+          "observation_boundary_correct",
+          "pair_outcomes",
+          "pair_count",
+          "individually_plausible_claim_count",
+          "jointly_consistent_world_ids",
+          "jointly_consistent_world_count",
+          "jointly_impossible_claim_set",
+          "false_concurrency_claim_count",
+          "unsupported_causal_claim_count",
+          "unnecessary_abstention_count",
+          "future_evidence_leakage_count",
+          "critical_unsupported_claim_count",
+          "missed_compromise_count",
+          "unsupported_compromise_claim_count"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "observation_boundary_claim": {
+            "type": "string"
+          },
+          "observation_boundary_correct": {
+            "type": "boolean"
+          },
+          "pair_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "left_event_id",
+                "right_event_id",
+                "possible_relations",
+                "expected_state",
+                "claimed_relation",
+                "individually_plausible",
+                "correct",
+                "false_concurrency",
+                "unsupported_causal_claim",
+                "unnecessary_abstention",
+                "future_evidence_event_ids",
+                "world_relations",
+                "missed_compromise",
+                "unsupported_compromise_claim"
+              ],
+              "properties": {
+                "left_event_id": {
+                  "type": "string"
+                },
+                "right_event_id": {
+                  "type": "string"
+                },
+                "possible_relations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "expected_state": {
+                  "type": "string"
+                },
+                "claimed_relation": {
+                  "type": "string"
+                },
+                "individually_plausible": {
+                  "type": "boolean"
+                },
+                "correct": {
+                  "type": "boolean"
+                },
+                "false_concurrency": {
+                  "type": "boolean"
+                },
+                "unsupported_causal_claim": {
+                  "type": "boolean"
+                },
+                "unnecessary_abstention": {
+                  "type": "boolean"
+                },
+                "future_evidence_event_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "world_relations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "world_id",
+                      "relation"
+                    ],
+                    "properties": {
+                      "world_id": {
+                        "type": "string"
+                      },
+                      "relation": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                },
+                "missed_compromise": {
+                  "type": "boolean"
+                },
+                "unsupported_compromise_claim": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "pair_count": {
+            "type": "integer"
+          },
+          "individually_plausible_claim_count": {
+            "type": "integer"
+          },
+          "jointly_consistent_world_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "jointly_consistent_world_count": {
+            "type": "integer"
+          },
+          "jointly_impossible_claim_set": {
+            "type": "boolean"
+          },
+          "false_concurrency_claim_count": {
+            "type": "integer"
+          },
+          "unsupported_causal_claim_count": {
+            "type": "integer"
+          },
+          "unnecessary_abstention_count": {
+            "type": "integer"
+          },
+          "future_evidence_leakage_count": {
+            "type": "integer"
+          },
+          "critical_unsupported_claim_count": {
+            "type": "integer"
+          },
+          "missed_compromise_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsupported_compromise_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,1301 @@
+{
+  "scenario_id": "d6.13-whole-dag-correlation-v0.1",
+  "adjudication_status": "synthetic_known_answer_not_independently_adjudicated",
+  "event_count": 6,
+  "admissible_world_count": 2,
+  "pair_count": 15,
+  "trusted_edge_count": 1,
+  "forbidden_pair_count": 11,
+  "traces": [
+    {
+      "trace_id": "always-abstain",
+      "observation_boundary_claim": "complete",
+      "observation_boundary_correct": true,
+      "pair_outcomes": [
+        {
+          "left_event_id": "A",
+          "right_event_id": "B",
+          "possible_relations": [
+            "after",
+            "before"
+          ],
+          "expected_state": "underdetermined",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "after"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "C",
+          "possible_relations": [
+            "after",
+            "before"
+          ],
+          "expected_state": "underdetermined",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "after"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "E",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "F",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "C",
+          "possible_relations": [
+            "after",
+            "before"
+          ],
+          "expected_state": "underdetermined",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "after"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "E",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "F",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "E",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "F",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "F",
+          "possible_relations": [
+            "before"
+          ],
+          "expected_state": "before",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "before"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "F",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": false,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        }
+      ],
+      "pair_count": 15,
+      "individually_plausible_claim_count": 3,
+      "jointly_consistent_world_ids": [
+        "world-forward",
+        "world-reverse"
+      ],
+      "jointly_consistent_world_count": 2,
+      "jointly_impossible_claim_set": false,
+      "false_concurrency_claim_count": 0,
+      "unsupported_causal_claim_count": 0,
+      "unnecessary_abstention_count": 12,
+      "future_evidence_leakage_count": 0,
+      "critical_unsupported_claim_count": 0,
+      "missed_compromise_count": 0,
+      "unsupported_compromise_claim_count": 0
+    },
+    {
+      "trace_id": "jointly-impossible-cycle",
+      "observation_boundary_claim": "complete",
+      "observation_boundary_correct": true,
+      "pair_outcomes": [
+        {
+          "left_event_id": "A",
+          "right_event_id": "B",
+          "possible_relations": [
+            "after",
+            "before"
+          ],
+          "expected_state": "underdetermined",
+          "claimed_relation": "before",
+          "individually_plausible": true,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": true,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [
+            "Z"
+          ],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "after"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "C",
+          "possible_relations": [
+            "after",
+            "before"
+          ],
+          "expected_state": "underdetermined",
+          "claimed_relation": "after",
+          "individually_plausible": true,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": true,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "after"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "E",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "F",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "C",
+          "possible_relations": [
+            "after",
+            "before"
+          ],
+          "expected_state": "underdetermined",
+          "claimed_relation": "before",
+          "individually_plausible": true,
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": true,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "after"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "E",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "F",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "E",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "F",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "F",
+          "possible_relations": [
+            "before"
+          ],
+          "expected_state": "before",
+          "claimed_relation": "before",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "before"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "F",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        }
+      ],
+      "pair_count": 15,
+      "individually_plausible_claim_count": 15,
+      "jointly_consistent_world_ids": [],
+      "jointly_consistent_world_count": 0,
+      "jointly_impossible_claim_set": true,
+      "false_concurrency_claim_count": 0,
+      "unsupported_causal_claim_count": 3,
+      "unnecessary_abstention_count": 0,
+      "future_evidence_leakage_count": 1,
+      "critical_unsupported_claim_count": 3,
+      "missed_compromise_count": 0,
+      "unsupported_compromise_claim_count": 0
+    },
+    {
+      "trace_id": "world-consistent-agent",
+      "observation_boundary_claim": "complete",
+      "observation_boundary_correct": true,
+      "pair_outcomes": [
+        {
+          "left_event_id": "A",
+          "right_event_id": "B",
+          "possible_relations": [
+            "after",
+            "before"
+          ],
+          "expected_state": "underdetermined",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "after"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "C",
+          "possible_relations": [
+            "after",
+            "before"
+          ],
+          "expected_state": "underdetermined",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "after"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "E",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "F",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "C",
+          "possible_relations": [
+            "after",
+            "before"
+          ],
+          "expected_state": "underdetermined",
+          "claimed_relation": "underdetermined",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "after"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "E",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "F",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "E",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "F",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "F",
+          "possible_relations": [
+            "before"
+          ],
+          "expected_state": "before",
+          "claimed_relation": "before",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "before"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "before"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        },
+        {
+          "left_event_id": "F",
+          "right_event_id": "Z",
+          "possible_relations": [
+            "concurrent"
+          ],
+          "expected_state": "concurrent",
+          "claimed_relation": "concurrent",
+          "individually_plausible": true,
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "future_evidence_event_ids": [],
+          "world_relations": [
+            {
+              "world_id": "world-forward",
+              "relation": "concurrent"
+            },
+            {
+              "world_id": "world-reverse",
+              "relation": "concurrent"
+            }
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
+        }
+      ],
+      "pair_count": 15,
+      "individually_plausible_claim_count": 15,
+      "jointly_consistent_world_ids": [
+        "world-forward",
+        "world-reverse"
+      ],
+      "jointly_consistent_world_count": 2,
+      "jointly_impossible_claim_set": false,
+      "false_concurrency_claim_count": 0,
+      "unsupported_causal_claim_count": 0,
+      "unnecessary_abstention_count": 0,
+      "future_evidence_leakage_count": 0,
+      "critical_unsupported_claim_count": 0,
+      "missed_compromise_count": 0,
+      "unsupported_compromise_claim_count": 0
+    }
+  ],
+  "claim_ceiling": "Finite whole-DAG possible-world evaluation of supplied admissible completions, trusted/forbidden relations, observation-boundary state, candidate claims, and decision-cutoff evidence availability. Does not prove the admissible-world set complete, authenticate real observation certificates, solve arbitrary causal discovery, or establish agent performance."
+}

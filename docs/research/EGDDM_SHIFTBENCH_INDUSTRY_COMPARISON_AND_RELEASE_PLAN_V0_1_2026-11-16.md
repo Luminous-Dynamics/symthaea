@@ -35,6 +35,8 @@ EGDDM should publish matched cross-benchmark results only where task, model, har
 4. **Causal structure:** partial orders, concurrency versus commutativity, branch isolation and merge requalification (D6.10).
 5. **Epistemic calibration:** observation completeness, admissible histories, underdetermination, compromise detection and justified abstention (D6.11).
 6. **Measurement integrity:** state-mutating oracles, stale caches, replay mismatch, nondeterminism, observer coverage, false positives and false negatives (D6.12).
+7. **Graph-level causal identifiability:** complete admissible DAG worlds, joint-claim consistency, entailed versus merely possible relations and no-vacuous-truth controls (D6.13).
+8. **Evidence-safe handoff:** interruption recovery, evidence portability, authority/commitment transfer and unknown-outcome reconciliation across agents or sessions (D6.14).
 
 D6.7 remains the owner of independently adjudicated impact/common-cause provenance and measured check-cost distributions. These tracks should share provenance conventions and report schemas, but their gold labels and failure denominators must remain separate.
 
@@ -80,6 +82,7 @@ Publish separate axes:
 - **Causal quality:** false serialization, missing order, false concurrency and confluence accuracy.
 - **Epistemic calibration:** identified relations, calibrated abstentions, false completeness and missed compromise.
 - **Oracle integrity:** state mutations, replay mismatches, cache contamination, false acceptance and false rejection.
+- **Handoff integrity:** workspace/obligation reconstruction, stale-evidence acceptance, authority continuity, duplicate side-effect prevention and recovery quality.
 - **Efficiency:** wall-clock time, tokens, tool calls, independent check cost, revalidation churn and recovery latency.
 
 Critical safety failures are hard gates. The leaderboard should expose the safe-performance frontier rather than combine dimensions into one weighted score.
@@ -110,8 +113,10 @@ For a later matched-agent pilot, an aspirational target is +10 percentage points
 | D6.10 partial orders | 360 DAG tasks after validity pilot | Synthetic known-answer fixture; no independent DAG adjudication |
 | D6.11 identifiability | 384 tasks after validity pilot | Synthetic pairwise admissible-relation prototype; not a full-DAG possible-world solver |
 | D6.12 oracle integrity | 480 audits after validity pilot | Synthetic state-digest/replay contract; no real benchmark fault injection |
+| D6.13 whole-DAG identifiability | 400 graph tasks after validity pilot | Synthetic 6-event / 2-world fixture; no independent whole-world adjudication |
+| D6.14 evidence-safe handoff | 480 base handoff episodes after validity pilot | Research brief opened; no evaluator implementation or receiver trials yet |
 
-These are separate task families and target counts; they are not a current 1,500-task benchmark. Pilot reliability, independent annotation agreement and power analysis determine whether the targets should change.
+These are separate task families and target counts; they are not a current 2,500-task benchmark. Pilot reliability, independent annotation agreement and power analysis determine whether the targets should change.
 
 ## Release gates
 
@@ -127,3 +132,34 @@ These are separate task families and target counts; they are not a current 1,500
 ## Present claim boundary
 
 As of 2026-11-16, D6.8–D6.12 have draft evaluator/protocol work and synthetic known-answer fixtures. No Rust compilation/test/Clippy/CI, independent gold adjudication, real agent trials, measured cost study, production isolation proof or external replication has been established in this execution environment. The current contribution is a research and evaluator implementation programme, not a validated benchmark ranking.
+## Industry update — temporal understanding, roadmap execution and project continuity (2026-11-16)
+
+Recent work makes the competitive boundary more specific:
+
+- [Long-Horizon Software Engineering Agents: From Tasks to Projects](https://longhorizonswe.github.io/) synthesizes the shift from one-off issues to projects that inherit agent-produced state. Its survey reports ChainSWE results of 69.1% in the reference-fix Oracle setting, 49.0% when later work inherits agents' own patches, and 47.4% when dialogue is also retained. The survey emphasizes retained functionality, active-requirement conformance, selective revision and interruption/handoff—not chain length alone.
+- [SWE-Time](https://arxiv.org/abs/2611.12083), posted Nov 9, 2026, evaluates temporal repository understanding across 1,661 cases and 65 GitHub repositories. It covers retrospective regression analysis and prospective change-intent understanding; the paper reports 15 coding agents and a highest cited average of 61.9 for Claude Opus 4.8 within Claude Code.
+- [RoadmapBench](https://arxiv.org/abs/2605.15846) evaluates 115 long-horizon version-upgrade tasks across 17 repositories and five programming languages. It reports a best task-resolution rate of 39.1% in its evaluated set and a median task involving 3,700 changed lines across 51 files.
+- [SWE-fficiency](https://proceedings.mlr.press/v306/ma26l.html) tests optimization on 498 real-workload tasks across nine repositories. Its authors report that top agents achieve, on average, less than 0.23× the expert speedup, showing that real engineering quality includes performance and workload fidelity—not just passing tests.
+
+### What this changes for EGDDM
+
+1. **Temporal comprehension is no longer an empty niche.** SWE-Time explicitly evaluates repository evolution, and SWE-Milestone/ChainSWE cover continuous or dependent work. EGDDM must differentiate through evidence validity, causal identifiability, branch/authority continuity, adversarial changes and evaluator trust—not merely historical repository understanding.
+2. **Project continuity requires selective revision.** Retained conversation alone does not preserve project capability. EGDDM should measure which prior guarantees remain valid, which became invalid, and whether agents repair only the affected obligations without stale-evidence reuse.
+3. **Broader engineering matters.** RoadmapBench spans five languages; SWE-fficiency demonstrates the value of real workloads and measured performance. EGDDM should add Rust/Go/infrastructure/database tracks after the software pilot, with domain-specific gold adjudication and cost models.
+4. **Report richer outcomes.** Alongside resolve rate, report retained functionality, active-requirement conformance, evidence support, graph-level consistency, justified abstention, evaluator integrity, cost and recovery latency. A safe-performance Pareto frontier is more informative than one aggregate rank.
+
+These papers are complementary baselines, not evidence that EGDDM currently outperforms them. Matched trials remain necessary.
+## Industry update — interruption, takeover and context compaction (2026-11-16)
+
+Three recent benchmark lines make interruption and cross-agent transfer a concrete adjacent dimension:
+
+- [Handoff Debt](https://arxiv.org/abs/2606.02875) studies 75 source tasks, 181 interruption points and 724 takeover runs per successor model. It reports 20–59% fewer median agent events and 42–63% fewer cumulative prompt tokens for context-bearing handoffs versus repository-only takeover, with solved-rate effects smaller and model-dependent.
+- [HSC-Bench](https://arxiv.org/abs/2610.36523) reports 1,039 takeover tasks across six receiving models, separating recovery of repository evidence from continuation of inherited conversation, tool and file-work state.
+- [ContinuityBench](https://openreview.net/pdf?id=3N3BzvoLbG) applies controlled interruptions to existing agent benchmarks. It reports average success falling from 41.7% to 28.0% after interruption; structured-summary handoff outperforms summary-plus-full-action-history in 11 of 18 settings. More context is not necessarily better.
+- [CompactionBench](https://www.microsoft.com/en-us/research/wp-content/uploads/2026/10/CompactionBench_preprint.pdf) analyzes 13.5 million GitHub Copilot sessions. The preprint reports that 7.8% of sessions invoke context compaction but account for 44.2% of total token use; compaction also reduces prefix-cache reuse.
+
+### D6.14 differentiation
+
+EGDDM D6.14 is tracked separately in [Issue #12470](https://github.com/Luminous-Dynamics/symthaea/issues/12470). Its target is not just successful task takeover. It tests whether the receiver inherits valid evidence, current authority, active obligations and unresolved side effects; rejects stale evidence; reconciles unknown non-idempotent operations before retry; and can verify artifact references without the sender's private transcript. This complements Handoff Debt, HSC-Bench and ContinuityBench rather than claiming to replace them.
+
+The design objective is minimum sufficient, provenance-bearing state that preserves commitments and evidence while limiting rediscovery, over-steering, disclosure and serving cost.
