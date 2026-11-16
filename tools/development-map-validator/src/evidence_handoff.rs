@@ -27,6 +27,7 @@ const OPERATION_STATES: &[&str] = &["completed", "failed", "unknown"];
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct HandoffReceiptOutcome {
     pub obligation_id: String,
+    pub critical: bool,
     pub expected_state: String,
     pub receiver_disposition: String,
     pub receipt_ids: Vec<String>,
@@ -165,7 +166,6 @@ struct ReceiptEvaluation {
     current_receipt_ids: Vec<String>,
     all_receipt_ids: Vec<String>,
     invalid_reasons: Vec<String>,
-    has_any_passing_receipt: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -630,7 +630,6 @@ fn expected_receipt_state(
         current_receipt_ids,
         all_receipt_ids,
         invalid_reasons,
-        has_any_passing_receipt,
     }
 }
 
@@ -840,6 +839,7 @@ fn score_trace(
         }
         obligation_outcomes.push(HandoffReceiptOutcome {
             obligation_id: obligation_id.clone(),
+            critical: obligation.critical,
             expected_state: evaluation.expected_state,
             receiver_disposition,
             receipt_ids: evaluation.all_receipt_ids,
