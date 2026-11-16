@@ -187,3 +187,13 @@ The solver requires:
 For the synthetic 100 m × 20 m × 6 m box, 12,300 tonnes at 1,025 kg/m³ returns z=0 m; 10,250 tonnes returns z=1 m. These are analytical fixture results.
 
 **Scope boundary:** this is an upright sinkage / displacement-mass balance only. It does not solve longitudinal trim, heel, LCG/TCG equilibrium, KG, tank free-surface, flooding, GZ curves, intact/damage stability or statutory criteria. Commercial packages such as Maxsurf, Orca3D and NAPA already provide much more complete loading and stability workflows; this function is an evidence-bound primitive for research and pipeline integration, not a replacement.
+
+### Upright mass-balance receipt schema v2
+
+The current upright mass-balance receipt is schema v2 / `upright-mass-balance-bisection-v2`. In addition to the final equilibrium and residual, it binds the configured mass tolerance, plane tolerance and requested maximum-iteration budget. Those settings contribute to the BLAKE3 identity: two solves of the same load case that produce the same final waterplane but use different numerical stopping budgets must produce different receipts.
+
+This is evidence provenance, not a change to the physical scope of the solver. It remains upright sinkage only.
+
+### Next: static trim/heel equilibrium
+
+The distinct follow-on specification is [MARINE-STATIC-ATTITUDE-EQUILIBRIUM-001 #12498](https://github.com/Luminous-Dynamics/symthaea/issues/12498). It will solve offset + pitch + roll using explicit CG, density, a body-frame oblique waterplane, force balance and two independent moment residuals. It is not the same as the WAPS manoeuvring/leeway 3-DOF programme and is not a GZ or stability approval. See `docs/research/marine/MARINE-FULL-ENVELOPE-G2F-A.md` for the equations, fixtures and current SOTA comparison.
