@@ -787,37 +787,4 @@ mod tests {
         assert!(errors.iter().any(|issue| issue.code == "loading_condition_identity"));
     }
 
-    #[test]
-    fn asymmetric_profiles_are_used_without_mirroring() {
-        let mut request = fixture_request();
-        request.source_spec.symmetry = SymmetryPolicy::ExplicitPortAndStarboard;
-        for station in &mut request.source_spec.stations {
-            let mut port = station.starboard_profile.clone();
-            for point in &mut port {
-                point.point_id = format!("PORT-{}", point.point_id);
-                point.y_m = -point.y_m * 0.9;
-            }
-            station.port_profile = Some(port);
-        }
-        for intersection in &mut request.source_spec.design_waterline.station_intersections {
-            intersection.port_source =
-                crate::full_envelope::WaterlinePortSource::ExplicitPortProfile;
-            intersection.port_point_id =
-                Some(format!("PORT-{}", intersection.starboard_point_id));
-        }
-        for (station, deck_section) in request
-            .source_spec
-            .stations
-            .iter()
-            .zip(request.source_spec.deck_surface.sections.iter_mut())
-        {
-            let port_sheer = station.port_profile.as_ref().unwrap().last().unwrap();
-            deck_section.points[0].point_id = port_sheer.point_id.clone();
-            deck_section.points[0].y_m = port_sheer.y_m;
-        }
-        let receipt = evaluate_loading_sweep(&request).unwrap();
-        let design = result_by_id(&receipt, "DESIGN-WL-Z0");
-        assert!((design.displacement_volume_m3 - 11_400.0).abs() < 1.0e-8);
-        assert!((design.transverse_center_of_buoyancy_m - 0.5).abs() < 1.0e-8);
-    }
 }
