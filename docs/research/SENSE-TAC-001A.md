@@ -81,8 +81,10 @@ No family is pre-ranked. Select the smallest useful subset after the reference-f
 | B0 | Commodity FSR / single-point load or pressure pad | Low-complexity baseline |
 | C1 | Capacitive/compliant patch with COTS readout | Accessible candidate transducer |
 | C2 | C1 with changed morphology/electrode/cell geometry, same readout | Isolate mechanical/electrode encoding |
-| C3 | Vision-based tactile sensor (DIGIT or GelSight Mini) | Optional optical comparator |
-| C4 | Direct multi-axis commercial tactile instrument (XELA uSkin or Contactile PapillArray) | Optional calibrated-3D-force/system comparator |
+| C3 | Optical deformation sensor (DIGIT, GelSight Mini, TacTip) | Image/deformation comparator; force outputs require their own validation |
+| C4 | Replaceable magnetic skin (ReSkin, AnySkin) | Repairability, cross-instance transfer and magnetic-field sensing comparator |
+| C5 | Commercial distributed/multiaxis tactile sensor (XELA uSkin, Contactile PapillArray) | Direct force/displacement system comparator, subject to exact model and calibration |
+| C6 | Multimodal research sensor (SuperTac) | Literature/SOTA comparator; include physically only if exact article, interfaces and task are available |
 
 C3/C4 are not required for the first bench run. Their inclusion depends on availability, interface access, exact model/revision, and fair task applicability. A baseline must not be deliberately weakened.
 
@@ -95,7 +97,12 @@ Pin exact model, datasheet revision, SDK/firmware, units, calibration state, and
 - **XELA uSkin uSPa44-S**: vendor datasheet describes 16 taxels, 3-axis sensing, 133 Hz sampling, and model-specific noise/range in LSB. The LSB values must not be mistaken for SI force uncertainty without exact physical calibration: https://assets-global.website-files.com/630ccaa81fd45082532631d0/65af8c18b1ee6dd10d114f9f_uSPa44_Datasheet%20-%20Jan%202024.pdf. Vendor technology page describes its 3-axis displacement approach and published 0.1 gf resolution: https://xelarobotics.com/technology/.
 - **Contactile PapillArray v2.0**: vendor development-kit sheet describes 9 sensing pillars, local 3-axis displacement/force, global 3D force/torque and 1 kHz sampling. The sheet also defines a limited lab/light-manufacturing environment; preserve that limitation: https://contactile.com/wp-content/uploads/2022/01/Contactile_PTSDevKit2.0_SpecSheet_JAN22.pdf.
 
-These are comparison anchors, not an assertion that vendor claims have been independently reproduced. Commercial listing prices are time-stamped context, not a procurement recommendation.
+- **ReSkin**: Meta's open-source magnetically read tactile skin separates the deformable interface from electronics and is designed to be replaceable. Meta reports a materials cost below USD 6 per unit at 100 units, up to 400 Hz, approximately 1 mm spatial resolution and 50,000+ interactions in its published research description. These are source-reported results, not an LMF reproduction: https://ai.meta.com/blog/reskin-a-versatile-replaceable-low-cost-skin-for-ai-research-on-tactile-perception/ and https://reskin.dev/.
+- **AnySkin**: an open-source, replaceable magnetic tactile skin with separated sensing electronics and replaceable interface. Its paper reports cross-instance transfer of learned manipulation policies and slip detection; the reported 92% slip accuracy is a task/model result on its own dataset and must not be compared directly with force calibration or a different slip protocol: https://arxiv.org/abs/2409.08276 and https://any-skin.github.io/.
+- **TacTip**: biomimetic optoelectronic sensing through deformation of a compliant skin and internal markers. The research family includes submillimetre rolling-cylinder localization; the current project page advertises 120 Hz reporting and slip/dynamic capabilities. Treat these as task- and implementation-specific research/manufacturer claims: https://tactip.org/en/research/ and https://tactip.org/en/.
+- **SuperTac**: a 2026 Nature Sensors research system combining multimodal optical/triboelectric/inertial sensing. The paper reports 0.06 N force accuracy, 0.4 mm position accuracy, temperature/proximity/vibration capabilities and greater than 94% classification accuracy on its evaluated classes. This is a high-end research comparator, not a direct baseline unless the exact hardware, measurement methods, test tasks and data are available: https://www.nature.com/articles/s44460-025-00006-y.
+
+These are comparison anchors, not an assertion that vendor or paper claims have been independently reproduced. Commercial listing prices are time-stamped context, not a procurement recommendation. Do not mix: (a) calibrated SI-unit force/displacement results, (b) raw image resolution/frame rate, (c) task-model accuracy, and (d) durability/cost into one rank. ReSkin/AnySkin/TacTip/DIGIT/GelSight/SuperTac may produce fundamentally different native signals; a matched downstream task can compare utility, but it cannot turn their different physical observables into equivalent measurands.
 
 ## 5. Reference fixture and evidence design
 
@@ -168,6 +175,20 @@ Minimum arm set where physically feasible:
 | A4 | C2 morphology variant | same readout and algorithm as C1 | morphology/electrode contribution |
 
 If exact parity is impossible, state the confound. Use factorial/ablation logic where it can distinguish morphology, transducer, front-end, calibration, representation and task model contributions.
+
+### Industry comparison rule
+
+The 2026 literature emphasizes a persistent transition from device-level sensitivity demonstrations to application-level systems balancing dynamic range, hysteresis, crosstalk, environmental stability, fatigue, integration, energy and task reliability. The comparison programme must therefore include:
+
+- a low-cost baseline (B0);
+- one open, replaceable research sensor (ReSkin or AnySkin);
+- one optical/deformation baseline (DIGIT, GelSight Mini or TacTip);
+- one direct multiaxis commercial sensor (XELA or Contactile) if the measurand and interface match;
+- the best task-specific published research method (SuperTac or a more relevant method selected at protocol freeze).
+
+The review literature identifies crosstalk, environmental stability, signal decoupling and scalable integration as persistent challenges, rather than one universally dominant transduction method: https://doi.org/10.1016/j.snr.2026.100459 and https://doi.org/10.1016/j.sna.2026.118150.
+
+For each comparator, freeze exact sensor model/revision, firmware/SDK, mounting, native data representation, filtering, calibration status, usable range, acquisition boundary, power boundary, and test conditions. Report native-signal and common-task comparisons separately. A 1 kHz sample rate, a 90 fps camera, 400 Hz magnetic readout, 92% task accuracy and a force resolution in LSB are not interchangeable measures.
 
 The comparison must report three non-substitutable planes:
 
