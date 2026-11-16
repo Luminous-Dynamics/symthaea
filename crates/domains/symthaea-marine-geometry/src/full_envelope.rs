@@ -472,6 +472,23 @@ fn validate_profile(
                 format!("station {station_id} waterline must lie between keel and sheer on z=0"),
             );
         }
+        if !profile[..waterline_index]
+            .iter()
+            .any(|point| point.region_to_next == ProfileRegion::Bottom)
+        {
+            reject(
+                issues,
+                "profile_bottom_region_missing",
+                format!("station {station_id} must explicitly label at least one keel-to-waterline segment as bottom"),
+            );
+        }
+        if waterline.region_to_next != ProfileRegion::Topsides {
+            reject(
+                issues,
+                "profile_topsides_region_missing",
+                format!("station {station_id} waterline-to-sheer segment must be explicitly labelled as topsides"),
+            );
+        }
     }
 
     for pair in profile.windows(2) {
@@ -1000,6 +1017,91 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
     }
 }
 
+fn validate_planar_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
+    if spec.deck_surface.construction != DeckConstruction::PlanarDeck {
+        return;
+    }
+
+    let mut points = Vec::<[f64; 3]>::new();
+    for (station, deck_section) in spec.stations.iter().zip(spec.deck_surface.sections.iter()) {
+        let x_m = station.x_over_length * spec.principal_dimensions.length_m;
+        for point in &deck_section.points {
+            points.push([x_m, point.y_m, point.z_m]);
+        }
+    }
+    let Some(origin) = points.first().copied() else {
+        reject(
+            issues,
+            "planar_deck_empty",
+            "planar deck requires at least three non-collinear points",
+        );
+        return;
+    };
+    let Some(first_axis) = points.iter().skip(1).copied().find(|point| {
+        let delta = [
+            point[0] - origin[0],
+            point[1] - origin[1],
+            point[2] - origin[2],
+        ];
+        delta.iter().any(|value| value.abs() > COORDINATE_TOLERANCE_M)
+    }) else {
+        reject(
+            issues,
+            "planar_deck_degenerate",
+            "planar deck points do not span a unique plane",
+        );
+        return;
+    };
+    let axis_a = [
+        first_axis[0] - origin[0],
+        first_axis[1] - origin[1],
+        first_axis[2] - origin[2],
+    ];
+    let Some(normal) = points.iter().skip(1).find_map(|point| {
+        let axis_b = [
+            point[0] - origin[0],
+            point[1] - origin[1],
+            point[2] - origin[2],
+        ];
+        let candidate = [
+            axis_a[1] * axis_b[2] - axis_a[2] * axis_b[1],
+            axis_a[2] * axis_b[0] - axis_a[0] * axis_b[2],
+            axis_a[0] * axis_b[1] - axis_a[1] * axis_b[0],
+        ];
+        let norm = candidate.iter().map(|value| value * value).sum::<f64>().sqrt();
+        (norm > COORDINATE_TOLERANCE_M * COORDINATE_TOLERANCE_M)
+            .then_some(candidate)
+    }) else {
+        reject(
+            issues,
+            "planar_deck_degenerate",
+            "planar deck points are collinear and do not define a unique plane",
+        );
+        return;
+    };
+    let normal_length = normal.iter().map(|value| value * value).sum::<f64>().sqrt();
+    for point in &points {
+        let delta = [
+            point[0] - origin[0],
+            point[1] - origin[1],
+            point[2] - origin[2],
+        ];
+        let distance = (normal[0] * delta[0]
+            + normal[1] * delta[1]
+            + normal[2] * delta[2])
+            .abs()
+            / normal_length;
+        if distance > COORDINATE_TOLERANCE_M {
+            reject(
+                issues,
+                "planar_deck_non_coplanar",
+                "deck is labelled PLANAR_DECK but its station points do not lie on one plane",
+            );
+            break;
+        }
+    }
+}
+
 fn validate_surface_inventory(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
     let mut seen = BTreeSet::new();
     for region in &spec.surface_inventory {
@@ -1025,6 +1127,21 @@ fn validate_surface_inventory(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnve
                 format!("surface inventory is missing required region {required:?}"),
             );
         }
+    }
+
+    let has_chine_breakline = spec.stations.iter().any(|station| {
+        station
+            .starboard_profile
+            .iter()
+            .chain(station.port_profile.iter().flatten())
+            .any(|point| point.role == ProfilePointRole::Chine)
+    });
+    if seen.contains(&SurfaceRegion::ChineBreaklines) != has_chine_breakline {
+        reject(
+            issues,
+            "chine_inventory_mismatch",
+            "chine-breakline inventory must be present exactly when station profiles declare chine points",
+        );
     }
 }
 
@@ -1297,6 +1414,7 @@ pub fn validate_full_envelope_spec(spec: &FullEnvelopeSpec) -> FullEnvelopeValid
     validate_symmetry_and_port_profiles(spec, &mut issues);
     validate_waterline(spec, &mut issues);
     validate_deck(spec, &mut issues);
+    validate_planar_deck(spec, &mut issues);
     validate_surface_inventory(spec, &mut issues);
     validate_boundary_and_components(spec, &mut issues);
 
