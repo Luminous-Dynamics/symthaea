@@ -14,7 +14,6 @@ const bundle = JSON.parse((await readFile(resolve(here, vectors.bundle_file))).t
 const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const fail = (message) => { throw new Error(message); };
 const rawHttp = Buffer.from((await readFile(resolve(here, vectors.raw_http_fixture))).toString("ascii").trim(), "base64");
-const expectedMaps = new Map();
 
 async function loadMaps(b) {
   const maps = new Map();
@@ -34,7 +33,7 @@ async function loadMaps(b) {
   return maps;
 }
 
-async function validate(b) {
+async function validate(b, mutateMaps = null) {
   if (b.profile_id !== "luminous.cpir.source-map.v1") fail("profile mismatch");
   if (b.session_binding.response_ordinal !== vectors.expected_response_ordinal ||
       b.session_binding.direction !== vectors.expected_direction ||
@@ -59,6 +58,7 @@ async function validate(b) {
   for (const id of reps.keys()) visit(id);
 
   const maps = await loadMaps(b);
+  if (mutateMaps) mutateMaps(maps, b);
   const artifacts = new Map((b.source_map_artifacts ?? []).map(a => [a.map_sha256, a]));
   const stages = [...b.transformations].sort((a, z) => a.ordinal - z.ordinal);
   if (stages.some((s, i) => s.ordinal !== i)) fail("stage ordinals are not contiguous");
@@ -124,7 +124,9 @@ async function validate(b) {
 
   const nodeArtifact = b.source_map_artifacts.find(a => a.artifact_id === "jcs-node-origin-map-001");
   const nodeMap = nodeArtifact && maps.get(nodeArtifact.map_sha256);
-  const node = nodeMap?.nodes?.find(n => n.json_pointer === selection.json_pointer);
+  const nodeMatches = nodeMap?.nodes?.filter(n => n.json_pointer === selection.json_pointer) ?? [];
+  if (nodeMatches.length !== 1) fail("JCS node-origin map is missing or ambiguous");
+  const node = nodeMatches[0];
   if (!node || node.source_node_id !== selection.source_node_id || node.canonical_node_id !== selection.canonical_node_id ||
       node.source_start !== span.start_byte || node.source_end !== span.end_byte ||
       node.raw_token_sha256 !== selection.raw_token_sha256 ||
@@ -134,8 +136,14 @@ async function validate(b) {
   if (b.typed_conversion.input_raw_token_sha256 !== selection.raw_token_sha256 ||
       b.typed_conversion.typed_value_encoding_digest !== typed.sha256 ||
       typed.sha256 !== tokenRep.sha256) fail("typed conversion is not bound to selected raw token");
-  if (b.predicate_binding.public_input_digest !== predicate.sha256 ||
-      predicate.sha256 !== vectors.expected_predicate_input_sha256) fail("predicate public input is not bound to predicate representation");
+  const expectedPredicateBytes = Buffer.from(vectors.expected_predicate_input, "utf8");
+  if (expectedPredicateBytes.length !== vectors.expected_predicate_input_byte_length ||
+      sha(expectedPredicateBytes) !== vectors.expected_predicate_input_sha256 ||
+      b.predicate_binding.public_input_digest !== predicate.sha256 ||
+      predicate.sha256 !== vectors.expected_predicate_input_sha256 ||
+      predicate.byte_length !== vectors.expected_predicate_input_byte_length) {
+    fail("predicate public input is not bound to expected predicate bytes");
+  }
   return true;
 }
 
@@ -147,13 +155,22 @@ const mutations = [
   ["wrong_response_ordinal", b => { b.session_binding.response_ordinal += 1; }],
   ["missing_http_body_range_map", b => { b.source_map_artifacts = b.source_map_artifacts.filter(a => a.artifact_id !== "http-body-range-map-001"); }],
   ["missing_jcs_node_origin_map", b => { b.source_map_artifacts = b.source_map_artifacts.filter(a => a.artifact_id !== "jcs-node-origin-map-001"); }],
-  ["wrong_transformation_profile_digest", b => { b.transformations.find(s => s.stage_id === "stage-content-decode").profile_digest = "0".repeat(64); }]
+  ["wrong_transformation_profile_digest", b => { b.transformations.find(s => s.stage_id === "stage-content-decode").profile_digest = "0".repeat(64); }],
+  ["wrong_field_pointer", b => { b.field_selection.json_pointer = "/height"; }],
+  ["broken_representation_parent", b => { b.representations.find(r => r.representation_id === "admitted-json").parent_representation_ids = []; }],
+  ["wrong_source_representation_digest", b => { b.representations.find(r => r.representation_id === "admitted-json").sha256 = "0".repeat(64); }]
 ];
-for (const [name, mutate] of mutations) {
+const mapMutation = (maps) => {
+  const nodeEntry = bundle.source_map_artifacts.find(a => a.artifact_id === "jcs-node-origin-map-001");
+  const map = maps.get(nodeEntry.map_sha256);
+  maps.set(nodeEntry.map_sha256, { ...map, nodes: [...map.nodes, structuredClone(map.nodes[0])] });
+};
+const allMutations = [...mutations, ["ambiguous_jcs_node_map", () => {}, mapMutation]];
+for (const [name, mutate, mutateMap] of allMutations) {
   const altered = structuredClone(bundle);
   mutate(altered);
   let rejected = false;
-  try { await validate(altered); } catch { rejected = true; }
+  try { await validate(altered, mutateMap ?? null); } catch { rejected = true; }
   if (!rejected) throw new Error("negative control was accepted: " + name);
 }
 console.log("PASS synthetic source-map chain: 11 representations; 10 transformations; 3 map artifacts; 1 positive and " + mutations.length + " rejected mutation controls.");
