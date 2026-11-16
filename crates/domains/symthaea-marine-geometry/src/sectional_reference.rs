@@ -758,6 +758,103 @@ mod tests {
         request
     }
 
+
+    fn quadratic_beam_request(station_count: usize) -> SectionalReferenceRequest {
+        assert!(station_count >= 2);
+        let mut request = fixture_request();
+        let mut stations = Vec::with_capacity(station_count);
+        let mut deck_sections = Vec::with_capacity(station_count);
+        let mut intersections = Vec::with_capacity(station_count);
+
+        for index in 0..station_count {
+            let fraction = index as f64 / (station_count - 1) as f64;
+            let half_beam_m = 8.0 + 4.0 * fraction * (1.0 - fraction);
+            let station_id = format!("QUADRATIC-{index:03}");
+            let keel_id = format!("{station_id}-KEEL");
+            let bottom_id = format!("{station_id}-BOTTOM");
+            let waterline_id = format!("{station_id}-WATERLINE");
+            let sheer_id = format!("{station_id}-SHEER");
+
+            let starboard_profile = vec![
+                ProfilePoint {
+                    point_id: keel_id,
+                    y_m: 0.0,
+                    z_m: 6.0,
+                    role: ProfilePointRole::Keel,
+                    region_to_next: crate::full_envelope::ProfileRegion::Bottom,
+                },
+                ProfilePoint {
+                    point_id: bottom_id,
+                    y_m: half_beam_m,
+                    z_m: 6.0,
+                    role: ProfilePointRole::Bottom,
+                    region_to_next: crate::full_envelope::ProfileRegion::Bottom,
+                },
+                ProfilePoint {
+                    point_id: waterline_id.clone(),
+                    y_m: half_beam_m,
+                    z_m: 0.0,
+                    role: ProfilePointRole::Waterline,
+                    region_to_next: crate::full_envelope::ProfileRegion::Topsides,
+                },
+                ProfilePoint {
+                    point_id: sheer_id.clone(),
+                    y_m: half_beam_m,
+                    z_m: -4.0,
+                    role: ProfilePointRole::Sheer,
+                    region_to_next: crate::full_envelope::ProfileRegion::None,
+                },
+            ];
+            stations.push(FullEnvelopeStation {
+                station_id: station_id.clone(),
+                x_over_length: fraction,
+                starboard_profile,
+                port_profile: None,
+            });
+            deck_sections.push(DeckSection {
+                station_id: station_id.clone(),
+                points: vec![
+                    DeckPoint {
+                        point_id: format!("MIRROR:{sheer_id}"),
+                        y_m: -half_beam_m,
+                        z_m: -4.0,
+                        role: DeckPointRole::PortDeckEdge,
+                    },
+                    DeckPoint {
+                        point_id: format!("{station_id}-DECK-CROWN"),
+                        y_m: 0.0,
+                        z_m: -4.5,
+                        role: DeckPointRole::DeckCrown,
+                    },
+                    DeckPoint {
+                        point_id: sheer_id,
+                        y_m: half_beam_m,
+                        z_m: -4.0,
+                        role: DeckPointRole::StarboardDeckEdge,
+                    },
+                ],
+            });
+            intersections.push(WaterlineStationIntersection {
+                station_id,
+                starboard_point_id: waterline_id,
+                port_source: WaterlinePortSource::MirroredFromStarboard,
+                port_point_id: None,
+            });
+        }
+
+        request.source_spec.candidate_id = "quadratic-half-beam-known-answer".into();
+        request.source_spec.principal_dimensions.maximum_beam_m = 20.0;
+        request.source_spec.stations = stations;
+        request.source_spec.deck_surface.sections = deck_sections;
+        request.source_spec.design_waterline.station_intersections = intersections;
+        request.loading_conditions = vec![LoadingCondition {
+            condition_id: "QUADRATIC-DESIGN-Z0".into(),
+            waterplane_z_m: 0.0,
+            water_density_kg_m3: 1025.0,
+        }];
+        request
+    }
+
     fn result_by_id<'a>(
         receipt: &'a LoadingSweepReceipt,
         id: &str,
@@ -860,6 +957,55 @@ mod tests {
                 assert!((left - right).abs() < 1.0e-9);
             }
         }
+    }
+
+
+    #[test]
+    fn quadratic_beam_loading_converges_at_second_order_for_displacement() {
+        let coarse = evaluate_loading_sweep(&quadratic_beam_request(3)).unwrap();
+        let medium = evaluate_loading_sweep(&quadratic_beam_request(5)).unwrap();
+        let fine = evaluate_loading_sweep(&quadratic_beam_request(9)).unwrap();
+        let exact_volume_m3 = 10_400.0;
+
+        let coarse_error = (result_by_id(&coarse, "QUADRATIC-DESIGN-Z0").displacement_volume_m3
+            - exact_volume_m3)
+            .abs();
+        let medium_error = (result_by_id(&medium, "QUADRATIC-DESIGN-Z0").displacement_volume_m3
+            - exact_volume_m3)
+            .abs();
+        let fine_error = (result_by_id(&fine, "QUADRATIC-DESIGN-Z0").displacement_volume_m3
+            - exact_volume_m3)
+            .abs();
+
+        assert!((coarse_error - 200.0).abs() < 1.0e-9);
+        assert!((medium_error - 50.0).abs() < 1.0e-9);
+        assert!((fine_error - 12.5).abs() < 1.0e-9);
+        assert!((coarse_error / medium_error - 4.0).abs() < 1.0e-9);
+        assert!((medium_error / fine_error - 4.0).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn quadratic_beam_loading_converges_at_second_order_for_waterplane_area() {
+        let coarse = evaluate_loading_sweep(&quadratic_beam_request(3)).unwrap();
+        let medium = evaluate_loading_sweep(&quadratic_beam_request(5)).unwrap();
+        let fine = evaluate_loading_sweep(&quadratic_beam_request(9)).unwrap();
+        let exact_area_m2 = 5_200.0 / 3.0;
+
+        let coarse_error = (result_by_id(&coarse, "QUADRATIC-DESIGN-Z0").waterplane_area_m2
+            - exact_area_m2)
+            .abs();
+        let medium_error = (result_by_id(&medium, "QUADRATIC-DESIGN-Z0").waterplane_area_m2
+            - exact_area_m2)
+            .abs();
+        let fine_error = (result_by_id(&fine, "QUADRATIC-DESIGN-Z0").waterplane_area_m2
+            - exact_area_m2)
+            .abs();
+
+        assert!((coarse_error - 100.0 / 3.0).abs() < 1.0e-9);
+        assert!((medium_error - 25.0 / 3.0).abs() < 1.0e-9);
+        assert!((fine_error - 25.0 / 12.0).abs() < 1.0e-9);
+        assert!((coarse_error / medium_error - 4.0).abs() < 1.0e-9);
+        assert!((medium_error / fine_error - 4.0).abs() < 1.0e-9);
     }
 
     #[test]
