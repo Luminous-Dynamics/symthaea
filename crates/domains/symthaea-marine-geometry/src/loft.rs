@@ -937,7 +937,10 @@ pub fn verify_loft_artifact_integrity(
             let range = artifact.stern_end_cap_face_range;
             let end = range.first_face.saturating_add(range.face_count);
             if end <= faces.len()
-                && faces[range.first_face..end].iter().copied().ne(expected.iter().copied())
+                && faces[range.first_face..end]
+                    .iter()
+                    .copied()
+                    .ne(expected.iter().copied())
             {
                 violation(
                     &mut violations,
@@ -1875,8 +1878,7 @@ mod tests {
             LongitudinalEndCondition::PlanarEndCap,
         );
         let face_index = loft.bow_end_cap_face_range.first_face;
-        loft.candidate.geometry.faces[face_index][0] =
-            loft.candidate.geometry.faces[face_index][1];
+        loft.candidate.geometry.faces[face_index][0] = loft.candidate.geometry.faces[face_index][1];
         rebind_loft_after_test_mutation(&mut loft);
         let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
         assert!(errors.iter().any(|item| item.code == "bow_cap_topology"));
