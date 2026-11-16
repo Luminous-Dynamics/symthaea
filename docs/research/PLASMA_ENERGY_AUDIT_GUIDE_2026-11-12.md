@@ -471,3 +471,18 @@ The exact Rust audit branch now includes six source-specific ammonia validators 
 - the benchmark comparator IDs must resolve to registered source cases.
 
 Current source register: **61 unique cases / 106 unique negative controls / 7 derived checks / 14 benchmark targets**. All new target statuses remain `RESEARCH_TARGET_NOT_RESULT`; no Luminous physical measurement or process superiority is claimed.
+
+
+## 9.17 Technology-neutral plasma pathway decision benchmark — 2026-11-16
+
+A new benchmark target, `PLASMA-PROCESS-PATHWAY-SELECTION-001`, establishes three separate chemistry comparison groups (ammonia cracking, methane pyrolysis and biogas-to-hydrogen). Each source case is typed as plasma, non-plasma thermal/thermochemical, or a review-derived non-plasma reference. Candidate source groups are explicitly marked `NOT_YET_MATCHED`; they are not a leaderboard.
+
+New source records:
+- Li et al. (1 October 2026), nanosecond-pulsed NH3 plasma with Ar/He/N2/O2 diluents. Ar cases report up to 58% conversion and a peak 1.8 g H2/kWh under different conditions; the source register explicitly refuses to combine those maxima.
+- Heat-integrated non-plasma NH3 cracker/TSA plant TEA (Applied Energy, 1 March 2026): 94.56% of thermodynamic heat-recovery limit, 36.79 kJ/mol NH3 net energy on the paper's boundary, USD 6.44/kg modeled H2 cost.
+- Abawalo et al. (29 August 2026), harmonized non-plasma biogas-reforming analysis: 99.9% H2 gate-to-gate product boundary, 2025 USD, 20-year life, 90% capacity factor, 10,000 Monte Carlo iterations. Its source-modeled mean LCOH is SR 5.21, POX 5.47, ATR 5.82 and DR 6.10 USD/kg H2 with reported P10–P90 intervals.
+- Shock-wave and microwave methane-pyrolysis Pareto points separated from the 156-dataset review: shock-wave ~92% conversion / ~$0.70/kg H2; microwave ~91% conversion / 99% selectivity / ~$1.09/kg H2. These are review-derived reference points, not new independent experiments; microwave heating is not assumed to mean microwave plasma.
+
+The new target requires at least three chemistry groups, at least one non-plasma incumbent per group, 10,000 fixed-seed paired uncertainty draws, zero false-feasible and unsupported route rankings, common service/energy/currency boundaries, a no-credit baseline, explicit abstention and value-of-information outputs, and Pareto/regret reporting rather than a weighted-sum winner.
+
+The Rust xtask now contains specific source and target validators and adversarial tests. The merged branch is expected to contain 66 source cases, 114 negative controls, 7 derived checks, 15 benchmark targets and 120 Rust tests. The target remains `RESEARCH_TARGET_NOT_RESULT`; all candidate chemistry groups remain NOT_YET_MATCHED until the data are normalized.
