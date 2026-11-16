@@ -24,6 +24,8 @@ const COST_HOURS_PER_EXPERIMENT: f64 = 1.0;
 const MEASUREMENT_SIGMA: f64 = 0.01;
 const MEASUREMENT_TOLERANCE: f64 = 0.04;
 const RANDOM_SEED: u64 = 0x4953_5255_444f_4531;
+const REFERENCE_OUTPUT: &str =
+    include_str!("fixtures/isru-material-experiment-selection-reference-v0.1.csv");
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Experiment {
@@ -599,6 +601,30 @@ mod tests {
         let candidate = eligible_catalogue()[0];
         let observation = hidden_world_observation(SyntheticWorld::LowFluxPeak, &candidate);
         assert_eq!(supported_decision(&[(candidate, observation)]), None);
+    }
+
+    #[test]
+    fn deterministic_policy_rows_match_the_frozen_reference_fixture() {
+        let mut expected_lines = REFERENCE_OUTPUT.lines();
+        assert_eq!(
+            expected_lines.next(),
+            Some("world,policy,decision,correct,experiments_used,cost_hours,initial_disagreement_score,selected_candidate_ids")
+        );
+
+        for world in SyntheticWorld::ALL {
+            for policy in Policy::ALL {
+                let actual = policy_row(world, policy, &run_trial(policy, world));
+                let expected = expected_lines
+                    .next()
+                    .expect("reference fixture must contain every world/policy pair");
+                assert_eq!(actual, expected, "{world:?} / {policy:?}");
+            }
+        }
+
+        assert!(
+            expected_lines.next().is_none(),
+            "reference fixture must not contain extra policy rows"
+        );
     }
 
     #[test]
