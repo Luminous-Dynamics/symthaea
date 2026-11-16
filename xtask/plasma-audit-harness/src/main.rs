@@ -25,7 +25,8 @@ fn main() -> anyhow::Result<()> {
     );
 
     let fixture = std::fs::read_to_string(
-        repository_root.join("xtask/plasma-audit-harness/fixtures/pathway-selection-synthetic-v0.json"),
+        repository_root
+            .join("xtask/plasma-audit-harness/fixtures/pathway-selection-synthetic-v0.json"),
     )?;
     let demo = xtask::plasma_pathway_decision::evaluate_decision_manifest_json(&fixture)
         .map_err(anyhow::Error::msg)?;
@@ -35,7 +36,9 @@ fn main() -> anyhow::Result<()> {
         demo.draws
     );
     anyhow::ensure!(
-        demo.groups.iter().all(|group| group.disposition == "SYNTHETIC_PAIRED_PARETO_ANALYSIS"),
+        demo.groups
+            .iter()
+            .all(|group| group.disposition == "SYNTHETIC_PAIRED_PARETO_ANALYSIS"),
         "synthetic paired pathway demonstration did not complete"
     );
     Ok(())
