@@ -7,6 +7,7 @@ on:
       - "crates/domains/symthaea-architecture-engineering/src/pareto_objectives.rs"
       - "crates/domains/symthaea-architecture-engineering/src/lib.rs"
       - "crates/domains/symthaea-architecture-engineering/Cargo.toml"
+      - "research/scilaws-candidate-selection-audit-harness/**"
       - ".github/workflows/scilaws-candidate-selection-audit.yml"
 
 permissions:
@@ -35,16 +36,18 @@ jobs:
       - name: Check formatting
         run: rustfmt --edition 2024 --check crates/domains/symthaea-architecture-engineering/src/scilaws_candidate_selection.rs
 
-      # Temporary lockfile-drift diagnostic: the inherited branch lock is
-      # unchanged from the base and Cargo 1.96 requests a resolution update.
-      # This diagnostic run captures the resolver-produced lock for review.
-      - name: Regenerate inherited workspace lockfile for diagnosis
-        run: cargo test --manifest-path crates/domains/symthaea-architecture-engineering/Cargo.toml --lib scilaws_candidate_selection
+      # Isolate the actual SciLaws module and its shared Pareto dependency.
+      # The harness imports these exact repository files by path; no source is copied.
+      - name: Compile and test exact SciLaws and Pareto source
+        run: cargo test --manifest-path research/scilaws-candidate-selection-audit-harness/Cargo.toml --all-targets
 
-      - name: Upload resolver-produced workspace lockfile
+      - name: Run strict Clippy on isolated research harness
+        run: cargo clippy --manifest-path research/scilaws-candidate-selection-audit-harness/Cargo.toml --all-targets -- -D warnings
+
+      - name: Upload isolated harness lockfile for pinning
         uses: actions/upload-artifact@v4
         with:
-          name: scilaws-workspace-lockfile-diagnostic-${{ github.event.pull_request.head.sha || github.sha }}
-          path: Cargo.lock
+          name: scilaws-candidate-audit-harness-lockfile-${{ github.event.pull_request.head.sha || github.sha }}
+          path: research/scilaws-candidate-selection-audit-harness/Cargo.lock
           if-no-files-found: error
           retention-days: 7
