@@ -165,6 +165,86 @@ If an owner contract is not implemented or is absent from the exact consuming br
 
 ## 6. Comparison and causal attribution
 
+### External benchmark alignment — reuse, do not create another leaderboard
+
+The first tactile campaign should have two distinct tracks:
+
+1. **Physical sensor/metrology track:** Symtropy #4753 phantom, independently qualified reference channels, Mycelix instrument/calibration/uncertainty/timebase/condition records, and the P1 physical characterization defined here.
+2. **Representation/manipulation track:** adapt to public benchmark protocols and datasets below, preserving their task definitions, splits, licenses and model baselines. These datasets cannot establish SI-unit calibration or physical traceability.
+
+| External benchmark / dataset | Published scope | What Luminous should test | Critical limitation |
+|---|---|---|---|
+| **TacO (2026)** | Four sensor modalities (visual, acoustic, magnetic, resistive) and three contact-rich manipulation tasks: unknown-mass pick-and-place, object reorientation and plug insertion | Sensor modality × material friction × task interaction; compare sensor utility under matched manipulation policies | Task-policy performance is not physical calibration; no universal best modality is implied |
+| **TacMind (30 Oct 2026)** | 128 simulation tasks, Precise / Recognition / Dynamic regimes, static and dynamic variants, 12 perturbation settings; action-conditioned tactile-history world model | Temporal prediction, contact-state discrimination, policy robustness and whether tactile history improves decision quality | Simulation benchmark only; physical transfer still required |
+| **RCT (2026 preprint)** | 29,279 tactile frames, per-press contact sequences, force signals, indentation depth, materials, categories, sensors and contact positions; held-out presses/materials/sensors/positions | Contact-sequence generalization and sensor/material transfer using its official sequence-level splits | Frame-random splitting leaks near-duplicate frames from the same press; preserve press/article lineage |
+| **TacVerse (2026)** | 106,800 images across 7 vision-based tactile platforms; within-sensor, zero-shot cross-sensor and few-shot adaptation protocols | Cross-sensor representation transfer, calibration/adaptation sample efficiency and degradation under sensor shift | Vision-based tactile family only; it does not compare all physical modalities |
+| **HT-Bench (2026)** | 10M RGB frames, 7.8M tactile frames, 226 tasks; retrieval, masked tactile inpainting, vision-to-tactile synthesis and multimodal prediction | Full-hand tactile representation, temporal/multimodal alignment and transfer to unseen tasks | Representation-task metrics are not force/pressure metrology |
+| **Sparsh / TacBench (Meta, 2024)** | Self-supervised tactile representation pretraining on 460k+ tactile images and six downstream tasks; reports strong gains over task-specific training | Mandatory learned-representation baseline for vision-based tactile inputs, including DINO/I-JEPA-style methods | The reported average relative gain is specific to the paper's tasks and baselines; do not compare it as a universal sensor accuracy |
+| **TactiDex (2026)** | Real-world tactile-guided dexterous manipulation, with real and simulated task demonstrations | Real-world manipulation confirmation after synthetic and dataset qualification | Task/embodiment scope must be matched before comparative claims |
+
+Source registry:
+- TacO paper: https://arxiv.org/abs/2605.21976 and project: https://tacobench.github.io/
+- TacMind: https://arxiv.org/abs/2611.00455 and https://tacmind-bench.github.io/
+- RCT: https://arxiv.org/abs/2606.31694 and https://faerber-lab.github.io/RCT/
+- TacVerse: https://lannwei.github.io/Tactile_Database/
+- HT-Bench: https://arxiv.org/abs/2606.19161
+- Sparsh / TacBench: https://ai.meta.com/research/publications/sparsh-self-supervised-touch-representations-for-vision-based-tactile-sensing/
+- TactiDex: https://tactidex.github.io/ and https://arxiv.org/abs/2607.09190
+
+No third-party benchmark result is a Symthaea result. Use the original benchmark license and official split/capture protocols. Do not silently redistribute external data or claim reproduction from a paper abstract alone.
+
+### Luminous competitive hypothesis
+
+The strongest defensible research target is not “best tactile classifier”. It is:
+
+> A repairable sensor system that preserves calibrated physical observations and uncertainty, diagnoses its own evidence failures, transfers representations across articles/sensors/materials, and improves a real manipulation task under matched power, latency, calibration and lifecycle constraints.
+
+To test this without double-counting evidence, report five distinct result families:
+
+- **P1 metrology:** force/displacement calibration, uncertainty coverage, hysteresis, drift, crosstalk, saturation and physical transfer.
+- **P2a representation:** sequence prediction, contact geometry, retrieval, sensor/material generalization, calibration sample efficiency and OOD detection.
+- **P2b task:** localization, slip discrimination, unknown-mass pick, reorientation, insertion and other exact manipulation outcomes.
+- **P3 resource/lifecycle:** complete-system energy, bandwidth, compute/memory, latency tails, calibration time, repair, replacement and useful measurement availability.
+- **P4 evidence integrity:** held-out leakage, common-mode detection, source/clock identity, calibration currentness, raw-to-derived lineage, fault diagnosis and correct abstention.
+
+A result can improve P2b while P1 remains unresolved. It is a valid task result, not a metrology upgrade.
+
+### Representation baselines and ablations
+
+For each public tactile representation task, compare at least:
+
+1. raw sensor input + the strongest simple task-specific baseline;
+2. sensor-native engineered features / conventional temporal filtering;
+3. published learned tactile encoder applicable to that sensor family (e.g. Sparsh, HandTouch where supported);
+4. Symthaea HDC encoding alone;
+5. Symthaea HDC + temporal/CfC context;
+6. a matched learned temporal baseline;
+7. fast HDC/event path plus slower contextual path.
+
+Use the same training/evaluation examples, task labels, adaptation budget and measured system boundary. Report both sample efficiency and total training/inference cost. A compressed representation must not silently erase amplitude, timing, uncertainty, saturation or channel-fault information required by the downstream claim.
+
+### Leakage-resistant evaluation
+
+- Use RCT's press/contact-sequence grouping rather than random frame splits.
+- Hold out physical sensor article, sensor model where possible, material, contact object, contact position, fixture/remount session and environment separately.
+- Keep calibration/development, design search and confirmatory partitions distinct.
+- Use TacVerse's zero-shot and few-shot cross-sensor protocols as separate strata; adaptation examples must be counted in the resource budget.
+- Do not train on hidden evaluator truth, held-out task labels, post-hoc calibration residuals or future observations.
+- Preserve every failed and excluded episode with its reason. Repeated frames from one physical press are not independent replications.
+
+### Proposed competitive gates (targets, not achieved results)
+
+- 100% deterministic agreement on frozen synthetic sensor-fault and representation-loss known answers.
+- Zero false-valid measurement claims for seeded saturation, missingness, stale/article-mismatched calibration, unit mismatch, common-reference faults or invalid timebase.
+- Held-out P1 uncertainty coverage and calibration residuals meet preregistered, measurand-specific criteria; no universal numerical force threshold is selected before the exact range and reference chain exist.
+- On each declared P2 task, beat or match the strongest applicable published/open baseline under matched data, sensor, compute and adaptation budgets; report paired uncertainty and per-stratum results.
+- On cross-sensor/material transfer, publish the full zero-shot-to-few-shot adaptation curve, not only the best post-adaptation score.
+- HDC/CfC earns deployment consideration only if it preserves task-relevant signal and physical-evidence lineage while improving a declared latency, energy, memory, sample-efficiency or robustness axis.
+- No task improvement may compensate for a protected P1, evidence-integrity or operational regression.
+
+This is how we can improve on SOTA responsibly: retain the strongest public baselines, find a measurable gap (especially metrology-aware transfer, fault diagnosis, or complete-system resource cost), and demonstrate a Pareto improvement on held-out evidence—not by selecting an easier task or collapsing incompatible metrics.
+
+
 Minimum arm set where physically feasible:
 
 | Arm | Physical system | Processing | What it can isolate |
