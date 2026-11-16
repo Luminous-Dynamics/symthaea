@@ -562,39 +562,55 @@ pub fn verify_loft_artifact_integrity(
     }
 
     let face_count = artifact.candidate.geometry.faces.len();
-    let ranges = [
-        artifact.side_face_range,
-        artifact.waterplane_face_range,
-        artifact.end_cap_face_range,
-    ];
-    let mut covered = vec![false; face_count];
-    for range in ranges {
-        match range.first_face.checked_add(range.face_count) {
-            Some(end) if end <= face_count => {
-                for index in range.first_face..end {
-                    if covered[index] {
-                        violation(
-                            &mut violations,
-                            "face_region_overlap",
-                            format!("face {index} appears in multiple semantic ranges"),
-                        );
-                        break;
-                    }
-                    covered[index] = true;
-                }
-            }
-            _ => violation(
-                &mut violations,
-                "face_region_bounds",
-                "a semantic face range exceeds the candidate mesh",
-            ),
-        }
-    }
-    if covered.iter().any(|value| !value) {
+    let vertex_count = artifact.candidate.geometry.vertices.len();
+    if face_count > MAX_MESH_FACES {
         violation(
             &mut violations,
-            "face_region_coverage",
-            "semantic face ranges do not cover every mesh face",
+            "mesh_face_budget",
+            format!("candidate has {face_count} faces; maximum is {MAX_MESH_FACES}"),
+        );
+    } else {
+        let ranges = [
+            artifact.side_face_range,
+            artifact.waterplane_face_range,
+            artifact.end_cap_face_range,
+        ];
+        let mut covered = vec![false; face_count];
+        for range in ranges {
+            match range.first_face.checked_add(range.face_count) {
+                Some(end) if end <= face_count => {
+                    for index in range.first_face..end {
+                        if covered[index] {
+                            violation(
+                                &mut violations,
+                                "face_region_overlap",
+                                format!("face {index} appears in multiple semantic ranges"),
+                            );
+                            break;
+                        }
+                        covered[index] = true;
+                    }
+                }
+                _ => violation(
+                    &mut violations,
+                    "face_region_bounds",
+                    "a semantic face range exceeds the candidate mesh",
+                ),
+            }
+        }
+        if covered.iter().any(|value| !value) {
+            violation(
+                &mut violations,
+                "face_region_coverage",
+                "semantic face ranges do not cover every mesh face",
+            );
+        }
+    }
+    if vertex_count > MAX_MESH_VERTICES {
+        violation(
+            &mut violations,
+            "mesh_vertex_budget",
+            format!("candidate has {vertex_count} vertices; maximum is {MAX_MESH_VERTICES}"),
         );
     }
 
@@ -769,7 +785,16 @@ pub fn verify_loft_artifact_integrity(
         }
     }
 
-    if station_bases.len() == station_count
+    let expected_side_face_budget = station_count
+        .checked_sub(1)
+        .and_then(|count| count.checked_mul(4))
+        .and_then(|count| count.checked_mul(point_count.saturating_sub(1)));
+    if station_count >= 2
+        && station_count <= MAX_STATIONS
+        && point_count >= 2
+        && point_count <= MAX_SECTION_POINTS
+        && expected_side_face_budget.is_some_and(|count| count <= MAX_MESH_FACES)
+        && station_bases.len() == station_count
         && artifact.side_face_range.first_face
             .checked_add(artifact.side_face_range.face_count)
             == Some(artifact.waterplane_face_range.first_face)
