@@ -256,6 +256,7 @@ pub struct SourceWatermarkLedger {
     event_arrivals: Vec<EventArrivalReceipt>,
     seen_event_ids: BTreeSet<u64>,
     late_breaches: Vec<LateEventBreach>,
+    late_breaches_by_source_event_time: BTreeMap<(SourceKey, i64), Vec<usize>>,
 }
 
 fn hash_progress_evidence(hasher: &mut Sha256, evidence: SourceProgressEvidence) {
@@ -457,8 +458,6 @@ impl SourceWatermarkLedger {
         if required_sources.is_empty() {
             return Err(WatermarkError::NoRequiredSources);
         }
-        self.verify_consistency()?;
-
         let mut unique = BTreeSet::new();
         let mut sources = Vec::with_capacity(required_sources.len());
         let mut blocked_sources = Vec::new();
@@ -493,20 +492,22 @@ impl SourceWatermarkLedger {
             });
         }
 
-        let late_breaches: Vec<_> = self.late_breaches.iter()
-            .filter(|breach| {
-                breach.recorded_at_us <= known_at_us
-                    && breach.event.entity_id == entity_id
-                    && breach.event.event_time_us >= interval_start_us
-                    && breach.event.event_time_us < interval_end_exclusive_us
-                    && unique.contains(&SourceKey {
-                        entity_id: breach.event.entity_id,
-                        modality_id: breach.event.modality_id,
-                        source_id: breach.event.source_id,
-                    })
-            })
-            .copied()
-            .collect();
+        // Use the required-source + half-open event-time index. Historical
+        // visibility is still filtered by transaction/knowledge time.
+        let mut late_breaches = Vec::new();
+        for source in &unique {
+            let start = (*source, interval_start_us);
+            let end = (*source, interval_end_exclusive_us);
+            for indices in self.late_breaches_by_source_event_time.range(start..end).map(|(_, indices)| indices) {
+                for index in indices {
+                    let breach = self.late_breaches.get(*index).ok_or(WatermarkError::InvalidHistory)?;
+                    if breach.recorded_at_us <= known_at_us {
+                        late_breaches.push(*breach);
+                    }
+                }
+            }
+        }
+        late_breaches.sort_by_key(|breach| (breach.recorded_at_us, breach.event.event_id));
 
         let verdict = if !late_breaches.is_empty() {
             CompletenessVerdict::Contested
@@ -525,6 +526,28 @@ impl SourceWatermarkLedger {
             blocked_sources,
             late_breaches,
         })
+    }
+
+    /// Assess an interval using source-progress and late-breach indexes.
+    /// This is the query-path operation and does not rebuild the append-only
+    /// history on every call. Use \`completeness_verified\` when a full audit is
+    /// required before returning a qualified result.
+    pub fn completeness_verified(
+        &self,
+        entity_id: u64,
+        required_sources: &[SourceKey],
+        interval_start_us: i64,
+        interval_end_exclusive_us: i64,
+        known_at_us: i64,
+    ) -> Result<CompletenessReport, WatermarkError> {
+        self.verify_consistency()?;
+        self.completeness(
+            entity_id,
+            required_sources,
+            interval_start_us,
+            interval_end_exclusive_us,
+            known_at_us,
+        )
     }
 
     /// Observe the arrival of an event. On-time events are not stored here;
@@ -625,11 +648,16 @@ impl SourceWatermarkLedger {
             classification,
         });
         if let EventArrivalClassification::Late(kind) = classification {
+            let index = self.late_breaches.len();
             self.late_breaches.push(LateEventBreach {
                 event,
                 recorded_at_us,
                 kind,
             });
+            self.late_breaches_by_source_event_time
+                .entry((source, event.event_time_us))
+                .or_default()
+                .push(index);
         }
         Ok(classification)
     }
@@ -837,6 +865,41 @@ mod tests {
             EventArrivalClassification::Late(kind) => kind,
             _ => unreachable!(),
         });
+    }
+
+    #[test]
+    fn indexed_completeness_matches_full_history_audit() {
+        let mut ledger = SourceWatermarkLedger::default();
+        ledger.append_batch([
+            progress(1, 1, 1, 1, 10, 100, false),
+            progress(2, 2, 1, 1, 10, 120, false),
+        ]).unwrap();
+        ledger.record_event_arrival(event(1, 1, 50, 20), 20).unwrap();
+
+        let indexed = ledger.completeness(1, &[source(1), source(2)], 0, 100, 20).unwrap();
+        let audited = ledger.completeness_verified(1, &[source(1), source(2)], 0, 100, 20).unwrap();
+        assert_eq!(indexed, audited);
+        assert_eq!(indexed.verdict, CompletenessVerdict::Contested);
+    }
+
+    #[test]
+    fn late_breach_index_filters_by_required_source_and_half_open_interval() {
+        let mut ledger = SourceWatermarkLedger::default();
+        ledger.append_batch([
+            progress(1, 1, 1, 1, 10, 100, false),
+            progress(2, 2, 1, 1, 10, 100, false),
+        ]).unwrap();
+        ledger.record_event_arrival(event(1, 2, 50, 20), 20).unwrap();
+        ledger.record_event_arrival(event(2, 1, 200, 30), 30).unwrap();
+
+        let report = ledger.completeness(1, &[source(1)], 0, 100, 30).unwrap();
+        assert_eq!(report.verdict, CompletenessVerdict::Complete);
+        assert!(report.late_breaches.is_empty());
+        assert_eq!(
+            ledger.verify_consistency(),
+            Ok(()),
+            "the append-only breach log and source/event-time index must rebuild identically"
+        );
     }
 
     #[test]
