@@ -33,7 +33,10 @@ fn task(
         subsystem_id: format!("subsystem-{id}"),
         failure_mode_id: format!("failure-mode-{id}"),
         duration_seconds,
-        predecessor_ids: predecessors.iter().map(|value| (*value).to_string()).collect(),
+        predecessor_ids: predecessors
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
         resource_demands: resource_ids
             .iter()
             .map(|resource_id| ResourceDemand {
@@ -175,10 +178,12 @@ fn main() {
     println!("exact_small_instance_makespan_seconds={exact}");
     println!(
         "parallel_speedup={}/{}",
-        report.parallel_speedup_over_serial.0,
-        report.parallel_speedup_over_serial.1
+        report.parallel_speedup_over_serial.0, report.parallel_speedup_over_serial.1
     );
-    println!("full_outage_window_seconds={}", report.full_outage_window_seconds);
+    println!(
+        "full_outage_window_seconds={}",
+        report.full_outage_window_seconds
+    );
     println!("lifecycle_event_count={}", report.lifecycle_events.len());
 
     for scheduled in &report.scheduled_tasks {
