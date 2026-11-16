@@ -59,7 +59,6 @@ fn cli_validates_explicitly_asymmetric_fixture_without_mirroring() {
     assert_valid_fixture("marine-full-envelope-asymmetric-001.json");
 }
 
-
 #[test]
 fn cli_validates_pointed_stem_with_asymmetric_midbody() {
     assert_valid_fixture("marine-full-envelope-pointed-bow-asymmetric-001.json");
@@ -75,7 +74,6 @@ fn cli_returns_documented_error_code_for_unknown_options() {
         String::from_utf8_lossy(&output.stderr)
     );
 }
-
 
 #[test]
 fn cli_returns_incomplete_exit_for_explicit_unsupported_opening() {
