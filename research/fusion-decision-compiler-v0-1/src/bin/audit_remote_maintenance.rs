@@ -1,5 +1,5 @@
 use fusion_decision_compiler_contract::remote_maintenance_compiler::{
-    InterfaceFamily, InterfaceProcedureBinding, IntegrityTestKind, MaintenanceAction,
+    IntegrityTestKind, InterfaceFamily, InterfaceProcedureBinding, MaintenanceAction,
     MaintenanceEvidenceClass, MaintenanceOperation, MaintenanceResource, MaintenanceTool,
     RemoteMaintenancePlan, ReplaceableAssembly, ServiceInterface, compile_remote_maintenance_plan,
 };
@@ -16,7 +16,10 @@ fn operation(
         operation_id: id.to_string(),
         action,
         interface_id: interface.map(str::to_string),
-        predecessor_ids: predecessors.iter().map(|value| (*value).to_string()).collect(),
+        predecessor_ids: predecessors
+            .iter()
+            .map(|value| (*value).to_string())
+            .collect(),
         required_capabilities: vec!["remote-maintenance".to_string()],
         resource_id: "remote-handler-1".to_string(),
         tool_id: "multi-service-tool-1".to_string(),
@@ -81,10 +84,34 @@ fn main() {
             isolation_plan_ref: "synthetic-coolant-electrical-isolation-plan".to_string(),
         },
         interfaces: vec![
-            interface("coolant-module", "coolant-plant", true, InterfaceFamily::Coolant, "DN200-PN40"),
-            interface("coolant-plant", "coolant-module", false, InterfaceFamily::Coolant, "DN200-PN40"),
-            interface("power-module", "power-plant", true, InterfaceFamily::Electrical, "HV-remote-plug"),
-            interface("power-plant", "power-module", false, InterfaceFamily::Electrical, "HV-remote-plug"),
+            interface(
+                "coolant-module",
+                "coolant-plant",
+                true,
+                InterfaceFamily::Coolant,
+                "DN200-PN40",
+            ),
+            interface(
+                "coolant-plant",
+                "coolant-module",
+                false,
+                InterfaceFamily::Coolant,
+                "DN200-PN40",
+            ),
+            interface(
+                "power-module",
+                "power-plant",
+                true,
+                InterfaceFamily::Electrical,
+                "HV-remote-plug",
+            ),
+            interface(
+                "power-plant",
+                "power-module",
+                false,
+                InterfaceFamily::Electrical,
+                "HV-remote-plug",
+            ),
         ],
         interface_bindings: vec![
             InterfaceProcedureBinding {
@@ -117,24 +144,150 @@ fn main() {
             maximum_centre_of_gravity_offset_m: 0.5,
         }],
         operations: vec![
-            operation("isolate", MaintenanceAction::IsolateSystem, None, &[], 0, 10),
-            operation("prove-safe", MaintenanceAction::ProveSafeState, None, &["isolate"], 10, 20),
-            operation("purge-coolant", MaintenanceAction::PrepareServiceBoundary, None, &["prove-safe"], 20, 30),
-            operation("disconnect-coolant", MaintenanceAction::DisconnectInterface, Some("coolant-module"), &["prove-safe", "purge-coolant"], 30, 40),
-            operation("disconnect-power", MaintenanceAction::DisconnectInterface, Some("power-module"), &["prove-safe"], 40, 50),
-            operation("release-restraints", MaintenanceAction::ReleaseRestraints, None, &["disconnect-coolant", "disconnect-power"], 50, 60),
-            operation("extract", MaintenanceAction::ExtractModule, None, &["release-restraints"], 60, 80),
-            operation("transfer-cask", MaintenanceAction::TransferToShieldedCask, None, &["extract"], 80, 100),
-            operation("hot-cell-inspect", MaintenanceAction::HotCellInspectRepair, None, &["transfer-cask"], 100, 150),
-            operation("install", MaintenanceAction::InstallModule, None, &["hot-cell-inspect"], 150, 170),
-            operation("align", MaintenanceAction::AlignMetrology, None, &["install"], 170, 180),
-            operation("secure-restraints", MaintenanceAction::SecureRestraints, None, &["align"], 180, 190),
-            operation("reconnect-coolant", MaintenanceAction::ReconnectInterface, Some("coolant-module"), &["secure-restraints"], 190, 200),
-            operation("reconnect-power", MaintenanceAction::ReconnectInterface, Some("power-module"), &["secure-restraints"], 200, 210),
-            operation("pressure-test-coolant", MaintenanceAction::IntegrityTest(IntegrityTestKind::PressureLeak), Some("coolant-module"), &["reconnect-coolant"], 210, 220),
-            operation("continuity-test-power", MaintenanceAction::IntegrityTest(IntegrityTestKind::ElectricalContinuity), Some("power-module"), &["reconnect-power"], 220, 230),
-            operation("system-requalification", MaintenanceAction::SystemRequalification, None, &["pressure-test-coolant", "continuity-test-power"], 230, 240),
-            operation("restart", MaintenanceAction::RestartSystem, None, &["system-requalification"], 240, 250),
+            operation(
+                "isolate",
+                MaintenanceAction::IsolateSystem,
+                None,
+                &[],
+                0,
+                10,
+            ),
+            operation(
+                "prove-safe",
+                MaintenanceAction::ProveSafeState,
+                None,
+                &["isolate"],
+                10,
+                20,
+            ),
+            operation(
+                "purge-coolant",
+                MaintenanceAction::PrepareServiceBoundary,
+                None,
+                &["prove-safe"],
+                20,
+                30,
+            ),
+            operation(
+                "disconnect-coolant",
+                MaintenanceAction::DisconnectInterface,
+                Some("coolant-module"),
+                &["prove-safe", "purge-coolant"],
+                30,
+                40,
+            ),
+            operation(
+                "disconnect-power",
+                MaintenanceAction::DisconnectInterface,
+                Some("power-module"),
+                &["prove-safe"],
+                40,
+                50,
+            ),
+            operation(
+                "release-restraints",
+                MaintenanceAction::ReleaseRestraints,
+                None,
+                &["disconnect-coolant", "disconnect-power"],
+                50,
+                60,
+            ),
+            operation(
+                "extract",
+                MaintenanceAction::ExtractModule,
+                None,
+                &["release-restraints"],
+                60,
+                80,
+            ),
+            operation(
+                "transfer-cask",
+                MaintenanceAction::TransferToShieldedCask,
+                None,
+                &["extract"],
+                80,
+                100,
+            ),
+            operation(
+                "hot-cell-inspect",
+                MaintenanceAction::HotCellInspectRepair,
+                None,
+                &["transfer-cask"],
+                100,
+                150,
+            ),
+            operation(
+                "install",
+                MaintenanceAction::InstallModule,
+                None,
+                &["hot-cell-inspect"],
+                150,
+                170,
+            ),
+            operation(
+                "align",
+                MaintenanceAction::AlignMetrology,
+                None,
+                &["install"],
+                170,
+                180,
+            ),
+            operation(
+                "secure-restraints",
+                MaintenanceAction::SecureRestraints,
+                None,
+                &["align"],
+                180,
+                190,
+            ),
+            operation(
+                "reconnect-coolant",
+                MaintenanceAction::ReconnectInterface,
+                Some("coolant-module"),
+                &["secure-restraints"],
+                190,
+                200,
+            ),
+            operation(
+                "reconnect-power",
+                MaintenanceAction::ReconnectInterface,
+                Some("power-module"),
+                &["secure-restraints"],
+                200,
+                210,
+            ),
+            operation(
+                "pressure-test-coolant",
+                MaintenanceAction::IntegrityTest(IntegrityTestKind::PressureLeak),
+                Some("coolant-module"),
+                &["reconnect-coolant"],
+                210,
+                220,
+            ),
+            operation(
+                "continuity-test-power",
+                MaintenanceAction::IntegrityTest(IntegrityTestKind::ElectricalContinuity),
+                Some("power-module"),
+                &["reconnect-power"],
+                220,
+                230,
+            ),
+            operation(
+                "system-requalification",
+                MaintenanceAction::SystemRequalification,
+                None,
+                &["pressure-test-coolant", "continuity-test-power"],
+                230,
+                240,
+            ),
+            operation(
+                "restart",
+                MaintenanceAction::RestartSystem,
+                None,
+                &["system-requalification"],
+                240,
+                250,
+            ),
         ],
     };
 
@@ -156,11 +309,17 @@ fn main() {
     for item in &report.scheduled_resource_utilization {
         println!(
             "resource={},busy_seconds={},idle_seconds={},operations={}",
-            item.resource_id, item.busy_seconds, item.idle_seconds_within_campaign, item.operation_count
+            item.resource_id,
+            item.busy_seconds,
+            item.idle_seconds_within_campaign,
+            item.operation_count
         );
     }
     for item in &report.evidence_class_counts {
-        println!("evidence_class={:?},operations={}", item.evidence_class, item.operation_count);
+        println!(
+            "evidence_class={:?},operations={}",
+            item.evidence_class, item.operation_count
+        );
     }
     println!(
         "SCOPE: synthetic declared replacement procedure only; no physical reachability, activated maintenance or repair-time validation"
