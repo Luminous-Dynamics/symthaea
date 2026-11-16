@@ -3,7 +3,7 @@
 
 **Status:** research protocol; implementation and execution are not yet qualified  
 **Parent:** [ISRU-MATERIAL-DOE-002 #12483](https://github.com/Luminous-Dynamics/symthaea/issues/12483)  
-**Predecessor:** [v0.1 synthetic experiment-selection benchmark](./ISRU_MATERIAL_EXPERIMENT_SELECTION_BENCHMARK_V0_1.md)  
+**Predecessor:** [v0.1 synthetic experiment-selection benchmark](https://github.com/Luminous-Dynamics/symthaea/blob/research/isru-material-experiment-selection-review-v0.1/docs/research/ISRU_MATERIAL_EXPERIMENT_SELECTION_BENCHMARK_V0_1.md)  
 **Composition:** Symthaea selects; Symtropy accounts for source observations and physical stages; independent laboratory authority approves and executes; Mycelix supplies custody, calibration and assay attestations.
 
 This document freezes the comparison rules for v0.2. It is not a claim that any v0.2 algorithm exists, compiles, passes tests, or outperforms current practice.
