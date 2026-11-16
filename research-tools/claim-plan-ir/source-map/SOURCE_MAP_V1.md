@@ -65,6 +65,23 @@ Required fields:
 
 The digest is over the exact bytes in that node's coordinate space. Never reuse a digest field to mean both an encoded body and a decoded body. If a no-op transform produces identical bytes, retain separate stage identity and equal digest/length rather than silently skipping the declared stage.
 
+## 3.1 Cross-field invariants (not expressible by shape alone)
+
+The JSON Schema is an envelope/shape check, not a complete semantic validator. A verifier must additionally enforce:
+
+- representation IDs are unique; all parent, transformation and mapping references resolve exactly once;
+- the derivation graph is acyclic, stage ordinals are contiguous, and each stage input is the preceding authorized output;
+- a transformation's input/output digests and lengths equal the corresponding representation records;
+- an identity mapping has identical input/output bytes and digest; range-map and semantic-node-map stages reference a map artifact with matching input/output representation IDs and digests;
+- a `field_selection.source_span` is measured in `json_source_utf8_bytes`, references `source_representation_id`, is within its byte length, and has `start_byte < end_byte`;
+- `token_representation_id` identifies the exact extracted `json_raw_value_token_bytes`; its digest equals `raw_token_sha256`, and the original source slice equals those token bytes;
+- a `semantic_node_map` links one unique source node and JSON Pointer to one unique canonical node; its source span must equal the raw field selection;
+- the typed conversion's `input_raw_token_sha256` equals the selected token digest and the output digest equals its typed-value representation;
+- the predicate public-input digest equals the final predicate-input representation; audience, purpose, request challenge and uniqueness scope are separately bound;
+- the session response ordinal, direction, server identity and commitment ID match the upstream verified opening evidence.
+
+The schema's `required` fields and enums cannot replace these relational checks. Unknown, duplicated, dangling or mismatched edges are reject/indeterminate, never inferred from names.
+
 ## 4. Transformation records and mapping modes
 
 Each transformation records:
