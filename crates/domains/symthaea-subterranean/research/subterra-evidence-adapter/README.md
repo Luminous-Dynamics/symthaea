@@ -6,11 +6,21 @@ A standalone Rust adapter for the exact Subterra v0.1 site-evidence and cave-net
 
 - Symtropy site schema: `research/geobio-foundry/SUBTERRA_SITE_EVIDENCE_SCHEMA_v0.1.json`, blob SHA `970b48703a8147cd3047cce05c5fc0631d1f03d9`.
 - Symtropy network schema: `research/geobio-foundry/SUBTERRA_NETWORK_SCHEMA_v0.1.json`, blob SHA `bfe797f741d930ffcde2ce9d33a21c75396f46c0`.
+- Symtropy profile schema: `research/geobio-foundry/SUBTERRA_PROFILE_SCHEMA_v0.1.json`, blob SHA pinned in Symtropy PR #5486.
 - Site fixture: blob SHA `31813b808d596f9ddb78c4de49a15f1773026fc9`.
 - Network fixture: blob SHA `95fa93de34773569aa3abcb9c3f808f2f9986e97`.
+- Profile fixture: the synthetic non-uniform profile with an explicit unobserved span from 16 m to 24 m, copied from Symtropy PR #5486.
 - Upstream research PR: https://github.com/Luminous-Dynamics/symtropy/pull/5486
 
 Fixtures in this package are copies of the cited synthetic examples for deterministic offline tests. They are not empirical planetary observations.
+
+## Supported records
+
+- Site evidence: typed DTO, semantic consistency checks and non-probabilistic `SiteBeliefInput` conversion.
+- Cave network: typed DTO, observed-topology components, evidence-state summary and directional demonstrated-route queries.
+- Non-uniform profile: typed DTO, explicit unknown intervals, measurement uncertainty preservation, coverage summary and observed-only length-weighted dimensions.
+
+All three inputs retain schema-specific states and evidence references. The profile summary is a lightweight adapter view, not a replacement for Symtropy's morphometry reference kernel.
 
 ## Design invariants
 
@@ -20,8 +30,10 @@ Fixtures in this package are copies of the cited synthetic examples for determin
 4. Physical connectivity components use only directly observed edges; demonstrated routes additionally require demonstrated traversability and obey direction.
 5. Candidate and geophysically supported edges are preserved as hypotheses and are not promoted into observed topology.
 6. Evidence references are opaque identifiers. The adapter does not authenticate, resolve, or dereference them.
-7. Planetary-protection and activity permissions are represented as declarations only. They are never converted into permission for a measurement, sample, biological activity or actuator.
-8. No Earth coordinate assumptions, geodetic transforms, SLAM, geomechanics or engineering qualification are implemented here.
+7. Profile means are calculated only over observed intervals. An unobserved interval is never treated as zero width/height or interpolated.
+8. The v0.1 observation `captured_at` string is retained but not independently checked as RFC 3339; JSON Schema format validation remains a separate gate.
+9. Planetary-protection and activity permissions are represented as declarations only. They are never converted into permission for a measurement, sample, biological activity or actuator.
+10. No Earth coordinate assumptions, geodetic transforms, SLAM, geomechanics or engineering qualification are implemented here.
 
 ## Run locally
 
@@ -35,6 +47,9 @@ The package has its own Cargo workspace and does not join the production Symthae
 
 ## Validation boundary
 
+- Site, cave-network and non-uniform-profile adapters plus unit-test fixtures: AUTHORED.
+- The profile adapter validates ordered contiguous coverage and computes observed-only geometry summaries; it does not yet propagate uncertainty through the summary statistics.
+- The adapter rejects malformed required fields and unknown fields, but does not replace full Draft 2020-12 schema validation or RFC 3339 format validation.
 - Rust source and unit-test fixtures: AUTHORED.
 - Compilation, formatting, tests and Clippy: NOT EXECUTED in the current authoring environment (no Rust toolchain available).
 - JSON Schema meta-validation: not performed by this crate; upstream schemas have a separate validation record.
