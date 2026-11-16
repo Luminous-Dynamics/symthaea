@@ -1008,6 +1008,58 @@ mod tests {
     }
 
     #[test]
+    fn indexed_and_verified_completeness_match_across_seeded_multi_source_histories() {
+        let mut ledger = SourceWatermarkLedger::default();
+        ledger
+            .append_batch([
+                progress(1, 1, 1, 1, 10, 70, false),
+                progress(2, 2, 1, 1, 10, 110, false),
+                progress(3, 3, 1, 1, 10, 150, false),
+            ])
+            .unwrap();
+
+        // Deterministic fixture generation: no RNG crate, wall clock or hidden
+        // evaluator state is required to replay this test.
+        for index in 0..48_u64 {
+            let modality_id = (index % 3 + 1) as u32;
+            let event_time_us = ((index * 37 + 11) % 180) as i64;
+            let recorded_at_us = 20 + index as i64;
+            let record = event(index + 10, modality_id, event_time_us, 20);
+            ledger
+                .record_event_arrival(record, recorded_at_us)
+                .expect("unique arrival with availability no later than receipt");
+        }
+
+        let source_sets = [
+            vec![source(1)],
+            vec![source(2)],
+            vec![source(3)],
+            vec![source(1), source(2)],
+            vec![source(2), source(3)],
+            vec![source(1), source(2), source(3)],
+        ];
+        let intervals = [(0, 40), (40, 80), (80, 120), (120, 180), (0, 180)];
+        let knowledge_times = [10, 20, 28, 40, 55, 67];
+
+        for required in &source_sets {
+            for (start, end) in intervals {
+                for known_at in knowledge_times {
+                    let indexed = ledger
+                        .completeness(1, required, start, end, known_at)
+                        .expect("indexed query");
+                    let audited = ledger
+                        .completeness_verified(1, required, start, end, known_at)
+                        .expect("full-history audit query");
+                    assert_eq!(
+                        indexed, audited,
+                        "index/audit mismatch: required={required:?}, interval=[{start},{end}), known_at={known_at}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn no_watermark_is_incomplete_not_absent() {
         let ledger = SourceWatermarkLedger::default();
         let report = ledger.completeness(1, &[source(1)], 0, 100, 100).unwrap();
