@@ -12,6 +12,8 @@ on:
       - "docs/research/IRREGULAR_EVENT_AVAILABILITY_CONTRACT_V0_1.md"
       - "docs/research/REAL_IRREGULAR_TIME_SERIES_BENCHMARK_MATRIX_V0_1.md"
       - "crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json"
+      - "crates/domains/symthaea-capability-closure/fixtures/real_irregular_benchmark_registry_v0.1.json"
+      - "crates/domains/symthaea-capability-closure/fixtures/tsfm_comparator_snapshot_v0.1.json"
   push:
     branches:
       - research/real-irregular-benchmark-adapters-20261101
@@ -21,6 +23,8 @@ on:
       - "docs/research/IRREGULAR_EVENT_AVAILABILITY_CONTRACT_V0_1.md"
       - "docs/research/REAL_IRREGULAR_TIME_SERIES_BENCHMARK_MATRIX_V0_1.md"
       - "crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json"
+      - "crates/domains/symthaea-capability-closure/fixtures/real_irregular_benchmark_registry_v0.1.json"
+      - "crates/domains/symthaea-capability-closure/fixtures/tsfm_comparator_snapshot_v0.1.json"
 
 permissions:
   contents: read
@@ -102,6 +106,8 @@ jobs:
             echo "scaler_source_sha256=$(sha256sum research/irregular-event-contract/src/scaler.rs | cut -d ' ' -f 1)"
             echo "time_imm_source_sha256=$(sha256sum research/irregular-event-contract/src/time_imm.rs | cut -d ' ' -f 1)"
             echo "watermark_fixture_sha256=$(sha256sum crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json | cut -d ' ' -f 1)"
+            echo "baseline_registry_sha256=$(sha256sum crates/domains/symthaea-capability-closure/fixtures/real_irregular_benchmark_registry_v0.1.json | cut -d ' ' -f 1)"
+            echo "tsfm_comparator_snapshot_sha256=$(sha256sum crates/domains/symthaea-capability-closure/fixtures/tsfm_comparator_snapshot_v0.1.json | cut -d ' ' -f 1)"
             echo "resolved_lock_sha256=$(sha256sum research/irregular-event-contract/Cargo.lock | cut -d ' ' -f 1)"
             echo
             cargo tree --manifest-path research/irregular-event-contract/Cargo.toml --locked
