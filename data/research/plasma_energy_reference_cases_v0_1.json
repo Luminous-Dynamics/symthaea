@@ -3043,7 +3043,12 @@
         "long_run_cycles_and_failed_batches_in_denominator": true,
         "matched_shock_wave_and_microwave_comparators_required": true
       },
-      "rationale": "The November 2026 PPH study reports 95% conversion/100% selectivity on diluted CH4/He and a separate 27 kWh/kg H2 minimum energy under pure methane. This stretch target intentionally requires >=90% conversion, >=99% selectivity and <=25 kWh/kg accepted H2 at one matched feed/operating point, while including CO2-plasma regeneration and 100 reaction/regeneration cycles with >=90% productivity retention. No such combined point or durability is currently established."
+      "rationale": "The November 2026 PPH study reports 95% conversion/100% selectivity on diluted CH4/He and a separate 27 kWh/kg H2 minimum energy under pure methane. This stretch target intentionally requires >=90% conversion, >=99% selectivity and <=25 kWh/kg accepted H2 at one matched feed/operating point, while including CO2-plasma regeneration and 100 reaction/regeneration cycles with >=90% productivity retention. No such combined point or durability is currently established.",
+      "credit_policies": [
+        "NO_CREDIT",
+        "ALLOCATION",
+        "AVOIDED_PRODUCT_CREDIT"
+      ]
     },
     {
       "target_id": "AMMONIA-SUPPLY-CHAIN-DYNAMIC-FLEX-001",
