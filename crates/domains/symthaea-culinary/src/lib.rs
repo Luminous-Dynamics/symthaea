@@ -55,5 +55,5 @@ pub use ingredient::Ingredient;
 pub use nutrition::NutrientProfile;
 pub use reaction::{arrhenius_rate, maillard_feasible, q10, reaction_extent};
 pub use spec::CulinarySpec;
-pub use thermal::ThermalTrajectory;
+pub use thermal::{ThermalTrajectory, ThermalTrajectoryError};
 pub use validate::{CulinaryViolation, validate};
