@@ -16,7 +16,8 @@ pub mod scaler;
 pub mod time_imm;
 pub mod watermarks;
 pub use clock::{
-    conservative_min_exclusive_watermark, ClockCalibrationError, ClockCalibrationV1,
+    conservative_min_exclusive_watermark, ClockCalibrationError, ClockCalibrationLedger,
+    ClockCalibrationV1,
     ClockDomainId, ConservativeExclusiveWatermark, MappedClockTime,
     MappedExclusiveWatermark,
 };
