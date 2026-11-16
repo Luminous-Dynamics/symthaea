@@ -891,7 +891,7 @@ mod tests {
             dimensions: vec![ObservationPredictionDimensionV1 {
                 variable_id: "temperature".to_string(),
                 unit: "fahrenheit".to_string(),
-                value: 0.25,
+                value: Some(0.25),
             }],
         };
 
