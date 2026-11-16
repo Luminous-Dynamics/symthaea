@@ -17,6 +17,7 @@ pub mod partial_order;
 pub mod identifiability;
 pub mod oracle_integrity;
 pub mod whole_dag;
+pub mod mutation_safety;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
