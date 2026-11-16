@@ -61,3 +61,15 @@ The package has its own Cargo workspace and does not join the production Symthae
 - Compilation, formatting, tests and Clippy: NOT EXECUTED in the current authoring environment (no Rust toolchain available).
 - JSON Schema meta-validation: not performed by this crate; upstream schemas have a separate validation record.
 - Evidence authenticity, planetary coordinate correctness, network physics, traversability, geology, safety, planetary protection and physical qualification: NOT ESTABLISHED.
+
+
+## Interoperable signed statements (research profile)
+
+A second, standards-oriented path is provided in `scitt_attestation`:
+- in-toto Statement v1 JSON subject with a SHA-256 resource digest;
+- Subterra science-return predicate v0.1 carrying site/observation identity and the full lifecycle event log;
+- COSE_Sign1 encoded with CBOR tag 18 as an RFC 9943 Signed_Statement;
+- protected CWT `iss` and `sub` claims, protected `kid`, JSON in-toto content type, and registered COSE Ed25519 algorithm `-19`;
+- strict Ed25519 verification against caller-supplied, externally trusted issuer/subject/key ID/public key.
+
+This path is intended for interoperability; the earlier project-specific Ed25519 envelope remains experimental and is not the wire format of this standards profile. The implementation does not register the statement with a Transparency Service and does not verify a SCITT Receipt. A future receipt verifier must validate the service's signature and the relevant verifiable-data-structure proof. Neither a valid signature nor log inclusion establishes that the scientific predicate is true.

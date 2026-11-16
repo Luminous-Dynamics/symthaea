@@ -198,3 +198,14 @@ The research adapter supports detached Ed25519 v1 attestations over a domain-sep
 The caller supplies the expected trusted actor ID, expected key ID and corresponding public key bytes from an independently governed key registry. A key ID or public key included only in the record is not trusted. The verifier first checks actual payload bytes, then confirms the external actor/key binding and verifies the signature over the canonical envelope. Unknown algorithm identifiers, malformed keys/signatures, mismatched actor/key IDs, modified payload bytes and cross-site/observation replay are rejected.
 
 This is not a complete identity or custody system. The crate does not create or authenticate the key registry, check certificate chains, key expiry/revocation/scope, device enrollment, signing authority, secure key storage, hardware attestation or durable custody. A valid signature proves that the corresponding private key signed the bound envelope; whether that key is authorized to speak for a sensor, rover, relay or institution remains an external trust-policy decision.
+
+
+### Interoperable attestation profile
+
+The adapter now has a separate standards-oriented signed-statement path:
+- payload: in-toto Attestation Statement v1 JSON, with the acquired observation represented as a SHA-256-digested subject and a versioned Subterra science-return predicate;
+- envelope: COSE_Sign1 wrapped in CBOR tag 18, matching the RFC 9943 Signed_Statement structure;
+- protected headers: registered Ed25519 COSE algorithm `-19`, key ID, `application/vnd.in-toto+json` content type and CWT Claims label 15 containing issuer (claim 1) and subject (claim 2);
+- verifier: checks tag, protected algorithm/key/content-type/issuer/subject and strict Ed25519 signature against caller-trusted values, then checks the payload digest and lifecycle event record.
+
+The custom v0.1 Ed25519 message remains experimental for compatibility and should not be used as the inter-system interchange format. The COSE path is a signed statement only. SCITT registration, receipt acquisition and verifiable-data-structure proof verification are not implemented. RFC 9943 explicitly distinguishes signing from transparency registration; a receipt demonstrates inclusion under a transparency service's rules, not scientific truth. The issuer and key registry remain external trust dependencies.

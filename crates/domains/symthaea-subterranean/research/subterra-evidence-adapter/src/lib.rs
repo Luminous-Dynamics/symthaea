@@ -13,6 +13,7 @@
 //! - validate planetary coordinate transforms, SLAM, geomechanics or safety.
 
 pub mod profile;
+pub mod scitt_attestation;
 
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 

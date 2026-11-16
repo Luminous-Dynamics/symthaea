@@ -15,6 +15,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 sha2 = "=0.11.1"
 ed25519-dalek = "=3.0.0"
+coset = "=0.4.2"
 
 # Standalone research crate; deliberately outside the production workspace.
 [workspace]
