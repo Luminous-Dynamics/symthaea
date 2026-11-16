@@ -258,6 +258,11 @@ pub fn arbitrate_actuator_channel(
     if channel.channel_id.trim().is_empty() || channel.unit.trim().is_empty() {
         diagnostics.push(ControlDiagnostic::ChannelIdentityMismatch);
     }
+    if channel.authority_manifest_ref.trim().is_empty()
+        || !is_sha256(&channel.authority_manifest_sha256)
+    {
+        diagnostics.push(ControlDiagnostic::AuthorityManifestConflict);
+    }
     if !channel.minimum_value.is_finite()
         || !channel.maximum_value.is_finite()
         || channel.minimum_value > channel.maximum_value
@@ -345,6 +350,8 @@ pub fn arbitrate_actuator_channel(
                 selected_command_value: None,
                 rejected_proposals: rejections,
                 safety_authority_id: Some(safety.authority_id.clone()),
+                safety_evidence_ref: Some(safety.evidence_ref.clone()),
+                safety_evidence_sha256: Some(safety.evidence_sha256.clone()),
                 diagnostics,
             },
             proposals,
@@ -460,6 +467,8 @@ pub fn arbitrate_actuator_channel(
                 selected_command_value: None,
                 rejected_proposals: rejections,
                 safety_authority_id: Some(safety.authority_id.clone()),
+                safety_evidence_ref: Some(safety.evidence_ref.clone()),
+                safety_evidence_sha256: Some(safety.evidence_sha256.clone()),
                 diagnostics,
             },
             proposals,
@@ -477,6 +486,8 @@ pub fn arbitrate_actuator_channel(
                 selected_command_value: None,
                 rejected_proposals: rejections,
                 safety_authority_id: Some(safety.authority_id.clone()),
+                safety_evidence_ref: Some(safety.evidence_ref.clone()),
+                safety_evidence_sha256: Some(safety.evidence_sha256.clone()),
                 diagnostics,
             },
             proposals,
@@ -535,6 +546,8 @@ pub fn arbitrate_actuator_channel(
                 selected_command_value: None,
                 rejected_proposals: rejections,
                 safety_authority_id: Some(safety.authority_id.clone()),
+                safety_evidence_ref: Some(safety.evidence_ref.clone()),
+                safety_evidence_sha256: Some(safety.evidence_sha256.clone()),
                 diagnostics,
             },
             proposals,
@@ -557,6 +570,8 @@ pub fn arbitrate_actuator_channel(
                 selected_command_value: None,
                 rejected_proposals: rejections,
                 safety_authority_id: Some(safety.authority_id.clone()),
+                safety_evidence_ref: Some(safety.evidence_ref.clone()),
+                safety_evidence_sha256: Some(safety.evidence_sha256.clone()),
                 diagnostics,
             },
             proposals,
@@ -573,6 +588,8 @@ pub fn arbitrate_actuator_channel(
             selected_command_value: Some(winner.command_value),
             rejected_proposals: rejections,
             safety_authority_id: Some(safety.authority_id.clone()),
+            safety_evidence_ref: Some(safety.evidence_ref.clone()),
+            safety_evidence_sha256: Some(safety.evidence_sha256.clone()),
             diagnostics,
         },
         proposals,
@@ -827,7 +844,7 @@ pub fn evaluate_state_transition(
 
     if supplied_guards
         .keys()
-        .any(|guard_id| !expected_guards.iter().any(|expected| expected == guard_id))
+        .any(|guard_id| !expected_guards.iter().any(|expected| expected.as_str() == *guard_id))
     {
         diagnostics.push(ControlDiagnostic::UnexpectedGuard);
     }
@@ -989,6 +1006,8 @@ mod tests {
         ActuatorChannelProfile {
             channel_id: "heating-power".to_string(),
             unit: "MW".to_string(),
+            authority_manifest_ref: "synthetic-authority-manifest-v1".to_string(),
+            authority_manifest_sha256: sha('9'),
             minimum_value: 0.0,
             maximum_value: 100.0,
             maximum_slew_per_second: 50.0,
