@@ -1480,11 +1480,10 @@ mod tests {
     #[test]
     fn source_graph_must_be_acyclic() {
         let mut manifest = fixture_manifest();
-        let raw = manifest.records[0].clone();
         manifest.records[0].artifact_kind = ObservationArtifactKind::DerivedProduct;
         manifest.records[0].source_record_ids = vec![manifest.records[2].record_id.clone()];
         manifest.records[0].acquisition_lineage_ids = vec!["acquisition-a-01".into()];
-        manifest.records[2].source_record_ids.push(raw.record_id);
+        // The mesh record already points back to record-site-a-raw-01.
         assert_eq!(manifest.validate(), Err(ManifestError::SourceGraphCycle));
     }
 
