@@ -1,0 +1,44 @@
+name: Exact SO(3) harmonic rank oracle
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "research/symmetry-harmonic-rank-oracle-001/**"
+      - ".github/workflows/symmetry-harmonic-rank-oracle.yml"
+  push:
+    branches: [main]
+    paths:
+      - "research/symmetry-harmonic-rank-oracle-001/**"
+      - ".github/workflows/symmetry-harmonic-rank-oracle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: symmetry-harmonic-rank-oracle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualification:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Format
+        run: cargo fmt --manifest-path research/symmetry-harmonic-rank-oracle-001/Cargo.toml --all -- --check
+      - name: Tests
+        run: cargo test --locked --manifest-path research/symmetry-harmonic-rank-oracle-001/Cargo.toml
+      - name: Strict Clippy
+        run: cargo clippy --locked --manifest-path research/symmetry-harmonic-rank-oracle-001/Cargo.toml --all-targets -- -D warnings
+      - name: Reproduce ambiguity / cutoff example
+        run: cargo run --locked --manifest-path research/symmetry-harmonic-rank-oracle-001/Cargo.toml --example template_ambiguity
