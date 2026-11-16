@@ -19,7 +19,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: sense-tac-001b-oracle-\${{ github.ref }}
+  group: sense-tac-001b-oracle-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -37,6 +37,15 @@ jobs:
         run: |
           test "$(git hash-object docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.json)" = "e9349751590c4a3a28f4be81a5a11f8170ef2212"
           test "$(git hash-object docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.schema.json)" = "7b531325c1c8f105879dd80e0ba6016555a4b645"
+      - name: Diagnostic lock resolution (temporary)
+        run: |
+          cargo generate-lockfile --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
+          if git diff --quiet -- tools/sense-tac-001b-oracle/Cargo.lock; then
+            echo "lockfile_current=true"
+          else
+            echo "lockfile_current=false; regenerated diff follows"
+            git diff -- tools/sense-tac-001b-oracle/Cargo.lock
+          fi
       - name: Fetch locked dependencies
         run: cargo fetch --locked --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
       - name: Check formatting
