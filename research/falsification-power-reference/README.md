@@ -131,7 +131,7 @@ This campaign is restricted to one frozen simple Gaussian design. It is not a ge
 
 ### Exact-head paired calibration receipt
 
-Run #40 on source head 950d80181d043470357863d43256519cb1b025c6 passed the focused workflow: rustfmt, all-target tests, sequential null calibration, paired Gaussian calibration, artifact upload and strict Clippy. Workflow: https://github.com/Luminous-Dynamics/symthaea/actions/runs/43821865007
+Run #41 on current PR head e9770b48170016e51b270b0bcfdd67a95c5604c2 passed the focused workflow: rustfmt, all-target tests, sequential null calibration, paired Gaussian calibration, artifact upload and strict Clippy. Workflow: https://github.com/Luminous-Dynamics/symthaea/actions/runs/43822231600
 
 The campaign used 20,000 paired paths per scenario, an 80-look fixed design, alpha 0.05, discrepancy 0.22 and sigma 0.80. The predeclared induced-test thresholds were 0.75, 0.90 and 0.99. Every method shared the same observations; each threshold used a separately seeded simulation randomizer stream. The PRNG is for synthetic replay only.
 
@@ -155,4 +155,4 @@ Interpretation:
 - The Gaussian e-process crosses less often and is more conservative here; its average observation cost counts non-crossers as running to the horizon.
 - The naive repeated test appears cheapest and most powerful, but its ~29.8% null rejection makes it invalid under repeated looks.
 
-The terminal NP method is an evaluator oracle because it knows the correct discrepancy direction and frozen design. This is not a Symthaea agent result or an unknown-mechanism discovery score.
+The terminal NP method is an evaluator oracle because it knows the correct discrepancy direction and frozen design. This is not a Symthaea agent result or an unknown-mechanism discovery score. Final artifact archive SHA-256: a45b26b33efb0c1caa1140c06da4411705534e187a867775bf783e01d5f982ef; report JSON SHA-256: 3ce1b598bf5ff280ace6d4c8901b2df36ce4ea08a02e1d2d70f6d757d2b0b67f.
