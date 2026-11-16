@@ -51,6 +51,7 @@ Ownership remains split:
 - Symthaea #12301: transcript commitment opening and same-witness predicate relation.
 - Symthaea #12328 / PR #12336: exact HTTP/JSON field semantics and bounded structural selector.
 - Symthaea #12373: TLSNotary typed verified-commitment API boundary.
+- Symthaea #12423: trust-equivalent network-round-trip benchmarking, direct packet instrumentation, multi-claim session amortization and privacy-composition controls.
 - Symthaea #12269: issuer/source and verifier-request binding.
 - Mycelix #6230 / #6245 / #6251 / #6219: PPAC composition, source profile, domain-scoped uniqueness, and LISE requalification.
 - Mycelix #5401 / #5404 / #5405 / #5411 / #5466 / #5468: cross-session linkability, cumulative disclosure inference, proof-shape correlation, and federated disclosure-budget conservation. CPIR references these owners rather than implementing a duplicate privacy ledger.
