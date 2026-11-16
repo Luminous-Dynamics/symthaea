@@ -201,3 +201,20 @@ reported separately so an always-incomplete strategy cannot pass. Late-arrival
 detection recall/latency, source watermark skew, and historical as-known
 mutation count are also recorded. The zero-false-complete and exact-replay gates
 are preregistered targets, not benchmark results.
+
+
+## 11. Indexed watermark scaling experiment
+
+The standalone executable
+`research/irregular-event-contract/src/bin/watermark_scaling.rs` constructs
+fixed, deterministic source-watermark ledgers containing 1k, 10k and 100k
+late-arrival receipts. Each generated history permutes event-time order relative
+to availability/arrival order. It queries a 16-unit half-open interval and
+compares 101 indexed reads with 15 full-history verified reads. It records
+p50/p95/p99 latency and the number of indexed breach entries examined, and
+checks exact report parity plus the expected 16 matching breaches before timing.
+The hosted workflow retains the CSV output with the exact commit, toolchain,
+dependency lock and fixture/source digests. This measures in-memory CPU query
+cost only; it does not establish durable-storage, distributed, throughput or
+physical-energy performance. No latency advantage is claimed until the latest
+exact-head run yields an artifact.
