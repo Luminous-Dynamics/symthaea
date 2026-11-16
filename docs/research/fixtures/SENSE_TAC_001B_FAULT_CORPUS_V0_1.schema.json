@@ -84,7 +84,7 @@
     },
     "cases": {
       "type": "array",
-      "minItems": 28,
+      "minItems": 30,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -463,7 +463,8 @@
             }
           }
         }
-      }
+      },
+      "maxItems": 30
     }
   }
 }
