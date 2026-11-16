@@ -1038,8 +1038,7 @@ mod tests {
     fn collapsed_bow_requires_exact_zero_breadth() {
         let mut spec = valid_spec();
         spec.schema_version = 2;
-        spec.longitudinal_end_conditions.bow =
-            LongitudinalEndCondition::CollapsedCentreline;
+        spec.longitudinal_end_conditions.bow = LongitudinalEndCondition::CollapsedCentreline;
         spec.stations[0].half_breadth_fraction = 0.0;
         let artifact = generate_section_artifact(&spec).unwrap();
         assert!(verify_section_family_artifact_integrity(&artifact).is_ok());
