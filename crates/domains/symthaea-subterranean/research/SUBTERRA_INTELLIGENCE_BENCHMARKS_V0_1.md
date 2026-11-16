@@ -462,7 +462,7 @@ A result that improves mapping but not scientific decision quality belongs to th
 
 ## 18. Content-addressed science-return integrity
 
-An acquired science-return record now binds a canonical SHA-256 digest and byte length. The consumer can recompute these values over the returned payload before treating the integrity stage as satisfied.
+An acquired science-return record now binds a canonical SHA-256 digest and byte length. The consumer can recompute these values over the returned payload. Structural lifecycle validation alone does not establish that payload bytes have been checked; callers must invoke the byte-verification method and preserve its result before treating byte integrity as established.
 
 | Benchmark | Required property | Proposed gate |
 |---|---|---|

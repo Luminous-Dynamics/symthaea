@@ -465,21 +465,19 @@ impl ScienceReturnRecord {
             }
             return Err(issues);
         };
-        {
-            let actual_length = payload_bytes.len() as u64;
-            if declared.byte_length != actual_length {
-                issues.push(ScienceReturnIssue::PayloadByteLengthMismatch {
-                    expected: declared.byte_length,
-                    actual: actual_length,
-                });
+        let actual_length = payload_bytes.len() as u64;
+        if declared.byte_length != actual_length {
+            issues.push(ScienceReturnIssue::PayloadByteLengthMismatch {
+                expected: declared.byte_length,
+                actual: actual_length,
+            });
+        }
+        if !is_canonical_sha256(&declared.sha256) {
+            if !issues.contains(&ScienceReturnIssue::MalformedPayloadSha256) {
+                issues.push(ScienceReturnIssue::MalformedPayloadSha256);
             }
-            if !is_canonical_sha256(&declared.sha256) {
-                if !issues.contains(&ScienceReturnIssue::MalformedPayloadSha256) {
-                    issues.push(ScienceReturnIssue::MalformedPayloadSha256);
-                }
-            } else if declared.sha256 != sha256_hex(payload_bytes) {
-                issues.push(ScienceReturnIssue::PayloadSha256Mismatch);
-            }
+        } else if declared.sha256 != sha256_hex(payload_bytes) {
+            issues.push(ScienceReturnIssue::PayloadSha256Mismatch);
         }
         if issues.is_empty() {
             Ok(())
