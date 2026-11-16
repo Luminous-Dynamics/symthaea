@@ -392,6 +392,7 @@ fn clip_section_to_oblique_waterplane(
         }
         previous = *current;
         previous_signed = current_signed;
+        previous_inside = current_inside;
     }
 
     deduplicate_polygon(output, tolerance)
