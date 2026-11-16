@@ -1237,7 +1237,7 @@ mod tests {
     fn missing_required_obligation_claim_is_reported_as_omission() {
         let report = evaluate_evidence_handoff_json(FIXTURE).expect("D6.14 fixture");
         let adversarial = trace(&report, "narrative-overtrust");
-        assert_eq!(adversarial.omitted_required_obligations, vec!["security-review"]);
+        assert_eq!(adversarial.omitted_required_obligations, vec!["security-review".to_owned()]);
     }
 
     #[test]
