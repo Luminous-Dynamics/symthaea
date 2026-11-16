@@ -37,6 +37,21 @@ pub enum MissingnessReason {
     Other,
 }
 
+/// Coarse health declaration from the source at capture/delivery time.
+/// This is source telemetry, not a claim that the physical environment is healthy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub enum SourceHealthV1 {
+    /// Source reports its nominal operating state.
+    Healthy,
+    /// Source reports degraded operation or reduced confidence.
+    Degraded,
+    /// Source reports that it was unavailable for this event.
+    Unavailable,
+    /// No source-health declaration was supplied.
+    #[default]
+    Unknown,
+}
+
 /// One variable in an observation event.
 ///
 /// `value == None` means that no measurement is available to inference.
@@ -69,6 +84,9 @@ pub struct ObservationEventV1 {
     pub source_id: String,
     /// Semantic observation modality (for example, visual, thermal, or audio).
     pub modality: String,
+    /// Source-reported health; this does not imply physical-world health.
+    #[serde(default)]
+    pub source_health: SourceHealthV1,
     /// When the underlying measurement was captured, in nanoseconds.
     pub capture_time_ns: u64,
     /// Clock domain that gives meaning to `capture_time_ns`.
@@ -119,6 +137,14 @@ pub struct ObservationLikelihoodV1 {
 }
 
 impl ObservationEventV1 {
+    /// Delivery delay when capture and arrival timestamps share a clock domain.
+    /// Returns `None` when clocks differ because subtracting incomparable
+    /// timestamps would invent an age measurement.
+    pub fn delivery_delay_ns(&self) -> Option<u64> {
+        (self.capture_clock_domain == self.arrival_clock_domain)
+            .then_some(self.arrival_time_ns - self.capture_time_ns)
+    }
+
     /// Validate event structure against the fixed observation dimension.
     ///
     /// When capture and arrival clocks differ, their raw timestamps are
@@ -305,6 +331,7 @@ mod tests {
             event_id: "event-1".to_string(),
             source_id: "sensor-1".to_string(),
             modality: "thermal".to_string(),
+            source_health: SourceHealthV1::Healthy,
             capture_time_ns: 1_000,
             capture_clock_domain: "sensor-clock".to_string(),
             arrival_time_ns: 1_200,
@@ -443,6 +470,15 @@ mod tests {
             non_finite.validate(1),
             Err(ObservationEventError::NonFiniteObservedValue { index: 0 })
         );
+    }
+
+    #[test]
+    fn delivery_age_is_only_derived_within_a_shared_clock_domain() {
+        let mut same_clock = event(vec![dimension("temperature", Some(0.5), None, None)]);
+        assert_eq!(same_clock.delivery_delay_ns(), Some(200));
+
+        same_clock.arrival_clock_domain = "host-monotonic-clock".to_string();
+        assert_eq!(same_clock.delivery_delay_ns(), None);
     }
 
     #[test]
