@@ -1,6 +1,7 @@
 {
   "version": "claim-plan-ir/v1",
   "plan_id": "synthetic-zar-balance-minimum-v1",
+  "plan_id": "attacker-substituted-plan-id",
   "canonicalization": {
     "profile": "RFC8785-JCS",
     "hash_algorithm": "SHA-256",
