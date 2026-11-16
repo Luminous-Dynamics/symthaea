@@ -60,7 +60,7 @@ pub struct SelectionReceipt {
     pub candidates: Vec<CandidatePropensity>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ReceiptError {
     EmptyReceiptField(&'static str),
     ZeroRandomSeed,
