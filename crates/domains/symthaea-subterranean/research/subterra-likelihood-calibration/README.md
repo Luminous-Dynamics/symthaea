@@ -39,6 +39,6 @@ This is a standalone nested Cargo workspace and is not included in the productio
 
 ## Evidence state
 
-- Data contract, empirical estimator and 12 unit-test cases: AUTHORED.
+- Data contract, empirical estimator and 14 unit-test cases: AUTHORED.
 - Rust formatting, compilation, tests and Clippy: NOT EXECUTED in the current authoring environment (no cargo/rustc/rustfmt).
 - Calibration quality, site transfer, robot-in-the-loop, cave analogue, flight and planetary validation: NOT PERFORMED.
