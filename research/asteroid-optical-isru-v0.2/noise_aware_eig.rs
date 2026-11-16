@@ -116,10 +116,7 @@ fn validate_prior(prior: &[f64]) -> Result<(), ModelError> {
     Ok(())
 }
 
-fn validate_action(
-    hypothesis_count: usize,
-    action: &DiscreteAction,
-) -> Result<usize, ModelError> {
+fn validate_action(hypothesis_count: usize, action: &DiscreteAction) -> Result<usize, ModelError> {
     if action.id.trim().is_empty() {
         return Err(ModelError::EmptyActionId);
     }
@@ -162,10 +159,7 @@ fn validate_action(
     Ok(outcome_count)
 }
 
-fn validate_loss_matrix(
-    hypothesis_count: usize,
-    losses: &[Vec<f64>],
-) -> Result<usize, ModelError> {
+fn validate_loss_matrix(hypothesis_count: usize, losses: &[Vec<f64>]) -> Result<usize, ModelError> {
     if losses.len() != hypothesis_count {
         return Err(ModelError::LossRowCount {
             expected: hypothesis_count,
@@ -252,8 +246,7 @@ pub fn evaluate_action(
             .iter()
             .enumerate()
             .map(|(hypothesis, prior_probability)| {
-                prior_probability * action.likelihoods[hypothesis][outcome]
-                    / outcome_probability
+                prior_probability * action.likelihoods[hypothesis][outcome] / outcome_probability
             })
             .collect();
 
@@ -332,9 +325,7 @@ mod tests {
         )
         .unwrap();
 
-        let expected_eig = std::f64::consts::LN_2
-            + 0.9 * 0.9_f64.ln()
-            + 0.1 * 0.1_f64.ln();
+        let expected_eig = std::f64::consts::LN_2 + 0.9 * 0.9_f64.ln() + 0.1 * 0.1_f64.ln();
         assert!((evaluation.expected_information_gain_nats - expected_eig).abs() < 1.0e-12);
         assert!((evaluation.expected_value_of_sample_information - 0.4).abs() < 1.0e-12);
         assert!((evaluation.prior_bayes_risk - 0.5).abs() < 1.0e-12);
@@ -357,28 +348,16 @@ mod tests {
     #[test]
     fn decision_value_can_reverse_the_information_gain_ranking() {
         let prior = [0.49, 0.49, 0.02];
-        let losses = vec![
-            vec![0.0, 10.0],
-            vec![0.0, 10.0],
-            vec![100.0, 0.0],
-        ];
+        let losses = vec![vec![0.0, 10.0], vec![0.0, 10.0], vec![100.0, 0.0]];
         let split_irrelevant_hypotheses = DiscreteAction {
             id: "distinguish_h0_from_h1".to_string(),
             cost_units: 1.0,
-            likelihoods: vec![
-                vec![0.1, 0.9],
-                vec![0.9, 0.1],
-                vec![0.5, 0.5],
-            ],
+            likelihoods: vec![vec![0.1, 0.9], vec![0.9, 0.1], vec![0.5, 0.5]],
         };
         let detect_decision_critical_state = DiscreteAction {
             id: "detect_h2".to_string(),
             cost_units: 1.0,
-            likelihoods: vec![
-                vec![0.99, 0.01],
-                vec![0.99, 0.01],
-                vec![0.01, 0.99],
-            ],
+            likelihoods: vec![vec![0.99, 0.01], vec![0.99, 0.01], vec![0.01, 0.99]],
         };
 
         let first = evaluate_action(&prior, &split_irrelevant_hypotheses, &losses).unwrap();
@@ -391,14 +370,15 @@ mod tests {
             select_best_action(
                 &[first.clone(), second.clone()],
                 ActionObjective::InformationGain
-            ).unwrap().action_id,
+            )
+            .unwrap()
+            .action_id,
             "distinguish_h0_from_h1"
         );
         assert_eq!(
-            select_best_action(
-                &[first, second],
-                ActionObjective::DecisionValue
-            ).unwrap().action_id,
+            select_best_action(&[first, second], ActionObjective::DecisionValue)
+                .unwrap()
+                .action_id,
             "detect_h2"
         );
     }
@@ -408,8 +388,7 @@ mod tests {
         let prior = [0.5, 0.5];
         let losses = binary_losses();
         let cheap = evaluate_action(&prior, &binary_action("cheap", 1.0), &losses).unwrap();
-        let expensive = evaluate_action(&prior, &binary_action("expensive", 4.0), &losses)
-            .unwrap();
+        let expensive = evaluate_action(&prior, &binary_action("expensive", 4.0), &losses).unwrap();
 
         assert_eq!(
             select_best_action(
@@ -419,10 +398,9 @@ mod tests {
             "cheap"
         );
         assert_eq!(
-            select_best_action(
-                &[cheap, expensive],
-                ActionObjective::DecisionValuePerCost
-            ).unwrap().action_id,
+            select_best_action(&[cheap, expensive], ActionObjective::DecisionValuePerCost)
+                .unwrap()
+                .action_id,
             "cheap"
         );
     }
@@ -485,14 +463,13 @@ mod tests {
         let action = binary_action("valid", 1.0);
         assert_eq!(
             evaluate_action(&[0.5, 0.5], &action, &[]),
-            Err(ModelError::LossRowCount { expected: 2, actual: 0 })
+            Err(ModelError::LossRowCount {
+                expected: 2,
+                actual: 0
+            })
         );
         assert_eq!(
-            evaluate_action(
-                &[0.5, 0.5],
-                &action,
-                &[vec![0.0, 1.0], vec![0.0]]
-            ),
+            evaluate_action(&[0.5, 0.5], &action, &[vec![0.0, 1.0], vec![0.0]]),
             Err(ModelError::RaggedLossMatrix)
         );
     }
@@ -505,10 +482,9 @@ mod tests {
         let second = evaluate_action(&prior, &binary_action("second", 1.0), &losses).unwrap();
 
         assert_eq!(
-            select_best_action(
-                &[first, second],
-                ActionObjective::InformationGain
-            ).unwrap().action_id,
+            select_best_action(&[first, second], ActionObjective::InformationGain)
+                .unwrap()
+                .action_id,
             "first"
         );
     }
