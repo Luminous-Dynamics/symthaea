@@ -157,7 +157,7 @@ The 1.5×/2× figures are programme targets chosen for a stringent prospective c
 ## 9. Validation record
 
 At the time this document is authored:
-- the observation register PR #5578 has 5 source records and 78 observation records with a separate evidence-class field;
+- the observation register PR #5578 has 5 source records and 85 observation records with separate value-status and evidence-class fields;
 - the policy reference fixture contains 20 expected world/policy output rows, derived by an independent deterministic reimplementation of the toy equations;
 - this example contains 13 authored Rust tests for the candidate eligibility filter, matched cost/noise, reuse of the current selector score, two-observation stopping, in-domain identification, OOD abstention, fixed-design budget adherence, deterministic random ordering and duplicate-candidate prevention;
 - the repository has no `cargo`, `rustc` or `rustfmt` in the current editing environment;
