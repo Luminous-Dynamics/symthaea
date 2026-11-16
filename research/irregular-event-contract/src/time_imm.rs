@@ -711,7 +711,8 @@ mod tests {
         let event = &parsed.events[0];
         match event.measurement {
             Measurement::OpaquePayload { payload_sha256, payload_bytes, encoding_id } => {
-                assert_eq!(payload_sha256, Sha256::digest(b" hello, world ").into());
+                let expected_digest: [u8; 32] = Sha256::digest(b" hello, world ").into();
+                assert_eq!(payload_sha256, expected_digest);
                 assert_eq!(payload_bytes, 14);
                 assert_eq!(encoding_id, 1);
             }
