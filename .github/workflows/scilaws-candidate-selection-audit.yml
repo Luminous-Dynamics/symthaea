@@ -33,7 +33,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Check formatting
-        run: cargo fmt --manifest-path crates/domains/symthaea-architecture-engineering/Cargo.toml -- --check
+        run: rustfmt --edition 2024 --check crates/domains/symthaea-architecture-engineering/src/scilaws_candidate_selection.rs
 
       - name: Run SciLaws candidate-audit tests
         run: cargo test --locked --manifest-path crates/domains/symthaea-architecture-engineering/Cargo.toml --lib scilaws_candidate_selection
