@@ -471,9 +471,11 @@ fn world_satisfies_claims(
         let Some(truth) = pair_truths.get(pair) else {
             return false;
         };
-        if claim.claimed_relation == "concurrent" && truth.expected_state != "concurrent" {
-            return false;
-        }
+        // Joint-world consistency asks whether a world supports the
+        // candidate's concrete relation. Entailment is scored separately:
+        // a merely possible concurrent claim can be world-consistent but
+        // still false as an unconditional claim when coverage is incomplete.
+        let _ = truth;
         pair_relation(&pair.0, &pair.1, &world.closure) == claim.claimed_relation
     })
 }
@@ -815,6 +817,30 @@ mod tests {
         let always = trace(&report, "always-abstain");
         assert_eq!(always.individually_plausible_claim_count, 3);
         assert_eq!(always.unnecessary_abstention_count, 12);
+    }
+
+    #[test]
+    fn possible_but_unentailed_concurrency_is_world_consistent_but_not_correct() {
+        let mut value = fixture_value();
+        value["candidate_view"]["observation_boundary_state"] = json!("incomplete");
+        value["gold_overlay"]["adjudicated_observation_boundary_state"] = json!("incomplete");
+        let t = value["candidate_traces"].as_array_mut().expect("traces")
+            .iter_mut().find(|trace| trace["trace_id"] == "world-consistent-agent")
+            .expect("trace");
+        let claim = t["relation_claims"].as_array_mut().expect("claims")
+            .iter_mut().find(|claim| claim["left_event_id"] == "A" && claim["right_event_id"] == "E")
+            .expect("A/E claim");
+        claim["claimed_relation"] = json!("concurrent");
+        let report = report_for(&value);
+        let scored = trace(&report, "world-consistent-agent");
+        let pair = scored.pair_outcomes.iter().find(|pair| {
+            pair.left_event_id == "A" && pair.right_event_id == "E"
+        }).expect("A/E pair");
+        assert_eq!(pair.expected_state, "underdetermined");
+        assert!(pair.false_concurrency);
+        assert!(!pair.correct);
+        assert_eq!(scored.jointly_consistent_world_count, 2);
+        assert!(!scored.jointly_impossible_claim_set);
     }
 
     #[test]
