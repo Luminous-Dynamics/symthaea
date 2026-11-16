@@ -1,7 +1,7 @@
 use fusion_decision_compiler_contract::pareto_tradeoff::{
     CandidateEligibility, CandidateObjectiveVector, DominanceRelation, ObjectiveComparisonProfile,
-    ParetoFrontStatus, ScalarPreference, ScalarTradeoffDisposition, SourcedScalar, compare_pair,
-    extract_pareto_front,
+    ObjectiveTolerance, ParetoFrontStatus, ScalarPreference, ScalarTradeoffDisposition,
+    SourcedScalar, compare_pair, extract_pareto_front,
 };
 
 fn sha(character: char) -> String {
@@ -24,6 +24,16 @@ fn profile() -> ObjectiveComparisonProfile {
         cost_basis_ref: "synthetic-usd-2026-real-discount-6pct-v1".to_string(),
         ebi_normalization_ref: "synthetic-qeng-ebi-normalization-v1".to_string(),
         uncertainty_basis_ref: "synthetic-net-export-95pct-interval-v1".to_string(),
+        objective_tolerances: [
+            ObjectiveTolerance { absolute: 0.01, relative: 1e-9 },
+            ObjectiveTolerance { absolute: 0.01, relative: 1e-9 },
+            ObjectiveTolerance { absolute: 1e-6, relative: 0.0 },
+            ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
+            ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
+            ObjectiveTolerance { absolute: 1e-9, relative: 1e-9 },
+            ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
+        ],
+        q_eng_tolerance: ObjectiveTolerance { absolute: 1e-9, relative: 1e-9 },
     }
 }
 
@@ -60,16 +70,7 @@ fn candidate(
 
 fn main() {
     let profile = profile();
-    let higher_qeng = candidate(
-        "higher-qeng",
-        8_000.0,
-        12_000.0,
-        0.95,
-        500.0,
-        300.0,
-        0.8,
-        25.0,
-    );
+    let higher_qeng = candidate("higher-qeng", 8_000.0, 12_000.0, 0.95, 500.0, 300.0, 0.8, 25.0);
     let higher_service = candidate(
         "higher-service",
         12_000.0,
@@ -83,7 +84,10 @@ fn main() {
 
     let pair = compare_pair(&profile, &higher_qeng, &higher_service);
     println!("contract_version={}", pair.contract_version);
-    println!("higher_qeng_scalar_preference={:?}", pair.scalar_preference);
+    println!(
+        "higher_qeng_scalar_preference={:?}",
+        pair.scalar_preference
+    );
     println!("qeng_a={:.6}", pair.first_q_eng.unwrap().q_eng);
     println!("qeng_b={:.6}", pair.second_q_eng.unwrap().q_eng);
     println!("pareto_dominance={:?}", pair.dominance);
@@ -102,8 +106,20 @@ fn main() {
         std::process::exit(1);
     }
 
-    let strict_dominator = candidate("dominant", 13_000.0, 7_000.0, 0.97, 250.0, 150.0, 0.6, 10.0);
-    let frontier = extract_pareto_front(&profile, &[higher_qeng, higher_service, strict_dominator]);
+    let strict_dominator = candidate(
+        "dominant",
+        13_000.0,
+        7_000.0,
+        0.97,
+        250.0,
+        150.0,
+        0.6,
+        10.0,
+    );
+    let frontier = extract_pareto_front(
+        &profile,
+        &[higher_qeng, higher_service, strict_dominator],
+    );
     println!("pareto_front={:?}", frontier.frontier_candidate_ids);
     println!(
         "non_dominated_statuses={}",
