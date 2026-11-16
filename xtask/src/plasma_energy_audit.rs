@@ -771,6 +771,9 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         if case_id == "NH3-CRACK-MW-ATM-MECHANISM-2026" {
             validate_nh3_operating_points(case, display_name)?;
         }
+        if case_id == "NH3-CRACK-MW-RESONATOR-DYNAMIC-2026" {
+            validate_nh3_crack_dynamic_response_case(case, display_name)?;
+        }
         if case_id == "CH4-PLASMA-PULSED-HEATING-REGEN-2026" {
             validate_ch4_pph_operating_points(case, display_name)?;
         }
@@ -1020,6 +1023,57 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             })?;
 
         match lane {
+            "AMMONIA_CRACKING_DYNAMIC_RESPONSE" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                for (key, expected) in [
+                    ("source_qwccr_up_step_response_ms_max_for_reproduction", 1.31),
+                    ("source_qwccr_down_step_response_ms_max_for_reproduction", 1.10),
+                    ("proposed_accepted_h2_service_90_percent_settling_time_max_s", 1.0),
+                    ("proposed_accepted_h2_delivery_overshoot_fraction_max", 0.05),
+                    ("proposed_dynamic_grid_to_accepted_h2_energy_penalty_max_fraction", 0.05),
+                    ("minimum_independent_device_days", 3.0),
+                    ("minimum_up_and_down_step_repeats_per_condition", 20.0),
+                    ("diagnostic_proxy_sampling_rate_min_hz", 10_000.0),
+                    ("timestamp_alignment_error_max_ms", 0.1),
+                ] {
+                    ensure!(
+                        close_f64(required_f64(metrics, key, &format!("{display_name}: {target_id}"))?, expected),
+                        "{display_name}: dynamic ammonia target {target_id} must preserve source/target threshold {key}"
+                    );
+                }
+                ensure!(
+                    metrics.get("all_response_thresholds_must_hold_at_same_device_and_feed_contract").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: dynamic ammonia target {target_id} must bind response results to one device/feed contract"
+                );
+                for key in [
+                    "plasma_state_diagnostic_proxy_and_accepted_h2_response_are_distinct_measurands",
+                    "accepted_h2_mass_flow_and_purity_measured_independently",
+                    "sampling_train_and_analyser_delay_characterized_with_uncertainty",
+                    "step_up_and_step_down_responses_reported_separately",
+                    "power_pressure_feed_flow_and_composition_bound_to_each_operating_point",
+                    "full_grid_to_accepted_h2_energy_boundary_required",
+                    "no_1ms_diagnostic_response_promoted_to_customer_h2_delivery_response",
+                    "held_out_pressure_and_device_groups_required_for_oes_proxy_transfer",
+                    "storage_compression_and_product_buffer_dynamics_included_or_excluded_explicitly",
+                    "failed_ignitions_purge_off_spec_output_and_restarts_in_denominator",
+                    "no_source_relative_waveguide_efficiency_gain_transferred_to_QWCCR",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: dynamic ammonia target {target_id} is missing product-response guard {key}"
+                    );
+                }
+                for comparator in [
+                    "NH3-CRACK-MW-RESONATOR-DYNAMIC-2026",
+                    "NH3-CRACK-WAVEGUIDE-MWPJ-2026",
+                    "NH3-CRACK-MW-ATM-MECHANISM-2026",
+                ] {
+                    ensure!(
+                        comparators.iter().any(|value| value.as_str() == Some(comparator)),
+                        "{display_name}: dynamic ammonia target {target_id} must include comparator {comparator}"
+                    );
+                }
+            }
             "AMMONIA_CRACKING" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
                 ensure!(
@@ -2322,6 +2376,100 @@ fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()>
             .is_some_and(Value::is_null),
         "{context}: highest-yield point must not borrow the 150 g/h throughput value"
     );
+    let discrepancies = case
+        .get("source_text_discrepancies")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: abstract/conclusion throughput discrepancy must remain recorded"))?;
+    ensure!(
+        discrepancies.iter().any(|item| {
+            item.get("discrepancy_id").and_then(Value::as_str)
+                == Some("NH3-MW-2026-ABSTRACT-CONCLUSION-150GPH-PAIRING")
+                && item.get("status").and_then(Value::as_str)
+                    == Some("UNRESOLVED_ABSTRACT_CONCLUSION_OPERATING_POINT_PAIRING")
+                && item.get("luminous_reproduction").and_then(Value::as_bool) == Some(false)
+        }),
+        "{context}: abstract/conclusion 150 g/h pairing discrepancy must remain explicit and unresolved"
+    );
+    Ok(())
+}
+
+fn validate_nh3_crack_dynamic_response_case(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: NH3 cracking dynamic-response measurand audit");
+    let configuration = case
+        .get("configuration")
+        .with_context(|| format!("{context}: configuration is missing"))?;
+    ensure!(
+        required_f64(configuration, "steady_state_system_input_power_w", &context)? == 200.0
+            && close_f64(required_f64(configuration, "steady_state_pressure_bar_abs", &context)?, 1.0)
+            && close_f64(required_f64(configuration, "steady_state_feed_flow_slpm", &context)?, 1.0),
+        "{context}: steady-state source reference must remain 200 W, 1 bar and 1 SLPM"
+    );
+    ensure!(
+        close_f64(required_f64(configuration, "steady_state_ammonia_cracking_ratio_fraction", &context)?, 0.4095)
+            && close_f64(required_f64(configuration, "steady_state_hydrogen_energy_yield_g_per_kwh", &context)?, 11.71),
+        "{context}: steady-state ACR and H2 energy-yield source values must remain paired"
+    );
+    ensure!(
+        configuration.get("accepted_h2_product_response_measured").and_then(Value::as_bool) == Some(false),
+        "{context}: source must not claim accepted H2 product response was measured"
+    );
+
+    let points = case
+        .get("operating_points")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: operating_points are missing"))?;
+    ensure!(points.len() == 2, "{context}: exactly two directed power-step points are required");
+
+    let up = points
+        .iter()
+        .find(|point| point.get("id").and_then(Value::as_str) == Some("QWCCR-POWER-UP-160-180W-1BAR"))
+        .with_context(|| format!("{context}: up-step reference point is missing"))?;
+    let down = points
+        .iter()
+        .find(|point| point.get("id").and_then(Value::as_str) == Some("QWCCR-POWER-DOWN-180-160W-1BAR"))
+        .with_context(|| format!("{context}: down-step reference point is missing"))?;
+
+    for (point, before, after, response_ms, direction) in [
+        (up, 160.0, 180.0, 1.31, "up"),
+        (down, 180.0, 160.0, 1.10, "down"),
+    ] {
+        ensure!(
+            point.get("step_direction").and_then(Value::as_str) == Some(direction),
+            "{context}: directed power-step identity is mismatched"
+        );
+        ensure!(
+            close_f64(required_f64(point, "input_power_before_w", &context)?, before)
+                && close_f64(required_f64(point, "input_power_after_w", &context)?, after)
+                && close_f64(required_f64(point, "pressure_bar_abs", &context)?, 1.0)
+                && close_f64(required_f64(point, "reported_response_time_ms", &context)?, response_ms),
+            "{context}: source-specific power-step direction, pressure or response time is cross-paired"
+        );
+        ensure!(
+            point.get("response_measurand").and_then(Value::as_str) == Some("ammonia_cracking_ratio")
+                && point.get("evidence_layer").and_then(Value::as_str) == Some("diagnostic_process_response"),
+            "{context}: the source response must remain an ACR diagnostic/process measurand, not accepted H2 delivery"
+        );
+    }
+
+    let diagnostic = case
+        .get("diagnostic_evidence")
+        .with_context(|| format!("{context}: diagnostic_evidence is missing"))?;
+    ensure!(
+        close_f64(required_f64(diagnostic, "reported_linear_correlation_r2_min", &context)?, 0.99)
+            && diagnostic.get("proxy_is_not_accepted_h2_mass_flow").and_then(Value::as_bool) == Some(true),
+        "{context}: OES proxy scope and non-product measurand boundary must remain explicit"
+    );
+    ensure!(
+        diagnostic.get("methods").and_then(Value::as_array)
+            .is_some_and(|methods| methods.iter().any(|method| method.as_str() == Some("optical_emission_spectroscopy"))
+                && methods.iter().any(|method| method.as_str() == Some("high_speed_imaging"))),
+        "{context}: OES and high-speed imaging methods must remain explicit"
+    );
+    ensure!(
+        case.get("comparison_status").and_then(Value::as_str)
+            == Some("SOURCE_SPECIFIC_DIAGNOSTIC_RESPONSE_NOT_ACCEPTED_PRODUCT_RESPONSE"),
+        "{context}: source claim ceiling must distinguish diagnostic from accepted-product response"
+    );
     Ok(())
 }
 
@@ -2787,8 +2935,8 @@ mod tests {
     fn source_manifest_accepts_new_nh3_synthesis_and_co2_cases() {
         let source = frozen_source_manifest();
         let summary = audit_source_value(&source, "frozen-plasma-energy.json").unwrap();
-        assert_eq!(summary.case_count, 53);
-        assert_eq!(summary.benchmark_target_count, 12);
+        assert_eq!(summary.case_count, 55);
+        assert_eq!(summary.benchmark_target_count, 13);
         assert!(source["cases"].as_array().unwrap().iter().any(|case|
             case.get("case_id").and_then(Value::as_str) == Some("CO2-CYCLIC-REFORMING-GASIFICATION-2026")
         ));
@@ -3341,6 +3489,14 @@ mod tests {
     }
 
     fn nh3_synthesis_energy_gap_manifest() -> Value {
+        let mut comparator_case_ids = vec![comparator_case_id];
+        let mut comparator_cases = vec![comparator_case];
+        if lane == "AMMONIA_CRACKING_DYNAMIC_RESPONSE" {
+            comparator_case_ids.push("NH3-CRACK-WAVEGUIDE-MWPJ-2026");
+            comparator_case_ids.push("NH3-CRACK-MW-ATM-MECHANISM-2026");
+            comparator_cases.push(registered_source_case("NH3-CRACK-WAVEGUIDE-MWPJ-2026"));
+            comparator_cases.push(registered_source_case("NH3-CRACK-MW-ATM-MECHANISM-2026"));
+        }
         serde_json::json!({
             "programme": "PLASMA-ENERGY-001",
             "claim_ceiling": "SOURCE_REGISTER_ONLY",
@@ -3983,7 +4139,20 @@ mod tests {
     }
 
     fn minimal_benchmark_target_manifest(lane: &str) -> Value {
-        let metrics = if lane == "AMMONIA_CRACKING" {
+        let metrics = if lane == "AMMONIA_CRACKING_DYNAMIC_RESPONSE" {
+            serde_json::json!({
+                "source_qwccr_up_step_response_ms_max_for_reproduction": 1.31,
+                "source_qwccr_down_step_response_ms_max_for_reproduction": 1.10,
+                "proposed_accepted_h2_service_90_percent_settling_time_max_s": 1.0,
+                "proposed_accepted_h2_delivery_overshoot_fraction_max": 0.05,
+                "proposed_dynamic_grid_to_accepted_h2_energy_penalty_max_fraction": 0.05,
+                "minimum_independent_device_days": 3.0,
+                "minimum_up_and_down_step_repeats_per_condition": 20.0,
+                "diagnostic_proxy_sampling_rate_min_hz": 10000.0,
+                "timestamp_alignment_error_max_ms": 0.1,
+                "all_response_thresholds_must_hold_at_same_device_and_feed_contract": true
+            })
+        } else if lane == "AMMONIA_CRACKING" {
             serde_json::json!({
                 "ammonia_conversion_min_fraction": 0.99,
                 "hydrogen_energy_yield_min_g_H2_per_kWh": 51.0,
@@ -4081,7 +4250,21 @@ mod tests {
                 "all_thresholds_must_hold_at_same_operating_point": true
             })
         };
-        let guards = if lane == "AMMONIA_CRACKING" {
+        let guards = if lane == "AMMONIA_CRACKING_DYNAMIC_RESPONSE" {
+            serde_json::json!({
+                "plasma_state_diagnostic_proxy_and_accepted_h2_response_are_distinct_measurands": true,
+                "accepted_h2_mass_flow_and_purity_measured_independently": true,
+                "sampling_train_and_analyser_delay_characterized_with_uncertainty": true,
+                "step_up_and_step_down_responses_reported_separately": true,
+                "power_pressure_feed_flow_and_composition_bound_to_each_operating_point": true,
+                "full_grid_to_accepted_h2_energy_boundary_required": true,
+                "no_1ms_diagnostic_response_promoted_to_customer_h2_delivery_response": true,
+                "held_out_pressure_and_device_groups_required_for_oes_proxy_transfer": true,
+                "storage_compression_and_product_buffer_dynamics_included_or_excluded_explicitly": true,
+                "failed_ignitions_purge_off_spec_output_and_restarts_in_denominator": true,
+                "no_source_relative_waveguide_efficiency_gain_transferred_to_QWCCR": true
+            })
+        } else if lane == "AMMONIA_CRACKING" {
             serde_json::json!({
                 "full_wall_plug_to_accepted_h2_boundary_required": true
             })
@@ -4197,6 +4380,10 @@ mod tests {
             })
         };
         let (comparator_case_id, comparator_case) = match lane {
+            "AMMONIA_CRACKING_DYNAMIC_RESPONSE" => (
+                "NH3-CRACK-MW-RESONATOR-DYNAMIC-2026",
+                registered_source_case("NH3-CRACK-MW-RESONATOR-DYNAMIC-2026"),
+            ),
             "CO2_DBD_MODEL_GENERALIZATION" => (
                 "CO2-DBD-ML-358-DATASET-2026",
                 frozen_case("CO2-DBD-ML-358-DATASET-2026"),
@@ -4232,12 +4419,12 @@ mod tests {
                 "GOVERNMENT_RESEARCH_FACILITY_DESCRIPTION",
                 "GOVERNMENT_ROADMAP"
             ],
-            "cases": [comparator_case],
+            "cases": comparator_cases,
             "benchmark_targets": [{
                 "target_id": "target-1",
                 "lane": lane,
                 "status": "RESEARCH_TARGET_NOT_RESULT",
-                "comparator_case_ids": [comparator_case_id],
+                "comparator_case_ids": comparator_case_ids,
                 "metric_thresholds": metrics,
                 "claim_guards": guards,
                 "credit_policies": ["NO_CREDIT", "ALLOCATION", "AVOIDED_PRODUCT_CREDIT"]
@@ -4476,6 +4663,57 @@ mod tests {
             serde_json::json!(false);
         let error = audit_source_value(&source, "co2-crg-target.json").unwrap_err();
         assert!(error.to_string().contains("grid_side_energy_includes"));
+    }
+
+    #[test]
+    fn dynamic_ammonia_source_case_keeps_diagnostic_and_product_response_distinct() {
+        let source = frozen_source_manifest();
+        let summary = audit_source_value(&source, "frozen-dynamic-nh3.json").unwrap();
+        assert!(summary.case_count >= 55);
+    }
+
+    #[test]
+    fn dynamic_ammonia_source_rejects_diagnostic_response_promoted_to_product_response() {
+        let mut source = frozen_source_manifest();
+        let cases = source["cases"].as_array_mut().unwrap();
+        let case = cases.iter_mut().find(|case| {
+            case.get("case_id").and_then(Value::as_str)
+                == Some("NH3-CRACK-MW-RESONATOR-DYNAMIC-2026")
+        }).unwrap();
+        case["configuration"]["accepted_h2_product_response_measured"] = serde_json::json!(true);
+        let error = audit_source_value(&source, "dynamic-nh3.json").unwrap_err();
+        assert!(error.to_string().contains("accepted H2 product response was measured"));
+    }
+
+    #[test]
+    fn dynamic_ammonia_source_rejects_cross_paired_step_directions() {
+        let mut source = frozen_source_manifest();
+        let cases = source["cases"].as_array_mut().unwrap();
+        let case = cases.iter_mut().find(|case| {
+            case.get("case_id").and_then(Value::as_str)
+                == Some("NH3-CRACK-MW-RESONATOR-DYNAMIC-2026")
+        }).unwrap();
+        case["operating_points"][1]["step_direction"] = serde_json::json!("up");
+        let error = audit_source_value(&source, "dynamic-nh3.json").unwrap_err();
+        assert!(error.to_string().contains("directed power-step identity is mismatched"));
+    }
+
+    #[test]
+    fn source_manifest_accepts_dynamic_ammonia_delivery_response_target() {
+        let source = minimal_benchmark_target_manifest("AMMONIA_CRACKING_DYNAMIC_RESPONSE");
+        let summary = audit_source_value(&source, "dynamic-nh3-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+        assert_eq!(summary.case_count, 3);
+    }
+
+    #[test]
+    fn source_manifest_rejects_dynamic_target_that_promotes_proxy_to_product_response() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_CRACKING_DYNAMIC_RESPONSE");
+        source["benchmark_targets"][0]["claim_guards"]
+            ["no_1ms_diagnostic_response_promoted_to_customer_h2_delivery_response"] =
+            serde_json::json!(false);
+        let error = audit_source_value(&source, "dynamic-nh3-target.json").unwrap_err();
+        assert!(error.to_string().contains("no_1ms_diagnostic_response_promoted"));
     }
 
     #[test]
