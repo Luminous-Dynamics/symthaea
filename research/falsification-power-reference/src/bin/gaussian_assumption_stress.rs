@@ -321,8 +321,7 @@ fn ar1_alternative_innovations(null_innovations: &[f64]) -> Vec<f64> {
         .collect()
 }
 
-fn known_rho_ar1_conditional_test(
-) -> Result<GaussianTerminalInducedTest, Box<dyn Error>> {
+fn known_rho_ar1_conditional_test() -> Result<GaussianTerminalInducedTest, Box<dyn Error>> {
     let mut discrepancies = Vec::with_capacity(HORIZON);
     let mut sigmas = Vec::with_capacity(HORIZON);
     for look in 0..HORIZON {
@@ -393,14 +392,14 @@ fn run_seed(
             alternative.rejections += 1;
         }
         if let Some((conditional_null, conditional_alternative)) = conditional_ar1_values {
-            let conditional_null_counts = conditional_ar1_null
-                .get_or_insert(RejectionCounts::default());
+            let conditional_null_counts =
+                conditional_ar1_null.get_or_insert(RejectionCounts::default());
             conditional_null_counts.paths += 1;
             if conditional_null.conditional_rejection_probability >= 0.5 {
                 conditional_null_counts.rejections += 1;
             }
-            let conditional_alternative_counts = conditional_ar1_alternative
-                .get_or_insert(RejectionCounts::default());
+            let conditional_alternative_counts =
+                conditional_ar1_alternative.get_or_insert(RejectionCounts::default());
             conditional_alternative_counts.paths += 1;
             if conditional_alternative.conditional_rejection_probability >= 0.5 {
                 conditional_alternative_counts.rejections += 1;
@@ -444,10 +443,7 @@ fn aggregate_counts(results: &[SeedResult], alternative: bool) -> RejectionCount
     pooled
 }
 
-fn aggregate_conditional_ar1(
-    results: &[SeedResult],
-    alternative: bool,
-) -> Option<RejectionCounts> {
+fn aggregate_conditional_ar1(results: &[SeedResult], alternative: bool) -> Option<RejectionCounts> {
     let mut pooled = RejectionCounts::default();
     let mut found = false;
     for result in results {
@@ -507,12 +503,7 @@ fn optional_pair_json(
 ) -> String {
     match (null, alternative) {
         (Some(null), Some(alternative)) => format!(
-            concat!(
-                "{{",
-                "\"null\":{},",
-                "\"alternative\":{}",
-                "}}"
-            ),
+            concat!("{{", "\"null\":{},", "\"alternative\":{}", "}}"),
             counts_json(null),
             counts_json(alternative)
         ),
@@ -776,8 +767,7 @@ mod tests {
         assert!((shifted[0] - (innovations[0] + DISCREPANCY)).abs() < 1.0e-12);
         for look in 1..shifted.len() {
             assert!(
-                (shifted[look] - (innovations[look] + (1.0 - AR1_RHO) * DISCREPANCY))
-                    .abs()
+                (shifted[look] - (innovations[look] + (1.0 - AR1_RHO) * DISCREPANCY)).abs()
                     < 1.0e-12
             );
         }
