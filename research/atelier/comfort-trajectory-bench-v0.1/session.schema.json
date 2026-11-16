@@ -1,0 +1,588 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/atelier/comfort-trajectory-bench-v0.1/session.schema.json",
+  "title": "Atelier Comfort Trajectory Session Record",
+  "description": "Participant-pseudonymous session contract for Comfort Trajectory Bench v0.1. Semantic cross-field checks are specified separately.",
+  "$defs": {
+    "rating": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "value"
+          ],
+          "properties": {
+            "status": {
+              "const": "observed"
+            },
+            "value": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 7
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "reason_code"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "missing",
+                "unable_to_judge",
+                "not_applicable",
+                "not_collected_due_to_stop"
+              ]
+            },
+            "reason_code": {
+              "enum": [
+                "not_recorded",
+                "participant_could_not_judge",
+                "dimension_not_applicable",
+                "session_ended_before_observation",
+                "instrument_failure",
+                "protocol_deviation"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tactile",
+        "thermal",
+        "moisture",
+        "fit_pressure",
+        "mobility",
+        "overall_comfort"
+      ],
+      "properties": {
+        "tactile": {
+          "$ref": "#/$defs/rating"
+        },
+        "thermal": {
+          "$ref": "#/$defs/rating"
+        },
+        "moisture": {
+          "$ref": "#/$defs/rating"
+        },
+        "fit_pressure": {
+          "$ref": "#/$defs/rating"
+        },
+        "mobility": {
+          "$ref": "#/$defs/rating"
+        },
+        "overall_comfort": {
+          "$ref": "#/$defs/rating"
+        }
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "time_min",
+        "dimensions"
+      ],
+      "properties": {
+        "time_min": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "dimensions": {
+          "$ref": "#/$defs/dimensions"
+        }
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "protocol_version",
+    "protocol_digest",
+    "session_id",
+    "participant_alias",
+    "consent_confirmed",
+    "study_phase",
+    "garment",
+    "trial_arm",
+    "session",
+    "environment",
+    "events",
+    "instrumentation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "atelier.comfort-session/0.1"
+    },
+    "protocol_version": {
+      "const": "0.1.0"
+    },
+    "protocol_digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^CTS-[A-Z0-9-]{6,40}$"
+    },
+    "participant_alias": {
+      "type": "string",
+      "pattern": "^P-[A-Z0-9]{3,8}$"
+    },
+    "consent_confirmed": {
+      "const": true
+    },
+    "study_phase": {
+      "enum": [
+        "formative",
+        "confirmatory"
+      ]
+    },
+    "garment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "style_id",
+        "variant_id",
+        "garment_revision",
+        "pattern_revision",
+        "bom_revision",
+        "assembly_plan_digest",
+        "configuration_digest",
+        "material_lot_id"
+      ],
+      "properties": {
+        "style_id": {
+          "enum": [
+            "AO-01",
+            "CR-01"
+          ]
+        },
+        "variant_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "garment_revision": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,40}$"
+        },
+        "pattern_revision": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,40}$"
+        },
+        "bom_revision": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]{1,40}$"
+        },
+        "assembly_plan_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "configuration_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "material_lot_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{1,80}$"
+        }
+      }
+    },
+    "trial_arm": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "atelier",
+            "comparator"
+          ]
+        },
+        "comparator_code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "comparator"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "comparator_code"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "atelier"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "not": {
+              "required": [
+                "comparator_code"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planned_duration_min",
+        "actual_duration_min",
+        "termination_reason",
+        "observations"
+      ],
+      "properties": {
+        "planned_duration_min": {
+          "const": 120
+        },
+        "actual_duration_min": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "termination_reason": {
+          "enum": [
+            "completed",
+            "participant_stop",
+            "withdrawal",
+            "adverse_event",
+            "equipment_failure",
+            "protocol_stopped"
+          ]
+        },
+        "observations": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "prefixItems": [
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/observation"
+                },
+                {
+                  "properties": {
+                    "time_min": {
+                      "const": 0
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/observation"
+                },
+                {
+                  "properties": {
+                    "time_min": {
+                      "const": 15
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/observation"
+                },
+                {
+                  "properties": {
+                    "time_min": {
+                      "const": 30
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/observation"
+                },
+                {
+                  "properties": {
+                    "time_min": {
+                      "const": 60
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/observation"
+                },
+                {
+                  "properties": {
+                    "time_min": {
+                      "const": 90
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "allOf": [
+                {
+                  "$ref": "#/$defs/observation"
+                },
+                {
+                  "properties": {
+                    "time_min": {
+                      "const": 120
+                    }
+                  }
+                }
+              ]
+            }
+          ],
+          "items": false
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "termination_reason": {
+                "const": "completed"
+              }
+            },
+            "required": [
+              "termination_reason"
+            ]
+          },
+          "then": {
+            "properties": {
+              "actual_duration_min": {
+                "const": 120
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "termination_reason": {
+                "enum": [
+                  "participant_stop",
+                  "withdrawal",
+                  "adverse_event",
+                  "equipment_failure",
+                  "protocol_stopped"
+                ]
+              }
+            },
+            "required": [
+              "termination_reason"
+            ]
+          },
+          "then": {
+            "properties": {
+              "actual_duration_min": {
+                "maximum": 119
+              }
+            }
+          }
+        }
+      ]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ambient_temp_c",
+        "relative_humidity_pct",
+        "underlayer_code"
+      ],
+      "properties": {
+        "ambient_temp_c": {
+          "type": "number",
+          "minimum": -10,
+          "maximum": 50
+        },
+        "relative_humidity_pct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "underlayer_code": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "time_min",
+          "kind",
+          "reason_code"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "pattern": "^EV-[A-Z0-9-]{3,30}$"
+          },
+          "time_min": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 120
+          },
+          "kind": {
+            "enum": [
+              "adjustment",
+              "break_start",
+              "break_end",
+              "layer_change",
+              "participant_stop",
+              "withdrawal",
+              "adverse_event",
+              "garment_removed",
+              "session_ended"
+            ]
+          },
+          "reason_code": {
+            "enum": [
+              "comfort",
+              "mobility",
+              "closure",
+              "pocket_access",
+              "thermal",
+              "moisture",
+              "tactile",
+              "fit_pressure",
+              "participant_choice",
+              "equipment",
+              "protocol",
+              "other"
+            ]
+          }
+        }
+      }
+    },
+    "instrumentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "microclimate_sensor_used"
+      ],
+      "properties": {
+        "microclimate_sensor_used": {
+          "type": "boolean"
+        },
+        "sensor_profile_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "calibration_digest": {
+          "type": "string",
+          "pattern": "^sha256:[a-f0-9]{64}$"
+        },
+        "non_interference_assessed": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "microclimate_sensor_used": {
+                "const": true
+              }
+            },
+            "required": [
+              "microclimate_sensor_used"
+            ]
+          },
+          "then": {
+            "required": [
+              "sensor_profile_id",
+              "calibration_digest",
+              "non_interference_assessed"
+            ],
+            "properties": {
+              "non_interference_assessed": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "microclimate_sensor_used": {
+                "const": false
+              }
+            },
+            "required": [
+              "microclimate_sensor_used"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "sensor_profile_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "calibration_digest"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,219 @@
+{
+  "schema_version": "atelier.comfort-session/0.1",
+  "protocol_version": "0.1.0",
+  "protocol_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "session_id": "CTS-CR01-STOP-01",
+  "participant_alias": "P-C01",
+  "consent_confirmed": true,
+  "study_phase": "formative",
+  "garment": {
+    "style_id": "CR-01",
+    "variant_id": "aperture-wrap-warmth-panel-off",
+    "garment_revision": "v0.1",
+    "pattern_revision": "AO-block-v0.1",
+    "bom_revision": "AO-bom-v0.1",
+    "assembly_plan_digest": "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "configuration_digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+    "material_lot_id": "CR-SHELL-SWATCH-02"
+  },
+  "trial_arm": {
+    "kind": "atelier"
+  },
+  "session": {
+    "planned_duration_min": 120,
+    "actual_duration_min": 34,
+    "termination_reason": "participant_stop",
+    "observations": [
+      {
+        "time_min": 0,
+        "dimensions": {
+          "tactile": {
+            "status": "observed",
+            "value": 6
+          },
+          "thermal": {
+            "status": "observed",
+            "value": 6
+          },
+          "moisture": {
+            "status": "observed",
+            "value": 6
+          },
+          "fit_pressure": {
+            "status": "observed",
+            "value": 6
+          },
+          "mobility": {
+            "status": "observed",
+            "value": 6
+          },
+          "overall_comfort": {
+            "status": "observed",
+            "value": 6
+          }
+        }
+      },
+      {
+        "time_min": 15,
+        "dimensions": {
+          "tactile": {
+            "status": "observed",
+            "value": 6
+          },
+          "thermal": {
+            "status": "observed",
+            "value": 6
+          },
+          "moisture": {
+            "status": "observed",
+            "value": 6
+          },
+          "fit_pressure": {
+            "status": "observed",
+            "value": 6
+          },
+          "mobility": {
+            "status": "observed",
+            "value": 6
+          },
+          "overall_comfort": {
+            "status": "observed",
+            "value": 6
+          }
+        }
+      },
+      {
+        "time_min": 30,
+        "dimensions": {
+          "tactile": {
+            "status": "observed",
+            "value": 6
+          },
+          "thermal": {
+            "status": "observed",
+            "value": 6
+          },
+          "moisture": {
+            "status": "observed",
+            "value": 6
+          },
+          "fit_pressure": {
+            "status": "observed",
+            "value": 6
+          },
+          "mobility": {
+            "status": "observed",
+            "value": 6
+          },
+          "overall_comfort": {
+            "status": "observed",
+            "value": 6
+          }
+        }
+      },
+      {
+        "time_min": 60,
+        "dimensions": {
+          "tactile": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "thermal": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "moisture": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "fit_pressure": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "mobility": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "overall_comfort": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          }
+        }
+      },
+      {
+        "time_min": 90,
+        "dimensions": {
+          "tactile": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "thermal": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "moisture": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "fit_pressure": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "mobility": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "overall_comfort": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          }
+        }
+      },
+      {
+        "time_min": 120,
+        "dimensions": {
+          "tactile": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "thermal": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "moisture": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "fit_pressure": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "mobility": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          },
+          "overall_comfort": {
+            "status": "not_collected_due_to_stop",
+            "reason_code": "session_ended_before_observation"
+          }
+        }
+      }
+    ]
+  },
+  "environment": {
+    "ambient_temp_c": 23.5,
+    "relative_humidity_pct": 48,
+    "underlayer_code": "BASE-COTTON-TEE-01"
+  },
+  "events": [
+    {
+      "event_id": "EV-STOP-001",
+      "time_min": 34,
+      "kind": "participant_stop",
+      "reason_code": "comfort"
+    }
+  ],
+  "instrumentation": {
+    "microclimate_sensor_used": false
+  }
+}
