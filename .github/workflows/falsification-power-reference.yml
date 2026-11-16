@@ -235,7 +235,7 @@ jobs:
             (.regimes | map(select(.regime == "matched_iid_gaussian"))[0]) as $iid
             | (.regimes | map(select(.regime == "stationary_ar1_rho_0_65"))[0]) as $ar1
             | (
-              .schema == "gaussian_assumption_stress_v0" and
+              .schema == "gaussian_assumption_stress_v1" and
               .prng == "SplitMix64_BoxMuller_v1" and
               .root_seed_count == 5 and
               (.root_seeds | length) == 5 and
@@ -261,6 +261,27 @@ jobs:
               ($ar1.expected_lag_one_correlation == 0.65) and
               ($ar1.pooled_null_lag_one_correlation >= 0.62) and
               ($ar1.pooled_null_lag_one_correlation <= 0.68) and
+              (.known_rho_ar1_analytic_conditional_power > 0) and
+              ($ar1.conditional_known_rho_ar1.assumption_status == "IN_CONTRACT_KNOWN_RHO_AR1") and
+              ($ar1.conditional_known_rho_ar1.rho == 0.65) and
+              ($ar1.conditional_known_rho_ar1.null.paths == 50000) and
+              ($ar1.conditional_known_rho_ar1.alternative.paths == 50000) and
+              ($ar1.conditional_known_rho_ar1.null.rate >= 0.04) and
+              ($ar1.conditional_known_rho_ar1.null.rate <= 0.06) and
+              (($ar1.conditional_known_rho_ar1.alternative.rate - .known_rho_ar1_analytic_conditional_power) | abs) < 0.007 and
+              ($ar1.conditional_known_rho_ar1.alternative.wilson95[0] <= .known_rho_ar1_analytic_conditional_power) and
+              ($ar1.conditional_known_rho_ar1.alternative.wilson95[1] >= .known_rho_ar1_analytic_conditional_power) and
+              all($ar1.per_seed[];
+                .conditional_known_rho_ar1.null.paths == 10000 and
+                .conditional_known_rho_ar1.alternative.paths == 10000 and
+                .conditional_known_rho_ar1.null.rate >= 0.02 and
+                .conditional_known_rho_ar1.null.rate <= 0.08 and
+                .conditional_known_rho_ar1.alternative.rate >= 0 and
+                .conditional_known_rho_ar1.alternative.rate <= 1
+              ) and
+              all(.regimes[] | select(.regime != "stationary_ar1_rho_0_65");
+                .conditional_known_rho_ar1 == null
+              ) and
               all(.regimes[];
                 (.assumption_status == "IN_CONTRACT" or .assumption_status == "OUT_OF_CONTRACT") and
                 (.pooled_null_mean | fabs) < 0.01 and
