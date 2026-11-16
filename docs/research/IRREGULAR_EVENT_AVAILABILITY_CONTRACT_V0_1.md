@@ -120,13 +120,13 @@ SHA-256 over the exact input bytes.
 
 ## 7. Authored test inventory and limits
 
-The current source contains 55 authored Rust test functions:
+The current source contains 77 authored Rust test functions:
 - 16 event-contract tests in `lib.rs`;
 - 12 bitemporal ledger tests in `lib.rs`;
 - 8 purged-split tests;
 - 10 train-only-scaler tests;
 - 10 Time-IMM adapter tests;
-- 17 source-watermark/completeness tests.
+- 21 source-watermark/completeness tests.
 
 No Cargo build, rustfmt, Clippy, unit test, dataset adapter execution or
 benchmark has run in this environment. The source and fixture inventory is
@@ -152,22 +152,28 @@ The query uses known_at, preserving the historical completeness view.
 A late event with event_time < an already recorded exclusive watermark is
 retained as a breach receipt and changes subsequent completeness to Contested
 for affected intervals. An event exactly at the watermark is not late. Every
-event arrival classification (including OnTime) is idempotently recorded so
-replaying an already accepted event cannot become a late breach after later
-progress. Historical queries before the late receipt remain unchanged. The
-caller must append the raw event to BitemporalEventLedger separately; the
-watermark ledger owns progress and breach evidence, not the authoritative
-source event.
+event arrival classification is idempotently recorded. Crucially, an event
+received before any progress claim is visible is `NoPriorProgress`, not
+`OnTime`: lack of a watermark cannot certify that an event was timely. An
+event at or beyond a visible exclusive watermark is classified OnTime relative
+to that source claim, not as proof of global completeness. Historical queries
+before the late receipt remain unchanged. The caller must append the raw event
+to BitemporalEventLedger separately; the watermark ledger owns progress and
+breach evidence, not the authoritative source event.
 
 The source-completeness report separates Complete, Incomplete and Contested,
-shows each required source's progress and returns the exact blocked source and
-late-breach sets. Terminal/end-of-stream is stronger than a finite watermark
-and closes intervals beyond its final event-time bound.
+shows each required source's exact supporting progress record (ID, generation,
+sequence, recorded-at knowledge time and policy digest), and returns the exact
+blocked source and late-breach sets. Each late-breach receipt also binds the
+specific progress record and policy digest that established the exclusive
+boundary. Terminal/end-of-stream is stronger than a finite watermark and
+closes intervals beyond its final event-time bound.
 
-Seventeen source-authored tests cover missing progress, multi-source minimum,
+Twenty-one source-authored tests cover missing progress, multi-source minimum,
 exclusive boundary behavior, as-known watermarks, late arrivals, terminal
 sources, monotonicity/generation, policy identity, atomic batches, duplicate
-arrivals and replay/index digest parity.
+arrivals, unqualified no-progress arrivals, evidence-bound completeness and
+breach receipts, and replay/index digest parity.
 
 This is a source-provided progress contract, not proof that a sensor's claim is
 authentic or physically true. Signature verification, source authorization,
@@ -178,7 +184,7 @@ durable WAL and a trusted progress-policy registry remain out of scope.
 
 The machine-readable fixture
 `crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json`
-pins fourteen adversarial scenarios and required metrics. False-complete rate is
+pins sixteen adversarial scenarios and required metrics. False-complete rate is
 the primary safety metric; false-incomplete rate and completeness lag are
 reported separately so an always-incomplete strategy cannot pass. Late-arrival
 detection recall/latency, source watermark skew, and historical as-known
