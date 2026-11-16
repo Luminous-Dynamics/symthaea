@@ -666,8 +666,8 @@ pub fn verify_loading_sweep_receipt(
 mod tests {
     use super::*;
     use crate::full_envelope::{
-        DeckPoint, DeckPointRole, DeckSection, FullEnvelopeStation, ProfilePoint,
-        ProfilePointRole, ProfileRegion, WaterlinePortSource, WaterlineStationIntersection,
+        DeckPoint, DeckPointRole, DeckSection, FullEnvelopeStation, ProfilePointRole,
+        WaterlinePortSource, WaterlineStationIntersection,
     };
 
     fn fixture_request() -> SectionalReferenceRequest {
