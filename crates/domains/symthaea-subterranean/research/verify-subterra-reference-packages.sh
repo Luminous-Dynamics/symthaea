@@ -28,7 +28,7 @@ CRATES=(
 printf 'Subterra reference verification\nRepository: %s\n' "$ROOT"
 printf 'Rust: %s\nCargo: %s\n\n' "$(rustc --version)" "$(cargo --version)"
 
-for crate in "\${CRATES[@]}"; do
+for crate in "${CRATES[@]}"; do
   manifest="$ROOT/$BASE/$crate/Cargo.toml"
   if [[ ! -f "$manifest" ]]; then
     printf 'ERROR: missing manifest: %s\n' "$manifest" >&2
@@ -37,19 +37,19 @@ for crate in "\${CRATES[@]}"; do
 done
 
 printf '== Formatting ==\n'
-for crate in "\${CRATES[@]}"; do
+for crate in "${CRATES[@]}"; do
   printf '\n-- %s --\n' "$crate"
   cargo fmt --manifest-path "$ROOT/$BASE/$crate/Cargo.toml" -- --check
 done
 
 printf '\n== Tests ==\n'
-for crate in "\${CRATES[@]}"; do
+for crate in "${CRATES[@]}"; do
   printf '\n-- %s --\n' "$crate"
   cargo test --manifest-path "$ROOT/$BASE/$crate/Cargo.toml" --all-targets
 done
 
 printf '\n== Strict Clippy ==\n'
-for crate in "\${CRATES[@]}"; do
+for crate in "${CRATES[@]}"; do
   printf '\n-- %s --\n' "$crate"
   cargo clippy --manifest-path "$ROOT/$BASE/$crate/Cargo.toml" --all-targets -- -D warnings
 done
