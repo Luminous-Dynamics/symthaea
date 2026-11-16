@@ -54,7 +54,7 @@ struct Band {
     pairing: String,
     key: String,
 }
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 struct Limit {
     metric: String,
@@ -194,7 +194,7 @@ fn evaluate_group(g:&Group,m:&Manifest)->GroupReport{
     let qualified:Vec<usize>=robust.iter().enumerate().filter_map(|(i,x)|if *x{Some(i)}else{None}).collect();
     if qualified.len()<2{
         let routes=g.routes.iter().enumerate().map(|(i,r)|{
-            let empty=OBJECTIVES.iter().map(|x|(x.to_string(),None)).collect();
+            let empty: BTreeMap<String, Option<f64>> = OBJECTIVES.iter().map(|x|(x.to_string(),None)).collect();
             RouteReport{route_id:r.route_id.clone(),technology:r.technology.clone(),feasibility_probability:probs[i],robustly_feasible:robust[i],pareto_membership_probability:None,mean_regret:empty.clone(),p95_regret:empty}
         }).collect();
         return GroupReport{group_id:g.group_id.clone(),disposition:"ABSTAIN_INSUFFICIENT_FEASIBLE_ROUTES".to_owned(),reasons:vec!["fewer than two routes satisfy all hard constraints at the required probability".to_owned()],routes,pairwise_dominance:vec![]};
