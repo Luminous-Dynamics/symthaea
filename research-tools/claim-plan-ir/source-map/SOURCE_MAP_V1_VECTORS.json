@@ -27,7 +27,13 @@
     "wrong_response_ordinal",
     "missing_http_body_range_map",
     "missing_jcs_node_origin_map",
-    "wrong_transformation_profile_digest"
+    "wrong_transformation_profile_digest",
+    "wrong_field_pointer",
+    "ambiguous_jcs_node_map",
+    "broken_representation_parent",
+    "wrong_source_representation_digest"
   ],
-  "claim_ceiling": "Synthetic transform graph only. No TLSNotary session, commitment opening, HTTP decoder implementation, JSON schema runtime validation, proof or production qualification."
+  "claim_ceiling": "Synthetic transform graph only. No TLSNotary session, commitment opening, HTTP decoder implementation, JSON schema runtime validation, proof or production qualification.",
+  "expected_predicate_input_sha256": "15fa7da9dccd571f7d120461262353c7cd6343535e0d522c2460dda73061d413",
+  "expected_predicate_input_byte_length": 30
 }
