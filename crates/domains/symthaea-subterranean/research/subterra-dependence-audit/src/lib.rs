@@ -559,17 +559,18 @@ pub fn paired_cluster_bootstrap(
     }
     let mean_baseline_score = baseline_sum / cluster_count as f64;
     let mean_candidate_score = candidate_sum / cluster_count as f64;
-    let mean_candidate_minus_baseline = mean_candidate_score - mean_baseline_score;
-    if !mean_baseline_score.is_finite()
-        || !mean_candidate_score.is_finite()
-        || !mean_candidate_minus_baseline.is_finite()
-    {
+    if !mean_baseline_score.is_finite() || !mean_candidate_score.is_finite() {
         return Err(BootstrapError::NumericalOverflow);
     }
 
     let deltas = ordered_scores.iter()
         .map(|score| score.candidate_score - score.baseline_score)
         .collect::<Vec<_>>();
+    let delta_sum = deltas.iter().sum::<f64>();
+    let mean_candidate_minus_baseline = delta_sum / cluster_count as f64;
+    if !delta_sum.is_finite() || !mean_candidate_minus_baseline.is_finite() {
+        return Err(BootstrapError::NumericalOverflow);
+    }
     let mut rng = SplitMix64::new(config.seed);
     let mut bootstrap_means = Vec::with_capacity(config.replicates);
     for _ in 0..config.replicates {
@@ -663,7 +664,7 @@ mod tests {
         let report = data.audit().unwrap();
         assert_eq!(report.unique_acquisitions, 2);
         assert_eq!(report.dependency_component_count, 1);
-        assert_eq!(report.components[0].case_ids, vec!["scan-1", "scan-2"]);
+        assert_eq!(report.components[0].case_ids, vec!["scan-1".to_string(), "scan-2".to_string()]);
     }
 
     #[test]

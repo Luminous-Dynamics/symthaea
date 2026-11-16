@@ -35,4 +35,4 @@ The crate also includes a deterministic paired percentile bootstrap over one alr
 
 For loss metrics, a negative candidate-minus-baseline interval favors the candidate. This is not proof of statistical independence: component grouping quality and the sampling frame remain assumptions. With fewer than 20–30 genuinely distinct components, treat interval estimates as exploratory and publish the component count prominently. The bootstrap does not correct selection bias, nonstationarity or missing common causes.
 
-There are 24 authored tests in this package after the bootstrap addition.
+There are 25 authored tests in this package after the bootstrap addition.

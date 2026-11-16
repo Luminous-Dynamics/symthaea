@@ -341,7 +341,7 @@ A 2026 *Earth and Planetary Science Letters* analysis reports that ignoring hier
 
 ### Current authored state
 
-- `subterra-dependence-audit/`: 15 authored tests.
+- `subterra-dependence-audit/`: 25 authored tests.
 - Six standalone packages are now listed in the verification script.
 - This package is a raw-manifest preflight only. It does not rewrite the current likelihood-calibration dataset or claim integrated hierarchical estimation.
 - Rust formatting, compilation, tests and Clippy remain unexecuted until the six-package script runs on a Rust-equipped environment.
