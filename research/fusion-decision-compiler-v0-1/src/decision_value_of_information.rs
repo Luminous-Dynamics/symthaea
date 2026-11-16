@@ -1071,14 +1071,8 @@ mod tests {
         input.scenarios[0].probability_weight = 1.0 / 3.0;
         input.scenarios[1].probability_weight = 1.0 / 3.0;
         input.scenarios[2].probability_weight = 1.0 / 3.0;
-        for experiment in &mut input.experiments {
-            // All signals that only contain s4 have zero probability mass.
-            // The other signal outcomes remain fully mapped and admissible.
-            if experiment.experiment_id == "e3-overpriced-perfect-test" {
-                experiment.signal_map.retain(|signal| signal.scenario_id != "s4");
-            }
-        }
-        // Keep s4 in the complete mapping: zero mass is not missing evidence.
+        // The full signal mapping is retained for s4; its signal carries zero
+        // probability and is skipped in conditional posterior calculations.
         let report = evaluate_decision_value_of_information(&input);
         assert_eq!(report.disposition, DecisionVoIDisposition::SyntheticOnly);
         let perfect = report
