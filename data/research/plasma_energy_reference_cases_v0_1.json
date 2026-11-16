@@ -2360,6 +2360,110 @@
         "The reported >80% cycling reduction is model-specific and is not a measured plant fatigue result."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "CH4-PLASMA-THERMAL-APPJ-2026",
+      "lane": "METHANE_PLASMA_THERMAL_APPJ",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Methane conversion by a plasma-assisted process: Role of hybrid plasma–thermal configurations in controlling conversion pathways",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2026-11-16",
+        "volume": 285,
+        "article_number": "158179",
+        "doi": "10.1016/j.ijhydene.2026.158179",
+        "url": "https://doi.org/10.1016/j.ijhydene.2026.158179"
+      },
+      "configuration": {
+        "process": "non-thermal plasma-assisted hybrid methane cracking and non-oxidative methane coupling",
+        "reactor": "thermally assisted atmospheric-pressure plasma jet (APPJ)",
+        "plasma_source_family": "DBD-based APPJ",
+        "configurations_compared": [
+          "single-electrode APPJ with plasma outside the heated zone",
+          "single-electrode APPJ with plasma directly inside the heated zone",
+          "double-electrode APPJ configuration"
+        ],
+        "spatial_design_variable": "plasma position relative to the controlled thermal zone",
+        "diagnostics": [
+          "optical emission spectroscopy",
+          "gas/product analysis",
+          "solid carbon characterization"
+        ]
+      },
+      "reported_claims": [
+        {
+          "claim_id": "PLASMA-IN-THERMAL-ZONE-CONVERSION-RELATIVE-GAIN",
+          "metric": "methane_conversion_relative_gain",
+          "comparison": "source-compared plasma/thermal configurations",
+          "value_lower_bound": 5,
+          "unit": "fold",
+          "qualifier": "source reports more than a fivefold increase when plasma is positioned directly inside the heated zone",
+          "evidence_class": "published_source_claim",
+          "absolute_conversion_fraction": null,
+          "comparator_pair_definition_status": "RECONSTRUCT_FROM_FULL_ARTICLE_AND_SUPPLEMENT"
+        },
+        {
+          "claim_id": "LOWEST-CARBON-DEPOSITION-APPJ",
+          "metric": "carbon_deposition_fraction",
+          "value_approx": 0.36,
+          "unit": "fraction",
+          "qualifier": "approximately 36%, reported as the lowest carbon deposition over the investigated temperature range",
+          "denominator_definition_status": "RECONSTRUCT_FROM_FULL_ARTICLE_AND_SUPPLEMENT",
+          "captured_product_mass": null,
+          "feed_carbon_recovery_fraction": null
+        },
+        {
+          "claim_id": "TURBOSTRATIC-CARBON-STRUCTURE",
+          "metric": "recovered_solid_carbon_structure",
+          "value": "turbostratic nanostructural features",
+          "unit": "qualitative material characterization",
+          "product_grade_qualification_status": "NOT_VALIDATED"
+        }
+      ],
+      "product_slate": [
+        {
+          "species_or_material": "H2",
+          "claim": "source describes high-purity, CO-free hydrogen",
+          "quantitative_rate": null,
+          "purity_fraction": null,
+          "pressure": null,
+          "accepted_product_status": "NOT_QUANTIFIED"
+        },
+        {
+          "species_or_material": "C2-C3 hydrocarbons",
+          "claim": "co-produced through non-oxidative methane coupling",
+          "species_resolved_yields": null,
+          "accepted_product_status": "NOT_QUANTIFIED"
+        },
+        {
+          "species_or_material": "solid carbon",
+          "claim": "recovered carbon with turbostratic nanostructural features",
+          "captured_mass": null,
+          "grade": null,
+          "accepted_product_status": "NOT_QUALIFIED"
+        }
+      ],
+      "source_conclusion": "The study compares thermally assisted atmospheric-pressure APPJ configurations for methane conversion through cracking and non-oxidative coupling. The publisher abstract reports that placing plasma directly within the heated zone increases methane conversion by more than fivefold relative to the compared configuration and yields the lowest reported carbon deposition, around 36%, over the investigated temperature range. The product slate includes H2, C2-C3 hydrocarbons and solid carbon; recovered carbon has turbostratic nanostructural features. The fivefold value is relative, not an absolute conversion. The ~36% deposition metric is not equivalent to recovered/collected carbon yield.",
+      "comparison_status": "SOURCE_SPECIFIC_RELATIVE_CONFIGURATION_RESULT_NOT_FULL_CHAIN_COMPARABLE",
+      "blockers": [
+        "The >5-fold conversion result is a relative configuration comparison; exact matched comparator and absolute conversion must be reconstructed from article tables/data.",
+        "The ~36% carbon-deposition measure has a source-specific denominator that must be reconstructed; it is not a measured carbon recovery fraction or saleable product yield.",
+        "H2 rate, purity, pressure and accepted delivery are not quantified in this source register.",
+        "C2-C3 species-resolved composition, yield, separation and product specifications remain to be reconstructed.",
+        "Complete grid-side energy for plasma, thermal zone, power conversion, cooling, gas handling, separation, quench and auxiliaries is not established here.",
+        "Carbon morphology is a characterization result, not product-grade qualification, market capacity, offtake or revenue evidence.",
+        "The source-specific result cannot be merged with pulsed-heating, microwave, shock-wave or arc-plasma metrics as a matched operating point."
+      ],
+      "luminous_reproduction": false,
+      "coproduct_accounting": {
+        "policy": "NO_SOURCE_COPRODUCT_CREDIT_REPORTED",
+        "credit_claim_status": "SOURCE_MODEL_ONLY",
+        "carbon_product_qualification_status": "NOT_VALIDATED",
+        "carbon_market_capacity_status": "NOT_VALIDATED",
+        "offtake_status": "NOT_VALIDATED",
+        "realized_revenue_evidence": false,
+        "no_credit_baseline_required": true
+      }
     }
   ],
   "negative_controls": [
@@ -2742,6 +2846,36 @@
       "control_id": "NC-088",
       "condition": "Compare a plasma-source load trace with plant-level accepted NH3 delivery without matching the hydrogen chain, N2 supply, synthesis loop, storage and product specification.",
       "expected_disposition": "NOT_COMPARABLE_SERVICE_BOUNDARY_MISMATCH"
+    },
+    {
+      "control_id": "NC-037",
+      "condition": "Convert the APPJ study's >5-fold relative methane-conversion increase into an invented absolute CH4 conversion percentage or universal plasma gain.",
+      "expected_disposition": "REJECT_RELATIVE_TO_ABSOLUTE_METRIC_PROMOTION"
+    },
+    {
+      "control_id": "NC-038",
+      "condition": "Treat the approximately 36% carbon-deposition metric as 36% of feed carbon recovered, collected or qualified as saleable carbon.",
+      "expected_disposition": "REJECT_DEPOSITION_TO_RECOVERY_PROMOTION"
+    },
+    {
+      "control_id": "NC-039",
+      "condition": "Infer accepted H2 mass rate, purity, pressure or species-resolved C2-C3 product yield from OES or qualitative source claims alone.",
+      "expected_disposition": "BLOCKED_QUANTITATIVE_PRODUCT_EVIDENCE_MISSING"
+    },
+    {
+      "control_id": "NC-040",
+      "condition": "Claim APPJ plasma-thermal hybrid superiority from fivefold conversion alone without complete grid-to-accepted-product energy, separation and product-quality boundaries.",
+      "expected_disposition": "NOT_COMPARABLE_INCOMPLETE_SYSTEM_BOUNDARY"
+    },
+    {
+      "control_id": "NC-041",
+      "condition": "Credit turbostratic carbon with commercial revenue or avoided-product value without measured collected mass, product specification, independent grade qualification and offtake.",
+      "expected_disposition": "BLOCKED_UNQUALIFIED_CARBON_COPRODUCT"
+    },
+    {
+      "control_id": "NC-042",
+      "condition": "Borrow the pulsed-heating paper's pure-CH4 27 kWh/kg H2 metric or diluted-feed 95% conversion into the APPJ source record.",
+      "expected_disposition": "REJECT_CROSS_SOURCE_OPERATING_POINT_BORROWING"
     }
   ],
   "derived_reference_checks": [
