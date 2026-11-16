@@ -1474,6 +1474,32 @@ mod tests {
         assert!((medium_error / fine_error - 4.0).abs() < 1.0e-9);
     }
 
+
+    #[test]
+    fn nonuniform_station_linear_taper_matches_analytic_integrals() {
+        let request: SectionalReferenceRequest = serde_json::from_str(include_str!(
+            "../../../../docs/research/marine/fixtures/marine-full-envelope-varying-breadth-001.json"
+        ))
+        .unwrap();
+        let receipt = evaluate_loading_sweep(&request).unwrap();
+        let result = &receipt.results[0];
+
+        assert!((result.displacement_volume_m3 - 9_000.0).abs() < 1.0e-8);
+        assert!((result.waterplane_area_m2 - 1_500.0).abs() < 1.0e-8);
+        assert!(
+            (result.longitudinal_center_of_buoyancy_m - 55.555_555_555_555_56).abs()
+                < 1.0e-10
+        );
+        assert!(
+            (result.longitudinal_center_of_flotation_m - 55.555_555_555_555_56).abs()
+                < 1.0e-10
+        );
+        assert!((result.vertical_center_of_buoyancy_m - 3.0).abs() < 1.0e-9);
+        assert!(result.transverse_center_of_buoyancy_m.abs() < 1.0e-9);
+        assert!((result.displaced_mass_tonnes - 9_225.0).abs() < 1.0e-8);
+        assert!((result.tonnes_per_cm_immersion - 15.375).abs() < 1.0e-9);
+    }
+
     #[test]
     fn loading_sweep_digest_is_deterministic_and_verifiable() {
         let request = fixture_request();
