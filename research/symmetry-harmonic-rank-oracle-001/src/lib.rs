@@ -88,6 +88,8 @@ pub enum TemplateAuthorityV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateProposalV1 {
     pub maximum_degree: usize,
+    pub maximum_group_parameter: usize,
+    pub observed_signature: Vec<usize>,
     pub matching_hypotheses: Vec<GroupHypothesisV1>,
     pub status: MatchStatusV1,
     /// First degree at which any two hypotheses in the declared candidate
@@ -109,9 +111,17 @@ impl GroupHypothesisV1 {
 impl TemplateProposalV1 {
     /// Stable, versioned byte representation for replay and external hashing.
     pub fn canonical_bytes(&self) -> Vec<u8> {
+        let observed = self
+            .observed_signature
+            .iter()
+            .map(usize::to_string)
+            .collect::<Vec<_>>()
+            .join(",");
         let mut encoded = format!(
-            "luminous.symm_harmonic_rank_proposal.v1\nL={}\nstatus={:?}\nfirst_divergence={}\nauthority={:?}\n",
+            "luminous.symm_harmonic_rank_proposal.v1\nL={}\nmax_order={}\nobserved={}\nstatus={:?}\nfirst_divergence={}\nauthority={:?}\n",
             self.maximum_degree,
+            self.maximum_group_parameter,
+            observed,
             self.status,
             self.first_family_divergence_degree
                 .map_or_else(|| "none".to_owned(), |degree| degree.to_string()),
@@ -500,6 +510,8 @@ pub fn match_signature(
     };
     Ok(TemplateProposalV1 {
         maximum_degree,
+        maximum_group_parameter,
+        observed_signature: observed.to_vec(),
         matching_hypotheses: matches,
         status,
         first_family_divergence_degree,
