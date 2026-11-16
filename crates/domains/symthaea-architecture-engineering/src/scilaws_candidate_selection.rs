@@ -291,6 +291,14 @@ pub struct RealEvaluatorCandidate {
 }
 
 impl RealEvaluatorPool {
+    /// Strictly parse the evaluator-only post-submission result bundle.
+    pub fn parse_json(input: &str) -> Result<Self, ScilawsSelectionError> {
+        let pool: Self = serde_json::from_str(input)
+            .map_err(|error| ScilawsSelectionError::InvalidJson(error.to_string()))?;
+        pool.validate()?;
+        Ok(pool)
+    }
+
     pub fn validate(&self) -> Result<(), ScilawsSelectionError> {
         if self.schema != EVALUATOR_SCHEMA || self.version != EVALUATOR_VERSION {
             return Err(ScilawsSelectionError::UnsupportedEvaluatorSchema);
@@ -397,6 +405,14 @@ pub struct ScilawsRealSelectionAudit {
     pub nondominated_candidate_ids: Vec<String>,
     pub submitted_candidate_id: Option<String>,
     pub submitted_disposition: SubmittedCandidateDisposition,
+    /// Best evaluator-only values among all complete, feasible candidates.
+    /// Kept coordinate-wise; there is no blended S_N/S_V winner score.
+    pub best_available_s_n: Option<f64>,
+    pub best_available_s_v: Option<f64>,
+    pub submitted_s_n: Option<f64>,
+    pub submitted_s_v: Option<f64>,
+    pub s_n_regret: Option<f64>,
+    pub s_v_regret: Option<f64>,
     /// None only when there were no complete evaluator rows. No score is
     /// synthesized for failed or non-evaluable candidates.
     pub pareto_summary: Option<ParetoAnalysisSummary>,
@@ -422,6 +438,12 @@ struct AuditReceiptPayload<'a> {
     nondominated_candidate_ids: &'a [String],
     submitted_candidate_id: &'a Option<String>,
     submitted_disposition: &'a SubmittedCandidateDisposition,
+    best_available_s_n: Option<f64>,
+    best_available_s_v: Option<f64>,
+    submitted_s_n: Option<f64>,
+    submitted_s_v: Option<f64>,
+    s_n_regret: Option<f64>,
+    s_v_regret: Option<f64>,
     pareto_receipt_sha256: Option<&'a str>,
 }
 
@@ -577,6 +599,45 @@ pub fn audit_real_candidate_selection(
         })
         .collect::<Vec<_>>();
 
+    let best_available_s_n = evaluator
+        .candidates
+        .iter()
+        .filter(|candidate| {
+            candidate.status == EvaluatorCandidateStatus::Complete
+                && candidate.contract_valid
+                && candidate.anti_hacking_pass
+        })
+        .filter_map(|candidate| candidate.s_n)
+        .max_by(f64::total_cmp);
+    let best_available_s_v = evaluator
+        .candidates
+        .iter()
+        .filter(|candidate| {
+            candidate.status == EvaluatorCandidateStatus::Complete
+                && candidate.contract_valid
+                && candidate.anti_hacking_pass
+        })
+        .filter_map(|candidate| candidate.s_v)
+        .max_by(f64::total_cmp);
+
+    let (submitted_s_n, submitted_s_v) = live
+        .submitted_candidate_id
+        .as_deref()
+        .and_then(|submitted_id| evaluator_by_id.get(submitted_id))
+        .filter(|candidate| {
+            candidate.status == EvaluatorCandidateStatus::Complete
+                && candidate.contract_valid
+                && candidate.anti_hacking_pass
+        })
+        .map(|candidate| (candidate.s_n, candidate.s_v))
+        .unwrap_or((None, None));
+    let s_n_regret = best_available_s_n
+        .zip(submitted_s_n)
+        .map(|(best, submitted)| (best - submitted).max(0.0));
+    let s_v_regret = best_available_s_v
+        .zip(submitted_s_v)
+        .map(|(best, submitted)| (best - submitted).max(0.0));
+
     let submitted_disposition = match live.submitted_candidate_id.as_deref() {
         None => SubmittedCandidateDisposition::Abstained,
         Some(submitted_id) => {
@@ -643,6 +704,12 @@ pub fn audit_real_candidate_selection(
         nondominated_candidate_ids: &nondominated_candidate_ids,
         submitted_candidate_id: &live.submitted_candidate_id,
         submitted_disposition: &submitted_disposition,
+        best_available_s_n,
+        best_available_s_v,
+        submitted_s_n,
+        submitted_s_v,
+        s_n_regret,
+        s_v_regret,
         pareto_receipt_sha256,
     };
     let bytes = serde_json::to_vec(&payload)
@@ -667,9 +734,29 @@ pub fn audit_real_candidate_selection(
         nondominated_candidate_ids,
         submitted_candidate_id: live.submitted_candidate_id.clone(),
         submitted_disposition,
+        best_available_s_n,
+        best_available_s_v,
+        submitted_s_n,
+        submitted_s_v,
+        s_n_regret,
+        s_v_regret,
         pareto_summary,
         audit_sha256,
     })
+}
+
+/// Parse the public/live packet and separate evaluator-only bundle, then
+/// produce a deterministic post-submission audit report. The evaluator bundle
+/// is never projected into the live packet or passed to a selector.
+pub fn audit_real_candidate_selection_json(
+    live_json: &str,
+    evaluator_json: &str,
+) -> Result<String, ScilawsSelectionError> {
+    let live = LiveSelectionPacket::parse_json(live_json)?;
+    let evaluator = RealEvaluatorPool::parse_json(evaluator_json)?;
+    let audit = audit_real_candidate_selection(&live, &evaluator)?;
+    serde_json::to_string_pretty(&audit)
+        .map_err(|error| ScilawsSelectionError::Serialization(error.to_string()))
 }
 
 fn validate_digest(value: &str, field: String) -> Result<(), ScilawsSelectionError> {
