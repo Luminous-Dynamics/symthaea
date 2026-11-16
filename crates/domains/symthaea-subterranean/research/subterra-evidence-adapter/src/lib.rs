@@ -497,7 +497,7 @@ impl SiteEvidenceRecord {
             );
         } else {
             if self.interior_survey.surveyed_extent_m.is_some()
-                && self.interior_survey.state == InteriorSurveyState::NotSurveyed
+                || self.interior_survey.coverage_fraction.is_some()
             {
                 issues.push(SiteIssue::InvalidSurveyExtent);
             }
@@ -622,6 +622,7 @@ impl SiteEvidenceRecord {
                 == ActivityPermission::AuthorizedForDeclaredActivity;
 
         SiteBeliefInput {
+            schema_version: self.schema_version,
             site_id: self.site_id,
             body: self.body,
             coordinates: self.coordinates,
@@ -711,6 +712,8 @@ pub struct InteriorSurveyBelief {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SiteBeliefInput {
+    /// Source schema version retained to preserve interpretation lineage.
+    pub schema_version: String,
     pub site_id: String,
     pub body: PlanetaryBody,
     pub coordinates: Option<Coordinates>,
@@ -1323,6 +1326,23 @@ mod tests {
             .validate()
             .unwrap_err()
             .contains(&SiteIssue::AuthorizedActivityWithoutProtectionAuthorization));
+    }
+
+    #[test]
+    fn belief_input_retains_source_schema_version() {
+        let input = intake_site_json(SITE_FIXTURE).expect("valid site fixture");
+        assert_eq!(input.schema_version, "0.1");
+    }
+
+    #[test]
+    fn not_surveyed_state_cannot_carry_survey_metrics() {
+        let mut record: SiteEvidenceRecord =
+            serde_json::from_str(SITE_FIXTURE).expect("fixture JSON");
+        record.interior_survey.coverage_fraction = Some(0.25);
+        assert!(record
+            .validate()
+            .unwrap_err()
+            .contains(&SiteIssue::InvalidSurveyExtent));
     }
 
     #[test]
