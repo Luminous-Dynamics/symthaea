@@ -114,6 +114,18 @@ These public surfaces are inconsistent at the time of this check. Preserve both 
 
 The TSFM.ai mirror reports that its FEV-Bench point-accuracy MASE-skill view (data loaded 15 Nov 2026) has TimeRSI-1.5 at 41.44, ci-proto at 40.80 and TimeRSI at 40.58. Its GIFT-Eval page ranks grouped probabilistic slices by average MASE rank and is led by Taichu-TimeSeries-Agent-v2, STRIDE with Synapse and RegLab-AH-2. Its BOOM telemetry view is led by Toto 2.0 models on CRPS. Those are different datasets, metrics and aggregation procedures; they should not be mixed into a single table as though ranks were interchangeable: https://tsfm.ai/benchmarks .
 
+### Machine-readable comparator snapshot
+
+The exact score observations above are now pinned separately in
+`crates/domains/symthaea-capability-closure/fixtures/tsfm_comparator_snapshot_v0.1.json`
+and linked from `real_irregular_benchmark_registry_v0.1.json`. It records
+TimeH2O-v1 (108.8M), Timestral-209M, ci-proto, TimeRSI-1.5, Toto-2.0-2.5B,
+Chronos-Bolt and TimesFM-3, including source URLs, retrieval dates, claim type,
+metric and task-specific caveats. The two conflicting H2O FEV-Bench surfaces
+remain separate observations. No external checkpoint is claimed to have been
+reproduced. The registry and comparator fixture are hashed in the exact-head
+validation receipt.
+
 ### Required matched comparison set
 
 1. **FEV-Bench:** use the official 100-task suite and record SQL / WQL / MASE / WAPE scores separately; retain raw per-task results, win-rate estimator and bootstrap uncertainty.
