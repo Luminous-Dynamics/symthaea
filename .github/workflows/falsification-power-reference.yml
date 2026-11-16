@@ -263,6 +263,9 @@ jobs:
               ($ar1.pooled_null_lag_one_correlation <= 0.68) and
               all(.regimes[];
                 (.assumption_status == "IN_CONTRACT" or .assumption_status == "OUT_OF_CONTRACT") and
+                (.pooled_null_mean | fabs) < 0.01 and
+                .pooled_null_variance >= 0.50 and
+                .pooled_null_variance <= 0.80 and
                 .null.paths == 50000 and
                 .alternative.paths == 50000 and
                 .null.rejections >= 0 and
