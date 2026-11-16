@@ -195,10 +195,10 @@ The deterministic multi-source differential regression generates 48 event arriva
 records. It crosses source counts 1/4/16, half-open interval widths 1/16/256
 microseconds, and early/full knowledge cutoffs (54 workload combinations).
 Event-time keys are permuted relative to four receipt-time batches. Each case
-compares 51 indexed queries with 7 `completeness_verified` queries that replay
+compares 51 indexed queries with 15 `completeness_verified` queries that replay
 and validate the full history. CSV output includes source count, interval width,
 knowledge cutoff, event-time buckets visited, receipt candidates examined,
-matching breaches and p50/p95/p99 latency for both paths. Exact equality of
+matching breaches and indexed p50/p95/p99 and verified median/worst-observed latency. Exact equality of
 indexed and verified reports is required before timing. The benchmark is diagnostic, not a physical
 energy measurement; runner CPU model, toolchain, release profile and exact
 source/fixture hashes must accompany each artifact. The latest run has not
