@@ -70,6 +70,7 @@ pub struct BudgetAssessment {
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResourceShadowPrices {
     pub version: String,
+    pub basis: ResourceBasis,
     pub config_digest: String,
     pub rig_hour: f64,
     pub source_energy_wh: f64,
@@ -366,6 +367,7 @@ impl CampaignLedger {
 
 impl ResourceShadowPrices {
     pub fn validate(&self) -> Result<(), ResourceError> {
+        self.basis.validate()?;
         if !nonempty(&self.version) {
             return Err(ResourceError::EmptyIdentity("shadow_price_version"));
         }
@@ -412,6 +414,9 @@ impl ResourceShadowPrices {
         &self,
         action: &CampaignAction,
     ) -> Result<f64, ResourceError> {
+        if action.basis != self.basis {
+            return Err(ResourceError::BasisMismatch);
+        }
         let cost = self.weighted_cost(&action.resources)?;
         if cost <= 0.0 {
             return Err(ResourceError::ZeroWeightedCost(action.id.clone()));
@@ -461,6 +466,7 @@ mod tests {
     fn shadow_prices() -> ResourceShadowPrices {
         ResourceShadowPrices {
             version: "shadow-prices-v1".to_string(),
+            basis: basis(),
             config_digest: "sha256:shadow-price-config".to_string(),
             rig_hour: 10.0,
             source_energy_wh: 0.01,
