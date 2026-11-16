@@ -422,6 +422,28 @@
           ]
         }
       }
+    ],
+    "decision_cutoff": "2026-11-16T10:00:00Z",
+    "budget_micros": 3000,
+    "actions": [
+      {
+        "action_id": "release",
+        "irreversible": true,
+        "hard_gate": true,
+        "max_residual_risk_bps": 0
+      },
+      {
+        "action_id": "inspect-readonly",
+        "irreversible": false,
+        "hard_gate": false,
+        "max_residual_risk_bps": 0
+      },
+      {
+        "action_id": "bounded-probe",
+        "irreversible": false,
+        "hard_gate": false,
+        "max_residual_risk_bps": 1200
+      }
     ]
   }
 }
