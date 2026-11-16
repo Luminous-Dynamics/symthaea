@@ -22,6 +22,11 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
+    # QUARANTINED 2026-10-09: the detached attestation adapter's source still
+    # imports the removed symthaea_core::observation_fabric API. Keep the
+    # historical implementation and manifest in-tree, but out of workspace
+    # builds until its contract is restored and the crate compiles independently.
+    "crates/core/symthaea-observation-attestation",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
