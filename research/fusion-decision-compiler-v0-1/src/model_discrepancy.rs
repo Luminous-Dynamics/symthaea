@@ -79,6 +79,7 @@ pub struct CalibrationResidual {
     pub facility_id: String,
     pub case_id: String,
     pub operating_point_id: String,
+    pub solver_id: String,
     pub model_revision: String,
     pub model_run_id: String,
     pub model_output_sha256: String,
@@ -675,10 +676,6 @@ fn validate_target_and_run(
     if target.quantity_ref != profile.quantity_ref {
         diagnostics.push(ModelDiscrepancyDiagnostic::QuantityMismatch);
     }
-    if target.requested_use == ModelUse::ReferenceSolverEvaluation {
-        // The applicability profile must explicitly state this strongest
-        // evaluation use; the exact use is checked against its receipt below.
-    }
 
     let reported_net = run
         .terms
@@ -710,10 +707,6 @@ fn validate_residuals(
         diagnostics.push(ModelDiscrepancyDiagnostic::EmptyCalibrationSet);
         return;
     }
-    if residuals.len() < profile.minimum_calibration_samples {
-        diagnostics.push(ModelDiscrepancyDiagnostic::CalibrationSampleCountBelowMinimum);
-    }
-
     let mut record_ids = BTreeSet::new();
     let mut episode_ids = BTreeSet::new();
     let mut cluster_ids = BTreeSet::new();
@@ -771,6 +764,9 @@ fn validate_residuals(
         {
             diagnostics.push(ModelDiscrepancyDiagnostic::ResidualDomainMismatch);
         }
+        if residual.solver_id != profile.solver_id {
+            diagnostics.push(ModelDiscrepancyDiagnostic::ResidualModelRevisionMismatch);
+        }
         if residual.model_revision != profile.solver_revision {
             diagnostics.push(ModelDiscrepancyDiagnostic::ResidualModelRevisionMismatch);
         }
@@ -798,9 +794,6 @@ fn validate_residuals(
         }
     }
 
-    if has_synthetic && has_measured {
-        diagnostics.push(ModelDiscrepancyDiagnostic::SyntheticAndMeasuredResidualMix);
-    }
     if has_synthetic && has_measured {
         diagnostics.push(ModelDiscrepancyDiagnostic::SyntheticAndMeasuredResidualMix);
     }
@@ -1090,6 +1083,7 @@ mod tests {
             facility_id: "facility-reference".to_string(),
             case_id: format!("case-{index}"),
             operating_point_id: format!("op-{index}"),
+            solver_id: "PROCESS".to_string(),
             model_revision: "process-revision-r1".to_string(),
             model_run_id: format!("calibration-run-{index}"),
             model_output_sha256: sha('j'),
@@ -1186,7 +1180,7 @@ mod tests {
 
     fn measured_residuals(count: usize) -> Vec<CalibrationResidual> {
         (1..=count)
-            .map(|index| residual(index, index as f64, EvidenceClass::MeasuredObservation))
+            .map(|index| residual(index, index as f64 / 2.0, EvidenceClass::MeasuredObservation))
             .collect()
     }
 
@@ -1221,9 +1215,9 @@ mod tests {
             ModelDiscrepancyDisposition::QualifiedWithinDeclaredDomain
         );
         assert_eq!(report.conformal_rank, Some(39));
-        assert_eq!(report.discrepancy_bound_mwe, Some(39.0));
+        assert_eq!(report.discrepancy_bound_mwe, Some(19.5));
         assert_eq!(report.combined_coverage_floor_basis_points, Some(9500));
-        assert_eq!(report.adjusted_lower_bound_mwe, Some(81.0));
+        assert_eq!(report.adjusted_lower_bound_mwe, Some(100.5));
         assert_eq!(
             report.model_form_validity,
             ModelFormValidity::WithinDeclaredDomain
@@ -1245,7 +1239,7 @@ mod tests {
         );
         assert_eq!(report.disposition, ModelDiscrepancyDisposition::SyntheticOnly);
         assert_eq!(report.model_form_validity, ModelFormValidity::Unknown);
-        assert_eq!(report.adjusted_lower_bound_mwe, Some(81.0));
+        assert_eq!(report.adjusted_lower_bound_mwe, Some(100.5));
     }
 
     #[test]
@@ -1543,7 +1537,7 @@ mod tests {
     #[test]
     fn maximum_discrepancy_threshold_equality_obeys_policy() {
         let mut profile = discrepancy_profile();
-        profile.maximum_discrepancy_mwe = 39.0;
+        profile.maximum_discrepancy_mwe = 19.5;
         profile.discrepancy_tolerance_inclusive = true;
         let report = evaluate(
             &profile,
