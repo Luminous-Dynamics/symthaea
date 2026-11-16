@@ -625,7 +625,7 @@ impl ClockCalibrationLedger {
 
     pub fn state_sha256(&self) -> [u8; 32] {
         let mut hasher = Sha256::new();
-        hasher.update(b"SYMTHAEA-CLOCK-CALIBRATION-LEDGER-V1\\0");
+        hasher.update(b"SYMTHAEA-CLOCK-CALIBRATION-LEDGER-V1\0");
         for calibration in &self.revisions {
             hasher.update(calibration.calibration_id.to_le_bytes());
             hasher.update(calibration.calibration_sha256());
