@@ -1,0 +1,226 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-identifiability-report-v0.1.schema.json",
+  "title": "EGDDM D6.11 causal-identifiability report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "event_count",
+    "boundary_count",
+    "pair_count",
+    "traces",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "adjudication_status": {
+      "type": "string"
+    },
+    "event_count": {
+      "type": "integer"
+    },
+    "boundary_count": {
+      "type": "integer"
+    },
+    "pair_count": {
+      "type": "integer"
+    },
+    "claim_ceiling": {
+      "type": "string"
+    },
+    "traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "boundary_outcomes",
+          "pair_outcomes",
+          "identifiable_pair_count",
+          "correctly_identified_pair_count",
+          "underdetermined_pair_count",
+          "correctly_abstained_pair_count",
+          "compromised_pair_count",
+          "correctly_detected_compromised_pair_count",
+          "false_concurrency_claim_count",
+          "unsupported_causal_claim_count",
+          "unnecessary_abstention_count",
+          "missed_compromise_count",
+          "false_completeness_claim_count",
+          "false_incompleteness_claim_count",
+          "future_evidence_leakage_count",
+          "critical_unsupported_claim_count"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "boundary_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "producer_id",
+                "expected_state",
+                "claimed_state",
+                "correct",
+                "missing_sequence_numbers",
+                "false_completeness_claim",
+                "false_incompleteness_claim"
+              ],
+              "properties": {
+                "producer_id": {
+                  "type": "string"
+                },
+                "expected_state": {
+                  "type": "string"
+                },
+                "claimed_state": {
+                  "type": "string"
+                },
+                "correct": {
+                  "type": "boolean"
+                },
+                "missing_sequence_numbers": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  }
+                },
+                "false_completeness_claim": {
+                  "type": "boolean"
+                },
+                "false_incompleteness_claim": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "pair_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pair_id",
+                "expected_state",
+                "admissible_relations",
+                "claimed_relation",
+                "correct",
+                "false_concurrency",
+                "unsupported_causal_claim",
+                "unnecessary_abstention",
+                "missed_compromise",
+                "future_evidence_event_ids",
+                "critical_unsupported_claim"
+              ],
+              "properties": {
+                "pair_id": {
+                  "type": "string"
+                },
+                "expected_state": {
+                  "type": "string"
+                },
+                "admissible_relations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "claimed_relation": {
+                  "type": "string"
+                },
+                "correct": {
+                  "type": "boolean"
+                },
+                "false_concurrency": {
+                  "type": "boolean"
+                },
+                "unsupported_causal_claim": {
+                  "type": "boolean"
+                },
+                "unnecessary_abstention": {
+                  "type": "boolean"
+                },
+                "missed_compromise": {
+                  "type": "boolean"
+                },
+                "future_evidence_event_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "critical_unsupported_claim": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "identifiable_pair_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "correctly_identified_pair_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "underdetermined_pair_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "correctly_abstained_pair_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "compromised_pair_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "correctly_detected_compromised_pair_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_concurrency_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsupported_causal_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unnecessary_abstention_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missed_compromise_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_completeness_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_incompleteness_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "future_evidence_leakage_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "critical_unsupported_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}
