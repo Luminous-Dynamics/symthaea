@@ -161,6 +161,14 @@ pub enum ObservationEventError {
     PredictionCoordinateMismatch { index: usize },
     NonFiniteLikelihood,
     NoiseModelNotDiagonalIndependent,
+    EmptyLikelihoodMatrix,
+    LikelihoodMatrixDimensionMismatch {
+        row: usize,
+        expected: usize,
+        actual: usize,
+    },
+    NonFiniteLikelihoodCoefficient { row: usize, column: usize },
+    NonFiniteBeliefGradient { row: usize },
 }
 
 impl std::fmt::Display for ObservationEventError {
@@ -185,6 +193,22 @@ pub struct ObservationLikelihoodV1 {
     pub weighted_squared_error: f64,
     /// Mean log likelihood, absent when no dimensions were observed.
     pub mean_log_likelihood: Option<f64>,
+}
+
+/// Log-likelihood ascent gradient with respect to hidden-state coordinates.
+///
+/// For a linear observation model y_hat[j] = sum_i A[i][j] * s[i], this
+/// stores d log p(y_observed | s) / d s[i] = sum_j A[i][j] *
+/// precision[j] * (value[j] - prediction[j]). Absent dimensions contribute
+/// exactly zero and their predictions are never read.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObservationBeliefGradientV1 {
+    /// Number of observation dimensions that contributed to the gradient.
+    pub observed_dimensions: usize,
+    /// Total dimensions in the event's declared observation space.
+    pub total_dimensions: usize,
+    /// Gradient in hidden-state coordinate order (one value per matrix row).
+    pub values: Vec<f64>,
 }
 
 impl ObservationEventV1 {
@@ -341,6 +365,114 @@ impl ObservationEventV1 {
                 None => Ok(None),
             })
             .collect()
+    }
+
+    /// Compute a mask-aware hidden-state likelihood gradient for a linear
+    /// observation mapping. The matrix uses
+    /// [hidden_state_dimension][observation_dimension] order.
+    ///
+    /// For the explicitly declared IndependentDiagonal noise model, each
+    /// observed coordinate contributes A[i][j] * precision[j] *
+    /// (value[j] - prediction[j]). An absent coordinate contributes exactly
+    /// zero; even a non-finite placeholder prediction at that absent coordinate
+    /// is never read. The matrix is validated before a gradient is returned.
+    ///
+    /// An all-missing event returns an all-zero gradient even when its noise
+    /// dependence is unspecified, because no observation likelihood term is
+    /// evaluated. Otherwise unspecified or joint-covariance noise fails closed;
+    /// use the separately owned covariance-aware path for correlated noise.
+    ///
+    /// This is a pure O1 reference primitive. It does not mutate an agent,
+    /// generative model, TD learner, eligibility trace or transition history.
+    pub fn masked_belief_gradient(
+        &self,
+        predicted: &ObservationPredictionV1,
+        likelihood_matrix: &[Vec<f64>],
+        fallback_precision: f64,
+    ) -> Result<ObservationBeliefGradientV1, ObservationEventError> {
+        self.validate(predicted.dimensions.len())?;
+        self.validate_prediction_coordinates(predicted)?;
+
+        if likelihood_matrix.is_empty() {
+            return Err(ObservationEventError::EmptyLikelihoodMatrix);
+        }
+
+        for (row_index, row) in likelihood_matrix.iter().enumerate() {
+            if row.len() != self.dimensions.len() {
+                return Err(ObservationEventError::LikelihoodMatrixDimensionMismatch {
+                    row: row_index,
+                    expected: self.dimensions.len(),
+                    actual: row.len(),
+                });
+            }
+            for (column_index, coefficient) in row.iter().enumerate() {
+                if !coefficient.is_finite() {
+                    return Err(ObservationEventError::NonFiniteLikelihoodCoefficient {
+                        row: row_index,
+                        column: column_index,
+                    });
+                }
+            }
+        }
+
+        let observed_dimensions = self.dimensions.iter().filter(|d| d.value.is_some()).count();
+        if observed_dimensions == 0 {
+            return Ok(ObservationBeliefGradientV1 {
+                observed_dimensions: 0,
+                total_dimensions: self.dimensions.len(),
+                values: vec![0.0; likelihood_matrix.len()],
+            });
+        }
+
+        if !matches!(
+            &self.noise_model,
+            ObservationNoiseModelV1::IndependentDiagonal { .. }
+        ) {
+            return Err(ObservationEventError::NoiseModelNotDiagonalIndependent);
+        }
+        if !fallback_precision.is_finite() || fallback_precision <= 0.0 {
+            return Err(ObservationEventError::InvalidFallbackPrecision);
+        }
+
+        let mut weighted_residuals = vec![None; self.dimensions.len()];
+        for (index, dimension) in self.dimensions.iter().enumerate() {
+            let Some(value) = dimension.value else {
+                continue;
+            };
+            let prediction = predicted.dimensions[index]
+                .value
+                .ok_or(ObservationEventError::MissingPredictionForObservedDimension { index })?;
+            if !prediction.is_finite() {
+                return Err(ObservationEventError::NonFinitePrediction { index });
+            }
+
+            let precision = dimension.precision.unwrap_or(fallback_precision);
+            let weighted_residual = precision * (value - prediction);
+            if !weighted_residual.is_finite() {
+                return Err(ObservationEventError::NonFiniteBeliefGradient { row: index });
+            }
+            weighted_residuals[index] = Some(weighted_residual);
+        }
+
+        let mut values = Vec::with_capacity(likelihood_matrix.len());
+        for (row_index, row) in likelihood_matrix.iter().enumerate() {
+            let mut gradient = 0.0;
+            for (column_index, weighted_residual) in weighted_residuals.iter().enumerate() {
+                if let Some(weighted_residual) = weighted_residual {
+                    gradient += row[column_index] * weighted_residual;
+                }
+            }
+            if !gradient.is_finite() {
+                return Err(ObservationEventError::NonFiniteBeliefGradient { row: row_index });
+            }
+            values.push(gradient);
+        }
+
+        Ok(ObservationBeliefGradientV1 {
+            observed_dimensions,
+            total_dimensions: self.dimensions.len(),
+            values,
+        })
     }
 
     /// Evaluate a normalized diagonal-Gaussian log likelihood over observed
@@ -729,6 +861,95 @@ mod tests {
         assert_eq!(
             observation.evaluate_diagonal_gaussian_likelihood(&prediction, 1.0),
             Err(ObservationEventError::PredictionCoordinateMismatch { index: 0 })
+        );
+    }
+
+    #[test]
+    fn masked_belief_gradient_matches_linear_gaussian_closed_form() {
+        let observation = event(vec![dimension("temperature", Some(0.5), Some(4.0), None)]);
+        let predicted = prediction(&[("temperature", Some(0.25))]);
+        let gradient = observation
+            .masked_belief_gradient(&predicted, &[vec![2.0], vec![3.0]], 1.0)
+            .expect("valid independent observation model");
+
+        assert_eq!(gradient.observed_dimensions, 1);
+        assert_eq!(gradient.total_dimensions, 1);
+        assert_eq!(gradient.values, vec![2.0, 3.0]);
+    }
+
+    #[test]
+    fn masked_belief_gradient_never_reads_absent_dimension_predictions() {
+        let observation = event(vec![
+            dimension("temperature", Some(0.5), Some(4.0), None),
+            dimension("pressure", None, None, Some(MissingnessReason::SensorUnavailable)),
+        ]);
+        let first = observation
+            .masked_belief_gradient(
+                &prediction(&[("temperature", Some(0.25)), ("pressure", Some(f64::NAN))]),
+                &[vec![2.0, 100.0], vec![3.0, -500.0]],
+                1.0,
+            )
+            .expect("absent prediction must not be read");
+        let second = observation
+            .masked_belief_gradient(
+                &prediction(&[("temperature", Some(0.25)), ("pressure", None)]),
+                &[vec![2.0, 100.0], vec![3.0, -500.0]],
+                1.0,
+            )
+            .expect("missing absent prediction is equivalent");
+
+        assert_eq!(first, second);
+        assert_eq!(first.observed_dimensions, 1);
+        assert_eq!(first.values, vec![2.0, 3.0]);
+    }
+
+    #[test]
+    fn all_missing_gradient_is_zero_without_a_noise_independence_claim() {
+        let mut observation = event(vec![
+            dimension("temperature", None, None, Some(MissingnessReason::NotSampled)),
+            dimension("pressure", None, None, None),
+        ]);
+        observation.noise_model = ObservationNoiseModelV1::Unspecified;
+        let gradient = observation
+            .masked_belief_gradient(
+                &prediction(&[("temperature", Some(f64::NAN)), ("pressure", None)]),
+                &[vec![2.0, 3.0], vec![4.0, 5.0]],
+                1.0,
+            )
+            .expect("no observation likelihood is evaluated");
+
+        assert_eq!(gradient.observed_dimensions, 0);
+        assert_eq!(gradient.total_dimensions, 2);
+        assert_eq!(gradient.values, vec![0.0, 0.0]);
+    }
+
+    #[test]
+    fn masked_belief_gradient_rejects_joint_noise_and_malformed_matrices() {
+        let observation = event(vec![dimension("temperature", Some(0.5), Some(4.0), None)]);
+        let predicted = prediction(&[("temperature", Some(0.25))]);
+        let mut joint = observation.clone();
+        joint.noise_model = ObservationNoiseModelV1::JointCovariance {
+            model_id: "joint-covariance-v1".to_string(),
+        };
+
+        assert_eq!(
+            joint.masked_belief_gradient(&predicted, &[vec![1.0]], 1.0),
+            Err(ObservationEventError::NoiseModelNotDiagonalIndependent)
+        );
+        assert_eq!(
+            observation.masked_belief_gradient(&predicted, &[vec![1.0, 2.0]], 1.0),
+            Err(ObservationEventError::LikelihoodMatrixDimensionMismatch {
+                row: 0,
+                expected: 1,
+                actual: 2,
+            })
+        );
+        assert_eq!(
+            observation.masked_belief_gradient(&predicted, &[vec![f64::NAN]], 1.0),
+            Err(ObservationEventError::NonFiniteLikelihoodCoefficient {
+                row: 0,
+                column: 0,
+            })
         );
     }
 
