@@ -656,6 +656,8 @@ pub fn verify_loft_artifact_integrity(
         == LongitudinalEndCondition::CollapsedCentreline;
     let point_count = artifact.section_point_count;
     let station_count = artifact.station_count;
+    let mut expected_vertices = 0_usize;
+    let mut station_bases = Vec::with_capacity(station_count.min(MAX_STATIONS));
     if point_count < 2
         || point_count > MAX_SECTION_POINTS
         || station_count < 2
@@ -668,8 +670,6 @@ pub fn verify_loft_artifact_integrity(
             "unsupported station/section counts for declared longitudinal end conditions",
         );
     } else {
-        let mut expected_vertices = 0_usize;
-        let mut station_bases = Vec::with_capacity(station_count);
         let mut vertex_layout_valid = true;
         for station_index in 0..station_count {
             station_bases.push(expected_vertices);
