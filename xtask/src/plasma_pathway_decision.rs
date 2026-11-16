@@ -202,17 +202,52 @@ fn evaluate_group(g:&Group,m:&Manifest)->GroupReport{
     let mut pareto=vec![0_u32;n];
     let mut regrets:Vec<BTreeMap<String,Vec<f64>>>=(0..n).map(|_|OBJECTIVES.iter().map(|x|(x.to_string(),Vec::new())).collect()).collect();
     let mut pairs:BTreeMap<(usize,usize),(u32,u32,u32)>=BTreeMap::new();
-    for d in 0..m.draws as usize{
-        let feasible:Vec<usize>=qualified.iter().copied().filter(|i|draws[*i][d].feasible).collect();
-        for i in &feasible{if !feasible.iter().any(|j|j!=i&&dominates(&draws[*j][d].values,&draws[*i][d].values)){pareto[*i]+=1;}}
-        for i in &feasible{for metric in OBJECTIVES{
-            let best=feasible.iter().map(|j|draws[*j][d].values[metric]).fold(f64::INFINITY,f64::min);
-            regrets[*i].get_mut(metric).unwrap().push((draws[*i][d].values[metric]-best).max(0.0));
-        }}
-        for p in 0..feasible.len(){for q in (p+1)..feasible.len(){
-            let a=feasible[p];let b=feasible[q];let c=pairs.entry((a,b)).or_insert((0,0,0));c.0+=1;
-            if dominates(&draws[a][d].values,&draws[b][d].values){c.1+=1;}else if dominates(&draws[b][d].values,&draws[a][d].values){c.2+=1;}
-        }}
+    let mut route_iters: Vec<_> = draws.iter().map(|route_draws| route_draws.iter()).collect();
+    for _ in 0..m.draws {
+        let current: Vec<&Sample> = route_iters
+            .iter_mut()
+            .map(|iter| iter.next().expect("one sample per route and draw"))
+            .collect();
+        let feasible: Vec<usize> = qualified
+            .iter()
+            .copied()
+            .filter(|i| current[*i].feasible)
+            .collect();
+
+        for i in &feasible {
+            if !feasible.iter().any(|j| {
+                j != i && dominates(&current[*j].values, &current[*i].values)
+            }) {
+                pareto[*i] += 1;
+            }
+        }
+
+        for i in &feasible {
+            for metric in OBJECTIVES {
+                let best = feasible
+                    .iter()
+                    .map(|j| current[*j].values[metric])
+                    .fold(f64::INFINITY, f64::min);
+                regrets[*i]
+                    .get_mut(metric)
+                    .unwrap()
+                    .push((current[*i].values[metric] - best).max(0.0));
+            }
+        }
+
+        for p in 0..feasible.len() {
+            for q in (p + 1)..feasible.len() {
+                let a = feasible[p];
+                let b = feasible[q];
+                let counts = pairs.entry((a, b)).or_insert((0, 0, 0));
+                counts.0 += 1;
+                if dominates(&current[a].values, &current[b].values) {
+                    counts.1 += 1;
+                } else if dominates(&current[b].values, &current[a].values) {
+                    counts.2 += 1;
+                }
+            }
+        }
     }
     let routes=g.routes.iter().enumerate().map(|(i,r)|{
         let mut mean=BTreeMap::new();let mut tail=BTreeMap::new();
