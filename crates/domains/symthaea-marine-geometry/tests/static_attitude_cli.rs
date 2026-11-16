@@ -43,7 +43,13 @@ fn cli_evaluates_upright_box_and_emits_digest_bound_residuals() {
     let receipt = &report["receipt"];
     assert!((receipt["displacement_volume_m3"].as_f64().unwrap() - 12_000.0).abs() < 1.0e-8);
     assert!((receipt["displaced_mass_tonnes"].as_f64().unwrap() - 12_300.0).abs() < 1.0e-8);
-    assert!(receipt["residuals"]["mass_residual_tonnes"].as_f64().unwrap().abs() < 1.0e-8);
+    assert!(
+        receipt["residuals"]["mass_residual_tonnes"]
+            .as_f64()
+            .unwrap()
+            .abs()
+            < 1.0e-8
+    );
     assert!(
         receipt["residuals"]["moment_residual_1_nm"]
             .as_f64()
@@ -51,7 +57,10 @@ fn cli_evaluates_upright_box_and_emits_digest_bound_residuals() {
             .abs()
             < 1.0e-7
     );
-    assert_eq!(receipt["receipt_digest_blake3"].as_str().map(str::len), Some(64));
+    assert_eq!(
+        receipt["receipt_digest_blake3"].as_str().map(str::len),
+        Some(64)
+    );
 }
 
 #[test]
