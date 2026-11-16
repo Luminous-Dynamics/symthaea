@@ -866,8 +866,8 @@ mod tests {
         assert_eq!(result.sigma, 0.5);
         assert_eq!(result.components[0].expected_residual, 0.2);
         assert_eq!(result.components[1].expected_residual, -0.2);
-        let positive_log_e = 0.08;
-        let negative_log_e = -0.24;
+        let positive_log_e: f64 = 0.08;
+        let negative_log_e: f64 = -0.24;
         let expected_mix = (0.5_f64 * positive_log_e.exp() + 0.5_f64 * negative_log_e.exp()).ln();
         assert!((result.log_e_value - expected_mix).abs() < 1.0e-12);
     }
