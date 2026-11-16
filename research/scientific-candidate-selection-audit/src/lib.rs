@@ -114,8 +114,10 @@ pub enum CandidateState {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectorPacket {
     pub task_id: String,
-    /// SHA-256 computed by the upstream canonical pool-manifest producer.
-    /// The selector must echo this exact identity in its trace.
+    /// SHA-256 supplied by the upstream canonical pool-manifest producer.
+    /// This crate validates its syntax and trace echo, but does not recompute
+    /// it: production integration must independently verify the canonical
+    /// manifest-to-packet binding before constructing SelectorPacket.
     pub candidate_pool_sha256: String,
     pub metric_mask: MetricMask,
     /// One task-native cost meter. Other resources remain separate and are
@@ -279,7 +281,7 @@ pub struct CandidateSelectionAudit {
     pub invalid_candidates: usize,
     pub incomplete_candidates: usize,
     pub missing_evaluator_outcomes: usize,
-    pub semantic_duplicate_groups: Vec<Vec<String>>,
+    pub identical_model_artifact_groups: Vec<Vec<String>>,
     pub submitted_candidate_id: Option<String>,
     pub submitted_status: Option<EvaluatorStatus>,
     pub submitted_admissibility: Option<EvaluatorAdmissibility>,
@@ -299,6 +301,7 @@ pub enum SelectionAuditError {
     InvalidCandidatePoolDigest,
     InvalidArtifactDigest { evidence_id: String },
     InvalidModelDigest { candidate_id: String },
+    MissingModelDigest { candidate_id: String },
     DuplicateCandidateId(String),
     EmptyCandidateId,
     EmptyEvidenceId,
@@ -348,6 +351,10 @@ impl fmt::Display for SelectionAuditError {
                     "candidate {candidate_id} has an invalid model SHA-256 digest"
                 )
             }
+            Self::MissingModelDigest { candidate_id } => write!(
+                f,
+                "ready candidate {candidate_id} is missing its canonical model artifact digest"
+            ),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate ID: {id}"),
             Self::EmptyCandidateId => write!(f, "candidate ID must not be empty"),
             Self::EmptyEvidenceId => write!(f, "evidence ID must not be empty"),
@@ -519,6 +526,13 @@ pub fn validate_selector_packet(packet: &SelectorPacket) -> Result<(), Selection
                 candidate_id: candidate.candidate_id.clone(),
             });
         }
+        if candidate.state == CandidateState::Ready
+            && candidate.canonical_model_sha256.is_none()
+        {
+            return Err(SelectionAuditError::MissingModelDigest {
+                candidate_id: candidate.candidate_id.clone(),
+            });
+        }
         for value in [
             candidate.development.predictive_score,
             candidate.development.stability_score,
@@ -673,7 +687,7 @@ fn dominates(left: &EvaluatorOutcome, right: &EvaluatorOutcome, mask: MetricMask
     strictly_better
 }
 
-fn duplicate_semantic_groups(candidates: &[SelectorCandidate]) -> Vec<Vec<String>> {
+fn identical_model_artifact_groups(candidates: &[SelectorCandidate]) -> Vec<Vec<String>> {
     let mut by_digest: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for candidate in candidates {
         if let Some(digest) = &candidate.canonical_model_sha256 {
@@ -858,7 +872,7 @@ pub fn audit_submission(
         invalid_candidates: invalid,
         incomplete_candidates: incomplete,
         missing_evaluator_outcomes: missing,
-        semantic_duplicate_groups: duplicate_semantic_groups(&packet.candidates),
+        identical_model_artifact_groups: identical_model_artifact_groups(&packet.candidates),
         submitted_candidate_id: submitted_id,
         submitted_status: submitted_outcome.map(|outcome| outcome.status),
         submitted_admissibility: submitted_outcome.map(|outcome| outcome.admissibility),
@@ -931,7 +945,7 @@ impl CandidateSelectionAudit {
         };
         let duplicate_groups = format!(
             "[{}]",
-            self.semantic_duplicate_groups
+            self.identical_model_artifact_groups
                 .iter()
                 .map(|group| ids(group))
                 .collect::<Vec<_>>()
@@ -970,7 +984,7 @@ impl CandidateSelectionAudit {
                 "\"invalid_candidates\":{},",
                 "\"incomplete_candidates\":{},",
                 "\"missing_evaluator_outcomes\":{},",
-                "\"semantic_duplicate_groups\":{},",
+                "\"identical_model_artifact_groups\":{},",
                 "\"submitted_candidate_id\":{},",
                 "\"submitted_status\":{},",
                 "\"submitted_admissibility\":{},",
@@ -1294,6 +1308,22 @@ mod tests {
     }
 
     #[test]
+    fn ready_candidates_require_exact_artifact_identity_but_failed_attempts_may_not_have_one() {
+        let mut packet = packet();
+        packet.candidates[0].canonical_model_sha256 = None;
+        assert_eq!(
+            validate_selector_packet(&packet),
+            Err(SelectionAuditError::MissingModelDigest {
+                candidate_id: "a".to_owned()
+            })
+        );
+
+        packet.candidates[0].state = CandidateState::GenerationFailed;
+        packet.candidates[0].eligibility = DevelopmentEligibility::Unresolved;
+        validate_selector_packet(&packet).unwrap();
+    }
+
+    #[test]
     fn semantic_duplicates_are_retained_and_reported_as_a_group() {
         let mut packet = packet();
         packet.candidates.push(candidate("a-copy", MODEL_A));
@@ -1309,7 +1339,7 @@ mod tests {
         let report = audit_submission(&packet, &frozen, &outcomes).unwrap();
         assert_eq!(report.attempted_candidates, 4);
         assert_eq!(
-            report.semantic_duplicate_groups,
+            report.identical_model_artifact_groups,
             vec![vec!["a".to_owned(), "a-copy".to_owned()]]
         );
     }
