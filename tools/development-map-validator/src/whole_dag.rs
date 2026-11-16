@@ -967,6 +967,68 @@ mod tests {
     }
 
     #[test]
+    fn exhaustive_three_node_edge_subsets_contain_exactly_25_dags() {
+        let nodes: BTreeSet<String> = ["A", "B", "C"].into_iter().map(str::to_owned).collect();
+        let possible_edges = [
+            ("A", "B"), ("A", "C"), ("B", "A"),
+            ("B", "C"), ("C", "A"), ("C", "B"),
+        ];
+        let mut acyclic_graph_count = 0usize;
+        for mask in 0u32..(1u32 << possible_edges.len()) {
+            let mut edges = BTreeSet::new();
+            for (index, (before, after)) in possible_edges.iter().enumerate() {
+                if (mask & (1u32 << index)) != 0 {
+                    edges.insert(((*before).to_owned(), (*after).to_owned()));
+                }
+            }
+            if transitive_closure(&nodes, &edges, "exhaustive three-node graph").is_ok() {
+                acyclic_graph_count += 1;
+            }
+        }
+        assert_eq!(acyclic_graph_count, 25);
+    }
+
+    #[test]
+    fn all_six_total_orders_produce_pairwise_contingency_not_invented_concurrency() {
+        let nodes: BTreeSet<String> = ["A", "B", "C"].into_iter().map(str::to_owned).collect();
+        let permutations = [
+            ["A", "B", "C"],
+            ["A", "C", "B"],
+            ["B", "A", "C"],
+            ["B", "C", "A"],
+            ["C", "A", "B"],
+            ["C", "B", "A"],
+        ];
+        let worlds: Vec<World> = permutations
+            .iter()
+            .enumerate()
+            .map(|(index, order)| {
+                let edges: BTreeSet<(String, String)> = [
+                    (order[0].to_owned(), order[1].to_owned()),
+                    (order[1].to_owned(), order[2].to_owned()),
+                ]
+                .into_iter()
+                .collect();
+                World {
+                    world_id: format!("permutation-{index}"),
+                    closure: transitive_closure(&nodes, &edges, "total-order permutation")
+                        .expect("each permutation is a DAG"),
+                }
+            })
+            .collect();
+        let pair_truths = build_pair_truths(&nodes, &worlds, "complete");
+        assert_eq!(worlds.len(), 6);
+        assert_eq!(pair_truths.len(), 3);
+        for truth in pair_truths.values() {
+            assert_eq!(
+                truth.possible_relations,
+                ["after".to_owned(), "before".to_owned()].into_iter().collect()
+            );
+            assert_eq!(truth.expected_state, "underdetermined");
+        }
+    }
+
+    #[test]
     fn reports_wrong_observation_boundary_claim() {
         let mut value = fixture_value();
         value["candidate_traces"][0]["observation_boundary_claim"] = json!("incomplete");
