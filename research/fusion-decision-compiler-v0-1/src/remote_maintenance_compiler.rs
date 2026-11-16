@@ -1517,7 +1517,12 @@ mod tests {
     #[test]
     fn complete_declared_procedure_is_accepted_with_bounded_claim() {
         let report = compile_remote_maintenance_plan(&base_plan());
-        assert_eq!(report.disposition, DfrmDisposition::ValidDeclaredProcedure);
+        assert_eq!(
+            report.disposition,
+            DfrmDisposition::ValidDeclaredProcedure,
+            "unexpected DFRM diagnostics: {:?}",
+            report.diagnostics
+        );
         assert_eq!(report.operation_count, 18);
         assert_eq!(report.interface_count, 4);
         assert_eq!(report.scheduled_outage_seconds, Some(300));
