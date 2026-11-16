@@ -293,7 +293,7 @@ pub enum ValidationSliceDisposition {
     InsufficientSliceEvidence,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum WorstSliceCriterion {
     NormalizedRmse,
     AbsoluteNormalizedBias,
@@ -1950,6 +1950,109 @@ mod tests {
         assert_eq!(report.measurement_evidence_refs.len(), 3);
         assert_eq!(report.model_run_receipt_refs.len(), 3);
         assert_eq!(report.unseal_receipt_refs.len(), 3);
+    }
+
+
+    #[test]
+    fn pooled_campaign_cannot_hide_a_failing_facility_slice() {
+        let mut source = campaign();
+
+        // Facility A has one severe positive residual. The other two cases are
+        // exact, so pooled normalized RMSE and bias remain within their limits.
+        source.cases[0].predictions[0].predicted_value = 125.0;
+        source.cases[0].predictions[0].prediction_interval_lower = 100.0;
+        source.cases[0].predictions[0].prediction_interval_upper = 125.0;
+        source.cases[1].predictions[0].predicted_value = 120.0;
+        source.cases[2].predictions[0].predicted_value = 80.0;
+        source.cases[2].predictions[0].prediction_interval_lower = 75.0;
+        source.cases[2].predictions[0].prediction_interval_upper = 85.0;
+
+        let report = assess_blind_holdout_campaign(&source).unwrap();
+        assert!(report.per_observable_metrics[0].meets_declared_acceptance);
+        assert_eq!(
+            report.slice_disposition,
+            ValidationSliceDisposition::OutsideDeclaredAcceptance
+        );
+        assert_eq!(
+            report.disposition,
+            PredictiveAssessmentDisposition::OutsideDeclaredAcceptance
+        );
+        let facility_a = report
+            .per_slice_metrics
+            .iter()
+            .find(|slice| {
+                slice.observable_id == "net-heat-flux"
+                    && slice.key.dimension == ValidationSliceDimension::Facility
+                    && slice.key.value == "facility-a"
+            })
+            .unwrap();
+        assert_eq!(
+            facility_a.disposition,
+            ValidationSliceDisposition::OutsideDeclaredAcceptance
+        );
+        assert!(!facility_a.metrics.meets_declared_acceptance);
+    }
+
+    #[test]
+    fn worst_slice_finding_identifies_the_largest_normalized_error_slice() {
+        let mut source = campaign();
+        source.cases[0].predictions[0].predicted_value = 125.0;
+        source.cases[0].predictions[0].prediction_interval_lower = 100.0;
+        source.cases[0].predictions[0].prediction_interval_upper = 125.0;
+        source.cases[1].predictions[0].predicted_value = 120.0;
+        source.cases[2].predictions[0].predicted_value = 80.0;
+        source.cases[2].predictions[0].prediction_interval_lower = 75.0;
+        source.cases[2].predictions[0].prediction_interval_upper = 85.0;
+
+        let report = assess_blind_holdout_campaign(&source).unwrap();
+        let worst = report
+            .worst_slice_findings
+            .iter()
+            .find(|finding| {
+                finding.observable_id == "net-heat-flux"
+                    && finding.criterion == WorstSliceCriterion::NormalizedRmse
+                    && finding.slice_keys.contains(&ValidationSliceKey {
+                        dimension: ValidationSliceDimension::Facility,
+                        value: "facility-a".to_string(),
+                    })
+            })
+            .unwrap();
+        assert!((worst.extreme_value - 0.25).abs() < 1e-12);
+    }
+
+    #[test]
+    fn underfilled_predeclared_slices_are_not_dropped_or_pooled_away() {
+        let mut source = campaign();
+        source.profile.minimum_per_slice_count = 2;
+        let report = assess_blind_holdout_campaign(&source).unwrap();
+        assert_eq!(
+            report.slice_disposition,
+            ValidationSliceDisposition::InsufficientSliceEvidence
+        );
+        assert_eq!(
+            report.disposition,
+            PredictiveAssessmentDisposition::InsufficientHoldoutEvidence
+        );
+        assert!(report.per_slice_metrics.iter().any(|slice| {
+            slice.disposition == ValidationSliceDisposition::InsufficientSliceEvidence
+        }));
+    }
+
+    #[test]
+    fn duplicate_or_empty_predeclared_slice_dimensions_are_refused() {
+        let mut source = campaign();
+        source.profile.slice_dimensions.push(ValidationSliceDimension::Facility);
+        let errors = assess_blind_holdout_campaign(&source).unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.kind == ValidationAssessmentErrorKind::DuplicateSliceDimension
+        }));
+
+        let mut source = campaign();
+        source.profile.slice_dimensions.clear();
+        let errors = assess_blind_holdout_campaign(&source).unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.kind == ValidationAssessmentErrorKind::EmptySliceDimensions
+        }));
     }
 
     #[test]
