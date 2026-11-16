@@ -361,3 +361,25 @@ Two additional research targets are audited:
 - AMMONIA-SUPPLY-CHAIN-DYNAMIC-FLEX-001: accepted NH3 at 10–120% load and up to 3%/min ramps with a one-year renewable trace, H2/N2 buffers, pressure/thermal fatigue and accepted product contract. A plasma source ramp cannot stand in for plant-level product ramp; flexible Haber–Bosch is the baseline.
 
 New tests enforce source-point pairings, four-cycle regeneration claim ceiling, and dynamic target guard/comparator integrity. These are benchmark contracts, not Luminous results or physical process qualification.
+
+
+## 9.30 Hybrid plasma–thermal APPJ methane conversion — 2026-11-16
+
+Sabir et al., *Methane conversion by a plasma-assisted process: Role of hybrid plasma–thermal configurations in controlling conversion pathways*, International Journal of Hydrogen Energy 285 (2026), article 158179, DOI https://doi.org/10.1016/j.ijhydene.2026.158179.
+
+The source reports a thermally assisted atmospheric-pressure plasma jet that couples methane cracking and non-oxidative methane coupling to co-produce H2, C2-C3 hydrocarbons and solid carbon. Placing plasma directly within the heated zone reportedly raises methane conversion by more than fivefold versus a source-compared configuration; the lowest carbon deposition is around 36% over the studied temperature range. Recovered solid carbon is characterized as having turbostratic nanostructural features.
+
+The source register and Rust auditor keep the following distinctions executable:
+- >5-fold is a **relative** conversion gain; absolute CH4 conversion remains unknown until the exact article comparator and data are reconstructed.
+- ~36% is a source-specific **carbon-deposition** metric with its denominator still to be reconstructed; it is not carbon capture, recovered feed-carbon fraction or saleable product yield.
+- H2 rate/purity/pressure and C2-C3 species-specific yield remain unquantified in the register.
+- Turbostratic structure is characterization, not commercial-grade validation, market capacity or offtake.
+- Complete grid-to-accepted-product energy is not established by the source abstract.
+
+The dedicated research programme is [CH4-PLASMA-THERMAL-APPJ-001 #12451](https://github.com/Luminous-Dynamics/symthaea/issues/12451), separate from pulsed DBD/resistive-heating and CO2-plasma regeneration in #12430. Symtropy integration is tracked by [CH4-PLASMA-THERMAL-APPJ-TWIN-001 #5525](https://github.com/Luminous-Dynamics/symtropy/issues/5525).
+
+### Audit implementation
+
+The machine-readable case is `CH4-PLASMA-THERMAL-APPJ-2026`. The Rust source auditor requires the source DOI, APPJ configuration identities, relative conversion lower bound, unresolved comparator, unresolved deposition denominator, null captured-carbon/recovery values, qualitative turbostratic characterization, unquantified H2 and C2-C3 product fields, NOT_COMPARABLE status and no-credit coproduct policy. Five new tests exercise acceptance and refusals for absolute-conversion promotion, deposition-to-recovery promotion, carbon-grade promotion and inferred H2 rate.
+
+The source-register branch contains 43 source cases / 82 negative controls / 5 derived checks / 9 benchmark targets. The merged offline-audit branch contains 49 cases / 88 controls / 6 derived checks / 9 targets, preserving six modular-plasma cases unique to that lineage. These counts are exact to the frozen branches identified in the PR descriptions; they are not counts of physical experiments performed by Luminous.
