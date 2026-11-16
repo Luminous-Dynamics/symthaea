@@ -1,7 +1,7 @@
 # Active Industrial Diagnosis and Value-of-Information Benchmark v0.1
 
 **Owner:** Symthaea INDUSTRIAL-DIAG-VOI-001 #12403  
-**Status:** synthetic finite-hypothesis, one-measurement decision-support benchmark.
+**Status:** synthetic finite-hypothesis decision-support benchmarks: one-step VoI and exact adaptive depth-two test selection.
 
 ## Research question
 
@@ -37,6 +37,24 @@ A measurement is blocked unless its calibration, process applicability and autho
 
 The current version evaluates one measurement and its two finite outcomes. Probabilities and losses use f64; "exact" means exhaustive evaluation of the supplied discrete hypotheses and both outcomes, not symbolic rational arithmetic or a validated Bayesian model of real equipment.
 
+## Adaptive depth-two extension
+
+The crate now includes an exact two-stage policy-tree evaluator in `sequential.rs`. It enumerates each admissible first measurement, updates the posterior for each non-zero-probability outcome, then chooses a second test or stops on that observed branch. It never sees a hidden scenario label or a future test outcome.
+
+Frozen pump/valve result with a measurement budget of 4.0 synthetic cost units:
+
+- No-test baseline expected loss: 11.4.
+- Greedy one-step net-VoI selects the independent process-safety test; expected total loss including cost: 9.77.
+- Exact depth-two policy selects the calibration reference artifact first. After a positive result it stops and chooses recalibrate/retest; after a negative result it conducts the independent process-safety test.
+- Adaptive depth-two expected terminal decision loss: 4.248.
+- Expected measurement cost: 2.35 (first test cost 1.0 plus second test cost 2.0 on the 0.675-probability negative branch).
+- Expected total loss: 6.598.
+- Worst-case path total loss in the two-branch policy: 7.204444.
+
+These values are finite-model outputs in dimensionless synthetic units. They demonstrate the value of adaptive sequencing relative to a greedy one-step policy on this constructed fixture; they are not real diagnostic performance, cost savings or safety advice.
+
+The depth-two evaluator assumes conditional independence between different evidence origins given the supplied hypotheses. It blocks reuse of the same measurement ID and same evidence origin, charges first and branch-specific second-test costs once, respects a total path budget, and abstains from zero-probability branches. Cross-origin correlated measurement models, timing/downtime, likelihood uncertainty and high-consequence robust constraints remain future work.
+
 ## Metrics
 
 Expected information gain is reported separately from expected posterior decision loss, measurement cost, gross value of information and net value of information. A test with negative net VoI is not selected by the decision-value policy. If no admissible test has positive net VoI, the policy returns NO_TEST.
@@ -47,6 +65,7 @@ Expected information gain is reported separately from expected posterior decisio
     cargo clippy --manifest-path tools/industrial-diagnosis-voi/Cargo.toml --all-targets -- -D warnings
     cargo test --manifest-path tools/industrial-diagnosis-voi/Cargo.toml --all-targets
     cargo run --manifest-path tools/industrial-diagnosis-voi/Cargo.toml --bin voi-report
+    cargo run --manifest-path tools/industrial-diagnosis-voi/Cargo.toml --bin voi-sequential-report
 
 ## Next generation
 
