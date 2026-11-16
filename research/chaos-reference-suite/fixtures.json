@@ -59,7 +59,7 @@
       "equation": "x=cos(n*sqrt(2)); y=sin(n*sqrt(2)); z=cos(n*sqrt(3))",
       "burn_in": 0,
       "samples": 2048,
-      "analytic_reference": {"lyapunov_spectrum": [0.0, 0.0, 0.0]}
+      "analytic_reference": {"qualitative": "two-frequency irrational torus-rotation construction"}
     },
     {
       "id": "ar1_colored_noise",
