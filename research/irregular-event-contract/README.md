@@ -28,8 +28,7 @@ each benchmark's official protocol.
 Eighty Rust test functions are authored (28 event/bitemporal contract, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter, 24 source-watermark tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
-and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
-has run for this draft.
+and input validation. The standalone crate was first exercised by a pinned Rust 1.96 workflow: dependency resolution and changed-module formatting succeeded, then whole-crate compilation exposed four real type errors. Those have been corrected. The latest exact-head test and Clippy results remain pending; no test pass or dataset score is claimed.
 
 
 ## Microsecond bitemporal source revisions
@@ -134,8 +133,7 @@ these CSV columns.
 Ten source-authored adapter tests cover timezone and DST, missing numeric
 cells, explicit availability delay, text payload hashing/whitespace,
 fixed-point quantization, file/row provenance, record identity and schema
-failures. The crate now has 54 source-authored test functions total. No build or
-test has run.
+failures. This contributes to the 80-test crate inventory above; hosted compile/test qualification is pending.
 
 
 
@@ -176,12 +174,12 @@ rebuild/digest parity. A completeness or late-breach result now returns the
 exact supporting progress identity, generation, sequence, transaction time,
 and policy digest. Events received before any progress claim are recorded as
 `NoPriorProgress`, not `OnTime`; an absent watermark cannot certify timeliness.
-No Rust build or test has run.
+Hosted execution previously reached whole-crate compilation and exposed errors that have since been corrected. The latest exact-head test result is pending; no pass is claimed.
 
 
 The source watermark adversarial evaluation fixture is
 `crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json`.
-It pins 14 deterministic scenario families and separates false-complete rate
+It pins 19 deterministic scenario families and separates false-complete rate
 (the primary safety metric) from false-incomplete rate/completeness lag. All
 qualification thresholds are targets, not measured results.
 
@@ -190,3 +188,19 @@ The completeness hot path uses the ordered per-source progress chain and a secon
 
 
 The deterministic multi-source differential regression generates 48 event arrivals under three distinct source watermarks, then compares indexed and fully audited reports across six required-source sets, five half-open intervals and six knowledge-time cutoffs (180 exact report comparisons). This exercises late-event indexing, source scoping and historical visibility without nondeterministic fixtures.
+
+
+## Reproducible source-watermark scaling benchmark
+
+`src/bin/watermark_scaling.rs` builds deterministic ledgers with 1,000,
+10,000 and 100,000 late-arrival records. It samples a narrow 16-microsecond
+half-open interval whose event-time keys are deliberately permuted relative to
+arrival order. For each size it compares 101 indexed queries with 15
+`completeness_verified` queries that replay and validate the full history
+before returning the same result. Output is CSV with index candidates examined,
+matched breaches and p50/p95/p99 latency for both paths. Every case checks the
+known answer (16 matching late breaches) and exact equality of indexed and
+verified reports before timing. The benchmark is diagnostic, not a physical
+energy measurement; runner CPU model, toolchain, release profile and exact
+source/fixture hashes must accompany each artifact. The latest run has not
+completed; no latency advantage is asserted yet.
