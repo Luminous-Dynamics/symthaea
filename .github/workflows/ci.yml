@@ -1367,6 +1367,10 @@ jobs:
           - symthaea-fep
           - symthaea-dream
           - symthaea-causal-reasoning
+          # Structural mechanics and the design-intelligence facade must be
+          # tested as packages, not only as transitive dependencies of other crates.
+          - symthaea-structural
+          - symthaea-engineering
           - symthaea-broca
           - symthaea-physics
           - symthaea-cell-foundry

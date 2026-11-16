@@ -1,0 +1,182 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/engineering/space-structural-codesign/proposal-v0.1.schema.json",
+  "title": "Symthaea Space Structural Analysis Proposal v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "proposal_id",
+    "request",
+    "mission",
+    "candidate",
+    "geometry",
+    "material",
+    "process_batch",
+    "load_case",
+    "frame",
+    "model_profile",
+    "model_profile_ref",
+    "backend_ref",
+    "model_profile_version",
+    "model_source_repository",
+    "model_source_commit",
+    "model_maturity",
+    "requested_physics",
+    "requested_observables",
+    "intended_use",
+    "material_evidence",
+    "mesh_required",
+    "mesh",
+    "comparison_reference",
+    "claim_ceiling",
+    "solver_execution_requested",
+    "execution_authorized",
+    "design_release_authorized"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "space-structural-analysis-proposal/0.1.0"
+    },
+    "proposal_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "request": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "mission": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "candidate": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "geometry": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "material": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "process_batch": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/artifactRef"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "load_case": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "frame": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "model_profile": {
+      "enum": [
+        "thin_rotating_ring_v0_1",
+        "uniform_radial_spoke_v0_1"
+      ]
+    },
+    "model_profile_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "backend_ref": {
+      "$ref": "#/$defs/artifactRef"
+    },
+    "model_profile_version": {
+      "const": "0.1.0"
+    },
+    "model_source_repository": {
+      "const": "Luminous-Dynamics/symtropy"
+    },
+    "model_source_commit": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "model_maturity": {
+      "const": "DRAFT_ANALYTICAL_REFERENCE"
+    },
+    "requested_physics": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "steady_uniform_rotation",
+          "thin_ring_membrane",
+          "self_centrifugal_load",
+          "radial_axial_elasticity"
+        ]
+      }
+    },
+    "requested_observables": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "hoop_stress",
+          "hoop_strain",
+          "radial_extension",
+          "axial_force_distribution",
+          "axial_stress_distribution",
+          "tip_extension"
+        ]
+      }
+    },
+    "intended_use": {
+      "const": "synthetic_reference_check"
+    },
+    "material_evidence": {
+      "const": "analytical_fixture_only"
+    },
+    "mesh_required": {
+      "const": false
+    },
+    "mesh": {
+      "type": "null"
+    },
+    "comparison_reference": {
+      "type": "null"
+    },
+    "claim_ceiling": {
+      "const": "SYNTHETIC_REFERENCE_CHECK"
+    },
+    "solver_execution_requested": {
+      "const": false
+    },
+    "execution_authorized": {
+      "const": false
+    },
+    "design_release_authorized": {
+      "const": false
+    }
+  },
+  "$defs": {
+    "artifactRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "generation",
+        "sha256"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/engineering/space-structural-codesign/cases-v0.1.schema.json",
+  "title": "Space Structural Co-Design v0.1 synthetic conformance corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "claim_ceiling",
+    "source_repositories",
+    "warning",
+    "authority_partition",
+    "admissibility_order",
+    "candidates",
+    "conformance_cases",
+    "comparison_policies",
+    "metrics"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "space-structural-codesign-cases/0.1"
+    },
+    "study_id": {
+      "const": "SPACE-STRUCT-CODESIGN-SYNTHETIC-v0.1"
+    },
+    "claim_ceiling": {
+      "const": "SYNTHETIC_CONFORMANCE_ONLY"
+    },
+    "source_repositories": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "warning": {
+      "type": "string",
+      "minLength": 40
+    },
+    "authority_partition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_generation",
+        "physics_execution",
+        "independent_verification",
+        "physical_validation",
+        "design_release"
+      ],
+      "properties": {
+        "candidate_generation": {
+          "const": "SYMTHAEA_PROPOSAL_ONLY"
+        },
+        "physics_execution": {
+          "const": "SYMTROPY_OR_ALLOWLISTED_EXTERNAL_BACKEND"
+        },
+        "independent_verification": {
+          "const": "SEPARATE_VERIFIER"
+        },
+        "physical_validation": {
+          "const": "EXTERNAL_MEASUREMENT_REQUIRED"
+        },
+        "design_release": {
+          "const": "HUMAN_COMPETENT_AUTHORITY_REQUIRED"
+        }
+      }
+    },
+    "admissibility_order": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "enum": [
+          "IDENTITY",
+          "INPUT_SEMANTICS",
+          "MATERIAL_APPLICABILITY",
+          "MODEL_APPLICABILITY",
+          "EXECUTION_AND_CONVERGENCE",
+          "INDEPENDENT_COMPARISON",
+          "DECISION_ELIGIBILITY"
+        ]
+      }
+    },
+    "candidates": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "$ref": "#/$defs/candidate"
+      }
+    },
+    "conformance_cases": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "$ref": "#/$defs/conformanceCase"
+      }
+    },
+    "comparison_policies": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "enum": [
+          "FIXED_LOW_FIDELITY",
+          "SEQUENTIAL_DISCIPLINE_ANALYSIS",
+          "EQUAL_BUDGET_SWEEP",
+          "SPACE_FILLING_DOE",
+          "EVOLUTIONARY_PARETO_SEARCH",
+          "BAYESIAN_OPTIMIZATION_ONLY_WHEN_PROBABILISTIC_ASSUMPTIONS_ARE_ADMITTED",
+          "UNCERTAINTY_OR_INFORMATION_GAIN_ONLY",
+          "DECISION_VALUE_SELECTION",
+          "ROBUST_FEASIBILITY_AND_MINIMAX_REGRET"
+        ]
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "enum": [
+          "TIME_AND_COST_TO_FIRST_ROBUST_FEASIBLE_CANDIDATE",
+          "FALSE_FEASIBLE_RATE_WITH_DENOMINATOR",
+          "MISSED_FEASIBLE_RATE_WITH_DENOMINATOR",
+          "ROBUST_FRONTIER_RECOVERY",
+          "REGRET_AGAINST_HELD_OUT_REFERENCE",
+          "OUT_OF_DOMAIN_ABSTENTION_PRECISION_RECALL",
+          "UNCERTAINTY_CALIBRATION_AND_COVERAGE",
+          "REQUIRED_OPERATING_CASE_COVERAGE",
+          "FAILED_ABORTED_AND_INCOMPLETE_EVALUATION_ACCOUNTING",
+          "TOTAL_COMPUTE_AND_ENGINEERING_COST_PER_SUPPORTED_DECISION"
+        ]
+      }
+    }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "candidate_id",
+        "family",
+        "context",
+        "geometry_subject",
+        "material_subject",
+        "manufacturing_profile",
+        "load_profile",
+        "proposed_model",
+        "evidence_status",
+        "expected_disposition",
+        "permitted_use",
+        "prohibited_claims"
+      ],
+      "properties": {
+        "candidate_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9-]*$"
+        },
+        "family": {
+          "enum": [
+            "ROTATING_THIN_RING",
+            "UNIFORM_RADIAL_SPOKE",
+            "RING_SPOKE_ASSEMBLY",
+            "SEGMENTED_ROTATING_RING",
+            "COUNTER_ROTATING_HABITAT",
+            "PLANAR_PIN_JOINTED_TRUSS",
+            "HABITAT_HYBRID_MATERIAL_SUBSTITUTION",
+            "OFF_EARTH_MANUFACTURED_NONPRESSURE_STRUCTURE",
+            "ROBUST_DESIGN_SPACE_COMPARISON",
+            "INSPECTION_AND_REPAIR_FIRST_ARCHITECTURE"
+          ]
+        },
+        "context": {
+          "type": "string",
+          "minLength": 1
+        },
+        "geometry_subject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "material_subject": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manufacturing_profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "load_profile": {
+          "type": "string",
+          "minLength": 1
+        },
+        "proposed_model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_status": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_disposition": {
+          "enum": [
+            "ADMISSIBLE_RESTRICTED",
+            "OUT_OF_DOMAIN",
+            "NEEDS_EVIDENCE",
+            "NEEDS_QUALIFICATION",
+            "PARTIAL_SUBSTITUTION_ONLY",
+            "ADMISSIBLE_FOR_DESIGN_SPACE_ONLY"
+          ]
+        },
+        "permitted_use": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prohibited_claims": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "conformanceCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "candidate_id",
+        "mutation",
+        "expected_disposition",
+        "expected_reason_codes"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9-]*$"
+        },
+        "candidate_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9-]*$"
+        },
+        "mutation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_disposition": {
+          "enum": [
+            "ADMISSIBLE_RESTRICTED",
+            "REJECT",
+            "NEEDS_EVIDENCE",
+            "OUT_OF_DOMAIN",
+            "NOT_DECISION_ELIGIBLE"
+          ]
+        },
+        "expected_reason_codes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Z0-9][A-Z0-9_]*$"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,73 @@
+{
+  "schema_version": "space-structural-analysis-proposal/0.1.0",
+  "proposal_id": "SPACE-STRUCT-RING-PROPOSAL-001",
+  "request": {
+    "id": "SPACE-STRUCT-RING-REQUEST-001",
+    "generation": "r1",
+    "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "mission": {
+    "id": "MISSION-CISLUNAR-001",
+    "generation": "m1",
+    "sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+  },
+  "candidate": {
+    "id": "AG-RING-CANDIDATE-001",
+    "generation": "c1",
+    "sha256": "3333333333333333333333333333333333333333333333333333333333333333"
+  },
+  "geometry": {
+    "id": "RING-GEOMETRY-001",
+    "generation": "g1",
+    "sha256": "4444444444444444444444444444444444444444444444444444444444444444"
+  },
+  "material": {
+    "id": "ANALYTICAL-MATERIAL-FIXTURE-001",
+    "generation": "mat1",
+    "sha256": "5555555555555555555555555555555555555555555555555555555555555555"
+  },
+  "process_batch": null,
+  "load_case": {
+    "id": "STEADY-RING-SPIN-001",
+    "generation": "l1",
+    "sha256": "6666666666666666666666666666666666666666666666666666666666666666"
+  },
+  "frame": {
+    "id": "RING-LOCAL-FRAME-001",
+    "generation": "f1",
+    "sha256": "7777777777777777777777777777777777777777777777777777777777777777"
+  },
+  "model_profile": "thin_rotating_ring_v0_1",
+  "model_profile_ref": {
+    "id": "ARTGRAV-THIN-RING-REF-V0_1",
+    "generation": "0.1.0",
+    "sha256": "8888888888888888888888888888888888888888888888888888888888888888"
+  },
+  "backend_ref": {
+    "id": "artgrav-prestress-reference",
+    "generation": "0.1.0",
+    "sha256": "9999999999999999999999999999999999999999999999999999999999999999"
+  },
+  "model_profile_version": "0.1.0",
+  "model_source_repository": "Luminous-Dynamics/symtropy",
+  "model_source_commit": "540fe6d2fc2fd99daa5277cbc2fe768db722cda9",
+  "model_maturity": "DRAFT_ANALYTICAL_REFERENCE",
+  "requested_physics": [
+    "steady_uniform_rotation",
+    "thin_ring_membrane"
+  ],
+  "requested_observables": [
+    "hoop_stress",
+    "hoop_strain",
+    "radial_extension"
+  ],
+  "intended_use": "synthetic_reference_check",
+  "material_evidence": "analytical_fixture_only",
+  "mesh_required": false,
+  "mesh": null,
+  "comparison_reference": null,
+  "claim_ceiling": "SYNTHETIC_REFERENCE_CHECK",
+  "solver_execution_requested": false,
+  "execution_authorized": false,
+  "design_release_authorized": false
+}
