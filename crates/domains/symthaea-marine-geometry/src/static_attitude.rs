@@ -12,8 +12,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::full_envelope::{
-    FullEnvelopeDisposition, FullEnvelopeSpec, SymmetryPolicy,
-    compute_full_envelope_spec_digest, validate_full_envelope_spec,
+    FullEnvelopeDisposition, FullEnvelopeSpec, SymmetryPolicy, compute_full_envelope_spec_digest,
+    validate_full_envelope_spec,
 };
 
 pub const STATIC_ATTITUDE_EVALUATION_SCHEMA_VERSION: u32 = 1;
@@ -176,9 +176,8 @@ fn norm3(value: [f64; 3]) -> f64 {
 
 fn normalize3(value: [f64; 3]) -> Option<[f64; 3]> {
     let norm = norm3(value);
-    (norm.is_finite() && norm > f64::EPSILON).then(|| {
-        [value[0] / norm, value[1] / norm, value[2] / norm]
-    })
+    (norm.is_finite() && norm > f64::EPSILON)
+        .then(|| [value[0] / norm, value[1] / norm, value[2] / norm])
 }
 
 fn body_gravity_direction(attitude: StaticAttitude) -> BodyGravityDirection {
@@ -187,11 +186,7 @@ fn body_gravity_direction(attitude: StaticAttitude) -> BodyGravityDirection {
 
     // R_body_to_world = R_y(pitch) * R_x(roll), so
     // R^T * (0, 0, 1) = (-sin(pitch), sin(roll)cos(pitch), cos(roll)cos(pitch)).
-    let gravity = [
-        -sin_pitch,
-        sin_roll * cos_pitch,
-        cos_roll * cos_pitch,
-    ];
+    let gravity = [-sin_pitch, sin_roll * cos_pitch, cos_roll * cos_pitch];
     let normalized = normalize3(gravity).unwrap_or([0.0, 0.0, 1.0]);
     BodyGravityDirection {
         x: normalized[0],
@@ -219,11 +214,7 @@ fn deduplicate_polygon(points: Vec<Point2>, tolerance: f64) -> Vec<Point2> {
     cleaned
 }
 
-fn section_polygon(
-    spec: &FullEnvelopeSpec,
-    station_index: usize,
-    tolerance: f64,
-) -> Vec<Point2> {
+fn section_polygon(spec: &FullEnvelopeSpec, station_index: usize, tolerance: f64) -> Vec<Point2> {
     let station = &spec.stations[station_index];
     let deck = &spec.deck_surface.sections[station_index];
     let mut polygon = Vec::with_capacity(
@@ -313,8 +304,7 @@ fn segments_intersect(
     {
         return true;
     }
-    (o1.abs() <= area_tolerance
-        && point_on_segment(c, a, b, coordinate_tolerance, area_tolerance))
+    (o1.abs() <= area_tolerance && point_on_segment(c, a, b, coordinate_tolerance, area_tolerance))
         || (o2.abs() <= area_tolerance
             && point_on_segment(d, a, b, coordinate_tolerance, area_tolerance))
         || (o3.abs() <= area_tolerance
@@ -515,7 +505,11 @@ fn validate_request(request: &StaticAttitudeEvaluationRequest) -> Vec<StaticAtti
         );
     }
     if request.load_case_id.trim().is_empty() {
-        push_issue(&mut issues, "load_case_id", "load-case ID must not be empty");
+        push_issue(
+            &mut issues,
+            "load_case_id",
+            "load-case ID must not be empty",
+        );
     }
     if !request.total_mass_tonnes.is_finite() || request.total_mass_tonnes <= 0.0 {
         push_issue(
@@ -638,18 +632,20 @@ pub fn evaluate_static_attitude(
         return Err(issues);
     }
 
-    let source_digest = compute_full_envelope_spec_digest(&request.source_spec).map_err(|error| {
-        vec![StaticAttitudeIssue {
-            code: "source_spec_digest".into(),
-            detail: format!("could not serialize full-envelope source identity: {error}"),
-        }]
-    })?;
+    let source_digest =
+        compute_full_envelope_spec_digest(&request.source_spec).map_err(|error| {
+            vec![StaticAttitudeIssue {
+                code: "source_spec_digest".into(),
+                detail: format!("could not serialize full-envelope source identity: {error}"),
+            }]
+        })?;
     let gravity = body_gravity_direction(request.attitude);
     let gravity_vector = [gravity.x, gravity.y, gravity.z];
     if gravity.z <= 0.0 {
         return Err(vec![StaticAttitudeIssue {
             code: "body_gravity_orientation".into(),
-            detail: "supported A0/A1 attitude must retain positive body-frame down component".into(),
+            detail: "supported A0/A1 attitude must retain positive body-frame down component"
+                .into(),
         }]);
     }
 
@@ -688,8 +684,16 @@ pub fn evaluate_static_attitude(
             .iter()
             .map(|point| dot2(*point, gravity.y, gravity.z))
             .collect::<Vec<_>>();
-        let min_value = signed_values.iter().copied().reduce(f64::min).unwrap_or(f64::NAN);
-        let max_value = signed_values.iter().copied().reduce(f64::max).unwrap_or(f64::NAN);
+        let min_value = signed_values
+            .iter()
+            .copied()
+            .reduce(f64::min)
+            .unwrap_or(f64::NAN);
+        let max_value = signed_values
+            .iter()
+            .copied()
+            .reduce(f64::max)
+            .unwrap_or(f64::NAN);
         if section_plane_offset < min_value - tolerance
             || section_plane_offset > max_value + tolerance
         {
@@ -718,9 +722,7 @@ pub fn evaluate_static_attitude(
             ),
             None => (0.0, 0.0, 0.0),
         };
-        if !area_m2.is_finite()
-            || !first_moment_y_m3.is_finite()
-            || !first_moment_z_m3.is_finite()
+        if !area_m2.is_finite() || !first_moment_y_m3.is_finite() || !first_moment_z_m3.is_finite()
         {
             return Err(vec![StaticAttitudeIssue {
                 code: "section_non_finite_property".into(),
@@ -760,8 +762,7 @@ pub fn evaluate_static_attitude(
         }]);
     }
 
-    let displaced_mass_tonnes =
-        displacement_volume_m3 * request.water_density_kg_m3 / 1000.0;
+    let displaced_mass_tonnes = displacement_volume_m3 * request.water_density_kg_m3 / 1000.0;
     let mass_residual_tonnes = displaced_mass_tonnes - request.total_mass_tonnes;
 
     let displacement_from_cg = [
@@ -816,9 +817,7 @@ pub fn evaluate_static_attitude(
         compute_static_attitude_receipt_digest(&receipt).map_err(|error| {
             vec![StaticAttitudeIssue {
                 code: "receipt_digest".into(),
-                detail: format!(
-                    "could not serialize static-attitude receipt identity: {error}"
-                ),
+                detail: format!("could not serialize static-attitude receipt identity: {error}"),
             }]
         })?;
     Ok(receipt)
@@ -832,7 +831,8 @@ pub fn verify_static_attitude_evaluation_receipt(
     if &expected != receipt {
         return Err(vec![StaticAttitudeIssue {
             code: "static_attitude_receipt_mismatch".into(),
-            detail: "receipt does not reproduce the exact full-envelope/load/attitude evaluation".into(),
+            detail: "receipt does not reproduce the exact full-envelope/load/attitude evaluation"
+                .into(),
         }]);
     }
     Ok(())
@@ -884,8 +884,8 @@ mod tests {
         assert!(receipt.residuals.moment_residual_1_nm.abs() < 1.0e-7);
         assert!(receipt.residuals.moment_residual_2_nm.abs() < 1.0e-7);
 
-        let horizontal_request: SectionalReferenceRequest = serde_json::from_value(
-            serde_json::json!({
+        let horizontal_request: SectionalReferenceRequest =
+            serde_json::from_value(serde_json::json!({
                 "schema_version": 1,
                 "source_spec": request.source_spec,
                 "loading_conditions": [{
@@ -893,9 +893,8 @@ mod tests {
                     "waterplane_z_m": 0.0,
                     "water_density_kg_m3": 1025.0
                 }]
-            }),
-        )
-        .unwrap();
+            }))
+            .unwrap();
         let horizontal = evaluate_loading_sweep(&horizontal_request).unwrap();
         assert!(
             (receipt.displacement_volume_m3 - horizontal.results[0].displacement_volume_m3).abs()
@@ -935,7 +934,6 @@ mod tests {
         let norm = (gravity.x.powi(2) + gravity.y.powi(2) + gravity.z.powi(2)).sqrt();
         assert!((norm - 1.0).abs() < 1.0e-12);
     }
-
 
     #[test]
     fn pure_roll_clipping_matches_the_analytic_prismatic_section() {
@@ -1026,7 +1024,11 @@ mod tests {
         let mut request = box_request();
         request.attitude.waterplane_offset_m = 7.0;
         let issues = evaluate_static_attitude(&request).unwrap_err();
-        assert!(issues.iter().any(|issue| issue.code == "waterplane_outside_section"));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "waterplane_outside_section")
+        );
     }
 
     #[test]
@@ -1046,7 +1048,11 @@ mod tests {
             },
         );
         let issues = evaluate_static_attitude(&request).unwrap_err();
-        assert!(issues.iter().any(|issue| issue.code == "source_spec_incomplete"));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "source_spec_incomplete")
+        );
     }
 
     #[test]
@@ -1059,8 +1065,7 @@ mod tests {
 
         let mut tampered = first;
         tampered.displacement_volume_m3 += 10.0;
-        tampered.receipt_digest_blake3 =
-            compute_static_attitude_receipt_digest(&tampered).unwrap();
+        tampered.receipt_digest_blake3 = compute_static_attitude_receipt_digest(&tampered).unwrap();
         assert!(verify_static_attitude_evaluation_receipt(&request, &tampered).is_err());
     }
 
@@ -1082,7 +1087,11 @@ mod tests {
         let mut request = box_request();
         request.attitude.pitch_rad = f64::NAN;
         let issues = evaluate_static_attitude(&request).unwrap_err();
-        assert!(issues.iter().any(|issue| issue.code == "attitude_non_finite"));
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "attitude_non_finite")
+        );
 
         request.attitude.pitch_rad = MAX_STATIC_ATTITUDE_ABS_RAD + 0.01;
         let issues = evaluate_static_attitude(&request).unwrap_err();
