@@ -52,7 +52,7 @@ Use posterior predictive checks and held-out residual structure to decide whethe
 
 The next query should be chosen for its expected impact on a decision, not just for entropy reduction in an abstract latent state.
 
-Compare:
+Compare within #9817's policy harness:
 - random or periodic observation;
 - uncertainty sampling;
 - expected information gain;
@@ -93,9 +93,9 @@ Independent verification must remain separate from the model that authored the c
 | [NIALIM / DFA-CfN / PRDFA-CfN (IEEE TNNLS, 2026)](https://doi.org/10.1109/TNNLS.2026.3669345) | Interpolation-aware closed-form continuous-time integration with a stated approximation error bound; experiments over six tasks | A direct technical comparator for HDC-LTC numerical integration. Reproduce its method and baselines before drawing conclusions from its reported SOTA or maximum 69.2% improvement. |
 | [Accuracy–energy benchmark (PMLR Swiss AI Days 2026)](https://proceedings.mlr.press/v309/guibert26a) | Ten time-series foundation models measured on accuracy, runtime and actual energy with fixed context/horizon | Establishes that accuracy-only comparisons miss architecture- and dataset-dependent energy/latency trade-offs. |
 
-## Proposed Symthaea benchmark: Evidence-Time and Active Discrimination (SETAD)
+## Proposed qualification profile: Evidence-Time and Active Discrimination (SETAD)
 
-This is a proposed programme, not an existing public leaderboard or completed benchmark.
+SETAD is a cross-cutting **qualification profile**, not a new dataset loader, leaderboard, arbitration engine or active-sensing planner. It composes existing owners: #9700 supplies official irregular-series adapters and matched forecasting baselines; #640 supplies model identity, applicability and horizon-specific arbitration semantics; #9817 supplies sensor acquisition policies and complete sensing-cost accounting; #12173/#12194/#12197 supply sequential experiment design and prospective-versus-realized information accounting. This profile defines the shared event, evidence, ablation and reporting contract across them. It is a proposed programme, not an existing public leaderboard or completed benchmark.
 
 ### Lane A — mathematical and event-time integrity
 
@@ -105,9 +105,9 @@ This is a proposed programme, not an existing public leaderboard or completed be
 - Masked-likelihood exactness: absent dimensions contribute no residual, likelihood, gradient or model-learning update.
 - Compare candidate HDC-LTC integrators against high-accuracy adaptive RK references and reproduce NIALIM/DFA-CfN under the same input interpolation policy.
 
-### Lane B — irregular and incomplete observations
+### Lane B — irregular and incomplete observations (reuse #9700)
 
-- Start with BITS' eleven datasets / nine domains and the five-dataset ISHN evaluation where data and protocols are accessible.
+- Reuse #9700's official adapters and exact split/metric manifests. Start with BITS' eleven datasets / nine domains and the five-dataset ISHN evaluation where data and protocols are accessible.
 - Add controlled synthetic processes with MCAR, MAR, MNAR, burst loss, periodic outages, event-triggered sampling, source-specific schedules, and sampling-policy changes.
 - Compare value-only, value+mask, value+mask+age, and value+mask+age+source/policy representations.
 - Include mask-only and shuffled-mask controls. A representation that predicts from masks but fails under policy shift has learned the collection policy, not robust physical dynamics.
@@ -121,9 +121,9 @@ Metrics: MAE/RMSE/MASE for point predictions; CRPS/WIS and NLL for distributions
 - Compare whole-vector timescale banks against seeded coordinate partitions and basis-defined subspaces with joint permutation controls.
 - Measure accuracy, retrieval, cross-scale consistency, memory footprint and energy per correct retrieval.
 
-### Lane D — active model discrimination
+### Lane D — active model discrimination (compose #640 and #9817)
 
-Construct paired worlds where the same observed residual could plausibly arise from different causes (for example, process shift versus sensor drift, or physical inactivity versus sampling-policy change). Each agent chooses a sensor, time, modality or intervention to query.
+Use #640's model identity/applicability and horizon-specific arbitration, and #9817's active-sensing task, policy interface and complete cost accounting. Construct paired worlds where the same observed residual could plausibly arise from different causes (for example, process shift versus sensor drift, or physical inactivity versus sampling-policy change). Each agent chooses a sensor, time, modality or intervention to query.
 
 Compare random, periodic, entropy-gain, expected-information-gain, decision-focused value-of-information and exact small-instance policies.
 
@@ -159,8 +159,8 @@ Do not claim a generic SOTA victory from a single dataset, one seed, or a vendor
 2. **O1 — masked likelihood:** integrate the event view into the existing FEP path. Masked dimensions must be absent from residuals, free energy, gradients, precision updates and model learning. Preserve legacy parity for fully observed inputs.
 3. **O2 — time-aware state propagation:** only after the FEP state transition model exposes a qualified duration-aware propagation contract. Reject unsupported clock/time inputs before mutation.
 4. **O3 — observation-process memory:** bind value, mask, age, source, modality and sampling-policy identity into separate but composable HDC representations; test independent value and mask contributions.
-5. **O4 — active discrimination:** connect to #640 and #9817; compare policies with exact small-instance oracles and prospective/realized value-of-information receipts.
-6. **O5 — external reproduction:** BITS/ISHN first, then Chronos-2, Toto 2.0, TimesFM 3.0 (licence permitting), and NIALIM/DFA-CfN at matched data, horizon, hardware and measurement boundaries.
+5. **O4 — active discrimination:** extend #640 and #9817, reusing #12173/#12194/#12197 for exact small-instance oracles and prospective/realized value-of-information receipts; do not create a parallel planner.
+6. **O5 — external reproduction:** implement BITS/ISHN and other external adapters under #9700, then compare Chronos-2, Toto 2.0, TimesFM 3.0 (licence permitting), and NIALIM/DFA-CfN at matched data, horizon, hardware and measurement boundaries.
 
 ## Claim boundary
 
