@@ -939,14 +939,14 @@ pub fn solve_upright_mass_balance(
             stop_reason = Some(UprightMassBalanceStopReason::MassResidualWithinTolerance);
             break;
         }
-        if upper_z - lower_z <= request.plane_tolerance_m {
-            stop_reason = Some(UprightMassBalanceStopReason::WaterplaneBracketWithinTolerance);
-            break;
-        }
         if best_result.displaced_mass_tonnes > request.target_mass_tonnes {
             lower_z = midpoint_z;
         } else {
             upper_z = midpoint_z;
+        }
+        if upper_z - lower_z <= request.plane_tolerance_m {
+            stop_reason = Some(UprightMassBalanceStopReason::WaterplaneBracketWithinTolerance);
+            break;
         }
     }
 
@@ -1269,6 +1269,34 @@ mod tests {
         assert!((receipt.equilibrium.waterplane_z_m - 1.0).abs() < 1.0e-12);
         assert!((receipt.equilibrium.displacement_volume_m3 - 10_000.0).abs() < 1.0e-8);
         assert!((receipt.equilibrium.longitudinal_center_of_buoyancy_m - 50.0).abs() < 1.0e-8);
+    }
+
+
+    #[test]
+    fn upright_mass_balance_stops_on_the_refined_bracket_width() {
+        let mut request = box_mass_balance_request(11_000.0);
+        request.mass_tolerance_tonnes = 1.0e-12;
+        request.plane_tolerance_m = 1.0;
+        request.maximum_iterations = 2;
+
+        let receipt = solve_upright_mass_balance(&request).unwrap();
+        assert_eq!(
+            receipt.stop_reason,
+            UprightMassBalanceStopReason::WaterplaneBracketWithinTolerance
+        );
+        assert_eq!(receipt.iteration_count, 2);
+        assert!((receipt.final_lower_waterplane_z_m - 0.0).abs() < 1.0e-12);
+        assert!((receipt.final_upper_waterplane_z_m - 1.0).abs() < 1.0e-12);
+        assert!(
+            receipt.final_upper_waterplane_z_m - receipt.final_lower_waterplane_z_m
+                <= request.plane_tolerance_m
+        );
+        assert!(
+            receipt.equilibrium.waterplane_z_m >= receipt.final_lower_waterplane_z_m
+                && receipt.equilibrium.waterplane_z_m <= receipt.final_upper_waterplane_z_m
+        );
+        assert!(receipt.mass_residual_tonnes > request.mass_tolerance_tonnes);
+        verify_upright_mass_balance_receipt(&request, &receipt).unwrap();
     }
 
     #[test]
