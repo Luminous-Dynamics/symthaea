@@ -7,7 +7,7 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TextDecoder } from "node:util";
 
-const decoder = new TextDecoder("utf-8", { fatal: true });
+const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
 const manifestPath = resolve(dirname(fileURLToPath(import.meta.url)), "fixtures/CORPUS_MANIFEST_V1.json");
 const fail = (code, message) => { const e = new Error(message); e.code = code; throw e; };
 const digest = bytes => createHash("sha256").update(bytes).digest("hex");
