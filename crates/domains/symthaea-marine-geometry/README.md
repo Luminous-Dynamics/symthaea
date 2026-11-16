@@ -14,9 +14,15 @@ It turns a versioned section-family artifact into a deterministic closed triangl
 
 The waterplane cap is not a deck surface or a freeboard model. This output is a watertight displacement-volume mesh, not a full neutral CAD hull, smooth surface, hydrostatic qualification, self-intersection certification, DFM pass or hydrodynamic result.
 
-A separate CLI accepts a request containing `section_family` and `profile`:
+Section specs with `schema_version: 1` remain valid for legacy planar/planar ends. For schema v2, the optional `longitudinal_end_conditions` object explicitly identifies bow and stern as `planar-end-cap` or `collapsed-centreline`. A runnable pointed-bow/planar-stern example is `examples/pointed-bow-planar-stern-section-spec.json`:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-section-generate -- examples/pointed-bow-planar-stern-section-spec.json --output /tmp/pointed-sections.json
+
+The separate loft CLI accepts a request containing `section_family` and `profile`:
 
     cargo run --locked -p symthaea-marine-geometry --bin marine-waterplane-loft -- loft-request.json --output /tmp/lofted-displacement.json
+
+Section-family artifacts are schema v2 and bind end conditions, dimensions and coordinate-frame metadata in a separate family-manifest digest. Loft artifacts are schema v2 and bind exact station/point counts, closure labels and bow/stern semantic face ranges. Old v1 section-family / loft files may still be parsed where defaults exist, but they are not admissible under the v2 verifier; regenerate them from their source specs rather than silently assuming their closure semantics.
 
 ## G2e explicit pointed bow/stern closure
 
