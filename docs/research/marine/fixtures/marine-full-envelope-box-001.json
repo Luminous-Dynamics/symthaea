@@ -50,6 +50,13 @@
           "region_to_next": "BOTTOM"
         },
         {
+          "point_id": "BOW-BOTTOM-S",
+          "y_m": 10,
+          "z_m": 6,
+          "role": "BOTTOM",
+          "region_to_next": "BOTTOM"
+        },
+        {
           "point_id": "BOW-WL-S",
           "y_m": 10,
           "z_m": 0,
@@ -77,6 +84,13 @@
           "region_to_next": "BOTTOM"
         },
         {
+          "point_id": "STERN-BOTTOM-S",
+          "y_m": 10,
+          "z_m": 6,
+          "role": "BOTTOM",
+          "region_to_next": "BOTTOM"
+        },
+        {
           "point_id": "STERN-WL-S",
           "y_m": 10,
           "z_m": 0,
@@ -101,7 +115,7 @@
         "station_id": "ST-000",
         "points": [
           {
-            "point_id": "BOW-DECK-PORT",
+            "point_id": "MIRROR:BOW-SHEER-S",
             "y_m": -10,
             "z_m": -4,
             "role": "PORT_DECK_EDGE"
@@ -124,7 +138,7 @@
         "station_id": "ST-100",
         "points": [
           {
-            "point_id": "STERN-DECK-PORT",
+            "point_id": "MIRROR:STERN-SHEER-S",
             "y_m": -10,
             "z_m": -4,
             "role": "PORT_DECK_EDGE"
