@@ -225,5 +225,85 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Run Gaussian observation-model assumption stress campaign
+        run: |
+          set -euo pipefail
+          manifest="research/falsification-power-reference/Cargo.toml"
+          report="$RUNNER_TEMP/gaussian-assumption-stress.json"
+          cargo run --locked --manifest-path "$manifest" --bin gaussian_assumption_stress > "$report"
+          jq -e '
+            (.regimes | map(select(.regime == "matched_iid_gaussian"))[0]) as $iid
+            | (.regimes | map(select(.regime == "stationary_ar1_rho_0_65"))[0]) as $ar1
+            | (
+              .schema == "gaussian_assumption_stress_v0" and
+              .prng == "SplitMix64_BoxMuller_v1" and
+              .root_seed_count == 5 and
+              (.root_seeds | length) == 5 and
+              ((.root_seeds | unique | length) == 5) and
+              .paths_per_seed == 10000 and
+              .paths_per_regime_scenario == 50000 and
+              .horizon == 80 and
+              .nominal_alpha == 0.05 and
+              .discrepancy == 0.22 and
+              .design_sigma == 0.8 and
+              (.regimes | length) == 6 and
+              ($iid.assumption_status == "IN_CONTRACT") and
+              ($iid.null.paths == 50000) and
+              ($iid.alternative.paths == 50000) and
+              ($iid.null.rate >= 0.04) and
+              ($iid.null.rate <= 0.06) and
+              ($iid.null.wilson95[0] <= $iid.null.rate) and
+              ($iid.null.rate <= $iid.null.wilson95[1]) and
+              (($iid.alternative.rate - .analytic_iid_terminal_power) | abs) < 0.007 and
+              ($iid.alternative.wilson95[0] <= .analytic_iid_terminal_power) and
+              ($iid.alternative.wilson95[1] >= .analytic_iid_terminal_power) and
+              ($ar1.assumption_status == "OUT_OF_CONTRACT") and
+              ($ar1.expected_lag_one_correlation == 0.65) and
+              ($ar1.pooled_null_lag_one_correlation >= 0.62) and
+              ($ar1.pooled_null_lag_one_correlation <= 0.68) and
+              all(.regimes[];
+                (.assumption_status == "IN_CONTRACT" or .assumption_status == "OUT_OF_CONTRACT") and
+                .null.paths == 50000 and
+                .alternative.paths == 50000 and
+                .null.rejections >= 0 and
+                .null.rate >= 0 and .null.rate <= 1 and
+                .null.wilson95[0] <= .null.rate and
+                .null.rate <= .null.wilson95[1] and
+                .alternative.rate >= 0 and .alternative.rate <= 1 and
+                .alternative.wilson95[0] <= .alternative.rate and
+                .alternative.rate <= .alternative.wilson95[1] and
+                (.per_seed | length) == 5 and
+                all(.per_seed[];
+                  .null.paths == 10000 and
+                  .alternative.paths == 10000 and
+                  .null.rate >= 0 and .null.rate <= 1 and
+                  .null.wilson95[0] <= .null.rate and
+                  .null.rate <= .null.wilson95[1] and
+                  .alternative.rate >= 0 and .alternative.rate <= 1 and
+                  .alternative.wilson95[0] <= .alternative.rate and
+                  .alternative.rate <= .alternative.wilson95[1] and
+                  (.null_variance > 0) and
+                  (.null_mean == .null_mean) and
+                  (.null_lag_one_correlation >= -1) and
+                  (.null_lag_one_correlation <= 1)
+                )
+              )
+            )
+          ' "$report"
+          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$report.source-sha"
+          sha256sum "$report" | tee "$report.sha256"
+          cat "$report"
+
+      - name: Upload Gaussian assumption-stress receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: gaussian-assumption-stress-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/gaussian-assumption-stress.json
+            ${{ runner.temp }}/gaussian-assumption-stress.json.sha256
+            ${{ runner.temp }}/gaussian-assumption-stress.json.source-sha
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets -- -D warnings
