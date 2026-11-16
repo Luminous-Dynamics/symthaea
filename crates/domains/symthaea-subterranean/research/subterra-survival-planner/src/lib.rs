@@ -1239,6 +1239,19 @@ mod tests {
     }
 
     #[test]
+    fn horizon_limit_is_hard_capped() {
+        assert!(matches!(
+            plan_survival_conditioned(
+                &problem(vec![scan("survey")]),
+                budget(),
+                prices(),
+                config(MAX_HORIZON_STEPS + 1),
+            ),
+            Err(PlanningError::InvalidPlannerLimit(_))
+        ));
+    }
+
+    #[test]
     fn search_expansion_is_bounded() {
         let mut limited = config(4);
         limited.maximum_search_nodes = 1;
