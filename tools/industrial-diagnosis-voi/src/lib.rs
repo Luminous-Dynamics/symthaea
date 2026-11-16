@@ -8,6 +8,8 @@
 
 use std::collections::BTreeSet;
 
+pub mod sequential;
+
 const PROBABILITY_TOLERANCE: f64 = 1.0e-9;
 const METRIC_TOLERANCE: f64 = 1.0e-9;
 
