@@ -494,13 +494,19 @@ pub fn arbitrate_actuator_channel(
         );
     }
 
-    valid.sort_by(|(left_proposal, left_authority), (right_proposal, right_authority)| {
-        left_authority
-            .authority_rank
-            .cmp(&right_authority.authority_rank)
-            .then_with(|| left_proposal.controller_id.cmp(&right_proposal.controller_id))
-            .then_with(|| left_proposal.proposal_id.cmp(&right_proposal.proposal_id))
-    });
+    valid.sort_by(
+        |(left_proposal, left_authority), (right_proposal, right_authority)| {
+            left_authority
+                .authority_rank
+                .cmp(&right_authority.authority_rank)
+                .then_with(|| {
+                    left_proposal
+                        .controller_id
+                        .cmp(&right_proposal.controller_id)
+                })
+                .then_with(|| left_proposal.proposal_id.cmp(&right_proposal.proposal_id))
+        },
+    );
 
     let highest_rank = valid[0].1.authority_rank;
     let tied: Vec<_> = valid
@@ -517,7 +523,8 @@ pub fn arbitrate_actuator_channel(
             .enumerate()
             .map(|(index, controller_id)| (controller_id.as_str(), index))
             .collect();
-        let has_duplicate_order = declared_positions.len() != channel.tie_break_controller_order.len();
+        let has_duplicate_order =
+            declared_positions.len() != channel.tie_break_controller_order.len();
         let tied_ids: Vec<&str> = tied
             .iter()
             .map(|(proposal, _)| proposal.controller_id.as_str())
@@ -770,9 +777,7 @@ pub fn evaluate_state_transition(
     if manifest.manifest_id.trim().is_empty() || !is_sha256(&manifest.manifest_sha256) {
         diagnostics.push(ControlDiagnostic::AuthorityManifestConflict);
     }
-    if manifest.clock_domain.trim().is_empty()
-        || attempt.clock_domain != manifest.clock_domain
-    {
+    if manifest.clock_domain.trim().is_empty() || attempt.clock_domain != manifest.clock_domain {
         diagnostics.push(ControlDiagnostic::TransitionClockDomainMismatch);
     }
     if attempt.transition_evidence_ref.trim().is_empty() {
@@ -788,7 +793,13 @@ pub fn evaluate_state_transition(
         .find(|rule| rule.transition_id == attempt.transition_id)
     else {
         diagnostics.push(ControlDiagnostic::UnknownTransition);
-        return transition_report(manifest, attempt, None, ControlDecisionDisposition::NotComparable, diagnostics);
+        return transition_report(
+            manifest,
+            attempt,
+            None,
+            ControlDecisionDisposition::NotComparable,
+            diagnostics,
+        );
     };
 
     if attempt.from_state_id != rule.from_state_id {
@@ -797,7 +808,11 @@ pub fn evaluate_state_transition(
     if attempt.to_state_id != rule.to_state_id {
         diagnostics.push(ControlDiagnostic::TransitionTargetMismatch);
     }
-    let state_ids: BTreeSet<&str> = manifest.states.iter().map(|state| state.state_id.as_str()).collect();
+    let state_ids: BTreeSet<&str> = manifest
+        .states
+        .iter()
+        .map(|state| state.state_id.as_str())
+        .collect();
     let safe_states: BTreeSet<&str> = manifest
         .states
         .iter()
@@ -812,7 +827,11 @@ pub fn evaluate_state_transition(
     if rule.timeout_ns == 0 {
         diagnostics.push(ControlDiagnostic::InvalidTransitionTimeout);
     }
-    if attempt.evaluated_at_ns.saturating_sub(attempt.initiated_at_ns) > rule.timeout_ns {
+    if attempt
+        .evaluated_at_ns
+        .saturating_sub(attempt.initiated_at_ns)
+        > rule.timeout_ns
+    {
         diagnostics.push(ControlDiagnostic::TransitionTimedOut);
     }
 
@@ -831,7 +850,10 @@ pub fn evaluate_state_transition(
     }
     let mut supplied_guards: BTreeMap<&str, &GuardEvidence> = BTreeMap::new();
     for guard in &attempt.guards {
-        if supplied_guards.insert(guard.guard_id.as_str(), guard).is_some() {
+        if supplied_guards
+            .insert(guard.guard_id.as_str(), guard)
+            .is_some()
+        {
             diagnostics.push(ControlDiagnostic::DuplicateGuard);
         }
         if guard.evidence_ref.trim().is_empty() {
@@ -842,10 +864,11 @@ pub fn evaluate_state_transition(
         }
     }
 
-    if supplied_guards
-        .keys()
-        .any(|guard_id| !expected_guards.iter().any(|expected| expected.as_str() == *guard_id))
-    {
+    if supplied_guards.keys().any(|guard_id| {
+        !expected_guards
+            .iter()
+            .any(|expected| expected.as_str() == *guard_id)
+    }) {
         diagnostics.push(ControlDiagnostic::UnexpectedGuard);
     }
 
@@ -1110,7 +1133,10 @@ mod tests {
             report.proposal_evidence_bindings[0].observation_sha256,
             proposals[0].observation_sha256
         );
-        assert_eq!(report.safety_evidence_ref.as_deref(), Some("safety-plc-receipt"));
+        assert_eq!(
+            report.safety_evidence_ref.as_deref(),
+            Some("safety-plc-receipt")
+        );
         assert_eq!(report.timing_evidence.cycle_id, "cycle-42");
         assert!(!report.authority_manifest_sha256.is_empty());
     }
@@ -1118,18 +1144,36 @@ mod tests {
     #[test]
     fn independent_safety_veto_overrides_high_performance_proposal() {
         let proposals = vec![proposal("p1", "deterministic-mpc", "mpc-r4", 40.0)];
-        let report = arbitrate(&proposals, SafetyDecision::Veto, &timing(), &channel().tie_break_controller_order);
+        let report = arbitrate(
+            &proposals,
+            SafetyDecision::Veto,
+            &timing(),
+            &channel().tie_break_controller_order,
+        );
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
         assert_eq!(report.winner_proposal_id, None);
-        assert!(report.diagnostics.contains(&ControlDiagnostic::SafetyVetoActive));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ControlDiagnostic::SafetyVetoActive)
+        );
     }
 
     #[test]
     fn unknown_safety_decision_holds_safe() {
         let proposals = vec![proposal("p1", "deterministic-mpc", "mpc-r4", 40.0)];
-        let report = arbitrate(&proposals, SafetyDecision::Unknown, &timing(), &channel().tie_break_controller_order);
+        let report = arbitrate(
+            &proposals,
+            SafetyDecision::Unknown,
+            &timing(),
+            &channel().tie_break_controller_order,
+        );
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
-        assert!(report.diagnostics.contains(&ControlDiagnostic::SafetyDecisionUnknown));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ControlDiagnostic::SafetyDecisionUnknown)
+        );
     }
 
     #[test]
@@ -1150,10 +1194,18 @@ mod tests {
         let first = proposal("p1", "ml-supervisor", "ml-r8", 45.0);
         let second = proposal("p2", "deterministic-mpc", "mpc-r4", 40.0);
         let order = channel().tie_break_controller_order;
-        let report_a = arbitrate(&[first.clone(), second.clone()], SafetyDecision::Permit, &timing(), &order);
+        let report_a = arbitrate(
+            &[first.clone(), second.clone()],
+            SafetyDecision::Permit,
+            &timing(),
+            &order,
+        );
         let report_b = arbitrate(&[second, first], SafetyDecision::Permit, &timing(), &order);
         assert_eq!(report_a, report_b);
-        assert_eq!(report_a.winner_controller_id.as_deref(), Some("deterministic-mpc"));
+        assert_eq!(
+            report_a.winner_controller_id.as_deref(),
+            Some("deterministic-mpc")
+        );
     }
 
     #[test]
@@ -1164,7 +1216,11 @@ mod tests {
         ];
         let report = arbitrate(&proposals, SafetyDecision::Permit, &timing(), &[]);
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
-        assert!(report.diagnostics.contains(&ControlDiagnostic::MissingAuthorityTieBreak));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ControlDiagnostic::MissingAuthorityTieBreak)
+        );
     }
 
     #[test]
@@ -1180,7 +1236,11 @@ mod tests {
             &timing(),
         );
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
-        assert!(report.diagnostics.contains(&ControlDiagnostic::AuthorityManifestConflict));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ControlDiagnostic::AuthorityManifestConflict)
+        );
     }
 
     #[test]
@@ -1196,7 +1256,11 @@ mod tests {
             &channel().tie_break_controller_order,
         );
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
-        assert!(report.diagnostics.contains(&ControlDiagnostic::DuplicateProposalId));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ControlDiagnostic::DuplicateProposalId)
+        );
     }
 
     #[test]
@@ -1217,50 +1281,91 @@ mod tests {
         });
         let report = evaluate_state_transition(&manifest, &attempt);
         assert_eq!(report.disposition, ControlDecisionDisposition::Rejected);
-        assert!(report.diagnostics.contains(&ControlDiagnostic::UnexpectedGuard));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ControlDiagnostic::UnexpectedGuard)
+        );
     }
 
     #[test]
     fn command_outside_absolute_envelope_is_rejected() {
         let proposals = vec![proposal("p1", "deterministic-mpc", "mpc-r4", 120.0)];
-        let report = arbitrate(&proposals, SafetyDecision::Permit, &timing(), &channel().tie_break_controller_order);
+        let report = arbitrate(
+            &proposals,
+            SafetyDecision::Permit,
+            &timing(),
+            &channel().tie_break_controller_order,
+        );
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
-        assert!(report.rejected_proposals[0].diagnostics.contains(
-            &ControlDiagnostic::CommandOutsideAbsoluteEnvelope
-        ));
+        assert!(
+            report.rejected_proposals[0]
+                .diagnostics
+                .contains(&ControlDiagnostic::CommandOutsideAbsoluteEnvelope)
+        );
     }
 
     #[test]
     fn command_exceeding_slew_rate_is_rejected() {
         let proposals = vec![proposal("p1", "deterministic-mpc", "mpc-r4", 90.0)];
-        let report = arbitrate(&proposals, SafetyDecision::Permit, &timing(), &channel().tie_break_controller_order);
+        let report = arbitrate(
+            &proposals,
+            SafetyDecision::Permit,
+            &timing(),
+            &channel().tie_break_controller_order,
+        );
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
-        assert!(report.rejected_proposals[0].diagnostics.contains(
-            &ControlDiagnostic::CommandExceedsSlewRate
-        ));
+        assert!(
+            report.rejected_proposals[0]
+                .diagnostics
+                .contains(&ControlDiagnostic::CommandExceedsSlewRate)
+        );
     }
 
     #[test]
     fn stale_observation_is_rejected() {
         let mut stale = proposal("p1", "deterministic-mpc", "mpc-r4", 40.0);
         stale.observation_timestamp_ns = 0;
-        let report = arbitrate(&[stale], SafetyDecision::Permit, &timing(), &channel().tie_break_controller_order);
-        assert!(report.rejected_proposals[0].diagnostics.contains(&ControlDiagnostic::StaleObservation));
+        let report = arbitrate(
+            &[stale],
+            SafetyDecision::Permit,
+            &timing(),
+            &channel().tie_break_controller_order,
+        );
+        assert!(
+            report.rejected_proposals[0]
+                .diagnostics
+                .contains(&ControlDiagnostic::StaleObservation)
+        );
     }
 
     #[test]
     fn expired_proposal_is_rejected() {
         let mut expired = proposal("p1", "deterministic-mpc", "mpc-r4", 40.0);
         expired.valid_until_ns = 999_999_999;
-        let report = arbitrate(&[expired], SafetyDecision::Permit, &timing(), &channel().tie_break_controller_order);
-        assert!(report.rejected_proposals[0].diagnostics.contains(&ControlDiagnostic::ProposalExpired));
+        let report = arbitrate(
+            &[expired],
+            SafetyDecision::Permit,
+            &timing(),
+            &channel().tie_break_controller_order,
+        );
+        assert!(
+            report.rejected_proposals[0]
+                .diagnostics
+                .contains(&ControlDiagnostic::ProposalExpired)
+        );
     }
 
     #[test]
     fn wrong_clock_domain_holds_safe() {
         let mut bad = proposal("p1", "deterministic-mpc", "mpc-r4", 40.0);
         bad.clock_domain = "unsynchronized-host-clock".to_string();
-        let report = arbitrate(&[bad], SafetyDecision::Permit, &timing(), &channel().tie_break_controller_order);
+        let report = arbitrate(
+            &[bad],
+            SafetyDecision::Permit,
+            &timing(),
+            &channel().tie_break_controller_order,
+        );
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
     }
 
@@ -1276,7 +1381,11 @@ mod tests {
             &channel().tie_break_controller_order,
         );
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
-        assert!(report.diagnostics.contains(&ControlDiagnostic::DeadlineExceeded));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ControlDiagnostic::DeadlineExceeded)
+        );
     }
 
     #[test]
@@ -1296,7 +1405,12 @@ mod tests {
     fn unauthorized_controller_channel_and_mode_are_rejected() {
         let mut bad = proposal("p1", "unregistered-ai", "unknown", 40.0);
         bad.channel_id = "magnet-current".to_string();
-        let report = arbitrate(&[bad], SafetyDecision::Permit, &timing(), &channel().tie_break_controller_order);
+        let report = arbitrate(
+            &[bad],
+            SafetyDecision::Permit,
+            &timing(),
+            &channel().tie_break_controller_order,
+        );
         assert!(!report.rejected_proposals.is_empty());
     }
 
@@ -1462,7 +1576,11 @@ mod tests {
         );
         let report = evaluate_state_transition(&manifest, &attempt);
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
-        assert!(report.diagnostics.contains(&ControlDiagnostic::TripRecoveryBypass));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ControlDiagnostic::TripRecoveryBypass)
+        );
     }
 
     #[test]
@@ -1505,7 +1623,10 @@ mod tests {
         );
         attempt.evaluated_at_ns = 200_000_000;
         let report = evaluate_state_transition(&manifest, &attempt);
-        assert_eq!(report.disposition, ControlDecisionDisposition::RecoveryRequired);
+        assert_eq!(
+            report.disposition,
+            ControlDecisionDisposition::RecoveryRequired
+        );
     }
 
     #[test]
@@ -1519,7 +1640,10 @@ mod tests {
             RequalificationResult::NotRequired,
         );
         let report = evaluate_state_transition(&manifest, &attempt);
-        assert_eq!(report.disposition, ControlDecisionDisposition::RecoveryRequired);
+        assert_eq!(
+            report.disposition,
+            ControlDecisionDisposition::RecoveryRequired
+        );
     }
 
     #[test]
@@ -1535,6 +1659,10 @@ mod tests {
         );
         let report = evaluate_state_transition(&manifest, &attempt);
         assert_eq!(report.disposition, ControlDecisionDisposition::Rejected);
-        assert!(report.diagnostics.contains(&ControlDiagnostic::MissingFallbackState));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ControlDiagnostic::MissingFallbackState)
+        );
     }
 }
