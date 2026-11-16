@@ -1,0 +1,550 @@
+{
+  "bundle_id": "egddm-d6.12-oracle-integrity-v0.1",
+  "bundle_visibility": "evaluator_only_never_candidate_visible",
+  "candidate_view": {
+    "scenario_id": "d6.12-state-mutating-oracle-two-sided-v0.1",
+    "oracle_runs": [
+      {
+        "case_id": "valid-reference",
+        "control_role": "positive",
+        "candidate_input_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "post_candidate_state_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "pre_grade_state_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "post_grade_state_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "replay_state_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "verifier_outcome": "pass",
+        "repeat_verifier_outcome": "pass",
+        "cache_hit": false,
+        "cache_input_digest": null,
+        "observed_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ]
+      },
+      {
+        "case_id": "empty-patch",
+        "control_role": "negative",
+        "candidate_input_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "post_candidate_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "pre_grade_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "post_grade_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "replay_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "verifier_outcome": "fail",
+        "repeat_verifier_outcome": "fail",
+        "cache_hit": false,
+        "cache_input_digest": null,
+        "observed_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ]
+      },
+      {
+        "case_id": "mutating-oracle",
+        "control_role": "fault_injection",
+        "candidate_input_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "post_candidate_state_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "pre_grade_state_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "post_grade_state_digest": "3333333333333333333333333333333333333333333333333333333333333333",
+        "replay_state_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "verifier_outcome": "pass",
+        "repeat_verifier_outcome": "pass",
+        "cache_hit": false,
+        "cache_input_digest": null,
+        "observed_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ]
+      },
+      {
+        "case_id": "stale-cache",
+        "control_role": "negative",
+        "candidate_input_digest": "4444444444444444444444444444444444444444444444444444444444444444",
+        "post_candidate_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "pre_grade_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "post_grade_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "replay_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "verifier_outcome": "pass",
+        "repeat_verifier_outcome": "pass",
+        "cache_hit": true,
+        "cache_input_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "observed_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ]
+      },
+      {
+        "case_id": "nondeterministic",
+        "control_role": "fault_injection",
+        "candidate_input_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "post_candidate_state_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "pre_grade_state_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "post_grade_state_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "replay_state_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "verifier_outcome": "pass",
+        "repeat_verifier_outcome": "fail",
+        "cache_hit": false,
+        "cache_input_digest": null,
+        "observed_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ]
+      },
+      {
+        "case_id": "replay-disagreement",
+        "control_role": "fault_injection",
+        "candidate_input_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+        "post_candidate_state_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+        "pre_grade_state_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+        "post_grade_state_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+        "replay_state_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+        "verifier_outcome": "pass",
+        "repeat_verifier_outcome": "pass",
+        "cache_hit": false,
+        "cache_input_digest": null,
+        "observed_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ]
+      },
+      {
+        "case_id": "valid-alternative",
+        "control_role": "positive",
+        "candidate_input_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+        "post_candidate_state_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+        "pre_grade_state_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+        "post_grade_state_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+        "replay_state_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+        "verifier_outcome": "fail",
+        "repeat_verifier_outcome": "fail",
+        "cache_hit": false,
+        "cache_input_digest": null,
+        "observed_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ]
+      },
+      {
+        "case_id": "observer-gap",
+        "control_role": "fault_injection",
+        "candidate_input_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+        "post_candidate_state_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+        "pre_grade_state_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+        "post_grade_state_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+        "replay_state_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+        "verifier_outcome": "pass",
+        "repeat_verifier_outcome": "pass",
+        "cache_hit": false,
+        "cache_input_digest": null,
+        "observed_surfaces": [
+          "workspace",
+          "filesystem",
+          "process"
+        ]
+      },
+      {
+        "case_id": "sham-grade",
+        "control_role": "sham",
+        "candidate_input_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "post_candidate_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "pre_grade_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "post_grade_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "replay_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "verifier_outcome": "fail",
+        "repeat_verifier_outcome": "fail",
+        "cache_hit": false,
+        "cache_input_digest": null,
+        "observed_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ]
+      },
+      {
+        "case_id": "candidate-state-drift",
+        "control_role": "fault_injection",
+        "candidate_input_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "post_candidate_state_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "pre_grade_state_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "post_grade_state_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "replay_state_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "verifier_outcome": "pass",
+        "repeat_verifier_outcome": "pass",
+        "cache_hit": false,
+        "cache_input_digest": null,
+        "observed_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ]
+      }
+    ]
+  },
+  "gold_overlay": {
+    "adjudication_status": "synthetic_known_answer_not_independently_adjudicated",
+    "case_truths": [
+      {
+        "case_id": "valid-reference",
+        "expected_semantic_outcome": "pass",
+        "expected_post_candidate_state_digest": "1111111111111111111111111111111111111111111111111111111111111111",
+        "required_observer_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ],
+        "expected_fault_classes": []
+      },
+      {
+        "case_id": "empty-patch",
+        "expected_semantic_outcome": "fail",
+        "expected_post_candidate_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "required_observer_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ],
+        "expected_fault_classes": []
+      },
+      {
+        "case_id": "mutating-oracle",
+        "expected_semantic_outcome": "pass",
+        "expected_post_candidate_state_digest": "2222222222222222222222222222222222222222222222222222222222222222",
+        "required_observer_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ],
+        "expected_fault_classes": [
+          "state_mutation"
+        ]
+      },
+      {
+        "case_id": "stale-cache",
+        "expected_semantic_outcome": "fail",
+        "expected_post_candidate_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "required_observer_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ],
+        "expected_fault_classes": [
+          "cache_mismatch",
+          "false_positive"
+        ]
+      },
+      {
+        "case_id": "nondeterministic",
+        "expected_semantic_outcome": "pass",
+        "expected_post_candidate_state_digest": "5555555555555555555555555555555555555555555555555555555555555555",
+        "required_observer_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ],
+        "expected_fault_classes": [
+          "nondeterminism"
+        ]
+      },
+      {
+        "case_id": "replay-disagreement",
+        "expected_semantic_outcome": "pass",
+        "expected_post_candidate_state_digest": "6666666666666666666666666666666666666666666666666666666666666666",
+        "required_observer_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ],
+        "expected_fault_classes": [
+          "replay_disagreement"
+        ]
+      },
+      {
+        "case_id": "valid-alternative",
+        "expected_semantic_outcome": "pass",
+        "expected_post_candidate_state_digest": "7777777777777777777777777777777777777777777777777777777777777777",
+        "required_observer_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ],
+        "expected_fault_classes": [
+          "false_negative"
+        ]
+      },
+      {
+        "case_id": "observer-gap",
+        "expected_semantic_outcome": "pass",
+        "expected_post_candidate_state_digest": "8888888888888888888888888888888888888888888888888888888888888888",
+        "required_observer_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ],
+        "expected_fault_classes": [
+          "observer_coverage_gap"
+        ]
+      },
+      {
+        "case_id": "sham-grade",
+        "expected_semantic_outcome": "fail",
+        "expected_post_candidate_state_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+        "required_observer_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ],
+        "expected_fault_classes": []
+      },
+      {
+        "case_id": "candidate-state-drift",
+        "expected_semantic_outcome": "pass",
+        "expected_post_candidate_state_digest": "9999999999999999999999999999999999999999999999999999999999999999",
+        "required_observer_surfaces": [
+          "workspace",
+          "filesystem",
+          "process",
+          "database"
+        ],
+        "expected_fault_classes": [
+          "candidate_state_drift"
+        ]
+      }
+    ]
+  },
+  "candidate_traces": [
+    {
+      "trace_id": "independent-auditor",
+      "case_claims": [
+        {
+          "case_id": "valid-reference",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "empty-patch",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "mutating-oracle",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [
+            "state_mutation"
+          ],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "stale-cache",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [
+            "cache_mismatch",
+            "false_positive"
+          ],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "nondeterministic",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [
+            "nondeterminism"
+          ],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "replay-disagreement",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [
+            "replay_disagreement"
+          ],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "valid-alternative",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [
+            "false_negative"
+          ],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "observer-gap",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [
+            "observer_coverage_gap"
+          ],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "sham-grade",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "candidate-state-drift",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [
+            "candidate_state_drift"
+          ],
+          "claimed_integrity_state": "invalid"
+        }
+      ]
+    },
+    {
+      "trace_id": "native-verifier-only",
+      "case_claims": [
+        {
+          "case_id": "valid-reference",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "empty-patch",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "mutating-oracle",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "stale-cache",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "nondeterministic",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "replay-disagreement",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "valid-alternative",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "observer-gap",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "sham-grade",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        },
+        {
+          "case_id": "candidate-state-drift",
+          "claimed_semantic_outcome": "pass",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "valid"
+        }
+      ]
+    },
+    {
+      "trace_id": "always-reject",
+      "case_claims": [
+        {
+          "case_id": "valid-reference",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "empty-patch",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "mutating-oracle",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "stale-cache",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "nondeterministic",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "replay-disagreement",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "valid-alternative",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "observer-gap",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "sham-grade",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "invalid"
+        },
+        {
+          "case_id": "candidate-state-drift",
+          "claimed_semantic_outcome": "fail",
+          "detected_fault_classes": [],
+          "claimed_integrity_state": "invalid"
+        }
+      ]
+    }
+  ]
+}
