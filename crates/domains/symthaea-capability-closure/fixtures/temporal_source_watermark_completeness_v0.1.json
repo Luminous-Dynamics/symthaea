@@ -52,7 +52,9 @@
       "event_time_us",
       "nested_recorded_at_us"
     ],
-    "known_at_behavior": "each_event_time_bucket_range_is_cut_off_at_known_at"
+    "known_at_behavior": "each_event_time_bucket_range_is_cut_off_at_known_at",
+    "audit_result_type": "VerifiedCompletenessReport",
+    "audit_result_semantics": "private_fields_bind_full_history_replay_to_ledger_sha256_and_record_counts; not physical_source_authentication"
   },
   "arrival": {
     "event_time_less_than_prior_watermark": "late_breach",
@@ -227,7 +229,9 @@
       "indexed_query_p50_p95_p99_us",
       "verified_query_p50_p95_p99_us",
       "future_known_breach_candidates_pruned",
-      "late_breach_index_buckets_examined"
+      "late_breach_index_buckets_examined",
+      "verified_report_ledger_digest_mismatch_count",
+      "verified_report_record_count_mismatch_count"
     ]
   },
   "qualification_targets": {
