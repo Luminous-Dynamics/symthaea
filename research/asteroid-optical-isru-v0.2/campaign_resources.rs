@@ -18,8 +18,6 @@
 use std::error::Error;
 use std::fmt;
 
-const RESOURCE_TOLERANCE: f64 = 1.0e-12;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EnergyMeterBoundary {
     ElectricalInput,
@@ -92,6 +90,7 @@ pub enum ResourceError {
     AllShadowPricesZero,
     ZeroWeightedCost(String),
     NoAffordableActions,
+    ActionExceedsRemainingBudget { action_id: String, resources: Vec<&'static str> },
 }
 
 impl fmt::Display for ResourceError {
@@ -124,32 +123,26 @@ impl ResourceVector {
     }
 
     fn fits_within(&self, budget: &Self) -> bool {
-        self.rig_hours <= budget.rig_hours + RESOURCE_TOLERANCE
-            && self.source_energy_wh <= budget.source_energy_wh + RESOURCE_TOLERANCE
-            && self.feedstock_g <= budget.feedstock_g + RESOURCE_TOLERANCE
-            && self.assay_cost <= budget.assay_cost + RESOURCE_TOLERANCE
-            && self.maintenance_minutes <= budget.maintenance_minutes + RESOURCE_TOLERANCE
-            && self.consumables_g <= budget.consumables_g + RESOURCE_TOLERANCE
     }
 
     fn over_budget(&self, budget: &Self) -> Vec<&'static str> {
         let mut over = Vec::new();
-        if self.rig_hours > budget.rig_hours + RESOURCE_TOLERANCE {
+        if self.rig_hours > budget.rig_hours {
             over.push("rig_hours");
         }
-        if self.source_energy_wh > budget.source_energy_wh + RESOURCE_TOLERANCE {
+        if self.source_energy_wh > budget.source_energy_wh {
             over.push("source_energy_wh");
         }
-        if self.feedstock_g > budget.feedstock_g + RESOURCE_TOLERANCE {
+        if self.feedstock_g > budget.feedstock_g {
             over.push("feedstock_g");
         }
-        if self.assay_cost > budget.assay_cost + RESOURCE_TOLERANCE {
+        if self.assay_cost > budget.assay_cost {
             over.push("assay_cost");
         }
-        if self.maintenance_minutes > budget.maintenance_minutes + RESOURCE_TOLERANCE {
+        if self.maintenance_minutes > budget.maintenance_minutes {
             over.push("maintenance_minutes");
         }
-        if self.consumables_g > budget.consumables_g + RESOURCE_TOLERANCE {
+        if self.consumables_g > budget.consumables_g {
             over.push("consumables_g");
         }
         over
@@ -167,21 +160,21 @@ impl ResourceVector {
     }
 
     fn componentwise_le(&self, other: &Self) -> bool {
-        self.rig_hours <= other.rig_hours + RESOURCE_TOLERANCE
-            && self.source_energy_wh <= other.source_energy_wh + RESOURCE_TOLERANCE
-            && self.feedstock_g <= other.feedstock_g + RESOURCE_TOLERANCE
-            && self.assay_cost <= other.assay_cost + RESOURCE_TOLERANCE
-            && self.maintenance_minutes <= other.maintenance_minutes + RESOURCE_TOLERANCE
-            && self.consumables_g <= other.consumables_g + RESOURCE_TOLERANCE
+        self.rig_hours <= other.rig_hours
+            && self.source_energy_wh <= other.source_energy_wh
+            && self.feedstock_g <= other.feedstock_g
+            && self.assay_cost <= other.assay_cost
+            && self.maintenance_minutes <= other.maintenance_minutes
+            && self.consumables_g <= other.consumables_g
     }
 
     fn componentwise_strict(&self, other: &Self) -> bool {
-        self.rig_hours < other.rig_hours - RESOURCE_TOLERANCE
-            || self.source_energy_wh < other.source_energy_wh - RESOURCE_TOLERANCE
-            || self.feedstock_g < other.feedstock_g - RESOURCE_TOLERANCE
-            || self.assay_cost < other.assay_cost - RESOURCE_TOLERANCE
-            || self.maintenance_minutes < other.maintenance_minutes - RESOURCE_TOLERANCE
-            || self.consumables_g < other.consumables_g - RESOURCE_TOLERANCE
+        self.rig_hours < other.rig_hours
+            || self.source_energy_wh < other.source_energy_wh
+            || self.feedstock_g < other.feedstock_g
+            || self.assay_cost < other.assay_cost
+            || self.maintenance_minutes < other.maintenance_minutes
+            || self.consumables_g < other.consumables_g
     }
 }
 
@@ -310,6 +303,68 @@ pub fn select_max_decision_value<'a>(
                 .unwrap_or(std::cmp::Ordering::Equal)
         })
         .ok_or(ResourceError::NoAffordableActions)
+}
+
+
+/// Mutable campaign accounting for a sequence of admitted actions.
+/// Each apply is atomic: an over-budget action does not change spent or remaining.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CampaignLedger {
+    pub basis: ResourceBasis,
+    pub total_budget: ResourceVector,
+    pub spent: ResourceVector,
+    pub remaining: ResourceVector,
+}
+
+impl CampaignLedger {
+    pub fn new(budget: &CampaignBudget) -> Result<Self, ResourceError> {
+        budget.validate()?;
+        Ok(Self {
+            basis: budget.basis.clone(),
+            total_budget: budget.resources,
+            spent: ResourceVector {
+                rig_hours: 0.0,
+                source_energy_wh: 0.0,
+                feedstock_g: 0.0,
+                assay_cost: 0.0,
+                maintenance_minutes: 0.0,
+                consumables_g: 0.0,
+            },
+            remaining: budget.resources,
+        })
+    }
+
+    pub fn apply(&mut self, action: &CampaignAction) -> Result<(), ResourceError> {
+        if !nonempty(&action.id) {
+            return Err(ResourceError::EmptyIdentity("action_id"));
+        }
+        if !action.decision_value.is_finite() || action.decision_value < 0.0 {
+            return Err(ResourceError::InvalidDecisionValue);
+        }
+        action.resources.validate()?;
+        if action.basis != self.basis {
+            return Err(ResourceError::BasisMismatch);
+        }
+
+        let over_budget_resources = action.resources.over_budget(&self.remaining);
+        if !over_budget_resources.is_empty() {
+            return Err(ResourceError::ActionExceedsRemainingBudget {
+                action_id: action.id.clone(),
+                resources: over_budget_resources,
+            });
+        }
+
+        self.spent = ResourceVector {
+            rig_hours: self.spent.rig_hours + action.resources.rig_hours,
+            source_energy_wh: self.spent.source_energy_wh + action.resources.source_energy_wh,
+            feedstock_g: self.spent.feedstock_g + action.resources.feedstock_g,
+            assay_cost: self.spent.assay_cost + action.resources.assay_cost,
+            maintenance_minutes: self.spent.maintenance_minutes + action.resources.maintenance_minutes,
+            consumables_g: self.spent.consumables_g + action.resources.consumables_g,
+        };
+        self.remaining = self.remaining.subtract(&action.resources);
+        Ok(())
+    }
 }
 
 impl ResourceShadowPrices {
@@ -539,6 +594,27 @@ mod tests {
         prices.maintenance_minute = 0.0;
         prices.consumable_g = 0.0;
         assert_eq!(prices.validate(), Err(ResourceError::AllShadowPricesZero));
+    }
+
+
+    #[test]
+    fn campaign_ledger_applies_actions_atomically_against_remaining_budget() {
+        let mut ledger = CampaignLedger::new(&budget()).unwrap();
+        let first = action("first", 1.0, vector(6.0, 100.0, 5.0, 10.0, 30.0, 1.0));
+        let second = action("second", 1.0, vector(5.0, 100.0, 5.0, 10.0, 30.0, 1.0));
+
+        ledger.apply(&first).unwrap();
+        let before_failed_apply = ledger.clone();
+        assert_eq!(
+            ledger.apply(&second),
+            Err(ResourceError::ActionExceedsRemainingBudget {
+                action_id: "second".to_string(),
+                resources: vec!["rig_hours"],
+            })
+        );
+        assert_eq!(ledger, before_failed_apply);
+        assert_eq!(ledger.spent.rig_hours, 6.0);
+        assert_eq!(ledger.remaining.rig_hours, 4.0);
     }
 
     #[test]
