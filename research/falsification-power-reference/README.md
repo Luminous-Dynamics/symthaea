@@ -127,3 +127,32 @@ For the same generated outcome path it compares:
 It reports null/alternative rejection rates with Wilson intervals for every threshold, early-stop frequency, mean stopping look, e-process crossing delay, the analytically computed terminal NP power and a terminal-equivalence mismatch count. The same observation paths are reused across all four methods; each threshold has a separate randomizer stream. The binary uses separate deterministic observation and randomizer streams; its PRNG is for simulation only.
 
 This campaign is restricted to one frozen simple Gaussian design. It is not a general adaptive-discovery benchmark or physical validation.
+
+
+### Exact-head paired calibration receipt
+
+Run #40 on source head 950d80181d043470357863d43256519cb1b025c6 passed the focused workflow: rustfmt, all-target tests, sequential null calibration, paired Gaussian calibration, artifact upload and strict Clippy. Workflow: https://github.com/Luminous-Dynamics/symthaea/actions/runs/43821865007
+
+The campaign used 20,000 paired paths per scenario, an 80-look fixed design, alpha 0.05, discrepancy 0.22 and sigma 0.80. The predeclared induced-test thresholds were 0.75, 0.90 and 0.99. Every method shared the same observations; each threshold used a separately seeded simulation randomizer stream. The PRNG is for synthetic replay only.
+
+| Method | Null rejection | Alternative rejection | Mean observations used under alternative |
+|---|---:|---:|---:|
+| Fixed-horizon terminal NP | 5.435% | 79.970% | 80.00 |
+| Induced test, threshold 0.75 | 5.320% | 66.055% | 60.69 |
+| Induced test, threshold 0.90 | 5.415% | 75.150% | 65.95 |
+| Induced test, threshold 0.99 | 5.410% | 79.550% | 71.43 |
+| Gaussian e-process | 2.815% | 62.420% | 58.53 |
+| Naive repeated fixed-time test | 29.795% | 91.055% | 26.21 |
+
+The induced-method null Wilson 95% intervals are [5.017%,5.640%], [5.110%,5.737%] and [5.105%,5.732%], respectively. Terminal NP has [5.129%,5.758%]. The e-process null Wilson interval is [2.595%,3.053%]. The naive repeated-test null interval is [29.165%,30.433%].
+
+The analytic terminal NP power is 79.241%; the observed terminal estimate is 79.970% (Wilson 95% [79.410%,80.519%]), a 0.73 percentage-point Monte Carlo deviation. The terminal induced decision matched the fixed NP decision on all 20,000 paths. All result rates are conditional on this one declared generator/design and do not establish general calibration.
+
+Interpretation:
+- Threshold 0.99 is the near-terminal point: 79.55% power with about 10.7% fewer observations than the 80-look test.
+- Threshold 0.90 gives about 17.6% fewer observations, with 75.15% power.
+- Threshold 0.75 gives about 24.1% fewer observations, with 66.06% power.
+- The Gaussian e-process crosses less often and is more conservative here; its average observation cost counts non-crossers as running to the horizon.
+- The naive repeated test appears cheapest and most powerful, but its ~29.8% null rejection makes it invalid under repeated looks.
+
+The terminal NP method is an evaluator oracle because it knows the correct discrepancy direction and frozen design. This is not a Symthaea agent result or an unknown-mechanism discovery score.
