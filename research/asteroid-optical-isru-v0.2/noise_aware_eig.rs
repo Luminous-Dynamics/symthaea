@@ -394,7 +394,9 @@ mod tests {
             select_best_action(
                 &[expensive.clone(), cheap.clone()],
                 ActionObjective::InformationGainPerCost
-            ).unwrap().action_id,
+            )
+            .unwrap()
+            .action_id,
             "cheap"
         );
         assert_eq!(
