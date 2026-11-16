@@ -231,6 +231,8 @@
       "future_known_breach_candidates_pruned",
       "late_breach_index_buckets_examined",
       "verified_report_ledger_digest_mismatch_count",
+      "verified_report_record_count_mismatch_count",
+      "verified_report_ledger_digest_mismatch_count",
       "verified_report_record_count_mismatch_count"
     ]
   },
@@ -263,6 +265,7 @@
     "verified_query_repetitions": 15,
     "event_time_order": "deterministic_permutation_relative_to_arrival_order",
     "outputs": [
+      "late_rate_basis_points",
       "source_count",
       "interval_width_us",
       "known_at_us",
@@ -271,11 +274,15 @@
       "matching_breaches",
       "indexed_p50_p95_p99_us",
       "verified_p50_us",
-      "verified_max_us"
+      "verified_max_us",
+      "verified_ledger_sha256",
+      "verified_progress_revision_count",
+      "verified_event_arrival_count",
+      "verified_late_breach_count"
     ],
-    "known_answer": "indexed_and_verified_reports_must_match_for_every_workload_before_timing",
-    "correctness_gate": "indexed_and_verified_reports_equal_before_timing",
-    "measurement_boundary": "in_memory_release_build_cpu_time_only",
+    "known_answer": "indexed_report_equals_verified_receipt.report; verified_receipt.ledger_sha256_equals_current_ledger_state_sha256",
+    "correctness_gate": "exact_report_equality_and_current_ledger_digest_match_before_timing",
+    "measurement_boundary": "in_memory_release_build_cpu_query_and_replay_time_only",
     "energy_measurement": "not_measured",
     "source_counts": [
       1,
@@ -291,7 +298,7 @@
       3000000,
       5000000
     ],
-    "workload_combinations": 54,
+    "workload_combinations": 216,
     "source_progress_recorded_at_us": 1000000,
     "arrival_transaction_times_us": [
       2000000,
@@ -301,6 +308,12 @@
     ],
     "availability_time": "equal_to_each_event_arrival_transaction_and_after_generated_event_time",
     "event_time": "zero_based_per_source_permuted_microsecond_values_below_declared_watermark",
-    "statistical_note": "51 indexed samples support nearest-rank p50/p95/p99; 15 full-audit samples report median and observed maximum only, not p95/p99"
+    "statistical_note": "51 indexed timing samples report nearest-rank p50/p95/p99; 15 full replay samples report median and observed maximum only",
+    "late_rate_basis_points": [
+      0,
+      100,
+      5000,
+      10000
+    ]
   }
 }
