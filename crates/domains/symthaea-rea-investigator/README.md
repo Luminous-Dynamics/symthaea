@@ -83,3 +83,59 @@ Scenario weights and likelihood matrices are still caller-supplied. They are not
 Do not pass ad hoc cell-wise lower/upper probability bounds and renormalize them as though they were a valid joint uncertainty set. If adding interval bounds later, use a mathematically valid simplex-constrained uncertainty set or a reviewed robust-optimization formulation.
 
 The robust tests are additive to the point-planner tests. The dedicated planner workflow runs both through the same isolated locked harness.
+
+
+## Decision-aware value of information (additive API)
+
+The `decision` module extends EIG and robust EIG without changing either existing API. It answers a different question:
+
+> Which permitted observation is expected to improve the downstream engineering decision, and how fragile is that improvement across plausible likelihood models?
+
+Use `plan_next_experiment_decision_aware` with:
+- independently rooted hypothesis Evidence and normalized prior probabilities;
+- experiment proposals and the same authorization, reversibility, destructive-operation, target-impact, time, energy and risk constraints used by the point planner;
+- shared likelihood scenarios from the robust planner;
+- a caller-owned `DecisionUtilityModel` naming its owner, scope, utility units and explicit exclusions;
+- terminal decisions with exactly one finite utility for every hypothesis;
+- `DecisionPlannerConfig`, selecting expected EVSI, worst-case shared-policy EVSI, lower-tail CVaR shared-policy EVSI, or minimax-regret policy search.
+
+The planner computes:
+- the prior Bayes decision and expected utility;
+- scenario-specific posterior-optimal actions and scenario-optimal EVSI;
+- one common outcome-to-decision policy for expected/worst/CVaR ranking;
+- the utility improvement of that shared policy under each scenario;
+- expected, worst-case and lower-tail decision value;
+- expected and worst-case regret versus the scenario-specific posterior-optimal action;
+- probability-weighted decision stability;
+- the selected decision ID and impact metadata for each outcome.
+
+### Why this is different from EIG
+
+EIG measures expected hypothesis entropy reduction. EVSI measures expected improvement in the best decision under a declared utility model. A probe can strongly reduce entropy without changing the optimal remediation, so it may have positive EIG but zero EVSI. Conversely, a probe that distinguishes a rare, high-consequence fault can be more valuable than a probe that produces more entropy reduction about benign details.
+
+The MinimaxRegret policy enumerates deterministic outcome-to-decision policies and minimizes worst-case expected regret across the supplied finite scenario set. It uses a caller-configured maximum policy-combination budget and rejects candidates whose exact search exceeds that bound. This is a finite-scenario result, not a guarantee against every possible unknown model.
+
+### Claim and authority boundaries
+
+- The utility model is caller-defined and caller-owned; it is not discovered, authenticated or morally complete merely because it is represented as a typed matrix.
+- Utility exclusions are mandatory and travel with the result.
+- Scenario probabilities and likelihoods are supplied inputs, not calibrated truth.
+- Terminal decision impact is reported as metadata. The planner does not execute that decision.
+- Experiments and actions are proposals only. The same authorization and resource gates apply to experiment proposals; terminal action execution requires a separate policy/approval boundary.
+- Unobservable or ungrounded hypotheses cause explicit abstention rather than being dropped.
+- The output claim ceiling keeps evidence authentication, utility-model review, calibration, causal truth and action execution false.
+
+### Decision-aware tests
+
+The decision module currently includes 10 unit tests with known-answer and adversarial cases for:
+- a high-EIG experiment that leaves the optimal action unchanged and therefore has zero EVSI;
+- a low-entropy rare-critical-fault probe that has higher decision value than a high-entropy benign-detail probe;
+- a shared minimax-regret policy that rejects a scenario-fragile probe;
+- explicit abstention when the evidence is only model-generated or synthetic;
+- rejection of unknown authorization and invalid utility matrices;
+- bounded minimax policy enumeration;
+- invariance to scenario ordering;
+- correct binary EVSI arithmetic and propagation of terminal decision impact;
+- robust worst-case ranking that abstains when one plausible scenario has no decision value.
+
+The dedicated `REA Investigator Planner` workflow validates the full crate and isolated locked harness. The decision-aware extension remains unqualified until its exact-head run passes.

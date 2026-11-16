@@ -124,6 +124,10 @@ pub enum PlannerErrorKind {
     InvalidMeasuredDistribution,
     InvalidLikelihoods,
     UnqualifiedObservationEvidence,
+    InvalidDecisionMatrix,
+    InvalidDecisionConfiguration,
+    InvalidDecisionScenario,
+    DecisionPolicySearchBudgetExceeded,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1363,3 +1367,6 @@ mod tests {
 
 /// Robust expected / worst-case / lower-tail EIG planning over likelihood scenarios.
 pub mod robust;
+
+/// Decision-aware expected value of sample information and minimax-regret planning.
+pub mod decision;
