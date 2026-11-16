@@ -618,9 +618,7 @@ fn validate_end_condition(
                 reject(
                     issues,
                     "pointed_port_end_not_collapsed",
-                    format!(
-                        "{end_name} pointed-stem port profile must collapse exactly to y=0"
-                    ),
+                    format!("{end_name} pointed-stem port profile must collapse exactly to y=0"),
                 );
             }
         }
