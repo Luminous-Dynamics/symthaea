@@ -22,7 +22,7 @@ from `symthaea_core::hdc::conjecture_engine`.
 
 ## 2. Synthetic test design
 
-The runnable example is `crates/core/symthaea-core/examples/isru_material_experiment_selection.rs`, registered in `crates/core/symthaea-core/Cargo.toml`.
+The runnable example is `crates/core/symthaea-core/examples/isru_material_experiment_selection.rs`, registered in `crates/core/symthaea-core/Cargo.toml`. Its expected deterministic output is frozen in `crates/core/symthaea-core/examples/fixtures/isru-material-experiment-selection-reference-v0.1.csv` and asserted by an authored Rust test.
 
 ### Candidate design space
 
@@ -158,7 +158,8 @@ The 1.5×/2× figures are programme targets chosen for a stringent prospective c
 
 At the time this document is authored:
 - the observation register PR #5578 has 5 source records and 78 observation records with a separate evidence-class field;
-- this example contains authored Rust tests for the candidate eligibility filter, matched cost/noise, reuse of the current selector score, two-observation stopping, in-domain identification, OOD abstention, fixed-design budget adherence, deterministic random ordering and duplicate-candidate prevention;
+- the policy reference fixture contains 20 expected world/policy output rows, derived by an independent deterministic reimplementation of the toy equations;
+- this example contains 13 authored Rust tests for the candidate eligibility filter, matched cost/noise, reuse of the current selector score, two-observation stopping, in-domain identification, OOD abstention, fixed-design budget adherence, deterministic random ordering and duplicate-candidate prevention;
 - the repository has no `cargo`, `rustc` or `rustfmt` in the current editing environment;
 - no Rust test, cargo check, physical experiment or hosted status-check pass is asserted.
 
