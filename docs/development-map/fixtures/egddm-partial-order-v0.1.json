@@ -1,0 +1,636 @@
+{
+  "bundle_id": "egddm-d6.10-partial-order-v0.1",
+  "bundle_visibility": "evaluator_only_never_candidate_visible",
+  "candidate_view": {
+    "scenario_id": "d6.10-branch-join-clock-skew-v0.1",
+    "events": [
+      {
+        "event_id": "baseline",
+        "event_time": "2026-11-16T00:00:00Z",
+        "available_at": "2026-11-16T00:00:00Z",
+        "branch_id": "main",
+        "event_kind": "baseline",
+        "effect_dimensions": []
+      },
+      {
+        "event_id": "tie-first",
+        "event_time": "2026-11-16T00:10:00Z",
+        "available_at": "2026-11-16T00:10:00Z",
+        "branch_id": "main",
+        "event_kind": "observation",
+        "effect_dimensions": []
+      },
+      {
+        "event_id": "tie-second",
+        "event_time": "2026-11-16T00:10:00Z",
+        "available_at": "2026-11-16T00:10:00Z",
+        "branch_id": "main",
+        "event_kind": "observation",
+        "effect_dimensions": []
+      },
+      {
+        "event_id": "late-backdated",
+        "event_time": "2026-11-16T00:20:00Z",
+        "available_at": "2026-11-16T02:00:00Z",
+        "branch_id": "main",
+        "event_kind": "observation",
+        "effect_dimensions": []
+      },
+      {
+        "event_id": "branch-a-source",
+        "event_time": "2026-11-16T01:00:00Z",
+        "available_at": "2026-11-16T01:05:00Z",
+        "branch_id": "branch-a",
+        "event_kind": "source_change",
+        "effect_dimensions": [
+          "source_tree_digest"
+        ]
+      },
+      {
+        "event_id": "branch-a-policy",
+        "event_time": "2026-11-16T01:10:00Z",
+        "available_at": "2026-11-16T01:15:00Z",
+        "branch_id": "branch-a",
+        "event_kind": "policy_change",
+        "effect_dimensions": [
+          "policy_digest"
+        ]
+      },
+      {
+        "event_id": "branch-b-docs",
+        "event_time": "2026-11-16T01:00:00Z",
+        "available_at": "2026-11-16T01:05:00Z",
+        "branch_id": "branch-b",
+        "event_kind": "contract_change",
+        "effect_dimensions": [
+          "docs_contract_digest"
+        ]
+      },
+      {
+        "event_id": "branch-b-policy",
+        "event_time": "2026-11-16T01:10:00Z",
+        "available_at": "2026-11-16T01:15:00Z",
+        "branch_id": "branch-b",
+        "event_kind": "policy_change",
+        "effect_dimensions": [
+          "policy_digest"
+        ]
+      },
+      {
+        "event_id": "joined-merge",
+        "event_time": "2026-11-16T02:10:00Z",
+        "available_at": "2026-11-16T02:11:00Z",
+        "branch_id": "joined",
+        "event_kind": "merge",
+        "effect_dimensions": []
+      }
+    ],
+    "branches": [
+      {
+        "branch_id": "main",
+        "parent_branch_ids": [],
+        "event_ids": [
+          "baseline",
+          "tie-first",
+          "tie-second",
+          "late-backdated"
+        ],
+        "is_join": false,
+        "merge_event_id": null,
+        "context_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      {
+        "branch_id": "branch-a",
+        "parent_branch_ids": [
+          "main"
+        ],
+        "event_ids": [
+          "branch-a-source",
+          "branch-a-policy"
+        ],
+        "is_join": false,
+        "merge_event_id": null,
+        "context_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "branch_id": "branch-b",
+        "parent_branch_ids": [
+          "main"
+        ],
+        "event_ids": [
+          "branch-b-docs",
+          "branch-b-policy"
+        ],
+        "is_join": false,
+        "merge_event_id": null,
+        "context_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "branch_id": "joined",
+        "parent_branch_ids": [
+          "branch-a",
+          "branch-b"
+        ],
+        "event_ids": [
+          "joined-merge"
+        ],
+        "is_join": true,
+        "merge_event_id": "joined-merge",
+        "context_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    ],
+    "obligations": [
+      {
+        "obligation_id": "build-repro",
+        "critical": false,
+        "dependency_dimensions": [
+          "source_tree_digest"
+        ]
+      },
+      {
+        "obligation_id": "docs-contract",
+        "critical": false,
+        "dependency_dimensions": [
+          "docs_contract_digest"
+        ]
+      },
+      {
+        "obligation_id": "policy-authority",
+        "critical": true,
+        "dependency_dimensions": [
+          "policy_digest"
+        ]
+      }
+    ],
+    "receipts": [
+      {
+        "receipt_id": "receipt-build-a",
+        "obligation_id": "build-repro",
+        "branch_id": "branch-a",
+        "scope": "descendants",
+        "context_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_event_ids": [
+          "branch-a-source"
+        ],
+        "outcome": "pass",
+        "observed_at": "2026-11-16T01:06:00Z",
+        "available_at": "2026-11-16T01:07:00Z",
+        "valid_until": "2026-11-16T10:00:00Z"
+      },
+      {
+        "receipt_id": "receipt-policy-a",
+        "obligation_id": "policy-authority",
+        "branch_id": "branch-a",
+        "scope": "descendants",
+        "context_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "source_event_ids": [
+          "branch-a-policy"
+        ],
+        "outcome": "pass",
+        "observed_at": "2026-11-16T01:16:00Z",
+        "available_at": "2026-11-16T01:17:00Z",
+        "valid_until": "2026-11-16T10:00:00Z"
+      },
+      {
+        "receipt_id": "receipt-docs-b",
+        "obligation_id": "docs-contract",
+        "branch_id": "branch-b",
+        "scope": "descendants",
+        "context_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_event_ids": [
+          "branch-b-docs"
+        ],
+        "outcome": "pass",
+        "observed_at": "2026-11-16T01:06:00Z",
+        "available_at": "2026-11-16T01:07:00Z",
+        "valid_until": "2026-11-16T10:00:00Z"
+      },
+      {
+        "receipt_id": "receipt-policy-b",
+        "obligation_id": "policy-authority",
+        "branch_id": "branch-b",
+        "scope": "descendants",
+        "context_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "source_event_ids": [
+          "branch-b-policy"
+        ],
+        "outcome": "pass",
+        "observed_at": "2026-11-16T01:16:00Z",
+        "available_at": "2026-11-16T01:17:00Z",
+        "valid_until": "2026-11-16T10:00:00Z"
+      },
+      {
+        "receipt_id": "receipt-join-build",
+        "obligation_id": "build-repro",
+        "branch_id": "joined",
+        "scope": "descendants",
+        "context_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "source_event_ids": [
+          "joined-merge"
+        ],
+        "outcome": "pass",
+        "observed_at": "2026-11-16T02:12:00Z",
+        "available_at": "2026-11-16T02:13:00Z",
+        "valid_until": "2026-11-16T10:00:00Z"
+      },
+      {
+        "receipt_id": "receipt-join-docs",
+        "obligation_id": "docs-contract",
+        "branch_id": "joined",
+        "scope": "descendants",
+        "context_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "source_event_ids": [
+          "joined-merge"
+        ],
+        "outcome": "pass",
+        "observed_at": "2026-11-16T02:12:00Z",
+        "available_at": "2026-11-16T02:13:00Z",
+        "valid_until": "2026-11-16T10:00:00Z"
+      },
+      {
+        "receipt_id": "receipt-join-policy",
+        "obligation_id": "policy-authority",
+        "branch_id": "joined",
+        "scope": "descendants",
+        "context_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "source_event_ids": [
+          "joined-merge"
+        ],
+        "outcome": "pass",
+        "observed_at": "2026-11-16T02:12:00Z",
+        "available_at": "2026-11-16T02:13:00Z",
+        "valid_until": "2026-11-16T10:00:00Z"
+      }
+    ]
+  },
+  "gold_overlay": {
+    "adjudication_status": "synthetic_known_answer_not_independently_adjudicated",
+    "happens_before_edges": [
+      [
+        "baseline",
+        "tie-first"
+      ],
+      [
+        "tie-first",
+        "tie-second"
+      ],
+      [
+        "baseline",
+        "tie-second"
+      ],
+      [
+        "baseline",
+        "late-backdated"
+      ],
+      [
+        "late-backdated",
+        "branch-a-source"
+      ],
+      [
+        "late-backdated",
+        "branch-b-docs"
+      ],
+      [
+        "tie-second",
+        "branch-a-source"
+      ],
+      [
+        "tie-second",
+        "branch-b-docs"
+      ],
+      [
+        "branch-a-source",
+        "branch-a-policy"
+      ],
+      [
+        "branch-b-docs",
+        "branch-b-policy"
+      ],
+      [
+        "branch-a-policy",
+        "joined-merge"
+      ],
+      [
+        "branch-b-policy",
+        "joined-merge"
+      ]
+    ],
+    "commuting_pairs": [
+      [
+        "branch-a-source",
+        "branch-b-docs"
+      ]
+    ],
+    "non_commuting_pairs": [
+      [
+        "branch-a-policy",
+        "branch-b-policy"
+      ]
+    ],
+    "join_required_obligations": [
+      {
+        "branch_id": "joined",
+        "obligation_ids": [
+          "build-repro",
+          "docs-contract",
+          "policy-authority"
+        ]
+      }
+    ]
+  },
+  "candidate_traces": [
+    {
+      "trace_id": "conformant-partial-order",
+      "asserted_happens_before_edges": [
+        [
+          "baseline",
+          "tie-first"
+        ],
+        [
+          "tie-first",
+          "tie-second"
+        ],
+        [
+          "baseline",
+          "tie-second"
+        ],
+        [
+          "baseline",
+          "late-backdated"
+        ],
+        [
+          "late-backdated",
+          "branch-a-source"
+        ],
+        [
+          "late-backdated",
+          "branch-b-docs"
+        ],
+        [
+          "tie-second",
+          "branch-a-source"
+        ],
+        [
+          "tie-second",
+          "branch-b-docs"
+        ],
+        [
+          "branch-a-source",
+          "branch-a-policy"
+        ],
+        [
+          "branch-b-docs",
+          "branch-b-policy"
+        ],
+        [
+          "branch-a-policy",
+          "joined-merge"
+        ],
+        [
+          "branch-b-policy",
+          "joined-merge"
+        ]
+      ],
+      "claimed_confluent_pairs": [
+        [
+          "branch-a-source",
+          "branch-b-docs"
+        ]
+      ],
+      "branch_decisions": [
+        {
+          "branch_id": "main",
+          "decision_cutoff": "2026-11-16T00:30:00Z",
+          "considered_event_ids": [
+            "baseline",
+            "tie-first",
+            "tie-second"
+          ],
+          "claimed_current_obligations": [],
+          "receipt_ids": []
+        },
+        {
+          "branch_id": "branch-a",
+          "decision_cutoff": "2026-11-16T01:30:00Z",
+          "considered_event_ids": [
+            "baseline",
+            "tie-first",
+            "tie-second",
+            "branch-a-source",
+            "branch-a-policy"
+          ],
+          "claimed_current_obligations": [
+            "build-repro",
+            "policy-authority"
+          ],
+          "receipt_ids": [
+            "receipt-build-a",
+            "receipt-policy-a"
+          ]
+        },
+        {
+          "branch_id": "branch-b",
+          "decision_cutoff": "2026-11-16T01:30:00Z",
+          "considered_event_ids": [
+            "baseline",
+            "tie-first",
+            "tie-second",
+            "branch-b-docs",
+            "branch-b-policy"
+          ],
+          "claimed_current_obligations": [
+            "docs-contract",
+            "policy-authority"
+          ],
+          "receipt_ids": [
+            "receipt-docs-b",
+            "receipt-policy-b"
+          ]
+        },
+        {
+          "branch_id": "joined",
+          "decision_cutoff": "2026-11-16T02:30:00Z",
+          "considered_event_ids": [
+            "baseline",
+            "tie-first",
+            "tie-second",
+            "late-backdated",
+            "branch-a-source",
+            "branch-a-policy",
+            "branch-b-docs",
+            "branch-b-policy",
+            "joined-merge"
+          ],
+          "claimed_current_obligations": [
+            "build-repro",
+            "docs-contract",
+            "policy-authority"
+          ],
+          "receipt_ids": []
+        }
+      ],
+      "join_requalifications": [
+        {
+          "branch_id": "joined",
+          "fresh_receipt_ids": [
+            "receipt-join-build",
+            "receipt-join-docs",
+            "receipt-join-policy"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "adversarial-linearization",
+      "asserted_happens_before_edges": [
+        [
+          "baseline",
+          "tie-first"
+        ],
+        [
+          "tie-first",
+          "tie-second"
+        ],
+        [
+          "baseline",
+          "tie-second"
+        ],
+        [
+          "baseline",
+          "late-backdated"
+        ],
+        [
+          "late-backdated",
+          "branch-a-source"
+        ],
+        [
+          "late-backdated",
+          "branch-b-docs"
+        ],
+        [
+          "tie-second",
+          "branch-a-source"
+        ],
+        [
+          "tie-second",
+          "branch-b-docs"
+        ],
+        [
+          "branch-a-source",
+          "branch-a-policy"
+        ],
+        [
+          "branch-b-docs",
+          "branch-b-policy"
+        ],
+        [
+          "branch-a-policy",
+          "joined-merge"
+        ],
+        [
+          "branch-b-policy",
+          "joined-merge"
+        ],
+        [
+          "branch-a-source",
+          "branch-b-docs"
+        ]
+      ],
+      "claimed_confluent_pairs": [
+        [
+          "branch-a-source",
+          "branch-b-docs"
+        ],
+        [
+          "branch-a-policy",
+          "branch-b-policy"
+        ]
+      ],
+      "branch_decisions": [
+        {
+          "branch_id": "main",
+          "decision_cutoff": "2026-11-16T00:30:00Z",
+          "considered_event_ids": [
+            "baseline",
+            "tie-first",
+            "tie-second"
+          ],
+          "claimed_current_obligations": [],
+          "receipt_ids": []
+        },
+        {
+          "branch_id": "branch-a",
+          "decision_cutoff": "2026-11-16T01:30:00Z",
+          "considered_event_ids": [
+            "baseline",
+            "tie-first",
+            "tie-second",
+            "branch-a-source",
+            "branch-a-policy",
+            "late-backdated"
+          ],
+          "claimed_current_obligations": [
+            "build-repro",
+            "policy-authority"
+          ],
+          "receipt_ids": [
+            "receipt-build-a",
+            "receipt-policy-a"
+          ]
+        },
+        {
+          "branch_id": "branch-b",
+          "decision_cutoff": "2026-11-16T01:30:00Z",
+          "considered_event_ids": [
+            "baseline",
+            "tie-first",
+            "tie-second",
+            "branch-b-docs",
+            "branch-b-policy"
+          ],
+          "claimed_current_obligations": [
+            "docs-contract",
+            "policy-authority"
+          ],
+          "receipt_ids": [
+            "receipt-docs-b",
+            "receipt-policy-b",
+            "receipt-build-a"
+          ]
+        },
+        {
+          "branch_id": "joined",
+          "decision_cutoff": "2026-11-16T02:30:00Z",
+          "considered_event_ids": [
+            "baseline",
+            "tie-first",
+            "tie-second",
+            "late-backdated",
+            "branch-a-source",
+            "branch-a-policy",
+            "branch-b-docs",
+            "branch-b-policy",
+            "joined-merge"
+          ],
+          "claimed_current_obligations": [
+            "build-repro",
+            "docs-contract",
+            "policy-authority"
+          ],
+          "receipt_ids": [
+            "receipt-build-a",
+            "receipt-docs-b"
+          ]
+        }
+      ],
+      "join_requalifications": [
+        {
+          "branch_id": "joined",
+          "fresh_receipt_ids": [
+            "receipt-join-build"
+          ]
+        }
+      ]
+    }
+  ]
+}
