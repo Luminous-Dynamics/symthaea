@@ -1342,6 +1342,13 @@ mod tests {
         .unwrap()
     }
 
+    fn asymmetric_fixture() -> FullEnvelopeSpec {
+        serde_json::from_str(include_str!(
+            "../../../../docs/research/marine/fixtures/marine-full-envelope-asymmetric-001.json"
+        ))
+        .unwrap()
+    }
+
     fn assert_rejected(spec: &FullEnvelopeSpec, code: &str) {
         let report = validate_full_envelope_spec(spec);
         assert_eq!(report.disposition, FullEnvelopeDisposition::Rejected);
@@ -1441,6 +1448,21 @@ mod tests {
         let port_profile = spec.stations[0].starboard_profile.clone();
         spec.stations[0].port_profile = Some(port_profile);
         assert_rejected(&spec, "symmetric_port_profile_supplied");
+    }
+
+
+    #[test]
+    fn asymmetric_json_fixture_passes_without_mirroring_port_geometry() {
+        let spec = asymmetric_fixture();
+        assert_eq!(spec.symmetry, SymmetryPolicy::ExplicitPortAndStarboard);
+        for station in &spec.stations {
+            let starboard = station.starboard_profile.iter().find(|p| p.role == ProfilePointRole::Waterline).unwrap();
+            let port = station.port_profile.as_ref().unwrap().iter().find(|p| p.role == ProfilePointRole::Waterline).unwrap();
+            assert_ne!(starboard.y_m.abs(), port.y_m.abs());
+        }
+        let report = validate_full_envelope_spec(&spec);
+        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert!(report.issues.is_empty());
     }
 
     #[test]
