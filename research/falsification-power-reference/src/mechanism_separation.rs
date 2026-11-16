@@ -840,8 +840,11 @@ mod tests {
                 mechanism("b", &[1.0, 0.0]),
                 mechanism("c", &[1.0, 1.0]),
             ],
-            0.05, 0.80, 6,
-        ).unwrap();
+            0.05,
+            0.80,
+            6,
+        )
+        .unwrap();
         assert_eq!(report.disposition, SeparationDisposition::TargetAchievable);
         assert_eq!(report.equivalence_class_count, 3);
         assert_eq!(report.total_observations, 6);
@@ -931,10 +934,7 @@ mod tests {
         .unwrap();
         assert_eq!(first, replay);
         assert_eq!(first.equivalence_classes[0].canonical_id, "a");
-        assert_eq!(
-            first.equivalence_classes[0].member_ids,
-            vec!["a", "b"]
-        );
+        assert_eq!(first.equivalence_classes[0].member_ids, vec!["a", "b"]);
     }
 
     #[test]
