@@ -281,3 +281,40 @@ Failure and cancellation are terminal dispositions. Store-and-forward is a disti
 
 All percentage targets are secondary to the hard state-transition invariants. The record validator checks local ordering and required references only; it does not authenticate signatures, establish durable storage, verify actual transport delivery, or grant custody authority. Those require separate independent verifiers and a versioned cryptographic receipt contract.
 
+
+
+## 12. Empirical likelihood calibration and planner-induced distribution shift
+
+The empirical calibration reference is now authored at research/subterra-likelihood-calibration/. It estimates categorical observation likelihoods from independent Training-site cases and scores a separate Calibration and Evaluation split.
+
+Required benchmarks:
+
+| Benchmark | Property | Proposed gate |
+|---|---|---|
+| SiteSplitLeakageBench | A whole physical site belongs to one split only | Zero cross-split site overlap |
+| AcquisitionLineageBench | One physical acquisition cannot be counted more than once | Zero duplicate acquisition-lineage contribution |
+| SiteActionIndependenceBench | A site/action pair contributes at most one independent sample in v0.1 | Zero duplicate site/action rows |
+| UnknownLikelihoodBench | Explicit unknown hypothesis remains in the contract | Under-supported unknown cells emit no probability vector |
+| ProperScoreBench | Outcome predictions evaluated with proper scoring rules | Report Brier and NLL against uniform and empirical-MLE baselines |
+| HoldoutCoverageBench | Missing likelihood support is visible | Publish scored/total cases and coverage; no hidden denominator change |
+| PlannerInducedShiftBench | Policies change their own observation distribution | Compare open-loop and policy-induced closed-loop predictive scores |
+| MultiStepPredictiveBench | Predictive quality changes with horizon | Report NLL/Brier at horizons 1, 5, 10 and 25 where supported |
+| LikelihoodTableIntegrityBench | A holdout scorer consumes only a table reproducible from Training | Reject modified cells, counts, outcomes, or probabilities |
+| ModelLineageBench | Each table binds dataset ID, estimator, alpha and support threshold | No unversioned likelihood table enters a planner comparison |
+
+### Evaluation design
+
+Keep three site-disjoint partitions:
+- Training: fit the empirical likelihood table.
+- Calibration: assess reliability and, in future versions, select preregistered calibration transforms/thresholds.
+- Evaluation: final frozen holdout; do not tune any parameter after viewing its results.
+
+The v0.1 estimator only scores Calibration and Evaluation. It does not fit temperature scaling, isotonic calibration, conformal prediction, hierarchical Bayesian sensor models or uncertainty sets. The Training split alone determines the Dirichlet-smoothed categorical likelihoods.
+
+The benchmark must also test planner-induced distribution shift. Compare passive/fixed, random, frontier, entropy-greedy, EVSI and survival-conditioned policies while keeping their base likelihood model frozen. Report the score gap between offline observations and the observations each policy actually selects. A model accurate under random sensing may be unreliable under a policy that seeks unusual or low-cost states.
+
+This is particularly important for physical world models: recent 2026 work notes that planner-driven state/action visitation can move away from the offline dataset and recommends multi-step rollout metrics (1/5/10/25), proper scoring rules and uncertainty calibration under OOD states/actions. The benchmark must not confuse in-distribution test performance with policy-time reliability.
+
+### Evidence boundary
+
+The calibration crate's 14 unit tests are AUTHORED, not executed. Its Dirichlet-smoothed empirical frequencies are not a general Bayesian sensor model and are not evidence of planetary transfer. Qualitative Candidate, Supported or DirectlyObserved site claim states must never be converted directly into probability values. Only independently adjudicated site/action observation cases with provenance are eligible for calibration.
