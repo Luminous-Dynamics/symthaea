@@ -488,7 +488,7 @@ fn parse_branches(
             let event = events
                 .get(event_id)
                 .ok_or_else(|| format!("branch {branch_id:?} references unknown event {event_id:?}"))?;
-            if event.branch_id != *branch_id {
+            if event.branch_id.as_str() != branch_id.as_str() {
                 return Err(format!(
                     "event {event_id:?} branch_id does not match its branch event_ids owner"
                 ));
@@ -1437,14 +1437,14 @@ mod tests {
         let conformant = trace(&report, "conformant-partial-order");
         assert_eq!(
             conformant.join_reports[0].freshly_requalified_obligations,
-            vec!["build-repro", "docs-contract", "policy-authority"]
+            vec!["build-repro".to_owned(), "docs-contract".to_owned(), "policy-authority".to_owned()]
         );
         assert!(conformant.join_reports[0].missing_requalification_obligations.is_empty());
 
         let adversarial = trace(&report, "adversarial-linearization");
         assert_eq!(
             adversarial.join_reports[0].missing_requalification_obligations,
-            vec!["docs-contract", "policy-authority"]
+            vec!["docs-contract".to_owned(), "policy-authority".to_owned()]
         );
     }
 
