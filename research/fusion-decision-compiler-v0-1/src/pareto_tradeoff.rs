@@ -43,6 +43,18 @@ impl ObjectiveDimension {
         }
     }
 
+    const fn index(self) -> usize {
+        match self {
+            Self::LifetimeNetElectricEnergyMwh => 0,
+            Self::WholeLifeCost => 1,
+            Self::OperationalAvailability => 2,
+            Self::PlannedDowntimeHours => 3,
+            Self::UnplannedDowntimeHours => 4,
+            Self::EngineeringBurdenIndex => 5,
+            Self::NetExportBoundWidthMwe => 6,
+        }
+    }
+
     const fn direction(self) -> ObjectiveDirection {
         match self {
             Self::LifetimeNetElectricEnergyMwh | Self::OperationalAvailability => {
@@ -70,7 +82,13 @@ pub enum CandidateEligibility {
     UnknownHardGate,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ObjectiveTolerance {
+    pub absolute: f64,
+    pub relative: f64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct ObjectiveComparisonProfile {
     pub profile_id: String,
     pub profile_sha256: String,
@@ -82,6 +100,11 @@ pub struct ObjectiveComparisonProfile {
     pub ebi_normalization_ref: String,
     /// Pins the UQ method and simultaneous/one-sided coverage definition.
     pub uncertainty_basis_ref: String,
+    /// Per-objective absolute/relative epsilons avoid spurious dominance
+    /// caused by solver rounding and mixed numerical scales.
+    pub objective_tolerances: [ObjectiveTolerance; 7],
+    /// Scalar Q_ENG comparison tolerance is separately declared.
+    pub q_eng_tolerance: ObjectiveTolerance,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -152,6 +175,8 @@ pub enum ScalarTradeoffDisposition {
 pub enum ComparisonDiagnostic {
     EmptyProfileIdentity,
     InvalidProfileDigest,
+    InvalidObjectiveTolerance(ObjectiveDimension),
+    InvalidQEngTolerance,
     EmptyProfileBoundary,
     EmptyLifetimeHorizon,
     EmptyCostBasis,
@@ -260,6 +285,24 @@ fn validate_profile(profile: &ObjectiveComparisonProfile) -> Vec<ComparisonDiagn
     if profile.uncertainty_basis_ref.trim().is_empty() {
         diagnostics.push(ComparisonDiagnostic::EmptyUncertaintyBasis);
     }
+    for dimension in ObjectiveDimension::ALL {
+        let tolerance = profile.objective_tolerances[dimension.index()];
+        if !tolerance.absolute.is_finite()
+            || tolerance.absolute < 0.0
+            || !tolerance.relative.is_finite()
+            || tolerance.relative < 0.0
+        {
+            diagnostics.push(ComparisonDiagnostic::InvalidObjectiveTolerance(dimension));
+        }
+    }
+    let q_tolerance = profile.q_eng_tolerance;
+    if !q_tolerance.absolute.is_finite()
+        || q_tolerance.absolute < 0.0
+        || !q_tolerance.relative.is_finite()
+        || q_tolerance.relative < 0.0
+    {
+        diagnostics.push(ComparisonDiagnostic::InvalidQEngTolerance);
+    }
     diagnostics
 }
 
@@ -350,16 +393,46 @@ fn q_eng(candidate: &CandidateObjectiveVector) -> Option<QEngValue> {
     calculate_q_eng(availability, burden)
 }
 
-fn scalar_preference(first: Option<QEngValue>, second: Option<QEngValue>) -> ScalarPreference {
+fn scalar_preference(
+    first: Option<QEngValue>,
+    second: Option<QEngValue>,
+    tolerance: ObjectiveTolerance,
+) -> ScalarPreference {
     match (first, second) {
-        (Some(first), Some(second)) if first.q_eng > second.q_eng => ScalarPreference::First,
-        (Some(first), Some(second)) if second.q_eng > first.q_eng => ScalarPreference::Second,
+        (Some(first), Some(second)) if is_better(
+            first.q_eng,
+            second.q_eng,
+            ObjectiveDirection::Maximize,
+            tolerance,
+        ) => ScalarPreference::First,
+        (Some(first), Some(second)) if is_better(
+            second.q_eng,
+            first.q_eng,
+            ObjectiveDirection::Maximize,
+            tolerance,
+        ) => ScalarPreference::Second,
         (Some(_), Some(_)) => ScalarPreference::Tie,
         _ => ScalarPreference::Unavailable,
     }
 }
 
+fn is_better(
+    first: f64,
+    second: f64,
+    direction: ObjectiveDirection,
+    tolerance: ObjectiveTolerance,
+) -> bool {
+    let threshold = tolerance.absolute.max(
+        tolerance.relative * first.abs().max(second.abs()),
+    );
+    match direction {
+        ObjectiveDirection::Maximize => first - second > threshold,
+        ObjectiveDirection::Minimize => second - first > threshold,
+    }
+}
+
 fn dominance(
+    profile: &ObjectiveComparisonProfile,
     first: &CandidateObjectiveVector,
     second: &CandidateObjectiveVector,
 ) -> DominanceRelation {
@@ -373,16 +446,9 @@ fn dominance(
         let Some(second_value) = objective_value(second, dimension).map(|item| item.value) else {
             return DominanceRelation::NotComparable;
         };
-        match dimension.direction() {
-            ObjectiveDirection::Maximize => {
-                first_better |= first_value > second_value;
-                second_better |= second_value > first_value;
-            }
-            ObjectiveDirection::Minimize => {
-                first_better |= first_value < second_value;
-                second_better |= second_value < first_value;
-            }
-        }
+        let tolerance = profile.objective_tolerances[dimension.index()];
+        first_better |= is_better(first_value, second_value, dimension.direction(), tolerance);
+        second_better |= is_better(second_value, first_value, dimension.direction(), tolerance);
     }
 
     match (first_better, second_better) {
@@ -394,6 +460,7 @@ fn dominance(
 }
 
 fn worse_dimensions(
+    profile: &ObjectiveComparisonProfile,
     winner: &CandidateObjectiveVector,
     other: &CandidateObjectiveVector,
 ) -> Vec<ObjectiveDimension> {
@@ -408,10 +475,12 @@ fn worse_dimensions(
             else {
                 return false;
             };
-            match dimension.direction() {
-                ObjectiveDirection::Maximize => winner_value < other_value,
-                ObjectiveDirection::Minimize => winner_value > other_value,
-            }
+            is_better(
+                other_value,
+                winner_value,
+                dimension.direction(),
+                profile.objective_tolerances[dimension.index()],
+            )
         })
         .collect()
 }
@@ -433,17 +502,21 @@ pub fn compare_pair(
 
     let first_q_eng = q_eng(first);
     let second_q_eng = q_eng(second);
-    let scalar_preference = scalar_preference(first_q_eng, second_q_eng);
+    let scalar_preference = scalar_preference(
+        first_q_eng,
+        second_q_eng,
+        profile.q_eng_tolerance,
+    );
     let comparable = first_diagnostics.is_empty() && second_diagnostics.is_empty();
     let relation = if comparable {
-        dominance(first, second)
+        dominance(profile, first, second)
     } else {
         DominanceRelation::NotComparable
     };
 
     let scalar_winner_worse_dimensions = match scalar_preference {
-        ScalarPreference::First if comparable => worse_dimensions(first, second),
-        ScalarPreference::Second if comparable => worse_dimensions(second, first),
+        ScalarPreference::First if comparable => worse_dimensions(profile, first, second),
+        ScalarPreference::Second if comparable => worse_dimensions(profile, second, first),
         _ => Vec::new(),
     };
 
@@ -538,7 +611,7 @@ pub fn extract_pareto_front(
             {
                 continue;
             }
-            if dominance(&candidates[second_index], &candidates[first_index])
+            if dominance(profile, &candidates[second_index], &candidates[first_index])
                 == DominanceRelation::FirstDominatesSecond
             {
                 statuses[first_index]
@@ -592,6 +665,16 @@ mod tests {
             cost_basis_ref: "USD-2026-real-discount-6pct-whole-life-v1".to_string(),
             ebi_normalization_ref: "qeng-ebi-normalization-paper-v1".to_string(),
             uncertainty_basis_ref: "net-export-one-sided-95pct-method-v1".to_string(),
+            objective_tolerances: [
+                ObjectiveTolerance { absolute: 0.01, relative: 1e-9 },
+                ObjectiveTolerance { absolute: 0.01, relative: 1e-9 },
+                ObjectiveTolerance { absolute: 1e-6, relative: 0.0 },
+                ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
+                ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
+                ObjectiveTolerance { absolute: 1e-9, relative: 1e-9 },
+                ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
+            ],
+            q_eng_tolerance: ObjectiveTolerance { absolute: 1e-9, relative: 1e-9 },
         }
     }
 
@@ -630,6 +713,47 @@ mod tests {
             ebi_normalization_ref: profile().ebi_normalization_ref,
             uncertainty_basis_ref: profile().uncertainty_basis_ref,
         }
+    }
+
+    #[test]
+    fn differences_inside_declared_objective_tolerances_do_not_create_false_dominance() {
+        let profile = profile();
+        let first = candidate("epsilon-a", 9_000.0, 10_000.0, 0.9000000, 400.0, 300.0, 0.5, 20.0);
+        let second = candidate(
+            "epsilon-b",
+            9_000.005,
+            10_000.005,
+            0.9000002,
+            400.00001,
+            300.00001,
+            0.5000000001,
+            20.00001,
+        );
+        let report = compare_pair(&profile, &first, &second);
+        assert_eq!(report.dominance, DominanceRelation::Equivalent);
+        assert_eq!(report.scalar_preference, ScalarPreference::Tie);
+    }
+
+    #[test]
+    fn differences_outside_declared_objective_tolerances_create_dominance() {
+        let profile = profile();
+        let first = candidate("epsilon-dominant", 9_001.0, 9_000.0, 0.91, 390.0, 290.0, 0.49, 19.0);
+        let second = candidate("epsilon-dominated", 9_000.0, 10_000.0, 0.90, 400.0, 300.0, 0.50, 20.0);
+        let report = compare_pair(&profile, &first, &second);
+        assert_eq!(report.dominance, DominanceRelation::FirstDominatesSecond);
+    }
+
+    #[test]
+    fn invalid_objective_tolerance_makes_comparison_not_comparable() {
+        let mut profile = profile();
+        profile.objective_tolerances[ObjectiveDimension::WholeLifeCost.index()].absolute = f64::NAN;
+        let first = candidate("first", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
+        let second = candidate("second", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
+        let report = compare_pair(&profile, &first, &second);
+        assert_eq!(report.dominance, DominanceRelation::NotComparable);
+        assert!(report.first_diagnostics.contains(
+            &ComparisonDiagnostic::InvalidObjectiveTolerance(ObjectiveDimension::WholeLifeCost)
+        ));
     }
 
     #[test]
