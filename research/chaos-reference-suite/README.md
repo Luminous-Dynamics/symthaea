@@ -22,6 +22,8 @@ cargo run --manifest-path research/chaos-reference-suite/Cargo.toml --bin chaos-
 
 The executable prints fixture metadata as comment lines, followed by CSV records. Sample count is capped at 1,000,000 per fixture.
 
+A dedicated pull-request workflow runs formatting, strict Clippy, all tests and a small frozen CSV smoke generation for this standalone package.
+
 ## Qualification rules
 
 - Keep fixture definitions, parameters, seeds, burn-in and sample count frozen per suite version.
