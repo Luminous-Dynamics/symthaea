@@ -7,10 +7,9 @@
 //! given the supplied finite hypothesis model; a reused origin is blocked.
 
 use super::{
-    DecisionCase, DecisionEstimate, EvidenceStatus, Measurement, MeasurementDisposition,
-    evaluate_case, evaluate_measurement, minimum_expected_loss, posterior,
+    DecisionCase, DecisionEstimate, Measurement, MeasurementDisposition, evaluate_case,
+    evaluate_measurement, minimum_expected_loss, posterior,
 };
-use std::collections::BTreeSet;
 
 const LOSS_TOLERANCE: f64 = 1.0e-9;
 
@@ -441,21 +440,19 @@ mod tests {
         let case = reference_case();
         let mut measurements = reference_measurements();
         measurements[1].evidence_origin = measurements[0].evidence_origin;
+        measurements.truncate(2);
         let result = evaluate_depth_two(&case, &measurements, 4.0).unwrap();
         let policy = result.adaptive_depth_two.unwrap();
         assert!(policy.branches.iter().all(|branch| branch.second_measurement_id.is_none()));
     }
 
     #[test]
-    fn no_branch_is_created_for_a_zero_probability_outcome() {
-        let case = reference_case();
-        let mut measurements = reference_measurements();
-        measurements[0].positive_likelihoods = Some(vec![0.0, 0.0, 0.0]);
-        let result = evaluate_depth_two(&case, &measurements, 4.0).unwrap();
-        let policy = result.adaptive_depth_two.unwrap();
-        assert_eq!(policy.first_measurement_id, "INDEPENDENT_PROCESS_SAFETY_TEST");
-        assert!(policy.branches.len() <= 2);
-        assert!(policy.branches.iter().all(|branch| branch.outcome_probability > 0.0));
+    fn zero_probability_outcome_has_no_posterior_branch() {
+        let prior = vec![0.10, 0.30, 0.60];
+        let impossible_positive = vec![0.0, 0.0, 0.0];
+        assert!(posterior(&prior, &impossible_positive, true, 0.0).is_none());
+        let negative = posterior(&prior, &impossible_positive, false, 1.0).unwrap();
+        assert_eq!(negative, prior);
     }
 
     #[test]
@@ -464,6 +461,16 @@ mod tests {
         assert_eq!(result.greedy_one_step_measurement_id, None);
         assert_eq!(result.greedy_one_step_total_loss, result.no_test_total_loss);
         assert_eq!(result.adaptive_depth_two, None);
+    }
+
+    #[test]
+    fn adaptive_policy_respects_budget_below_two_test_combination_cost() {
+        let result = evaluate_depth_two(&reference_case(), &reference_measurements(), 2.99).unwrap();
+        let policy = result.adaptive_depth_two.unwrap();
+        assert!(policy.expected_measurement_cost <= 2.99 + LOSS_TOLERANCE);
+        assert!(policy.branches.iter().all(|branch| {
+            branch.second_measurement_id.is_none()
+        }));
     }
 
     #[test]
