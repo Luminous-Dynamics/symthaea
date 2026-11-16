@@ -230,7 +230,7 @@ fn validate_schema(
 
     const SUPPORTED: &[&str] = &[
         "$schema", "$id", "title", "type", "additionalProperties", "required",
-        "properties", "items", "enum", "const", "minItems", "minLength",
+        "properties", "items", "enum", "const", "minItems", "maxItems", "minLength",
         "minProperties", "pattern",
     ];
     for keyword in schema_object.keys() {
@@ -295,6 +295,11 @@ fn validate_schema(
         if let Some(minimum) = schema_object.get("minItems").and_then(Value::as_u64) {
             if array.len() < minimum as usize {
                 errors.push(path_error(path, format!("requires at least {minimum} items")));
+            }
+        }
+        if let Some(maximum) = schema_object.get("maxItems").and_then(Value::as_u64) {
+            if array.len() > maximum as usize {
+                errors.push(path_error(path, format!("allows at most {maximum} items")));
             }
         }
         if let Some(item_schema) = schema_object.get("items") {
@@ -886,6 +891,13 @@ mod tests {
         let (mut document, schema) = tracked_values();
         case_mut(&mut document, "TAC-ALIAS-030")["candidate_input"]
             ["representation_comparison"]["comparison_normal_raw"] = json!(0.31);
+        assert!(validate_document(&document, &schema).is_err());
+    }
+
+    #[test]
+    fn maximum_array_length_is_enforced_by_the_closed_schema() {
+        let (document, mut schema) = tracked_values();
+        schema["properties"]["cases"]["maxItems"] = json!(29);
         assert!(validate_document(&document, &schema).is_err());
     }
 
