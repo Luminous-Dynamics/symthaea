@@ -653,6 +653,22 @@ mod tests {
                 GroupHypothesisV1::Cyclic { order: 4 },
                 GroupHypothesisV1::Cyclic { order: 5 },
                 GroupHypothesisV1::Cyclic { order: 6 },
+            ]
+        );
+    }
+
+    #[test]
+    fn truncated_dihedral_signatures_return_all_ambiguous_dihedral_hypotheses() {
+        let signature =
+            rank_template(GroupHypothesisV1::RotationalDihedral { order: 3 }, 2, budget())
+                .unwrap();
+        let proposal = match_signature(&signature, 6, budget()).unwrap();
+
+        assert_eq!(signature, vec![1, 0, 1]);
+        assert_eq!(proposal.status, MatchStatusV1::Ambiguous);
+        assert_eq!(
+            proposal.matching_hypotheses,
+            vec![
                 GroupHypothesisV1::RotationalDihedral { order: 3 },
                 GroupHypothesisV1::RotationalDihedral { order: 4 },
                 GroupHypothesisV1::RotationalDihedral { order: 5 },
