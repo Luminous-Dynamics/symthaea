@@ -35,6 +35,8 @@ EGDDM should publish matched cross-benchmark results only where task, model, har
 4. **Causal structure:** partial orders, concurrency versus commutativity, branch isolation and merge requalification (D6.10).
 5. **Epistemic calibration:** observation completeness, admissible histories, underdetermination, compromise detection and justified abstention (D6.11).
 6. **Measurement integrity:** state-mutating oracles, stale caches, replay mismatch, nondeterminism, observer coverage, false positives and false negatives (D6.12).
+7. **Graph-level causal identifiability:** complete admissible DAG worlds, joint-claim consistency, entailed versus merely possible relations and no-vacuous-truth controls (D6.13).
+8. **Evidence-safe handoff:** interruption recovery, evidence portability, authority/commitment transfer and unknown-outcome reconciliation across agents or sessions (D6.14).
 
 D6.7 remains the owner of independently adjudicated impact/common-cause provenance and measured check-cost distributions. These tracks should share provenance conventions and report schemas, but their gold labels and failure denominators must remain separate.
 
@@ -80,6 +82,7 @@ Publish separate axes:
 - **Causal quality:** false serialization, missing order, false concurrency and confluence accuracy.
 - **Epistemic calibration:** identified relations, calibrated abstentions, false completeness and missed compromise.
 - **Oracle integrity:** state mutations, replay mismatches, cache contamination, false acceptance and false rejection.
+- **Handoff integrity:** workspace/obligation reconstruction, stale-evidence acceptance, authority continuity, duplicate side-effect prevention and recovery quality.
 - **Efficiency:** wall-clock time, tokens, tool calls, independent check cost, revalidation churn and recovery latency.
 
 Critical safety failures are hard gates. The leaderboard should expose the safe-performance frontier rather than combine dimensions into one weighted score.
@@ -110,8 +113,10 @@ For a later matched-agent pilot, an aspirational target is +10 percentage points
 | D6.10 partial orders | 360 DAG tasks after validity pilot | Synthetic known-answer fixture; no independent DAG adjudication |
 | D6.11 identifiability | 384 tasks after validity pilot | Synthetic pairwise admissible-relation prototype; not a full-DAG possible-world solver |
 | D6.12 oracle integrity | 480 audits after validity pilot | Synthetic state-digest/replay contract; no real benchmark fault injection |
+| D6.13 whole-DAG identifiability | 400 graph tasks after validity pilot | Synthetic 6-event / 2-world fixture; no independent whole-world adjudication |
+| D6.14 evidence-safe handoff | 480 base handoff episodes after validity pilot | Research brief opened; no evaluator implementation or receiver trials yet |
 
-These are separate task families and target counts; they are not a current 1,500-task benchmark. Pilot reliability, independent annotation agreement and power analysis determine whether the targets should change.
+These are separate task families and target counts; they are not a current 2,500-task benchmark. Pilot reliability, independent annotation agreement and power analysis determine whether the targets should change.
 
 ## Release gates
 
