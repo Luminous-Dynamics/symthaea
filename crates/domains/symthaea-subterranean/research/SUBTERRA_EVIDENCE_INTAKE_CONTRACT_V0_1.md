@@ -147,13 +147,15 @@ Contents:
 - science-return lifecycle validator and site/observation linkage;
 - copied synthetic site, network and profile fixtures;
 - 21 site/network tests, 6 profile tests and 10 science-return tests (37 adapter cases total).
+- Pinned upstream schema/fixture manifest and explicit local verification script for the four nested Cargo packages.
 
 Across the complete current Symthaea Subterra PR, the one-step EVSI, survival planner, robust EVSI, site/network/profile adapter and science-return lifecycle together have 68 authored Rust unit tests. This count is source inspection only. None has been compiled or executed in the current environment.
 
 ### Verification status
 
-- Fixture JSON syntax: checked.
-- Source/schema blob provenance: recorded.
+- Fixture and manifest JSON syntax: checked.
+- Source/schema blob provenance: recorded in the pinned manifest.
+- Local verifier script: AUTHORED; not executed because cargo, rustc and rustfmt are unavailable.
 - Rust formatting: not executed.
 - Rust compilation: not executed.
 - Rust tests: not executed.
@@ -164,6 +166,7 @@ Across the complete current Symthaea Subterra PR, the one-step EVSI, survival pl
 ## 8. Next increments
 
 1. Add runtime/source-level enforcement of the pinned schema manifest and negative fixtures; reject unsupported version/blob drift.
+2. Run the authored four-package verification script on an environment with the declared Rust toolchain and retain exact-head receipts.
 2. Connect verified observation lineage and source-trust receipts; retain common-cause correlations.
 3. Create a separate calibration model that maps site evidence to prior/likelihood distributions with non-zero unknown mass.
 4. Add direct adapters from validated site/network/profile packets into finite model-ensemble EVSI inputs, without copying source claims into numeric probabilities.
