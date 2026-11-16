@@ -432,6 +432,23 @@ mod tests {
         assert!(adaptive.expected_total_loss < result.greedy_one_step_total_loss);
         close(result.greedy_one_step_total_loss, 9.77);
         close(adaptive.expected_total_loss, 6.598);
+        close(adaptive.expected_terminal_decision_loss, 4.248);
+        close(adaptive.expected_measurement_cost, 2.35);
+        close(adaptive.worst_case_branch_total_loss, 7.204444444);
+    }
+
+    #[test]
+    fn adaptive_policy_reports_worst_case_path_loss_separately() {
+        let result = evaluate_depth_two(&reference_case(), &reference_measurements(), 4.0).unwrap();
+        let policy = result.adaptive_depth_two.unwrap();
+        let expected_max = policy
+            .branches
+            .iter()
+            .map(|branch| branch.branch_expected_total_loss)
+            .max_by(f64::total_cmp)
+            .unwrap();
+        close(policy.worst_case_branch_total_loss, expected_max);
+        assert!(policy.worst_case_branch_total_loss >= policy.expected_total_loss);
     }
 
     #[test]
