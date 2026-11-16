@@ -37,16 +37,19 @@
   "observables": {
     "fusion_gain_Q_dimensionless": 9.959031439182866,
     "thermal_power_MWth_reported": 549.700,
-    "gross_electric_power_MWe_reported": 192.395,
-    "variable_recirculated_power_MWe_reported": 144.149,
-    "fixed_recirculated_power_MWe_reported": 91.0951,
-    "total_recirculated_power_MWe_reported": 235.244,
+    "gross_electric_power_MWe": 192.395,
+    "variable_recirculated_power_MWe": 144.14914,
+    "fixed_recirculated_power_MWe": 91.09506863494322,
+    "total_recirculated_power_MWe": 235.24420863494322,
     "net_electric_power_MWe": -42.84920863494321,
-    "engineering_gain_QE_reported": 0.818
+    "engineering_gain_QE_reported": 0.8178522273360723
   },
-  "reported_balance_residuals": {
-    "total_recirculated_rounding_difference_MW": -0.0001,
-    "net_electric_rounding_difference_MW": -0.000108634943208
+  "recomputed_balance": {
+    "absolute_balance_tolerance_mw": 0.000001,
+    "calculated_total_recirculated_mwe": 235.24420863494322,
+    "calculated_net_electric_mwe": -42.849208634943196,
+    "total_recirculated_residual_mw": 0.0,
+    "net_electric_residual_mw": -1.4210854715202004e-14
   },
   "qualification": {
     "expected_disposition": "NetImport",
