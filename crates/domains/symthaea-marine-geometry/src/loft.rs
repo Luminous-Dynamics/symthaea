@@ -27,7 +27,7 @@ pub struct LoftViolation {
     pub detail: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FaceRange {
     pub first_face: usize,
     pub face_count: usize,
@@ -47,10 +47,15 @@ pub struct LoftedHullArtifact {
     pub side_face_range: FaceRange,
     pub waterplane_face_range: FaceRange,
     pub end_cap_face_range: FaceRange,
+    #[serde(default)]
     pub bow_end_cap_face_range: FaceRange,
+    #[serde(default)]
     pub stern_end_cap_face_range: FaceRange,
+    #[serde(default)]
     pub station_count: usize,
+    #[serde(default)]
     pub section_point_count: usize,
+    #[serde(default)]
     pub longitudinal_end_conditions: LongitudinalEndConditions,
     pub candidate: CandidateInput,
     pub admission_report: AdmissionReport,
@@ -1222,6 +1227,52 @@ mod tests {
         }
     }
 
+    fn end_condition_spec(
+        bow: LongitudinalEndCondition,
+        stern: LongitudinalEndCondition,
+    ) -> SectionHullSpec {
+        let mut spec = convex_spec();
+        spec.candidate_id = format!("end-closure-{bow:?}-{stern:?}");
+        spec.longitudinal_end_conditions = LongitudinalEndConditions { bow, stern };
+        if bow == LongitudinalEndCondition::CollapsedCentreline {
+            spec.stations[0].half_breadth_fraction = 0.0;
+        }
+        if stern == LongitudinalEndCondition::CollapsedCentreline {
+            spec.stations[spec.stations.len() - 1].half_breadth_fraction = 0.0;
+        }
+        spec
+    }
+
+    fn assert_admissible_end_conditions(
+        bow: LongitudinalEndCondition,
+        stern: LongitudinalEndCondition,
+    ) -> LoftedHullArtifact {
+        let sections = generate_section_artifact(&end_condition_spec(bow, stern)).unwrap();
+        let loft = loft_waterplane_capped_hull(&sections, profile()).unwrap();
+        assert_eq!(
+            loft.admission_report.disposition,
+            Disposition::AdmissibleForProfile
+        );
+        assert_eq!(loft.admission_report.metrics.boundary_edge_count, 0);
+        assert_eq!(loft.admission_report.metrics.non_manifold_edge_count, 0);
+        assert_eq!(loft.admission_report.metrics.non_manifold_vertex_link_count, 0);
+        verify_loft_artifact_integrity(&loft).unwrap();
+
+        let expected_bow_caps = if bow == LongitudinalEndCondition::PlanarEndCap {
+            2 * loft.section_point_count - 1
+        } else {
+            0
+        };
+        let expected_stern_caps = if stern == LongitudinalEndCondition::PlanarEndCap {
+            2 * loft.section_point_count - 1
+        } else {
+            0
+        };
+        assert_eq!(loft.bow_end_cap_face_range.face_count, expected_bow_caps);
+        assert_eq!(loft.stern_end_cap_face_range.face_count, expected_stern_caps);
+        loft
+    }
+
     fn rectangular_spec() -> SectionHullSpec {
         let shape = vec![
             SectionControlPoint {
@@ -1387,6 +1438,140 @@ mod tests {
         result.admission_report = admit(&result.candidate);
         let error = verify_loft_artifact_integrity(&result).unwrap_err();
         assert!(error.iter().any(|item| item.code == "loft_manifest_digest"));
+    }
+
+
+    #[test]
+    fn pointed_bow_with_planar_stern_is_manifold_and_admissible() {
+        let loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        assert_eq!(loft.waterplane_face_range.face_count, 3);
+        assert_eq!(loft.bow_end_cap_face_range.face_count, 0);
+        assert!(loft.end_cap_face_range.face_count > 0);
+    }
+
+    #[test]
+    fn planar_bow_with_pointed_stern_is_manifold_and_admissible() {
+        let loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::PlanarEndCap,
+            LongitudinalEndCondition::CollapsedCentreline,
+        );
+        assert_eq!(loft.waterplane_face_range.face_count, 3);
+        assert_eq!(loft.stern_end_cap_face_range.face_count, 0);
+        assert!(loft.end_cap_face_range.face_count > 0);
+    }
+
+    #[test]
+    fn both_pointed_ends_share_centreline_vertices_without_end_caps() {
+        let loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::CollapsedCentreline,
+        );
+        assert_eq!(loft.waterplane_face_range.face_count, 2);
+        assert_eq!(loft.end_cap_face_range.face_count, 0);
+
+        let point_count = loft.section_point_count;
+        for station_index in [0, loft.station_count - 1] {
+            let base = if station_index == 0 {
+                0
+            } else {
+                (0..loft.station_count - 1).fold(0_usize, |offset, index| {
+                    let collapsed = index == 0;
+                    offset + point_count + if collapsed { 0 } else { point_count - 1 }
+                })
+            };
+            let endpoint_vertices =
+                &loft.candidate.geometry.vertices[base..base + point_count];
+            assert!(endpoint_vertices.iter().all(|point| point[1] == 0.0));
+        }
+    }
+
+    #[test]
+    fn planar_planar_legacy_end_conditions_remain_supported() {
+        let loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::PlanarEndCap,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        assert_eq!(
+            loft.waterplane_face_range.face_count,
+            2 * (loft.station_count - 1)
+        );
+        assert_eq!(
+            loft.end_cap_face_range.face_count,
+            2 * (2 * loft.section_point_count - 1)
+        );
+    }
+
+    #[test]
+    fn collapsed_interior_station_is_rejected() {
+        let mut spec = convex_spec();
+        spec.stations[1].half_breadth_fraction = 0.0;
+        let error = generate_section_artifact(&spec).unwrap_err();
+        assert!(error.iter().any(|item| item.code == "interior_station_breadth"));
+    }
+
+    #[test]
+    fn zero_breadth_endpoint_with_planar_cap_label_is_rejected() {
+        let mut spec = convex_spec();
+        spec.stations[0].half_breadth_fraction = 0.0;
+        let error = generate_section_artifact(&spec).unwrap_err();
+        assert!(error.iter().any(|item| item.code == "planar_end_breadth"));
+    }
+
+    #[test]
+    fn positive_breadth_endpoint_with_collapsed_label_is_rejected() {
+        let mut spec = end_condition_spec(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        spec.stations[0].half_breadth_fraction = 0.01;
+        let error = generate_section_artifact(&spec).unwrap_err();
+        assert!(error.iter().any(|item| item.code == "collapsed_end_breadth"));
+    }
+
+    #[test]
+    fn two_adjacent_collapsed_ends_are_rejected() {
+        let mut spec = end_condition_spec(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::CollapsedCentreline,
+        );
+        spec.stations.truncate(2);
+        spec.stations[1].x_over_length = 1.0;
+        spec.stations[1].half_breadth_fraction = 0.0;
+        let error = generate_section_artifact(&spec).unwrap_err();
+        assert!(error.iter().any(|item| item.code == "adjacent_collapsed_ends"));
+    }
+
+    #[test]
+    fn mutated_end_condition_without_manifest_rebinding_is_rejected() {
+        let mut loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        loft.longitudinal_end_conditions.bow = LongitudinalEndCondition::PlanarEndCap;
+        let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
+        assert!(errors.iter().any(|item| item.code == "loft_manifest_digest"));
+    }
+
+    #[test]
+    fn collapsed_endpoint_must_not_duplicate_transverse_vertices() {
+        let mut loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        let starboard_keel = loft.candidate.geometry.vertices[0];
+        loft.candidate.geometry.vertices[0][1] = 0.25;
+        assert_ne!(loft.candidate.geometry.vertices[0], starboard_keel);
+        // Rebinding the geometry digest cannot make invalid collapsed-end semantics pass.
+        let digest = crate::compute_geometry_digest(&loft.candidate.geometry).unwrap();
+        loft.candidate.geometry_digest_blake3 = digest.clone();
+        loft.mesh_digest_blake3 = digest;
+        loft.admission_report = crate::admit(&loft.candidate);
+        loft.loft_manifest_digest_blake3 = compute_loft_manifest_digest(&loft).unwrap();
+        let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
+        assert!(errors.iter().any(|item| item.code == "collapsed_end_geometry"));
     }
 
     #[test]
