@@ -51,7 +51,8 @@ The package has its own Cargo workspace and does not join the production Symthae
 
 ## Validation boundary
 
-- Site, cave-network and non-uniform-profile adapters plus science-return lifecycle and unit-test fixtures: AUTHORED.
+- Site, cave-network and non-uniform-profile adapters, science-return lifecycle, pinned upstream-schema manifest and unit-test fixtures: AUTHORED.
+- Authored tests: 21 site/network + 6 profile + 10 science-return = 37 adapter tests.
 - The profile adapter validates ordered contiguous coverage and computes observed-only geometry summaries; it does not yet propagate uncertainty through the summary statistics.
 - The science-return record validates event order and reference presence; it does not prove cryptographic authenticity, immutable storage, custody authority or transport delivery.
 - The upstream manifest pins source Git objects but does not fetch or authenticate upstream content at runtime.
