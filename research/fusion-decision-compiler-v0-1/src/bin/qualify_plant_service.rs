@@ -26,7 +26,7 @@ fn main() {
         unit_ref: "MWe".to_string(),
         averaging_window_ref: "iter-run-steady-state-window-v1".to_string(),
         sign_convention_ref: "gross-and-load-positive-net-export-positive-v1".to_string(),
-        absolute_balance_tolerance_mw: 0.001,
+        absolute_balance_tolerance_mw: 0.000_001,
         required_net_export_reserve_mw: 0.0,
         reserve_threshold_inclusive: true,
     };
@@ -47,9 +47,9 @@ fn main() {
         receipt_ref: "symthaea-workflow:43729456208:artifact:14167288485".to_string(),
         terms: vec![
             term(PowerObservable::GrossElectric, 192.395, 153),
-            term(PowerObservable::VariableRecirculated, 144.149, 160),
-            term(PowerObservable::FixedRecirculated, 91.0951, 161),
-            term(PowerObservable::TotalRecirculated, 235.244, 162),
+            term(PowerObservable::VariableRecirculated, 144.14914, 160),
+            term(PowerObservable::FixedRecirculated, 91.09506863494322, 161),
+            term(PowerObservable::TotalRecirculated, 235.24420863494322, 162),
             term(PowerObservable::NetElectric, -42.84920863494321, 25),
         ],
     };
