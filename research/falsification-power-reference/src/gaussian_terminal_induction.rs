@@ -332,6 +332,13 @@ mod tests {
     }
 
     #[test]
+    fn terminal_power_matches_external_normal_reference_value() {
+        let test =
+            GaussianTerminalInducedTest::new(0.05, vec![0.24; 3], vec![0.15; 3]).unwrap();
+        assert!((test.terminal_power() - 0.870_007_728_878_440_5).abs() < 2.0e-7);
+    }
+
+    #[test]
     fn fixed_design_conditional_values_satisfy_a_prefix_martingale_check() {
         let test =
             GaussianTerminalInducedTest::new(0.05, vec![0.2; 3], vec![0.5; 3]).unwrap();
