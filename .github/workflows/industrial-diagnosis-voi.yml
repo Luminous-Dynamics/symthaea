@@ -41,7 +41,34 @@ jobs:
       run: |
         cargo run --quiet --manifest-path tools/industrial-diagnosis-voi/Cargo.toml --bin voi-sequential-report | tee /tmp/industrial-diagnosis-sequential-voi.tsv
         test "$(wc -l < /tmp/industrial-diagnosis-sequential-voi.tsv)" -eq 6
-        awk -F '\t' '$1 == "GREEDY_ONE_STEP" && $3 == "INDEPENDENT_PROCESS_SAFETY_TEST" && $7 == "7.770000" && $8 == "2.000000" && $9 == "9.770000" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
-        awk -F '\t' '$1 == "ADAPTIVE_DEPTH_TWO" && $3 == "CALIBRATION_REFERENCE_ARTIFACT" && $7 == "4.248000" && $8 == "2.350000" && $9 == "6.598000" && $10 == "7.204444" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
-        awk -F '\t' '$1 == "BRANCH" && $4 == "POSITIVE" && $5 == "STOP" && $11 == "0.325000" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
-        awk -F '\t' '$1 == "BRANCH" && $4 == "NEGATIVE" && $5 == "INDEPENDENT_PROCESS_SAFETY_TEST" && $11 == "0.675000" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
+        awk -F '\t' '$1 == "GREEDY_ONE_STEP" && $3 == "INDEPENDENT_PROCESS_SAFETY_TEST" && $7 == "7.770000" && $8 == "2.000000" && $9 == "9.770000" && $10 == "14.000000" && $12 == "2.600000" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
+        awk -F '\t' '$1 == "ADAPTIVE_DEPTH_TWO" && $3 == "CALIBRATION_REFERENCE_ARTIFACT" && $7 == "4.248000" && $8 == "2.350000" && $9 == "6.598000" && $10 == "15.000000" && $11 == "4.802000" && $12 == "3.600000" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
+        awk -F '\t' '$1 == "BRANCH" && $4 == "POSITIVE" && $5 == "STOP" && $10 == "5.338462" && $17 == "0.325000" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
+        awk -F '\t' '$1 == "BRANCH" && $4 == "NEGATIVE" && $5 == "INDEPENDENT_PROCESS_SAFETY_TEST" && $10 == "15.000000" && $13 == "0.207778" && $14 == "0.792222" && $15 == "15.000000" && $16 == "5.159888" && $17 == "0.675000" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
+    - name: Set up benchmark-only Python reference
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - name: Independently enumerate depth-two policy tree
+      run: |
+        python tools/industrial-diagnosis-voi/reference/sequential_depth2_check.py | tee /tmp/industrial-diagnosis-sequential-reference.json
+        python - <<'PY'
+        import json
+        with open("/tmp/industrial-diagnosis-sequential-reference.json", encoding="utf-8") as handle:
+            result = json.load(handle)
+        policy = result["adaptive_depth_two"]
+        assert policy["first_measurement"] == "CALIBRATION_REFERENCE_ARTIFACT"
+        assert abs(policy["expected_terminal_loss"] - 4.248) < 1e-9
+        assert abs(policy["expected_measurement_cost"] - 2.35) < 1e-9
+        assert abs(policy["expected_total_loss"] - 6.598) < 1e-9
+        assert abs(policy["worst_case_leaf_total_loss"] - 15.0) < 1e-9
+        assert abs(policy["worst_case_regret_vs_no_test"] - 3.6) < 1e-9
+        positive, negative = policy["branches"]
+        assert positive["first_outcome"] == "POSITIVE"
+        assert positive["second_measurement"] == "STOP"
+        assert abs(positive["probability"] - 0.325) < 1e-9
+        assert negative["first_outcome"] == "NEGATIVE"
+        assert negative["second_measurement"] == "INDEPENDENT_PROCESS_SAFETY_TEST"
+        assert abs(negative["second_positive_leaf_total_loss"] - 15.0) < 1e-9
+        assert abs(negative["second_negative_leaf_total_loss"] - 5.159887798) < 1e-6
+        PY
