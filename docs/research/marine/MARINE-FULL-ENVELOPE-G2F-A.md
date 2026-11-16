@@ -84,7 +84,15 @@ The G2f-a input is not itself a B-rep, triangle mesh or full external hull artif
 - explicit bottom, topsides, deck and both end-closure regions;
 - no appendages or openings.
 
-The fixture is an input contract test, not a produced mesh. Its dimensions provide an exact future geometry/hydrostatic known-answer target after the generator exists: external box envelope volume 20,000 m³ before accounting for the declared deck crown; the submerged rectangular prism below z=0 has 12,000 m³ displacement. The crown makes the full-envelope top not a simple rectangular box, so external-envelope volume must be computed from the explicit deck profile rather than reusing the 20,000 m³ rectangular-box bound.
+The fixture is an input contract test, not a produced mesh. Its exact prismatic geometry yields 12,000 m³ below z=0 and 20,500 m³ for the full external envelope including the declared 0.5 m triangular deck crown. These are analytical reference values for this synthetic profile, not generated-mesh or vessel measurements.
+
+### Explicit asymmetry and pointed-end fixture extension
+
+The JSON fixture set now includes:
+- `marine-full-envelope-box-001.json`: symmetric transom/transom reference hull;
+- `marine-full-envelope-asymmetric-001.json`: explicit port/starboard profiles with different transverse breadths and independently referenced waterline points.
+
+The pointed-stem + explicit port/starboard combination is covered by a Rust unit fixture. It requires both sides to share exact point identities and z coordinates along the collapsed stem, while permitting independent port/starboard geometry through the midbody. This distinction prevents the validator from treating asymmetric vessels as mirrored vessels or allowing a disconnected stem seam.
 
 ## 7. Next implementation increments
 
@@ -144,7 +152,9 @@ Exit codes: 0 valid input contract, 1 incomplete, 2 rejected, 3 CLI/I/O/parse fa
 
 The Rust tests include malformed and negative controls for missing port profiles, asymmetric input falsely declared symmetric, invalid waterline references, wrong waterline plane, incorrect deck seams, pointed-end geometry, openings whose boundary points do not resolve, missing surface regions, non-finite coordinates, unsupported regions, duplicate station/component IDs, unknown nested JSON keys and resource-bounded station counts.
 
-The synthetic box input passes the typed validator; the earlier local structural/schema reference checks also reported no errors. The runner evidence for this Rust validator is tracked separately in the G2f branch workflow. A valid input contract remains strictly below generated-surface and engineering qualification.
+The symmetric box input and the explicit asymmetric box fixture are separate cases. The asymmetric fixture supplies port and starboard profiles with different transverse breadths, distinct side point IDs and independent waterline references. The validator checks compatible semantic roles and breaklines without imposing reflected coordinates. At a pointed stem, both profiles must share exact centreplane point identities and z coordinates so that the stem seam is closed.
+
+The symmetric box and explicit asymmetric fixture pass the typed validator on the feature branch; a pointed-stem/explicit-port case is covered by a separate unit test. A valid input contract remains strictly below generated-surface and engineering qualification.
 
 ## 11. Research benchmark programme — match the 2026 literature, exceed it through evidence
 
