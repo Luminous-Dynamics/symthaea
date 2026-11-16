@@ -36,6 +36,11 @@ pub struct AdaptiveBranch {
     pub terminal_expected_decision_loss: f64,
     pub second_measurement_cost: f64,
     pub branch_expected_total_loss: f64,
+    pub second_positive_probability: Option<f64>,
+    pub second_negative_probability: Option<f64>,
+    pub second_positive_leaf_total_loss: Option<f64>,
+    pub second_negative_leaf_total_loss: Option<f64>,
+    pub worst_case_leaf_total_loss: f64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -46,7 +51,8 @@ pub struct AdaptivePolicy {
     pub expected_terminal_decision_loss: f64,
     pub expected_measurement_cost: f64,
     pub expected_total_loss: f64,
-    pub worst_case_branch_total_loss: f64,
+    pub worst_case_leaf_total_loss: f64,
+    pub worst_case_regret_vs_no_test: f64,
     pub improvement_over_no_test: f64,
 }
 
@@ -162,6 +168,26 @@ fn evaluate_first_branch(
             let second_cost = evaluation
                 .measurement_cost
                 .expect("eligible measurement has a cost");
+            let second_positive_probability = evaluation.probability_positive;
+            let second_negative_probability = evaluation
+                .probability_positive
+                .map(|probability| (1.0 - probability).max(0.0));
+            let second_positive_leaf_total_loss = evaluation
+                .positive_decision
+                .as_ref()
+                .map(|decision| first_measurement.cost_units + second_cost + decision.expected_loss);
+            let second_negative_leaf_total_loss = evaluation
+                .negative_decision
+                .as_ref()
+                .map(|decision| first_measurement.cost_units + second_cost + decision.expected_loss);
+            let worst_case_leaf_total_loss = [
+                second_positive_leaf_total_loss,
+                second_negative_leaf_total_loss,
+            ]
+            .into_iter()
+            .flatten()
+            .max_by(f64::total_cmp)
+            .unwrap_or(first_measurement.cost_units + terminal_loss + second_cost);
             AdaptiveBranch {
                 first_outcome,
                 outcome_probability,
@@ -178,6 +204,11 @@ fn evaluate_first_branch(
                 terminal_expected_decision_loss: terminal_loss,
                 second_measurement_cost: second_cost,
                 branch_expected_total_loss: first_measurement.cost_units + terminal_loss + second_cost,
+                second_positive_probability,
+                second_negative_probability,
+                second_positive_leaf_total_loss,
+                second_negative_leaf_total_loss,
+                worst_case_leaf_total_loss,
             }
         }
         None => AdaptiveBranch {
@@ -190,6 +221,11 @@ fn evaluate_first_branch(
             terminal_expected_decision_loss: current_decision.expected_loss,
             second_measurement_cost: 0.0,
             branch_expected_total_loss: first_measurement.cost_units + current_decision.expected_loss,
+            second_positive_probability: None,
+            second_negative_probability: None,
+            second_positive_leaf_total_loss: None,
+            second_negative_leaf_total_loss: None,
+            worst_case_leaf_total_loss: first_measurement.cost_units + current_decision.expected_loss,
         },
     };
 
@@ -343,9 +379,9 @@ pub fn evaluate_depth_two(
             continue;
         }
 
-        let worst_case_branch_total_loss = branches
+        let worst_case_leaf_total_loss = branches
             .iter()
-            .map(|branch| branch.branch_expected_total_loss)
+            .map(|branch| branch.worst_case_leaf_total_loss)
             .max_by(f64::total_cmp)
             .unwrap_or(expected_total_loss);
         let candidate = AdaptivePolicy {
@@ -355,7 +391,8 @@ pub fn evaluate_depth_two(
             expected_terminal_decision_loss: expected_terminal_loss,
             expected_measurement_cost,
             expected_total_loss,
-            worst_case_branch_total_loss,
+            worst_case_leaf_total_loss,
+            worst_case_regret_vs_no_test: (worst_case_leaf_total_loss - no_test_loss).max(0.0),
             improvement_over_no_test: improvement,
         };
 
@@ -434,21 +471,34 @@ mod tests {
         close(adaptive.expected_total_loss, 6.598);
         close(adaptive.expected_terminal_decision_loss, 4.248);
         close(adaptive.expected_measurement_cost, 2.35);
-        close(adaptive.worst_case_branch_total_loss, 7.204444444);
+        close(adaptive.worst_case_leaf_total_loss, 15.0);
+        close(adaptive.worst_case_regret_vs_no_test, 3.6);
     }
 
     #[test]
-    fn adaptive_policy_reports_worst_case_path_loss_separately() {
+    fn adaptive_policy_reports_worst_case_leaf_loss_separately() {
         let result = evaluate_depth_two(&reference_case(), &reference_measurements(), 4.0).unwrap();
         let policy = result.adaptive_depth_two.unwrap();
         let expected_max = policy
             .branches
             .iter()
-            .map(|branch| branch.branch_expected_total_loss)
+            .map(|branch| branch.worst_case_leaf_total_loss)
             .max_by(f64::total_cmp)
             .unwrap();
-        close(policy.worst_case_branch_total_loss, expected_max);
-        assert!(policy.worst_case_branch_total_loss >= policy.expected_total_loss);
+        close(policy.worst_case_leaf_total_loss, expected_max);
+        assert!(policy.worst_case_leaf_total_loss >= policy.expected_total_loss);
+    }
+
+    #[test]
+    fn adaptive_second_test_exposes_both_leaf_losses() {
+        let result = evaluate_depth_two(&reference_case(), &reference_measurements(), 4.0).unwrap();
+        let policy = result.adaptive_depth_two.unwrap();
+        let negative = &policy.branches[1];
+        close(negative.second_positive_probability.unwrap(), 0.2077777778);
+        close(negative.second_negative_probability.unwrap(), 0.7922222222);
+        close(negative.second_positive_leaf_total_loss.unwrap(), 15.0);
+        close(negative.second_negative_leaf_total_loss.unwrap(), 5.159887798);
+        close(negative.worst_case_leaf_total_loss, 15.0);
     }
 
     #[test]
