@@ -1,0 +1,429 @@
+{
+  "scenario_id": "d6.10-branch-join-clock-skew-v0.1",
+  "adjudication_status": "synthetic_known_answer_not_independently_adjudicated",
+  "event_count": 9,
+  "branch_count": 4,
+  "obligation_count": 3,
+  "receipt_count": 7,
+  "traces": [
+    {
+      "trace_id": "adversarial-linearization",
+      "causal_order": {
+        "reference_ordered_pairs": 30,
+        "declared_ordered_pairs": 32,
+        "correctly_ordered_pairs": [
+          [
+            "baseline",
+            "branch-a-policy"
+          ],
+          [
+            "baseline",
+            "branch-a-source"
+          ],
+          [
+            "baseline",
+            "branch-b-docs"
+          ],
+          [
+            "baseline",
+            "branch-b-policy"
+          ],
+          [
+            "baseline",
+            "joined-merge"
+          ],
+          [
+            "baseline",
+            "late-backdated"
+          ],
+          [
+            "baseline",
+            "tie-first"
+          ],
+          [
+            "baseline",
+            "tie-second"
+          ],
+          [
+            "branch-a-policy",
+            "joined-merge"
+          ],
+          [
+            "branch-a-source",
+            "branch-a-policy"
+          ],
+          [
+            "branch-a-source",
+            "joined-merge"
+          ],
+          [
+            "branch-b-docs",
+            "branch-b-policy"
+          ],
+          [
+            "branch-b-docs",
+            "joined-merge"
+          ],
+          [
+            "branch-b-policy",
+            "joined-merge"
+          ],
+          [
+            "late-backdated",
+            "branch-a-policy"
+          ],
+          [
+            "late-backdated",
+            "branch-a-source"
+          ],
+          [
+            "late-backdated",
+            "branch-b-docs"
+          ],
+          [
+            "late-backdated",
+            "branch-b-policy"
+          ],
+          [
+            "late-backdated",
+            "joined-merge"
+          ],
+          [
+            "tie-first",
+            "branch-a-policy"
+          ],
+          [
+            "tie-first",
+            "branch-a-source"
+          ],
+          [
+            "tie-first",
+            "branch-b-docs"
+          ],
+          [
+            "tie-first",
+            "branch-b-policy"
+          ],
+          [
+            "tie-first",
+            "joined-merge"
+          ],
+          [
+            "tie-first",
+            "tie-second"
+          ],
+          [
+            "tie-second",
+            "branch-a-policy"
+          ],
+          [
+            "tie-second",
+            "branch-a-source"
+          ],
+          [
+            "tie-second",
+            "branch-b-docs"
+          ],
+          [
+            "tie-second",
+            "branch-b-policy"
+          ],
+          [
+            "tie-second",
+            "joined-merge"
+          ]
+        ],
+        "false_serialization_pairs": [
+          [
+            "branch-a-source",
+            "branch-b-docs"
+          ],
+          [
+            "branch-a-source",
+            "branch-b-policy"
+          ]
+        ],
+        "missing_order_pairs": [],
+        "wrong_direction_pairs": []
+      },
+      "confluence": {
+        "reference_commuting_pairs": [
+          [
+            "branch-a-source",
+            "branch-b-docs"
+          ]
+        ],
+        "claimed_confluent_pairs": [
+          [
+            "branch-a-policy",
+            "branch-b-policy"
+          ],
+          [
+            "branch-a-source",
+            "branch-b-docs"
+          ]
+        ],
+        "true_confluence_pairs": [
+          [
+            "branch-a-source",
+            "branch-b-docs"
+          ]
+        ],
+        "false_confluence_pairs": [
+          [
+            "branch-a-policy",
+            "branch-b-policy"
+          ]
+        ],
+        "missed_confluence_pairs": [],
+        "false_noncommuting_confluence_pairs": [
+          [
+            "branch-a-policy",
+            "branch-b-policy"
+          ]
+        ]
+      },
+      "future_evidence_leakage_event_ids": [
+        "late-backdated"
+      ],
+      "future_evidence_leakage_receipt_ids": [],
+      "out_of_scope_event_ids": [],
+      "branch_receipt_contamination_ids": [
+        "receipt-build-a",
+        "receipt-docs-b"
+      ],
+      "invalid_receipt_uses": [
+        {
+          "receipt_id": "receipt-build-a",
+          "target_branch_id": "branch-b",
+          "reasons": [
+            "receipt_branch_is_not_an_ancestor",
+            "receipt_context_digest_mismatch",
+            "receipt_source_event_outside_target_ancestry:branch-a-source"
+          ]
+        },
+        {
+          "receipt_id": "receipt-build-a",
+          "target_branch_id": "joined",
+          "reasons": [
+            "join_obligation_requires_fresh_requalification",
+            "receipt_context_digest_mismatch"
+          ]
+        },
+        {
+          "receipt_id": "receipt-docs-b",
+          "target_branch_id": "joined",
+          "reasons": [
+            "join_obligation_requires_fresh_requalification",
+            "receipt_context_digest_mismatch"
+          ]
+        }
+      ],
+      "unsupported_current_claims": [
+        "joined:docs-contract",
+        "joined:policy-authority"
+      ],
+      "critical_unsupported_current_claims": [
+        "joined:policy-authority"
+      ],
+      "join_reports": [
+        {
+          "branch_id": "joined",
+          "required_requalification_obligations": [
+            "build-repro",
+            "docs-contract",
+            "policy-authority"
+          ],
+          "freshly_requalified_obligations": [
+            "build-repro"
+          ],
+          "missing_requalification_obligations": [
+            "docs-contract",
+            "policy-authority"
+          ],
+          "invalid_fresh_receipt_ids": []
+        }
+      ]
+    },
+    {
+      "trace_id": "conformant-partial-order",
+      "causal_order": {
+        "reference_ordered_pairs": 30,
+        "declared_ordered_pairs": 30,
+        "correctly_ordered_pairs": [
+          [
+            "baseline",
+            "branch-a-policy"
+          ],
+          [
+            "baseline",
+            "branch-a-source"
+          ],
+          [
+            "baseline",
+            "branch-b-docs"
+          ],
+          [
+            "baseline",
+            "branch-b-policy"
+          ],
+          [
+            "baseline",
+            "joined-merge"
+          ],
+          [
+            "baseline",
+            "late-backdated"
+          ],
+          [
+            "baseline",
+            "tie-first"
+          ],
+          [
+            "baseline",
+            "tie-second"
+          ],
+          [
+            "branch-a-policy",
+            "joined-merge"
+          ],
+          [
+            "branch-a-source",
+            "branch-a-policy"
+          ],
+          [
+            "branch-a-source",
+            "joined-merge"
+          ],
+          [
+            "branch-b-docs",
+            "branch-b-policy"
+          ],
+          [
+            "branch-b-docs",
+            "joined-merge"
+          ],
+          [
+            "branch-b-policy",
+            "joined-merge"
+          ],
+          [
+            "late-backdated",
+            "branch-a-policy"
+          ],
+          [
+            "late-backdated",
+            "branch-a-source"
+          ],
+          [
+            "late-backdated",
+            "branch-b-docs"
+          ],
+          [
+            "late-backdated",
+            "branch-b-policy"
+          ],
+          [
+            "late-backdated",
+            "joined-merge"
+          ],
+          [
+            "tie-first",
+            "branch-a-policy"
+          ],
+          [
+            "tie-first",
+            "branch-a-source"
+          ],
+          [
+            "tie-first",
+            "branch-b-docs"
+          ],
+          [
+            "tie-first",
+            "branch-b-policy"
+          ],
+          [
+            "tie-first",
+            "joined-merge"
+          ],
+          [
+            "tie-first",
+            "tie-second"
+          ],
+          [
+            "tie-second",
+            "branch-a-policy"
+          ],
+          [
+            "tie-second",
+            "branch-a-source"
+          ],
+          [
+            "tie-second",
+            "branch-b-docs"
+          ],
+          [
+            "tie-second",
+            "branch-b-policy"
+          ],
+          [
+            "tie-second",
+            "joined-merge"
+          ]
+        ],
+        "false_serialization_pairs": [],
+        "missing_order_pairs": [],
+        "wrong_direction_pairs": []
+      },
+      "confluence": {
+        "reference_commuting_pairs": [
+          [
+            "branch-a-source",
+            "branch-b-docs"
+          ]
+        ],
+        "claimed_confluent_pairs": [
+          [
+            "branch-a-source",
+            "branch-b-docs"
+          ]
+        ],
+        "true_confluence_pairs": [
+          [
+            "branch-a-source",
+            "branch-b-docs"
+          ]
+        ],
+        "false_confluence_pairs": [],
+        "missed_confluence_pairs": [],
+        "false_noncommuting_confluence_pairs": []
+      },
+      "future_evidence_leakage_event_ids": [],
+      "future_evidence_leakage_receipt_ids": [],
+      "out_of_scope_event_ids": [],
+      "branch_receipt_contamination_ids": [],
+      "invalid_receipt_uses": [],
+      "unsupported_current_claims": [],
+      "critical_unsupported_current_claims": [],
+      "join_reports": [
+        {
+          "branch_id": "joined",
+          "required_requalification_obligations": [
+            "build-repro",
+            "docs-contract",
+            "policy-authority"
+          ],
+          "freshly_requalified_obligations": [
+            "build-repro",
+            "docs-contract",
+            "policy-authority"
+          ],
+          "missing_requalification_obligations": [],
+          "invalid_fresh_receipt_ids": []
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic known-answer evaluation of declared partial-order relations, branch ancestry, receipt scope, join requalification, and candidate-visible availability. Does not establish complete causal reconstruction, authenticated event capture, production concurrency safety, or agent performance."
+}
