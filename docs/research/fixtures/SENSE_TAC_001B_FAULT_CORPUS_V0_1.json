@@ -1,0 +1,1549 @@
+{
+  "schema_id": "https://luminousdynamics.io/schemas/sense-tac-001b-fault-corpus-v0.1.schema.json",
+  "corpus_id": "SENSE-TAC-001B-FAULT-CORPUS",
+  "version": "0.1.0",
+  "status": "synthetic_reference_only",
+  "claim_ceiling": "The corpus defines deterministic synthetic cases only. It does not estimate real tactile sensor physics, calibration, fault rates, hardware coverage, or task performance.",
+  "model": {
+    "signal_unit": "arb (dimensionless synthetic unit; not an SI measurand)",
+    "normal_equation": "normal_raw = gain_normal * normal_truth + shear_to_normal * shear_truth + bias_normal + drift_normal * elapsed_ms + temp_coeff_normal * (temperature_c - reference_temperature_c) + shared_offset + deterministic_noise_normal",
+    "shear_equation": "shear_raw = gain_shear * shear_truth + normal_to_shear * normal_truth + bias_shear + drift_shear * elapsed_ms + temp_coeff_shear * (temperature_c - reference_temperature_c) + shared_offset + deterministic_noise_shear",
+    "order": [
+      "linear_response",
+      "history_or_environment_effect",
+      "dead_zone",
+      "clip_to_range",
+      "quantize_to_nearest_step"
+    ],
+    "rounding": "For non-zero quantum q: sign(x) * floor(abs(x) / q + 0.5) * q. The rule is deterministic and symmetric around zero.",
+    "fault_overrides": [
+      "dropout",
+      "stuck_at",
+      "intermittent_open",
+      "channel_swap",
+      "unit_scale_mismatch",
+      "clock_offset",
+      "readout_latency",
+      "timestamp_jitter",
+      "duplicate_or_conflicting_replay"
+    ],
+    "truth_visibility": "physical_truth, injected_fault and expected are evaluator-only. Candidate code may consume candidate_input only.",
+    "independence": "raw channels, event features and HDC projections derived from one physical acquisition share the same physical evidence root unless a separate sensor/reference path is independently established.",
+    "reference_temperature_c": 20,
+    "drift_epoch_ms": 0,
+    "default_channel_gain": 1,
+    "default_channel_bias": 0,
+    "drift_elapsed_time_basis": "time_ms - drift_epoch_ms",
+    "parameter_semantics": {
+      "bias": "Additive offset in arb on the named channel; omitted other-channel parameters are zero.",
+      "gain": "Multiplicative gain on the named channel; omitted other-channel gains are 1.",
+      "normal_to_shear_crosstalk": "shear_raw receives parameter * normal_truth.",
+      "shear_to_normal_crosstalk": "normal_raw receives parameter * shear_truth.",
+      "saturation": "Upper clipping limit in arb on the named channel.",
+      "dead_zone": "Values with absolute magnitude below parameter become zero.",
+      "quantization": "Quantization step in arb; nearest step, ties away from zero.",
+      "linear_drift": "Additive offset slope in arb/ms after drift_epoch_ms.",
+      "temperature_coefficient": "Additive offset slope in arb/degC relative to reference_temperature_c.",
+      "hysteresis": "Additive branch offset in arb; event field identifies the branch.",
+      "shared_adc_offset": "Same additive offset in arb on all declared channels sharing the named ADC/reference roots.",
+      "shared_reference_gain": "Same multiplicative gain on all declared channels sharing the named reference roots.",
+      "clock_offset": "Device timestamp minus independent reference timestamp, in ms.",
+      "readout_latency": "Collector receipt time minus source acquisition time, in ms.",
+      "timestamp_jitter": "One bounded timestamp residual in ms relative to the independent reference; full distribution is not inferred from one sample."
+    }
+  },
+  "cases": [
+    {
+      "id": "TAC-NOM-001",
+      "family": "nominal",
+      "candidate_input": {
+        "normal_raw": 0.6,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 1,
+        "time_ms": 1000,
+        "receipt_time_ms": 1004,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-001",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "none",
+          "parameter": null,
+          "description": "Nominal identity response."
+        },
+        "expected": {
+          "evidence_disposition": "eligible",
+          "qc_flags": [],
+          "task_disposition": "usable",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-BIAS-002",
+      "family": "static_error",
+      "candidate_input": {
+        "normal_raw": 0.8,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 2,
+        "time_ms": 1010,
+        "receipt_time_ms": 1014,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-002",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "bias",
+          "parameter": 0.2,
+          "description": "Normal-channel additive offset."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "bias_suspect"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-GAIN-003",
+      "family": "static_error",
+      "candidate_input": {
+        "normal_raw": 0.66,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 3,
+        "time_ms": 1020,
+        "receipt_time_ms": 1024,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-003",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "gain",
+          "parameter": 1.1,
+          "description": "Normal-channel gain is 1.1 rather than 1.0."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "gain_suspect"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-XTALK-004",
+      "family": "cross_axis",
+      "candidate_input": {
+        "normal_raw": 0.6,
+        "shear_raw": 0.3,
+        "sample_presence": "present",
+        "sequence": 4,
+        "time_ms": 1030,
+        "receipt_time_ms": 1034,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-004",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "normal_to_shear_crosstalk",
+          "parameter": 0.5,
+          "description": "Half of normal signal leaks into shear channel."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "cross_axis_coupling"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-XTALK-005",
+      "family": "cross_axis",
+      "candidate_input": {
+        "normal_raw": 0.3,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 5,
+        "time_ms": 1040,
+        "receipt_time_ms": 1044,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-005",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "shear_to_normal_crosstalk",
+          "parameter": 1.5,
+          "description": "Normal channel contains 1.5 times the shear signal."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "cross_axis_coupling"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-SAT-006",
+      "family": "range_fault",
+      "candidate_input": {
+        "normal_raw": 0.5,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 6,
+        "time_ms": 1050,
+        "receipt_time_ms": 1054,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-006",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.8,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "saturation",
+          "parameter": 0.5,
+          "description": "Normal channel clips at 0.5 arbitrary units."
+        },
+        "expected": {
+          "evidence_disposition": "reject",
+          "qc_flags": [
+            "saturated"
+          ],
+          "task_disposition": "abstain",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-DEAD-007",
+      "family": "range_fault",
+      "candidate_input": {
+        "normal_raw": 0,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 7,
+        "time_ms": 1060,
+        "receipt_time_ms": 1064,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-007",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.1,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "dead_zone",
+          "parameter": 0.2,
+          "description": "Normal magnitudes below 0.2 are output as zero."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "dead_zone"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-QUANT-008",
+      "family": "quantization",
+      "candidate_input": {
+        "normal_raw": 0.25,
+        "shear_raw": 0.25,
+        "sample_presence": "present",
+        "sequence": 8,
+        "time_ms": 1070,
+        "receipt_time_ms": 1074,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-008",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.31,
+          "shear": 0.31,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "quantization",
+          "parameter": 0.25,
+          "description": "Output quantized to 0.25-unit steps using nearest-step rounding."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "quantized"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-DRIFT-009",
+      "family": "time_dependent_error",
+      "candidate_input": {
+        "normal_raw": 0.8,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 9,
+        "time_ms": 20000,
+        "receipt_time_ms": 20004,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-009",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "linear_drift",
+          "parameter": 0.00001,
+          "description": "Normal-channel offset drifts by 0.00001 units per millisecond from the profile epoch."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "drift_suspect"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-TEMP-010",
+      "family": "environmental_error",
+      "candidate_input": {
+        "normal_raw": 0.7,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 10,
+        "time_ms": 1100,
+        "receipt_time_ms": 1104,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-010",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 30,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "temperature_coefficient",
+          "parameter": 0.01,
+          "description": "Normal-channel offset coefficient is 0.01 units per degree C from 20 C."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "environmental_compensation_unresolved"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-HYST-011",
+      "family": "history_dependence",
+      "candidate_input": {
+        "normal_raw": 0.5,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 11,
+        "time_ms": 1110,
+        "receipt_time_ms": 1114,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-011",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "unloading"
+        },
+        "fault": {
+          "kind": "hysteresis",
+          "parameter": -0.1,
+          "description": "Unloading branch differs by -0.1 units from loading branch at the same truth value."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "history_dependent"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-DROP-012",
+      "family": "missingness",
+      "candidate_input": {
+        "normal_raw": null,
+        "shear_raw": null,
+        "sample_presence": "missing",
+        "sequence": 12,
+        "time_ms": 1120,
+        "receipt_time_ms": 1124,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-012",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "dropout",
+          "parameter": null,
+          "description": "No sample is emitted. Missing is not encoded as zero."
+        },
+        "expected": {
+          "evidence_disposition": "reject",
+          "qc_flags": [
+            "missing"
+          ],
+          "task_disposition": "abstain",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-STUCK-013",
+      "family": "missingness",
+      "candidate_input": {
+        "normal_raw": 0.25,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 13,
+        "time_ms": 1130,
+        "receipt_time_ms": 1134,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-013",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.8,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "stuck_at",
+          "parameter": 0.25,
+          "description": "Normal output remains fixed despite changing physical input."
+        },
+        "expected": {
+          "evidence_disposition": "reject",
+          "qc_flags": [
+            "stuck_at"
+          ],
+          "task_disposition": "abstain",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-OPEN-014",
+      "family": "missingness",
+      "candidate_input": {
+        "normal_raw": null,
+        "shear_raw": 0.2,
+        "sample_presence": "intermittent_open",
+        "sequence": 14,
+        "time_ms": 1140,
+        "receipt_time_ms": 1144,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-014",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "intermittent_open",
+          "parameter": "normal",
+          "description": "Normal channel opens on this sequence; other channel remains present."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "intermittent_open"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-SWAP-015",
+      "family": "identity",
+      "candidate_input": {
+        "normal_raw": 0.2,
+        "shear_raw": 0.6,
+        "sample_presence": "present",
+        "sequence": 15,
+        "time_ms": 1150,
+        "receipt_time_ms": 1154,
+        "channel_order": [
+          "shear",
+          "normal"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-015",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "channel_swap",
+          "parameter": null,
+          "description": "Normal and shear channel identities are swapped at the adapter boundary."
+        },
+        "expected": {
+          "evidence_disposition": "reject",
+          "qc_flags": [
+            "channel_identity_mismatch"
+          ],
+          "task_disposition": "abstain",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-UNIT-016",
+      "family": "units",
+      "candidate_input": {
+        "normal_raw": 500,
+        "shear_raw": 200,
+        "sample_presence": "present",
+        "sequence": 16,
+        "time_ms": 1160,
+        "receipt_time_ms": 1164,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-016",
+        "reported_unit": "milli-arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.5,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "unit_scale_mismatch",
+          "parameter": 1000,
+          "description": "Numerical values are expressed in milli-arb but calibration/profile expects arb; no implicit scale conversion."
+        },
+        "expected": {
+          "evidence_disposition": "reject",
+          "qc_flags": [
+            "unit_mismatch"
+          ],
+          "task_disposition": "abstain",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-CLOCK-017",
+      "family": "timing",
+      "candidate_input": {
+        "normal_raw": 0.6,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 17,
+        "time_ms": 1250,
+        "receipt_time_ms": 1260,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-device"
+        ],
+        "payload_identity": "payload-017",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable",
+          "reference_time_ms": 1000
+        },
+        "fault": {
+          "kind": "clock_offset",
+          "parameter": 250,
+          "description": "Device timestamp has +250 ms offset; no verified clock transform is supplied."
+        },
+        "expected": {
+          "evidence_disposition": "unknown",
+          "qc_flags": [
+            "clock_offset"
+          ],
+          "task_disposition": "indeterminate",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-LAT-018",
+      "family": "timing",
+      "candidate_input": {
+        "normal_raw": 0.6,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 18,
+        "time_ms": 1000,
+        "receipt_time_ms": 1080,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-device"
+        ],
+        "payload_identity": "payload-018",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable",
+          "reference_time_ms": 1000
+        },
+        "fault": {
+          "kind": "readout_latency",
+          "parameter": 80,
+          "description": "Fixed 80 ms readout/transport delay; source time and receive time remain distinct."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "readout_latency"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-JITTER-019",
+      "family": "timing",
+      "candidate_input": {
+        "normal_raw": 0.6,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 19,
+        "time_ms": 1005,
+        "receipt_time_ms": 1015,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-device"
+        ],
+        "payload_identity": "payload-019",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable",
+          "reference_time_ms": 1000
+        },
+        "fault": {
+          "kind": "timestamp_jitter",
+          "parameter": 5,
+          "description": "Timestamp varies by up to 5 ms under the fixed fixture; this is timing uncertainty, not average latency."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "timestamp_jitter"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-DUP-020",
+      "family": "replay",
+      "candidate_input": {
+        "normal_raw": 0.6,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 20,
+        "time_ms": 1200,
+        "receipt_time_ms": 1210,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-identical-020",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw",
+        "replay_context": {
+          "previous_sequence": 20,
+          "previous_payload_identity": "payload-identical-020",
+          "expected_relation": "same_payload"
+        }
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "exact_duplicate",
+          "parameter": "same_sequence_same_payload",
+          "description": "The same sequence and payload are delivered twice; replay must be idempotent."
+        },
+        "expected": {
+          "evidence_disposition": "idempotent_duplicate",
+          "qc_flags": [
+            "duplicate"
+          ],
+          "task_disposition": "usable_once_only",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-CONFLICT-021",
+      "family": "replay",
+      "candidate_input": {
+        "normal_raw": 0.9,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 21,
+        "time_ms": 1210,
+        "receipt_time_ms": 1220,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-conflict-021b",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw",
+        "replay_context": {
+          "previous_sequence": 21,
+          "previous_payload_identity": "payload-021a",
+          "expected_relation": "different_payload"
+        }
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "conflicting_duplicate",
+          "parameter": "same_sequence_different_payload",
+          "description": "An existing sequence identity is replayed with a different payload; block dependent aggregation."
+        },
+        "expected": {
+          "evidence_disposition": "conflict",
+          "qc_flags": [
+            "conflict"
+          ],
+          "task_disposition": "abstain",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-ADC-COMMON-022",
+      "family": "common_mode",
+      "candidate_input": {
+        "normal_raw": 0.8,
+        "shear_raw": 0.4,
+        "sample_presence": "present",
+        "sequence": 22,
+        "time_ms": 1220,
+        "receipt_time_ms": 1224,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-shared",
+          "ref-shared",
+          "clock-a"
+        ],
+        "payload_identity": "payload-022",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-shared",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "shared_adc_offset",
+          "parameter": 0.2,
+          "description": "The same +0.2 offset affects both channels through one ADC/reference path."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "common_mode"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "shared_common_mode",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-REF-GAIN-023",
+      "family": "common_mode",
+      "candidate_input": {
+        "normal_raw": 0.72,
+        "shear_raw": 0.24,
+        "sample_presence": "present",
+        "sequence": 23,
+        "time_ms": 1230,
+        "receipt_time_ms": 1234,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-shared",
+          "ref-shared",
+          "clock-a"
+        ],
+        "payload_identity": "payload-023",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-shared",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "shared_reference_gain",
+          "parameter": 1.2,
+          "description": "A shared reference shift scales both channels by 1.2; two channels are not independent witnesses."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "common_mode"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "shared_common_mode",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-ARTICLE-024",
+      "family": "calibration",
+      "candidate_input": {
+        "normal_raw": 0.6,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 24,
+        "time_ms": 1240,
+        "receipt_time_ms": 1244,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-024",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-article-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable",
+          "physical_article": "article-b"
+        },
+        "fault": {
+          "kind": "wrong_article_calibration",
+          "parameter": "article-a",
+          "description": "Calibration belongs to a different physical sensor article."
+        },
+        "expected": {
+          "evidence_disposition": "reject",
+          "qc_flags": [
+            "calibration_article_mismatch"
+          ],
+          "task_disposition": "abstain",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-STALE-025",
+      "family": "calibration",
+      "candidate_input": {
+        "normal_raw": 0.6,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 25,
+        "time_ms": 1250,
+        "receipt_time_ms": 1254,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-025",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-fw-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-b",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "firmware_generation_change",
+          "parameter": "fw-a_to_fw-b",
+          "description": "Firmware/scaling generation changed without an applicable calibration update."
+        },
+        "expected": {
+          "evidence_disposition": "reject",
+          "qc_flags": [
+            "stale_calibration"
+          ],
+          "task_disposition": "abstain",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-REMOUNT-026",
+      "family": "installation",
+      "candidate_input": {
+        "normal_raw": 0.75,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 26,
+        "time_ms": 1260,
+        "receipt_time_ms": 1264,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-026",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-b",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "remount_offset",
+          "parameter": 0.15,
+          "description": "Mounting/reassembly changes mechanical coupling and normal response."
+        },
+        "expected": {
+          "evidence_disposition": "unknown",
+          "qc_flags": [
+            "remount_mismatch"
+          ],
+          "task_disposition": "indeterminate",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-CURVE-027",
+      "family": "applicability",
+      "candidate_input": {
+        "normal_raw": 0.6,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 27,
+        "time_ms": 1270,
+        "receipt_time_ms": 1274,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-027",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-flat",
+        "installation_ref": "mount-curved",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable",
+          "mount_profile": "curved"
+        },
+        "fault": {
+          "kind": "curvature_profile_mismatch",
+          "parameter": "flat_calibration_to_curved_mount",
+          "description": "The evidence is outside the calibration/installation applicability envelope."
+        },
+        "expected": {
+          "evidence_disposition": "out_of_profile",
+          "qc_flags": [
+            "out_of_profile"
+          ],
+          "task_disposition": "abstain",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-SELFTEST-028",
+      "family": "self_test",
+      "candidate_input": {
+        "normal_raw": 0.72,
+        "shear_raw": 0.2,
+        "sample_presence": "present",
+        "sequence": 28,
+        "time_ms": 1280,
+        "receipt_time_ms": 1284,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-028",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "raw",
+        "self_test": "pass"
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.6,
+          "shear": 0.2,
+          "temperature_c": 20,
+          "event": "stable"
+        },
+        "fault": {
+          "kind": "self_test_misses_scale_drift",
+          "parameter": 1.2,
+          "description": "Electrical continuity self-test passes while normal-channel scale has drifted."
+        },
+        "expected": {
+          "evidence_disposition": "limited",
+          "qc_flags": [
+            "self_test_insufficient",
+            "gain_suspect"
+          ],
+          "task_disposition": "degraded",
+          "independence_disposition": "one_physical_root",
+          "representation_disposition": "raw_preserved"
+        }
+      }
+    },
+    {
+      "id": "TAC-HDC-029",
+      "family": "representation_loss",
+      "candidate_input": {
+        "normal_raw": 0.08,
+        "shear_raw": 0,
+        "sample_presence": "present",
+        "sequence": 29,
+        "time_ms": 1290,
+        "receipt_time_ms": 1294,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-029",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "hdc-threshold-v1",
+        "representation_output": 0
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.08,
+          "shear": 0,
+          "temperature_c": 20,
+          "event": "subthreshold_contact"
+        },
+        "fault": {
+          "kind": "representation_threshold_loss",
+          "parameter": 0.1,
+          "description": "HDC/event projection thresholds 0.08 to zero; raw observation remains intact."
+        },
+        "expected": {
+          "evidence_disposition": "eligible",
+          "qc_flags": [
+            "representation_loss"
+          ],
+          "task_disposition": "abstain",
+          "independence_disposition": "not_independent_descendant",
+          "representation_disposition": "lossy"
+        }
+      }
+    },
+    {
+      "id": "TAC-ALIAS-030",
+      "family": "representation_alias",
+      "candidate_input": {
+        "normal_raw": 0.31,
+        "shear_raw": 0.1,
+        "sample_presence": "present",
+        "sequence": 30,
+        "time_ms": 1300,
+        "receipt_time_ms": 1304,
+        "channel_order": [
+          "normal",
+          "shear"
+        ],
+        "source_roots": [
+          "adc-a",
+          "ref-a",
+          "clock-a"
+        ],
+        "payload_identity": "payload-030",
+        "reported_unit": "arb",
+        "calibration_ref": "cal-a",
+        "installation_ref": "mount-a",
+        "firmware_generation": "fw-a",
+        "representation_id": "hdc-vector-collision-7",
+        "representation_comparison": {
+          "comparison_trace_ref": "trace-b",
+          "comparison_normal_raw": 0.32,
+          "comparison_shear_raw": 0.1,
+          "comparison_representation_id": "hdc-vector-collision-7"
+        }
+      },
+      "evaluator_only": {
+        "physical_truth": {
+          "normal": 0.31,
+          "shear": 0.1,
+          "temperature_c": 20,
+          "event": "trace-a"
+        },
+        "fault": {
+          "kind": "representation_alias",
+          "parameter": "same_hdc_vector_as_trace_b",
+          "description": "A second evaluator-distinct raw trace maps to the same compressed HDC representation."
+        },
+        "expected": {
+          "evidence_disposition": "eligible",
+          "qc_flags": [
+            "representation_alias"
+          ],
+          "task_disposition": "indeterminate",
+          "independence_disposition": "not_independent_descendant",
+          "representation_disposition": "alias"
+        }
+      }
+    }
+  ]
+}
