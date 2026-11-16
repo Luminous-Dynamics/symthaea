@@ -58,6 +58,11 @@
       "path": "negative/https_origin_port_out_of_range.json",
       "expected": "reject-semantic-preflight",
       "reason": "The canonical HTTPS origin port must be in the range 1..=65535; a five-digit lexical match is not sufficient."
+    },
+    {
+      "path": "negative/https_origin_explicit_default_port.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "Canonical HTTPS origin must omit default port 443."
     }
   ],
   "nonclaims": [
