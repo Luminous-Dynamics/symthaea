@@ -1,0 +1,59 @@
+name: SYM-RSI Receipt Composer
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "tools/sym-rsi-receipt-composer/**"
+      - "tools/benchmark-run-receipt-harness/**"
+      - ".github/workflows/sym-rsi-receipt-composer.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/sym-rsi-receipt-composer/**"
+      - "tools/benchmark-run-receipt-harness/**"
+      - ".github/workflows/sym-rsi-receipt-composer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: sym-rsi-receipt-composer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  composer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CARGO_BUILD_JOBS: 2
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Set up pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+
+      - name: Assert Rust toolchain
+        run: |
+          test "$(rustc --version | cut -d ' ' -f 2)" = "1.96.0"
+          cargo --version
+
+      - name: Validate locked standalone metadata
+        run: |
+          cargo metadata \
+            --manifest-path tools/sym-rsi-receipt-composer/Cargo.toml \
+            --locked --no-deps --format-version 1 \
+            > "$RUNNER_TEMP/sym-rsi-receipt-composer-metadata.json"
+
+      - name: Rust format check
+        run: cargo fmt --manifest-path tools/sym-rsi-receipt-composer/Cargo.toml -- --check
+
+      - name: Receipt composition tests
+        run: cargo test --manifest-path tools/sym-rsi-receipt-composer/Cargo.toml --locked
+
+      - name: Clippy
+        run: cargo clippy --manifest-path tools/sym-rsi-receipt-composer/Cargo.toml --all-targets --locked -- -D warnings
