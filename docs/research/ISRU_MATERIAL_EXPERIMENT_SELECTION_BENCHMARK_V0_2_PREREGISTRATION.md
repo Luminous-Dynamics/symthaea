@@ -110,6 +110,34 @@ Include a physics-informed prior, kernel or constraint only when its source, der
 
 An oracle policy may be computed for diagnostic upper bounds only. It is never a peer baseline.
 
+### 4.5 Phase-boundary and material-family transfer baselines
+
+Regime mapping is a distinct task from optimizing one scalar response. Include level-set / contour estimation and probabilistic phase classification as primary baselines, not just as a post-hoc metric:
+
+- GP classification and GP regression + level-set estimation for each declared process transition;
+- BALPI-style active phase-diagram mapping, including maximum-entropy / BALD, extended-straddle and cost-of-uncertainty acquisitions;
+- boundary-focused margin sampling or property-derivative labeling, where the observable derivatives and noise model justify it;
+- hierarchical / transfer-learning models that borrow evidence from related material families while learning where source-family knowledge is unreliable;
+- a no-transfer target-only counterpart, to determine whether transfer actually helps rather than hiding negative transfer;
+- a robust contour policy that selects confirmatory points on both sides of a proposed transition and can abstain when the boundary is not identifiable.
+
+Relevant SOTA includes BALPI's 2026 phase-diagram reconstruction using GP classifiers/regressors, level-set estimation and non-myopic acquisition; PhaseTransfer's 2026 transfer-learning framework, which uses spatially varying reliability of prior diagrams; and the AMASE autonomous thin-film phase-diagram campaign, which combined live experiment/model interaction and reported a sixfold reduction versus exhaustive grid mapping in that specific system. These are methodological comparators, not expected ISRU performance results.
+
+The material-family transfer experiment must explicitly test:
+- positive transfer when two families share a genuine boundary structure;
+- negative transfer when source and target families differ;
+- spatially varying transfer reliability (one part of a regime map may transfer while another does not);
+- partial overlap, missing regimes and disconnected regions;
+- a completely held-out family where transfer must be down-weighted or rejected.
+
+Report per-transition boundary localization error (including a distance metric such as symmetric Hausdorff distance where appropriate), regime-classification balanced accuracy, boundary precision/recall, uncertainty coverage around the transition, and experiments/cost needed to reach a preregistered boundary tolerance. Scalar optimum error is not a substitute for boundary accuracy.
+
+Sources:
+- [BALPI: Bayesian active learning to accelerate high throughput phase diagram exploration (2026)](https://pubs.rsc.org/en/content/articlehtml/2026/dd/d5dd00459d)
+- [PhaseTransfer: A transfer learning framework for efficient phase diagram mapping (2026)](https://www.nature.com/articles/s41524-026-02154-2)
+- [AMASE real-time experiment-theory closed-loop interaction (2025)](https://pmc.ncbi.nlm.nih.gov/articles/PMC12219503/)
+- [A critical examination of active learning workflows in materials science (2026)](https://pubs.rsc.org/en/content/articlehtml/2026/dd/d6dd00081a)
+
 ## 5. Sealing, leakage control and reproducibility
 
 A public benchmark cannot credibly claim to be sealed if the optimizer authors can inspect the hidden response functions, labels or evaluation seeds.
