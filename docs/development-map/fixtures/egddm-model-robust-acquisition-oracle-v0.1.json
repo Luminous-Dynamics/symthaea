@@ -166,7 +166,6 @@
           "state_id": "hazard",
           "prior_bps": 1500,
           "safe_actions": [
-            "bounded-probe",
             "inspect"
           ]
         },
@@ -435,7 +434,6 @@
           "state_id": "hazard",
           "prior_bps": 3000,
           "safe_actions": [
-            "bounded-probe",
             "inspect"
           ]
         },
