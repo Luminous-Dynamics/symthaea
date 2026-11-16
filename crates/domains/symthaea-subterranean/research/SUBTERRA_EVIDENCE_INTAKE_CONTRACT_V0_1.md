@@ -128,7 +128,7 @@ A later source-trust bridge should bind:
 - physical sensor and acquisition identity;
 - observation ID and immutable content digest;
 - calibration chain and version;
-- capture/receipt clocks and uncertainty;
+- capture/receipt clocks and uncertainty, bound to trusted clock sources;
 - derived-product ancestry;
 - integrity/signature status;
 - independent source/modality lineage;
@@ -149,10 +149,10 @@ Contents:
 - science-return lifecycle validator and site/observation linkage;
 - a separate site-disjoint likelihood-calibration reference crate for Training-only empirical likelihood estimates, Calibration/Evaluation proper scoring and a guarded conversion into EVSI inputs;
 - copied synthetic site, network and profile fixtures;
-- 21 site/network tests, 6 profile tests and 10 science-return tests (37 adapter cases total); 19 site-disjoint likelihood-calibration tests in the separate calibration package.
-- Pinned upstream schema/fixture manifest and explicit local verification script for the four nested Cargo packages.
+- 21 site/network tests, 6 profile tests and 19 science-return tests (46 adapter cases total); 19 site-disjoint likelihood-calibration tests and 47 dependence-auditor tests in their separate packages.
+- Pinned upstream schema/fixture manifest and explicit local verification script for the six nested Cargo packages.
 
-Across the complete current Symthaea Subterra PR, the one-step EVSI, survival planner, robust EVSI, site/network/profile adapter and science-return lifecycle together have 87 authored Rust unit tests. This count is source inspection only. None has been compiled or executed in the current environment.
+Across the complete current Symthaea Subterra PR, the six standalone packages have 143 authored Rust unit tests (10 EVSI + 11 survival + 10 robust EVSI + 21 site/network + 6 profile + 19 science-return + 19 likelihood calibration + 47 dependence audit). This is a source count only; none has been compiled or executed in the current environment.
 
 ### Verification status
 
