@@ -390,6 +390,10 @@ pub fn evaluate_model_discrepancy(
         ApplicabilityState::InDeclaredDomain => {}
     }
 
+    let rank = conformal_order_statistic_rank(
+        residuals.len(),
+        profile.discrepancy_coverage_basis_points,
+    );
     if residuals.len() < profile.minimum_calibration_samples {
         return report(
             profile,
@@ -397,7 +401,7 @@ pub fn evaluate_model_discrepancy(
             ModelDiscrepancyDisposition::InsufficientCalibration,
             ModelFormValidity::Unknown,
             residuals.len(),
-            None,
+            Some(rank),
             None,
             parametric,
             None,
@@ -409,11 +413,6 @@ pub fn evaluate_model_discrepancy(
             ],
         );
     }
-
-    let rank = conformal_order_statistic_rank(
-        residuals.len(),
-        profile.discrepancy_coverage_basis_points,
-    );
     if rank > residuals.len() {
         return report(
             profile,
