@@ -101,3 +101,58 @@ It reports, separately for a fixed-known-variance null, a predictable adaptive-v
 - undetected path count.
 
 The focused GitHub workflow runs this binary and uploads the JSON, source commit identity and SHA-256 receipt. The fixed synthetic campaign uses 20,000 paths and 100 looks per scenario. Its checks are smoke gates for this exact generator: null e-process rates <=6%, and the adaptive-null naive repeated-look rate >10%. These are not universal statistical guarantees, a 5% calibration proof, confidence intervals across generator families, or physical validation. The naive repeated fixed-time test is deliberately invalid under optional stopping and is included only as a negative control.
+
+
+## Fixed-design Gaussian terminal-test induction
+
+The gaussian_terminal_induction module derives an anytime-valid randomized test process from a frozen simple-vs-simple Gaussian terminal Neyman–Pearson test.
+
+For a deterministic design with H0 residuals Normal(0, sigma_t^2) and H1 residuals Normal(d_t, sigma_t^2), the induced prefix value is the null-conditional probability that the fixed terminal NP test rejects. It is a [0,1]-valued test value, not a p-value. At any bounded stopping time, an independent uniform randomizer U and the rule U < phi_tau preserve the terminal test's level; at the planned horizon the process equals the original terminal test exactly.
+
+This v0 requires all future d_t and sigma_t to be frozen before observations. It is not the adaptive Gaussian e-process in the sequential module, does not cover unknown variance or composite nulls, and does not automatically transfer to physical trajectories. See docs/research/GAUSSIAN_TERMINAL_TEST_INDUCTION_V0_2026-11-16.md.
+
+
+## Paired Gaussian terminal-test method comparison
+
+The standalone binary gaussian_terminal_induction_calibration runs the fixed-design comparator over a preregistered induced-test stopping-threshold grid of 0.75, 0.90 and 0.99:
+
+    cargo run --locked --manifest-path research/falsification-power-reference/Cargo.toml --bin gaussian_terminal_induction_calibration
+
+For the same generated outcome path it compares:
+- the fixed-horizon Neyman–Pearson terminal test;
+- the induced conditional-rejection test with an early-stop threshold and independent randomization at the stopping time;
+- the Gaussian e-process Ville-boundary crossing rule;
+- naive repeated fixed-time z tests as an invalid optional-stopping control.
+
+It reports null/alternative rejection rates with Wilson intervals for every threshold, early-stop frequency, mean stopping look, e-process crossing delay, the analytically computed terminal NP power and a terminal-equivalence mismatch count. The same observation paths are reused across all four methods; each threshold has a separate randomizer stream. The binary uses separate deterministic observation and randomizer streams; its PRNG is for simulation only.
+
+This campaign is restricted to one frozen simple Gaussian design. It is not a general adaptive-discovery benchmark or physical validation.
+
+
+### Exact-head paired calibration receipt
+
+Run #41 on current PR head e9770b48170016e51b270b0bcfdd67a95c5604c2 passed the focused workflow: rustfmt, all-target tests, sequential null calibration, paired Gaussian calibration, artifact upload and strict Clippy. Workflow: https://github.com/Luminous-Dynamics/symthaea/actions/runs/43822231600
+
+The campaign used 20,000 paired paths per scenario, an 80-look fixed design, alpha 0.05, discrepancy 0.22 and sigma 0.80. The predeclared induced-test thresholds were 0.75, 0.90 and 0.99. Every method shared the same observations; each threshold used a separately seeded simulation randomizer stream. The PRNG is for synthetic replay only.
+
+| Method | Null rejection | Alternative rejection | Mean observations used under alternative |
+|---|---:|---:|---:|
+| Fixed-horizon terminal NP | 5.435% | 79.970% | 80.00 |
+| Induced test, threshold 0.75 | 5.320% | 66.055% | 60.69 |
+| Induced test, threshold 0.90 | 5.415% | 75.150% | 65.95 |
+| Induced test, threshold 0.99 | 5.410% | 79.550% | 71.43 |
+| Gaussian e-process | 2.815% | 62.420% | 58.53 |
+| Naive repeated fixed-time test | 29.795% | 91.055% | 26.21 |
+
+The induced-method null Wilson 95% intervals are [5.017%,5.640%], [5.110%,5.737%] and [5.105%,5.732%], respectively. Terminal NP has [5.129%,5.758%]. The e-process null Wilson interval is [2.595%,3.053%]. The naive repeated-test null interval is [29.165%,30.433%].
+
+The analytic terminal NP power is 79.241%; the observed terminal estimate is 79.970% (Wilson 95% [79.410%,80.519%]), a 0.73 percentage-point Monte Carlo deviation. The terminal induced decision matched the fixed NP decision on all 20,000 paths. All result rates are conditional on this one declared generator/design and do not establish general calibration.
+
+Interpretation:
+- Threshold 0.99 is the near-terminal point: 79.55% power with about 10.7% fewer observations than the 80-look test.
+- Threshold 0.90 gives about 17.6% fewer observations, with 75.15% power.
+- Threshold 0.75 gives about 24.1% fewer observations, with 66.06% power.
+- The Gaussian e-process crosses less often and is more conservative here; its average observation cost counts non-crossers as running to the horizon.
+- The naive repeated test appears cheapest and most powerful, but its ~29.8% null rejection makes it invalid under repeated looks.
+
+The terminal NP method is an evaluator oracle because it knows the correct discrepancy direction and frozen design. This is not a Symthaea agent result or an unknown-mechanism discovery score. Final artifact archive SHA-256: a45b26b33efb0c1caa1140c06da4411705534e187a867775bf783e01d5f982ef; report JSON SHA-256: 3ce1b598bf5ff280ace6d4c8901b2df36ce4ea08a02e1d2d70f6d757d2b0b67f.
