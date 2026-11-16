@@ -712,6 +712,8 @@ mod tests {
                 .point_id
                 .clone();
             let sheer = starboard_profile.last().unwrap();
+            let sheer_point_id = sheer.point_id.clone();
+            let deck_edge_z_m = sheer.z_m;
             let half_beam = sheer.y_m;
             let station = FullEnvelopeStation {
                 station_id: station_id.clone(),
@@ -723,9 +725,9 @@ mod tests {
                 station_id: station_id.clone(),
                 points: vec![
                     DeckPoint {
-                        point_id: format!("MIRROR:{}", sheer.point_id),
+                        point_id: format!("MIRROR:{sheer_point_id}"),
                         y_m: -half_beam,
-                        z_m: -4.0,
+                        z_m: deck_edge_z_m,
                         role: DeckPointRole::PortDeckEdge,
                     },
                     DeckPoint {
@@ -735,9 +737,9 @@ mod tests {
                         role: DeckPointRole::DeckCrown,
                     },
                     DeckPoint {
-                        point_id: sheer.point_id.clone(),
+                        point_id: sheer_point_id,
                         y_m: half_beam,
-                        z_m: -4.0,
+                        z_m: deck_edge_z_m,
                         role: DeckPointRole::StarboardDeckEdge,
                     },
                 ],
