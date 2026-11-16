@@ -36,6 +36,7 @@ pub enum ScilawsSelectionError {
     UnsupportedLiveSchema,
     UnsupportedEvaluatorSchema,
     EmptyCampaignId,
+    InvalidSelectorPolicyId,
     EmptyCandidatePool,
     EmptyCandidateId,
     DuplicateCandidateId(String),
@@ -65,6 +66,7 @@ impl fmt::Display for ScilawsSelectionError {
                 write!(f, "unsupported evaluator pool schema/version")
             }
             Self::EmptyCampaignId => write!(f, "campaign ID must not be empty"),
+            Self::InvalidSelectorPolicyId => write!(f, "selector policy ID must not be empty"),
             Self::EmptyCandidatePool => write!(f, "candidate pool must not be empty"),
             Self::EmptyCandidateId => write!(f, "candidate ID must not be empty"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate ID: {id}"),
@@ -173,7 +175,7 @@ impl LiveSelectionPacket {
             validate_digest(digest, field.to_owned())?;
         }
         if self.selector_policy_id.trim().is_empty() {
-            return Err(ScilawsSelectionError::EmptyCandidateId);
+            return Err(ScilawsSelectionError::InvalidSelectorPolicyId);
         }
         if self.candidates.is_empty() {
             return Err(ScilawsSelectionError::EmptyCandidatePool);
@@ -233,7 +235,7 @@ impl LiveSelectionPacket {
     /// Returns semantic-duplicate groups without dropping attempts. Equality is
     /// by the caller-supplied canonical ScientificModel digest, never by raw
     /// source text or candidate ID.
-    pub fn semantic_duplicate_groups(&self) -> Vec<Vec<String>> {
+    pub fn duplicate_model_artifact_groups(&self) -> Vec<Vec<String>> {
         let mut groups = BTreeMap::<&str, Vec<String>>::new();
         for candidate in &self.candidates {
             groups
@@ -386,7 +388,7 @@ pub struct ScilawsRealSelectionAudit {
     pub evaluator_manifest_sha256: String,
     pub live_packet_sha256: String,
     pub attempt_count: usize,
-    pub semantic_duplicate_groups: Vec<Vec<String>>,
+    pub duplicate_model_artifact_groups: Vec<Vec<String>>,
     pub attempt_results: Vec<EvaluatorAttemptAudit>,
     pub complete_count: usize,
     pub failed_count: usize,
@@ -411,7 +413,7 @@ struct AuditReceiptPayload<'a> {
     evaluator_manifest_sha256: &'a str,
     live_packet_sha256: &'a str,
     attempt_count: usize,
-    semantic_duplicate_groups: &'a [Vec<String>],
+    duplicate_model_artifact_groups: &'a [Vec<String>],
     attempt_results: &'a [EvaluatorAttemptAudit],
     complete_count: usize,
     failed_count: usize,
@@ -551,7 +553,7 @@ pub fn audit_real_candidate_selection(
         })
         .unwrap_or_else(|| (0, Vec::new()));
 
-    let semantic_duplicate_groups = live.semantic_duplicate_groups();
+    let duplicate_model_artifact_groups = live.duplicate_model_artifact_groups();
     let attempt_results = evaluator
         .candidates
         .iter()
@@ -632,7 +634,7 @@ pub fn audit_real_candidate_selection(
         evaluator_manifest_sha256: &evaluator.evaluator_manifest_sha256,
         live_packet_sha256: &live_packet_sha256,
         attempt_count,
-        semantic_duplicate_groups: &semantic_duplicate_groups,
+        duplicate_model_artifact_groups: &duplicate_model_artifact_groups,
         attempt_results: &attempt_results,
         complete_count,
         failed_count,
@@ -656,7 +658,7 @@ pub fn audit_real_candidate_selection(
         evaluator_manifest_sha256: evaluator.evaluator_manifest_sha256.clone(),
         live_packet_sha256,
         attempt_count,
-        semantic_duplicate_groups,
+        duplicate_model_artifact_groups,
         attempt_results,
         complete_count,
         failed_count,
@@ -734,12 +736,12 @@ mod tests {
             schema: LIVE_SCHEMA.to_owned(),
             version: LIVE_VERSION.to_owned(),
             campaign_id: "scilaws-real-fixture-001".to_owned(),
-            task_manifest_sha256: digest('t'),
-            development_split_sha256: digest('s'),
+            task_manifest_sha256: digest('f'),
+            development_split_sha256: digest('a'),
             selector_policy_id: "fixture-selector-v1".to_owned(),
-            selector_policy_sha256: digest('p'),
-            selection_trace_sha256: digest('x'),
-            resource_receipt_sha256: digest('r'),
+            selector_policy_sha256: digest('d'),
+            selection_trace_sha256: digest('c'),
+            resource_receipt_sha256: digest('b'),
             candidates,
             submitted_candidate_id: submitted.map(str::to_owned),
         }
@@ -772,8 +774,8 @@ mod tests {
             schema: EVALUATOR_SCHEMA.to_owned(),
             version: EVALUATOR_VERSION.to_owned(),
             campaign_id: "scilaws-real-fixture-001".to_owned(),
-            task_manifest_sha256: digest('t'),
-            evaluator_manifest_sha256: digest('e'),
+            task_manifest_sha256: digest('f'),
+            evaluator_manifest_sha256: digest('a'),
             candidates,
         }
     }
@@ -784,12 +786,12 @@ mod tests {
             "schema":"symthaea.scilaws.live-selection-packet",
             "version":"0.1.0",
             "campaign_id":"c1",
-            "task_manifest_sha256":"tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
-            "development_split_sha256":"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss",
+            "task_manifest_sha256":"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            "development_split_sha256":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
             "selector_policy_id":"fixture-selector-v1",
-            "selector_policy_sha256":"pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
-            "selection_trace_sha256":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-            "resource_receipt_sha256":"rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
+            "selector_policy_sha256":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+            "selection_trace_sha256":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+            "resource_receipt_sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
             "candidates":[{
                 "candidate_id":"a",
                 "model_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -953,7 +955,7 @@ mod tests {
         );
         live.validate().unwrap();
         assert_eq!(
-            live.semantic_duplicate_groups(),
+            live.duplicate_model_artifact_groups(),
             vec![vec!["first".to_owned(), "second".to_owned()]]
         );
     }
