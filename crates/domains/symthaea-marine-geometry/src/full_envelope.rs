@@ -593,7 +593,8 @@ fn validate_symmetry_and_port_profiles(
                 {
                     let semantic_mismatch = port_point.role != starboard_point.role
                         || port_point.region_to_next != starboard_point.region_to_next;
-                    let identity_or_geometry_mismatch = if pointed_end {
+                    let shared_keel = starboard_point.role == ProfilePointRole::Keel;
+                    let identity_or_geometry_mismatch = if pointed_end || shared_keel {
                         port_point.point_id != starboard_point.point_id
                             || !close(port_point.y_m, 0.0)
                             || !close(starboard_point.y_m, 0.0)
@@ -609,6 +610,11 @@ fn validate_symmetry_and_port_profiles(
                                 format!(
                                     "station {} pointed stem requires shared port/starboard point identity and coincident centreplane coordinates for {:?}",
                                     station.station_id, starboard_point.role
+                                )
+                            } else if shared_keel {
+                                format!(
+                                    "station {} explicit port/starboard keel must share point identity and coincident centreline coordinates",
+                                    station.station_id
                                 )
                             } else {
                                 format!(
@@ -1474,6 +1480,37 @@ mod tests {
         .unwrap()
     }
 
+    fn asymmetric_box_fixture(port_scale: f64) -> FullEnvelopeSpec {
+        let mut spec = box_fixture();
+        spec.symmetry = SymmetryPolicy::ExplicitPortAndStarboard;
+        for station in &mut spec.stations {
+            let mut port = station.starboard_profile.clone();
+            for point in &mut port {
+                if point.role != ProfilePointRole::Keel {
+                    point.point_id = format!("PORT-{}", point.point_id);
+                }
+                point.y_m *= -port_scale;
+            }
+            station.port_profile = Some(port);
+        }
+        for intersection in &mut spec.design_waterline.station_intersections {
+            intersection.port_source = WaterlinePortSource::ExplicitPortProfile;
+            intersection.port_point_id = Some(format!("PORT-{}", intersection.starboard_point_id));
+        }
+        for (station, deck_section) in spec
+            .stations
+            .iter()
+            .zip(spec.deck_surface.sections.iter_mut())
+        {
+            let port_sheer = station.port_profile.as_ref().unwrap().last().unwrap();
+            let deck_port = deck_section.points.first_mut().unwrap();
+            deck_port.point_id = port_sheer.point_id.clone();
+            deck_port.y_m = port_sheer.y_m;
+            deck_port.z_m = port_sheer.z_m;
+        }
+        spec
+    }
+
     fn assert_rejected(spec: &FullEnvelopeSpec, code: &str) {
         let report = validate_full_envelope_spec(spec);
         assert_eq!(report.disposition, FullEnvelopeDisposition::Rejected);
@@ -1604,31 +1641,7 @@ mod tests {
 
     #[test]
     fn explicit_asymmetric_policy_requires_port_profiles_and_references() {
-        let mut spec = box_fixture();
-        spec.symmetry = SymmetryPolicy::ExplicitPortAndStarboard;
-        for station in &mut spec.stations {
-            let mut port = station.starboard_profile.clone();
-            for point in &mut port {
-                point.point_id = format!("PORT-{}", point.point_id);
-                point.y_m *= -0.9;
-            }
-            station.port_profile = Some(port);
-        }
-        for intersection in &mut spec.design_waterline.station_intersections {
-            intersection.port_source = WaterlinePortSource::ExplicitPortProfile;
-            intersection.port_point_id = Some(format!("PORT-{}", intersection.starboard_point_id));
-        }
-        for (station, deck_section) in spec
-            .stations
-            .iter()
-            .zip(spec.deck_surface.sections.iter_mut())
-        {
-            let port_sheer = station.port_profile.as_ref().unwrap().last().unwrap();
-            let deck_port = deck_section.points.first_mut().unwrap();
-            deck_port.point_id = port_sheer.point_id.clone();
-            deck_port.y_m = port_sheer.y_m;
-            deck_port.z_m = port_sheer.z_m;
-        }
+        let spec = asymmetric_box_fixture(0.9);
         let report = validate_full_envelope_spec(&spec);
         assert_eq!(
             report.disposition,
@@ -1639,31 +1652,7 @@ mod tests {
 
     #[test]
     fn explicit_asymmetric_waterline_does_not_require_equal_port_starboard_breadths() {
-        let mut spec = box_fixture();
-        spec.symmetry = SymmetryPolicy::ExplicitPortAndStarboard;
-        for station in &mut spec.stations {
-            let mut port = station.starboard_profile.clone();
-            for point in &mut port {
-                point.point_id = format!("PORT-{}", point.point_id);
-                point.y_m *= -0.8;
-            }
-            station.port_profile = Some(port);
-        }
-        for intersection in &mut spec.design_waterline.station_intersections {
-            intersection.port_source = WaterlinePortSource::ExplicitPortProfile;
-            intersection.port_point_id = Some(format!("PORT-{}", intersection.starboard_point_id));
-        }
-        for (station, deck_section) in spec
-            .stations
-            .iter()
-            .zip(spec.deck_surface.sections.iter_mut())
-        {
-            let port_sheer = station.port_profile.as_ref().unwrap().last().unwrap();
-            let deck_port = deck_section.points.first_mut().unwrap();
-            deck_port.point_id = port_sheer.point_id.clone();
-            deck_port.y_m = port_sheer.y_m;
-            deck_port.z_m = port_sheer.z_m;
-        }
+        let spec = asymmetric_box_fixture(0.8);
         let report = validate_full_envelope_spec(&spec);
         assert_eq!(
             report.disposition,
@@ -1689,6 +1678,24 @@ mod tests {
     }
 
     #[test]
+    fn explicit_asymmetric_transom_keel_identity_must_be_shared() {
+        let mut spec = asymmetric_box_fixture(0.9);
+        spec.stations[0]
+            .port_profile
+            .as_mut()
+            .unwrap()[0]
+            .point_id = "PORT-SEPARATE-KEEL".into();
+        assert_rejected(&spec, "port_starboard_correspondence");
+    }
+
+    #[test]
+    fn explicit_asymmetric_transom_keel_coordinate_must_be_shared() {
+        let mut spec = asymmetric_box_fixture(0.9);
+        spec.stations[0].port_profile.as_mut().unwrap()[0].z_m += 0.01;
+        assert_rejected(&spec, "port_starboard_correspondence");
+    }
+
+    #[test]
     fn explicit_asymmetric_policy_cannot_silently_mirror_missing_port() {
         let mut spec = box_fixture();
         spec.symmetry = SymmetryPolicy::ExplicitPortAndStarboard;
@@ -1709,7 +1716,9 @@ mod tests {
 
         let mut stern_port = spec.stations[1].starboard_profile.clone();
         for point in &mut stern_port {
-            point.point_id = format!("PORT-{}", point.point_id);
+            if point.role != ProfilePointRole::Keel {
+                point.point_id = format!("PORT-{}", point.point_id);
+            }
             point.y_m *= -0.9;
         }
         spec.stations[1].port_profile = Some(stern_port);
