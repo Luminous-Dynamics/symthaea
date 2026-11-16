@@ -28,7 +28,29 @@
       "duplicate_or_conflicting_replay"
     ],
     "truth_visibility": "physical_truth, injected_fault and expected are evaluator-only. Candidate code may consume candidate_input only.",
-    "independence": "raw channels, event features and HDC projections derived from one physical acquisition share the same physical evidence root unless a separate sensor/reference path is independently established."
+    "independence": "raw channels, event features and HDC projections derived from one physical acquisition share the same physical evidence root unless a separate sensor/reference path is independently established.",
+    "reference_temperature_c": 20,
+    "drift_epoch_ms": 0,
+    "default_channel_gain": 1,
+    "default_channel_bias": 0,
+    "drift_elapsed_time_basis": "time_ms - drift_epoch_ms",
+    "parameter_semantics": {
+      "bias": "Additive offset in arb on the named channel; omitted other-channel parameters are zero.",
+      "gain": "Multiplicative gain on the named channel; omitted other-channel gains are 1.",
+      "normal_to_shear_crosstalk": "shear_raw receives parameter * normal_truth.",
+      "shear_to_normal_crosstalk": "normal_raw receives parameter * shear_truth.",
+      "saturation": "Upper clipping limit in arb on the named channel.",
+      "dead_zone": "Values with absolute magnitude below parameter become zero.",
+      "quantization": "Quantization step in arb; nearest step, ties away from zero.",
+      "linear_drift": "Additive offset slope in arb/ms after drift_epoch_ms.",
+      "temperature_coefficient": "Additive offset slope in arb/degC relative to reference_temperature_c.",
+      "hysteresis": "Additive branch offset in arb; event field identifies the branch.",
+      "shared_adc_offset": "Same additive offset in arb on all declared channels sharing the named ADC/reference roots.",
+      "shared_reference_gain": "Same multiplicative gain on all declared channels sharing the named reference roots.",
+      "clock_offset": "Device timestamp minus independent reference timestamp, in ms.",
+      "readout_latency": "Collector receipt time minus source acquisition time, in ms.",
+      "timestamp_jitter": "One bounded timestamp residual in ms relative to the independent reference; full distribution is not inferred from one sample."
+    }
   },
   "cases": [
     {
