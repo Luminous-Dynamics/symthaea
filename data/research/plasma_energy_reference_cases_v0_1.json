@@ -1499,13 +1499,14 @@
         }
       ],
       "source_conclusion": "The paper reports three distinct operating points: >99% NH3 conversion at 45 g H2/kWh and 242 kJ/mol; 150 g H2/h at 92.4% conversion, 50 g H2/kWh and 217 kJ/mol; and its highest energy yield of 51 g H2/kWh with lowest energy cost of 210 kJ/mol at 76% conversion. These points must remain separately paired; the 150 g/h result is not the >99% conversion point.",
-      "comparison_status": "SOURCE_SPECIFIC_TWO_OPERATING_POINTS_NOT_MATCHED_TO_OTHER_STUDIES",
+      "comparison_status": "SOURCE_SPECIFIC_THREE_POINTS_WITH_ABSTRACT_CONCLUSION_THROUGHPUT_CONFLICT",
       "blockers": [
         "The >99% conversion / 45 g per kWh, 92.4% conversion / 150 g per hour / 50 g per kWh, and 76% conversion / 51 g per kWh results are three distinct operating points and must not be mixed.",
         "The reported energy yield must be traced to its exact electrical meter boundary and must not be assumed to be complete wall-plug-to-purified-H2 performance.",
         "Product separation, purification, compression, cooling, auxiliaries, startup, downtime and lifetime remain to be reconciled.",
         "The atmospheric pure-NH3 reactor differs from the 2025 atmospheric NH3/N2 torch and the 2025 reduced-pressure pure-NH3 reactor; no direct ranking is permitted.",
-        "The coupled model is source-reported model evidence, not a Luminous simulation or independent validation."
+        "The coupled model is source-reported model evidence, not a Luminous simulation or independent validation.",
+        "The abstract and conclusion associate the 150 g/h value with different NH3 conversion / energy-yield points; preserve the discrepancy and block exact throughput-point pairing until figures/tables/SI are reconciled."
       ],
       "luminous_reproduction": false,
       "operating_points": [
@@ -1532,6 +1533,17 @@
           "hydrogen_energy_cost_kJ_per_mol": 210,
           "hydrogen_production_rate_g_per_hour": null,
           "qualifier": "highest reported H2 energy yield and lowest energy cost, at a distinct 76% conversion point"
+        }
+      ],
+      "source_text_discrepancies": [
+        {
+          "discrepancy_id": "NH3-MW-2026-ABSTRACT-CONCLUSION-150GPH-PAIRING",
+          "field": "hydrogen_production_rate_g_per_hour",
+          "abstract_statement": "The abstract associates >99% NH3 conversion, 45 g/kWh H2 energy yield, 242 kJ/mol energy cost and 150 g/h H2 production.",
+          "conclusion_statement": "The conclusion separately states 150 g/h at 92.4% NH3 conversion, 50 g/kWh H2 energy yield and 217 kJ/mol energy cost.",
+          "status": "UNRESOLVED_ABSTRACT_CONCLUSION_OPERATING_POINT_PAIRING",
+          "handling": "Keep the >99%/45g-per-kWh and 92.4%/150g-per-hour/50g-per-kWh points separate. Do not attribute the 150g/h value to the >99% point or use it in a Pareto comparison until the source figure/table and supplementary data resolve the discrepancy.",
+          "luminous_reproduction": false
         }
       ]
     },
@@ -3246,6 +3258,133 @@
         "No complete carbon inventory, long-cycle durability or accepted syngas customer contract is established by this source summary."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-CRACK-MW-RESONATOR-DYNAMIC-2026",
+      "lane": "AMMONIA_CRACKING_DYNAMIC_RESPONSE",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Dynamic response of a microwave resonant plasma system for hydrogen production via ammonia cracking",
+        "publisher": "Chemical Engineering Journal",
+        "publication_date": "2026-09-01",
+        "volume": "543",
+        "article_number": "178329",
+        "doi": "10.1016/j.cej.2026.178329",
+        "url": "https://doi.org/10.1016/j.cej.2026.178329"
+      },
+      "configuration": {
+        "reactor": "quarter-wavelength coaxial cavity resonator",
+        "feedstock": "pure NH3",
+        "steady_state_system_input_power_w": 200,
+        "steady_state_pressure_bar_abs": 1,
+        "steady_state_feed_flow_slpm": 1,
+        "steady_state_ammonia_cracking_ratio_fraction": 0.4095,
+        "steady_state_hydrogen_energy_yield_g_per_kwh": 11.71,
+        "reported_dynamic_response_layer": "ammonia cracking ratio inferred/observed through the study's diagnostic measurement chain",
+        "accepted_h2_product_response_measured": false
+      },
+      "operating_points": [
+        {
+          "id": "QWCCR-POWER-UP-160-180W-1BAR",
+          "step_direction": "up",
+          "input_power_before_w": 160,
+          "input_power_after_w": 180,
+          "pressure_bar_abs": 1,
+          "reported_response_time_ms": 1.31,
+          "response_measurand": "ammonia_cracking_ratio",
+          "evidence_layer": "diagnostic_process_response",
+          "qualifier": "source-reported atmospheric-pressure power-step response; not accepted purified H2 delivery response"
+        },
+        {
+          "id": "QWCCR-POWER-DOWN-180-160W-1BAR",
+          "step_direction": "down",
+          "input_power_before_w": 180,
+          "input_power_after_w": 160,
+          "pressure_bar_abs": 1,
+          "reported_response_time_ms": 1.1,
+          "response_measurand": "ammonia_cracking_ratio",
+          "evidence_layer": "diagnostic_process_response",
+          "qualifier": "source-reported atmospheric-pressure power-step response; not accepted purified H2 delivery response"
+        }
+      ],
+      "diagnostic_evidence": {
+        "methods": [
+          "optical_emission_spectroscopy",
+          "high_speed_imaging"
+        ],
+        "proxy_species_or_features": [
+          "H_alpha",
+          "NH2_star",
+          "overall_emission"
+        ],
+        "reported_linear_correlation_r2_min": 0.99,
+        "correlation_scope": "source-reported calibration at 1.0 bar; not independently established as transferable to other pressures, devices, feeds or geometries",
+        "proxy_is_not_accepted_h2_mass_flow": true
+      },
+      "source_conclusion": "At 200 W, 1 bar and 1 SLPM pure NH3, the coaxial resonator reports 40.95% ACR and 11.71 g/kWh H2 energy yield. At 1 bar, a 160→180 W power step has a reported 1.31 ms ACR response and a 180→160 W step has a 1.10 ms response. The study correlates emission features with ACR (R2 > 0.99 in the stated calibration scope), but does not establish the same response time at the purified/accepted H2 customer boundary.",
+      "comparison_status": "SOURCE_SPECIFIC_DIAGNOSTIC_RESPONSE_NOT_ACCEPTED_PRODUCT_RESPONSE",
+      "blockers": [
+        "The 1.31 ms and 1.10 ms values are source-specific ACR/diagnostic response times, not measured purified or delivered H2 mass-flow response times.",
+        "The OES correlation is scoped to the article's stated operating and calibration conditions; it is not universal across pressure, feed composition, flow, geometry, device ageing or instruments.",
+        "The reported 11.71 g/kWh steady-state energy yield is not by itself a complete grid-to-accepted-H2 energy boundary.",
+        "Sampling-train, analyser, gas separation, purification, compression, storage and customer-delivery dynamics are not inferred from the plasma diagnostic response.",
+        "No Luminous reproduction or independent experiment has been performed."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-CRACK-WAVEGUIDE-MWPJ-2026",
+      "lane": "AMMONIA_CRACKING",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Enhanced ammonia cracking using high-power waveguide-based microwave plasma jets",
+        "publisher": "Proceedings of the Combustion Institute",
+        "publication_date": "2026",
+        "volume": "42",
+        "article_number": "106307",
+        "doi": "10.1016/j.proci.2026.106307",
+        "url": "https://doi.org/10.1016/j.proci.2026.106307"
+      },
+      "configuration": {
+        "reactor": "high-power waveguide-based argon microwave plasma jet",
+        "feedstock": "NH3 in Ar balance gas",
+        "major_variables": [
+          "microwave power",
+          "total flow rate",
+          "inlet NH3 concentration"
+        ],
+        "comparison_configuration": "Surfatron-based microwave plasma jet"
+      },
+      "observations": [
+        {
+          "metric": "critical_inlet_ammonia_fraction",
+          "value": 0.475,
+          "qualifier": "source-reported critical NH3 fraction enabled by waveguide MWPJ; configuration-specific",
+          "unit": "fraction"
+        },
+        {
+          "metric": "critical_inlet_ammonia_fraction_comparator",
+          "value": 0.0232,
+          "qualifier": "source-reported Surfatron comparator",
+          "unit": "fraction"
+        },
+        {
+          "metric": "hydrogen_production_efficiency_relative_gain",
+          "value": 7,
+          "qualifier": "approximately sevenfold relative improvement claimed by source; not an absolute efficiency or a matched plant-level result",
+          "unit": "dimensionless"
+        }
+      ],
+      "source_conclusion": "The high-power waveguide MWPJ study reports critical NH3 fraction up to approximately 47.5% versus approximately 2.32% for a Surfatron comparison and an approximately sevenfold increase in H2 production efficiency. Results depend on power, total flow, NH3 concentration and reactor-flow coupling; absolute energy and product boundaries must be extracted before cross-study ranking.",
+      "comparison_status": "SOURCE_SPECIFIC_RELATIVE_EFFICIENCY_AND_FEED_TOLERANCE_NOT_MATCHED_TO_QWCCR",
+      "blockers": [
+        "The sevenfold value is a relative, source-specific comparison and must not be presented as an absolute efficiency or a system-level result.",
+        "The configuration uses Ar balance gas and a different waveguide/flow-field architecture; it is not directly comparable to pure-NH3 QWCCR data.",
+        "SIE alone does not capture the coupled effects of microwave power and total flow in this source.",
+        "The source result must not be merged with the QWCCR 1.31 ms/1.10 ms dynamic response points.",
+        "No Luminous reproduction or independent experiment has been performed."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -3676,18 +3815,18 @@
     },
     {
       "control_id": "NC-040",
-      "condition": "Claim APPJ plasma-thermal hybrid superiority from fivefold conversion alone without complete grid-to-accepted-product energy, separation and product-quality boundaries.",
-      "expected_disposition": "NOT_COMPARABLE_INCOMPLETE_SYSTEM_BOUNDARY"
+      "condition": "Promote the source-reported QWCCR 1.31 ms ACR diagnostic response to accepted purified hydrogen mass-flow or customer-delivery response time.",
+      "expected_disposition": "REJECT_MEASURAND_LAYER_MISMATCH"
     },
     {
       "control_id": "NC-041",
-      "condition": "Credit turbostratic carbon with commercial revenue or avoided-product value without measured collected mass, product specification, independent grade qualification and offtake.",
-      "expected_disposition": "BLOCKED_UNQUALIFIED_CARBON_COPRODUCT"
+      "condition": "Transfer the OES-to-ACR R2 > 0.99 calibration beyond the source's stated pressure/feed/device domain without held-out calibration and product-side reference measurements.",
+      "expected_disposition": "BLOCKED_DOMAIN_TRANSFER"
     },
     {
       "control_id": "NC-042",
-      "condition": "Borrow the pulsed-heating paper's pure-CH4 27 kWh/kg H2 metric or diluted-feed 95% conversion into the APPJ source record.",
-      "expected_disposition": "REJECT_CROSS_SOURCE_OPERATING_POINT_BORROWING"
+      "condition": "Combine the waveguide MWPJ approximately sevenfold relative efficiency claim with the QWCCR dynamic response or treat it as an absolute grid-to-accepted-H2 efficiency.",
+      "expected_disposition": "NOT_COMPARABLE_CONFIGURATION_AND_BOUNDARY_MISMATCH"
     },
     {
       "control_id": "NC-CO2-ML-001",
@@ -4203,6 +4342,42 @@
         "matched_syngas_composition_and_product_contract_required": true
       },
       "rationale": "The 2026 cyclic CRG paper demonstrates carbon formation/gasification but uses plasma-deposited power, has distinct modes, and reports only about 0.5 vol% maximum O2 after three passes. This target tests real carbon closure, durability and retained useful syngas over 100 cycles with full grid-side energy accounting."
+    },
+    {
+      "target_id": "NH3-CRACK-DYNAMIC-DELIVERY-RESPONSE-001",
+      "lane": "AMMONIA_CRACKING_DYNAMIC_RESPONSE",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "NH3-CRACK-MW-RESONATOR-DYNAMIC-2026",
+        "NH3-CRACK-WAVEGUIDE-MWPJ-2026",
+        "NH3-CRACK-MW-ATM-MECHANISM-2026"
+      ],
+      "metric_thresholds": {
+        "source_qwccr_up_step_response_ms_max_for_reproduction": 1.31,
+        "source_qwccr_down_step_response_ms_max_for_reproduction": 1.1,
+        "proposed_accepted_h2_service_90_percent_settling_time_max_s": 1,
+        "proposed_accepted_h2_delivery_overshoot_fraction_max": 0.05,
+        "proposed_dynamic_grid_to_accepted_h2_energy_penalty_max_fraction": 0.05,
+        "minimum_independent_device_days": 3,
+        "minimum_up_and_down_step_repeats_per_condition": 20,
+        "diagnostic_proxy_sampling_rate_min_hz": 10000,
+        "timestamp_alignment_error_max_ms": 0.1,
+        "all_response_thresholds_must_hold_at_same_device_and_feed_contract": true
+      },
+      "claim_guards": {
+        "plasma_state_diagnostic_proxy_and_accepted_h2_response_are_distinct_measurands": true,
+        "accepted_h2_mass_flow_and_purity_measured_independently": true,
+        "sampling_train_and_analyser_delay_characterized_with_uncertainty": true,
+        "step_up_and_step_down_responses_reported_separately": true,
+        "power_pressure_feed_flow_and_composition_bound_to_each_operating_point": true,
+        "full_grid_to_accepted_h2_energy_boundary_required": true,
+        "no_1ms_diagnostic_response_promoted_to_customer_h2_delivery_response": true,
+        "held_out_pressure_and_device_groups_required_for_oes_proxy_transfer": true,
+        "storage_compression_and_product_buffer_dynamics_included_or_excluded_explicitly": true,
+        "failed_ignitions_purge_off_spec_output_and_restarts_in_denominator": true,
+        "no_source_relative_waveguide_efficiency_gain_transferred_to_QWCCR": true
+      },
+      "rationale": "The September 2026 QWCCR study reports 1.31 ms ACR response on a 160→180 W step and 1.10 ms on a 180→160 W step, with OES/high-speed imaging proxies; those are not accepted H2 product delivery response times. The waveguide MWPJ study reports a separate approximately sevenfold relative H2 production efficiency gain and approximately 47.5% critical NH3 fraction under its own Ar-diluted feed and flow architecture. The benchmark's paradigm shift is to measure command→plasma→diagnostic→gas composition→purified H2→customer delivery separately, then optimize full grid-to-accepted-H2 service under realistic load profiles. The 1 s customer-service settling target is an aspirational research target, not a source-reported or achieved result."
     }
   ]
 }
