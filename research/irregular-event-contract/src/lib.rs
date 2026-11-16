@@ -10,10 +10,16 @@
 use std::collections::{BTreeMap, BTreeSet};
 use sha2::{Digest, Sha256};
 
+pub mod clock;
 pub mod splits;
 pub mod scaler;
 pub mod time_imm;
 pub mod watermarks;
+pub use clock::{
+    conservative_min_exclusive_watermark, ClockCalibrationError, ClockCalibrationV1,
+    ClockDomainId, ConservativeExclusiveWatermark, MappedClockTime,
+    MappedExclusiveWatermark,
+};
 pub use watermarks::{CompletenessReport, CompletenessVerdict, EventArrivalClassification, LateEventBreach, LateEventKind, SourceCompleteness, SourceCompletenessEntry, SourceKey, SourceProgressEvidence, SourceProgressOperation, SourceProgressRevision, SourceWatermarkLedger, VerifiedCompletenessReport, WatermarkError};
 pub use time_imm::{AvailabilityPolicy, NaiveTimestampZone, NumericFeatureSpec, TimeImmAdapterConfig, TimeImmAdapterError, TimeImmCsvAdapter, TimeImmParsedTable};
 pub use scaler::{FeatureScale, TrainOnlyStandardizer, WindowFeatureValue, ScalerError};
