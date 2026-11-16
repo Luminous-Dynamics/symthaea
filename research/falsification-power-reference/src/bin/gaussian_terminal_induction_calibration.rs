@@ -106,20 +106,14 @@ fn wilson_95(successes: u64, trials: u64) -> (f64, f64) {
 }
 
 fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
-    let design = GaussianTerminalInducedTest::new(
-        ALPHA,
-        vec![DISCREPANCY; HORIZON],
-        vec![SIGMA; HORIZON],
-    )?;
+    let design =
+        GaussianTerminalInducedTest::new(ALPHA, vec![DISCREPANCY; HORIZON], vec![SIGMA; HORIZON])?;
     let mut counts = Counts::default();
 
     for path in 0..PATHS {
-        let seed = ROOT_SEED
-            ^ scenario.seed_offset()
-            ^ path.wrapping_mul(0xd6e8_feb8_6659_fd93);
+        let seed = ROOT_SEED ^ scenario.seed_offset() ^ path.wrapping_mul(0xd6e8_feb8_6659_fd93);
         let mut observation_rng = SplitMix64::new(seed);
-        let mut randomizer_rng =
-            SplitMix64::new(seed ^ 0xa5a5_5a5a_1234_9876);
+        let mut randomizer_rng = SplitMix64::new(seed ^ 0xa5a5_5a5a_1234_9876);
         let mut e_process = PredictableGaussianEProcess::new(SIGMA, ALPHA)?;
         let mut observations = Vec::with_capacity(HORIZON);
         let mut cumulative_standardized = 0.0;
@@ -140,8 +134,7 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
                 DISCREPANCY,
                 SIGMA,
             )?;
-            let e_update =
-                e_process.observe(&observation_id, &decision_digest, observed)?;
+            let e_update = e_process.observe(&observation_id, &decision_digest, observed)?;
             if e_update.crossed_alpha_boundary && e_process_first_crossing.is_none() {
                 e_process_first_crossing = Some(look as u64);
             }
@@ -164,7 +157,8 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
 
         let terminal = design.evaluate_prefix(&observations)?;
         let terminal_np_reject = terminal.conditional_rejection_probability >= 0.5;
-        if terminal.conditional_rejection_probability != if terminal_np_reject { 1.0 } else { 0.0 } {
+        if terminal.conditional_rejection_probability != if terminal_np_reject { 1.0 } else { 0.0 }
+        {
             counts.terminal_induced_mismatches += 1;
         }
         if terminal_np_reject {
@@ -183,7 +177,8 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
         if e_process_first_crossing.is_some() {
             counts.e_process_crossings += 1;
             counts.e_process_crossers += 1;
-            counts.e_process_first_crossing_looks += e_process_first_crossing.unwrap_or(HORIZON as u64);
+            counts.e_process_first_crossing_looks +=
+                e_process_first_crossing.unwrap_or(HORIZON as u64);
         }
         if naive_rejected {
             counts.naive_repeated_rejections += 1;
@@ -194,10 +189,8 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
 }
 
 fn emit_counts(scenario: Scenario, counts: &Counts, expected_terminal_power: f64) {
-    let (terminal_low, terminal_high) =
-        wilson_95(counts.terminal_np_rejections, PATHS);
-    let (induced_low, induced_high) =
-        wilson_95(counts.induced_randomized_rejections, PATHS);
+    let (terminal_low, terminal_high) = wilson_95(counts.terminal_np_rejections, PATHS);
+    let (induced_low, induced_high) = wilson_95(counts.induced_randomized_rejections, PATHS);
     let (e_low, e_high) = wilson_95(counts.e_process_crossings, PATHS);
     let (naive_low, naive_high) = wilson_95(counts.naive_repeated_rejections, PATHS);
     let mean_stop_look = counts.induced_stop_looks as f64 / PATHS as f64;
@@ -252,11 +245,8 @@ fn emit_counts(scenario: Scenario, counts: &Counts, expected_terminal_power: f64
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let design = GaussianTerminalInducedTest::new(
-        ALPHA,
-        vec![DISCREPANCY; HORIZON],
-        vec![SIGMA; HORIZON],
-    )?;
+    let design =
+        GaussianTerminalInducedTest::new(ALPHA, vec![DISCREPANCY; HORIZON], vec![SIGMA; HORIZON])?;
     let null = run_scenario(Scenario::SimpleNull)?;
     let alternative = run_scenario(Scenario::DeclaredAlternative)?;
 
@@ -283,11 +273,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         design.total_information(),
         design.terminal_power()
     );
-    emit_counts(
-        Scenario::SimpleNull,
-        &null,
-        design.terminal_power(),
-    );
+    emit_counts(Scenario::SimpleNull, &null, design.terminal_power());
     println!(",");
     emit_counts(
         Scenario::DeclaredAlternative,
