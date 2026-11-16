@@ -227,10 +227,12 @@ fn emit_counts(scenario: Scenario, counts: &Counts, expected_terminal_power: f64
         counts.e_process_first_crossing_looks as f64 / counts.e_process_crossers as f64
     };
     let mean_e_process_observations_used = (counts.e_process_first_crossing_looks
-        + (PATHS - counts.e_process_crossers) * HORIZON as u64) as f64
+        + (PATHS - counts.e_process_crossers) * HORIZON as u64)
+        as f64
         / PATHS as f64;
     let mean_naive_repeated_observations_used = (counts.naive_first_rejection_looks
-        + (PATHS - counts.naive_crossers) * HORIZON as u64) as f64
+        + (PATHS - counts.naive_crossers) * HORIZON as u64)
+        as f64
         / PATHS as f64;
     let policy_json = counts
         .induced_policies
