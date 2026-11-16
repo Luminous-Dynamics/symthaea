@@ -219,7 +219,7 @@ fixed, deterministic source-watermark ledgers containing 1k, 10k and 100k
 late-arrival receipts. Each generated history permutes event-time order relative
 to availability/arrival order. It queries a 16-unit half-open interval and
 compares 101 indexed reads with 15 full-history verified reads. It records
-p50/p95/p99 latency, event-time buckets visited and receipt entries examined, and
+indexed p50/p95/p99 latency, verified median/worst-observed latency, event-time buckets visited and receipt entries examined, and
 checks exact report parity plus the expected 16 matching breaches before timing.
 The hosted workflow retains the CSV output with the exact commit, toolchain,
 dependency lock and fixture/source digests. This measures in-memory CPU query
