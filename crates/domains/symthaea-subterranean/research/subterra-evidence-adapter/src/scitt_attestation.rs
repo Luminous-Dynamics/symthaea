@@ -13,6 +13,7 @@ use std::collections::BTreeMap;
 use coset::{
     cbor::Value,
     iana,
+    AsCborValue,
     CborSerializable,
     CoseSign1,
     CoseSign1Builder,
@@ -78,6 +79,7 @@ pub enum ScittAttestationError {
     ProtectedKeyIdMismatch,
     WrongCoseContentType,
     UnexpectedUnprotectedSecurityHeader,
+    UnsupportedProtectedCriticalHeader,
     MissingCwtClaims,
     DuplicateCwtClaims,
     InvalidCwtClaims,
@@ -193,8 +195,11 @@ fn check_cose_profile(
     if sign1.protected.header.key_id.is_empty() {
         return Err(ScittAttestationError::MissingProtectedKeyId);
     }
-    if sign1.protected.header.key_id != expected_key_id.as_bytes() {
+    if sign1.protected.header.key_id.as_slice() != expected_key_id.as_bytes() {
         return Err(ScittAttestationError::ProtectedKeyIdMismatch);
+    }
+    if !sign1.protected.header.crit.is_empty() {
+        return Err(ScittAttestationError::UnsupportedProtectedCriticalHeader);
     }
     if sign1.protected.header.content_type.as_ref()
         != Some(&coset::ContentType::Text(IN_TOTO_JSON_CONTENT_TYPE.to_string()))
@@ -205,6 +210,7 @@ fn check_cose_profile(
     // Security-relevant fields must be protected. A conflicting unprotected
     // algorithm, key ID or CWT claim is rejected rather than merged.
     if sign1.unprotected.alg.is_some()
+        || sign1.unprotected.content_type.is_some()
         || !sign1.unprotected.key_id.is_empty()
         || sign1.unprotected.rest.iter().any(|(label, _)| {
             label == &Label::Int(CWT_CLAIMS_HEADER_LABEL)
@@ -734,6 +740,7 @@ mod tests {
             panic!("expected tag wrapper");
         };
         let mut sign1 = CoseSign1::from_cbor_value(*inner).unwrap();
+        sign1.protected.original_data = None;
         sign1.protected.header.alg = Some(iana::Algorithm::ES256);
         let tampered = Value::Tag(
             SCITT_COSE_SIGN1_TAG,
@@ -780,4 +787,63 @@ mod tests {
             Err(ScittAttestationError::UnexpectedUnprotectedSecurityHeader)
         );
     }
+    #[test]
+    fn wrong_protected_content_type_is_rejected() {
+        let (signed, public_key) = signed_fixture();
+        let Value::Tag(_, inner) = Value::from_slice(&signed).unwrap() else {
+            panic!("expected tag wrapper");
+        };
+        let mut sign1 = CoseSign1::from_cbor_value(*inner).unwrap();
+        sign1.protected.original_data = None;
+        sign1.protected.header.content_type =
+            Some(coset::ContentType::Text("application/json".to_string()));
+        let tampered = Value::Tag(
+            SCITT_COSE_SIGN1_TAG,
+            Box::new(sign1.to_cbor_value().unwrap()),
+        )
+        .to_vec()
+        .unwrap();
+        assert_eq!(
+            verify_scitt_signed_science_return_statement(
+                &tampered,
+                b"abc",
+                ISSUER_URI,
+                SUBJECT_URI,
+                KEY_ID,
+                &public_key,
+            ),
+            Err(ScittAttestationError::WrongCoseContentType)
+        );
+    }
+
+    #[test]
+    fn protected_cwt_claims_are_not_accepted_from_the_unprotected_header() {
+        let (signed, public_key) = signed_fixture();
+        let Value::Tag(_, inner) = Value::from_slice(&signed).unwrap() else {
+            panic!("expected tag wrapper");
+        };
+        let mut sign1 = CoseSign1::from_cbor_value(*inner).unwrap();
+        sign1.unprotected.rest.push((
+            Label::Int(CWT_CLAIMS_HEADER_LABEL),
+            cwt_issuer_subject_claims(ISSUER_URI, SUBJECT_URI),
+        ));
+        let tampered = Value::Tag(
+            SCITT_COSE_SIGN1_TAG,
+            Box::new(sign1.to_cbor_value().unwrap()),
+        )
+        .to_vec()
+        .unwrap();
+        assert_eq!(
+            verify_scitt_signed_science_return_statement(
+                &tampered,
+                b"abc",
+                ISSUER_URI,
+                SUBJECT_URI,
+                KEY_ID,
+                &public_key,
+            ),
+            Err(ScittAttestationError::UnexpectedUnprotectedSecurityHeader)
+        );
+    }
+
 }

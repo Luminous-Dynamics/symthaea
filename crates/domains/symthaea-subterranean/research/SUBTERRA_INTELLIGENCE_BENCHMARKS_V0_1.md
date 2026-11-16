@@ -497,7 +497,7 @@ This is a signature verifier, not a PKI or custody authority. It does not authen
 |---|---|---|
 | InTotoStatementV1Bench | Payload has the exact Statement v1 type URI, exactly one SHA-256 subject and the versioned Subterra predicate URI | All frozen positive fixtures parse; unsupported type/predicate rejected |
 | ScittTag18Bench | Signed statement is CBOR tag 18 wrapping COSE_Sign1 | Zero untagged COSE arrays accepted as SCITT Signed_Statement |
-| ScittProtectedClaimsBench | Protected header contains Ed25519 (-19), kid, JSON content type and CWT iss/sub | Zero missing, unprotected or substituted security claims |
+| ScittProtectedClaimsBench | Protected header contains Ed25519 (-19), kid, JSON content type and CWT iss/sub | Zero missing, unprotected, critical-unknown or substituted security claims |
 | Ed25519CoseBench | COSE signature verifies with strict Ed25519 using the evaluator's trusted public key | 100% fixed positive/negative controls |
 | SubjectDigestBench | in-toto subject digest matches the actual acquired bytes | Zero altered payloads accepted |
 | ScienceReturnPredicateBench | Signed predicate event history satisfies the science-return lifecycle validator | Zero invalid lifecycle records admitted |

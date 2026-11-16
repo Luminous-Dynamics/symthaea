@@ -209,3 +209,6 @@ The adapter now has a separate standards-oriented signed-statement path:
 - verifier: checks tag, protected algorithm/key/content-type/issuer/subject and strict Ed25519 signature against caller-trusted values, then checks the payload digest and lifecycle event record.
 
 The custom v0.1 Ed25519 message remains experimental for compatibility and should not be used as the inter-system interchange format. The COSE path is a signed statement only. SCITT registration, receipt acquisition and verifiable-data-structure proof verification are not implemented. RFC 9943 explicitly distinguishes signing from transparency registration; a receipt demonstrates inclusion under a transparency service's rules, not scientific truth. The issuer and key registry remain external trust dependencies.
+
+
+The COSE verifier also rejects COSE security fields placed only in unprotected headers (algorithm, key ID, content type and CWT claims), and rejects protected critical headers it does not understand. This profile intentionally keeps the protected-header surface narrow. A future SCITT receipt is a separate signed COSE structure in the unprotected receipts parameter and must not be confused with the issuer's original signature.
