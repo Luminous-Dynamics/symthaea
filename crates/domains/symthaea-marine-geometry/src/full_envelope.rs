@@ -592,7 +592,9 @@ fn validate_symmetry_and_port_profiles(
                             } else {
                                 format!(
                                     "station {} explicit port point {} must have a distinct identity and matching semantic role/breakline with starboard point {}",
-                                    station.station_id, port_point.point_id, starboard_point.point_id
+                                    station.station_id,
+                                    port_point.point_id,
+                                    starboard_point.point_id
                                 )
                             },
                         );
@@ -768,8 +770,7 @@ fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssu
                         .is_some_and(|last| station.station_id == last.station_id)
                         && spec.end_conditions.stern == HullEndCondition::PointedStem);
                 let port_coordinate_invalid = if pointed_end {
-                    !close(port_point.y_m, 0.0)
-                        || port_point.point_id != starboard_point.point_id
+                    !close(port_point.y_m, 0.0) || port_point.point_id != starboard_point.point_id
                 } else {
                     port_point.y_m >= -COORDINATE_TOLERANCE_M
                 };
@@ -1450,14 +1451,23 @@ mod tests {
         assert_rejected(&spec, "symmetric_port_profile_supplied");
     }
 
-
     #[test]
     fn asymmetric_json_fixture_passes_without_mirroring_port_geometry() {
         let spec = asymmetric_fixture();
         assert_eq!(spec.symmetry, SymmetryPolicy::ExplicitPortAndStarboard);
         for station in &spec.stations {
-            let starboard = station.starboard_profile.iter().find(|p| p.role == ProfilePointRole::Waterline).unwrap();
-            let port = station.port_profile.as_ref().unwrap().iter().find(|p| p.role == ProfilePointRole::Waterline).unwrap();
+            let starboard = station
+                .starboard_profile
+                .iter()
+                .find(|p| p.role == ProfilePointRole::Waterline)
+                .unwrap();
+            let port = station
+                .port_profile
+                .as_ref()
+                .unwrap()
+                .iter()
+                .find(|p| p.role == ProfilePointRole::Waterline)
+                .unwrap();
             assert_ne!(starboard.y_m.abs(), port.y_m.abs());
         }
         let report = validate_full_envelope_spec(&spec);
@@ -1503,7 +1513,6 @@ mod tests {
         assert!(report.issues.is_empty());
     }
 
-
     #[test]
     fn explicit_asymmetric_waterline_does_not_require_equal_port_starboard_breadths() {
         let mut spec = box_fixture();
@@ -1532,7 +1541,10 @@ mod tests {
             deck_port.z_m = port_sheer.z_m;
         }
         let report = validate_full_envelope_spec(&spec);
-        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert_eq!(
+            report.disposition,
+            FullEnvelopeDisposition::ValidInputContract
+        );
         assert!(report.issues.is_empty());
         for intersection in &spec.design_waterline.station_intersections {
             let station = spec
@@ -1540,11 +1552,9 @@ mod tests {
                 .iter()
                 .find(|item| item.station_id == intersection.station_id)
                 .unwrap();
-            let starboard = profile_point_by_id(
-                &station.starboard_profile,
-                &intersection.starboard_point_id,
-            )
-            .unwrap();
+            let starboard =
+                profile_point_by_id(&station.starboard_profile, &intersection.starboard_point_id)
+                    .unwrap();
             let port = profile_point_by_id(
                 station.port_profile.as_ref().unwrap(),
                 intersection.port_point_id.as_deref().unwrap(),
@@ -1560,7 +1570,6 @@ mod tests {
         spec.symmetry = SymmetryPolicy::ExplicitPortAndStarboard;
         assert_rejected(&spec, "explicit_port_profile_missing");
     }
-
 
     #[test]
     fn explicit_port_and_starboard_profiles_share_point_ids_at_pointed_stem_only() {
