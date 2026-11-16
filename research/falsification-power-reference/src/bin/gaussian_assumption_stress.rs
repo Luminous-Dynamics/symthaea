@@ -296,6 +296,51 @@ fn generate_residuals(regime: NoiseRegime, rng: &mut SplitMix64) -> Vec<f64> {
     residuals
 }
 
+fn ar1_innovations(observations: &[f64]) -> Vec<f64> {
+    let mut innovations = Vec::with_capacity(observations.len());
+    if let Some(first) = observations.first() {
+        innovations.push(*first);
+        for look in 1..observations.len() {
+            innovations.push(observations[look] - AR1_RHO * observations[look - 1]);
+        }
+    }
+    innovations
+}
+
+fn ar1_alternative_innovations(null_innovations: &[f64]) -> Vec<f64> {
+    null_innovations
+        .iter()
+        .enumerate()
+        .map(|(look, value)| {
+            if look == 0 {
+                value + DISCREPANCY
+            } else {
+                value + (1.0 - AR1_RHO) * DISCREPANCY
+            }
+        })
+        .collect()
+}
+
+fn known_rho_ar1_conditional_test(
+) -> Result<GaussianTerminalInducedTest, Box<dyn Error>> {
+    let mut discrepancies = Vec::with_capacity(HORIZON);
+    let mut sigmas = Vec::with_capacity(HORIZON);
+    for look in 0..HORIZON {
+        if look == 0 {
+            discrepancies.push(DISCREPANCY);
+            sigmas.push(SIGMA);
+        } else {
+            discrepancies.push((1.0 - AR1_RHO) * DISCREPANCY);
+            sigmas.push(SIGMA * (1.0 - AR1_RHO * AR1_RHO).sqrt());
+        }
+    }
+    Ok(GaussianTerminalInducedTest::new(
+        ALPHA,
+        discrepancies,
+        sigmas,
+    )?)
+}
+
 fn run_seed(
     regime: NoiseRegime,
     root_seed: u64,
@@ -329,22 +374,8 @@ fn run_seed(
         let alternative_terminal = test.evaluate_prefix(&alternative_observations)?;
 
         let conditional_ar1_values = if regime == NoiseRegime::StationaryAr1 {
-            let mut innovations = Vec::with_capacity(HORIZON);
-            innovations.push(residuals[0]);
-            for look in 1..HORIZON {
-                innovations.push(residuals[look] - AR1_RHO * residuals[look - 1]);
-            }
-            let alternative_innovations = innovations
-                .iter()
-                .enumerate()
-                .map(|(look, value)| {
-                    if look == 0 {
-                        value + DISCREPANCY
-                    } else {
-                        value + (1.0 - AR1_RHO) * DISCREPANCY
-                    }
-                })
-                .collect::<Vec<_>>();
+            let innovations = ar1_innovations(&residuals);
+            let alternative_innovations = ar1_alternative_innovations(&innovations);
             Some((
                 conditional_ar1_test.evaluate_prefix(&innovations)?,
                 conditional_ar1_test.evaluate_prefix(&alternative_innovations)?,
@@ -490,6 +521,32 @@ fn optional_pair_json(
     }
 }
 
+fn conditional_ar1_json(
+    null: Option<RejectionCounts>,
+    alternative: Option<RejectionCounts>,
+    analytic_power: f64,
+) -> String {
+    match (null, alternative) {
+        (Some(null), Some(alternative)) => format!(
+            concat!(
+                "{{",
+                "\"assumption_status\":\"IN_CONTRACT_KNOWN_RHO_AR1\",",
+                "\"rho\":{:.8},",
+                "\"analytic_terminal_power\":{:.8},",
+                "\"null\":{},",
+                "\"alternative\":{}",
+                "}}"
+            ),
+            AR1_RHO,
+            analytic_power,
+            counts_json(null),
+            counts_json(alternative)
+        ),
+        (None, None) => "null".to_owned(),
+        _ => "null".to_owned(),
+    }
+}
+
 fn seed_json(result: &SeedResult) -> String {
     let conditional = optional_pair_json(
         result.conditional_ar1_null,
@@ -527,18 +584,17 @@ fn regime_json(
     let moments = aggregate_moments(&result.seeds);
     let conditional_null = aggregate_conditional_ar1(&result.seeds, false);
     let conditional_alternative = aggregate_conditional_ar1(&result.seeds, true);
-    let conditional = optional_pair_json(conditional_null, conditional_alternative);
+    let conditional = conditional_ar1_json(
+        conditional_null,
+        conditional_alternative,
+        conditional_ar1_analytic_power,
+    );
     let per_seed = result
         .seeds
         .iter()
         .map(seed_json)
         .collect::<Vec<_>>()
         .join(",");
-    let conditional_status = if conditional_null.is_some() && conditional_alternative.is_some() {
-        "IN_CONTRACT_KNOWN_RHO_AR1"
-    } else {
-        "NOT_APPLICABLE"
-    };
     format!(
         concat!(
             "{{",
@@ -550,9 +606,7 @@ fn regime_json(
             "\"alternative\":{},",
             "\"analytic_iid_terminal_power\":{:.8},",
             "\"known_rho_ar1_analytic_conditional_power\":{:.8},",
-            "\"conditional_known_rho_ar1_status\":\"{}\",",
             "\"conditional_known_rho_ar1\":{},",
-            "\"conditional_known_rho_ar1_analytic_power\":{:.8},",
             "\"null_false_alarm_excess_over_alpha\":{:.8},",
             "\"pooled_null_mean\":{:.8},",
             "\"pooled_null_variance\":{:.8},",
@@ -567,9 +621,7 @@ fn regime_json(
         counts_json(null),
         counts_json(alternative),
         analytic_power,
-        conditional_status,
         conditional,
-        conditional_ar1_analytic_power,
         null.rate() - ALPHA,
         moments.mean(),
         moments.variance(),
@@ -581,22 +633,7 @@ fn regime_json(
 fn main() -> Result<(), Box<dyn Error>> {
     let test =
         GaussianTerminalInducedTest::new(ALPHA, vec![DISCREPANCY; HORIZON], vec![SIGMA; HORIZON])?;
-    let mut conditional_discrepancies = Vec::with_capacity(HORIZON);
-    let mut conditional_sigmas = Vec::with_capacity(HORIZON);
-    for look in 0..HORIZON {
-        if look == 0 {
-            conditional_discrepancies.push(DISCREPANCY);
-            conditional_sigmas.push(SIGMA);
-        } else {
-            conditional_discrepancies.push((1.0 - AR1_RHO) * DISCREPANCY);
-            conditional_sigmas.push(SIGMA * (1.0 - AR1_RHO * AR1_RHO).sqrt());
-        }
-    }
-    let conditional_ar1_test = GaussianTerminalInducedTest::new(
-        ALPHA,
-        conditional_discrepancies,
-        conditional_sigmas,
-    )?;
+    let conditional_ar1_test = known_rho_ar1_conditional_test()?;
     let unique_seeds = ROOT_SEEDS
         .iter()
         .copied()
@@ -723,6 +760,37 @@ mod tests {
             assert_eq!(first.next_u64(), second.next_u64());
         }
         assert_ne!(second.next_u64(), other.next_u64());
+    }
+
+    #[test]
+    fn ar1_innovation_transform_recovers_known_conditional_errors() {
+        let observations = vec![2.0, 1.7, 2.105];
+        let innovations = ar1_innovations(&observations);
+        assert!((innovations[0] - 2.0).abs() < 1.0e-12);
+        assert!((innovations[1] - 0.4).abs() < 1.0e-12);
+        assert!((innovations[2] - 1.0).abs() < 1.0e-12);
+
+        let shifted = ar1_alternative_innovations(&innovations);
+        assert!((shifted[0] - (innovations[0] + DISCREPANCY)).abs() < 1.0e-12);
+        for look in 1..shifted.len() {
+            assert!(
+                (shifted[look] - (innovations[look] + (1.0 - AR1_RHO) * DISCREPANCY))
+                    .abs()
+                    < 1.0e-12
+            );
+        }
+    }
+
+    #[test]
+    fn known_rho_conditional_design_information_matches_closed_form() {
+        let test = known_rho_ar1_conditional_test().unwrap();
+        let initial_information = DISCREPANCY.powi(2) / SIGMA.powi(2);
+        let later_discrepancy = (1.0 - AR1_RHO) * DISCREPANCY;
+        let later_sigma = SIGMA * (1.0 - AR1_RHO * AR1_RHO).sqrt();
+        let expected = initial_information
+            + (HORIZON - 1) as f64 * later_discrepancy.powi(2) / later_sigma.powi(2);
+        assert!((test.total_information() - expected).abs() < 1.0e-10);
+        assert!(test.terminal_power() > 0.0 && test.terminal_power() < 1.0);
     }
 
     #[test]
