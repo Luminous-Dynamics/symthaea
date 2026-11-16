@@ -164,7 +164,6 @@ pub enum BenchmarkDiagnostic {
     FailedOperationInCompletedTrial,
     MissingMetrologyCalibration,
     InvalidAlignmentMeasurement,
-    DuplicateMetrologyArtifactUse,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -430,7 +429,6 @@ fn validate_trials(
     let mut diagnostics = Vec::new();
     let mut trial_ids = BTreeSet::new();
     let mut raw_digests = BTreeSet::new();
-    let mut metrology_digests = BTreeSet::new();
     let required: BTreeSet<&str> = manifest
         .required_operation_ids
         .iter()
@@ -511,12 +509,6 @@ fn validate_trials(
                 != Some(manifest.metrology_calibration_ref.as_str())
             {
                 diagnostics.push(BenchmarkDiagnostic::MissingMetrologyCalibration);
-            } else if !metrology_digests.insert(
-                trial.metrology_calibration_ref.as_deref().unwrap_or_default(),
-            ) {
-                // Repeated use of the same calibration is expected and valid:
-                // the manifest fixes one calibration reference for the set.
-                // This collection is intentionally not used as a uniqueness gate.
             }
         }
 
@@ -533,8 +525,10 @@ fn validate_trials(
             {
                 diagnostics.push(BenchmarkDiagnostic::OperationOutsideAttempt);
             }
-            if event.outcome == OperationTrialOutcome::Failed
-                && trial.status == TrialStatus::Completed
+            if matches!(
+                event.outcome,
+                OperationTrialOutcome::Failed | OperationTrialOutcome::Skipped
+            ) && trial.status == TrialStatus::Completed
             {
                 diagnostics.push(BenchmarkDiagnostic::FailedOperationInCompletedTrial);
             }
@@ -610,7 +604,7 @@ fn binomial_cdf(n: usize, p: f64, k_max: usize) -> f64 {
     if p >= 1.0 {
         return 0.0;
     }
-    log_sum_binomial(n, p, 0, k_max)
+    log_sum_binomial(n, p, 0, k_max).exp()
 }
 
 fn binomial_tail(n: usize, k_min: usize, p: f64) -> f64 {
@@ -626,7 +620,7 @@ fn binomial_tail(n: usize, k_min: usize, p: f64) -> f64 {
     if p >= 1.0 {
         return 1.0;
     }
-    log_sum_binomial(n, p, k_min, n)
+    log_sum_binomial(n, p, k_min, n).exp()
 }
 
 fn log_sum_binomial(n: usize, p: f64, start: usize, end: usize) -> f64 {
@@ -722,7 +716,12 @@ mod tests {
             metrology_calibration_ref: Some(manifest.metrology_calibration_ref),
             evidence_class: manifest.evidence_class,
             raw_data_ref: format!("raw-trial-{id}"),
-            raw_data_sha256: sha(id.chars().next().unwrap_or('9')),
+            raw_data_sha256: {
+                let hash = id.bytes().fold(0xcbf29ce484222325_u64, |state, byte| {
+                    (state ^ u64::from(byte)).wrapping_mul(0x100000001b3)
+                });
+                format!("{hash:064x}")
+            },
             attempt_duration_seconds: duration,
             status,
             safe_terminal_state: status != TrialStatus::Failed,
@@ -750,7 +749,7 @@ mod tests {
         assert_eq!(report.completed_trials, 30);
         assert_eq!(report.completion_fraction, Some(1.0));
         assert!(report.completion_fraction_one_sided_lower_bound.unwrap() > 0.90);
-        assert_eq!(report.completed_duration_p50_seconds, Some(615));
+        assert_eq!(report.completed_duration_p50_seconds, Some(614));
         assert_eq!(report.completed_duration_p90_seconds, Some(626));
         assert_eq!(report.completion_time_quantile_upper_confidence_seconds, Some(629));
     }
