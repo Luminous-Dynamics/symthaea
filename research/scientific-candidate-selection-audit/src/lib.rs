@@ -138,7 +138,7 @@ pub enum SelectionDecision {
 pub struct SelectionObservation {
     pub decision: SelectionDecision,
     pub consumed_evidence_ids: Vec<String>,
-    pub all_in_cost_units: f64,
+    pub selector_cost_units: f64,
 }
 
 pub trait CandidateSelectionPolicy {
@@ -154,7 +154,7 @@ pub struct SelectionTrace {
     pub policy_id: String,
     pub decision: SelectionDecision,
     pub consumed_evidence_ids: Vec<String>,
-    pub all_in_cost_units: f64,
+    pub selector_cost_units: f64,
 }
 
 /// Run a policy against the selector-only packet and immediately validate
@@ -172,7 +172,7 @@ pub fn run_selector<P: CandidateSelectionPolicy>(
         policy_id: policy.policy_id().to_owned(),
         decision: observation.decision,
         consumed_evidence_ids: observation.consumed_evidence_ids,
-        all_in_cost_units: observation.all_in_cost_units,
+        selector_cost_units: observation.selector_cost_units,
     };
     validate_selection_trace(packet, &trace)?;
     Ok(trace)
@@ -585,10 +585,10 @@ pub fn validate_selection_trace(
     if trace.cost_unit_id != packet.cost_unit_id {
         return Err(SelectionAuditError::TraceCostUnitMismatch);
     }
-    if !trace.all_in_cost_units.is_finite() || trace.all_in_cost_units < 0.0 {
+    if !trace.selector_cost_units.is_finite() || trace.selector_cost_units < 0.0 {
         return Err(SelectionAuditError::InvalidCost);
     }
-    if trace.all_in_cost_units > packet.budget_limit_cost_units {
+    if trace.selector_cost_units > packet.budget_limit_cost_units {
         return Err(SelectionAuditError::BudgetExceeded);
     }
 
@@ -846,7 +846,7 @@ pub fn audit_submission(
         candidate_pool_sha256: packet.candidate_pool_sha256.clone(),
         policy_id: trace.policy_id.clone(),
         cost_unit_id: trace.cost_unit_id.clone(),
-        selection_cost_units: trace.all_in_cost_units,
+        selection_cost_units: trace.selector_cost_units,
         budget_limit_cost_units: packet.budget_limit_cost_units,
         attempted_candidates: packet.candidates.len(),
         scored_candidates: scored,
@@ -1073,7 +1073,7 @@ mod tests {
             policy_id: "test-policy-v1".to_owned(),
             decision,
             consumed_evidence_ids: vec!["dev-fold-1".to_owned()],
-            all_in_cost_units: 12.5,
+            selector_cost_units: 12.5,
         }
     }
 
@@ -1119,7 +1119,7 @@ mod tests {
                     candidate_id: self.selected.clone(),
                 },
                 consumed_evidence_ids: vec!["dev-fold-1".to_owned()],
-                all_in_cost_units: 1.0,
+                selector_cost_units: 1.0,
             })
         }
     }
@@ -1176,12 +1176,12 @@ mod tests {
         let mut frozen = trace(SelectionDecision::Select {
             candidate_id: "a".to_owned(),
         });
-        frozen.all_in_cost_units = 21.0;
+        frozen.selector_cost_units = 21.0;
         assert_eq!(
             validate_selection_trace(&packet, &frozen),
             Err(SelectionAuditError::BudgetExceeded)
         );
-        frozen.all_in_cost_units = 2.0;
+        frozen.selector_cost_units = 2.0;
         frozen.cost_unit_id = "unrelated_cost_unit".to_owned();
         assert_eq!(
             validate_selection_trace(&packet, &frozen),
