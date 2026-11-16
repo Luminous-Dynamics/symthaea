@@ -210,3 +210,51 @@ That is a distinct and testable competitive contribution.
 - **PLANETARY-DEPLOYED:** measured at the destination.
 
 Never collapse queued, skipped, not-run, or stale-head evidence into PASS.
+
+
+## 10. Evidence-adapter and claim-separation benchmarks
+
+The typed intake adapter is a prerequisite for connecting the scientific planners to Symtropy's source records. Its own correctness must be measured separately from the planner.
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| SchemaContractBench | Required fields, enum values, nullability, additional fields and schema versions match the frozen v0.1 contract | 100% schema positive fixtures accepted; every frozen negative fixture rejected |
+| EvidenceRetentionBench | All claim states, original values and evidence references survive JSON-to-typed conversion | Zero dropped or changed evidence references; zero state promotion |
+| ClaimIndependenceBench | Connectivity, access, surveyed extent, origin and engineering suitability remain separate | Directly observed connectivity may coexist with unknown access and unsurveyed interior; no automatic implication |
+| ProfileUnknownPreservationBench | Explicitly unobserved intervals remain unobserved through parsing and summary | Zero zero-filled or interpolated unknown spans |
+| NetworkTopologyBench | Physical observed components use only directly observed connections | Candidate/geophysical edges never alter confirmed components |
+| DemonstratedRouteBench | Traversal queries require directly observed connection AND demonstrated traversal, respecting direction | Zero route through candidate, geophysically supported, contradicted or traversal-unknown edges |
+| PlanetaryAuthorityBoundaryBench | Declared activity permission remains data, not action authority | Zero adapter output is accepted as an external planetary-protection authorization |
+| SchemaDriftBench | Unsupported schema version, unknown enum and unexpected fields fail closed | Zero silent downgrade or lossy forward compatibility |
+
+### Required positive controls
+
+- Directly observed connection with accessibility still unknown.
+- Partial interior survey with no demonstrated traversal of the whole network.
+- Directly observed edge whose traversal remains unknown.
+- Candidate and geophysically supported edges retained in the source record but excluded from confirmed topology.
+- One-way demonstrated edge where outbound traversal is known but retreat is not.
+- Non-Earth permission declaration preserved with a mandatory external review boundary.
+- Partial profile with an explicitly unknown interval.
+
+### Required negative controls
+
+- Directly observed connectivity without its evidence references.
+- Demonstrated access without access/egress descriptions or supporting references.
+- Qualified engineering claim without envelope ID or evidence.
+- Duplicate observation IDs, edge IDs or evidence references.
+- Edge endpoint absent from the node set.
+- Candidate / geophysically supported / contradicted edge marked traversal-demonstrated.
+- Non-finite or negative profile measurements and uncertainty.
+- Missing required nullable fields in profile records.
+- Unknown schema fields or unsupported schema versions.
+
+### Integration boundary
+
+The adapter emits typed site beliefs and network records. It does not fabricate priors from qualitative states, establish sensor independence, authenticate evidence, transform planetary coordinates, calculate cave geomechanics, qualify human access or grant a mission action. A separate calibrated observation model must map evidence into probabilities before an EVSI planner consumes it.
+
+The adapter-level profile summary reports observed-only length-weighted dimensions and coverage. It is not a 3D reconstruction and does not replace Symtropy's morphometry reference.
+
+### Current status
+
+The standalone site/network/profile adapter and source fixtures are AUTHORED. Fixture JSON syntax has been checked. The 25 adapter test cases are AUTHORED but not compiled or executed. No JSON Schema meta-validation, Rust test execution, CI qualification, robot-in-the-loop or analogue result is claimed for this adapter increment.
