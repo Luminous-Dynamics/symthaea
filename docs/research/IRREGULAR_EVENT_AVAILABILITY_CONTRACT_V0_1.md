@@ -120,13 +120,13 @@ SHA-256 over the exact input bytes.
 
 ## 7. Authored test inventory and limits
 
-The current source contains 77 authored Rust test functions:
+The current source contains 79 authored Rust test functions:
 - 16 event-contract tests in `lib.rs`;
 - 12 bitemporal ledger tests in `lib.rs`;
 - 8 purged-split tests;
 - 10 train-only-scaler tests;
 - 10 Time-IMM adapter tests;
-- 21 source-watermark/completeness tests.
+- 23 source-watermark/completeness tests.
 
 No Cargo build, rustfmt, Clippy, unit test, dataset adapter execution or
 benchmark has run in this environment. The source and fixture inventory is
@@ -169,7 +169,18 @@ specific progress record and policy digest that established the exclusive
 boundary. Terminal/end-of-stream is stronger than a finite watermark and
 closes intervals beyond its final event-time bound.
 
-Twenty-one source-authored tests cover missing progress, multi-source minimum,
+The normal completeness query uses the ordered source-progress chain and a
+secondary index keyed by source identity and event time to inspect only late
+breaches that could affect the requested half-open interval. It does not replay
+the full append-only history on every query. The completeness_verified method
+is the explicit audit path: it rebuilds progress and arrival indexes from the
+history, checks digest/replay parity, then returns the same completeness report.
+The fast and audited paths are tested for exact report equality. This is a query
+complexity improvement by construction, not yet a measured throughput result;
+the benchmark records p50/p95/p99 query latency, late-breach candidates visited,
+and full-audit rebuild latency separately.
+
+Twenty-three source-authored tests cover missing progress, multi-source minimum,
 exclusive boundary behavior, as-known watermarks, late arrivals, terminal
 sources, monotonicity/generation, policy identity, atomic batches, duplicate
 arrivals, unqualified no-progress arrivals, evidence-bound completeness and
@@ -184,7 +195,7 @@ durable WAL and a trusted progress-policy registry remain out of scope.
 
 The machine-readable fixture
 `crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json`
-pins sixteen adversarial scenarios and required metrics. False-complete rate is
+pins eighteen adversarial scenarios and required metrics. False-complete rate is
 the primary safety metric; false-incomplete rate and completeness lag are
 reported separately so an always-incomplete strategy cannot pass. Late-arrival
 detection recall/latency, source watermark skew, and historical as-known
