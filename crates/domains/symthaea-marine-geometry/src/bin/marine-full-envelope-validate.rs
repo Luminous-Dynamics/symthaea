@@ -1,6 +1,5 @@
 use std::{env, fs, path::PathBuf, process};
 
-use serde_json::json;
 use symthaea_marine_geometry::full_envelope::{
     FullEnvelopeDisposition, FullEnvelopeSpec, validate_full_envelope_spec,
 };
