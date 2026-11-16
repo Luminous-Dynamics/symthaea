@@ -882,9 +882,11 @@ mod tests {
             report.disposition,
             RobustNetExportDisposition::RobustlyAboveReserve
         );
-        assert!(report.evidence_refs.contains(
-            &"measured-residual-calibration-receipt".to_string()
-        ));
+        assert!(
+            report
+                .evidence_refs
+                .contains(&"measured-residual-calibration-receipt".to_string())
+        );
     }
 
     #[test]
@@ -900,9 +902,11 @@ mod tests {
         receipt.direct_net_analysis_ref = Some("unexpected-direct-interval".to_string());
         let report = evaluate(Some(&receipt));
         assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(
-            &RobustNetExportDiagnostic::UnexpectedMethodReceipt
-        ));
+        assert!(
+            report
+                .diagnostics
+                .contains(&RobustNetExportDiagnostic::UnexpectedMethodReceipt)
+        );
     }
 
     #[test]
