@@ -99,3 +99,32 @@ The predictable conditional-innovation Gaussian reference in #12442 is the right
 - Stress report JSON SHA-256: `7a548f05a629a33363213afcca6b505edc167d49d4f8a588439fada4ab35579a`
 - Uploaded stress artifact ZIP SHA-256: `8c9e748f571513a9150cd104f39a533e3af564166c5197f4a87d08e993864499`
 - Multi-seed IID calibration artifact ZIP SHA-256: `7afd00a48cbb262909959ab01c744f2c93132d4b83f5f7097c4f7f496df2b42b`
+
+
+## 7. Separately qualified known-rho AR(1) conditional comparator
+
+The v1 campaign adds a distinct comparator only on the stationary AR(1) row. This comparator assumes the evaluator-known rho=0.65 and the correctly specified Gaussian conditional law; it does not estimate rho from observations or provide a blind noise classifier.
+
+For raw AR(1) residuals y_t under the null:
+
+    y_0 ~ N(0, sigma^2)
+    y_t | y_(t-1) ~ N(rho*y_(t-1), sigma^2*(1-rho^2))
+
+Transform to innovations:
+
+    e_0 = y_0
+    e_t = y_t - rho*y_(t-1), t >= 1
+
+For a persistent raw-observation mean discrepancy d at every look, the predictable innovation discrepancies are:
+
+    d_0 = d
+    d_t = (1-rho)*d, t >= 1
+
+The innovation standard deviations are:
+
+    sigma_0 = sigma
+    sigma_t = sigma*sqrt(1-rho^2), t >= 1
+
+The existing fixed Gaussian terminal-test implementation is applied to those independent known-variance innovations as a distinct simple-vs-simple design. It is reported only as `conditional_known_rho_ar1` on the AR(1) regime and is labelled `IN_CONTRACT_KNOWN_RHO_AR1`. It is not merged with the original IID statistic, and its analytic power is distinct from the IID analytic power.
+
+This is a deliberately strong known-parameter evaluator comparator. It does not show that Symthaea can infer rho, establish the model's correctness from blind observations, handle estimated parameters, or justify an AR(1) model in the physical world. It demonstrates the expected change in operating characteristics when the dependence model is correctly specified rather than ignored.
