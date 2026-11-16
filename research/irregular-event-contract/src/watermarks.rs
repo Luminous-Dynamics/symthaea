@@ -984,10 +984,12 @@ mod tests {
     #[test]
     fn late_breach_index_filters_by_required_source_and_half_open_interval() {
         let mut ledger = SourceWatermarkLedger::default();
-        ledger.append_batch([
-            progress(1, 1, 1, 1, 10, 100, false),
-            progress(2, 2, 1, 1, 10, 100, false),
-        ]).unwrap();
+        ledger
+            .append_batch([
+                progress(1, 1, 1, 1, 10, 100, false),
+                progress(2, 2, 1, 1, 10, 100, false),
+            ])
+            .unwrap();
         ledger
             .record_event_arrival(event(1, 2, 50, 20), 20)
             .unwrap();
@@ -995,9 +997,7 @@ mod tests {
             .record_event_arrival(event(2, 1, 200, 30), 30)
             .unwrap();
 
-        let report = ledger
-            .completeness(1, &[source(1)], 0, 100, 30)
-            .unwrap();
+        let report = ledger.completeness(1, &[source(1)], 0, 100, 30).unwrap();
         assert_eq!(report.verdict, CompletenessVerdict::Complete);
         assert!(report.late_breaches.is_empty());
         assert_eq!(
@@ -1034,11 +1034,15 @@ mod tests {
     #[test]
     fn all_required_sources_must_advance_to_the_exclusive_end() {
         let mut ledger = SourceWatermarkLedger::default();
-        ledger.append_batch([
-            progress(1, 1, 1, 1, 10, 100, false),
-            progress(2, 2, 1, 1, 10, 100, false),
-        ]).unwrap();
-        let report = ledger.completeness(1, &[source(1), source(2)], 0, 100, 10).unwrap();
+        ledger
+            .append_batch([
+                progress(1, 1, 1, 1, 10, 100, false),
+                progress(2, 2, 1, 1, 10, 100, false),
+            ])
+            .unwrap();
+        let report = ledger
+            .completeness(1, &[source(1), source(2)], 0, 100, 10)
+            .unwrap();
         assert_eq!(report.verdict, CompletenessVerdict::Complete);
         assert!(report.blocked_sources.is_empty());
     }
@@ -1130,7 +1134,10 @@ mod tests {
         ledger.append(progress(1, 1, 1, 1, 10, 100, false)).unwrap();
         assert_eq!(
             ledger.append(progress(2, 1, 2, 1, 20, 90, false)),
-            Err(WatermarkError::WatermarkRegression { previous: 100, actual: 90 })
+            Err(WatermarkError::WatermarkRegression {
+                previous: 100,
+                actual: 90
+            })
         );
         ledger.append(progress(3, 1, 2, 1, 21, 120, false)).unwrap();
         assert_eq!(ledger.revisions().last().unwrap().stream_generation, 2);
