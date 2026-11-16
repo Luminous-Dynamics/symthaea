@@ -191,15 +191,15 @@ The deterministic multi-source differential regression generates 48 event arriva
 
 ## Reproducible source-watermark scaling benchmark
 
-`src/bin/watermark_scaling.rs` builds deterministic ledgers with 1,000,
-10,000 and 100,000 late-arrival records. It samples a narrow 16-microsecond
-half-open interval whose event-time keys are deliberately permuted relative to
-arrival order. For each size it compares 101 indexed queries with 15
-`completeness_verified` queries that replay and validate the full history
-before returning the same result. Output is CSV with index candidates examined,
-matched breaches and p50/p95/p99 latency for both paths. Every case checks the
-known answer (16 matching late breaches) and exact equality of indexed and
-verified reports before timing. The benchmark is diagnostic, not a physical
+`src/bin/watermark_scaling.rs` builds deterministic ledgers with 4,096, 16,384 and 65,536 late-arrival
+records. It crosses source counts 1/4/16, half-open interval widths 1/16/256
+microseconds, and early/full knowledge cutoffs (54 workload combinations).
+Event-time keys are permuted relative to four receipt-time batches. Each case
+compares 51 indexed queries with 7 `completeness_verified` queries that replay
+and validate the full history. CSV output includes source count, interval width,
+knowledge cutoff, event-time buckets visited, receipt candidates examined,
+matching breaches and p50/p95/p99 latency for both paths. Exact equality of
+indexed and verified reports is required before timing. The benchmark is diagnostic, not a physical
 energy measurement; runner CPU model, toolchain, release profile and exact
 source/fixture hashes must accompany each artifact. The latest run has not
 completed; no latency advantage is asserted yet.
