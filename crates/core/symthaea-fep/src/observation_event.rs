@@ -141,8 +141,11 @@ impl ObservationEventV1 {
     /// Returns `None` when clocks differ because subtracting incomparable
     /// timestamps would invent an age measurement.
     pub fn delivery_delay_ns(&self) -> Option<u64> {
-        (self.capture_clock_domain == self.arrival_clock_domain)
-            .then_some(self.arrival_time_ns - self.capture_time_ns)
+        if self.capture_clock_domain == self.arrival_clock_domain {
+            self.arrival_time_ns.checked_sub(self.capture_time_ns)
+        } else {
+            None
+        }
     }
 
     /// Validate event structure against the fixed observation dimension.
@@ -476,6 +479,10 @@ mod tests {
     fn delivery_age_is_only_derived_within_a_shared_clock_domain() {
         let mut same_clock = event(vec![dimension("temperature", Some(0.5), None, None)]);
         assert_eq!(same_clock.delivery_delay_ns(), Some(200));
+
+        same_clock.arrival_time_ns = 999;
+        assert_eq!(same_clock.delivery_delay_ns(), None);
+        same_clock.arrival_time_ns = 1_200;
 
         same_clock.arrival_clock_domain = "host-monotonic-clock".to_string();
         assert_eq!(same_clock.delivery_delay_ns(), None);
