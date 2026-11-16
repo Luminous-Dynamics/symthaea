@@ -458,3 +458,49 @@ The work reports a QHDC implementation tested on a 156-qubit IBM Heron r3 proces
 | Critical transitions | Persistence/trend, CSD-only, nonlinear diagnostics, network cascade models and ensemble warning approaches |
 
 **Updated principle:** compare the strongest available baseline under a matched experimental budget. A new architecture should be retained only when its contribution survives ablation, held-out regimes, uncertainty analysis and independent reproduction.
+
+
+
+## Applied multiscale systems: architected materials and modular structural grammars
+
+Symthaea's complexity knowledge should include engineered multiscale structures, not only cognitive/physical dynamics. This is a concrete application domain for HDC/VSA compositional reasoning and generative design.
+
+### Scientific framing
+
+Distinguish:
+- **Hierarchical architecture:** components nested across scales; no claim of scale invariance.
+- **Graded architecture:** density, topology, material or geometry varies spatially to meet local requirements.
+- **Modular metamaterial:** global mechanical response depends on module interfaces, contact and constraints as well as each cell's properties.
+- **Fractal geometry:** a statistically supported scaling regime over a stated scale interval; recursive construction alone is insufficient.
+- **Free-form modular structure:** a global continuous/irregular shape assembled from a bounded, repeatable interface vocabulary.
+
+The 2025 Nature Materials perspective identifies cross-scale design and characterization over multiple length and timescales as an important frontier. The 2026 generative-lattice review calls for process-aware, human-in-the-loop search combining physics-based constraints and data-driven acceleration. A September 2026 modular-metamaterial review emphasizes that inter-module interaction governs global mechanical response.
+
+### Symthaea research role
+
+- Encode module catalogs, connector families, orientation, allowed interfaces, assembly sequence and service constraints compositionally.
+- Benchmark HRR/FHRR/MAP/BSC/TPR and GHRR/non-commutative binding for assembly graphs, sequence constraints and held-out module compositions.
+- Explore hierarchical HDC for cell/panel/module/bay/system levels, retaining scale-specific state rather than collapsing it into one complexity score.
+- Propose diverse design candidates and explain constraint conflicts.
+- Use uncertainty-aware active learning to recommend the next Symtropy simulation or physical coupon experiment.
+- Keep human-authored expressive infill and accessibility preferences as explicit requirements; do not optimize inhabitants toward one aesthetic.
+
+### Required structural-design baselines
+
+- Hand-authored parametric grammars.
+- Conventional graph search and evolutionary optimization.
+- Topology optimization and robust multiobjective design.
+- Bayesian/surrogate-assisted optimization.
+- Conventional structural embeddings or graph-learning models where appropriate.
+- Standard connector/spaceframe and voxel assembly grammars.
+
+### Evidence boundary
+
+Symthaea may generate and rank candidate geometry, but it does not certify strength or safety. Symtropy must supply qualified physical/structural analysis, and physical coupons plus applicable inspection/qualification evidence are needed before real-world claims. Graph connectivity, cycle rank, HDC similarity and visual fractality are not substitutes for stress, buckling, fatigue, fracture, joint and manufacturing analysis.
+
+References:
+- 3D architected materials across scales (Nature Materials, 2025): https://www.nature.com/articles/s41563-025-02119-8
+- Generative lattice design for AM (Materials & Design, 2026): https://doi.org/10.1016/j.matdes.2026.115431
+- Modular discrete mechanical metamaterials (IJMS, 2026): https://doi.org/10.1016/j.ijmecsci.2026.111915
+- NASA ARMADAS: https://www.nasa.gov/automated-reconfigurable-mission-adaptive-digital-assembly-systems-armadas/
+- NASA modular in-space truss technology: https://technology.nasa.gov/patent/LAR-TOPS-359
