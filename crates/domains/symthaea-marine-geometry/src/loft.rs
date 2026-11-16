@@ -1703,6 +1703,37 @@ mod tests {
         assert!(errors.iter().any(|item| item.code == "loft_manifest_digest"));
     }
 
+
+    #[test]
+    fn rehashed_wrong_waterplane_triangle_is_rejected_by_closure_semantics() {
+        let mut loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        let face_index = loft.waterplane_face_range.first_face;
+        loft.candidate.geometry.faces[face_index][0] =
+            loft.candidate.geometry.faces[face_index][1];
+        rebind_loft_after_test_mutation(&mut loft);
+        let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|item| item.code == "waterplane_closure_semantics"));
+    }
+
+    #[test]
+    fn rehashed_wrong_planar_end_cap_triangle_is_rejected() {
+        let mut loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::PlanarEndCap,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        let face_index = loft.bow_end_cap_face_range.first_face;
+        loft.candidate.geometry.faces[face_index][0] =
+            loft.candidate.geometry.faces[face_index][1];
+        rebind_loft_after_test_mutation(&mut loft);
+        let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
+        assert!(errors.iter().any(|item| item.code == "bow_cap_topology"));
+    }
+
     #[test]
     fn collapsed_endpoint_must_not_duplicate_transverse_vertices() {
         let mut loft = assert_admissible_end_conditions(
