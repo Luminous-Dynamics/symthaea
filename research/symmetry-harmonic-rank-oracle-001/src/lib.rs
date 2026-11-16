@@ -79,11 +79,50 @@ pub enum MatchStatusV1 {
 
 /// Matching group hypotheses only. This type carries no action, physical,
 /// equivalence, or pruning authority.
+/// A rank-template match is permanently proposal-only in this API surface.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TemplateAuthorityV1 {
+    CandidateProposalOnly,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TemplateProposalV1 {
     pub maximum_degree: usize,
     pub matching_hypotheses: Vec<GroupHypothesisV1>,
     pub status: MatchStatusV1,
+    /// First degree at which any two hypotheses in the declared candidate
+    /// family have different multiplicities. None means the family remains
+    /// indistinguishable through the selected cutoff.
+    pub first_family_divergence_degree: Option<usize>,
+    pub authority: TemplateAuthorityV1,
+}
+
+impl GroupHypothesisV1 {
+    pub fn canonical_label(self) -> String {
+        match self {
+            Self::Cyclic { order } => format!("C{order}"),
+            Self::RotationalDihedral { order } => format!("D{order}"),
+        }
+    }
+}
+
+impl TemplateProposalV1 {
+    /// Stable, versioned byte representation for replay and external hashing.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut encoded = format!(
+            "luminous.symm_harmonic_rank_proposal.v1\nL={}\nstatus={:?}\nfirst_divergence={}\nauthority={:?}\n",
+            self.maximum_degree,
+            self.status,
+            self.first_family_divergence_degree
+                .map_or_else(|| "none".to_owned(), |degree| degree.to_string()),
+            self.authority
+        );
+        for hypothesis in &self.matching_hypotheses {
+            encoded.push_str(&hypothesis.canonical_label());
+            encoded.push('\n');
+        }
+        encoded.into_bytes()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -91,6 +130,7 @@ pub enum TemplateErrorV1 {
     ZeroGroupOrder,
     InvalidDihedralOrder,
     EmptySignature,
+    EmptyCandidateFamily,
     GroupParameterExceeded { required: usize, maximum: usize },
     DegreeExceeded { required: usize, maximum: usize },
     WorkBudgetExceeded { required: usize, maximum: usize },
@@ -154,7 +194,7 @@ pub fn cyclic_fixed_dimension(
 
 /// Independent explicit weight count for C_n. It is intentionally simple and
 /// used as an oracle for the closed-form cyclic formula.
-pub fn cyclic_weight_count(
+fn cyclic_weight_count(
     degree: usize,
     order: usize,
 ) -> Result<usize, TemplateErrorV1> {
@@ -189,15 +229,27 @@ pub fn dihedral_character_fixed_dimension(
     if order < 2 {
         return Err(TemplateErrorV1::InvalidDihedralOrder);
     }
-    (degree / order)
-        .checked_add(usize::from(degree % 2 == 0))
-        .ok_or(TemplateErrorV1::ArithmeticOverflow)
+    let cyclic_character_sum = cyclic_fixed_dimension(degree, order)?;
+    let half_turn_character = usize::from(degree % 2 == 0);
+    let numerator = if half_turn_character == 1 {
+        cyclic_character_sum
+            .checked_add(1)
+            .ok_or(TemplateErrorV1::ArithmeticOverflow)?
+    } else {
+        cyclic_character_sum
+            .checked_sub(1)
+            .ok_or(TemplateErrorV1::ArithmeticOverflow)?
+    };
+    if numerator % 2 != 0 {
+        return Err(TemplateErrorV1::ArithmeticOverflow);
+    }
+    Ok(numerator / 2)
 }
 
 /// Independent weight-pair derivation for D_n:
 /// each positive multiple of n contributes one invariant ±m combination;
 /// m=0 contributes one extra mode exactly when l is even.
-pub fn dihedral_weight_pair_count(
+fn dihedral_weight_pair_count(
     degree: usize,
     order: usize,
 ) -> Result<usize, TemplateErrorV1> {
@@ -333,6 +385,48 @@ pub fn first_divergence_degree(
     Ok(None)
 }
 
+/// Return the first degree where any two hypotheses in a declared family differ.
+/// The family is assumed to use the same canonical co-axial embedding conventions.
+pub fn family_first_divergence_degree(
+    hypotheses: &[GroupHypothesisV1],
+    maximum_degree: usize,
+    budget: TemplateBudgetV1,
+) -> Result<Option<usize>, TemplateErrorV1> {
+    if hypotheses.is_empty() {
+        return Err(TemplateErrorV1::EmptyCandidateFamily);
+    }
+    for hypothesis in hypotheses {
+        preflight(*hypothesis, maximum_degree, budget)?;
+    }
+    let required_work = hypotheses
+        .len()
+        .checked_mul(
+            maximum_degree
+                .checked_add(1)
+                .ok_or(TemplateErrorV1::ArithmeticOverflow)?,
+        )
+        .ok_or(TemplateErrorV1::ArithmeticOverflow)?;
+    if required_work > budget.maximum_work_units {
+        return Err(TemplateErrorV1::WorkBudgetExceeded {
+            required: required_work,
+            maximum: budget.maximum_work_units,
+        });
+    }
+    if hypotheses.len() < 2 {
+        return Ok(None);
+    }
+
+    for degree in 0..=maximum_degree {
+        let first = fixed_dimension(hypotheses[0], degree)?;
+        for hypothesis in hypotheses.iter().skip(1) {
+            if fixed_dimension(*hypothesis, degree)? != first {
+                return Ok(Some(degree));
+            }
+        }
+    }
+    Ok(None)
+}
+
 /// Match a truncated exact rank signature against all C_n and proper D_n
 /// hypotheses up to the maximum group parameter. All matches are returned.
 /// A non-unique result is AMBIGUOUS; it is never collapsed to a guessed label.
@@ -377,20 +471,22 @@ pub fn match_signature(
         });
     }
 
-    let mut matches = Vec::new();
+    let mut candidates = Vec::with_capacity(candidate_count);
     for order in 1..=maximum_group_parameter {
-        let cyclic = GroupHypothesisV1::Cyclic { order };
-        if rank_template(cyclic, maximum_degree, budget)? == observed {
-            matches.push(cyclic);
-        }
+        candidates.push(GroupHypothesisV1::Cyclic { order });
         if order >= 2 {
-            let dihedral = GroupHypothesisV1::RotationalDihedral { order };
-            if rank_template(dihedral, maximum_degree, budget)? == observed {
-                matches.push(dihedral);
-            }
+            candidates.push(GroupHypothesisV1::RotationalDihedral { order });
         }
     }
-    matches.sort();
+
+    let first_family_divergence_degree =
+        family_first_divergence_degree(&candidates, maximum_degree, budget)?;
+    let mut matches = Vec::new();
+    for hypothesis in &candidates {
+        if rank_template(*hypothesis, maximum_degree, budget)? == observed {
+            matches.push(*hypothesis);
+        }
+    }
 
     let status = match matches.len() {
         0 => MatchStatusV1::NoMatch,
@@ -401,6 +497,8 @@ pub fn match_signature(
         maximum_degree,
         matching_hypotheses: matches,
         status,
+        first_family_divergence_degree,
+        authority: TemplateAuthorityV1::CandidateProposalOnly,
     })
 }
 
@@ -438,6 +536,21 @@ mod tests {
                     dihedral_weight_pair_count(degree, order).unwrap(),
                     "D_{order}, l={degree}"
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn dihedral_character_average_uses_the_cyclic_character_sum_and_half_turn_parity() {
+        for order in 2..=64 {
+            for degree in 0..=32 {
+                let cyclic = cyclic_fixed_dimension(degree, order).unwrap();
+                let expected = if degree % 2 == 0 {
+                    (cyclic + 1) / 2
+                } else {
+                    (cyclic - 1) / 2
+                };
+                assert_eq!(dihedral_character_fixed_dimension(degree, order).unwrap(), expected);
             }
         }
     }
@@ -526,6 +639,8 @@ mod tests {
 
         assert_eq!(signature, vec![1, 1, 1]);
         assert_eq!(proposal.status, MatchStatusV1::Ambiguous);
+        assert_eq!(proposal.first_family_divergence_degree, Some(1));
+        assert_eq!(proposal.authority, TemplateAuthorityV1::CandidateProposalOnly);
         assert_eq!(
             proposal.matching_hypotheses,
             vec![
@@ -533,6 +648,10 @@ mod tests {
                 GroupHypothesisV1::Cyclic { order: 4 },
                 GroupHypothesisV1::Cyclic { order: 5 },
                 GroupHypothesisV1::Cyclic { order: 6 },
+                GroupHypothesisV1::RotationalDihedral { order: 3 },
+                GroupHypothesisV1::RotationalDihedral { order: 4 },
+                GroupHypothesisV1::RotationalDihedral { order: 5 },
+                GroupHypothesisV1::RotationalDihedral { order: 6 },
             ]
         );
     }
@@ -551,7 +670,33 @@ mod tests {
     }
 
     #[test]
-    fn dihedral_template_has_expected_low_degree_values() {
+    fn family_divergence_is_reported_without_forcing_an_early_label() {
+        let family = [
+            GroupHypothesisV1::Cyclic { order: 3 },
+            GroupHypothesisV1::Cyclic { order: 4 },
+            GroupHypothesisV1::RotationalDihedral { order: 3 },
+            GroupHypothesisV1::RotationalDihedral { order: 4 },
+        ];
+        assert_eq!(
+            family_first_divergence_degree(&family, 0, budget()).unwrap(),
+            None
+        );
+        assert_eq!(
+            family_first_divergence_degree(&family, 1, budget()).unwrap(),
+            Some(1)
+        );
+    }
+
+    #[test]
+    fn family_divergence_rejects_an_empty_candidate_family() {
+        assert_eq!(
+            family_first_divergence_degree(&[], 4, budget()),
+            Err(TemplateErrorV1::EmptyCandidateFamily)
+        );
+    }
+
+    #[test]
+    fn invalid_orders_empty_signatures_and_budget_exhaustion_fail_closed() {
         let d3 = GroupHypothesisV1::RotationalDihedral { order: 3 };
         assert_eq!(rank_template(d3, 6, budget()).unwrap(), vec![1, 0, 1, 1, 2, 1, 3]);
     }
@@ -591,7 +736,11 @@ mod tests {
         let proposal = match_signature(&signature, 8, budget()).unwrap();
         assert_eq!(proposal.status, MatchStatusV1::Ambiguous);
         assert!(!proposal.matching_hypotheses.is_empty());
-        // The proposal data structure exposes only candidate hypotheses and
-        // matching status; it has no field or operation granting pruning.
+        assert_eq!(proposal.authority, TemplateAuthorityV1::CandidateProposalOnly);
+        let first = proposal.canonical_bytes();
+        let second = match_signature(&signature, 8, budget())
+            .unwrap()
+            .canonical_bytes();
+        assert_eq!(first, second);
     }
 }
