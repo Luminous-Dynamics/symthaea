@@ -20,7 +20,8 @@
     "MANUFACTURER_REPORTED_OPERATIONAL_CLAIM",
     "MANUFACTURER_PRODUCT_CLAIM",
     "GOVERNMENT_RESEARCH_FACILITY_DESCRIPTION",
-    "GOVERNMENT_ROADMAP"
+    "GOVERNMENT_ROADMAP",
+    "INSTITUTION_REPORTED_TECH_TRANSFER_RESULT"
   ],
   "cases": [
     {
@@ -3385,6 +3386,336 @@
         "No Luminous reproduction or independent experiment has been performed."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-PLASMA-DUAL-MEMBRANE-PEDMADS-2025",
+      "lane": "AMMONIA_CRACKING_INTEGRATED_PLASMA_MEMBRANE",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Plasma-Driven Dual-Membrane System for Intensified Hydrogen Production with Integrated Ammonia Recovery",
+        "publisher": "Journal of the American Chemical Society",
+        "publication_date": "2025-11-11",
+        "doi": "10.1021/jacs.5c15789",
+        "url": "https://doi.org/10.1021/jacs.5c15789"
+      },
+      "configuration": {
+        "architecture": "DBD + ALD Ru/SiO2 catalyst + 1.8 um Pd hydrogen membrane + Silicalite-1 ammonia recovery cascade",
+        "reactor_temperature_c": 400,
+        "cascade_stages": 5
+      },
+      "observations": [
+        {
+          "metric": "hydrogen_space_time_yield",
+          "value": 1567,
+          "qualifier": "catalyst-mass-normalized laboratory result",
+          "unit": "mmol_H2_g_catalyst^-1_h^-1"
+        },
+        {
+          "metric": "ammonia_hydrogen_separation_factor",
+          "value": 686,
+          "unit": "dimensionless"
+        },
+        {
+          "metric": "ammonia_nitrogen_separation_factor",
+          "value": 7076,
+          "unit": "dimensionless"
+        },
+        {
+          "metric": "ammonia_effluent_concentration_upper_bound",
+          "value": 4,
+          "qualifier": "below 4 vol% after five-stage cascade; not accepted hydrogen purity",
+          "unit": "vol_percent"
+        },
+        {
+          "metric": "ammonia_removal_efficiency",
+          "value": 87,
+          "unit": "percent"
+        },
+        {
+          "metric": "levelized_cost_of_hydrogen",
+          "value": 0.92,
+          "qualifier": "modeled estimate, not observed commercial price",
+          "unit": "USD_per_kg_H2"
+        },
+        {
+          "metric": "carbon_footprint_reduction",
+          "value": 95.9,
+          "qualifier": "modeled comparison; source-specific boundary",
+          "unit": "percent"
+        }
+      ],
+      "comparison_status": "LAB_EXPERIMENT_WITH_TEA_NOT_ACCEPTED_H2_PRODUCT_QUALIFICATION",
+      "system_boundary": {
+        "full_grid_to_accepted_h2_energy_measured": false,
+        "accepted_h2_purity_qualified": false,
+        "complete_plant_lifetime_measured": false,
+        "lcoh_is_modelled": true
+      },
+      "claim_guards": {
+        "effluent_nh3_below_4_percent_is_not_accepted_h2_purity": true,
+        "source_lcoh_is_not_realized_market_price": true,
+        "space_time_yield_is_not_full_plant_hydrogen_delivery_rate": true
+      },
+      "blockers": [
+        "The <4 vol% effluent observation is not an accepted H2 purity measurement.",
+        "The $0.92/kg H2 value is a modeled TEA result, not a market sale price.",
+        "Catalyst-normalized space-time yield is not full-system delivery rate.",
+        "Complete grid-to-accepted-H2 energy, final polishing, compression, lifetime and catalyst/membrane replacement remain unqualified."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-CATALYTIC-MEMBRANE-30BAR-MODEL-2026",
+      "lane": "AMMONIA_CRACKING_MEMBRANE_PROCESS_MODEL",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "Efficient low-carbon and high-pressure hydrogen production via membrane-based ammonia cracking",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2026-05-27",
+        "article_number": "154910",
+        "doi": "10.1016/j.ijhydene.2026.154910",
+        "url": "https://doi.org/10.1016/j.ijhydene.2026.154910"
+      },
+      "configuration": {
+        "architecture": "catalytic ammonia decomposition + H2-selective membrane separation + multistage compression",
+        "system_hydrogen_delivery_pressure_bar": 30
+      },
+      "operating_points": [
+        {
+          "operating_point_id": "CATALYTIC-MEMBRANE-BASE-550C-30BAR-1BAR",
+          "temperature_c": 550,
+          "retentate_pressure_bar": 30,
+          "permeate_pressure_bar": 1,
+          "overall_energy_efficiency_fraction": 0.854,
+          "overall_exergy_efficiency_fraction": 0.858,
+          "compression_to_30_bar_included": true
+        },
+        {
+          "operating_point_id": "CATALYTIC-MEMBRANE-5BAR-PERMEATE-PLUS50AREA",
+          "temperature_c": 550,
+          "retentate_pressure_bar": 30,
+          "permeate_pressure_bar": 5,
+          "membrane_area_increase_fraction": 0.5,
+          "overall_energy_efficiency_fraction": 0.875,
+          "compression_to_30_bar_included": true
+        }
+      ],
+      "comparison_status": "PUBLISHED_PROCESS_MODEL_NOT_PHYSICAL_PLANT_DEMONSTRATION",
+      "system_boundary": {
+        "h2_compression_to_30_bar_included": true,
+        "grid_side_physical_meter_validation": false,
+        "physical_plant_measurement": false
+      },
+      "claim_guards": {
+        "85_4_percent_and_87_5_percent_are_separate_operating_points": true,
+        "energy_and_exergy_efficiencies_remain_distinct": true,
+        "modeled_efficiency_is_not_physical_plant_performance": true
+      },
+      "blockers": [
+        "The 85.4% and 87.5% values are separate permeate-pressure and membrane-area configurations.",
+        "Results are model outputs, not physical plant measurements.",
+        "Preserve the source efficiency denominator and compression boundary.",
+        "Membrane fouling, concentration polarization, permeance drift and catalyst deactivation require physical validation."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-EC-MEA-CRACKER-NTU-2026",
+      "lane": "AMMONIA_CRACKING_ELECTROCHEMICAL_MEA",
+      "evidence_class": "INSTITUTION_REPORTED_TECH_TRANSFER_RESULT",
+      "source": {
+        "title": "An MEA Electrolyzer for Hydrogen Production by Electrochemical Cracking of Ammonia",
+        "organization": "Nanyang Technological University; Singapore Advanced Energy and Decarbonisation Office IP Repository",
+        "publication_date": "2026-10-19",
+        "source_id": "NTU-2023-069",
+        "url": "https://www.aedo.gov.sg/ip-repository/ntu-2023-069/"
+      },
+      "configuration": {
+        "architecture": "electrochemical ammonia cracking membrane-electrode assembly",
+        "temperature_c": 80
+      },
+      "operating_modes": [
+        {
+          "mode_id": "MEA-HIGH-THROUGHPUT-80C",
+          "current_density_a_per_cm2": 0.47,
+          "voltage_v": 0.35,
+          "h2_areal_rate_mmol_per_cm2_h": 17.5,
+          "specific_energy_kwh_per_kg_h2": 9.38,
+          "reported_hhv_efficiency_fraction": 0.85
+        },
+        {
+          "mode_id": "MEA-LOW-ENERGY-POWER-OUTPUT-80C",
+          "current_density_a_per_cm2": 0.1,
+          "voltage_v": 0.076,
+          "specific_energy_kwh_per_kg_h2": 2.03,
+          "maximum_electrical_output_mw_per_cm2": 5.9
+        }
+      ],
+      "comparison_status": "INSTITUTION_REPORTED_LAB_RESULT_TWO_DISTINCT_MODES_NOT_FULL_PLANT_COMPARISON",
+      "system_boundary": {
+        "device_level_metrics_reported": true,
+        "full_balance_of_plant_energy": false,
+        "accepted_h2_purity_qualified": false,
+        "long_duration_lifetime_qualified": false
+      },
+      "claim_guards": {
+        "high_throughput_and_low_energy_modes_must_remain_separate": true,
+        "2_03_kwh_per_kg_must_not_be_paired_with_0_47_a_per_cm2_rate": true,
+        "areal_rate_requires_active_area_and_uptime": true,
+        "cell_energy_is_not_full_grid_to_accepted_h2_energy": true
+      },
+      "blockers": [
+        "9.38 and 2.03 kWh/kg refer to distinct current/voltage operating modes.",
+        "Cell metrics do not establish full balance-of-plant energy, product purity, compression or lifetime.",
+        "The low-energy mode's simultaneous electrical output must be separately metered and not double-counted.",
+        "Institution-reported results are not Luminous measurements or independent replication."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-PACKED-BED-MEMBRANE-OPTIMIZATION-2026",
+      "lane": "AMMONIA_CRACKING_MEMBRANE_MODEL_OPTIMIZATION",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "Mechanism-guided multi-objective optimization of ammonia decomposition in a packed bed membrane reactor",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2026-11-11",
+        "article_number": "158072",
+        "doi": "10.1016/j.ijhydene.2026.158072",
+        "url": "https://doi.org/10.1016/j.ijhydene.2026.158072"
+      },
+      "configuration": {
+        "architecture": "Ni microkinetic model coupled to packed-bed membrane reactor optimization",
+        "model_components": [
+          "Ni catalyst surface microkinetics",
+          "hydrogen-selective membrane transport",
+          "reactor process model",
+          "ANN surrogate"
+        ]
+      },
+      "observations": [
+        {
+          "metric": "predicted_ammonia_conversion",
+          "value": 0.98,
+          "qualifier": "predicted greater than 98%",
+          "unit": "fraction",
+          "evidence_class": "MODEL_PREDICTION"
+        },
+        {
+          "metric": "predicted_hydrogen_recovery",
+          "value": 0.98,
+          "qualifier": "predicted greater than 98%",
+          "unit": "fraction",
+          "evidence_class": "MODEL_PREDICTION"
+        },
+        {
+          "metric": "predicted_h2_recovery_rate",
+          "value": 0.207,
+          "unit": "mmol_H2_per_s",
+          "evidence_class": "MODEL_PREDICTION"
+        },
+        {
+          "metric": "ann_surrogate_r_squared",
+          "value": 0.99,
+          "qualifier": "reported R2 greater than 0.99",
+          "unit": "fraction",
+          "evidence_class": "MODEL_SURROGATE"
+        },
+        {
+          "metric": "ann_surrogate_evaluation_time",
+          "value": 0.027,
+          "unit": "s",
+          "evidence_class": "MODEL_SURROGATE"
+        }
+      ],
+      "comparison_status": "PUBLISHED_MODEL_OUTPUT_NOT_PHYSICAL_MEMBRANE_REACTOR_VALIDATION",
+      "system_boundary": {
+        "physical_reactor_validation": false,
+        "external_holdout_transfer_demonstrated": false,
+        "full_grid_to_accepted_h2_boundary_measured": false
+      },
+      "claim_guards": {
+        "ann_r2_is_not_physical_accuracy": true,
+        "predicted_conversion_and_recovery_are_not_measurements": true,
+        "membrane_and_catalyst_degradation_require_validation": true
+      },
+      "blockers": [
+        "Conversion, recovery and flow are model predictions.",
+        "ANN R2 is an in-dataset surrogate fit, not physical accuracy or external transfer.",
+        "Membrane fouling, concentration polarization, permeance drift and catalyst deactivation remain unvalidated."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-PROCESS-INTENSIFICATION-REACTOR-REVIEW-2026",
+      "lane": "AMMONIA_CRACKING_PROCESS_INTENSIFICATION_REVIEW",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "title": "Advances in process intensification and reactor engineering for hydrogen production from ammonia decomposition",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2026-06-03",
+        "article_number": "155298",
+        "doi": "10.1016/j.ijhydene.2026.155298",
+        "url": "https://doi.org/10.1016/j.ijhydene.2026.155298"
+      },
+      "reviewed_pathways": [
+        "thermocatalytic",
+        "microwave",
+        "photothermal",
+        "thermoelectric",
+        "plasma-assisted"
+      ],
+      "reviewed_reactor_architectures": [
+        "microreactor",
+        "membrane reactor",
+        "monolithic reactor"
+      ],
+      "reported_review_findings": [
+        "Selected process intensification examples reduce full-decomposition temperature by approximately 100 C versus conventional thermocatalysis.",
+        "Selected examples report 2–5x catalytic activity enhancement; not universal across pathways.",
+        "Selected membrane/reactor cases report H2 purity above 99.9%; not universal across designs."
+      ],
+      "comparison_status": "PEER_REVIEWED_TECHNOLOGY_SYNTHESIS_NOT_ONE_MATCHED_PERFORMANCE_POINT",
+      "claim_guards": {
+        "99_9_percent_h2_purity_is_bound_to_its_specific_source_case": true,
+        "review_level_findings_are_not_one_universal_operating_point": true
+      },
+      "blockers": [
+        "Review findings combine different catalysts, routes and reactor boundaries.",
+        "Temperature and activity figures are not a universal plasma result.",
+        "Purity must be traced to the exact membrane/reactor case."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-DECOMPOSITION-SYSTEM-MODELING-GAPS-REVIEW-2026",
+      "lane": "AMMONIA_CRACKING_MULTISCALE_MODEL_QUALIFICATION",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "title": "From Catalyst to System: A Systematic Review of Simulation-Based Modelling of Ammonia Decomposition for Hydrogen Production",
+        "publisher": "MDPI",
+        "publication_date": "2026",
+        "volume": "7",
+        "issue": "1",
+        "article_number": "37",
+        "url": "https://www.mdpi.com/2673-4141/7/1/37"
+      },
+      "reported_modeling_gaps": [
+        "Membrane models often assume constant permeance and ideal separation, omitting concentration polarization, fouling and temperature-dependent permeability.",
+        "Catalyst deactivation and structural evolution are rarely propagated into reactor-level heat/mass transport.",
+        "Plasma models often substitute effective kinetic enhancement for explicit EEDF, plasma-surface interaction and spatial discharge heterogeneity.",
+        "Steady-state models can omit transient discharge stability, electrode degradation and time-dependent behavior."
+      ],
+      "recommended_modeling_priorities": [
+        "transient heat-transfer-coupled reactor simulation",
+        "non-ideal membrane transport",
+        "catalyst deactivation and structural evolution",
+        "plasma kinetics coupled to surface chemistry",
+        "spatially resolved non-equilibrium plasma",
+        "electro-thermal coupling and dynamic discharge stability"
+      ],
+      "comparison_status": "PUBLISHED_MODELING_REVIEW_NOT_PHYSICAL_PERFORMANCE_RESULT",
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -3877,6 +4208,46 @@
       "control_id": "NC-NH3-PLASMA-TEA-002",
       "condition": "Mix the 84 kWh/kg RGA-NORR, 154 kWh/kg RGA-LNT and 435 kWh/kg direct-DBD alternative as if they were one route or operating point.",
       "expected_disposition": "REJECT_ROUTE_MIX"
+    },
+    {
+      "control_id": "NC-099",
+      "condition": "Promote the PEDMADS reported <4 vol% post-cascade effluent NH3 to accepted fuel-cell-grade H2 purity.",
+      "expected_disposition": "REJECT_PRODUCT_QUALITY_MEASURAND_MISMATCH"
+    },
+    {
+      "control_id": "NC-100",
+      "condition": "Treat PEDMADS space-time yield or modeled LCOH as full-grid accepted-H2 throughput or realized commercial price.",
+      "expected_disposition": "REJECT_EVIDENCE_AND_DENOMINATOR_MISMATCH"
+    },
+    {
+      "control_id": "NC-101",
+      "condition": "Combine the 85.4% membrane base case and 87.5% higher-permeate-pressure/greater-area case as one configuration.",
+      "expected_disposition": "REJECT_OPERATING_POINT_MISMATCH"
+    },
+    {
+      "control_id": "NC-102",
+      "condition": "Pair the electrochemical MEA low-energy mode with the distinct high-throughput current density and production rate.",
+      "expected_disposition": "REJECT_OPERATING_MODE_CROSS_PAIRING"
+    },
+    {
+      "control_id": "NC-103",
+      "condition": "Treat packed-bed membrane ANN R2 or inference latency as physical accuracy, external transfer or hydrogen production response.",
+      "expected_disposition": "REJECT_MODEL_SURROGATE_EVIDENCE_MISMATCH"
+    },
+    {
+      "control_id": "NC-104",
+      "condition": "Promote >98% predicted conversion/recovery from the packed-bed membrane model to physical plant performance.",
+      "expected_disposition": "REJECT_MODEL_OUTPUT_PROMOTION"
+    },
+    {
+      "control_id": "NC-105",
+      "condition": "Compare device-level electrochemical energy to plasma terminal energy without matching auxiliaries, purity, pressure and compression.",
+      "expected_disposition": "NOT_COMPARABLE_SYSTEM_BOUNDARY_MISMATCH"
+    },
+    {
+      "control_id": "NC-106",
+      "condition": "Treat review-level temperature, catalyst-activity and selected purity findings as one universal process result.",
+      "expected_disposition": "REJECT_REVIEW_SCOPE_OVERGENERALIZATION"
     }
   ],
   "derived_reference_checks": [
@@ -4378,6 +4749,48 @@
         "no_source_relative_waveguide_efficiency_gain_transferred_to_QWCCR": true
       },
       "rationale": "The September 2026 QWCCR study reports 1.31 ms ACR response on a 160→180 W step and 1.10 ms on a 180→160 W step, with OES/high-speed imaging proxies; those are not accepted H2 product delivery response times. The waveguide MWPJ study reports a separate approximately sevenfold relative H2 production efficiency gain and approximately 47.5% critical NH3 fraction under its own Ar-diluted feed and flow architecture. The benchmark's paradigm shift is to measure command→plasma→diagnostic→gas composition→purified H2→customer delivery separately, then optimize full grid-to-accepted-H2 service under realistic load profiles. The 1 s customer-service settling target is an aspirational research target, not a source-reported or achieved result."
+    },
+    {
+      "target_id": "NH3-INTEGRATED-DELIVERED-H2-PARETO-001",
+      "lane": "AMMONIA_CRACKING_INTEGRATED_PLANT_SERVICE",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "NH3-PLASMA-DUAL-MEMBRANE-PEDMADS-2025",
+        "NH3-CATALYTIC-MEMBRANE-30BAR-MODEL-2026",
+        "NH3-EC-MEA-CRACKER-NTU-2026",
+        "NH3-PACKED-BED-MEMBRANE-OPTIMIZATION-2026",
+        "NH3-CRACK-MW-ATM-MECHANISM-2026",
+        "NH3-CRACK-DYNAMIC-DELIVERY-RESPONSE-001"
+      ],
+      "metric_thresholds": {
+        "same_accepted_h2_purity_and_contaminant_contract_required": true,
+        "same_h2_delivery_pressure_required": true,
+        "full_grid_to_accepted_h2_specific_energy_measured_required": true,
+        "full_system_material_balance_required": true,
+        "h2_recovery_min_fraction": 0.99,
+        "product_acceptance_fraction_min": 0.99,
+        "target_grid_energy_or_risk_adjusted_cost_improvement_vs_best_matched_incumbent_min_fraction": 0.1,
+        "cumulative_physical_operation_hours_before_durability_claim_min": 1000,
+        "independent_start_stop_or_load_following_cycles_before_dynamic_superiority_claim_min": 100,
+        "accepted_h2_delivery_settling_time_target_s_max": 1,
+        "critical_material_intensity_and_replacement_burden_must_be_reported": true,
+        "heat_recovery_credit_requires_measured_useful_duty": true,
+        "no_coproduct_or_carbon_credit_without_qualified_offtake": true
+      },
+      "claim_guards": {
+        "all_source_operating_points_remain_separate": true,
+        "PEDMADS_effluent_nh3_below_4_percent_is_not_accepted_h2_purity": true,
+        "MEA_high_throughput_and_low_energy_modes_remain_separate": true,
+        "membrane_model_efficiency_is_not_physical_plant_performance": true,
+        "ANN_surrogate_fit_is_not_external_physical_validation": true,
+        "accepted_h2_mass_flow_and_purity_are_directly_measured": true,
+        "NH3_recycle_purge_slip_and_unrecovered_inventory_are_separate_streams": true,
+        "grid_side_power_includes_source_power_conversion_and_all_auxiliaries": true,
+        "catalyst_and_membrane_degradation_and_replacement_are_in_lifecycle_boundary": true,
+        "full_product_and_energy_boundary_must_match_before_Pareto_ranking": true,
+        "mode_selection_simulation_is_not_hardware_control_authority": true
+      },
+      "rationale": "Compare plasma-catalytic dual-membrane experiments, catalytic membrane process models, electrochemical MEA operating modes, membrane-reactor surrogates and microwave plasma at one accepted H2 purity/pressure/service boundary and full grid-to-delivered-product energy. A hybrid plasma/catalyst/membrane/electrochemical topology is a falsifiable research hypothesis, not an achieved result."
     }
   ]
 }
