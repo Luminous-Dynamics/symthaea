@@ -5,13 +5,15 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::section::{compute_sampled_sections_digest, SectionFamilyArtifact};
+use crate::section::{
+    LongitudinalEndCondition, LongitudinalEndConditions, SectionFamilyArtifact,
+    compute_sampled_sections_digest, verify_section_family_artifact_integrity,
+};
 use crate::{
-    admit, compute_geometry_digest, AdmissionProfile, AdmissionReport, CandidateInput,
-    MeshGeometry,
+    AdmissionProfile, AdmissionReport, CandidateInput, MeshGeometry, admit, compute_geometry_digest,
 };
 
-const LOFT_SCHEMA_VERSION: u32 = 1;
+const LOFT_SCHEMA_VERSION: u32 = 2;
 const MAX_STATIONS: usize = 512;
 const MAX_SECTION_POINTS: usize = 8_193;
 const MAX_MESH_VERTICES: usize = 1_000_000;
@@ -24,7 +26,7 @@ pub struct LoftViolation {
     pub detail: String,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct FaceRange {
     pub first_face: usize,
     pub face_count: usize,
@@ -44,6 +46,16 @@ pub struct LoftedHullArtifact {
     pub side_face_range: FaceRange,
     pub waterplane_face_range: FaceRange,
     pub end_cap_face_range: FaceRange,
+    #[serde(default)]
+    pub bow_end_cap_face_range: FaceRange,
+    #[serde(default)]
+    pub stern_end_cap_face_range: FaceRange,
+    #[serde(default)]
+    pub station_count: usize,
+    #[serde(default)]
+    pub section_point_count: usize,
+    #[serde(default)]
+    pub longitudinal_end_conditions: LongitudinalEndConditions,
     pub candidate: CandidateInput,
     pub admission_report: AdmissionReport,
 }
@@ -59,6 +71,11 @@ struct LoftArtifactIdentity<'a> {
     side_face_range: FaceRange,
     waterplane_face_range: FaceRange,
     end_cap_face_range: FaceRange,
+    bow_end_cap_face_range: FaceRange,
+    stern_end_cap_face_range: FaceRange,
+    station_count: usize,
+    section_point_count: usize,
+    longitudinal_end_conditions: LongitudinalEndConditions,
     candidate_schema_version: u32,
     candidate_id: &'a str,
     geometry_digest_blake3: &'a str,
@@ -78,6 +95,11 @@ fn compute_loft_manifest_digest(
         side_face_range: artifact.side_face_range,
         waterplane_face_range: artifact.waterplane_face_range,
         end_cap_face_range: artifact.end_cap_face_range,
+        bow_end_cap_face_range: artifact.bow_end_cap_face_range,
+        stern_end_cap_face_range: artifact.stern_end_cap_face_range,
+        station_count: artifact.station_count,
+        section_point_count: artifact.section_point_count,
+        longitudinal_end_conditions: artifact.longitudinal_end_conditions,
         candidate_schema_version: artifact.candidate.schema_version,
         candidate_id: &artifact.candidate.candidate_id,
         geometry_digest_blake3: &artifact.candidate.geometry_digest_blake3,
@@ -87,12 +109,7 @@ fn compute_loft_manifest_digest(
     Ok(blake3::hash(&bytes).to_hex().to_string())
 }
 
-
-fn violation(
-    violations: &mut Vec<LoftViolation>,
-    code: &str,
-    detail: impl Into<String>,
-) {
+fn violation(violations: &mut Vec<LoftViolation>, code: &str, detail: impl Into<String>) {
     violations.push(LoftViolation {
         code: code.to_owned(),
         detail: detail.into(),
@@ -115,17 +132,24 @@ fn section_ring(section: &crate::section::SampledSection) -> Vec<[f64; 3]> {
     ring
 }
 
-fn validate_section_family(
-    artifact: &SectionFamilyArtifact,
-) -> Result<usize, Vec<LoftViolation>> {
+fn validate_section_family(artifact: &SectionFamilyArtifact) -> Result<usize, Vec<LoftViolation>> {
     let mut violations = Vec::new();
 
-    if artifact.artifact_schema_version != 1 {
+    if artifact.artifact_schema_version != 2 {
         violation(
             &mut violations,
             "section_artifact_version",
-            "only section artifact schema version 1 is supported",
+            "only section artifact schema version 2 is supported by G2e",
         );
+    }
+    if let Err(errors) = verify_section_family_artifact_integrity(artifact) {
+        for error in errors {
+            violation(
+                &mut violations,
+                &format!("section_family_{}", error.code),
+                error.detail,
+            );
+        }
     }
     if artifact.candidate_id.trim().is_empty() {
         violation(
@@ -178,6 +202,18 @@ fn validate_section_family(
         );
     }
 
+    if artifact.sections.len() == 2
+        && artifact.longitudinal_end_conditions.bow == LongitudinalEndCondition::CollapsedCentreline
+        && artifact.longitudinal_end_conditions.stern
+            == LongitudinalEndCondition::CollapsedCentreline
+    {
+        violation(
+            &mut violations,
+            "adjacent_collapsed_ends",
+            "two adjacent collapsed endpoints have no positive interior station",
+        );
+    }
+
     if artifact.source_spec_digest_blake3.len() != 64
         || !artifact
             .source_spec_digest_blake3
@@ -209,7 +245,7 @@ fn validate_section_family(
         return Err(violations);
     };
     let point_count = first.keel_to_sheer_m.len();
-    if point_count < 2 || point_count > MAX_SECTION_POINTS {
+    if !(2..=MAX_SECTION_POINTS).contains(&point_count) {
         violation(
             &mut violations,
             "section_point_count",
@@ -255,14 +291,14 @@ fn validate_section_family(
             );
             continue;
         }
-        if let Some(previous) = previous_x {
-            if section.x_m <= previous {
-                violation(
-                    &mut violations,
-                    "station_order",
-                    format!("station {station_index} is not strictly after its predecessor"),
-                );
-            }
+        if let Some(previous) = previous_x
+            && section.x_m <= previous
+        {
+            violation(
+                &mut violations,
+                "station_order",
+                format!("station {station_index} is not strictly after its predecessor"),
+            );
         }
         previous_x = Some(section.x_m);
 
@@ -279,7 +315,9 @@ fn validate_section_family(
                 violation(
                     &mut violations,
                     "station_plane",
-                    format!("station {station_index} contains a point outside its declared x-plane"),
+                    format!(
+                        "station {station_index} contains a point outside its declared x-plane"
+                    ),
                 );
                 break;
             }
@@ -291,7 +329,9 @@ fn validate_section_family(
                 violation(
                     &mut violations,
                     "section_bounds",
-                    format!("station {station_index}, point {point_index} lies outside the declared beam/draft envelope"),
+                    format!(
+                        "station {station_index}, point {point_index} lies outside the declared beam/draft envelope"
+                    ),
                 );
                 break;
             }
@@ -326,12 +366,55 @@ fn validate_section_family(
             violation(
                 &mut violations,
                 "keel_endpoint",
-                format!("station {station_index} must begin on the centreline below the waterplane"),
+                format!(
+                    "station {station_index} must begin on the centreline below the waterplane"
+                ),
             );
         }
-        if waterline[1] <= coordinate_tolerance
-            || !close_enough(waterline[2], 0.0, coordinate_tolerance)
-        {
+        if !close_enough(waterline[2], 0.0, coordinate_tolerance) {
+            violation(
+                &mut violations,
+                "waterline_endpoint",
+                format!("station {station_index} must end on z=0"),
+            );
+        }
+
+        let endpoint_condition = if station_index == 0 {
+            Some(artifact.longitudinal_end_conditions.bow)
+        } else if station_index + 1 == artifact.sections.len() {
+            Some(artifact.longitudinal_end_conditions.stern)
+        } else {
+            None
+        };
+        let collapsed = endpoint_condition == Some(LongitudinalEndCondition::CollapsedCentreline);
+
+        if collapsed {
+            if section.keel_to_sheer_m.iter().any(|point| point[1] != 0.0) {
+                violation(
+                    &mut violations,
+                    "collapsed_end_not_centreline",
+                    format!(
+                        "collapsed endpoint station {station_index} must have exact y=0 for every sample"
+                    ),
+                );
+            }
+            for pair in section.keel_to_sheer_m.windows(2) {
+                if pair[0][2] <= pair[1][2] {
+                    violation(
+                        &mut violations,
+                        "collapsed_end_sample_order",
+                        format!(
+                            "collapsed endpoint station {station_index} must have strictly descending z samples from keel to waterline"
+                        ),
+                    );
+                    break;
+                }
+            }
+            // A collapsed endpoint is a line, not an area-bearing section ring.
+            continue;
+        }
+
+        if waterline[1] <= coordinate_tolerance {
             violation(
                 &mut violations,
                 "waterline_endpoint",
@@ -356,7 +439,12 @@ fn validate_section_family(
                 current[1] * next[2] - current[2] * next[1]
             })
             .sum();
-        let area_tolerance = coordinate_tolerance * coordinate_tolerance;
+        // Cross products have area units. Scale the coordinate tolerance
+        // by the section length scale; squaring a length tolerance would be
+        // dimensionally inconsistent and can reject exactly collinear
+        // linearly sampled points due to floating-point roundoff.
+        let section_scale = artifact.beam_m.max(artifact.draft_m).max(1.0);
+        let area_tolerance = coordinate_tolerance * section_scale;
         if !signed_area_twice.is_finite() || signed_area_twice >= -area_tolerance {
             violation(
                 &mut violations,
@@ -395,14 +483,14 @@ fn validate_section_family(
                 "first section must be at x=0",
             );
         }
-        if let Some(last) = artifact.sections.last() {
-            if !close_enough(last.x_m, artifact.length_m, coordinate_tolerance) {
-                violation(
-                    &mut violations,
-                    "last_station",
-                    "last section must be at x=length_m",
-                );
-            }
+        if let Some(last) = artifact.sections.last()
+            && !close_enough(last.x_m, artifact.length_m, coordinate_tolerance)
+        {
+            violation(
+                &mut violations,
+                "last_station",
+                "last section must be at x=length_m",
+            );
         }
     }
 
@@ -475,44 +563,65 @@ pub fn verify_loft_artifact_integrity(
     }
 
     let face_count = artifact.candidate.geometry.faces.len();
-    let ranges = [
-        artifact.side_face_range,
-        artifact.waterplane_face_range,
-        artifact.end_cap_face_range,
-    ];
-    let mut covered = vec![false; face_count];
-    for range in ranges {
-        match range.first_face.checked_add(range.face_count) {
-            Some(end) if end <= face_count => {
-                for index in range.first_face..end {
-                    if covered[index] {
-                        violation(
-                            &mut violations,
-                            "face_region_overlap",
-                            format!("face {index} appears in multiple semantic ranges"),
-                        );
-                        break;
-                    }
-                    covered[index] = true;
-                }
-            }
-            _ => violation(
-                &mut violations,
-                "face_region_bounds",
-                "a semantic face range exceeds the candidate mesh",
-            ),
-        }
-    }
-    if covered.iter().any(|value| !value) {
+    let vertex_count = artifact.candidate.geometry.vertices.len();
+    if face_count > MAX_MESH_FACES {
         violation(
             &mut violations,
-            "face_region_coverage",
-            "semantic face ranges do not cover every mesh face",
+            "mesh_face_budget",
+            format!("candidate has {face_count} faces; maximum is {MAX_MESH_FACES}"),
+        );
+    } else {
+        let ranges = [
+            artifact.side_face_range,
+            artifact.waterplane_face_range,
+            artifact.end_cap_face_range,
+        ];
+        let mut covered = vec![false; face_count];
+        for range in ranges {
+            match range.first_face.checked_add(range.face_count) {
+                Some(end) if end <= face_count => {
+                    for (index, is_covered) in covered
+                        .iter_mut()
+                        .enumerate()
+                        .take(end)
+                        .skip(range.first_face)
+                    {
+                        if *is_covered {
+                            violation(
+                                &mut violations,
+                                "face_region_overlap",
+                                format!("face {index} appears in multiple semantic ranges"),
+                            );
+                            break;
+                        }
+                        *is_covered = true;
+                    }
+                }
+                _ => violation(
+                    &mut violations,
+                    "face_region_bounds",
+                    "a semantic face range exceeds the candidate mesh",
+                ),
+            }
+        }
+        if covered.iter().any(|value| !value) {
+            violation(
+                &mut violations,
+                "face_region_coverage",
+                "semantic face ranges do not cover every mesh face",
+            );
+        }
+    }
+    if vertex_count > MAX_MESH_VERTICES {
+        violation(
+            &mut violations,
+            "mesh_vertex_budget",
+            format!("candidate has {vertex_count} vertices; maximum is {MAX_MESH_VERTICES}"),
         );
     }
 
     if artifact.artifact_schema_version != LOFT_SCHEMA_VERSION
-        || artifact.generator != "symthaea-marine-waterplane-loft-v1"
+        || artifact.generator != "symthaea-marine-waterplane-loft-v2"
         || artifact.cap_semantics != "closed-displacement-volume-at-design-waterplane-z0"
         || artifact.candidate.schema_version != 1
     {
@@ -563,6 +672,349 @@ pub fn verify_loft_artifact_integrity(
         );
     }
 
+    let bow_collapsed =
+        artifact.longitudinal_end_conditions.bow == LongitudinalEndCondition::CollapsedCentreline;
+    let stern_collapsed =
+        artifact.longitudinal_end_conditions.stern == LongitudinalEndCondition::CollapsedCentreline;
+    let point_count = artifact.section_point_count;
+    let station_count = artifact.station_count;
+    let mut expected_vertices = 0_usize;
+    let mut station_bases = Vec::with_capacity(station_count.min(MAX_STATIONS));
+    if !(2..=MAX_SECTION_POINTS).contains(&point_count)
+        || !(2..=MAX_STATIONS).contains(&station_count)
+        || (station_count == 2 && bow_collapsed && stern_collapsed)
+    {
+        violation(
+            &mut violations,
+            "end_semantics_station_budget",
+            "unsupported station/section counts for declared longitudinal end conditions",
+        );
+    } else {
+        let mut vertex_layout_valid = true;
+        for station_index in 0..station_count {
+            station_bases.push(expected_vertices);
+            let collapsed = (station_index == 0 && bow_collapsed)
+                || (station_index + 1 == station_count && stern_collapsed);
+            let station_vertices = point_count + if collapsed { 0 } else { point_count - 1 };
+            let Some(next) = expected_vertices.checked_add(station_vertices) else {
+                vertex_layout_valid = false;
+                break;
+            };
+            let end = next.min(artifact.candidate.geometry.vertices.len());
+            if next > artifact.candidate.geometry.vertices.len() {
+                vertex_layout_valid = false;
+                break;
+            }
+            let vertices = &artifact.candidate.geometry.vertices[expected_vertices..end];
+            let starboard = &vertices[..point_count];
+            if collapsed {
+                if starboard.iter().any(|point| point[1] != 0.0) {
+                    violation(
+                        &mut violations,
+                        "collapsed_end_geometry",
+                        format!(
+                            "collapsed endpoint station {station_index} has a non-zero transverse coordinate"
+                        ),
+                    );
+                    vertex_layout_valid = false;
+                }
+            } else {
+                let port = &vertices[point_count..];
+                for point_index in 1..point_count {
+                    let source = starboard[point_index];
+                    let mirrored = port[point_index - 1];
+                    if source[0] != mirrored[0]
+                        || source[1] != -mirrored[1]
+                        || source[2] != mirrored[2]
+                    {
+                        violation(
+                            &mut violations,
+                            "port_starboard_mirror",
+                            format!(
+                                "station {station_index} port sample {point_index} is not the exact mirror of its starboard sample"
+                            ),
+                        );
+                        vertex_layout_valid = false;
+                        break;
+                    }
+                }
+            }
+            expected_vertices = next;
+        }
+        let planar_cap_count = usize::from(!bow_collapsed) + usize::from(!stern_collapsed);
+        let expected_total_vertices = expected_vertices.checked_add(planar_cap_count);
+        if !vertex_layout_valid
+            || expected_total_vertices != Some(artifact.candidate.geometry.vertices.len())
+        {
+            violation(
+                &mut violations,
+                "vertex_layout",
+                "mesh vertex layout does not match the versioned station/end-condition budget",
+            );
+        }
+        if expected_vertices > artifact.candidate.geometry.vertices.len() {
+            vertex_layout_valid = false;
+        }
+        if vertex_layout_valid {
+            let mut centre_offset = expected_vertices;
+            if !bow_collapsed {
+                let centre = artifact.candidate.geometry.vertices[centre_offset];
+                if (centre[0] - artifact.candidate.geometry.vertices[0][0]).abs()
+                    > GEOMETRY_TOLERANCE
+                    || centre[1].abs() > GEOMETRY_TOLERANCE
+                {
+                    violation(
+                        &mut violations,
+                        "bow_cap_centre",
+                        "planar bow cap centre must lie in the bow section plane and centreline",
+                    );
+                }
+                centre_offset += 1;
+            }
+            if !stern_collapsed {
+                let centre = artifact.candidate.geometry.vertices[centre_offset];
+                let last_station_base =
+                    (0..station_count - 1).fold(0_usize, |offset, station_index| {
+                        let collapsed = station_index == 0 && bow_collapsed;
+                        offset + point_count + if collapsed { 0 } else { point_count - 1 }
+                    });
+                let stern_x = artifact.candidate.geometry.vertices[last_station_base][0];
+                if (centre[0] - stern_x).abs() > GEOMETRY_TOLERANCE
+                    || centre[1].abs() > GEOMETRY_TOLERANCE
+                {
+                    violation(
+                        &mut violations,
+                        "stern_cap_centre",
+                        "planar stern cap centre must lie in the stern section plane and centreline",
+                    );
+                }
+            }
+        }
+    }
+
+    let expected_side_face_budget = station_count
+        .checked_sub(1)
+        .and_then(|count| count.checked_mul(4))
+        .and_then(|count| count.checked_mul(point_count.saturating_sub(1)));
+    if (2..=MAX_STATIONS).contains(&station_count)
+        && (2..=MAX_SECTION_POINTS).contains(&point_count)
+        && expected_side_face_budget.is_some_and(|count| count <= MAX_MESH_FACES)
+        && station_bases.len() == station_count
+        && artifact
+            .side_face_range
+            .first_face
+            .checked_add(artifact.side_face_range.face_count)
+            == Some(artifact.waterplane_face_range.first_face)
+    {
+        let faces = &artifact.candidate.geometry.faces;
+        let mut expected_side = Vec::<[u32; 3]>::new();
+        let mut expected_waterplane = Vec::<[u32; 3]>::new();
+        let port_vertex = |station_index: usize, point_index: usize| -> u32 {
+            let base = station_bases[station_index];
+            let collapsed = (station_index == 0 && bow_collapsed)
+                || (station_index + 1 == station_count && stern_collapsed);
+            if point_index == 0 || collapsed {
+                (base + point_index) as u32
+            } else {
+                (base + point_count + point_index - 1) as u32
+            }
+        };
+        let starboard_vertex = |station_index: usize, point_index: usize| -> u32 {
+            (station_bases[station_index] + point_index) as u32
+        };
+        for interval in 0..station_count - 1 {
+            let right_collapsed = interval + 1 == station_count - 1 && stern_collapsed;
+            for point_index in 0..point_count - 1 {
+                let a = starboard_vertex(interval, point_index);
+                let b = starboard_vertex(interval + 1, point_index);
+                let c = starboard_vertex(interval + 1, point_index + 1);
+                let d = starboard_vertex(interval, point_index + 1);
+                let port_a = port_vertex(interval, point_index);
+                let port_b = port_vertex(interval + 1, point_index);
+                let port_c = port_vertex(interval + 1, point_index + 1);
+                let port_d = port_vertex(interval, point_index + 1);
+                if right_collapsed {
+                    expected_side.extend([
+                        [a, b, d],
+                        [b, c, d],
+                        [port_a, port_d, port_b],
+                        [port_d, port_c, port_b],
+                    ]);
+                } else {
+                    expected_side.extend([
+                        [a, b, c],
+                        [a, c, d],
+                        [port_a, port_c, port_b],
+                        [port_a, port_d, port_c],
+                    ]);
+                }
+            }
+
+            let left_collapsed = interval == 0 && bow_collapsed;
+            let port_here = port_vertex(interval, point_count - 1);
+            let starboard_here = starboard_vertex(interval, point_count - 1);
+            let starboard_next = starboard_vertex(interval + 1, point_count - 1);
+            let port_next = port_vertex(interval + 1, point_count - 1);
+            match (left_collapsed, right_collapsed) {
+                (true, false) => expected_waterplane.push([port_here, starboard_next, port_next]),
+                (false, true) => {
+                    expected_waterplane.push([port_here, starboard_here, starboard_next])
+                }
+                (false, false) => {
+                    expected_waterplane.push([port_here, starboard_here, starboard_next]);
+                    expected_waterplane.push([port_here, starboard_next, port_next]);
+                }
+                (true, true) => {}
+            }
+        }
+        let side_first = artifact.side_face_range.first_face;
+        let side_end = side_first.saturating_add(artifact.side_face_range.face_count);
+        if side_end <= faces.len()
+            && faces[side_first..side_end]
+                .iter()
+                .copied()
+                .ne(expected_side.iter().copied())
+        {
+            violation(
+                &mut violations,
+                "side_closure_semantics",
+                "side triangle indices do not match the declared shared-vertex endpoint and diagonal semantics",
+            );
+        }
+
+        let first = artifact.waterplane_face_range.first_face;
+        let end = first.saturating_add(artifact.waterplane_face_range.face_count);
+        if end <= faces.len()
+            && faces[first..end]
+                .iter()
+                .copied()
+                .ne(expected_waterplane.iter().copied())
+        {
+            violation(
+                &mut violations,
+                "waterplane_closure_semantics",
+                "waterplane triangle indices do not match the declared collapsed/planar endpoint semantics",
+            );
+        }
+
+        let expected_cap_faces = |is_bow: bool, centre_index: u32| -> Vec<[u32; 3]> {
+            let station_index = if is_bow { 0 } else { station_count - 1 };
+            let mut ring = (0..point_count)
+                .map(|point_index| starboard_vertex(station_index, point_index))
+                .collect::<Vec<_>>();
+            for point_index in (1..point_count).rev() {
+                ring.push(port_vertex(station_index, point_index));
+            }
+            let mut cap_faces = Vec::with_capacity(ring.len());
+            for index in 0..ring.len() {
+                let next = (index + 1) % ring.len();
+                if is_bow {
+                    cap_faces.push([centre_index, ring[index], ring[next]]);
+                } else {
+                    cap_faces.push([centre_index, ring[next], ring[index]]);
+                }
+            }
+            cap_faces
+        };
+
+        let planar_bow = !bow_collapsed;
+        let planar_stern = !stern_collapsed;
+        let first_centre_index = expected_vertices as u32;
+        if planar_bow {
+            let expected = expected_cap_faces(true, first_centre_index);
+            let range = artifact.bow_end_cap_face_range;
+            let end = range.first_face.saturating_add(range.face_count);
+            if end <= faces.len()
+                && faces[range.first_face..end]
+                    .iter()
+                    .copied()
+                    .ne(expected.iter().copied())
+            {
+                violation(
+                    &mut violations,
+                    "bow_cap_topology",
+                    "bow end-cap triangles do not match the declared planar bow ring and centre",
+                );
+            }
+        }
+        if planar_stern {
+            let stern_centre_index = first_centre_index + (if planar_bow { 1_u32 } else { 0_u32 });
+            let expected = expected_cap_faces(false, stern_centre_index);
+            let range = artifact.stern_end_cap_face_range;
+            let end = range.first_face.saturating_add(range.face_count);
+            if end <= faces.len()
+                && faces[range.first_face..end]
+                    .iter()
+                    .copied()
+                    .ne(expected.iter().copied())
+            {
+                violation(
+                    &mut violations,
+                    "stern_cap_topology",
+                    "stern end-cap triangles do not match the declared planar stern ring and centre",
+                );
+            }
+        }
+    }
+
+    let expected_side_faces = station_count
+        .checked_sub(1)
+        .and_then(|count| count.checked_mul(4))
+        .and_then(|count| count.checked_mul(point_count.saturating_sub(1)));
+    let expected_waterplane_faces = station_count
+        .checked_sub(1)
+        .and_then(|count| count.checked_mul(2))
+        .and_then(|count| count.checked_sub(if bow_collapsed { 1_usize } else { 0_usize }))
+        .and_then(|count| count.checked_sub(if stern_collapsed { 1_usize } else { 0_usize }));
+    let cap_faces_per_planar_end = point_count
+        .checked_mul(2)
+        .and_then(|count| count.checked_sub(1));
+    let expected_bow_cap_faces = if bow_collapsed {
+        Some(0)
+    } else {
+        cap_faces_per_planar_end
+    };
+    let expected_stern_cap_faces = if stern_collapsed {
+        Some(0)
+    } else {
+        cap_faces_per_planar_end
+    };
+    if expected_side_faces != Some(artifact.side_face_range.face_count)
+        || expected_waterplane_faces != Some(artifact.waterplane_face_range.face_count)
+        || expected_bow_cap_faces != Some(artifact.bow_end_cap_face_range.face_count)
+        || expected_stern_cap_faces != Some(artifact.stern_end_cap_face_range.face_count)
+    {
+        violation(
+            &mut violations,
+            "end_face_budget",
+            "semantic face counts do not match the declared endpoint closure conditions",
+        );
+    }
+
+    let expected_bow_range_end = artifact
+        .bow_end_cap_face_range
+        .first_face
+        .checked_add(artifact.bow_end_cap_face_range.face_count);
+    let expected_stern_range_end = artifact
+        .stern_end_cap_face_range
+        .first_face
+        .checked_add(artifact.stern_end_cap_face_range.face_count);
+    if artifact.bow_end_cap_face_range.first_face != artifact.end_cap_face_range.first_face
+        || expected_bow_range_end != Some(artifact.stern_end_cap_face_range.first_face)
+        || expected_stern_range_end != end_cap_end
+        || artifact
+            .bow_end_cap_face_range
+            .face_count
+            .checked_add(artifact.stern_end_cap_face_range.face_count)
+            != Some(artifact.end_cap_face_range.face_count)
+    {
+        violation(
+            &mut violations,
+            "end_cap_range_semantics",
+            "bow/stern subranges must exactly partition the combined end-cap range",
+        );
+    }
+
     if violations.is_empty() {
         Ok(())
     } else {
@@ -586,50 +1038,107 @@ pub fn loft_waterplane_capped_hull(
     if !profile.require_closed_surface {
         return Err(vec![LoftViolation {
             code: "profile_requires_closure".into(),
-            detail: "waterplane-capped displacement meshes require a closed-surface admission profile".into(),
+            detail:
+                "waterplane-capped displacement meshes require a closed-surface admission profile"
+                    .into(),
         }]);
     }
 
-    let vertices_per_station = point_count
-        .checked_mul(2)
-        .and_then(|count| count.checked_sub(1));
-    let Some(vertices_per_station) = vertices_per_station else {
+    let mirrored_point_count = point_count.checked_sub(1);
+    let Some(mirrored_point_count) = mirrored_point_count else {
         return Err(vec![LoftViolation {
             code: "mesh_vertex_budget".into(),
-            detail: "mirrored vertex count overflowed".into(),
+            detail: "section point count is too small to mirror".into(),
         }]);
     };
-    let vertex_count = station_count
-        .checked_mul(vertices_per_station)
-        .and_then(|count| count.checked_add(2));
-    let Some(vertex_count) = vertex_count.filter(|count| *count <= MAX_MESH_VERTICES) else {
+    let bow_collapsed =
+        sections.longitudinal_end_conditions.bow == LongitudinalEndCondition::CollapsedCentreline;
+    let stern_collapsed =
+        sections.longitudinal_end_conditions.stern == LongitudinalEndCondition::CollapsedCentreline;
+    let bow_planar = !bow_collapsed;
+    let stern_planar = !stern_collapsed;
+
+    // Preflight every station independently: collapsed endpoints share every
+    // port/starboard sample ID; all other stations add mirrored samples except keel.
+    let mut vertex_count = 0_usize;
+    for station_index in 0..station_count {
+        let collapsed = (station_index == 0 && bow_collapsed)
+            || (station_index + 1 == station_count && stern_collapsed);
+        let station_vertices =
+            point_count.checked_add(if collapsed { 0 } else { mirrored_point_count });
+        let Some(station_vertices) = station_vertices else {
+            return Err(vec![LoftViolation {
+                code: "mesh_vertex_budget".into(),
+                detail: "per-station vertex count overflowed".into(),
+            }]);
+        };
+        let Some(total) = vertex_count.checked_add(station_vertices) else {
+            return Err(vec![LoftViolation {
+                code: "mesh_vertex_budget".into(),
+                detail: "total station vertex count overflowed".into(),
+            }]);
+        };
+        vertex_count = total;
+    }
+    let planar_cap_count = (if bow_planar { 1_usize } else { 0_usize })
+        + (if stern_planar { 1_usize } else { 0_usize });
+    let Some(vertex_count) = vertex_count
+        .checked_add(planar_cap_count)
+        .filter(|count| *count <= MAX_MESH_VERTICES)
+    else {
         return Err(vec![LoftViolation {
             code: "mesh_vertex_budget".into(),
             detail: format!("loft exceeds the {MAX_MESH_VERTICES}-vertex budget"),
         }]);
     };
 
-    let interval_face_count = point_count
-        .checked_sub(1)
-        .and_then(|count| count.checked_mul(4))
-        .and_then(|count| count.checked_add(2));
-    let Some(interval_face_count) = interval_face_count else {
+    let side_faces_per_interval = mirrored_point_count.checked_mul(4);
+    let Some(side_faces_per_interval) = side_faces_per_interval else {
         return Err(vec![LoftViolation {
             code: "mesh_face_budget".into(),
-            detail: "face count overflowed".into(),
+            detail: "side face count overflowed".into(),
         }]);
     };
-    let end_cap_face_count = point_count.checked_mul(4).and_then(|count| count.checked_sub(2));
-    let Some(end_cap_face_count) = end_cap_face_count else {
+    let side_face_count = (station_count - 1).checked_mul(side_faces_per_interval);
+    let Some(side_face_count) = side_face_count else {
+        return Err(vec![LoftViolation {
+            code: "mesh_face_budget".into(),
+            detail: "side face count overflowed".into(),
+        }]);
+    };
+    let waterplane_face_count = (station_count - 1)
+        .checked_mul(2)
+        .and_then(|count| count.checked_sub(if bow_collapsed { 1_usize } else { 0_usize }))
+        .and_then(|count| count.checked_sub(if stern_collapsed { 1_usize } else { 0_usize }));
+    let Some(waterplane_face_count) = waterplane_face_count else {
+        return Err(vec![LoftViolation {
+            code: "mesh_face_budget".into(),
+            detail: "waterplane face count underflowed or overflowed".into(),
+        }]);
+    };
+    let cap_faces_per_end = point_count
+        .checked_mul(2)
+        .and_then(|count| count.checked_sub(1));
+    let Some(cap_faces_per_end) = cap_faces_per_end else {
         return Err(vec![LoftViolation {
             code: "mesh_face_budget".into(),
             detail: "end-cap face count overflowed".into(),
         }]);
     };
-    let face_count = (station_count - 1)
-        .checked_mul(interval_face_count)
-        .and_then(|count| count.checked_add(end_cap_face_count));
-    let Some(face_count) = face_count.filter(|count| *count <= MAX_MESH_FACES) else {
+    let bow_end_cap_face_count = if bow_planar { cap_faces_per_end } else { 0 };
+    let stern_end_cap_face_count = if stern_planar { cap_faces_per_end } else { 0 };
+    let Some(end_cap_face_count) = bow_end_cap_face_count.checked_add(stern_end_cap_face_count)
+    else {
+        return Err(vec![LoftViolation {
+            code: "mesh_face_budget".into(),
+            detail: "combined end-cap face count overflowed".into(),
+        }]);
+    };
+    let Some(face_count) = side_face_count
+        .checked_add(waterplane_face_count)
+        .and_then(|count| count.checked_add(end_cap_face_count))
+        .filter(|count| *count <= MAX_MESH_FACES)
+    else {
         return Err(vec![LoftViolation {
             code: "mesh_face_budget".into(),
             detail: format!("loft exceeds the {MAX_MESH_FACES}-face budget"),
@@ -659,76 +1168,111 @@ pub fn loft_waterplane_capped_hull(
             vertices.push(*point);
         }
         port[station_index][0] = starboard[station_index][0];
-        for (point_index, point) in section.keel_to_sheer_m.iter().enumerate().skip(1) {
-            let index = u32::try_from(vertices.len()).map_err(|_| {
-                vec![LoftViolation {
-                    code: "mesh_index_budget".into(),
-                    detail: "vertex index exceeds u32".into(),
-                }]
-            })?;
-            port[station_index][point_index] = index;
-            vertices.push([point[0], -point[1], point[2]]);
+        let collapsed = (station_index == 0 && bow_collapsed)
+            || (station_index + 1 == station_count && stern_collapsed);
+        if collapsed {
+            for point_index in 1..point_count {
+                port[station_index][point_index] = starboard[station_index][point_index];
+            }
+        } else {
+            for (point_index, point) in section.keel_to_sheer_m.iter().enumerate().skip(1) {
+                let index = u32::try_from(vertices.len()).map_err(|_| {
+                    vec![LoftViolation {
+                        code: "mesh_index_budget".into(),
+                        detail: "vertex index exceeds u32".into(),
+                    }]
+                })?;
+                port[station_index][point_index] = index;
+                vertices.push([point[0], -point[1], point[2]]);
+            }
         }
     }
 
-    let side_face_count = (station_count - 1) * 4 * (point_count - 1);
-    let waterplane_face_count = (station_count - 1) * 2;
     let mut side_faces = Vec::with_capacity(side_face_count);
     let mut waterplane_faces = Vec::with_capacity(waterplane_face_count);
 
     for station_index in 0..station_count - 1 {
+        let interval_enters_collapsed_stern =
+            station_index + 1 == station_count - 1 && stern_collapsed;
         for point_index in 0..point_count - 1 {
             let a = starboard[station_index][point_index];
             let b = starboard[station_index + 1][point_index];
             let c = starboard[station_index + 1][point_index + 1];
             let d = starboard[station_index][point_index + 1];
-            side_faces.push([a, b, c]);
-            side_faces.push([a, c, d]);
 
-            let a = port[station_index][point_index];
-            let b = port[station_index + 1][point_index];
-            let c = port[station_index + 1][point_index + 1];
-            let d = port[station_index][point_index + 1];
-            side_faces.push([a, c, b]);
-            side_faces.push([a, d, c]);
+            let port_a = port[station_index][point_index];
+            let port_b = port[station_index + 1][point_index];
+            let port_c = port[station_index + 1][point_index + 1];
+            let port_d = port[station_index][point_index + 1];
+
+            if interval_enters_collapsed_stern {
+                // At a collapsed right endpoint the port and starboard
+                // station columns share IDs. Flip both side-quad diagonals
+                // so their shared seam edge has exactly two incident faces.
+                side_faces.push([a, b, d]);
+                side_faces.push([b, c, d]);
+                side_faces.push([port_a, port_d, port_b]);
+                side_faces.push([port_d, port_c, port_b]);
+            } else {
+                side_faces.push([a, b, c]);
+                side_faces.push([a, c, d]);
+                side_faces.push([port_a, port_c, port_b]);
+                side_faces.push([port_a, port_d, port_c]);
+            }
         }
 
         let port_here = port[station_index][point_count - 1];
         let starboard_here = starboard[station_index][point_count - 1];
         let starboard_next = starboard[station_index + 1][point_count - 1];
         let port_next = port[station_index + 1][point_count - 1];
-        waterplane_faces.push([port_here, starboard_here, starboard_next]);
-        waterplane_faces.push([port_here, starboard_next, port_next]);
+        let left_collapsed = station_index == 0 && bow_collapsed;
+        let right_collapsed = station_index + 1 == station_count - 1 && stern_collapsed;
+        match (left_collapsed, right_collapsed) {
+            (true, false) => waterplane_faces.push([port_here, starboard_next, port_next]),
+            (false, true) => waterplane_faces.push([port_here, starboard_here, starboard_next]),
+            (false, false) => {
+                waterplane_faces.push([port_here, starboard_here, starboard_next]);
+                waterplane_faces.push([port_here, starboard_next, port_next]);
+            }
+            (true, true) => {
+                return Err(vec![LoftViolation {
+                    code: "adjacent_collapsed_ends".into(),
+                    detail: "an interval cannot connect two collapsed longitudinal endpoints"
+                        .into(),
+                }]);
+            }
+        }
     }
 
-    let bow_ring = {
-        let mut ring = starboard[0].clone();
-        ring.extend(port[0].iter().skip(1).rev().copied());
-        ring
+    let bow_centre = if bow_planar {
+        let index = u32::try_from(vertices.len()).map_err(|_| {
+            vec![LoftViolation {
+                code: "mesh_index_budget".into(),
+                detail: "bow centre index exceeds u32".into(),
+            }]
+        })?;
+        vertices.push(section_centre(&sections.sections[0]));
+        Some(index)
+    } else {
+        None
     };
-    let stern_ring = {
-        let last = station_count - 1;
-        let mut ring = starboard[last].clone();
-        ring.extend(port[last].iter().skip(1).rev().copied());
-        ring
+    let stern_centre = if stern_planar {
+        let index = u32::try_from(vertices.len()).map_err(|_| {
+            vec![LoftViolation {
+                code: "mesh_index_budget".into(),
+                detail: "stern centre index exceeds u32".into(),
+            }]
+        })?;
+        vertices.push(section_centre(
+            sections
+                .sections
+                .last()
+                .expect("validated sections are non-empty"),
+        ));
+        Some(index)
+    } else {
+        None
     };
-
-    let bow_centre = u32::try_from(vertices.len()).map_err(|_| {
-        vec![LoftViolation {
-            code: "mesh_index_budget".into(),
-            detail: "bow centre index exceeds u32".into(),
-        }]
-    })?;
-    vertices.push(section_centre(&sections.sections[0]));
-    let stern_centre = u32::try_from(vertices.len()).map_err(|_| {
-        vec![LoftViolation {
-            code: "mesh_index_budget".into(),
-            detail: "stern centre index exceeds u32".into(),
-        }]
-    })?;
-    vertices.push(section_centre(
-        sections.sections.last().expect("validated sections are non-empty"),
-    ));
 
     let side_face_range = FaceRange {
         first_face: 0,
@@ -742,22 +1286,54 @@ pub fn loft_waterplane_capped_hull(
     faces.extend(side_faces);
     faces.extend(waterplane_faces);
 
-    let end_cap_face_range = FaceRange {
+    let bow_end_cap_face_range = FaceRange {
         first_face: faces.len(),
-        face_count: end_cap_face_count,
+        face_count: 0,
     };
-    for index in 0..bow_ring.len() {
-        let next = (index + 1) % bow_ring.len();
-        faces.push([bow_centre, bow_ring[index], bow_ring[next]]);
+    if let Some(centre) = bow_centre {
+        let ring = {
+            let mut points = starboard[0].clone();
+            points.extend(port[0].iter().skip(1).rev().copied());
+            points
+        };
+        for index in 0..ring.len() {
+            let next = (index + 1) % ring.len();
+            faces.push([centre, ring[index], ring[next]]);
+        }
     }
-    for index in 0..stern_ring.len() {
-        let next = (index + 1) % stern_ring.len();
-        faces.push([stern_centre, stern_ring[next], stern_ring[index]]);
+    let bow_end_cap_face_range = FaceRange {
+        face_count: faces.len() - bow_end_cap_face_range.first_face,
+        ..bow_end_cap_face_range
+    };
+
+    let stern_end_cap_face_range = FaceRange {
+        first_face: faces.len(),
+        face_count: 0,
+    };
+    if let Some(centre) = stern_centre {
+        let last = station_count - 1;
+        let ring = {
+            let mut points = starboard[last].clone();
+            points.extend(port[last].iter().skip(1).rev().copied());
+            points
+        };
+        for index in 0..ring.len() {
+            let next = (index + 1) % ring.len();
+            faces.push([centre, ring[next], ring[index]]);
+        }
     }
+    let stern_end_cap_face_range = FaceRange {
+        face_count: faces.len() - stern_end_cap_face_range.first_face,
+        ..stern_end_cap_face_range
+    };
+    let end_cap_face_range = FaceRange {
+        first_face: bow_end_cap_face_range.first_face,
+        face_count: bow_end_cap_face_range.face_count + stern_end_cap_face_range.face_count,
+    };
 
     if vertices.len() != vertex_count || faces.len() != face_count {
         return Err(vec![LoftViolation {
-            code: "mesh_count_invariant",
+            code: "mesh_count_invariant".into(),
             detail: "generated vertex/face counts differ from preflight budget calculation".into(),
         }]);
     }
@@ -770,7 +1346,7 @@ pub fn loft_waterplane_capped_hull(
     };
     let geometry_digest_blake3 = compute_geometry_digest(&geometry).map_err(|error| {
         vec![LoftViolation {
-            code: "geometry_digest",
+            code: "geometry_digest".into(),
             detail: format!("could not compute normalized geometry digest: {error}"),
         }]
     })?;
@@ -785,7 +1361,7 @@ pub fn loft_waterplane_capped_hull(
 
     let mut artifact = LoftedHullArtifact {
         artifact_schema_version: LOFT_SCHEMA_VERSION,
-        generator: "symthaea-marine-waterplane-loft-v1".into(),
+        generator: "symthaea-marine-waterplane-loft-v2".into(),
         cap_semantics: "closed-displacement-volume-at-design-waterplane-z0".into(),
         source_spec_digest_blake3: sections.source_spec_digest_blake3.clone(),
         sampled_sections_digest_blake3: sections.sampled_sections_digest_blake3.clone(),
@@ -794,11 +1370,16 @@ pub fn loft_waterplane_capped_hull(
         side_face_range,
         waterplane_face_range,
         end_cap_face_range,
+        bow_end_cap_face_range,
+        stern_end_cap_face_range,
+        station_count,
+        section_point_count: point_count,
+        longitudinal_end_conditions: sections.longitudinal_end_conditions,
         candidate,
         admission_report,
     };
-    artifact.loft_manifest_digest_blake3 = compute_loft_manifest_digest(&artifact)
-        .map_err(|error| {
+    artifact.loft_manifest_digest_blake3 =
+        compute_loft_manifest_digest(&artifact).map_err(|error| {
             vec![LoftViolation {
                 code: "loft_manifest_digest".into(),
                 detail: format!("could not serialize loft artifact identity: {error}"),
@@ -811,7 +1392,8 @@ pub fn loft_waterplane_capped_hull(
 mod tests {
     use super::*;
     use crate::section::{
-        generate_section_artifact, SectionControlPoint, SectionHullSpec, SectionStation,
+        LongitudinalEndCondition, LongitudinalEndConditions, SectionControlPoint, SectionHullSpec,
+        SectionStation, generate_section_artifact,
     };
     use crate::{CoordinateFrame, Disposition};
 
@@ -846,6 +1428,7 @@ mod tests {
                 handedness: "right-handed".into(),
             },
             samples_per_segment: 4,
+            longitudinal_end_conditions: LongitudinalEndConditions::default(),
             stations: vec![
                 SectionStation {
                     x_over_length: 0.0,
@@ -879,6 +1462,60 @@ mod tests {
         }
     }
 
+    fn end_condition_spec(
+        bow: LongitudinalEndCondition,
+        stern: LongitudinalEndCondition,
+    ) -> SectionHullSpec {
+        let mut spec = convex_spec();
+        spec.candidate_id = format!("end-closure-{bow:?}-{stern:?}");
+        spec.schema_version = 2;
+        spec.longitudinal_end_conditions = LongitudinalEndConditions { bow, stern };
+        if bow == LongitudinalEndCondition::CollapsedCentreline {
+            spec.stations[0].half_breadth_fraction = 0.0;
+        }
+        if stern == LongitudinalEndCondition::CollapsedCentreline {
+            let last_station = spec.stations.len() - 1;
+            spec.stations[last_station].half_breadth_fraction = 0.0;
+        }
+        spec
+    }
+
+    fn assert_admissible_end_conditions(
+        bow: LongitudinalEndCondition,
+        stern: LongitudinalEndCondition,
+    ) -> LoftedHullArtifact {
+        let sections = generate_section_artifact(&end_condition_spec(bow, stern)).unwrap();
+        let loft = loft_waterplane_capped_hull(&sections, profile()).unwrap();
+        assert_eq!(
+            loft.admission_report.disposition,
+            Disposition::AdmissibleForProfile
+        );
+        assert_eq!(loft.admission_report.metrics.boundary_edge_count, 0);
+        assert_eq!(loft.admission_report.metrics.non_manifold_edge_count, 0);
+        assert_eq!(
+            loft.admission_report.metrics.non_manifold_vertex_link_count,
+            0
+        );
+        verify_loft_artifact_integrity(&loft).unwrap();
+
+        let expected_bow_caps = if bow == LongitudinalEndCondition::PlanarEndCap {
+            2 * loft.section_point_count - 1
+        } else {
+            0
+        };
+        let expected_stern_caps = if stern == LongitudinalEndCondition::PlanarEndCap {
+            2 * loft.section_point_count - 1
+        } else {
+            0
+        };
+        assert_eq!(loft.bow_end_cap_face_range.face_count, expected_bow_caps);
+        assert_eq!(
+            loft.stern_end_cap_face_range.face_count,
+            expected_stern_caps
+        );
+        loft
+    }
+
     fn rectangular_spec() -> SectionHullSpec {
         let shape = vec![
             SectionControlPoint {
@@ -906,6 +1543,7 @@ mod tests {
                 handedness: "right-handed".into(),
             },
             samples_per_segment: 1,
+            longitudinal_end_conditions: LongitudinalEndConditions::default(),
             stations: vec![
                 SectionStation {
                     x_over_length: 0.0,
@@ -936,6 +1574,7 @@ mod tests {
                 handedness: "right-handed".into(),
             },
             samples_per_segment: 1,
+            longitudinal_end_conditions: LongitudinalEndConditions::default(),
             stations: vec![
                 SectionStation {
                     x_over_length: 0.0,
@@ -976,6 +1615,14 @@ mod tests {
         generate_section_artifact(&convex_spec()).unwrap()
     }
 
+    fn rebind_loft_after_test_mutation(loft: &mut LoftedHullArtifact) {
+        let digest = crate::compute_geometry_digest(&loft.candidate.geometry).unwrap();
+        loft.candidate.geometry_digest_blake3 = digest.clone();
+        loft.mesh_digest_blake3 = digest;
+        loft.admission_report = crate::admit(&loft.candidate);
+        loft.loft_manifest_digest_blake3 = compute_loft_manifest_digest(loft).unwrap();
+    }
+
     #[test]
     fn convex_section_family_lofts_to_closed_admissible_mesh() {
         let result = loft_waterplane_capped_hull(&artifact(), profile()).unwrap();
@@ -984,10 +1631,19 @@ mod tests {
             Disposition::AdmissibleForProfile
         );
         assert_eq!(result.candidate.geometry.units, "m");
-        assert_eq!(result.cap_semantics, "closed-displacement-volume-at-design-waterplane-z0");
+        assert_eq!(
+            result.cap_semantics,
+            "closed-displacement-volume-at-design-waterplane-z0"
+        );
         assert_eq!(result.admission_report.metrics.boundary_edge_count, 0);
         assert_eq!(result.admission_report.metrics.non_manifold_edge_count, 0);
-        assert_eq!(result.admission_report.metrics.non_manifold_vertex_link_count, 0);
+        assert_eq!(
+            result
+                .admission_report
+                .metrics
+                .non_manifold_vertex_link_count,
+            0
+        );
         assert_eq!(result.side_face_range.first_face, 0);
         assert_eq!(
             result.waterplane_face_range.first_face,
@@ -997,9 +1653,8 @@ mod tests {
             result.end_cap_face_range.first_face,
             result.waterplane_face_range.first_face + result.waterplane_face_range.face_count
         );
-        for face in result.candidate.geometry.faces
-            [result.waterplane_face_range.first_face
-                ..result.waterplane_face_range.first_face + result.waterplane_face_range.face_count]
+        for face in result.candidate.geometry.faces[result.waterplane_face_range.first_face
+            ..result.waterplane_face_range.first_face + result.waterplane_face_range.face_count]
             .iter()
         {
             assert!(face.iter().all(|index| {
@@ -1027,6 +1682,30 @@ mod tests {
     }
 
     #[test]
+    fn legacy_v1_loft_parses_but_fails_v2_integrity_admission() {
+        let loft = loft_waterplane_capped_hull(&artifact(), profile()).unwrap();
+        let mut legacy = serde_json::to_value(&loft).unwrap();
+        let object = legacy.as_object_mut().unwrap();
+        object.insert("artifact_schema_version".into(), serde_json::json!(1));
+        object.insert(
+            "generator".into(),
+            serde_json::json!("symthaea-marine-waterplane-loft-v1"),
+        );
+        object.remove("bow_end_cap_face_range");
+        object.remove("stern_end_cap_face_range");
+        object.remove("station_count");
+        object.remove("section_point_count");
+        object.remove("longitudinal_end_conditions");
+        let parsed: LoftedHullArtifact = serde_json::from_value(legacy).unwrap();
+        let errors = verify_loft_artifact_integrity(&parsed).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|item| item.code == "loft_artifact_version")
+        );
+    }
+
+    #[test]
     fn face_ranges_are_bound_to_the_loft_manifest_digest() {
         let mut result = loft_waterplane_capped_hull(&artifact(), profile()).unwrap();
         assert!(verify_loft_artifact_integrity(&result).is_ok());
@@ -1045,6 +1724,205 @@ mod tests {
     }
 
     #[test]
+    fn pointed_bow_with_planar_stern_is_manifold_and_admissible() {
+        let loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        assert_eq!(loft.waterplane_face_range.face_count, 3);
+        assert_eq!(loft.bow_end_cap_face_range.face_count, 0);
+        assert!(loft.end_cap_face_range.face_count > 0);
+    }
+
+    #[test]
+    fn planar_bow_with_pointed_stern_is_manifold_and_admissible() {
+        let loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::PlanarEndCap,
+            LongitudinalEndCondition::CollapsedCentreline,
+        );
+        assert_eq!(loft.waterplane_face_range.face_count, 3);
+        assert_eq!(loft.stern_end_cap_face_range.face_count, 0);
+        assert!(loft.end_cap_face_range.face_count > 0);
+    }
+
+    #[test]
+    fn both_pointed_ends_share_centreline_vertices_without_end_caps() {
+        let loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::CollapsedCentreline,
+        );
+        assert_eq!(loft.waterplane_face_range.face_count, 2);
+        assert_eq!(loft.end_cap_face_range.face_count, 0);
+
+        let point_count = loft.section_point_count;
+        for station_index in [0, loft.station_count - 1] {
+            let base = if station_index == 0 {
+                0
+            } else {
+                (0..loft.station_count - 1).fold(0_usize, |offset, index| {
+                    let collapsed = index == 0;
+                    offset + point_count + if collapsed { 0 } else { point_count - 1 }
+                })
+            };
+            let endpoint_vertices = &loft.candidate.geometry.vertices[base..base + point_count];
+            assert!(endpoint_vertices.iter().all(|point| point[1] == 0.0));
+        }
+    }
+
+    #[test]
+    fn planar_planar_legacy_end_conditions_remain_supported() {
+        let loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::PlanarEndCap,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        assert_eq!(
+            loft.waterplane_face_range.face_count,
+            2 * (loft.station_count - 1)
+        );
+        assert_eq!(
+            loft.end_cap_face_range.face_count,
+            2 * (2 * loft.section_point_count - 1)
+        );
+    }
+
+    #[test]
+    fn collapsed_interior_station_is_rejected() {
+        let mut spec = convex_spec();
+        spec.stations[1].half_breadth_fraction = 0.0;
+        let error = generate_section_artifact(&spec).unwrap_err();
+        assert!(
+            error
+                .iter()
+                .any(|item| item.code == "interior_station_breadth")
+        );
+    }
+
+    #[test]
+    fn zero_breadth_endpoint_with_planar_cap_label_is_rejected() {
+        let mut spec = convex_spec();
+        spec.stations[0].half_breadth_fraction = 0.0;
+        let error = generate_section_artifact(&spec).unwrap_err();
+        assert!(error.iter().any(|item| item.code == "planar_end_breadth"));
+    }
+
+    #[test]
+    fn positive_breadth_endpoint_with_collapsed_label_is_rejected() {
+        let mut spec = end_condition_spec(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        spec.stations[0].half_breadth_fraction = 0.01;
+        let error = generate_section_artifact(&spec).unwrap_err();
+        assert!(
+            error
+                .iter()
+                .any(|item| item.code == "collapsed_end_breadth")
+        );
+    }
+
+    #[test]
+    fn two_adjacent_collapsed_ends_are_rejected() {
+        let mut spec = end_condition_spec(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::CollapsedCentreline,
+        );
+        spec.stations.truncate(2);
+        spec.stations[1].x_over_length = 1.0;
+        spec.stations[1].half_breadth_fraction = 0.0;
+        let error = generate_section_artifact(&spec).unwrap_err();
+        assert!(
+            error
+                .iter()
+                .any(|item| item.code == "adjacent_collapsed_ends")
+        );
+    }
+
+    #[test]
+    fn mutated_end_condition_without_manifest_rebinding_is_rejected() {
+        let mut loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        loft.longitudinal_end_conditions.bow = LongitudinalEndCondition::PlanarEndCap;
+        let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|item| item.code == "loft_manifest_digest")
+        );
+    }
+
+    #[test]
+    fn rehashed_wrong_side_face_is_rejected_by_shared_vertex_semantics() {
+        let mut loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::PlanarEndCap,
+            LongitudinalEndCondition::CollapsedCentreline,
+        );
+        let face_index = loft.side_face_range.first_face;
+        loft.candidate.geometry.faces[face_index][0] = loft.candidate.geometry.faces[face_index][1];
+        rebind_loft_after_test_mutation(&mut loft);
+        let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|item| item.code == "side_closure_semantics")
+        );
+    }
+
+    #[test]
+    fn rehashed_wrong_waterplane_triangle_is_rejected_by_closure_semantics() {
+        let mut loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        let face_index = loft.waterplane_face_range.first_face;
+        loft.candidate.geometry.faces[face_index][0] = loft.candidate.geometry.faces[face_index][1];
+        rebind_loft_after_test_mutation(&mut loft);
+        let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|item| item.code == "waterplane_closure_semantics")
+        );
+    }
+
+    #[test]
+    fn rehashed_wrong_planar_end_cap_triangle_is_rejected() {
+        let mut loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::PlanarEndCap,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        let face_index = loft.bow_end_cap_face_range.first_face;
+        loft.candidate.geometry.faces[face_index][0] = loft.candidate.geometry.faces[face_index][1];
+        rebind_loft_after_test_mutation(&mut loft);
+        let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
+        assert!(errors.iter().any(|item| item.code == "bow_cap_topology"));
+    }
+
+    #[test]
+    fn collapsed_endpoint_must_not_duplicate_transverse_vertices() {
+        let mut loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::CollapsedCentreline,
+            LongitudinalEndCondition::PlanarEndCap,
+        );
+        let starboard_keel = loft.candidate.geometry.vertices[0];
+        loft.candidate.geometry.vertices[0][1] = 0.25;
+        assert_ne!(loft.candidate.geometry.vertices[0], starboard_keel);
+        // Rebinding the geometry digest cannot make invalid collapsed-end semantics pass.
+        let digest = crate::compute_geometry_digest(&loft.candidate.geometry).unwrap();
+        loft.candidate.geometry_digest_blake3 = digest.clone();
+        loft.mesh_digest_blake3 = digest;
+        loft.admission_report = crate::admit(&loft.candidate);
+        loft.loft_manifest_digest_blake3 = compute_loft_manifest_digest(&loft).unwrap();
+        let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|item| item.code == "collapsed_end_geometry")
+        );
+    }
+
+    #[test]
     fn rectangular_prism_mesh_matches_known_volume_and_waterplane() {
         let source = generate_section_artifact(&rectangular_spec()).unwrap();
         let result = loft_waterplane_capped_hull(&source, profile()).unwrap();
@@ -1052,10 +1930,18 @@ mod tests {
             result.admission_report.disposition,
             Disposition::AdmissibleForProfile
         );
-        assert!((result.admission_report.metrics.signed_volume_m3.unwrap() - 12_000.0).abs() < 1.0e-9);
+        assert!(
+            (result.admission_report.metrics.signed_volume_m3.unwrap() - 12_000.0).abs() < 1.0e-9
+        );
         assert_eq!(result.admission_report.metrics.boundary_edge_count, 0);
         assert_eq!(result.admission_report.metrics.non_manifold_edge_count, 0);
-        assert_eq!(result.admission_report.metrics.non_manifold_vertex_link_count, 0);
+        assert_eq!(
+            result
+                .admission_report
+                .metrics
+                .non_manifold_vertex_link_count,
+            0
+        );
         assert!(verify_loft_artifact_integrity(&result).is_ok());
     }
 
@@ -1082,9 +1968,11 @@ mod tests {
         source.sampled_sections_digest_blake3 =
             compute_sampled_sections_digest(&source.sections).unwrap();
         let error = loft_waterplane_capped_hull(&source, profile()).unwrap_err();
-        assert!(error
-            .iter()
-            .any(|item| item.code == "section_point_count_mismatch"));
+        assert!(
+            error
+                .iter()
+                .any(|item| item.code == "section_point_count_mismatch")
+        );
     }
 
     #[test]
@@ -1101,8 +1989,9 @@ mod tests {
     fn non_monotonic_station_coordinates_are_rejected() {
         let mut source = artifact();
         source.sections[1].x_m = source.sections[0].x_m;
+        let station_x = source.sections[1].x_m;
         for point in &mut source.sections[1].keel_to_sheer_m {
-            point[0] = source.sections[1].x_m;
+            point[0] = station_x;
         }
         source.sampled_sections_digest_blake3 =
             compute_sampled_sections_digest(&source.sections).unwrap();
@@ -1115,8 +2004,10 @@ mod tests {
         let mut invalid_profile = profile();
         invalid_profile.require_closed_surface = false;
         let error = loft_waterplane_capped_hull(&artifact(), invalid_profile).unwrap_err();
-        assert!(error
-            .iter()
-            .any(|item| item.code == "profile_requires_closure"));
+        assert!(
+            error
+                .iter()
+                .any(|item| item.code == "profile_requires_closure")
+        );
     }
 }

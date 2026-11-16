@@ -1,10 +1,8 @@
 use std::{env, fs, path::PathBuf, process};
 
 use serde::Deserialize;
-use symthaea_marine_geometry::{
-    loft::loft_waterplane_capped_hull, AdmissionProfile, Disposition,
-};
 use symthaea_marine_geometry::section::SectionFamilyArtifact;
+use symthaea_marine_geometry::{AdmissionProfile, Disposition, loft::loft_waterplane_capped_hull};
 
 const USAGE: &str = concat!(
     "Usage: marine-waterplane-loft <loft-request.json> [--output <loft-artifact.json>]\n",
@@ -47,10 +45,10 @@ fn run() -> Result<i32, String> {
     }
 
     let input = input.ok_or_else(|| USAGE.to_string())?;
-    let bytes = fs::read(&input)
-        .map_err(|error| format!("cannot read {}: {error}", input.display()))?;
-    let request: LoftRequest = serde_json::from_slice(&bytes)
-        .map_err(|error| format!("invalid loft request: {error}"))?;
+    let bytes =
+        fs::read(&input).map_err(|error| format!("cannot read {}: {error}", input.display()))?;
+    let request: LoftRequest =
+        serde_json::from_slice(&bytes).map_err(|error| format!("invalid loft request: {error}"))?;
     let artifact = loft_waterplane_capped_hull(&request.section_family, request.profile)
         .map_err(|violations| format!("loft rejected: {violations:#?}"))?;
     let disposition = artifact.admission_report.disposition;

@@ -178,6 +178,31 @@ A candidate may advance only when:
 
 A geometry pass is not design approval. A CFD pass is not a physical trial. A physical model test is not full-scale operational validation.
 
+## 8B. Longitudinal end-condition benchmark (G2e)
+
+G2b's planar end caps are a useful closed-volume fixture but do not represent a pointed stem/stern. G2e introduces an explicit terminal boundary contract instead of attempting to infer endpoint topology from very small positive breadths.
+
+Freeze and compare four end-condition cases:
+- pointed bow + planar stern;
+- planar bow + pointed stern;
+- both pointed, with at least one positive-breadth interior station;
+- both planar (legacy v1 behavior).
+
+The endpoint modes are part of the v2 source-spec digest, section-family manifest digest, loft manifest digest and semantic face-region ranges. No geometry repair, welding, snapping or tolerance-based collapse is allowed. A collapsed station must have exact zero transverse coordinates and shared port/starboard vertex IDs.
+
+### Required known-answer and adversarial checks
+
+- Explicit per-station vertex and per-region face budgets equal actual allocation.
+- No duplicate transverse coordinates with distinct port/starboard IDs at a collapsed end.
+- No end-cap centre vertex or end-cap faces at collapsed ends.
+- One waterplane triangle, not a degenerate quad split, at each collapsed endpoint interval.
+- Fresh G0/G1 admission: zero boundary edges, zero non-manifold edges and zero non-manifold vertex links.
+- Positive per-component signed volume and every face above the declared minimum area.
+- Recomputed source/sample/family/loft digests and exact bow/stern range partition.
+- Reject interior zero-breadth stations, endpoint mode/breadth disagreement, nonzero y at collapsed points, adjacent two-station collapsed ends, wrong/unknown closure labels, tampered face ranges and old artifact schemas.
+
+Preserve the legacy planar/planar mesh as a known-answer compatibility case. For each pointed combination, report vertex/face counts, signed volume, topology metrics, minimum triangle area, geometry digest and exact admission profile. Do not infer hull fairness, waterline quality, stability, or manufacturability from a passing closed mesh.
+
 ## 9. Implementation order
 
 - G0/G1: candidate schema, deterministic geometry identity, topology and scoped admission (implemented in the companion Rust crate).
