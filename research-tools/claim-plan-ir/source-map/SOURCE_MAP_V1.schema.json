@@ -342,7 +342,8 @@
         "source_span",
         "raw_token_sha256",
         "source_node_id",
-        "parser_profile_digest"
+        "parser_profile_digest",
+        "token_representation_id"
       ],
       "properties": {
         "json_pointer": {
@@ -368,8 +369,24 @@
         },
         "schema_digest": {
           "$ref": "#/$defs/digest"
+        },
+        "token_representation_id": {
+          "$ref": "#/$defs/id"
         }
-      }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "source_span": {
+              "properties": {
+                "coordinate_space": {
+                  "const": "json_source_utf8_bytes"
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "typedConversion": {
       "type": "object",
