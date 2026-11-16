@@ -15,6 +15,8 @@ Evaluator gold contains a finite non-empty set of complete DAG completions over 
 Across worlds:
 - A unique BEFORE or AFTER relation is entailed.
 - A unique CONCURRENT relation is entailed only when the scoped observation boundary is complete.
+- A relation may be possible in one or more worlds yet still be unsupported as an unconditional claim if other worlds disagree.
+- Whole-world compatibility and epistemic entailment are separate outputs: a merely possible assertion can fit a world while still being false as a claim of current fact.
 - Multiple possible relations are underdetermined.
 - A compromised boundary blocks unsupported concurrency, while independently entailed positive order remains reportable.
 - An empty world set is invalid, not vacuous truth.
