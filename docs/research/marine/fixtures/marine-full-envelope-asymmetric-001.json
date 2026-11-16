@@ -73,7 +73,7 @@
       ],
       "port_profile": [
         {
-          "point_id": "PORT-BOW-KEEL",
+          "point_id": "BOW-KEEL",
           "y_m": 0,
           "z_m": 6,
           "role": "KEEL",
@@ -137,7 +137,7 @@
       ],
       "port_profile": [
         {
-          "point_id": "PORT-STERN-KEEL",
+          "point_id": "STERN-KEEL",
           "y_m": 0,
           "z_m": 6,
           "role": "KEEL",
