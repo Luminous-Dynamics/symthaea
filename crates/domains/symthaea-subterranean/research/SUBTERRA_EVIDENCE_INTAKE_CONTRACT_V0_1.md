@@ -145,12 +145,12 @@ Contents:
 - cave-network JSON-to-typed adapter and topology/route queries;
 - non-uniform profile adapter and observed-only summary;
 - science-return lifecycle validator and site/observation linkage;
-- a separate site-disjoint likelihood-calibration reference crate for Training-only empirical likelihood estimates and Calibration/Evaluation proper scoring;
+- a separate site-disjoint likelihood-calibration reference crate for Training-only empirical likelihood estimates, Calibration/Evaluation proper scoring and a guarded conversion into EVSI inputs;
 - copied synthetic site, network and profile fixtures;
-- 21 site/network tests, 6 profile tests and 10 science-return tests (37 adapter cases total); 14 site-disjoint likelihood-calibration tests in the separate calibration package.
+- 21 site/network tests, 6 profile tests and 10 science-return tests (37 adapter cases total); 19 site-disjoint likelihood-calibration tests in the separate calibration package.
 - Pinned upstream schema/fixture manifest and explicit local verification script for the four nested Cargo packages.
 
-Across the complete current Symthaea Subterra PR, the one-step EVSI, survival planner, robust EVSI, site/network/profile adapter and science-return lifecycle together have 82 authored Rust unit tests. This count is source inspection only. None has been compiled or executed in the current environment.
+Across the complete current Symthaea Subterra PR, the one-step EVSI, survival planner, robust EVSI, site/network/profile adapter and science-return lifecycle together have 87 authored Rust unit tests. This count is source inspection only. None has been compiled or executed in the current environment.
 
 ### Verification status
 
@@ -170,7 +170,7 @@ Across the complete current Symthaea Subterra PR, the one-step EVSI, survival pl
 2. Run the authored four-package verification script on an environment with the declared Rust toolchain and retain exact-head receipts.
 2. Connect verified observation lineage and source-trust receipts; retain common-cause correlations.
 3. Ingest independently adjudicated, site-disjoint observation cases into the calibration reference; extend beyond Dirichlet categorical counts to hierarchical/correlated sensor models only after held-out evidence supports them.
-4. Add direct adapters from validated site/network/profile packets into finite model-ensemble EVSI inputs, without copying source claims into numeric probabilities.
+4. Add labelled observation-dataset adapters and source-lineage receipts; the current calibration-to-EVSI converter still requires caller-supplied priors, decision losses, action costs and external gate dispositions.
 5. Extend science-return records with verifier-bound signatures, immutable custody receipts, transport-delivery reconciliation and cross-agent identity evidence; the current state machine only validates local event ordering and required reference fields.
 6. Compare planner outputs against one-step EVSI, entropy, frontier, FEP and survival-conditioned baselines under identical evidence and resource budgets.
 7. Only after exact-head source/test qualification should production runtime interfaces be proposed.
