@@ -30,7 +30,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Set up pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@1.100.0
       - name: Format check
         run: cargo fmt --check --package symthaea-rea-evidence-verifier
       - name: Unit and negative-control tests
