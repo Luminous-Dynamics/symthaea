@@ -204,7 +204,24 @@
     "dataset_adapter_implemented": false,
     "baseline_reproductions_executed": false,
     "benchmark_executed": false,
-    "sota_claim": false
+    "sota_claim": false,
+    "comparator_snapshot_pinned": true,
+    "comparator_models_reproduced": false
   },
-  "pin_semantics": "repository_commit is a tree commit; readme_blob_sha is a file blob object and is not a commit"
+  "pin_semantics": "repository_commit is a tree commit; readme_blob_sha is a file blob object and is not a commit",
+  "current_comparator_snapshot": {
+    "schema": "symthaea.tsfm_comparator_snapshot.v0.1",
+    "fixture_path": "crates/domains/symthaea-capability-closure/fixtures/tsfm_comparator_snapshot_v0.1.json",
+    "retrieved_at": "2026-11-16",
+    "included_models": [
+      "timeh2o_v1",
+      "timestral_209m",
+      "ci_proto",
+      "time_rsi_1_5",
+      "toto_2_0_2_5b",
+      "chronos_bolt",
+      "timesfm_3"
+    ],
+    "comparison_rule": "source-specific benchmark and metric only; preserve conflicting public surfaces and require official matched reproduction"
+  }
 }
