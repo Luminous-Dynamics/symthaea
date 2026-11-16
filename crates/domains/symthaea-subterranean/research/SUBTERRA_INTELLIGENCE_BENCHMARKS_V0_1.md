@@ -391,3 +391,18 @@ The Symthaea dependence auditor cross-checks the lineage sidecar against the thr
 | SchemaVersionBoundaryBench | Unsupported site-evidence schema versions fail closed | Zero silent downgrade |
 
 The consumer only projects schema version/site ID/observation IDs; full site-evidence validation must run against the pinned producer schema. Opaque provenance references remain unauthenticated.
+
+
+## 17. Science-return clock integrity
+
+The science-return state machine now distinguishes sequence order from wall-clock claims. Every event carries a clock identity and absolute time uncertainty. Events from different clocks are not compared; same-clock time regression is rejected only when uncertainty intervals prove the regression.
+
+| Benchmark | Property | Proposed gate |
+|---|---|---|
+| CanonicalEventTimeBench | Invalid dates, offsets and malformed timestamps fail closed | Zero invalid UTC timestamps accepted |
+| ClockIdentityBench | Every event identifies its clock source | Zero missing clock IDs |
+| SameClockRegressionBench | Definite same-clock time regression is rejected | 100% of frozen definite regressions rejected |
+| ClockUncertaintyBench | Overlapping uncertainty intervals are not falsely called regressions | Zero false chronology failures in overlap controls |
+| CrossClockHandoffBench | Robot/relay/ground timestamps from different clocks are not naïvely compared | Sequence order remains authoritative; no cross-clock false rejection |
+
+These checks improve event-log coherence but do not establish clock synchronization, trusted time, actor identity or cryptographic custody.

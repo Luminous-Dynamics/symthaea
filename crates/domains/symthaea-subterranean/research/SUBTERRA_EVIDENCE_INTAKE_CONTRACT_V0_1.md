@@ -122,6 +122,8 @@ The network adapter is a graph of evidence claims. It is not a SLAM map, path pl
 
 A non-empty evidence reference is an opaque identifier. It does not prove that the object exists, is immutable, is correctly calibrated, was captured by the declared sensor, is independent of another reference or is authorized for use.
 
+Science-return events also carry `clock_id` and `clock_uncertainty_ms`; the v0.1 event-log check accepts canonical UTC `YYYY-MM-DDTHH:MM:SSZ` only and flags same-clock regressions only when uncertainty intervals prove them. Event sequence remains authoritative, and distinct clocks are not directly compared.
+
 A later source-trust bridge should bind:
 - physical sensor and acquisition identity;
 - observation ID and immutable content digest;
@@ -178,3 +180,10 @@ Across the complete current Symthaea Subterra PR, the one-step EVSI, survival pl
 ## 9. Non-claims
 
 This adapter does not authenticate observations, establish geological truth, infer connectivity from surface morphology, demonstrate traversal, validate a planetary coordinate transform, certify structural safety or habitation, grant planetary-protection permission, issue robot commands, or prove SOTA superiority. It is a typed data boundary designed to prevent those claims from being silently conflated.
+
+
+### Clock and chronology integrity
+
+Event sequence numbers establish lifecycle order. Timestamps add an independent consistency check but do not replace sequence order. Every event declares a clock ID and an absolute uncertainty bound in milliseconds. Events from different clock IDs are never directly compared. For events from the same clock, a regression is rejected only when the current timestamp's upper uncertainty bound is earlier than the previous timestamp's lower bound. Overlapping uncertainty intervals are inconclusive, not proof of bad order.
+
+The reference accepts only fixed-width UTC timestamps in `YYYY-MM-DDTHH:MM:SSZ` form. Timezone offsets, fractional seconds and leap-second notation are outside v0.1. This deliberately narrow representation avoids silently comparing local-clock strings or ambiguous formats.

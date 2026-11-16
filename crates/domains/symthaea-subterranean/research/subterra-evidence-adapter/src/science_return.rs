@@ -53,7 +53,13 @@ pub struct ScienceReturnEvent {
     pub sequence: u64,
     pub event_id: String,
     pub stage: ScienceReturnStage,
+    /// Canonical UTC timestamp: YYYY-MM-DDTHH:MM:SSZ.
     pub recorded_at: String,
+    /// Identity of the clock that produced recorded_at; different clocks are
+    /// not compared as if they were synchronized.
+    pub clock_id: String,
+    /// Conservative absolute clock uncertainty in milliseconds.
+    pub clock_uncertainty_ms: u64,
     pub actor_id: String,
     /// Opaque source/evidence reference. Not an authenticity proof.
     pub evidence_ref: String,
@@ -86,6 +92,13 @@ pub enum ScienceReturnIssue {
     EmptyEventId,
     DuplicateEventId(String),
     EmptyRecordedAt(String),
+    InvalidRecordedAt(String),
+    EmptyClockId(String),
+    TimestampRegression {
+        clock_id: String,
+        previous_event_id: String,
+        current_event_id: String,
+    },
     EmptyActorId(String),
     EmptyEvidenceRef(String),
     InvalidTransition {
@@ -124,6 +137,82 @@ fn transition_allowed(
     }
 }
 
+
+fn parse_canonical_utc_millis(value: &str) -> Option<i128> {
+    let bytes = value.as_bytes();
+    if bytes.len() != 20
+        || bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+        || bytes[19] != b'Z'
+    {
+        return None;
+    }
+
+    fn digits(bytes: &[u8], start: usize, end: usize) -> Option<i128> {
+        bytes.get(start..end)?.iter().try_fold(0_i128, |value, byte| {
+            if !byte.is_ascii_digit() {
+                return None;
+            }
+            Some(value * 10 + i128::from(*byte - b'0'))
+        })
+    }
+
+    let year = digits(bytes, 0, 4)?;
+    let month = digits(bytes, 5, 7)?;
+    let day = digits(bytes, 8, 10)?;
+    let hour = digits(bytes, 11, 13)?;
+    let minute = digits(bytes, 14, 16)?;
+    let second = digits(bytes, 17, 19)?;
+
+    if year == 0 || !(1..=12).contains(&month)
+        || hour > 23 || minute > 59 || second > 59
+    {
+        return None;
+    }
+
+    let leap_year = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
+    let days_in_month = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap_year => 29,
+        2 => 28,
+        _ => return None,
+    };
+    if day < 1 || day > days_in_month {
+        return None;
+    }
+
+    let days_before_year = |y: i128| {
+        let prior = y - 1;
+        prior * 365 + prior / 4 - prior / 100 + prior / 400
+    };
+    let days_before_month = match month {
+        1 => 0,
+        2 => 31,
+        3 => 59,
+        4 => 90,
+        5 => 120,
+        6 => 151,
+        7 => 181,
+        8 => 212,
+        9 => 243,
+        10 => 273,
+        11 => 304,
+        12 => 334,
+        _ => return None,
+    };
+    let leap_adjustment = if leap_year && month > 2 { 1 } else { 0 };
+    let day_of_year = days_before_month + leap_adjustment + day - 1;
+    let days_from_epoch =
+        days_before_year(year) - days_before_year(1970) + day_of_year;
+    let seconds_from_epoch =
+        days_from_epoch * 86_400 + hour * 3_600 + minute * 60 + second;
+    Some(seconds_from_epoch * 1_000)
+}
+
 impl ScienceReturnRecord {
     /// Validate event ordering and stage-specific references.
     ///
@@ -145,6 +234,8 @@ impl ScienceReturnRecord {
 
         let mut event_ids = BTreeSet::new();
         let mut previous_stage: Option<ScienceReturnStage> = None;
+        let mut last_clock_times =
+            std::collections::BTreeMap::<String, (i128, u64, String)>::new();
 
         for (index, event) in self.events.iter().enumerate() {
             let expected_sequence = index as u64 + 1;
@@ -165,6 +256,45 @@ impl ScienceReturnRecord {
             }
             if !nonempty(&event.recorded_at) {
                 issues.push(ScienceReturnIssue::EmptyRecordedAt(
+                    event.event_id.clone(),
+                ));
+            } else if let Some(timestamp_ms) = parse_canonical_utc_millis(&event.recorded_at) {
+                if !nonempty(&event.clock_id) {
+                    issues.push(ScienceReturnIssue::EmptyClockId(event.event_id.clone()));
+                } else if let Some((previous_ms, previous_uncertainty, previous_event_id)) =
+                    last_clock_times.get(&event.clock_id)
+                {
+                    let previous_lower =
+                        *previous_ms - i128::from(*previous_uncertainty);
+                    let current_upper =
+                        timestamp_ms + i128::from(event.clock_uncertainty_ms);
+                    if current_upper < previous_lower {
+                        issues.push(ScienceReturnIssue::TimestampRegression {
+                            clock_id: event.clock_id.clone(),
+                            previous_event_id: previous_event_id.clone(),
+                            current_event_id: event.event_id.clone(),
+                        });
+                    }
+                    last_clock_times.insert(
+                        event.clock_id.clone(),
+                        (
+                            timestamp_ms,
+                            event.clock_uncertainty_ms,
+                            event.event_id.clone(),
+                        ),
+                    );
+                } else {
+                    last_clock_times.insert(
+                        event.clock_id.clone(),
+                        (
+                            timestamp_ms,
+                            event.clock_uncertainty_ms,
+                            event.event_id.clone(),
+                        ),
+                    );
+                }
+            } else {
+                issues.push(ScienceReturnIssue::InvalidRecordedAt(
                     event.event_id.clone(),
                 ));
             }
@@ -321,6 +451,8 @@ mod tests {
             event_id: event_id.into(),
             stage,
             recorded_at: format!("2026-11-16T12:{:02}:00Z", sequence),
+            clock_id: "synthetic-robot-clock-01".into(),
+            clock_uncertainty_ms: 100,
             actor_id: "synthetic-robot-01".into(),
             evidence_ref: format!("synthetic-evidence-{event_id}"),
             calibration_ref: None,
@@ -485,4 +617,82 @@ mod tests {
             |issue| matches!(issue, ScienceReturnIssue::SiteIdMismatch { .. })
         ));
     }
+    #[test]
+    fn malformed_or_impossible_utc_timestamps_are_rejected() {
+        let mut record = complete_record();
+        record.events[2].recorded_at = "2026-11-16 12:03:00".into();
+        assert!(record.validate().unwrap_err().contains(
+            &ScienceReturnIssue::InvalidRecordedAt("acquired".into())
+        ));
+
+        let mut record = complete_record();
+        record.events[2].recorded_at = "2026-02-30T12:03:00Z".into();
+        assert!(record.validate().unwrap_err().contains(
+            &ScienceReturnIssue::InvalidRecordedAt("acquired".into())
+        ));
+    }
+
+    #[test]
+    fn certain_same_clock_regression_is_rejected() {
+        let mut record = complete_record();
+        record.events[4].recorded_at = "2026-11-16T12:02:00Z".into();
+        let issues = record.validate().unwrap_err();
+        assert!(issues.contains(&ScienceReturnIssue::TimestampRegression {
+            clock_id: "synthetic-robot-clock-01".into(),
+            previous_event_id: "verified".into(),
+            current_event_id: "persisted".into()
+        }));
+    }
+
+    #[test]
+    fn overlapping_clock_uncertainty_does_not_claim_a_certain_regression() {
+        let mut record = complete_record();
+        record.events[4].recorded_at = "2026-11-16T12:03:59Z".into();
+        record.events[3].clock_uncertainty_ms = 1_000;
+        record.events[4].clock_uncertainty_ms = 1_000;
+        assert!(record.validate().is_ok());
+    }
+
+    #[test]
+    fn timestamps_from_distinct_clocks_are_not_naively_compared() {
+        let mut record = complete_record();
+        record.events[5].clock_id = "ground-station-clock-01".into();
+        record.events[5].recorded_at = "2026-11-16T08:00:00Z".into();
+        assert!(record.validate().is_ok());
+    }
+
+    #[test]
+    fn event_clock_identity_is_required() {
+        let mut record = complete_record();
+        record.events[1].clock_id = " ".into();
+        assert!(record.validate().unwrap_err().contains(
+            &ScienceReturnIssue::EmptyClockId("executed".into())
+        ));
+    }
+
+    #[test]
+    fn utc_timestamp_parser_handles_leap_day_and_rejects_non_leap_day() {
+        assert!(parse_canonical_utc_millis("2024-02-29T12:00:00Z").is_some());
+        assert!(parse_canonical_utc_millis("2025-02-29T12:00:00Z").is_none());
+        assert!(parse_canonical_utc_millis("2026-11-16T24:00:00Z").is_none());
+        assert!(parse_canonical_utc_millis("2026-11-16T12:60:00Z").is_none());
+    }
+
+    #[test]
+    fn timestamp_equality_is_allowed_when_event_sequence_disambiguates() {
+        let mut record = complete_record();
+        record.events[1].recorded_at = record.events[0].recorded_at.clone();
+        assert!(record.validate().is_ok());
+    }
+
+    #[test]
+    fn empty_clock_and_bad_timestamp_are_reported_independently() {
+        let mut record = complete_record();
+        record.events[0].clock_id.clear();
+        record.events[0].recorded_at.clear();
+        let issues = record.validate().unwrap_err();
+        assert!(issues.contains(&ScienceReturnIssue::EmptyRecordedAt("proposed".into())));
+        assert!(!issues.contains(&ScienceReturnIssue::EmptyClockId("proposed".into())));
+    }
+
 }
