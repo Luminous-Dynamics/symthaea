@@ -52,3 +52,6 @@ jobs:
 
       - name: Run synthetic robust net-export qualification
         run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_robust_net_export
+
+      - name: Run synthetic model-form discrepancy audit
+        run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_model_form_discrepancy
