@@ -37,15 +37,7 @@ jobs:
         run: rustfmt --edition 2024 --check crates/domains/symthaea-architecture-engineering/src/scilaws_candidate_selection.rs
 
       - name: Compile and test exact SciLaws and Pareto source
-        run: cargo test --manifest-path research/scilaws-candidate-selection-audit-harness/Cargo.toml --all-targets
-
-      - name: Upload isolated harness lockfile for pinning
-        uses: actions/upload-artifact@v4
-        with:
-          name: scilaws-candidate-audit-harness-lockfile-${{ github.event.pull_request.head.sha || github.sha }}
-          path: research/scilaws-candidate-selection-audit-harness/Cargo.lock
-          if-no-files-found: error
-          retention-days: 7
+        run: cargo test --locked --manifest-path research/scilaws-candidate-selection-audit-harness/Cargo.toml --all-targets
 
       - name: Run strict Clippy on isolated research harness
         run: cargo clippy --locked --manifest-path research/scilaws-candidate-selection-audit-harness/Cargo.toml --all-targets -- -D warnings
