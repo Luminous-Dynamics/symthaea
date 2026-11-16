@@ -1363,15 +1363,20 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             }
             "CO2_DBD_MODEL_GENERALIZATION" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
-                ensure!(
-                    close_f64(
-                        required_f64(metrics, "baseline_best_publication_grouped_cv_r2", &format!("{display_name}: {target_id}"))?,
-                        0.791
-                    ),
-                    "{display_name}: CO2 DBD target {target_id} must preserve the source grouped-CV baseline"
-                );
+                for ( (key, expected) in [
+                    ("published_mean_publication_grouped_5fold_hybrid_r2", 0.441),
+                    ("published_best_fold_publication_grouped_5fold_hybrid_r2", 0.791),
+                    ("published_worst_fold_publication_grouped_5fold_hybrid_r2", 0.024),
+                ] {
+                    ensure!(
+                        close_f64(required_f64(metrics, key, &format!("{display_name}: {target_id}"))?, expected),
+                        "{display_name}: DBD target {target_id} must preserve source-published grouped-CV metric {key}"
+                    );
+                }
                 for (key, floor) in [
-                    ("target_mean_leave_one_publication_out_r2_min", 0.80),
+                    ("target_mean_publication_grouped_5fold_r2_min", 0.55),
+                    ("target_worst_publication_grouped_5fold_r2_min", 0.15),
+                    ("target_mean_leave_one_publication_out_r2_min", 0.45),
                     ("nominal_prediction_interval_coverage_min", 0.90),
                     ("minimum_applicability_domain_coverage_fraction", 0.80),
                 ] {
@@ -1382,10 +1387,18 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     );
                 }
                 ensure!(
-                    metrics.get("sealed_prospective_reactor_holdout_required").and_then(Value::as_bool)
-                        == Some(true),
-                    "{display_name}: CO2 DBD target {target_id} must require a sealed prospective reactor holdout"
+                    required_f64(metrics, "prospective_validation_minimum_independent_points", &format!("{display_name}: {target_id}"))? >= 20.0,
+                    "{display_name}: CO2 DBD target {target_id} must require at least 20 prospective independent points"
                 );
+                for key in [
+                    "sealed_prospective_reactor_holdout_required",
+                    "all_prediction_and_uncertainty_thresholds_must_hold_on_same_sealed_protocol",
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: CO2 DBD target {target_id} is missing target metric gate {key}"
+                    );
+                }
                 for key in [
                     "source_paper_grouped_splits_required",
                     "leave_one_publication_out_required",
@@ -1395,6 +1408,7 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     "worst_group_error_and_abstention_reported",
                     "no_extrapolation_claim_without_sealed_external_measurements",
                     "only_measured_physical_descriptors_may_be_used",
+                    "source_data_row_count_discrepancy_resolved_before_exact_reproduction_claim",
                 ] {
                     ensure!(
                         guards.get(key).and_then(Value::as_bool) == Some(true),
@@ -1403,7 +1417,7 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                 }
                 ensure!(
                     comparators.iter().any(|value| value.as_str() == Some("CO2-DBD-ML-358-DATASET-2026")),
-                    "{display_name}: CO2 DBD target {target_id} must reference the 358-point source corpus"
+                    "{display_name}: CO2 DBD target {target_id} must reference the 358/357-point source corpus"
                 );
             }
             "CO2_WARM_PLASMA_RWGS" => {
@@ -1924,17 +1938,35 @@ fn validate_co2_dbd_ml_case(case: &Value, display_name: &str) -> Result<()> {
         .get("dataset")
         .with_context(|| format!("{context}: dataset metadata is missing"))?;
     ensure!(
-        required_f64(dataset, "data_point_count", &context)? == 358.0,
-        "{context}: source dataset must retain its 358 data points"
+        required_f64(dataset, "data_point_count", &context)? == 358.0
+            && required_f64(dataset, "data_point_count_reported_in_conclusion", &context)? == 357.0,
+        "{context}: preserve the unresolved abstract/methods 358 versus conclusion 357 row-count discrepancy"
     );
     ensure!(
-        required_f64(dataset, "feature_count", &context)? == 6.0,
-        "{context}: source model must retain its six reported features"
+        required_f64(dataset, "source_paper_count", &context)? == 27.0,
+        "{context}: source corpus must retain its 27 publication groups"
+    );
+    ensure!(
+        required_f64(dataset, "prospective_validation_new_data_points", &context)? == 10.0,
+        "{context}: prospective validation sample count must remain 10"
     );
     ensure!(
         dataset.get("split_protocol").and_then(Value::as_str)
             == Some("publication-wise grouped five-fold cross-validation"),
         "{context}: source validation must retain publication-wise grouped folds"
+    );
+    let discrepancy = dataset.get("row_count_discrepancy")
+        .with_context(|| format!("{context}: 358/357 source discrepancy record is missing"))?;
+    ensure!(
+        discrepancy.get("abstract_and_methods_report").and_then(Value::as_u64) == Some(358)
+            && discrepancy.get("conclusion_reports").and_then(Value::as_u64) == Some(357)
+            && discrepancy.get("resolution").and_then(Value::as_str)
+                .is_some_and(|value| value.contains("UNRESOLVED")),
+        "{context}: 358/357 source row-count discrepancy must remain visible and unresolved"
+    );
+    ensure!(
+        required_f64(dataset, "feature_count", &context)? == 6.0,
+        "{context}: source model must retain its six reported features"
     );
     let features = dataset
         .get("features")
@@ -1944,22 +1976,26 @@ fn validate_co2_dbd_ml_case(case: &Value, display_name: &str) -> Result<()> {
         features.len() == 6,
         "{context}: feature list must contain exactly six declared features"
     );
-    let best_fold = case_observation_value(case, "best_fold_grouped_cross_validation_r2")
-        .unwrap_or(f64::NAN);
-    let prospective = case_observation_value(case, "prospective_unseen_data_r2")
-        .unwrap_or(f64::NAN);
-    ensure!(
-        close_f64(best_fold, 0.791),
-        "{context}: best-fold grouped-CV R2 must remain source-pinned at 0.791"
-    );
-    ensure!(
-        close_f64(prospective, 0.92),
-        "{context}: prospective in-domain R2 must remain source-pinned at 0.92"
-    );
+
+    for (metric, expected, label) in [
+        ("grouped_cv_mean_hybrid_r2", 0.441, "mean five-fold hybrid R2"),
+        ("grouped_cv_best_fold_hybrid_r2", 0.791, "best-fold hybrid R2"),
+        ("grouped_cv_worst_fold_hybrid_r2", 0.024, "worst-fold hybrid R2"),
+        ("grouped_cv_mean_best_single_learner_r2", 0.362, "mean XGBoost R2"),
+        ("prospective_unseen_data_r2", 0.92, "prospective in-domain R2"),
+        ("grouped_cv_mean_hybrid_mae", 3.463, "mean hybrid MAE"),
+        ("grouped_cv_mean_hybrid_rmse", 4.544, "mean hybrid RMSE"),
+    ] {
+        let observed = case_observation_value(case, metric).unwrap_or(f64::NAN);
+        ensure!(
+            close_f64(observed, expected),
+            "{context}: source {label} must remain pinned at {expected}"
+        );
+    }
     ensure!(
         case.get("comparison_status").and_then(Value::as_str)
-            == Some("PUBLISHED_GROUPED_DATA_MODEL_WITH_DOMAIN_LIMITED_PROSPECTIVE_VALIDATION"),
-        "{context}: prospective validation must retain its domain-limited claim ceiling"
+            == Some("PUBLISHED_GROUPED_DATA_MODEL_WITH_TEN_POINT_IN_DOMAIN_PROSPECTIVE_VALIDATION_AND_UNRESOLVED_357_358_ROW_COUNT_DISCREPANCY"),
+        "{context}: prospective validation and source row-count discrepancy must retain their claim ceiling"
     );
     ensure!(
         case.get("luminous_reproduction").and_then(Value::as_bool) == Some(false),
@@ -3975,11 +4011,17 @@ mod tests {
             })
         } else if lane == "CO2_DBD_MODEL_GENERALIZATION" {
             serde_json::json!({
-                "baseline_best_publication_grouped_cv_r2": 0.791,
-                "target_mean_leave_one_publication_out_r2_min": 0.80,
+                "published_mean_publication_grouped_5fold_hybrid_r2": 0.441,
+                "published_best_fold_publication_grouped_5fold_hybrid_r2": 0.791,
+                "published_worst_fold_publication_grouped_5fold_hybrid_r2": 0.024,
+                "target_mean_publication_grouped_5fold_r2_min": 0.55,
+                "target_worst_publication_grouped_5fold_r2_min": 0.15,
+                "target_mean_leave_one_publication_out_r2_min": 0.45,
                 "nominal_prediction_interval_coverage_min": 0.90,
                 "minimum_applicability_domain_coverage_fraction": 0.80,
-                "sealed_prospective_reactor_holdout_required": true
+                "prospective_validation_minimum_independent_points": 20.0,
+                "sealed_prospective_reactor_holdout_required": true,
+                "all_prediction_and_uncertainty_thresholds_must_hold_on_same_sealed_protocol": true
             })
         } else if lane == "CO2_WARM_PLASMA_RWGS" {
             serde_json::json!({
@@ -4124,7 +4166,8 @@ mod tests {
                 "prediction_interval_calibration_reported": true,
                 "worst_group_error_and_abstention_reported": true,
                 "no_extrapolation_claim_without_sealed_external_measurements": true,
-                "only_measured_physical_descriptors_may_be_used": true
+                "only_measured_physical_descriptors_may_be_used": true,
+                "source_data_row_count_discrepancy_resolved_before_exact_reproduction_claim": true
             })
         } else if lane == "CO2_WARM_PLASMA_RWGS" {
             serde_json::json!({
@@ -4327,6 +4370,47 @@ mod tests {
         assert!(error.to_string().contains("one operating point"));
     }
 
+
+
+    #[test]
+    fn co2_dbd_source_preserves_mean_best_worst_and_count_discrepancy() {
+        let case = frozen_case("CO2-DBD-ML-358-DATASET-2026");
+        validate_co2_dbd_ml_case(&case, "co2-dbd.json").unwrap();
+    }
+
+    #[test]
+    fn co2_dbd_source_rejects_best_fold_promoted_to_mean() {
+        let mut case = frozen_case("CO2-DBD-ML-358-DATASET-2026");
+        let observation = case["observations"].as_array_mut().unwrap().iter_mut().find(|item|
+            item.get("metric").and_then(Value::as_str) == Some("grouped_cv_mean_hybrid_r2")
+        ).unwrap();
+        observation["value"] = serde_json::json!(0.791);
+        let error = validate_co2_dbd_ml_case(&case, "co2-dbd.json").unwrap_err();
+        assert!(error.to_string().contains("mean five-fold hybrid R2"));
+    }
+
+    #[test]
+    fn co2_dbd_source_rejects_silently_resolved_358_357_row_count() {
+        let mut case = frozen_case("CO2-DBD-ML-358-DATASET-2026");
+        case["dataset"]["row_count_discrepancy"]["resolution"] = serde_json::json!("RESOLVED");
+        let error = validate_co2_dbd_ml_case(&case, "co2-dbd.json").unwrap_err();
+        assert!(error.to_string().contains("must remain visible and unresolved"));
+    }
+
+    #[test]
+    fn co2_dbd_target_accepts_corrected_mean_and_worst_fold_gates() {
+        let source = minimal_benchmark_target_manifest("CO2_DBD_MODEL_GENERALIZATION");
+        audit_source_value(&source, "co2-dbd-target.json").unwrap();
+    }
+
+    #[test]
+    fn co2_dbd_target_rejects_mean_threshold_below_published_challenge_floor() {
+        let mut source = minimal_benchmark_target_manifest("CO2_DBD_MODEL_GENERALIZATION");
+        source["benchmark_targets"][0]["metric_thresholds"]["target_mean_publication_grouped_5fold_r2_min"] =
+            serde_json::json!(0.50);
+        let error = audit_source_value(&source, "co2-dbd-target.json").unwrap_err();
+        assert!(error.to_string().contains("target_mean_publication_grouped_5fold_r2_min"));
+    }
 
     #[test]
     fn source_manifest_accepts_co2_dbd_grouped_generalization_target() {
