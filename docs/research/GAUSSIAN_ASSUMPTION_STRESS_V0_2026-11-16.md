@@ -128,3 +128,42 @@ The innovation standard deviations are:
 The existing fixed Gaussian terminal-test implementation is applied to those independent known-variance innovations as a distinct simple-vs-simple design. It is reported only as `conditional_known_rho_ar1` on the AR(1) regime and is labelled `IN_CONTRACT_KNOWN_RHO_AR1`. It is not merged with the original IID statistic, and its analytic power is distinct from the IID analytic power.
 
 This is a deliberately strong known-parameter evaluator comparator. It does not show that Symthaea can infer rho, establish the model's correctness from blind observations, handle estimated parameters, or justify an AR(1) model in the physical world. It demonstrates the expected change in operating characteristics when the dependence model is correctly specified rather than ignored.
+
+
+
+### Known-rho AR(1) comparator: exact-head results
+
+Exact source head at the comparator run: `27b328b191cc4998d8442dcd604261356312663a`  
+Workflow: https://github.com/Luminous-Dynamics/symthaea/actions/runs/43964216088
+
+The same 50,000 AR(1) null paths and 50,000 matched alternatives were passed through two different fixed-horizon tests:
+
+| Test / contract | Null rejection | Wilson 95% interval | Alternative rejection | Analytic alternative power |
+|---|---:|---:|---:|---:|
+| Naive IID test applied to AR(1) observations (out of contract) | 21.820% | 21.460–22.184% | 64.748% | IID-design reference 79.241% is not applicable |
+| Known-rho conditional-innovation test (separately in contract) | **5.026%** | 4.838–5.221% | **31.112%** | **31.348%** |
+
+The known-rho conditional alternative Wilson interval is 30.708–31.519%, containing its analytic 31.348% power. All five root seeds produced 10,000 paths per scenario; their conditional null rates ranged 4.70–5.20%, and conditional alternative rates ranged 30.61–31.63%.
+
+This is a known-parameter conditional Gaussian comparison only. It demonstrates:
+1. Ignoring serial dependence can inflate false alarms by more than fourfold even when the marginal variance is correct.
+2. Correctly modeling the known AR(1) conditional mean and innovation variance restores the nominal null size.
+3. Restoring size costs power in this design: 31.1% versus the naive test's 64.7% (which is invalid due to its false-alarm inflation). The comparison does not justify using the naive power as a valid benchmark.
+
+The known-rho comparator is not a blind noise estimator and does not show how to infer rho with uncertainty. It is distinct from #12442's predictable conditional-innovation e-process: this slice applies the fixed-horizon Gaussian terminal test to evaluator-known transformed innovations, while #12442 owns its separate sequential e-process and assumptions.
+
+### Updated exact-head identity
+
+After adding the comparator, the branch ran all original and new checks successfully:
+- 48 Rust tests across the library and four binaries;
+- rustfmt;
+- sequential and fixed-terminal Gaussian campaigns;
+- five-seed IID stability campaign;
+- six-regime stress campaign including the known-rho conditional comparator;
+- all four receipt uploads;
+- strict Clippy with warnings denied.
+
+- Stress report JSON SHA-256: `807a1c6494994d24f813faeb02fd686888ac85cb4ea52f722a94e0f6c37215ee`
+- Stress artifact ZIP SHA-256: `92ca5e7f4ccfd4fd740c0d3f6306b01e35e98e328483e9d9d59cd73bf3f143dd`
+- Multi-seed IID artifact ZIP SHA-256: `e2ed0bebad799628e02af4697cf3223e2995d93a998eda9263742b5a3cde6b57`
+
