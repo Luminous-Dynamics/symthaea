@@ -219,6 +219,8 @@ struct SeedResult {
     root_seed: u64,
     null: RejectionCounts,
     alternative: RejectionCounts,
+    conditional_ar1_null: Option<RejectionCounts>,
+    conditional_ar1_alternative: Option<RejectionCounts>,
     null_moments: SufficientMoments,
 }
 
@@ -298,6 +300,7 @@ fn run_seed(
     regime: NoiseRegime,
     root_seed: u64,
     test: &GaussianTerminalInducedTest,
+    conditional_ar1_test: &GaussianTerminalInducedTest,
 ) -> Result<SeedResult, Box<dyn Error>> {
     let mut null = RejectionCounts::default();
     let mut alternative = RejectionCounts::default();
@@ -323,6 +326,31 @@ fn run_seed(
         let null_terminal = test.evaluate_prefix(&residuals)?;
         let alternative_terminal = test.evaluate_prefix(&alternative_observations)?;
 
+        let conditional_ar1_values = if regime == NoiseRegime::StationaryAr1 {
+            let mut innovations = Vec::with_capacity(HORIZON);
+            innovations.push(residuals[0]);
+            for look in 1..HORIZON {
+                innovations.push(residuals[look] - AR1_RHO * residuals[look - 1]);
+            }
+            let alternative_innovations = innovations
+                .iter()
+                .enumerate()
+                .map(|(look, value)| {
+                    if look == 0 {
+                        value + DISCREPANCY
+                    } else {
+                        value + (1.0 - AR1_RHO) * DISCREPANCY
+                    }
+                })
+                .collect::<Vec<_>>();
+            Some((
+                conditional_ar1_test.evaluate_prefix(&innovations)?,
+                conditional_ar1_test.evaluate_prefix(&alternative_innovations)?,
+            ))
+        } else {
+            None
+        };
+
         null.paths += 1;
         alternative.paths += 1;
         if null_terminal.conditional_rejection_probability >= 0.5 {
@@ -331,12 +359,28 @@ fn run_seed(
         if alternative_terminal.conditional_rejection_probability >= 0.5 {
             alternative.rejections += 1;
         }
+        if let Some((conditional_null, conditional_alternative)) = conditional_ar1_values {
+            let conditional_null_counts = conditional_ar1_null
+                .get_or_insert(RejectionCounts::default());
+            conditional_null_counts.paths += 1;
+            if conditional_null.conditional_rejection_probability >= 0.5 {
+                conditional_null_counts.rejections += 1;
+            }
+            let conditional_alternative_counts = conditional_ar1_alternative
+                .get_or_insert(RejectionCounts::default());
+            conditional_alternative_counts.paths += 1;
+            if conditional_alternative.conditional_rejection_probability >= 0.5 {
+                conditional_alternative_counts.rejections += 1;
+            }
+        }
     }
 
     Ok(SeedResult {
         root_seed,
         null,
         alternative,
+        conditional_ar1_null,
+        conditional_ar1_alternative,
         null_moments,
     })
 }
