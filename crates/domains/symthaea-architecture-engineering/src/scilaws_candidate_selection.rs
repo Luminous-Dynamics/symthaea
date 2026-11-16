@@ -120,6 +120,12 @@ pub struct LiveSelectionPacket {
     pub schema: String,
     pub version: String,
     pub campaign_id: String,
+    pub task_manifest_sha256: String,
+    pub development_split_sha256: String,
+    pub selector_policy_id: String,
+    pub selector_policy_sha256: String,
+    pub selection_trace_sha256: String,
+    pub resource_receipt_sha256: String,
     pub candidates: Vec<LiveCandidateEvidence>,
     /// None is an explicit abstention. This field records the actual submitted
     /// candidate; it is not a request for this evaluator module to select one.
@@ -156,6 +162,18 @@ impl LiveSelectionPacket {
         }
         if self.campaign_id.trim().is_empty() {
             return Err(ScilawsSelectionError::EmptyCampaignId);
+        }
+        for (field, digest) in [
+            ("task_manifest_sha256", &self.task_manifest_sha256),
+            ("development_split_sha256", &self.development_split_sha256),
+            ("selector_policy_sha256", &self.selector_policy_sha256),
+            ("selection_trace_sha256", &self.selection_trace_sha256),
+            ("resource_receipt_sha256", &self.resource_receipt_sha256),
+        ] {
+            validate_digest(digest, field.to_owned())?;
+        }
+        if self.selector_policy_id.trim().is_empty() {
+            return Err(ScilawsSelectionError::EmptyCandidateId);
         }
         if self.candidates.is_empty() {
             return Err(ScilawsSelectionError::EmptyCandidatePool);
@@ -249,6 +267,8 @@ pub struct RealEvaluatorPool {
     pub schema: String,
     pub version: String,
     pub campaign_id: String,
+    pub task_manifest_sha256: String,
+    pub evaluator_manifest_sha256: String,
     pub candidates: Vec<RealEvaluatorCandidate>,
 }
 
@@ -277,6 +297,14 @@ impl RealEvaluatorPool {
         if self.campaign_id.trim().is_empty() {
             return Err(ScilawsSelectionError::EmptyCampaignId);
         }
+        validate_digest(
+            &self.task_manifest_sha256,
+            "evaluator.task_manifest_sha256".to_owned(),
+        )?;
+        validate_digest(
+            &self.evaluator_manifest_sha256,
+            "evaluator.evaluator_manifest_sha256".to_owned(),
+        )?;
         if self.candidates.is_empty() {
             return Err(ScilawsSelectionError::EmptyCandidatePool);
         }
@@ -354,6 +382,8 @@ pub struct ScilawsRealSelectionAudit {
     pub schema: String,
     pub version: String,
     pub campaign_id: String,
+    pub task_manifest_sha256: String,
+    pub evaluator_manifest_sha256: String,
     pub live_packet_sha256: String,
     pub attempt_count: usize,
     pub semantic_duplicate_groups: Vec<Vec<String>>,
@@ -377,6 +407,8 @@ struct AuditReceiptPayload<'a> {
     schema: &'a str,
     version: &'a str,
     campaign_id: &'a str,
+    task_manifest_sha256: &'a str,
+    evaluator_manifest_sha256: &'a str,
     live_packet_sha256: &'a str,
     attempt_count: usize,
     semantic_duplicate_groups: &'a [Vec<String>],
@@ -405,7 +437,9 @@ pub fn audit_real_candidate_selection(
 ) -> Result<ScilawsRealSelectionAudit, ScilawsSelectionError> {
     live.validate()?;
     evaluator.validate()?;
-    if live.campaign_id != evaluator.campaign_id {
+    if live.campaign_id != evaluator.campaign_id
+        || live.task_manifest_sha256 != evaluator.task_manifest_sha256
+    {
         return Err(ScilawsSelectionError::CampaignMismatch);
     }
 
@@ -594,6 +628,8 @@ pub fn audit_real_candidate_selection(
         schema: &schema,
         version: &version,
         campaign_id: &evaluator.campaign_id,
+        task_manifest_sha256: &evaluator.task_manifest_sha256,
+        evaluator_manifest_sha256: &evaluator.evaluator_manifest_sha256,
         live_packet_sha256: &live_packet_sha256,
         attempt_count,
         semantic_duplicate_groups: &semantic_duplicate_groups,
@@ -616,6 +652,8 @@ pub fn audit_real_candidate_selection(
         schema,
         version,
         campaign_id: evaluator.campaign_id.clone(),
+        task_manifest_sha256: evaluator.task_manifest_sha256.clone(),
+        evaluator_manifest_sha256: evaluator.evaluator_manifest_sha256.clone(),
         live_packet_sha256,
         attempt_count,
         semantic_duplicate_groups,
@@ -696,6 +734,12 @@ mod tests {
             schema: LIVE_SCHEMA.to_owned(),
             version: LIVE_VERSION.to_owned(),
             campaign_id: "scilaws-real-fixture-001".to_owned(),
+            task_manifest_sha256: digest('t'),
+            development_split_sha256: digest('s'),
+            selector_policy_id: "fixture-selector-v1".to_owned(),
+            selector_policy_sha256: digest('p'),
+            selection_trace_sha256: digest('x'),
+            resource_receipt_sha256: digest('r'),
             candidates,
             submitted_candidate_id: submitted.map(str::to_owned),
         }
@@ -728,6 +772,8 @@ mod tests {
             schema: EVALUATOR_SCHEMA.to_owned(),
             version: EVALUATOR_VERSION.to_owned(),
             campaign_id: "scilaws-real-fixture-001".to_owned(),
+            task_manifest_sha256: digest('t'),
+            evaluator_manifest_sha256: digest('e'),
             candidates,
         }
     }
@@ -738,6 +784,12 @@ mod tests {
             "schema":"symthaea.scilaws.live-selection-packet",
             "version":"0.1.0",
             "campaign_id":"c1",
+            "task_manifest_sha256":"tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+            "development_split_sha256":"ssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssss",
+            "selector_policy_id":"fixture-selector-v1",
+            "selector_policy_sha256":"pppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppp",
+            "selection_trace_sha256":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "resource_receipt_sha256":"rrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrrr",
             "candidates":[{
                 "candidate_id":"a",
                 "model_sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
