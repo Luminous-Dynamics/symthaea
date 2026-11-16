@@ -61,6 +61,32 @@ pub struct ResourceDemand {
     pub units: u32,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum AccessAssessmentDisposition {
+    AnalyticFixturePass,
+    SimulationFeasibleForMockup,
+    MockupDemonstrated,
+    IndependentlyVerified,
+    PhysicalQualification,
+    Blocked,
+    Unknown,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AccessCertificateBinding {
+    pub certificate_ref: String,
+    pub certificate_sha256: String,
+    pub bound_candidate_revision: String,
+    pub bound_geometry_sha256: String,
+    pub bound_task_definition_ref: String,
+    pub bound_task_definition_sha256: String,
+    pub robot_model_sha256: String,
+    pub tool_model_sha256: String,
+    pub clearance_profile_ref: String,
+    pub disposition: AccessAssessmentDisposition,
+    pub evidence_class: LifecycleEvidenceClass,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MaintenanceTask {
     pub task_id: String,
@@ -74,6 +100,7 @@ pub struct MaintenanceTask {
     pub service_impact: ServiceImpact,
     pub task_definition_ref: String,
     pub task_definition_sha256: String,
+    pub access_certificate: AccessCertificateBinding,
     pub evidence_ref: String,
     pub evidence_class: LifecycleEvidenceClass,
 }
@@ -81,6 +108,8 @@ pub struct MaintenanceTask {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MaintenanceSchedulePlan {
     pub campaign_id: String,
+    pub candidate_revision: String,
+    pub geometry_sha256: String,
     pub campaign_start_second: u64,
     pub priority_order: Vec<String>,
     pub resources: Vec<RenewableResource>,
@@ -100,6 +129,7 @@ pub struct ScheduledMaintenanceTask {
     pub service_impact: ServiceImpact,
     pub task_definition_ref: String,
     pub task_definition_sha256: String,
+    pub access_certificate: AccessCertificateBinding,
     pub evidence_ref: String,
     pub evidence_class: LifecycleEvidenceClass,
 }
@@ -113,6 +143,19 @@ pub enum ScheduleDiagnostic {
     EmptyFailureModeIdentity,
     EmptyTaskEvidence,
     InvalidTaskDefinitionDigest,
+    EmptyCandidateRevision,
+    InvalidGeometryDigest,
+    MissingAccessCertificate,
+    InvalidAccessCertificateDigest,
+    AccessCandidateRevisionMismatch,
+    AccessGeometryDigestMismatch,
+    AccessTaskDefinitionMismatch,
+    InvalidRobotModelDigest,
+    InvalidToolModelDigest,
+    MissingClearanceProfile,
+    AccessAssessmentBlocked,
+    AccessAssessmentUnknown,
+    InsufficientAccessEvidenceClass,
     ZeroTaskDuration,
     DuplicatePredecessor,
     MissingPredecessor,
@@ -151,6 +194,7 @@ pub struct ScheduledTaskReceipt {
     pub resource_demands: Vec<ResourceDemand>,
     pub task_definition_ref: String,
     pub task_definition_sha256: String,
+    pub access_certificate: AccessCertificateBinding,
     pub evidence_ref: String,
     pub evidence_class: LifecycleEvidenceClass,
 }
@@ -302,6 +346,7 @@ pub fn generate_maintenance_schedule(
             service_impact: entry.task.service_impact,
             task_definition_ref: entry.task.task_definition_ref.clone(),
             task_definition_sha256: entry.task.task_definition_sha256.clone(),
+            access_certificate: entry.task.access_certificate.clone(),
             evidence_ref: entry.task.evidence_ref.clone(),
             evidence_class: entry.task.evidence_class,
         })
@@ -322,6 +367,7 @@ pub fn generate_maintenance_schedule(
             resource_demands: task.resource_demands.clone(),
             task_definition_ref: task.task_definition_ref.clone(),
             task_definition_sha256: task.task_definition_sha256.clone(),
+            access_certificate: task.access_certificate.clone(),
             evidence_ref: task.evidence_ref.clone(),
             evidence_class: task.evidence_class,
         })
@@ -411,6 +457,7 @@ pub fn validate_maintenance_schedule(
             || entry.service_impact != task.service_impact
             || entry.task_definition_ref != task.task_definition_ref
             || entry.task_definition_sha256 != task.task_definition_sha256
+            || entry.access_certificate != task.access_certificate
             || entry.evidence_ref != task.evidence_ref
             || entry.evidence_class != task.evidence_class
             || entry.resource_demands != canonical_demands(&task.resource_demands)
@@ -567,6 +614,20 @@ fn validate_plan(plan: &MaintenanceSchedulePlan) -> Vec<ScheduleError> {
             "campaign identity is empty",
         ));
     }
+    if plan.candidate_revision.trim().is_empty() {
+        errors.push(error(
+            ScheduleDiagnostic::EmptyCandidateRevision,
+            &plan.campaign_id,
+            "candidate revision is required for physical-access binding",
+        ));
+    }
+    if !is_sha256(&plan.geometry_sha256) {
+        errors.push(error(
+            ScheduleDiagnostic::InvalidGeometryDigest,
+            &plan.campaign_id,
+            "campaign geometry SHA-256 is malformed",
+        ));
+    }
 
     let mut resources = BTreeMap::new();
     for resource in &plan.resources {
@@ -634,6 +695,85 @@ fn validate_plan(plan: &MaintenanceSchedulePlan) -> Vec<ScheduleError> {
                 ScheduleDiagnostic::InvalidTaskDefinitionDigest,
                 &task.task_id,
                 "task-definition SHA-256 is malformed",
+            ));
+        }
+        let access = &task.access_certificate;
+        if access.certificate_ref.trim().is_empty() {
+            errors.push(error(
+                ScheduleDiagnostic::MissingAccessCertificate,
+                &task.task_id,
+                "source-owned access certificate reference is required",
+            ));
+        }
+        if !is_sha256(&access.certificate_sha256) {
+            errors.push(error(
+                ScheduleDiagnostic::InvalidAccessCertificateDigest,
+                &task.task_id,
+                "access certificate SHA-256 is malformed",
+            ));
+        }
+        if access.bound_candidate_revision != plan.candidate_revision {
+            errors.push(error(
+                ScheduleDiagnostic::AccessCandidateRevisionMismatch,
+                &task.task_id,
+                "access certificate is bound to a different candidate revision",
+            ));
+        }
+        if access.bound_geometry_sha256 != plan.geometry_sha256 {
+            errors.push(error(
+                ScheduleDiagnostic::AccessGeometryDigestMismatch,
+                &task.task_id,
+                "access certificate is bound to different geometry",
+            ));
+        }
+        if access.bound_task_definition_ref != task.task_definition_ref
+            || access.bound_task_definition_sha256 != task.task_definition_sha256
+        {
+            errors.push(error(
+                ScheduleDiagnostic::AccessTaskDefinitionMismatch,
+                &task.task_id,
+                "access certificate is bound to a different task definition",
+            ));
+        }
+        if !is_sha256(&access.robot_model_sha256) {
+            errors.push(error(
+                ScheduleDiagnostic::InvalidRobotModelDigest,
+                &task.task_id,
+                "robot-model SHA-256 is malformed",
+            ));
+        }
+        if !is_sha256(&access.tool_model_sha256) {
+            errors.push(error(
+                ScheduleDiagnostic::InvalidToolModelDigest,
+                &task.task_id,
+                "tool-model SHA-256 is malformed",
+            ));
+        }
+        if access.clearance_profile_ref.trim().is_empty() {
+            errors.push(error(
+                ScheduleDiagnostic::MissingClearanceProfile,
+                &task.task_id,
+                "declared clearance/tolerance profile is required",
+            ));
+        }
+        match access.disposition {
+            AccessAssessmentDisposition::Blocked => errors.push(error(
+                ScheduleDiagnostic::AccessAssessmentBlocked,
+                &task.task_id,
+                "physical access certificate reports a blocked task",
+            )),
+            AccessAssessmentDisposition::Unknown => errors.push(error(
+                ScheduleDiagnostic::AccessAssessmentUnknown,
+                &task.task_id,
+                "physical access is unknown or out of domain",
+            )),
+            _ => {}
+        }
+        if !access_evidence_supports(access.disposition, access.evidence_class) {
+            errors.push(error(
+                ScheduleDiagnostic::InsufficientAccessEvidenceClass,
+                &task.task_id,
+                "access evidence class does not support its declared assessment disposition",
             ));
         }
         if tasks.insert(task.task_id.as_str(), task).is_some() {
@@ -982,6 +1122,41 @@ fn gcd(mut left: u64, mut right: u64) -> u64 {
     left.max(1)
 }
 
+fn access_evidence_supports(
+    disposition: AccessAssessmentDisposition,
+    evidence: LifecycleEvidenceClass,
+) -> bool {
+    match disposition {
+        AccessAssessmentDisposition::AnalyticFixturePass => {
+            evidence == LifecycleEvidenceClass::Synthetic
+        }
+        AccessAssessmentDisposition::SimulationFeasibleForMockup => matches!(
+            evidence,
+            LifecycleEvidenceClass::Modelled
+                | LifecycleEvidenceClass::MockupValidated
+                | LifecycleEvidenceClass::Measured
+                | LifecycleEvidenceClass::IndependentlyVerified
+                | LifecycleEvidenceClass::PhysicallyQualified
+        ),
+        AccessAssessmentDisposition::MockupDemonstrated => matches!(
+            evidence,
+            LifecycleEvidenceClass::MockupValidated
+                | LifecycleEvidenceClass::Measured
+                | LifecycleEvidenceClass::IndependentlyVerified
+                | LifecycleEvidenceClass::PhysicallyQualified
+        ),
+        AccessAssessmentDisposition::IndependentlyVerified => matches!(
+            evidence,
+            LifecycleEvidenceClass::IndependentlyVerified
+                | LifecycleEvidenceClass::PhysicallyQualified
+        ),
+        AccessAssessmentDisposition::PhysicalQualification => {
+            evidence == LifecycleEvidenceClass::PhysicallyQualified
+        }
+        AccessAssessmentDisposition::Blocked | AccessAssessmentDisposition::Unknown => false,
+    }
+}
+
 fn is_sha256(value: &str) -> bool {
     value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
@@ -999,6 +1174,22 @@ mod tests {
             resource_id: id.to_string(),
             capacity,
             evidence_ref: format!("resource-evidence-{id}"),
+            evidence_class: LifecycleEvidenceClass::Synthetic,
+        }
+    }
+
+    fn access_binding(id: &str, task_sha: String) -> AccessCertificateBinding {
+        AccessCertificateBinding {
+            certificate_ref: format!("analytic-access-certificate-{id}"),
+            certificate_sha256: sha('c'),
+            bound_candidate_revision: "candidate-r1".to_string(),
+            bound_geometry_sha256: sha('d'),
+            bound_task_definition_ref: format!("task-definition-{id}"),
+            bound_task_definition_sha256: task_sha,
+            robot_model_sha256: sha('e'),
+            tool_model_sha256: sha('f'),
+            clearance_profile_ref: "synthetic-clearance-profile-v1".to_string(),
+            disposition: AccessAssessmentDisposition::AnalyticFixturePass,
             evidence_class: LifecycleEvidenceClass::Synthetic,
         }
     }
@@ -1032,6 +1223,7 @@ mod tests {
             service_impact: impact,
             task_definition_ref: format!("task-definition-{id}"),
             task_definition_sha256: sha('a'),
+            access_certificate: access_binding(id, sha('a')),
             evidence_ref: format!("task-evidence-{id}"),
             evidence_class: LifecycleEvidenceClass::Synthetic,
         }
@@ -1046,6 +1238,8 @@ mod tests {
         priority_order.sort();
         MaintenanceSchedulePlan {
             campaign_id: "synthetic-maintenance-campaign-v1".to_string(),
+            candidate_revision: "candidate-r1".to_string(),
+            geometry_sha256: sha('d'),
             campaign_start_second: 1_000,
             priority_order,
             resources,
@@ -1385,6 +1579,102 @@ mod tests {
         assert_eq!(event.event_id, "a");
         assert_eq!(event.impact, ServiceImpact::Derated);
         assert_eq!(event.evidence_class, LifecycleEvidenceClass::Synthetic);
+    }
+
+    #[test]
+    fn missing_or_stale_access_certificate_refuses_task_schedule() {
+        let mut plan = plan(
+            vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
+            vec![resource("robot", 1)],
+        );
+        plan.tasks[0].access_certificate.certificate_ref.clear();
+        let errors = generate_maintenance_schedule(&plan).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::MissingAccessCertificate)
+        );
+
+        let mut plan = plan(
+            vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
+            vec![resource("robot", 1)],
+        );
+        plan.tasks[0].access_certificate.bound_geometry_sha256 = sha('b');
+        let errors = generate_maintenance_schedule(&plan).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::AccessGeometryDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn blocked_or_unknown_access_cannot_be_scheduled_as_feasible() {
+        let mut plan = plan(
+            vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
+            vec![resource("robot", 1)],
+        );
+        plan.tasks[0].access_certificate.disposition = AccessAssessmentDisposition::Blocked;
+        let errors = generate_maintenance_schedule(&plan).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::AccessAssessmentBlocked)
+        );
+
+        let mut plan = plan(
+            vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
+            vec![resource("robot", 1)],
+        );
+        plan.tasks[0].access_certificate.disposition = AccessAssessmentDisposition::Unknown;
+        let errors = generate_maintenance_schedule(&plan).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::AccessAssessmentUnknown)
+        );
+    }
+
+    #[test]
+    fn simulated_access_requires_modelled_or_stronger_evidence() {
+        let mut plan = plan(
+            vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
+            vec![resource("robot", 1)],
+        );
+        plan.tasks[0].access_certificate.disposition =
+            AccessAssessmentDisposition::SimulationFeasibleForMockup;
+        plan.tasks[0].access_certificate.evidence_class = LifecycleEvidenceClass::Synthetic;
+        let errors = generate_maintenance_schedule(&plan).unwrap_err();
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::InsufficientAccessEvidenceClass)
+        );
+
+        plan.tasks[0].access_certificate.evidence_class = LifecycleEvidenceClass::Modelled;
+        assert!(generate_maintenance_schedule(&plan).is_ok());
+    }
+
+    #[test]
+    fn mockup_and_physical_access_dispositions_require_matching_evidence_class() {
+        let mut plan = plan(
+            vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
+            vec![resource("robot", 1)],
+        );
+        plan.tasks[0].access_certificate.disposition =
+            AccessAssessmentDisposition::MockupDemonstrated;
+        plan.tasks[0].access_certificate.evidence_class = LifecycleEvidenceClass::Modelled;
+        assert!(generate_maintenance_schedule(&plan).is_err());
+        plan.tasks[0].access_certificate.evidence_class = LifecycleEvidenceClass::MockupValidated;
+        assert!(generate_maintenance_schedule(&plan).is_ok());
+
+        plan.tasks[0].access_certificate.disposition =
+            AccessAssessmentDisposition::PhysicalQualification;
+        plan.tasks[0].access_certificate.evidence_class = LifecycleEvidenceClass::MockupValidated;
+        assert!(generate_maintenance_schedule(&plan).is_err());
+        plan.tasks[0].access_certificate.evidence_class =
+            LifecycleEvidenceClass::PhysicallyQualified;
+        assert!(generate_maintenance_schedule(&plan).is_ok());
     }
 
     #[test]
