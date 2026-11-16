@@ -6,10 +6,10 @@ A standalone Rust adapter for the exact Subterra v0.1 site-evidence and cave-net
 
 - Symtropy site schema: `research/geobio-foundry/SUBTERRA_SITE_EVIDENCE_SCHEMA_v0.1.json`, blob SHA `970b48703a8147cd3047cce05c5fc0631d1f03d9`.
 - Symtropy network schema: `research/geobio-foundry/SUBTERRA_NETWORK_SCHEMA_v0.1.json`, blob SHA `bfe797f741d930ffcde2ce9d33a21c75396f46c0`.
-- Symtropy profile schema: `research/geobio-foundry/SUBTERRA_PROFILE_SCHEMA_v0.1.json`, blob SHA pinned in Symtropy PR #5486.
+- Symtropy profile schema: `research/geobio-foundry/SUBTERRA_PROFILE_SCHEMA_v0.1.json`, blob SHA `87d77b208f20227797ff59fd1f6d4c01bbb1c72c`.
 - Site fixture: blob SHA `31813b808d596f9ddb78c4de49a15f1773026fc9`.
 - Network fixture: blob SHA `95fa93de34773569aa3abcb9c3f808f2f9986e97`.
-- Profile fixture: the synthetic non-uniform profile with an explicit unobserved span from 16 m to 24 m, copied from Symtropy PR #5486.
+- Profile fixture: blob SHA `a8305c9881f3483a762e3bc6717b86009d583039`; synthetic non-uniform profile with an explicit unobserved span from 16 m to 24 m.
 - Upstream research PR: https://github.com/Luminous-Dynamics/symtropy/pull/5486
 
 Fixtures in this package are copies of the cited synthetic examples for deterministic offline tests. They are not empirical planetary observations.
