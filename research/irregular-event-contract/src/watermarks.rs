@@ -162,6 +162,9 @@ pub struct CompletenessReport {
     pub sources: Vec<SourceCompletenessEntry>,
     pub blocked_sources: Vec<SourceKey>,
     pub late_breaches: Vec<LateEventBreach>,
+    /// Number of indexed breach entries inspected for this query, including
+    /// entries later filtered by their as-known receipt time.
+    pub late_breach_candidates_examined: usize,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -552,6 +555,7 @@ impl SourceWatermarkLedger {
         // Use the required-source + half-open event-time index. Historical
         // visibility is still filtered by transaction/knowledge time.
         let mut late_breaches = Vec::new();
+        let mut late_breach_candidates_examined = 0usize;
         for source in &unique {
             let start = (*source, interval_start_us);
             let end = (*source, interval_end_exclusive_us);
@@ -561,6 +565,9 @@ impl SourceWatermarkLedger {
                 .map(|(_, indices)| indices)
             {
                 for index in indices {
+                    late_breach_candidates_examined = late_breach_candidates_examined
+                        .checked_add(1)
+                        .ok_or(WatermarkError::ArithmeticOverflow)?;
                     let breach = self
                         .late_breaches
                         .get(*index)
@@ -589,6 +596,7 @@ impl SourceWatermarkLedger {
             sources,
             blocked_sources,
             late_breaches,
+            late_breach_candidates_examined,
         })
     }
 
