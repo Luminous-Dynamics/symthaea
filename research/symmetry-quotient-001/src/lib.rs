@@ -834,6 +834,7 @@ pub fn lift_representative_solution(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::BTreeMap;
 
     fn c2_action() -> FiniteActionV1 {
         FiniteActionV1 {
@@ -960,6 +961,287 @@ mod tests {
             panic!("expected an exact task-preserving quotient");
         };
         (problem, action, certificate)
+    }
+
+    fn cyclic_group(order: usize) -> FiniteGroupV1 {
+        FiniteGroupV1 {
+            group_id: format!("C{order}"),
+            identity: 0,
+            multiplication: (0..order)
+                .map(|left| (0..order).map(|right| (left + right) % order).collect())
+                .collect(),
+        }
+    }
+
+    /// D_n elements are encoded as r + f*n, with f=0 a rotation and f=1
+    /// a reflection. Multiplication is composition of left actions.
+    fn dihedral_group(order: usize) -> FiniteGroupV1 {
+        let group_order = 2 * order;
+        let mut multiplication = vec![vec![0; group_order]; group_order];
+        for left in 0..group_order {
+            let left_rotation = left % order;
+            let left_reflection = left / order;
+            for right in 0..group_order {
+                let right_rotation = right % order;
+                let right_reflection = right / order;
+                let signed_rotation = if left_reflection == 0 {
+                    right_rotation
+                } else {
+                    (order - right_rotation) % order
+                };
+                let product_rotation = (left_rotation + signed_rotation) % order;
+                let product_reflection = left_reflection ^ right_reflection;
+                multiplication[left][right] = product_reflection * order + product_rotation;
+            }
+        }
+        FiniteGroupV1 {
+            group_id: format!("D{order}"),
+            identity: 0,
+            multiplication,
+        }
+    }
+
+    fn point_permutations(group: &FiniteGroupV1, polygon_order: usize, dihedral: bool) -> Vec<Vec<usize>> {
+        (0..group.multiplication.len())
+            .map(|element| {
+                let rotation = if dihedral {
+                    element % polygon_order
+                } else {
+                    element
+                };
+                let reflection = dihedral && element / polygon_order == 1;
+                (0..polygon_order)
+                    .map(|vertex| {
+                        let signed_vertex = if reflection {
+                            (polygon_order - vertex) % polygon_order
+                        } else {
+                            vertex
+                        };
+                        (rotation + signed_vertex) % polygon_order
+                    })
+                    .collect()
+            })
+            .collect()
+    }
+
+    fn product_action(
+        group: FiniteGroupV1,
+        point_maps: &[Vec<usize>],
+        degree: usize,
+        dimensions: usize,
+        action_id: String,
+    ) -> FiniteActionV1 {
+        let candidate_count = degree.pow(dimensions as u32);
+        let permutations = point_maps
+            .iter()
+            .map(|point_map| {
+                let mut permutation = vec![0; candidate_count];
+                for (candidate, image) in permutation.iter_mut().enumerate() {
+                    let mut remainder = candidate;
+                    let mut digits = vec![0; dimensions];
+                    for position in (0..dimensions).rev() {
+                        digits[position] = remainder % degree;
+                        remainder /= degree;
+                    }
+                    let mut transformed = 0;
+                    for digit in digits {
+                        transformed = transformed * degree + point_map[digit];
+                    }
+                    *image = transformed;
+                }
+                permutation
+            })
+            .collect();
+        FiniteActionV1 {
+            action_id,
+            group,
+            permutations,
+        }
+    }
+
+    fn unordered_pair_action(
+        group: FiniteGroupV1,
+        point_maps: &[Vec<usize>],
+        degree: usize,
+        action_id: String,
+    ) -> FiniteActionV1 {
+        let pairs: Vec<(usize, usize)> = (0..degree)
+            .flat_map(|left| ((left + 1)..degree).map(move |right| (left, right)))
+            .collect();
+        let pair_index: BTreeMap<(usize, usize), usize> = pairs
+            .iter()
+            .copied()
+            .enumerate()
+            .map(|(index, pair)| (pair, index))
+            .collect();
+
+        let permutations = point_maps
+            .iter()
+            .map(|point_map| {
+                pairs
+                    .iter()
+                    .map(|(left, right)| {
+                        let mapped_left = point_map[*left];
+                        let mapped_right = point_map[*right];
+                        let key = if mapped_left < mapped_right {
+                            (mapped_left, mapped_right)
+                        } else {
+                            (mapped_right, mapped_left)
+                        };
+                        pair_index[&key]
+                    })
+                    .collect()
+            })
+            .collect();
+
+        FiniteActionV1 {
+            action_id,
+            group,
+            permutations,
+        }
+    }
+
+    fn disjoint_union_action(
+        base: &FiniteActionV1,
+        copies: usize,
+        action_id: String,
+    ) -> FiniteActionV1 {
+        let candidates_per_copy = base.permutations[0].len();
+        let permutations = base
+            .permutations
+            .iter()
+            .map(|permutation| {
+                (0..copies)
+                    .flat_map(|copy| {
+                        permutation
+                            .iter()
+                            .map(move |image| copy * candidates_per_copy + image)
+                    })
+                    .collect()
+            })
+            .collect();
+        FiniteActionV1 {
+            action_id,
+            group: base.group.clone(),
+            permutations,
+        }
+    }
+
+    fn regular_action(group: FiniteGroupV1, action_id: String) -> FiniteActionV1 {
+        FiniteActionV1 {
+            action_id,
+            permutations: group.multiplication.clone(),
+            group,
+        }
+    }
+
+    fn invariant_problem(action: &FiniteActionV1) -> (SearchProblemV1, Vec<BTreeSet<usize>>) {
+        let candidate_count = action.permutations[0].len();
+        let oracle = exhaustive_oracle(action, candidate_count);
+        let mut semantics = vec![semantics(0, 0, "unassigned", "unassigned"); candidate_count];
+        for (orbit_index, orbit) in oracle.iter().enumerate() {
+            let orbit_cost = orbit_index as i64;
+            let boundary = format!("boundary-orbit-{orbit_index}");
+            let output = format!("output-orbit-{orbit_index}");
+            for candidate in orbit {
+                semantics[*candidate] = semantics(
+                    orbit_cost,
+                    orbit.len() as i64,
+                    &boundary,
+                    &output,
+                );
+            }
+        }
+        let candidate_ids = (0..candidate_count)
+            .map(|index| format!("candidate-{index:05}"))
+            .collect();
+        (
+            SearchProblemV1 {
+                problem_id: format!("task-{}", action.action_id),
+                candidate_ids,
+                semantics,
+            },
+            oracle,
+        )
+    }
+
+    fn assert_exact_quotient_matches_oracle(action: FiniteActionV1) {
+        let (problem, oracle) = invariant_problem(&action);
+        let outcome =
+            compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
+        let CompileOutcomeV1::Authorized(certificate) = outcome else {
+            panic!("group action must preserve orbit-assigned exact task semantics: {}", action.action_id);
+        };
+        let compiled: Vec<BTreeSet<usize>> = certificate
+            .orbits
+            .iter()
+            .map(|orbit| {
+                orbit
+                    .members
+                    .iter()
+                    .map(|member| member.candidate_index)
+                    .collect()
+            })
+            .collect();
+        assert_eq!(compiled, oracle, "orbit mismatch for {}", action.action_id);
+        assert_eq!(
+            certificate
+                .orbits
+                .iter()
+                .map(|orbit| orbit.members.len() * orbit.stabilizer_group_elements.len())
+                .collect::<Vec<_>>(),
+            vec![action.group.multiplication.len(); certificate.orbits.len()],
+            "orbit-stabilizer mismatch for {}",
+            action.action_id
+        );
+        verify_certificate(
+            &problem,
+            &action,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+
+        // Compare the full optimum and the lifted set, not just partition shape.
+        let exhaustive_best = problem
+            .semantics
+            .iter()
+            .map(|candidate| candidate.objective_cost)
+            .min()
+            .unwrap();
+        let exhaustive_solutions: BTreeSet<usize> = problem
+            .semantics
+            .iter()
+            .enumerate()
+            .filter_map(|(index, candidate)| {
+                (candidate.objective_cost == exhaustive_best).then_some(index)
+            })
+            .collect();
+        let quotient_best = certificate
+            .orbits
+            .iter()
+            .map(|orbit| problem.semantics[orbit.representative_index].objective_cost)
+            .min()
+            .unwrap();
+        let mut lifted = BTreeSet::new();
+        for orbit in &certificate.orbits {
+            if problem.semantics[orbit.representative_index].objective_cost == quotient_best {
+                lifted.extend(
+                    lift_representative_solution(
+                        &problem,
+                        &action,
+                        &certificate,
+                        orbit.representative_index,
+                        QualificationBudgetV1::default(),
+                    )
+                    .unwrap()
+                    .into_iter()
+                    .map(|candidate| candidate.candidate_index),
+                );
+            }
+        }
+        assert_eq!(quotient_best, exhaustive_best, "best objective for {}", action.action_id);
+        assert_eq!(lifted, exhaustive_solutions, "lifted optimum for {}", action.action_id);
     }
 
     #[test]
@@ -1312,6 +1594,126 @@ mod tests {
         // This is candidate-work reduction, not measured wall-clock speedup.
         assert_eq!(problem.candidate_ids.len(), 16);
         assert_eq!(certificate.orbits.len(), 3);
+    }
+
+    #[test]
+    fn generated_cyclic_and_dihedral_action_corpus_matches_exhaustive_search() {
+        let mut fixture_count = 0usize;
+
+        for n in 3usize..=12 {
+            let cyclic = cyclic_group(n);
+            let cyclic_points = point_permutations(&cyclic, n, false);
+
+            let cyclic_vertices = product_action(
+                cyclic.clone(),
+                &cyclic_points,
+                n,
+                1,
+                format!("C{n}-vertices"),
+            );
+            assert_exact_quotient_matches_oracle(cyclic_vertices);
+            fixture_count += 1;
+
+            let cyclic_pairs = product_action(
+                cyclic.clone(),
+                &cyclic_points,
+                n,
+                2,
+                format!("C{n}-ordered-pairs"),
+            );
+            assert_exact_quotient_matches_oracle(cyclic_pairs);
+            fixture_count += 1;
+
+            let cyclic_triples = product_action(
+                cyclic.clone(),
+                &cyclic_points,
+                n,
+                3,
+                format!("C{n}-ordered-triples"),
+            );
+            assert_exact_quotient_matches_oracle(cyclic_triples);
+            fixture_count += 1;
+
+            let cyclic_unordered_pairs = unordered_pair_action(
+                cyclic.clone(),
+                &cyclic_points,
+                n,
+                format!("C{n}-unordered-pairs"),
+            );
+            assert_exact_quotient_matches_oracle(cyclic_unordered_pairs);
+            fixture_count += 1;
+
+            let cyclic_copies = disjoint_union_action(
+                &product_action(
+                    cyclic.clone(),
+                    &cyclic_points,
+                    n,
+                    1,
+                    format!("C{n}-single-cycle"),
+                ),
+                3,
+                format!("C{n}-three-disjoint-cycles"),
+            );
+            assert_exact_quotient_matches_oracle(cyclic_copies);
+            fixture_count += 1;
+
+            let dihedral = dihedral_group(n);
+            let dihedral_points = point_permutations(&dihedral, n, true);
+
+            let dihedral_vertices = product_action(
+                dihedral.clone(),
+                &dihedral_points,
+                n,
+                1,
+                format!("D{n}-vertices"),
+            );
+            assert_exact_quotient_matches_oracle(dihedral_vertices);
+            fixture_count += 1;
+
+            let dihedral_pairs = product_action(
+                dihedral.clone(),
+                &dihedral_points,
+                n,
+                2,
+                format!("D{n}-ordered-pairs"),
+            );
+            assert_exact_quotient_matches_oracle(dihedral_pairs);
+            fixture_count += 1;
+
+            let dihedral_triples = product_action(
+                dihedral.clone(),
+                &dihedral_points,
+                n,
+                3,
+                format!("D{n}-ordered-triples"),
+            );
+            assert_exact_quotient_matches_oracle(dihedral_triples);
+            fixture_count += 1;
+
+            let dihedral_unordered_pairs = unordered_pair_action(
+                dihedral.clone(),
+                &dihedral_points,
+                n,
+                format!("D{n}-unordered-pairs"),
+            );
+            assert_exact_quotient_matches_oracle(dihedral_unordered_pairs);
+            fixture_count += 1;
+
+            let dihedral_regular =
+                regular_action(dihedral.clone(), format!("D{n}-regular-action"));
+            assert_exact_quotient_matches_oracle(dihedral_regular.clone());
+            fixture_count += 1;
+
+            let dihedral_regular_copies = disjoint_union_action(
+                &dihedral_regular,
+                2,
+                format!("D{n}-two-disjoint-regular-orbits"),
+            );
+            assert_exact_quotient_matches_oracle(dihedral_regular_copies);
+            fixture_count += 1;
+        }
+
+        assert_eq!(fixture_count, 110);
     }
 
     #[test]
