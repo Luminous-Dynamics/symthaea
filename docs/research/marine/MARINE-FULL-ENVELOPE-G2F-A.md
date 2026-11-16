@@ -151,12 +151,15 @@ The synthetic box input passes the typed validator; the earlier local structural
 A credible comparison should not use a single neural-generation metric. Current literature already compares GAN and VAE-point-cloud-transformer generation, including geometry-distribution and diversity measures, followed by CAD reconstruction and preliminary resistance evaluation. Other 2026 work explores representation-aware generation across surface point clouds, waterline sections and buttock curves, including conditional latent diffusion. These are baselines to reproduce, not techniques to dismiss.
 
 Relevant references:
-- 2026 GAN vs VAE-PCT comparison for ship-hull generation, 8,000 generated CAD hulls and distribution/diversity plus resistance evaluation: https://www.mdpi.com/2077-1312/14/9/878
+- 2026 GAN vs VAE-PCT comparison for ship-hull generation, 8,000 generated CAD hulls and distribution/diversity plus resistance evaluation: https://www.mdpi.com/2077-1312/14/18/1707
 - 2026 representation-aware ship design using point-cloud, waterline-section and buttock-curve representations: https://www.mdpi.com/2077-1312/14/7/642
-- 2026 hydrostatic-constrained hull reconstruction from insufficient data: https://www.sciencedirect.com/science/article/pii/S0029801826009347
-- 2026 latent-space data-driven evolutionary hull optimization under limited CFD evaluation budgets: https://doi.org/10.1016/j.oceaneng.2026.121234
-- ITTC CFD verification and validation methodology, 7.5-03-01-01 Revision 05 (2024): https://www.ittc.info/media/11822/75-03-01-01.pdf
-- ITTC benchmark database for CFD validation in resistance and propulsion, 7.5-03-02-02 Revision 03 (2024): https://www.ittc.info/media/11825/75-03-02-02.pdf
+- 2026 hydrostatic-constrained hull reconstruction from insufficient data: https://www.sciencedirect.com/science/article/pii/S2092678225000901
+- 2026 latent-space data-driven evolutionary hull optimization under limited CFD evaluation budgets: https://www.sciencedirect.com/science/article/pii/S0029801826017695
+- ITTC CFD verification and validation methodology, 7.5-03-01-01 Revision 05 (2024): https://www.ittc.info/media/11950/75-03-01-01.pdf
+- ITTC benchmark database for CFD validation in resistance and propulsion, 7.5-03-02-02 Revision 03 (2024): https://ittc.info/media/11956/75-03-02-02.pdf
+- ITTC uncertainty-analysis examples for CFD resistance and flow, 7.5-03-02-01 Revision 02 (2024): https://ittc.info/media/11954/75-03-02-01.pdf
+- CAx-IF Cross-Domain Exchange for Downstream Uses, Version 1.0 (29 January 2026): https://www.mbx-if.org/home/wp-content/uploads/2026/02/rec_prac_cross-domain_exchange_v10.pdf
+- CAx-IF 58J Summer 2026 implementer test round and Test Suite 1.2: https://www.mbx-if.org/home/cax/testrounds/
 - CAx-IF recommended-practice index and revision archive: https://www.mbx-if.org/home/cax/recpractices/
 
 ### Frozen comparison arms
@@ -168,7 +171,7 @@ Relevant references:
 5. Deterministic section/loft generator as a non-learned geometry baseline.
 6. Evidence-carrying G2f pipeline: generated/reconstructed source → typed contract → external surface generation → multi-waterline displacement derivation → independent CAD exchange → specialist numerical validation.
 
-All learned models must use a common, rights-cleared corpus, identical parent-hull-family splits, matched input dimensions, comparable compute budgets and fixed random seeds. Do not split randomly across near-identical variants from the same parent hull; this leaks geometry and creates inflated results.
+All learned models must use a common, rights-cleared corpus, identical parent-hull-family splits, matched input dimensions, comparable compute budgets and fixed random seeds. Do not split randomly across near-identical variants from the same parent hull; this leaks geometry and creates inflated results. In addition, report which generator/decoder claims are directly reproduced and which are our own variants; do not compare paper-reported scores across different datasets or normalization conventions without a matched reproduction.
 
 ### Metric groups
 
