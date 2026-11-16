@@ -486,3 +486,18 @@ New source records:
 The new target requires at least three chemistry groups, at least one non-plasma incumbent per group, 10,000 fixed-seed paired uncertainty draws, zero false-feasible and unsupported route rankings, common service/energy/currency boundaries, a no-credit baseline, explicit abstention and value-of-information outputs, and Pareto/regret reporting rather than a weighted-sum winner.
 
 The Rust xtask now contains specific source and target validators and adversarial tests. The merged branch is expected to contain 66 source cases, 114 negative controls, 7 derived checks, 15 benchmark targets and 120 Rust tests. The target remains `RESEARCH_TARGET_NOT_RESULT`; all candidate chemistry groups remain NOT_YET_MATCHED until the data are normalized.
+
+
+## 9.18 Decision benchmark implementation — 2026-11-16
+
+The source register now includes a technology-neutral `PLASMA-PROCESS-PATHWAY-SELECTION-001` target with three candidate groups: ammonia cracking, methane pyrolysis and biogas-to-hydrogen. Every group contains an explicit plasma candidate and at least one non-plasma incumbent; all groups remain `NOT_YET_MATCHED`, so no cross-route ranking is currently authorized.
+
+Added five evidence records:
+- 1 October 2026 NH3 nanosecond-pulsed diluent study (Ar/He/N2/O2); the 58% conversion and 1.8 g H2/kWh peaks are explicitly unpaired.
+- 1 March 2026 heat-integrated thermal/catalytic NH3 cracker plant TEA.
+- 29 August 2026 harmonized non-plasma biogas-reforming TEA/LCA with four routes, 99.9% H2 gate-to-gate product, 2025 USD, 20-year life, 90% capacity factor and 10,000 Monte Carlo iterations.
+- Separate review-derived methane shock-wave and microwave-heating Pareto references; microwave heating is not inferred to be plasma.
+
+The offline Rust auditor validates technology classes, source-point pairing, the four-route biogas cost distributions and the process-selection target's non-plasma incumbents, common-service/energy/currency guards, paired uncertainty draws, no-credit policy and abstention requirements. It now contains 120 authored tests.
+
+Expected frozen plasma corpus on this branch: 66 cases / 114 negative controls / 7 derived checks / 15 benchmark targets. The existing six HTS thermal-storage source cases/12 controls remain separately audited. The focused workflow must pass on this exact head before these new gates are reported as verified.
