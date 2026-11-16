@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-risk-acquisition-report-v0.1.schema.json",
+  "title": "EGDDM D6.15 Risk-bounded acquisition report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "world_count",
+    "action_count",
+    "option_count",
+    "trace_count",
+    "summary",
+    "traces",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "adjudication_status": {
+      "const": "synthetic_known_answer_evaluator_only"
+    },
+    "world_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "action_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "option_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "trace_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unsupported_action_trace_count",
+        "actual_unsafe_action_trace_count",
+        "hard_gate_violation_trace_count",
+        "risk_policy_violation_trace_count",
+        "unnecessary_abstention_trace_count",
+        "budget_overrun_trace_count",
+        "future_evidence_leakage_events",
+        "false_observation_events",
+        "cost_estimate_undercoverage_events"
+      ],
+      "properties": {
+        "unsupported_action_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actual_unsafe_action_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_gate_violation_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "risk_policy_violation_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unnecessary_abstention_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "budget_overrun_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "future_evidence_leakage_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_observation_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_estimate_undercoverage_events": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "trace_id",
+          "decision_kind",
+          "action_id",
+          "residual_risk_bps",
+          "action_justified",
+          "unsupported_action",
+          "hard_gate_violation",
+          "unnecessary_abstention",
+          "acquisition_count",
+          "total_cost_upper_micros",
+          "budget_overrun",
+          "oracle_minimal_sufficient_cost_micros"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "decision_kind": {
+            "enum": [
+              "act",
+              "defer"
+            ]
+          },
+          "action_id": {
+            "type": "string"
+          },
+          "residual_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "action_justified": {
+            "type": "boolean"
+          },
+          "unsupported_action": {
+            "type": "boolean"
+          },
+          "hard_gate_violation": {
+            "type": "boolean"
+          },
+          "unnecessary_abstention": {
+            "type": "boolean"
+          },
+          "acquisition_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_cost_upper_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "budget_overrun": {
+            "type": "boolean"
+          },
+          "oracle_minimal_sufficient_cost_micros": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
