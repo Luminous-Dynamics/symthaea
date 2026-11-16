@@ -10,8 +10,7 @@ use super::robust_net_export::{
     ModelFormValidity, NetExportBoundMethod, NetExportEvidenceClass, NetExportLowerBoundReceipt,
 };
 
-pub const MODEL_FORM_DISCREPANCY_VERSION: &str =
-    "fusion-model-form-discrepancy/0.1";
+pub const MODEL_FORM_DISCREPANCY_VERSION: &str = "fusion-model-form-discrepancy/0.1";
 pub const CONFORMAL_METHOD: &str = "split-conformal-absolute-residual-v1";
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -338,18 +337,14 @@ impl ModelFormDiscrepancyReport {
                 applicability.method_profile_ref
             ),
             method: NetExportBoundMethod::ParametricPlusModelFormDiscrepancy,
-            method_ref: format!(
-                "parametric-lcb-minus-{}",
-                CONFORMAL_METHOD
-            ),
+            method_ref: format!("parametric-lcb-minus-{}", CONFORMAL_METHOD),
             method_evidence_sha256: decision_receipt_sha256.clone(),
             method_run_id: target.run_id.clone(),
             method_output_sha256: target.output_sha256.clone(),
             method_variable_order: vec![target.observable_id.clone()],
             distribution_assumption_ref: format!(
                 "parametric-coverage:{}; discrepancy-exchangeability:{}; composition:bonferroni-union-bound",
-                parametric.method_ref,
-                profile.exchangeability_scope_ref
+                parametric.method_ref, profile.exchangeability_scope_ref
             ),
             assumption_manifest_sha256: profile.profile_sha256.clone(),
             validity_domain_ref: profile.validity_domain_ref.clone(),
@@ -710,8 +705,7 @@ fn validate_plan(plan: &ModelFormDiscrepancyPlan) -> Vec<ModelFormDiagnostic> {
         {
             errors.push(ModelFormDiagnostic::InvalidResidualDigest);
         }
-        if residual.solver_mismatch(profile)
-        {
+        if residual.solver_mismatch(profile) {
             errors.push(ModelFormDiagnostic::ResidualProfileMismatch);
         }
         if !residual.absolute_residual_mwe.is_finite() {
@@ -719,7 +713,8 @@ fn validate_plan(plan: &ModelFormDiscrepancyPlan) -> Vec<ModelFormDiagnostic> {
         } else if residual.absolute_residual_mwe < 0.0 {
             errors.push(ModelFormDiagnostic::NegativeResidual);
         }
-        if residual.metrology_reference.trim().is_empty() || residual.evidence_ref.trim().is_empty() {
+        if residual.metrology_reference.trim().is_empty() || residual.evidence_ref.trim().is_empty()
+        {
             errors.push(ModelFormDiagnostic::MissingMetrologyReference);
         }
         if residual.used_for_model_fit
@@ -740,14 +735,10 @@ fn validate_plan(plan: &ModelFormDiscrepancyPlan) -> Vec<ModelFormDiagnostic> {
         }
     }
 
-    if applicability.receipt_ref.trim().is_empty()
-        || applicability.evidence_ref.trim().is_empty()
-    {
+    if applicability.receipt_ref.trim().is_empty() || applicability.evidence_ref.trim().is_empty() {
         errors.push(ModelFormDiagnostic::ApplicabilityEvidenceInvalid);
     }
-    if !is_sha256(&applicability.receipt_sha256)
-        || !is_sha256(&applicability.evidence_sha256)
-    {
+    if !is_sha256(&applicability.receipt_sha256) || !is_sha256(&applicability.evidence_sha256) {
         errors.push(ModelFormDiagnostic::ApplicabilityEvidenceInvalid);
     }
     if applicability.run_id != target.run_id
@@ -1075,11 +1066,12 @@ mod tests {
         plan.profile.parametric_coverage = 0.975;
         plan.profile.target_total_coverage = 0.925;
         let report = evaluate_model_form_discrepancy(&plan);
-        assert_eq!(report.disposition, ModelFormDisposition::QualifiedWithinDeclaredDomain);
-        assert_eq!(report.conformal_rank_one_based, Some(19));
-        assert!(
-            (report.discrepancy_allowance_mwe.unwrap() - 1.18).abs() < 1e-12
+        assert_eq!(
+            report.disposition,
+            ModelFormDisposition::QualifiedWithinDeclaredDomain
         );
+        assert_eq!(report.conformal_rank_one_based, Some(19));
+        assert!((report.discrepancy_allowance_mwe.unwrap() - 1.18).abs() < 1e-12);
         assert!((report.combined_coverage_floor.unwrap() - 0.925).abs() < 1e-12);
     }
 
@@ -1089,7 +1081,10 @@ mod tests {
         plan.profile.discrepancy_coverage = 0.95;
         plan.profile.minimum_calibration_samples = 1;
         let report = evaluate_model_form_discrepancy(&plan);
-        assert_eq!(report.disposition, ModelFormDisposition::InsufficientCalibration);
+        assert_eq!(
+            report.disposition,
+            ModelFormDisposition::InsufficientCalibration
+        );
         assert_eq!(report.conformal_rank_one_based, None);
         assert_eq!(report.discrepancy_allowance_mwe, None);
     }
@@ -1097,7 +1092,10 @@ mod tests {
     #[test]
     fn thirty_nine_residuals_at_ninety_seven_point_five_percent_use_maximum() {
         let report = evaluate_model_form_discrepancy(&plan(39, 1.0));
-        assert_eq!(report.disposition, ModelFormDisposition::QualifiedWithinDeclaredDomain);
+        assert_eq!(
+            report.disposition,
+            ModelFormDisposition::QualifiedWithinDeclaredDomain
+        );
         assert_eq!(report.conformal_rank_one_based, Some(39));
     }
 
@@ -1122,7 +1120,11 @@ mod tests {
         test_plan.parametric_bound.one_sided_coverage = 0.95;
         let report = evaluate_model_form_discrepancy(&test_plan);
         assert_eq!(report.disposition, ModelFormDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&ModelFormDiagnostic::ParametricCoverageMismatch));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelFormDiagnostic::ParametricCoverageMismatch)
+        );
     }
 
     #[test]
@@ -1153,7 +1155,10 @@ mod tests {
         let mut plan = plan(39, 1.0);
         plan.applicability.state = ApplicabilityState::Unknown;
         let report = evaluate_model_form_discrepancy(&plan);
-        assert_eq!(report.disposition, ModelFormDisposition::ApplicabilityUnknown);
+        assert_eq!(
+            report.disposition,
+            ModelFormDisposition::ApplicabilityUnknown
+        );
         assert_eq!(report.combined_lower_bound_mwe, None);
     }
 
@@ -1162,14 +1167,26 @@ mod tests {
         for mutation in 0..4 {
             let mut plan = plan(19, 1.0);
             match mutation {
-                0 => plan.calibration_residuals[1].episode_id =
-                    plan.calibration_residuals[0].episode_id.clone(),
-                1 => plan.calibration_residuals[1].measured_observation_id =
-                    plan.calibration_residuals[0].measured_observation_id.clone(),
-                2 => plan.calibration_residuals[1].measured_artifact_sha256 =
-                    plan.calibration_residuals[0].measured_artifact_sha256.clone(),
-                _ => plan.calibration_residuals[1].model_run_id =
-                    plan.calibration_residuals[0].model_run_id.clone(),
+                0 => {
+                    plan.calibration_residuals[1].episode_id =
+                        plan.calibration_residuals[0].episode_id.clone()
+                }
+                1 => {
+                    plan.calibration_residuals[1].measured_observation_id = plan
+                        .calibration_residuals[0]
+                        .measured_observation_id
+                        .clone()
+                }
+                2 => {
+                    plan.calibration_residuals[1].measured_artifact_sha256 = plan
+                        .calibration_residuals[0]
+                        .measured_artifact_sha256
+                        .clone()
+                }
+                _ => {
+                    plan.calibration_residuals[1].model_run_id =
+                        plan.calibration_residuals[0].model_run_id.clone()
+                }
             }
             assert_eq!(
                 evaluate_model_form_discrepancy(&plan).disposition,
@@ -1184,7 +1201,11 @@ mod tests {
         plan.calibration_residuals[0].used_for_feature_selection = true;
         let report = evaluate_model_form_discrepancy(&plan);
         assert_eq!(report.disposition, ModelFormDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&ModelFormDiagnostic::CalibrationLeakage));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelFormDiagnostic::CalibrationLeakage)
+        );
     }
 
     #[test]
@@ -1233,7 +1254,10 @@ mod tests {
     #[test]
     fn material_discrepancy_above_tolerance_blocks_combined_bound() {
         let report = evaluate_model_form_discrepancy(&plan(39, 30.0));
-        assert_eq!(report.disposition, ModelFormDisposition::MaterialDiscrepancy);
+        assert_eq!(
+            report.disposition,
+            ModelFormDisposition::MaterialDiscrepancy
+        );
         assert_eq!(report.combined_lower_bound_mwe, None);
     }
 
@@ -1241,7 +1265,8 @@ mod tests {
     fn material_tolerance_equality_obeys_inclusive_policy() {
         let mut plan = plan(39, 20.0);
         let exact_allowance = conformal_absolute_residual_allowance(
-            &plan.calibration_residuals
+            &plan
+                .calibration_residuals
                 .iter()
                 .map(|item| item.absolute_residual_mwe)
                 .collect::<Vec<_>>(),
@@ -1276,7 +1301,9 @@ mod tests {
     #[test]
     fn combined_lower_bound_never_exceeds_parametric_lower_bound() {
         let report = evaluate_model_form_discrepancy(&plan(39, 1.0));
-        assert!(report.combined_lower_bound_mwe.unwrap() <= report.parametric_lower_bound_mwe.unwrap());
+        assert!(
+            report.combined_lower_bound_mwe.unwrap() <= report.parametric_lower_bound_mwe.unwrap()
+        );
     }
 
     #[test]
@@ -1328,6 +1355,9 @@ mod tests {
         second.calibration_residuals.reverse();
         let a = evaluate_model_form_discrepancy(&first);
         let b = evaluate_model_form_discrepancy(&second);
-        assert_eq!(a.residual_order_statistic_mwe, b.residual_order_statistic_mwe);
+        assert_eq!(
+            a.residual_order_statistic_mwe,
+            b.residual_order_statistic_mwe
+        );
     }
 }
