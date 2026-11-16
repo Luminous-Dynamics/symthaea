@@ -68,6 +68,10 @@ pub struct InformationExperiment {
     pub cost_basis_ref: String,
     pub cost_evidence_ref: String,
     pub evidence_ref: String,
+    /// Optional variance-only acquisition baseline score. It is reported but
+    /// never used in EVSI or NetVoI calculations.
+    pub predictive_variance_score: Option<f64>,
+    pub variance_score_evidence_ref: Option<String>,
     /// Complete deterministic mapping from every scenario to one possible
     /// observation signal. Probabilities are induced by scenario weights.
     pub signal_map: Vec<ExperimentSignal>,
@@ -151,6 +155,8 @@ pub enum DecisionVoIDiagnostic {
     ExperimentCostBasisMismatch,
     EmptyExperimentCostEvidence,
     EmptyExperimentEvidence,
+    InvalidPredictiveVarianceScore,
+    MissingPredictiveVarianceEvidence,
     DuplicateScenarioSignal,
     UnknownSignalScenario,
     MissingScenarioSignal,
@@ -178,6 +184,7 @@ pub struct ExperimentValueReport {
     pub direct_cost_value: f64,
     pub opportunity_cost_value: f64,
     pub total_cost_value: f64,
+    pub predictive_variance_score: Option<f64>,
     pub expected_value_after_information: f64,
     pub evsi: f64,
     pub evpi: f64,
@@ -329,6 +336,14 @@ pub fn evaluate_decision_value_of_information(
         let total_cost_value =
             experiment.direct_cost_value + experiment.opportunity_cost_value;
         let net_voi = evsi - total_cost_value;
+        if !total_cost_value.is_finite()
+            || !expected_value_after_information.is_finite()
+            || !evsi.is_finite()
+            || !expected_regret_after_information.is_finite()
+            || !net_voi.is_finite()
+        {
+            diagnostics.push(DecisionVoIDiagnostic::NonFiniteCurrentValue);
+        }
 
         if evsi < -plan.numerical_tolerance {
             diagnostics.push(DecisionVoIDiagnostic::NegativeEvsi);
@@ -347,6 +362,12 @@ pub fn evaluate_decision_value_of_information(
         ];
         refs.extend(
             experiment
+                .variance_score_evidence_ref
+                .iter()
+                .cloned(),
+        );
+        refs.extend(
+            experiment
                 .signal_map
                 .iter()
                 .map(|signal| signal.evidence_ref.clone()),
@@ -359,6 +380,7 @@ pub fn evaluate_decision_value_of_information(
             direct_cost_value: experiment.direct_cost_value,
             opportunity_cost_value: experiment.opportunity_cost_value,
             total_cost_value,
+            predictive_variance_score: experiment.predictive_variance_score,
             expected_value_after_information,
             evsi,
             evpi,
@@ -591,6 +613,25 @@ fn validate_plan(plan: &DecisionValuePlan) -> Vec<DecisionVoIDiagnostic> {
         if experiment.evidence_ref.trim().is_empty() {
             diagnostics.push(DecisionVoIDiagnostic::EmptyExperimentEvidence);
         }
+        if experiment
+            .predictive_variance_score
+            .is_some_and(|score| !score.is_finite() || score < 0.0)
+        {
+            diagnostics.push(DecisionVoIDiagnostic::InvalidPredictiveVarianceScore);
+        }
+        if experiment.predictive_variance_score.is_some()
+            && experiment
+                .variance_score_evidence_ref
+                .as_deref()
+                .is_none_or(str::is_empty)
+        {
+            diagnostics.push(DecisionVoIDiagnostic::MissingPredictiveVarianceEvidence);
+        }
+        if experiment.predictive_variance_score.is_none()
+            && experiment.variance_score_evidence_ref.is_some()
+        {
+            diagnostics.push(DecisionVoIDiagnostic::MissingPredictiveVarianceEvidence);
+        }
 
         let mut mapped_scenarios = BTreeSet::new();
         for signal in &experiment.signal_map {
@@ -695,6 +736,7 @@ fn collect_evidence_refs(plan: &DecisionValuePlan) -> Vec<String> {
         std::iter::once(experiment.experiment_design_sha256.clone())
             .chain(std::iter::once(experiment.cost_evidence_ref.clone()))
             .chain(std::iter::once(experiment.evidence_ref.clone()))
+            .chain(experiment.variance_score_evidence_ref.iter().cloned())
             .chain(
                 experiment
                     .signal_map
@@ -779,6 +821,8 @@ mod tests {
             cost_basis_ref: "USD-2026-real-discount-6pct-v1".to_string(),
             cost_evidence_ref: format!("cost-evidence-{id}"),
             evidence_ref: format!("experiment-evidence-{id}"),
+            predictive_variance_score: Some(predictive_variance_score),
+            variance_score_evidence_ref: Some(format!("variance-score-{id}")),
             signal_map: signal_groups
                 .iter()
                 .map(|(scenario_id, signal_id)| ExperimentSignal {
@@ -824,18 +868,21 @@ mod tests {
                     "e1-decision-discriminating-test",
                     3.0,
                     2.0,
+                    1.0,
                     &[("s1", "left"), ("s2", "left"), ("s3", "right"), ("s4", "right")],
                 ),
                 experiment(
                     "e2-high-variance-uninformative-test",
                     0.5,
                     0.5,
+                    100.0,
                     &[("s1", "same"), ("s2", "same"), ("s3", "same"), ("s4", "same")],
                 ),
                 experiment(
                     "e3-overpriced-perfect-test",
                     20.0,
                     0.0,
+                    25.0,
                     &[("s1", "s1"), ("s2", "s2"), ("s3", "s3"), ("s4", "s4")],
                 ),
             ],
@@ -873,6 +920,11 @@ mod tests {
             .iter()
             .find(|item| item.experiment_id == "e2-high-variance-uninformative-test")
             .unwrap();
+        assert_eq!(item.predictive_variance_score, Some(100.0));
+        assert!(
+            report.experiments[0].predictive_variance_score.unwrap()
+                < item.predictive_variance_score.unwrap()
+        );
         assert!(item.evsi.abs() < 1e-12);
         assert!((item.expected_regret_after_information - 13.75).abs() < 1e-12);
         assert!(item.net_voi < 0.0);
