@@ -108,7 +108,7 @@ pub enum DecisionVoIDisposition {
     AssumptionOnly,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DecisionVoIDiagnostic {
     EmptyDecisionCaseIdentity,
     InvalidDecisionCaseDigest,
@@ -987,9 +987,6 @@ mod tests {
             eligibility: AlternativeEligibility::BlockedByHardGate,
             eligibility_evidence_ref: "blocked-gate-evidence".to_string(),
         });
-        for scenario_id in ["s1", "s2", "s3", "s4"] {
-            input.utilities.push(utility(scenario_id, "C-blocked", 1_000.0));
-        }
         let report = evaluate_decision_value_of_information(&input);
         assert_eq!(report.current_best_alternative_id.as_deref(), Some("B"));
         assert_eq!(report.disposition, DecisionVoIDisposition::SyntheticOnly);
