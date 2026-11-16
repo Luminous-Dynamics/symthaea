@@ -3302,10 +3302,10 @@ mod tests {
         let plasma_summary = audit_source_value(&plasma, "plasma-source-cases").unwrap();
         let hts_summary = audit_source_value(&hts, "hts-source-cases").unwrap();
 
-        assert_eq!(plasma_summary.case_count, 53);
+        assert_eq!(plasma_summary.case_count, 55);
         assert_eq!(plasma_summary.negative_control_count, 98);
         assert_eq!(plasma_summary.derived_reference_check_count, 7);
-        assert_eq!(plasma_summary.benchmark_target_count, 12);
+        assert_eq!(plasma_summary.benchmark_target_count, 13);
         let plasma_case_ids: BTreeSet<_> = plasma
             .get("cases")
             .and_then(Value::as_array)
@@ -3575,6 +3575,17 @@ mod tests {
                 "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
                 "luminous_reproduction": false,
                 "source": {"url": "https://doi.org/10.1016/j.ijhydene.2026.156912"},
+                "source_text_discrepancies": [
+                    {
+                        "discrepancy_id": "NH3-MW-2026-ABSTRACT-CONCLUSION-150GPH-PAIRING",
+                        "field": "hydrogen_production_rate_g_per_hour",
+                        "abstract_statement": "The abstract associates >99% NH3 conversion, 45 g/kWh H2 energy yield, 242 kJ/mol energy cost and 150 g/h H2 production.",
+                        "conclusion_statement": "The conclusion separately states 150 g/h at 92.4% NH3 conversion, 50 g/kWh H2 energy yield and 217 kJ/mol energy cost.",
+                        "status": "UNRESOLVED_ABSTRACT_CONCLUSION_OPERATING_POINT_PAIRING",
+                        "handling": "Keep the >99%/45g-per-kWh and 92.4%/150g-per-hour/50g-per-kWh points separate.",
+                        "luminous_reproduction": false
+                    }
+                ],
                 "operating_points": [
                     {
                         "operating_point_id": "NH3-MW-ATM-HIGH-CONVERSION",
@@ -3616,7 +3627,7 @@ mod tests {
                     "relative_specific_energy_reduction_at_92_4_percent_conversion": 1.0 - 45.0 / 50.0,
                     "relative_specific_energy_reduction_at_76_percent_conversion": 1.0 - 45.0 / 51.0
                 },
-                "interpretation": "Two distinct source operating points; not a matched process result."
+                "interpretation": "Three source-specific operating points, with the 150 g/h abstract/conclusion pairing discrepancy preserved; not a matched process result."
             }],
             "negative_controls": [{
                 "control_id": "NC-024",
