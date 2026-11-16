@@ -501,3 +501,20 @@ Added five evidence records:
 The offline Rust auditor validates technology classes, source-point pairing, the four-route biogas cost distributions and the process-selection target's non-plasma incumbents, common-service/energy/currency guards, paired uncertainty draws, no-credit policy and abstention requirements. It now contains 120 authored tests.
 
 Expected frozen plasma corpus on this branch: 66 cases / 114 negative controls / 7 derived checks / 15 benchmark targets. The existing six HTS thermal-storage source cases/12 controls remain separately audited. The focused workflow must pass on this exact head before these new gates are reported as verified.
+
+
+## Current audit-branch snapshot — 2026-11-16
+
+The merged branch `research/plasma-energy-offline-audit-v0-1` now contains:
+- 66 plasma source cases;
+- 114 negative controls;
+- 7 derived reference checks;
+- 15 research benchmark targets;
+- 120 authored Rust tests in `xtask/src/plasma_energy_audit.rs`;
+- 6 HTS thermal-storage cases and 12 HTS negative controls, audited separately.
+
+The new `PLASMA-PROCESS-PATHWAY-SELECTION-001` target covers NH3 cracking, methane pyrolysis and biogas-to-hydrogen. Each group contains both plasma and non-plasma routes. Every group is explicitly `NOT_YET_MATCHED`, so the benchmark presently refuses cross-route ranking. The source and metadata validators do not themselves run 10,000 Monte Carlo scenarios or implement a robust optimizer; those are target requirements for the next implementation tranche.
+
+The new case validators preserve distinct NH3 diluent operating conditions, the heat-integrated thermal NH3 plant boundary, the four-route biogas LCOH distributions, and the review-derived methane shock-wave/microwave points. They explicitly distinguish microwave heating from microwave plasma.
+
+The new Rust code and corpus changes have been pushed to the audit branch. The prior exact-head run at 5fb8b3f passed 110 tests; the latest head `af1a548ed19c4574cd83b2ca31a6e3afc2ca9679` has 120 authored tests and refreshed frozen-count assertions. Its exact-head workflow result has not yet been observed, so no pass is claimed for the 120-test revision.
