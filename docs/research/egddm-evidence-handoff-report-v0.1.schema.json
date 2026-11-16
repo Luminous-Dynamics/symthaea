@@ -1,0 +1,340 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-evidence-handoff-report-v0.1.schema.json",
+  "title": "EGDDM D6.14 evidence-handoff report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "workspace_clean",
+    "visible_obligation_count",
+    "required_obligation_count",
+    "receipt_count",
+    "authority_count",
+    "operation_count",
+    "traces",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "adjudication_status": {
+      "type": "string"
+    },
+    "workspace_clean": {
+      "type": "boolean"
+    },
+    "visible_obligation_count": {
+      "type": "integer"
+    },
+    "required_obligation_count": {
+      "type": "integer"
+    },
+    "receipt_count": {
+      "type": "integer"
+    },
+    "authority_count": {
+      "type": "integer"
+    },
+    "operation_count": {
+      "type": "integer"
+    },
+    "claim_ceiling": {
+      "type": "string"
+    },
+    "traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "expected_workspace_state",
+          "receiver_workspace_claim",
+          "workspace_claim_correct",
+          "sender_false_claims",
+          "obligation_outcomes",
+          "authority_outcomes",
+          "operation_outcomes",
+          "omitted_required_obligations",
+          "unauthorized_actions",
+          "obligation_count",
+          "correctly_classified_obligations",
+          "evidence_portability_count",
+          "stale_claim_acceptance_count",
+          "unnecessary_revalidation_count",
+          "unsupported_current_claim_count",
+          "false_completion_claim_count",
+          "false_authority_active_claim_count",
+          "unsafe_unknown_non_idempotent_retry_count",
+          "missing_reconciliation_count",
+          "future_evidence_leakage_count",
+          "unauthorized_action_count",
+          "workspace_claim_error_count",
+          "sender_false_claim_count"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "expected_workspace_state": {
+            "type": "string"
+          },
+          "receiver_workspace_claim": {
+            "type": "string"
+          },
+          "workspace_claim_correct": {
+            "type": "boolean"
+          },
+          "sender_false_claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "obligation_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "obligation_id",
+                "critical",
+                "expected_state",
+                "receiver_disposition",
+                "receipt_ids",
+                "correct",
+                "stale_claim_acceptance",
+                "unnecessary_revalidation",
+                "unsupported_current_claim",
+                "missing_evidence",
+                "invalid_receipt_reasons"
+              ],
+              "properties": {
+                "obligation_id": {
+                  "type": "string"
+                },
+                "critical": {
+                  "type": "boolean"
+                },
+                "expected_state": {
+                  "type": "string"
+                },
+                "receiver_disposition": {
+                  "type": "string"
+                },
+                "receipt_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "correct": {
+                  "type": "boolean"
+                },
+                "stale_claim_acceptance": {
+                  "type": "boolean"
+                },
+                "unnecessary_revalidation": {
+                  "type": "boolean"
+                },
+                "unsupported_current_claim": {
+                  "type": "boolean"
+                },
+                "missing_evidence": {
+                  "type": "boolean"
+                },
+                "invalid_receipt_reasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "authority_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "authority_id",
+                "expected_state",
+                "receiver_claim",
+                "correct",
+                "false_active_claim"
+              ],
+              "properties": {
+                "authority_id": {
+                  "type": "string"
+                },
+                "expected_state": {
+                  "type": "string"
+                },
+                "receiver_claim": {
+                  "type": "string"
+                },
+                "correct": {
+                  "type": "boolean"
+                },
+                "false_active_claim": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "operation_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operation_id",
+                "expected_state",
+                "receiver_claim",
+                "correct",
+                "false_completion_claim",
+                "retry_requested",
+                "reconciliation_requested",
+                "unsafe_unknown_non_idempotent_retry",
+                "missing_unknown_outcome_reconciliation",
+                "future_evidence_leakage"
+              ],
+              "properties": {
+                "operation_id": {
+                  "type": "string"
+                },
+                "expected_state": {
+                  "type": "string"
+                },
+                "receiver_claim": {
+                  "type": "string"
+                },
+                "correct": {
+                  "type": "boolean"
+                },
+                "false_completion_claim": {
+                  "type": "boolean"
+                },
+                "retry_requested": {
+                  "type": "boolean"
+                },
+                "reconciliation_requested": {
+                  "type": "boolean"
+                },
+                "unsafe_unknown_non_idempotent_retry": {
+                  "type": "boolean"
+                },
+                "missing_unknown_outcome_reconciliation": {
+                  "type": "boolean"
+                },
+                "future_evidence_leakage": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "omitted_required_obligations": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unauthorized_actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "authority_id",
+                "action",
+                "target_branch_id",
+                "obligation_id",
+                "reasons"
+              ],
+              "properties": {
+                "authority_id": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "target_branch_id": {
+                  "type": "string"
+                },
+                "obligation_id": {
+                  "type": "string"
+                },
+                "reasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "obligation_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "correctly_classified_obligations": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "evidence_portability_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "stale_claim_acceptance_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unnecessary_revalidation_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsupported_current_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_completion_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_authority_active_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsafe_unknown_non_idempotent_retry_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missing_reconciliation_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "future_evidence_leakage_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unauthorized_action_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "workspace_claim_error_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sender_false_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}
