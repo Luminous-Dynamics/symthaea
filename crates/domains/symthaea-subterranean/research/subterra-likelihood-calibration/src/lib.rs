@@ -563,15 +563,15 @@ pub struct LikelihoodCell {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EmpiricalLikelihoodTable {
-    pub dataset_id: String,
-    pub hypothesis_ids: Vec<String>,
-    pub action_ids: Vec<String>,
-    pub action_modalities: Vec<(String, String)>,
-    pub estimator_id: String,
-    pub training_split_only: bool,
-    pub dirichlet_alpha: f64,
-    pub minimum_training_sites: usize,
-    pub cells: Vec<LikelihoodCell>,
+    dataset_id: String,
+    hypothesis_ids: Vec<String>,
+    action_ids: Vec<String>,
+    action_modalities: Vec<(String, String)>,
+    estimator_id: String,
+    training_split_only: bool,
+    dirichlet_alpha: f64,
+    minimum_training_sites: usize,
+    cells: Vec<LikelihoodCell>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -583,6 +583,38 @@ pub struct MeasurementActionPolicy {
 }
 
 impl EmpiricalLikelihoodTable {
+    pub fn dataset_id(&self) -> &str {
+        &self.dataset_id
+    }
+
+    pub fn hypothesis_ids(&self) -> &[String] {
+        &self.hypothesis_ids
+    }
+
+    pub fn action_ids(&self) -> &[String] {
+        &self.action_ids
+    }
+
+    pub fn estimator_id(&self) -> &str {
+        &self.estimator_id
+    }
+
+    pub fn training_split_only(&self) -> bool {
+        self.training_split_only
+    }
+
+    pub fn dirichlet_alpha(&self) -> f64 {
+        self.dirichlet_alpha
+    }
+
+    pub fn minimum_training_sites(&self) -> usize {
+        self.minimum_training_sites
+    }
+
+    pub fn cells(&self) -> &[LikelihoodCell] {
+        &self.cells
+    }
+
     pub fn cell(&self, action_id: &str, hypothesis_id: &str) -> Option<&LikelihoodCell> {
         self.cells.iter().find(|cell| {
             cell.action_id == action_id && cell.hypothesis_id == hypothesis_id
@@ -917,7 +949,7 @@ mod tests {
         let probabilities = tunnel.probabilities.as_ref().unwrap();
         assert!((probabilities[0] - 0.625).abs() < 1.0e-12);
         assert!((probabilities[1] - 0.375).abs() < 1.0e-12);
-        assert!(table.training_split_only);
+        assert!(table.training_split_only());
     }
 
     #[test]
