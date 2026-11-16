@@ -9,6 +9,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use subterra_voi_reference::{
+    Hypothesis as PlannerHypothesis, MeasurementAction as PlannerMeasurementAction,
+    MissionDecision as PlannerMissionDecision, ObservationOutcome as PlannerObservationOutcome,
+    PlanningProblem, ResourceCost,
+};
+
 pub const UNKNOWN_HYPOTHESIS_ID: &str = "unknown";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -74,6 +80,15 @@ pub enum CalibrationError {
     UnknownOutcome { case_id: String, action_id: String, outcome_id: String },
     NoTrainingCases,
     InvalidLikelihoodTable,
+    PlannerHypothesisOrderMismatch,
+    PlannerDecisionDimensionMismatch,
+    PlannerActionPolicyMismatch,
+    DuplicatePlannerActionPolicy(String),
+    InsufficientLikelihoodSupport {
+        action_id: String,
+        hypothesis_id: String,
+        training_sample_count: usize,
+    },
     InvalidDirichletAlpha,
     InvalidMinimumTrainingSites,
     CannotScoreTrainingSplit,
@@ -341,6 +356,8 @@ impl CalibrationDataset {
 
         Ok(EmpiricalLikelihoodTable {
             dataset_id: self.dataset_id.clone(),
+            hypothesis_ids: self.hypothesis_ids.clone(),
+            action_ids: self.actions.iter().map(|action| action.action_id.clone()).collect(),
             estimator_id: "dirichlet-categorical-v0.1".to_string(),
             training_split_only: true,
             dirichlet_alpha,
@@ -361,6 +378,8 @@ impl CalibrationDataset {
         if table.dataset_id != self.dataset_id
             || !table.training_split_only
             || table.estimator_id != "dirichlet-categorical-v0.1"
+            || table.hypothesis_ids != self.hypothesis_ids
+            || table.action_ids != self.actions.iter().map(|action| action.action_id.clone()).collect::<Vec<_>>()
             || !table.dirichlet_alpha.is_finite()
             || table.dirichlet_alpha <= 0.0
             || table.minimum_training_sites == 0
@@ -531,6 +550,8 @@ pub struct LikelihoodCell {
 #[derive(Debug, Clone, PartialEq)]
 pub struct EmpiricalLikelihoodTable {
     pub dataset_id: String,
+    pub hypothesis_ids: Vec<String>,
+    pub action_ids: Vec<String>,
     pub estimator_id: String,
     pub training_split_only: bool,
     pub dirichlet_alpha: f64,
@@ -538,10 +559,117 @@ pub struct EmpiricalLikelihoodTable {
     pub cells: Vec<LikelihoodCell>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct MeasurementActionPolicy {
+    pub action_id: String,
+    pub resource_cost: ResourceCost,
+    /// Supplied by the separate reviewed mission/ODD/preservation gate.
+    pub external_gate_passed: bool,
+}
+
 impl EmpiricalLikelihoodTable {
     pub fn cell(&self, action_id: &str, hypothesis_id: &str) -> Option<&LikelihoodCell> {
         self.cells.iter().find(|cell| {
             cell.action_id == action_id && cell.hypothesis_id == hypothesis_id
+        })
+    }
+
+    /// Build the one-step EVSI input without inventing priors, losses, resource
+    /// costs or permission. The caller supplies those independently. Every
+    /// action/hypothesis likelihood cell must have sufficient Training support.
+    pub fn to_planning_problem(
+        &self,
+        hypotheses: Vec<PlannerHypothesis>,
+        decisions: Vec<PlannerMissionDecision>,
+        action_policies: Vec<MeasurementActionPolicy>,
+    ) -> Result<PlanningProblem, CalibrationError> {
+        let supplied_hypothesis_ids = hypotheses
+            .iter()
+            .map(|hypothesis| hypothesis.id.clone())
+            .collect::<Vec<_>>();
+        if supplied_hypothesis_ids != self.hypothesis_ids {
+            return Err(CalibrationError::PlannerHypothesisOrderMismatch);
+        }
+        if decisions
+            .iter()
+            .any(|decision| decision.loss_by_hypothesis.len() != hypotheses.len())
+        {
+            return Err(CalibrationError::PlannerDecisionDimensionMismatch);
+        }
+
+        let mut policy_map = BTreeMap::new();
+        for policy in action_policies {
+            let id = policy.action_id.clone();
+            if policy_map.insert(id.clone(), policy).is_some() {
+                return Err(CalibrationError::DuplicatePlannerActionPolicy(id));
+            }
+        }
+        if policy_map.len() != self.action_ids.len()
+            || self.action_ids.iter().any(|id| !policy_map.contains_key(id))
+        {
+            return Err(CalibrationError::PlannerActionPolicyMismatch);
+        }
+
+        let mut actions = Vec::with_capacity(self.action_ids.len());
+        for action_id in &self.action_ids {
+            let first_hypothesis = self
+                .hypothesis_ids
+                .first()
+                .ok_or(CalibrationError::InvalidLikelihoodTable)?;
+            let first_cell = self
+                .cell(action_id, first_hypothesis)
+                .ok_or(CalibrationError::InvalidLikelihoodTable)?;
+            let outcome_ids = first_cell.outcome_ids.clone();
+
+            let mut probabilities_by_hypothesis = Vec::with_capacity(self.hypothesis_ids.len());
+            for hypothesis_id in &self.hypothesis_ids {
+                let cell = self
+                    .cell(action_id, hypothesis_id)
+                    .ok_or(CalibrationError::InvalidLikelihoodTable)?;
+                if cell.outcome_ids != outcome_ids {
+                    return Err(CalibrationError::InvalidLikelihoodTable);
+                }
+                let Some(probabilities) = &cell.probabilities else {
+                    return Err(CalibrationError::InsufficientLikelihoodSupport {
+                        action_id: action_id.clone(),
+                        hypothesis_id: hypothesis_id.clone(),
+                        training_sample_count: cell.training_sample_count,
+                    });
+                };
+                if probabilities.len() != outcome_ids.len() {
+                    return Err(CalibrationError::InvalidLikelihoodTable);
+                }
+                probabilities_by_hypothesis.push(probabilities.clone());
+            }
+
+            let outcomes = outcome_ids
+                .iter()
+                .enumerate()
+                .map(|(outcome_index, outcome_id)| PlannerObservationOutcome {
+                    id: outcome_id.clone(),
+                    likelihood_by_hypothesis: probabilities_by_hypothesis
+                        .iter()
+                        .map(|probabilities| probabilities[outcome_index])
+                        .collect(),
+                })
+                .collect();
+
+            let policy = policy_map
+                .get(action_id)
+                .ok_or(CalibrationError::PlannerActionPolicyMismatch)?;
+            actions.push(PlannerMeasurementAction {
+                id: action_id.clone(),
+                modality: action_id.clone(),
+                outcomes,
+                cost: policy.resource_cost,
+                external_gate_passed: policy.external_gate_passed,
+            });
+        }
+
+        Ok(PlanningProblem {
+            hypotheses,
+            decisions,
+            actions,
         })
     }
 }
@@ -742,6 +870,133 @@ mod tests {
         assert_eq!(report.scored_cases, 2);
         assert_eq!(report.unscored_cases, 1);
         assert!((report.coverage_fraction - (2.0 / 3.0)).abs() < 1.0e-12);
+    }
+
+    fn planner_hypotheses() -> Vec<PlannerHypothesis> {
+        vec![
+            PlannerHypothesis {
+                id: "tunnel".into(),
+                prior_probability: 0.45,
+            },
+            PlannerHypothesis {
+                id: "collapse".into(),
+                prior_probability: 0.45,
+            },
+            PlannerHypothesis {
+                id: "unknown".into(),
+                prior_probability: 0.10,
+            },
+        ]
+    }
+
+    fn planner_decisions() -> Vec<PlannerMissionDecision> {
+        vec![
+            PlannerMissionDecision {
+                id: "enter".into(),
+                loss_by_hypothesis: vec![0.0, 100.0, 50.0],
+            },
+            PlannerMissionDecision {
+                id: "hold".into(),
+                loss_by_hypothesis: vec![30.0, 0.0, 10.0],
+            },
+        ]
+    }
+
+    fn planner_policy(allowed: bool) -> MeasurementActionPolicy {
+        MeasurementActionPolicy {
+            action_id: "gpr".into(),
+            resource_cost: ResourceCost {
+                energy_j: 100.0,
+                duration_s: 10.0,
+                data_bytes: 1_000.0,
+                exposure_units: 0.1,
+            },
+            external_gate_passed: allowed,
+        }
+    }
+
+    #[test]
+    fn calibrated_table_converts_to_valid_evsi_problem() {
+        let data = dataset();
+        let table = data.fit_likelihoods(0.5, 2).unwrap();
+        let problem = table
+            .to_planning_problem(
+                planner_hypotheses(),
+                planner_decisions(),
+                vec![planner_policy(true)],
+            )
+            .unwrap();
+        assert!(problem.validate().is_ok());
+        let signal = problem.actions[0]
+            .outcomes
+            .iter()
+            .find(|outcome| outcome.id == "signal")
+            .unwrap();
+        assert!((signal.likelihood_by_hypothesis[0] - 0.625).abs() < 1.0e-12);
+        assert!((signal.likelihood_by_hypothesis[1] - (0.5 / 3.0)).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn planner_conversion_preserves_external_gate_denial() {
+        let data = dataset();
+        let table = data.fit_likelihoods(0.5, 2).unwrap();
+        let problem = table
+            .to_planning_problem(
+                planner_hypotheses(),
+                planner_decisions(),
+                vec![planner_policy(false)],
+            )
+            .unwrap();
+        assert!(!problem.actions[0].external_gate_passed);
+    }
+
+    #[test]
+    fn unsupported_cells_cannot_be_converted_to_evsi_probabilities() {
+        let mut data = dataset();
+        data.cases.retain(|case| case.case_id != "u2");
+        let table = data.fit_likelihoods(0.5, 2).unwrap();
+        assert_eq!(
+            table.to_planning_problem(
+                planner_hypotheses(),
+                planner_decisions(),
+                vec![planner_policy(true)],
+            ),
+            Err(CalibrationError::InsufficientLikelihoodSupport {
+                action_id: "gpr".into(),
+                hypothesis_id: "unknown".into(),
+                training_sample_count: 1,
+            })
+        );
+    }
+
+    #[test]
+    fn planner_conversion_rejects_hypothesis_order_drift() {
+        let data = dataset();
+        let table = data.fit_likelihoods(0.5, 2).unwrap();
+        let mut hypotheses = planner_hypotheses();
+        hypotheses.swap(0, 1);
+        assert_eq!(
+            table.to_planning_problem(
+                hypotheses,
+                planner_decisions(),
+                vec![planner_policy(true)],
+            ),
+            Err(CalibrationError::PlannerHypothesisOrderMismatch)
+        );
+    }
+
+    #[test]
+    fn planner_conversion_requires_exact_action_policy_set() {
+        let data = dataset();
+        let table = data.fit_likelihoods(0.5, 2).unwrap();
+        assert_eq!(
+            table.to_planning_problem(
+                planner_hypotheses(),
+                planner_decisions(),
+                Vec::new(),
+            ),
+            Err(CalibrationError::PlannerActionPolicyMismatch)
+        );
     }
 
     #[test]
