@@ -245,7 +245,7 @@ fn validate_section_family(artifact: &SectionFamilyArtifact) -> Result<usize, Ve
         return Err(violations);
     };
     let point_count = first.keel_to_sheer_m.len();
-    if point_count < 2 || point_count > MAX_SECTION_POINTS {
+    if !(2..=MAX_SECTION_POINTS).contains(&point_count) {
         violation(
             &mut violations,
             "section_point_count",
@@ -291,14 +291,14 @@ fn validate_section_family(artifact: &SectionFamilyArtifact) -> Result<usize, Ve
             );
             continue;
         }
-        if let Some(previous) = previous_x {
-            if section.x_m <= previous {
-                violation(
-                    &mut violations,
-                    "station_order",
-                    format!("station {station_index} is not strictly after its predecessor"),
-                );
-            }
+        if let Some(previous) = previous_x
+            && section.x_m <= previous
+        {
+            violation(
+                &mut violations,
+                "station_order",
+                format!("station {station_index} is not strictly after its predecessor"),
+            );
         }
         previous_x = Some(section.x_m);
 
@@ -675,10 +675,8 @@ pub fn verify_loft_artifact_integrity(
     let station_count = artifact.station_count;
     let mut expected_vertices = 0_usize;
     let mut station_bases = Vec::with_capacity(station_count.min(MAX_STATIONS));
-    if point_count < 2
-        || point_count > MAX_SECTION_POINTS
-        || station_count < 2
-        || station_count > MAX_STATIONS
+    if !(2..=MAX_SECTION_POINTS).contains(&point_count)
+        || !(2..=MAX_STATIONS).contains(&station_count)
         || (station_count == 2 && bow_collapsed && stern_collapsed)
     {
         violation(
@@ -793,10 +791,8 @@ pub fn verify_loft_artifact_integrity(
         .checked_sub(1)
         .and_then(|count| count.checked_mul(4))
         .and_then(|count| count.checked_mul(point_count.saturating_sub(1)));
-    if station_count >= 2
-        && station_count <= MAX_STATIONS
-        && point_count >= 2
-        && point_count <= MAX_SECTION_POINTS
+    if (2..=MAX_STATIONS).contains(&station_count)
+        && (2..=MAX_SECTION_POINTS).contains(&point_count)
         && expected_side_face_budget.is_some_and(|count| count <= MAX_MESH_FACES)
         && station_bases.len() == station_count
         && artifact
