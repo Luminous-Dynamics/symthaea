@@ -2,8 +2,9 @@ use fusion_decision_compiler_contract::lifecycle_service_ledger::{
     LifecycleEvidenceClass, OutageCategory, ServiceImpact,
 };
 use fusion_decision_compiler_contract::maintenance_choreography::{
-    MaintenancePhase, MaintenanceSchedulePlan, MaintenanceTask, RenewableResource, ResourceDemand,
-    exact_small_instance_makespan, generate_maintenance_schedule, validate_maintenance_schedule,
+    AccessAssessmentDisposition, AccessCertificateBinding, MaintenancePhase, MaintenanceSchedulePlan,
+    MaintenanceTask, RenewableResource, ResourceDemand, exact_small_instance_makespan,
+    generate_maintenance_schedule, validate_maintenance_schedule,
 };
 
 fn sha(character: char) -> String {
@@ -48,6 +49,19 @@ fn task(
         service_impact: impact,
         task_definition_ref: format!("synthetic-task-definition-{id}"),
         task_definition_sha256: sha('a'),
+        access_certificate: AccessCertificateBinding {
+            certificate_ref: format!("synthetic-access-certificate-{id}"),
+            certificate_sha256: sha('b'),
+            bound_candidate_revision: "candidate-maintenance-r1".to_string(),
+            bound_geometry_sha256: sha('d'),
+            bound_task_definition_ref: format!("synthetic-task-definition-{id}"),
+            bound_task_definition_sha256: sha('a'),
+            robot_model_sha256: sha('e'),
+            tool_model_sha256: sha('f'),
+            clearance_profile_ref: "synthetic-clearance-envelope-v1".to_string(),
+            disposition: AccessAssessmentDisposition::AnalyticFixturePass,
+            evidence_class: LifecycleEvidenceClass::Synthetic,
+        },
         evidence_ref: format!("synthetic-task-evidence-{id}"),
         evidence_class: LifecycleEvidenceClass::Synthetic,
     }
@@ -126,6 +140,8 @@ fn main() {
 
     let plan = MaintenanceSchedulePlan {
         campaign_id: "synthetic-parallel-blanket-changeout-v1".to_string(),
+        candidate_revision: "candidate-maintenance-r1".to_string(),
+        geometry_sha256: sha('d'),
         campaign_start_second: 1_000,
         priority_order,
         resources: vec![
