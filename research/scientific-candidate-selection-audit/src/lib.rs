@@ -700,7 +700,10 @@ fn identical_model_artifact_groups(candidates: &[SelectorCandidate]) -> Vec<Vec<
     by_digest
         .into_values()
         .filter(|ids| ids.len() > 1)
-        .map(|ids| ids.into_iter().map(str::to_owned).collect())
+        .map(|mut ids| {
+            ids.sort_unstable();
+            ids.into_iter().map(str::to_owned).collect()
+        })
         .collect()
 }
 
@@ -1342,6 +1345,14 @@ mod tests {
             report.identical_model_artifact_groups,
             vec![vec!["a".to_owned(), "a-copy".to_owned()]]
         );
+
+        let mut reordered = packet.clone();
+        reordered.candidates.reverse();
+        let replay = audit_submission(&reordered, &frozen, &outcomes).unwrap();
+        assert_eq!(
+            replay.identical_model_artifact_groups,
+            report.identical_model_artifact_groups
+        );
     }
 
     #[test]
@@ -1433,6 +1444,13 @@ mod tests {
         assert!(matches!(
             audit_submission(&packet, &frozen, &bad),
             Err(SelectionAuditError::NonFiniteMetric { .. })
+        ));
+
+        let mut bad_digest = packet.clone();
+        bad_digest.candidates[0].canonical_model_sha256 = Some("not-a-sha256".to_owned());
+        assert!(matches!(
+            validate_selector_packet(&bad_digest),
+            Err(SelectionAuditError::InvalidModelDigest { .. })
         ));
 
         let mut not_ready = packet.clone();
