@@ -310,8 +310,7 @@ fn parse_truths(
                 "retry_result",
                 "compensation_result",
                 "expected_terminal_state",
-                "expected_effect_count",
-                "primary_effect_count",
+                "initial_primary_effect_count",
             ],
             &label,
         )?;
@@ -425,8 +424,8 @@ fn parse_action(value: &Value, label: &str, case: &OperationCase) -> Result<Cand
         }
         _ => {}
     }
-    if kind == "retry" && operation_id != case.operation_id {
-        return Err(format!("{label} retry must retain the same operation_id"));
+    if kind != "compensate" && operation_id != case.operation_id {
+        return Err(format!("{label} action must retain the same operation_id"));
     }
     if kind == "compensate" && operation_id == case.operation_id {
         return Err(format!("{label} compensation must use a distinct operation_id"));
