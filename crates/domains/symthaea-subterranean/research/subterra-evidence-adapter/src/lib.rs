@@ -914,19 +914,22 @@ impl CaveNetworkRecord {
             }
 
             if edge.traversability == TraversabilityEvidence::Demonstrated {
-                if edge.connection_evidence != ConnectionEvidence::DirectlyObserved {
-                    issues.push(
-                        NetworkIssue::DemonstratedTraversalWithoutObservedConnection(
-                            edge.edge_id.clone(),
-                        ),
-                    );
-                }
-                if edge.connection_evidence == ConnectionEvidence::Contradicted {
-                    issues.push(
-                        NetworkIssue::ContradictedConnectionMarkedTraversable(
-                            edge.edge_id.clone(),
-                        ),
-                    );
+                match edge.connection_evidence {
+                    ConnectionEvidence::DirectlyObserved => {}
+                    ConnectionEvidence::Contradicted => {
+                        issues.push(
+                            NetworkIssue::ContradictedConnectionMarkedTraversable(
+                                edge.edge_id.clone(),
+                            ),
+                        );
+                    }
+                    _ => {
+                        issues.push(
+                            NetworkIssue::DemonstratedTraversalWithoutObservedConnection(
+                                edge.edge_id.clone(),
+                            ),
+                        );
+                    }
                 }
                 if refs.is_empty() {
                     issues.push(NetworkIssue::EdgeMissingEvidence(edge.edge_id.clone()));
@@ -1261,6 +1264,40 @@ mod tests {
         let input = record.into_belief_input();
         assert!(input.has_declared_authorized_activity);
         assert!(input.planetary_protection_review_required);
+    }
+
+    #[test]
+    fn demonstrated_access_requires_its_own_evidence_reference() {
+        let mut record: SiteEvidenceRecord =
+            serde_json::from_str(SITE_FIXTURE).expect("fixture JSON");
+        record.accessibility.state = AccessibilityState::RobotAccessDemonstrated;
+        record.accessibility.access_method = Some("tethered rover".into());
+        record.accessibility.egress_method = Some("reverse tether".into());
+        record.accessibility.evidence_refs.clear();
+        assert!(record
+            .validate()
+            .unwrap_err()
+            .contains(&SiteIssue::DemonstratedAccessMissingEvidence));
+    }
+
+    #[test]
+    fn unsupported_site_schema_version_is_rejected() {
+        let mut record: SiteEvidenceRecord =
+            serde_json::from_str(SITE_FIXTURE).expect("fixture JSON");
+        record.schema_version = "0.2".into();
+        assert!(record
+            .validate()
+            .unwrap_err()
+            .contains(&SiteIssue::UnsupportedSchemaVersion("0.2".into())));
+    }
+
+    #[test]
+    fn site_deserializer_rejects_unknown_top_level_fields() {
+        let invalid = format!("{{\n  \"unexpected\": true,{}", &SITE_FIXTURE[1..]);
+        assert!(matches!(
+            intake_site_json(&invalid),
+            Err(SiteIntakeError::Json(_))
+        ));
     }
 
     #[test]
