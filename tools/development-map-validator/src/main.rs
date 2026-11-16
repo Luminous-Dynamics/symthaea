@@ -13,6 +13,7 @@ use development_map_validator::{
     partial_order::evaluate_partial_order_json,
     identifiability::evaluate_identifiability_json,
     oracle_integrity::evaluate_oracle_integrity_json,
+    whole_dag::evaluate_whole_dag_json,
     validate_document_json,
 };
 
@@ -33,6 +34,7 @@ fn usage() {
     eprintln!("  development-map-validator partial-order <bundle.json>");
     eprintln!("  development-map-validator identifiability <bundle.json>");
     eprintln!("  development-map-validator oracle-integrity <bundle.json>");
+    eprintln!("  development-map-validator whole-dag <bundle.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
     eprintln!("projects source files, composes a Git tree snapshot, or replays a pinned epistemic temporal ledger.");
@@ -519,6 +521,36 @@ fn evaluate_oracle_integrity_file(args: &[String]) -> i32 {
     }
 }
 
+
+fn evaluate_whole_dag_file(args: &[String]) -> i32 {
+    if args.len() != 2 {
+        usage();
+        return 2;
+    }
+    let path = &args[1];
+    let input = match read_input(path, "D6.13-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match evaluate_whole_dag_json(&input) {
+        Err(error) => {
+            eprintln!("ERROR D6.13-WHOLE-DAG-001 {path}: {error}");
+            1
+        }
+        Ok(report) => match serde_json::to_string_pretty(&report) {
+            Ok(output) => {
+                println!("{output}");
+                println!("NOTE evaluator-only finite-DAG report; the supplied admissible-world set is not independently proven complete");
+                0
+            }
+            Err(error) => {
+                eprintln!("ERROR D6.13-WHOLE-DAG-JSON-001 {path}: {error}");
+                2
+            }
+        },
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -544,6 +576,7 @@ fn main() {
         "partial-order" => evaluate_partial_order_file(&args),
         "identifiability" => evaluate_identifiability_file(&args),
         "oracle-integrity" => evaluate_oracle_integrity_file(&args),
+        "whole-dag" => evaluate_whole_dag_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {
             usage();

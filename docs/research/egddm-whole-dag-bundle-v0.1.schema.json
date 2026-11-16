@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-whole-dag-bundle-v0.1.schema.json",
+  "title": "EGDDM D6.13 whole-DAG bundle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundle_id",
+    "bundle_visibility",
+    "candidate_view",
+    "gold_overlay",
+    "candidate_traces"
+  ],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_visibility": {
+      "const": "evaluator_only_never_candidate_visible"
+    },
+    "candidate_view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "events",
+        "pair_tasks"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event_id",
+              "available_at"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "available_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "pair_tasks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "pair_id",
+              "left_event_id",
+              "right_event_id",
+              "decision_cutoff",
+              "critical"
+            ],
+            "properties": {
+              "pair_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "left_event_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "right_event_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "decision_cutoff": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "critical": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      }
+    },
+    "gold_overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adjudication_status",
+        "admissible_worlds"
+      ],
+      "properties": {
+        "adjudication_status": {
+          "const": "synthetic_known_answer_not_independently_adjudicated"
+        },
+        "admissible_worlds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "world_id",
+              "hidden_event_ids",
+              "happens_before_edges"
+            ],
+            "properties": {
+              "world_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "hidden_event_ids": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "happens_before_edges": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/edge"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "candidate_traces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "asserted_happens_before_edges",
+          "pair_claims",
+          "claimed_worlds"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "asserted_happens_before_edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/edge"
+            }
+          },
+          "pair_claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pair_id",
+                "claimed_relation",
+                "evidence_event_ids"
+              ],
+              "properties": {
+                "pair_id": {
+                  "type": "string"
+                },
+                "claimed_relation": {
+                  "enum": [
+                    "before",
+                    "after",
+                    "concurrent",
+                    "underdetermined",
+                    "compromised"
+                  ]
+                },
+                "evidence_event_ids": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "claimed_worlds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "world_claim_id",
+                "happens_before_edges"
+              ],
+              "properties": {
+                "world_claim_id": {
+                  "type": "string"
+                },
+                "happens_before_edges": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/edge"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "edge": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
