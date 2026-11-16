@@ -373,3 +373,88 @@ References:
 7. Keep QHDC, HHLF cryptography and standardized PQC deployment in separate categories.
 
 **Status:** literature watch and research implications only. No result in this addendum has been reproduced by Symthaea.
+
+
+
+## Additional frontier findings — verified 2026-11-16
+
+These papers materially refine the benchmark baselines and acceptance criteria. Their results are claims from the cited studies, not reproduced Symthaea results.
+
+### A. Full Lyapunov-spectrum reliability — November 2026
+
+**A Framework for the Assessment of Lyapunov Spectrum Computation Methods for Nonlinear Systems of Increasing Dynamical Complexity**, *Communications in Nonlinear Science and Numerical Simulation* 163 (November 2026), DOI: [10.1016/j.cnsns.2026.110493](https://doi.org/10.1016/j.cnsns.2026.110493).
+
+The study proposes a reliability-oriented assessment using full-spectrum error, trace/divergence consistency error and determinant-consistency error. It classifies methods as reliable, conditionally reliable or diagnostic-only, and warns that agreement on the largest exponent may still coexist with a poor reconstruction of the full spectrum.
+
+**Immediate change to Symthaea's qualification contract:**
+
+- Compare every estimated exponent in the spectrum, not only the maximum.
+- For systems with a known Jacobian, compare the sum of exponents against the long-time average divergence (trace of the Jacobian) under matching conventions.
+- Check determinant/volume-evolution consistency for the tangent propagator where a suitable reference is available.
+- Run QR/reorthogonalization sensitivity tests and report transient, timestep, window and initial-condition sensitivity.
+- Do not compute or publish Kaplan–Yorke dimension as qualified when the spectrum is only diagnostic.
+- Label results Reliable, ConditionallyReliable, DiagnosticOnly or Inconclusive, with machine-readable reasons.
+
+This is a particularly high-value addition to the existing chaos-dynamics audit.
+
+### B. Next-generation reservoir computing — January 2026
+
+Cestnik and Martens, **Next-generation reservoir computing for dynamical inference**, *Chaos* 36(1), 013115 (2026), DOI: [10.1063/5.0302319](https://doi.org/10.1063/5.0302319).
+
+The paper introduces a scalable NGRC implementation using pseudorandom nonlinear projections of time-delay embedded inputs. It reports attractor reconstruction and bifurcation-diagram estimation with partial/noisy measurements, and reports that small amounts of training noise can improve long-horizon autonomous stability.
+
+**Benchmark implication:** NGRC must become a mandatory baseline for Symthaea's CfC/LTC and reservoir experiments. Compare exact feature budgets, trainable parameter count, training data, inference cost, autonomous rollout stability and distributional fidelity. Test whether the noise-regularization benefit persists on held-out parameter regimes rather than only the authors' reported cases.
+
+### C. Complex Ginzburg–Landau reservoir — October 2026
+
+Chong, Sun and Xu, **Reservoir computing with complex Ginzburg–Landau lattice dynamics for chaotic time-series prediction**, *Chaos, Solitons & Fractals* 211 (October 2026), article 118873, DOI: [10.1016/j.chaos.2026.118873](https://doi.org/10.1016/j.chaos.2026.118873).
+
+The study reports a 16-complex-node CGLE lattice reservoir with R-squared greater than 0.999 on Lorenz next-step prediction. It compares with ESN, NGRC and linear AR, and notes that the Lorenz next-step task is near-linear. Its own ablations report task-dependent benefit from CGLE nonlinearity and a memory–responsiveness trade-off controlled by dissipation.
+
+**Benchmark implication:** add CGLE-reservoir results where reproducible implementation details are available, but do not let next-step Lorenz R-squared stand in for chaotic forecasting capability. Require autonomous rollout, forecast horizon in Lyapunov times, attractor/statistical fidelity, parameter extrapolation and non-Lorenz systems.
+
+### D. VSA for object-centric program synthesis — October 2026
+
+Joffe and Eliasmith, **Vector symbolic algebras for the Abstraction and Reasoning Corpus**, *npj Unconventional Computing* 3, article 54 (published 2026-10-01), [article](https://www.nature.com/articles/s44335-026-00100-5).
+
+The paper uses VSAs for object-centric program synthesis and reports 10.8% ARC-AGI-1 Train and 3.0% ARC-AGI-1 Eval, as well as 94.5% Sort-of-ARC, 83.1% 1D-ARC and 20.5% ConceptARC. The authors explicitly describe the ARC-AGI results as preliminary and far from state of the art; DSL coverage is a material limitation.
+
+**Benchmark implication:** this is a useful architectural comparator for Symthaea's HDC + symbolic/program reasoning, not an SOTA result to copy. Add object-centric scene decomposition, explicit transformation DSL coverage, compositional generalization, sample efficiency, search cost and held-out operator composition. Report the trade-off between interpretable symbolic programs and raw task coverage.
+
+### E. Hardware-aware sparse HDC — ISLPED 2026
+
+Oh et al., **HyperSPACE: Sparse-Adder-Compatible Encoding for Efficient Hyperdimensional Computing on Digital CIM Arrays**, ISLPED 2026, DOI: [10.1145/3816440.3818512](https://doi.org/10.1145/3816440.3818512).
+
+The reported design uses AND-binding, sparsity-tuned projection vectors and adaptive binary quantization on 128×64 digital SRAM compute-in-memory arrays. The authors report up to 13.03× lower encoding energy and up to +3.82% classification accuracy across four benchmarks.
+
+**Benchmark implication:** add sparse/quantized binding as an HDC hardware-efficiency axis. Compare recall/accuracy and robustness at equal memory and energy budgets; do not treat the paper's encoding-energy result as a general end-to-end energy improvement or as a software CPU result.
+
+### F. Generalized holographic reduced representations — distinguish the related papers
+
+Two closely related 2026 research outputs should be tracked separately:
+
+1. **Scalable Symbolic Reasoning with Matrix-Based Brain-Inspired Representations and Vector-Space Acceleration**, DATE 2026, DOI: [10.23919/DATE69613.2026.11539261](https://doi.org/10.23919/DATE69613.2026.11539261).
+2. Chung et al., **Vector-Space Projection and Unified Complex-Valued Acceleration for Scaling Matrix-Based Brain-Inspired Representations**, ISLPED 2026, DOI: [10.1145/3816440.3818598](https://doi.org/10.1145/3816440.3818598). An arXiv version was posted 2026-11-12: [arXiv:2611.16363](https://arxiv.org/abs/2611.16363).
+
+Both explore non-commutative matrix binding for ordered/graph/hierarchical structures and vector-space/hardware acceleration approaches. Keep their venues, claims and baselines distinct when citing or reproducing them.
+
+### G. Quantum HDC — physical feasibility is not quantum advantage
+
+Cumbo et al., **Quantum hyperdimensional computing: a foundational paradigm for quantum neuromorphic architectures**, *npj Unconventional Computing* 3, 21 (published 2026-05-04), DOI: [10.1038/s44335-026-00064-6](https://doi.org/10.1038/s44335-026-00064-6).
+
+The work reports a QHDC implementation tested on a 156-qubit IBM Heron r3 processor. Its own hardware-noise discussion is important: at dimension 128, the physical execution averaged 54.75% weighted F1 with a transpiled Hadamard-test depth of 510; a hardware-aware dimension-32 configuration achieved 68.59% weighted F1 with depth 126, but still required about 52 minutes of QPU time per reported execution. The authors explicitly state that the primary result is physical feasibility of the mapping, not an immediate performance advantage over mature classical HDC.
+
+**Benchmark implication:** treat QHDC as a separate hardware research axis. Compare it with strong classical HDC and conventional ML on identical tasks, including total wall time, QPU time, circuit depth, shots, error mitigation, energy and result quality. Do not infer PQC security or general quantum advantage.
+
+### Updated baseline matrix
+
+| Symthaea research task | Required comparison set |
+|---|---|
+| Full Lyapunov spectrum | Independent Benettin/QR, variational equations, trace/divergence and determinant/volume checks |
+| Chaotic forecasting | Persistence, AR, ESN, NGRC, CGLE reservoir where reproducible, current CfC/LTC, strong recurrent/state-space models |
+| HDC representation | HRR, FHRR, MAP/BSC/TPR, GHRR, sparse/quantized HyperSPACE-like encoding, conventional learned embeddings |
+| Symbolic / object-centric reasoning | Explicit DSL/program synthesis, VSA-based scene/object representations, strong conventional neurosymbolic and task-specific baselines |
+| Quantum HDC | Classical HDC and ML, plus hardware-noise and resource accounting; never quantum baselines alone |
+| Critical transitions | Persistence/trend, CSD-only, nonlinear diagnostics, network cascade models and ensemble warning approaches |
+
+**Updated principle:** compare the strongest available baseline under a matched experimental budget. A new architecture should be retained only when its contribution survives ablation, held-out regimes, uncertainty analysis and independent reproduction.
