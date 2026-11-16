@@ -1,0 +1,47 @@
+{
+  "network_id": "synthetic-moon-cave-network-01",
+  "nodes": ["entrance", "chamber-a", "chamber-b", "suspected-chamber"],
+  "edges": [
+    {
+      "edge_id": "entrance-to-a",
+      "node_a": "entrance",
+      "node_b": "chamber-a",
+      "length_m": 12.0,
+      "connection_evidence": "directly_observed",
+      "traversability": "demonstrated",
+      "direction": "undirected",
+      "evidence_refs": ["synthetic-robot-traverse-01", "synthetic-interior-map-01"]
+    },
+    {
+      "edge_id": "a-to-b",
+      "node_a": "chamber-a",
+      "node_b": "chamber-b",
+      "length_m": 18.0,
+      "connection_evidence": "directly_observed",
+      "traversability": "unknown",
+      "direction": "undirected",
+      "evidence_refs": ["synthetic-interior-observation-02"]
+    },
+    {
+      "edge_id": "b-to-suspected",
+      "node_a": "chamber-b",
+      "node_b": "suspected-chamber",
+      "length_m": 22.0,
+      "connection_evidence": "geophysically_supported",
+      "traversability": "unknown",
+      "direction": "undirected",
+      "evidence_refs": ["synthetic-gpr-03"]
+    },
+    {
+      "edge_id": "alternative-shortcut",
+      "node_a": "entrance",
+      "node_b": "suspected-chamber",
+      "length_m": 9.0,
+      "connection_evidence": "candidate",
+      "traversability": "candidate",
+      "direction": "undirected",
+      "evidence_refs": ["synthetic-morphology-hypothesis-04"]
+    }
+  ],
+  "notes": "Synthetic only. Directly observed topology connects entrance, chamber-a and chamber-b. Only the entrance-to-a edge has demonstrated traversability. The suspected chamber remains outside confirmed topology. No physical cave is represented."
+}
