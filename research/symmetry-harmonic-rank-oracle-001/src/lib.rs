@@ -32,9 +32,7 @@ impl GroupHypothesisV1 {
         match self {
             Self::Cyclic { order: 0 } => Err(TemplateErrorV1::ZeroGroupOrder),
             Self::Cyclic { order } => Ok(order),
-            Self::RotationalDihedral { order: 0 | 1 } => {
-                Err(TemplateErrorV1::InvalidDihedralOrder)
-            }
+            Self::RotationalDihedral { order: 0 | 1 } => Err(TemplateErrorV1::InvalidDihedralOrder),
             Self::RotationalDihedral { order } => order
                 .checked_mul(2)
                 .ok_or(TemplateErrorV1::ArithmeticOverflow),
@@ -189,10 +187,7 @@ fn preflight(
 /// Exact multiplicity of the trivial representation in V_l restricted to C_n.
 ///
 /// The fixed weights are m = 0, ±n, ±2n, ..., ±floor(l/n)n.
-pub fn cyclic_fixed_dimension(
-    degree: usize,
-    order: usize,
-) -> Result<usize, TemplateErrorV1> {
+pub fn cyclic_fixed_dimension(degree: usize, order: usize) -> Result<usize, TemplateErrorV1> {
     if order == 0 {
         return Err(TemplateErrorV1::ZeroGroupOrder);
     }
@@ -204,10 +199,7 @@ pub fn cyclic_fixed_dimension(
 
 /// Independent explicit weight count for C_n. It is intentionally simple and
 /// used as an oracle for the closed-form cyclic formula.
-fn cyclic_weight_count(
-    degree: usize,
-    order: usize,
-) -> Result<usize, TemplateErrorV1> {
+fn cyclic_weight_count(degree: usize, order: usize) -> Result<usize, TemplateErrorV1> {
     if order == 0 {
         return Err(TemplateErrorV1::ZeroGroupOrder);
     }
@@ -259,10 +251,7 @@ pub fn dihedral_character_fixed_dimension(
 /// Independent weight-pair derivation for D_n:
 /// each positive multiple of n contributes one invariant ±m combination;
 /// m=0 contributes one extra mode exactly when l is even.
-fn dihedral_weight_pair_count(
-    degree: usize,
-    order: usize,
-) -> Result<usize, TemplateErrorV1> {
+fn dihedral_weight_pair_count(degree: usize, order: usize) -> Result<usize, TemplateErrorV1> {
     if order < 2 {
         return Err(TemplateErrorV1::InvalidDihedralOrder);
     }
@@ -339,18 +328,12 @@ pub fn is_subgroup_of(
 
     Ok(match (subgroup, supergroup) {
         (GroupHypothesisV1::Cyclic { .. }, GroupHypothesisV1::Cyclic { .. }) => divides,
-        (
-            GroupHypothesisV1::Cyclic { .. },
-            GroupHypothesisV1::RotationalDihedral { .. },
-        ) => divides,
+        (GroupHypothesisV1::Cyclic { .. }, GroupHypothesisV1::RotationalDihedral { .. }) => divides,
         (
             GroupHypothesisV1::RotationalDihedral { .. },
             GroupHypothesisV1::RotationalDihedral { .. },
         ) => divides,
-        (
-            GroupHypothesisV1::RotationalDihedral { .. },
-            GroupHypothesisV1::Cyclic { .. },
-        ) => false,
+        (GroupHypothesisV1::RotationalDihedral { .. }, GroupHypothesisV1::Cyclic { .. }) => false,
     })
 }
 
@@ -567,7 +550,10 @@ mod tests {
                 } else {
                     (cyclic - 1) / 2
                 };
-                assert_eq!(dihedral_character_fixed_dimension(degree, order).unwrap(), expected);
+                assert_eq!(
+                    dihedral_character_fixed_dimension(degree, order).unwrap(),
+                    expected
+                );
             }
         }
     }
@@ -618,7 +604,9 @@ mod tests {
                 assert!(
                     verify_subgroup_monotonicity(
                         GroupHypothesisV1::Cyclic { order: divisor },
-                        GroupHypothesisV1::Cyclic { order: parent_order },
+                        GroupHypothesisV1::Cyclic {
+                            order: parent_order
+                        },
                         32,
                         budget()
                     )
@@ -627,7 +615,9 @@ mod tests {
                 assert!(
                     verify_subgroup_monotonicity(
                         GroupHypothesisV1::Cyclic { order: divisor },
-                        GroupHypothesisV1::RotationalDihedral { order: parent_order },
+                        GroupHypothesisV1::RotationalDihedral {
+                            order: parent_order
+                        },
                         32,
                         budget()
                     )
@@ -637,7 +627,9 @@ mod tests {
                     assert!(
                         verify_subgroup_monotonicity(
                             GroupHypothesisV1::RotationalDihedral { order: divisor },
-                            GroupHypothesisV1::RotationalDihedral { order: parent_order },
+                            GroupHypothesisV1::RotationalDihedral {
+                                order: parent_order
+                            },
                             32,
                             budget()
                         )
@@ -650,14 +642,16 @@ mod tests {
 
     #[test]
     fn truncated_signatures_return_all_ambiguous_group_hypotheses() {
-        let signature =
-            rank_template(GroupHypothesisV1::Cyclic { order: 3 }, 2, budget()).unwrap();
+        let signature = rank_template(GroupHypothesisV1::Cyclic { order: 3 }, 2, budget()).unwrap();
         let proposal = match_signature(&signature, 6, budget()).unwrap();
 
         assert_eq!(signature, vec![1, 1, 1]);
         assert_eq!(proposal.status, MatchStatusV1::Ambiguous);
         assert_eq!(proposal.first_family_divergence_degree, Some(1));
-        assert_eq!(proposal.authority, TemplateAuthorityV1::CandidateProposalOnly);
+        assert_eq!(
+            proposal.authority,
+            TemplateAuthorityV1::CandidateProposalOnly
+        );
         assert_eq!(
             proposal.matching_hypotheses,
             vec![
@@ -671,9 +665,12 @@ mod tests {
 
     #[test]
     fn truncated_dihedral_signatures_return_all_ambiguous_dihedral_hypotheses() {
-        let signature =
-            rank_template(GroupHypothesisV1::RotationalDihedral { order: 3 }, 2, budget())
-                .unwrap();
+        let signature = rank_template(
+            GroupHypothesisV1::RotationalDihedral { order: 3 },
+            2,
+            budget(),
+        )
+        .unwrap();
         let proposal = match_signature(&signature, 6, budget()).unwrap();
 
         assert_eq!(signature, vec![1, 0, 1]);
@@ -697,9 +694,15 @@ mod tests {
         let d4 = GroupHypothesisV1::RotationalDihedral { order: 4 };
 
         assert_eq!(first_divergence_degree(c3, c4, 2, budget()).unwrap(), None);
-        assert_eq!(first_divergence_degree(c3, c4, 3, budget()).unwrap(), Some(3));
+        assert_eq!(
+            first_divergence_degree(c3, c4, 3, budget()).unwrap(),
+            Some(3)
+        );
         assert_eq!(first_divergence_degree(d3, d4, 2, budget()).unwrap(), None);
-        assert_eq!(first_divergence_degree(d3, d4, 3, budget()).unwrap(), Some(3));
+        assert_eq!(
+            first_divergence_degree(d3, d4, 3, budget()).unwrap(),
+            Some(3)
+        );
     }
 
     #[test]
@@ -709,7 +712,10 @@ mod tests {
         let proposal_c3 = match_signature(&c3, 6, budget()).unwrap();
         let proposal_c4 = match_signature(&c4, 6, budget()).unwrap();
 
-        assert_ne!(proposal_c3.observed_signature, proposal_c4.observed_signature);
+        assert_ne!(
+            proposal_c3.observed_signature,
+            proposal_c4.observed_signature
+        );
         assert_ne!(proposal_c3.canonical_bytes(), proposal_c4.canonical_bytes());
         assert_eq!(proposal_c3.maximum_group_parameter, 6);
         assert_eq!(proposal_c3.maximum_degree, 3);
@@ -744,7 +750,10 @@ mod tests {
     #[test]
     fn invalid_orders_empty_signatures_and_budget_exhaustion_fail_closed() {
         let d3 = GroupHypothesisV1::RotationalDihedral { order: 3 };
-        assert_eq!(rank_template(d3, 6, budget()).unwrap(), vec![1, 0, 1, 1, 2, 1, 3]);
+        assert_eq!(
+            rank_template(d3, 6, budget()).unwrap(),
+            vec![1, 0, 1, 1, 2, 1, 3]
+        );
     }
 
     #[test]
@@ -776,7 +785,7 @@ mod tests {
         let signature = rank_template(
             GroupHypothesisV1::RotationalDihedral { order: 4 },
             1,
-            budget()
+            budget(),
         )
         .unwrap();
         let proposal = match_signature(&signature, 8, budget()).unwrap();
