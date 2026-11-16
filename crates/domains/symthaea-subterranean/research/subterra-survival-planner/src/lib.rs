@@ -761,9 +761,11 @@ fn evaluate_action(
     let expected_resource_cost_units = action_cost_units + expected_future_cost_units;
     let expected_resources =
         ExpectedResources::add_action_and_future(action.cost, expected_resources)?;
+    let expected_total_value = expected_loss + expected_resource_cost_units;
 
     if !expected_loss.is_finite()
         || !expected_resource_cost_units.is_finite()
+        || !expected_total_value.is_finite()
         || !interruption_probability.is_finite()
         || !robot_loss_probability.is_finite()
     {
@@ -863,6 +865,7 @@ pub fn plan_survival_conditioned(
         expanded: 0,
         maximum: config.maximum_search_nodes,
     };
+    counter.visit()?;
     let mut root = best_stop_decision(&belief, &problem.decisions)?;
     let mut root_action_assessments = Vec::new();
 
