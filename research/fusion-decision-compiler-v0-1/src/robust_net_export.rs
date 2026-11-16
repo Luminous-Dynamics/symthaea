@@ -863,6 +863,49 @@ mod tests {
     }
 
     #[test]
+    fn parametric_plus_model_form_method_requires_and_accepts_domain_evidence() {
+        let mut receipt = lower_bound(60.0);
+        receipt.method = NetExportBoundMethod::ParametricPlusModelFormDiscrepancy;
+        receipt.method_variable_order = vec!["P_elec".to_string()];
+        receipt.covariance_receipt_ref = None;
+        receipt.covariance_receipt_sha256 = None;
+        receipt.covariance_run_id = None;
+        receipt.covariance_output_sha256 = None;
+        receipt.covariance_variable_order.clear();
+        receipt.direct_net_analysis_ref = None;
+        receipt.simultaneous_allocation_ref = None;
+        receipt.model_form_validity = ModelFormValidity::WithinDeclaredDomain;
+        receipt.model_form_evidence_ref = "measured-residual-calibration-receipt".to_string();
+        receipt.model_form_evidence_sha256 = sha('f');
+        let report = evaluate(Some(&receipt));
+        assert_eq!(
+            report.disposition,
+            RobustNetExportDisposition::RobustlyAboveReserve
+        );
+        assert!(report.evidence_refs.contains(
+            &"measured-residual-calibration-receipt".to_string()
+        ));
+    }
+
+    #[test]
+    fn parametric_plus_model_form_method_rejects_covariance_and_direct_interval_mixins() {
+        let mut receipt = lower_bound(60.0);
+        receipt.method = NetExportBoundMethod::ParametricPlusModelFormDiscrepancy;
+        receipt.method_variable_order = vec!["P_elec".to_string()];
+        receipt.covariance_receipt_ref = None;
+        receipt.covariance_receipt_sha256 = None;
+        receipt.covariance_run_id = None;
+        receipt.covariance_output_sha256 = None;
+        receipt.covariance_variable_order.clear();
+        receipt.direct_net_analysis_ref = Some("unexpected-direct-interval".to_string());
+        let report = evaluate(Some(&receipt));
+        assert_eq!(report.disposition, RobustNetExportDisposition::NotEvaluable);
+        assert!(report.diagnostics.contains(
+            &RobustNetExportDiagnostic::UnexpectedMethodReceipt
+        ));
+    }
+
+    #[test]
     fn direct_net_method_requires_direct_analysis_receipt() {
         let mut receipt = lower_bound(60.0);
         receipt.method = NetExportBoundMethod::DirectNetOutputInterval;
