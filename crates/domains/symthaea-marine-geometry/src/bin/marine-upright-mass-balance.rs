@@ -17,7 +17,7 @@ const USAGE: &str = concat!(
 #[serde(tag = "status", rename_all = "kebab-case")]
 enum CliReport {
     Solved {
-        receipt: UprightMassBalanceReceipt,
+        receipt: Box<UprightMassBalanceReceipt>,
     },
     Rejected {
         issues: Vec<SectionalReferenceIssue>,
@@ -114,7 +114,9 @@ fn run() -> Result<i32, String> {
 
     match solve_upright_mass_balance(&request) {
         Ok(receipt) => {
-            write_report(output, &CliReport::Solved { receipt })?;
+            write_report(output, &CliReport::Solved {
+                receipt: Box::new(receipt),
+            })?;
             Ok(0)
         }
         Err(issues) => {
