@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 // Synthetic CPIR source-map relation checker. This is not a TLS verifier,
 // generic HTTP parser, JSON Schema implementation, or proof verifier.
-import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
