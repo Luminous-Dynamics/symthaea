@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-whole-dag-report-v0.1.schema.json",
+  "title": "EGDDM D6.13 whole-DAG report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "visible_event_count",
+    "admissible_world_count",
+    "pair_task_count",
+    "traces",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "adjudication_status": {
+      "type": "string"
+    },
+    "visible_event_count": {
+      "type": "integer"
+    },
+    "admissible_world_count": {
+      "type": "integer"
+    },
+    "pair_task_count": {
+      "type": "integer"
+    },
+    "claim_ceiling": {
+      "type": "string"
+    },
+    "traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "entailed_visible_edges",
+          "asserted_entailed_edges",
+          "unsupported_asserted_edges",
+          "missing_entailed_edges",
+          "pair_outcomes",
+          "candidate_world_outcomes",
+          "gold_projection_count",
+          "claimed_world_count",
+          "matched_world_count",
+          "missing_world_count",
+          "extra_world_count",
+          "jointly_impossible_candidate_graph_count",
+          "cyclic_candidate_graph_count",
+          "false_concurrency_claim_count",
+          "unsupported_causal_claim_count",
+          "unnecessary_abstention_count",
+          "future_evidence_leakage_count",
+          "critical_unsupported_claim_count"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "entailed_visible_edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/edge"
+            }
+          },
+          "asserted_entailed_edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/edge"
+            }
+          },
+          "unsupported_asserted_edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/edge"
+            }
+          },
+          "missing_entailed_edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/edge"
+            }
+          },
+          "pair_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "pair_id",
+                "expected_state",
+                "admissible_relations",
+                "claimed_relation",
+                "correct",
+                "false_concurrency",
+                "unsupported_causal_claim",
+                "unnecessary_abstention",
+                "future_evidence_event_ids",
+                "critical_unsupported_claim"
+              ],
+              "properties": {
+                "pair_id": {
+                  "type": "string"
+                },
+                "expected_state": {
+                  "type": "string"
+                },
+                "admissible_relations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "claimed_relation": {
+                  "type": "string"
+                },
+                "correct": {
+                  "type": "boolean"
+                },
+                "false_concurrency": {
+                  "type": "boolean"
+                },
+                "unsupported_causal_claim": {
+                  "type": "boolean"
+                },
+                "unnecessary_abstention": {
+                  "type": "boolean"
+                },
+                "future_evidence_event_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "critical_unsupported_claim": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "candidate_world_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "world_claim_id",
+                "asserted_edges",
+                "cyclic",
+                "individually_possible_edge_count",
+                "asserted_edge_count",
+                "jointly_possible",
+                "exact_projection_match",
+                "matched_gold_world_ids"
+              ],
+              "properties": {
+                "world_claim_id": {
+                  "type": "string"
+                },
+                "asserted_edges": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/edge"
+                  }
+                },
+                "cyclic": {
+                  "type": "boolean"
+                },
+                "individually_possible_edge_count": {
+                  "type": "integer"
+                },
+                "asserted_edge_count": {
+                  "type": "integer"
+                },
+                "jointly_possible": {
+                  "type": "boolean"
+                },
+                "exact_projection_match": {
+                  "type": "boolean"
+                },
+                "matched_gold_world_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "gold_projection_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "claimed_world_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "matched_world_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missing_world_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "extra_world_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "jointly_impossible_candidate_graph_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cyclic_candidate_graph_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_concurrency_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsupported_causal_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unnecessary_abstention_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "future_evidence_leakage_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "critical_unsupported_claim_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "edge": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
