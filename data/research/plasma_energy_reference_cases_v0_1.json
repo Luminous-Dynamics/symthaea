@@ -3401,7 +3401,8 @@
       "configuration": {
         "architecture": "DBD + ALD Ru/SiO2 catalyst + 1.8 um Pd hydrogen membrane + Silicalite-1 ammonia recovery cascade",
         "reactor_temperature_c": 400,
-        "cascade_stages": 5
+        "cascade_stages": 5,
+        "hydrogen_membrane": "1.8 um Pd membrane"
       },
       "observations": [
         {
