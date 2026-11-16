@@ -277,18 +277,16 @@ fn validate_schema(
             .get("properties")
             .and_then(Value::as_object);
 
-        if let Some(properties) = properties {
-            for (key, value) in object {
-                if let Some(child_schema) = properties.get(key) {
-                    validate_schema(value, child_schema, &format!("{path}.{key}"), errors);
-                } else if schema_object.get("additionalProperties") == Some(&Value::Bool(false)) {
-                    errors.push(path_error(path, format!("unknown member {key}")));
-                } else if let Some(extra_schema) = schema_object
-                    .get("additionalProperties")
-                    .filter(|value| value.is_object())
-                {
-                    validate_schema(value, extra_schema, &format!("{path}.{key}"), errors);
-                }
+        for (key, value) in object {
+            if let Some(child_schema) = properties.and_then(|items| items.get(key)) {
+                validate_schema(value, child_schema, &format!("{path}.{key}"), errors);
+            } else if schema_object.get("additionalProperties") == Some(&Value::Bool(false)) {
+                errors.push(path_error(path, format!("unknown member {key}")));
+            } else if let Some(extra_schema) = schema_object
+                .get("additionalProperties")
+                .filter(|value| value.is_object())
+            {
+                validate_schema(value, extra_schema, &format!("{path}.{key}"), errors);
             }
         }
     }
@@ -907,8 +905,8 @@ mod tests {
     #[test]
     fn clock_offset_cannot_be_mistaken_for_readout_latency() {
         let (mut document, schema) = tracked_values();
-        case_mut(&mut document, "TAC-CLOCK-017")["candidate_input"]["receipt_time_ms"] =
-            json!(1250);
+        case_mut(&mut document, "TAC-CLOCK-017")["candidate_input"]["time_ms"] =
+            json!(1249);
         assert!(validate_document(&document, &schema).is_err());
     }
 
@@ -916,7 +914,7 @@ mod tests {
     fn self_test_pass_does_not_clear_scale_drift() {
         let (mut document, schema) = tracked_values();
         case_mut(&mut document, "TAC-SELFTEST-028")["evaluator_only"]["expected"]
-            ["qc_flags"] = json!([""]);
+            ["qc_flags"] = json!(["self_test_insufficient"]);
         assert!(validate_document(&document, &schema).is_err());
     }
 
