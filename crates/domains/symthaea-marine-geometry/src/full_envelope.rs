@@ -731,12 +731,36 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
             );
             continue;
         }
-        if deck_section.points.len() < 2 || deck_section.points.len() > 128 {
+        let is_pointed_end = (station.station_id == spec.stations[0].station_id
+            && spec.end_conditions.bow == HullEndCondition::PointedStem)
+            || (spec.stations.last().is_some_and(|item| station.station_id == item.station_id)
+                && spec.end_conditions.stern == HullEndCondition::PointedStem);
+        if deck_section.points.len() > 128
+            || (is_pointed_end && deck_section.points.len() != 1)
+            || (!is_pointed_end && deck_section.points.len() < 2)
+        {
             reject(
                 issues,
                 "deck_point_count",
-                format!("deck section {} must contain 2..=128 points", station.station_id),
+                format!(
+                    "deck section {} must contain one collapsed point at a pointed end or 2..=128 points otherwise",
+                    station.station_id
+                ),
             );
+            continue;
+        }
+        if is_pointed_end {
+            let point = &deck_section.points[0];
+            if point.role != DeckPointRole::DeckCrown
+                || !close(point.y_m, 0.0)
+                || point.z_m >= -COORDINATE_TOLERANCE_M
+            {
+                reject(
+                    issues,
+                    "pointed_deck_endpoint",
+                    format!("pointed-end deck section {} must collapse to one above-waterline centreplane crown point", station.station_id),
+                );
+            }
             continue;
         }
         let mut ids = BTreeSet::new();
@@ -777,7 +801,9 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
             );
         }
 
-        let starboard_sheer = station.starboard_profile.last().expect("profile length validated later");
+        let Some(starboard_sheer) = station.starboard_profile.last() else {
+            continue;
+        };
         let deck_starboard = deck_section.points.last().expect("deck point count checked");
         if deck_starboard.point_id != starboard_sheer.point_id
             || !close(deck_starboard.y_m, starboard_sheer.y_m)
@@ -809,7 +835,9 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
                 let Some(port_profile) = station.port_profile.as_ref() else {
                     continue;
                 };
-                let port_sheer = port_profile.last().expect("port profile length validated later");
+                let Some(port_sheer) = port_profile.last() else {
+                    continue;
+                };
                 if deck_port.point_id != port_sheer.point_id
                     || !close(deck_port.y_m, port_sheer.y_m)
                     || !close(deck_port.z_m, port_sheer.z_m)
@@ -869,6 +897,26 @@ fn validate_boundary_and_components(spec: &FullEnvelopeSpec, issues: &mut Vec<Fu
         _ => {}
     }
 
+    let mut resolvable_point_ids = BTreeSet::<String>::new();
+    for station in &spec.stations {
+        for point in &station.starboard_profile {
+            resolvable_point_ids.insert(point.point_id.clone());
+            if spec.symmetry == SymmetryPolicy::SymmetricAboutY0 {
+                resolvable_point_ids.insert(format!("MIRROR:{}", point.point_id));
+            }
+        }
+        if let Some(port_profile) = station.port_profile.as_ref() {
+            for point in port_profile {
+                resolvable_point_ids.insert(point.point_id.clone());
+            }
+        }
+    }
+    for deck_section in &spec.deck_surface.sections {
+        for point in &deck_section.points {
+            resolvable_point_ids.insert(point.point_id.clone());
+        }
+    }
+
     let mut opening_ids = BTreeSet::new();
     for opening in &boundary.openings {
         if opening.opening_id.trim().is_empty() || !opening_ids.insert(opening.opening_id.as_str()) {
@@ -894,6 +942,15 @@ fn validate_boundary_and_components(spec: &FullEnvelopeSpec, issues: &mut Vec<Fu
                 "opening_boundary_references",
                 format!("opening {} has empty or duplicate point references", opening.opening_id),
             );
+        }
+        for point_id in &opening.boundary_point_refs {
+            if !resolvable_point_ids.contains(point_id) {
+                reject(
+                    issues,
+                    "opening_boundary_point_reference",
+                    format!("opening {} references unknown point {}", opening.opening_id, point_id),
+                );
+            }
         }
         if opening.status == OpeningStatus::UnsupportedRequiresReview {
             incomplete(
@@ -1111,7 +1168,7 @@ mod tests {
 
     fn box_fixture() -> FullEnvelopeSpec {
         serde_json::from_str(include_str!(
-            "../docs/research/marine/fixtures/marine-full-envelope-box-001.json"
+            "../../../../docs/research/marine/fixtures/marine-full-envelope-box-001.json"
         ))
         .unwrap()
     }
@@ -1201,7 +1258,8 @@ mod tests {
     #[test]
     fn symmetric_hull_must_not_supply_a_separate_port_profile() {
         let mut spec = box_fixture();
-        spec.stations[0].port_profile = Some(spec.stations[0].starboard_profile.clone());
+        let port_profile = spec.stations[0].starboard_profile.clone();
+        spec.stations[0].port_profile = Some(port_profile);
         assert_rejected(&spec, "symmetric_port_profile_supplied");
     }
 
