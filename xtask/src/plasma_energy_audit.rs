@@ -1195,7 +1195,7 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     "{display_name}: ammonia competitiveness target {target_id} must retain the 8.14 kWh/kg modeled SOEC-HB reference"
                 );
                 ensure!(
-                    improvement >= 0.10 && improvement < 1.0,
+                    (0.10..1.0).contains(&improvement),
                     "{display_name}: ammonia competitiveness target {target_id} must require at least a 10% improvement"
                 );
                 ensure!(
