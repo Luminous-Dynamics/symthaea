@@ -191,20 +191,7 @@ The deterministic multi-source differential regression generates 48 event arriva
 
 ## Reproducible source-watermark scaling benchmark
 
-`src/bin/watermark_scaling.rs` builds deterministic ledgers with 4,096, 16,384 and 65,536 late-arrival
-records. It crosses source counts 1/4/16, half-open interval widths 1/16/256
-microseconds, and early/full knowledge cutoffs (54 workload combinations).
-Event-time keys are permuted relative to four receipt-time batches. Each case
-compares 51 indexed queries with 15 `completeness_verified` queries that replay
-and validate the full history. CSV output includes source count, interval width,
-knowledge cutoff, event-time buckets visited, receipt candidates examined,
-matching breaches and indexed p50/p95/p99 and verified median/worst-observed latency. The benchmark requires exact equality between the indexed report and the
-verified receipt's report, and checks that the receipt digest matches the
-ledger snapshot before timing. The benchmark is diagnostic, not a physical
-energy measurement; runner CPU model, toolchain, release profile and exact
-source/fixture hashes must accompany each artifact. The latest run has not
-completed; no latency advantage is asserted yet.
-
+`src/bin/watermark_scaling.rs` builds deterministic ledgers with 4,096, 16,384 and 65,536 event records. It crosses source counts 1/4/16, half-open interval widths 1/16/256 microseconds, four late-event densities (0, 100, 5,000 and 10,000 basis points), and early/full knowledge cutoffs (216 workload combinations). Event-time keys are permuted relative to four receipt-time batches. Each case compares 51 indexed queries with 15 `completeness_verified` queries that replay and validate the full history. The audit path returns a non-forgeable `VerifiedCompletenessReport` containing the ledger digest and record counts; the benchmark checks its report against the fast indexed result and checks the receipt digest against the ledger before timing. CSV output includes source count, interval width, late-event rate, knowledge cutoff, event-time buckets visited, receipt candidates examined, matching breaches and indexed p50/p95/p99 plus verified median/worst-observed latency. This is diagnostic in-memory CPU timing, not a physical energy or durable-WAL measurement; runner CPU model, toolchain, release profile and exact source/fixture hashes must accompany each artifact. The latest run has not completed; no latency advantage is asserted yet.
 
 ## Current foundation-model comparator snapshot
 
