@@ -151,10 +151,10 @@ Contents:
 - science-return lifecycle validator and site/observation linkage;
 - a separate site-disjoint likelihood-calibration reference crate for Training-only empirical likelihood estimates, Calibration/Evaluation proper scoring and a guarded conversion into EVSI inputs;
 - copied synthetic site, network and profile fixtures;
-- 21 site/network tests, 6 profile tests and 39 science-return tests (66 adapter cases total); 19 site-disjoint likelihood-calibration tests and 47 dependence-auditor tests in their separate packages.
+- 21 site/network tests, 6 profile tests, 39 science-return tests and 14 standards-attestation tests (80 adapter cases total); 19 site-disjoint likelihood-calibration tests and 47 dependence-auditor tests in their separate packages.
 - Pinned upstream schema/fixture manifest and explicit local verification script for the six nested Cargo packages.
 
-Across the complete current Symthaea Subterra PR, the six standalone packages have 163 authored Rust unit tests (10 EVSI + 11 survival + 10 robust EVSI + 21 site/network + 6 profile + 39 science-return + 19 likelihood calibration + 47 dependence audit). This is a source count only; none has been compiled or executed in the current environment.
+Across the complete current Symthaea Subterra PR, the six standalone packages have 177 authored Rust unit tests (10 EVSI + 11 survival + 10 robust EVSI + 21 site/network + 6 profile + 39 science-return + 19 likelihood calibration + 47 dependence audit). This is a source count only; none has been compiled or executed in the current environment.
 
 ### Verification status
 

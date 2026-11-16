@@ -741,7 +741,7 @@ mod tests {
         };
         let mut sign1 = CoseSign1::from_cbor_value(*inner).unwrap();
         sign1.protected.original_data = None;
-        sign1.protected.header.alg = Some(iana::Algorithm::ES256);
+        sign1.protected.header.alg = Some(iana::Algorithm::A128GCM);
         let tampered = Value::Tag(
             SCITT_COSE_SIGN1_TAG,
             Box::new(sign1.to_cbor_value().unwrap()),
