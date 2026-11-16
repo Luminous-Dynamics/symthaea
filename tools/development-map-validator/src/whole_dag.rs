@@ -94,7 +94,6 @@ struct PairTask {
 struct World {
     world_id: String,
     visible_projection: BTreeSet<(String, String)>,
-    all_nodes: BTreeSet<String>,
     closure: BTreeSet<(String, String)>,
 }
 
@@ -351,7 +350,6 @@ fn parse_worlds(
         worlds.push(World {
             world_id,
             visible_projection,
-            all_nodes,
             closure,
         });
     }
@@ -527,8 +525,11 @@ fn score_trace(
             .collect();
         let correct = claimed_relation == &expected_state;
         let false_concurrency = claimed_relation == "concurrent" && expected_state != "concurrent";
+        // A relation appearing in one admissible world is not enough to
+        // justify asserting it as a definite fact. It must hold in every
+        // admissible world (i.e. equal the entailed pair state).
         let unsupported_causal_claim = ["before", "after"].contains(&claimed_relation.as_str())
-            && !relations.contains(claimed_relation);
+            && claimed_relation != &expected_state;
         let unnecessary_abstention =
             claimed_relation == "underdetermined" && expected_state != "underdetermined";
         let critical_unsupported_claim = task.critical
@@ -758,6 +759,19 @@ mod tests {
             .expect("impossible mixed graph");
         assert!(impossible.individually_possible_edge_count > 0);
         assert!(!impossible.jointly_possible);
+    }
+
+    #[test]
+    fn rejects_a_relation_that_is_possible_but_not_entailed() {
+        let report = evaluate_whole_dag_json(FIXTURE).expect("D6.13 fixture");
+        let adversarial = trace(&report, "pairwise-marginals-combined");
+        let pair = adversarial.pair_outcomes.iter()
+            .find(|item| item.pair_id == "order-flip")
+            .expect("order-flip pair");
+        assert_eq!(pair.expected_state, "underdetermined");
+        assert!(pair.admissible_relations.contains(&"before".to_owned()));
+        assert!(pair.unsupported_causal_claim);
+        assert!(adversarial.unsupported_causal_claim_count >= 3);
     }
 
     #[test]
