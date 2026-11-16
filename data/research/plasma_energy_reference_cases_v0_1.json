@@ -3017,6 +3017,368 @@
         "No Luminous reproduction or independent experiment has been performed."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-PLASMA-DILUENTS-NSP-2026",
+      "lane": "AMMONIA_CRACKING",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Role of diluents in hydrogen production via plasma assisted ammonia decomposition",
+        "publisher": "Energy Conversion and Management",
+        "publication_date": "2026-10-01",
+        "volume": "365",
+        "article_number": "121791",
+        "doi": "10.1016/j.enconman.2026.121791",
+        "url": "https://doi.org/10.1016/j.enconman.2026.121791"
+      },
+      "configuration": {
+        "reactor_type": "nanosecond-pulsed plasma discharge",
+        "feedstock": "NH3 with Ar, He, N2 or O2 diluents",
+        "process_temperature_basis": "room-temperature feed without preheating as described by the study",
+        "tested_variables": [
+          "diluent identity and fraction",
+          "pressure",
+          "flow rate",
+          "discharge voltage",
+          "frequency",
+          "pulse width",
+          "small oxygen addition"
+        ]
+      },
+      "observations": [
+        {
+          "metric": "ammonia_conversion",
+          "value": 0.58,
+          "qualifier": "up to 58% reported in argon-diluted cases; source does not pair this maximum conversion with the peak H2 energy-yield condition",
+          "unit": "fraction"
+        },
+        {
+          "metric": "hydrogen_energy_yield",
+          "value": 1.8,
+          "qualifier": "peak reported yield in argon-diluted cases under a different operating condition; must not be cross-paired with the 58% conversion maximum",
+          "unit": "g_H2/kWh"
+        },
+        {
+          "metric": "maximum_diluent_fraction_for_peak_yield",
+          "value": 0.9,
+          "qualifier": "reported for NH3/Ar and NH3/He energy-yield maxima; source-specific, not a universal optimum",
+          "unit": "fraction"
+        },
+        {
+          "metric": "helium_temperature_relationship",
+          "value": "electron-driven dissociation persists at the lowest reported gas temperature",
+          "qualifier": "qualitative source-reported mechanism; gas temperature is not a proxy for electron energy distribution",
+          "unit": "qualitative"
+        },
+        {
+          "metric": "nitrogen_dilution_effect",
+          "value": "lower hydrogen production and yield in the studied configuration",
+          "qualifier": "source-specific to this nanosecond pulsed reactor and conditions",
+          "unit": "qualitative"
+        },
+        {
+          "metric": "oxygen_addition_effect",
+          "value": "small O2 addition inhibits plasma-assisted H2 production",
+          "qualifier": "opposite to the direction reported in some high-temperature thermocatalytic systems; do not generalize beyond the studied plasma chemistry",
+          "unit": "qualitative"
+        }
+      ],
+      "source_conclusion": "The study reports NH3 conversion up to 58% and peak H2 yield of 1.8 g/kWh for Ar-diluted nanosecond-pulsed plasma under different conditions. He supports electron-driven dissociation despite low gas temperature; N2 dilution performs worse in the studied configuration; small O2 additions inhibit H2 production. Diluent identity, fraction, pressure, flow and discharge parameters interact non-monotonically.",
+      "comparison_status": "SOURCE_SPECIFIC_DILUENT_EXPERIMENT_WITH_UNPAIRED_PEAK_METRICS",
+      "blockers": [
+        "The 58% conversion maximum and 1.8 g/kWh peak yield are reported under different operating conditions and must not be combined into one point.",
+        "The result is a nanosecond-pulsed discharge, not the atmospheric microwave reactor or reduced-pressure microwave reactor.",
+        "The source summary does not establish a full wall-plug-to-purified-H2 system boundary, downstream separation/recycle energy, or accepted product purity.",
+        "Diluents alter chemistry, ionization and flow; the Ar/He/N2/O2 findings must not be transferred to other plasma regimes without matched evidence.",
+        "No Luminous reproduction or independent validation has occurred."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-THERMAL-HEAT-INTEGRATED-PLANT-TEA-2026",
+      "lane": "AMMONIA_CRACKING",
+      "evidence_class": "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+      "source": {
+        "title": "Dynamic modeling and techno-economic analysis of a heat-integrated NH3 cracking plant for cost-effective H2 production under uncertainty",
+        "publisher": "Applied Energy",
+        "publication_date": "2026-03-01",
+        "volume": "406",
+        "article_number": "127210",
+        "doi": "10.1016/j.apenergy.2025.127210",
+        "url": "https://doi.org/10.1016/j.apenergy.2025.127210"
+      },
+      "configuration": {
+        "technology_family": "thermal_catalytic_ammonia_cracking_with_heat_exchanger_network_and_temperature_swing_adsorption",
+        "model": "dynamic tubular NH3 cracker plus steady-state plant units and TSA purification",
+        "scope": "plant-level heat integration and techno-economic analysis",
+        "non_plasma_incumbent": true
+      },
+      "observations": [
+        {
+          "metric": "heat_recovery_fraction_of_thermodynamic_limit",
+          "value": 0.9456,
+          "qualifier": "reported for the proposed heat-exchanger network",
+          "unit": "fraction"
+        },
+        {
+          "metric": "net_energy_consumption",
+          "value": 36.79,
+          "qualifier": "reported while covering the modeled plant heat duties; the paper's exact boundary must be preserved",
+          "unit": "kJ/mol_NH3"
+        },
+        {
+          "metric": "hydrogen_production_cost",
+          "value": 6.44,
+          "qualifier": "source-reported modeled cost under uncertainty",
+          "unit": "USD/kg_H2"
+        }
+      ],
+      "source_conclusion": "The study models a heat-integrated ammonia cracking plant with a dynamic tubular cracker and TSA purification. Its heat-exchanger network reaches 94.56% of the thermodynamic energy recovery limit, net energy consumption is reported as 36.79 kJ/mol NH3 while covering the modeled heat duties, and H2 production cost is 6.44 USD/kg H2 under uncertainty.",
+      "comparison_status": "PUBLISHED_THERMAL_PLANT_TEA_NOT_MATCHED_TO_PLASMA_SERVICE_BOUNDARY",
+      "blockers": [
+        "This is a modeled thermal/catalytic plant, not a new physical plant demonstration.",
+        "The 36.79 kJ/mol NH3 metric must retain its exact paper boundary and cannot be compared with source-specific plasma g H2/kWh without conversion and complete system matching.",
+        "Hydrogen purity, pressure, capacity factor, feed pretreatment, compression/storage and infrastructure boundaries must be resolved before direct ranking.",
+        "Heat recovery is a modeled plant result and must not be credited to a plasma candidate without measured useful heat duty.",
+        "No Luminous reproduction has occurred."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "BIOGAS-REFORMING-THERMOCHEMICAL-HARMONIZED-TEA-2026",
+      "lane": "BIOGAS_TO_HYDROGEN_NON_PLASMA_BASELINE",
+      "evidence_class": "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+      "source": {
+        "title": "Harmonized Techno-Economic and Environmental Analysis of Biogas-Reforming Pathways for Sustainable Hydrogen Production",
+        "publisher": "Energies",
+        "publication_date": "2026-08-29",
+        "volume": "19",
+        "issue": "17",
+        "article_number": "4068",
+        "doi": "10.3390/en19174068",
+        "url": "https://doi.org/10.3390/en19174068"
+      },
+      "configuration": {
+        "technology_family": "conventional_thermochemical_reforming",
+        "feedstock": "biogas represented as 60% CH4 / 40% CO2 in the reconstructed basis",
+        "routes": [
+          "steam reforming",
+          "dry reforming",
+          "partial oxidation",
+          "autothermal reforming"
+        ],
+        "system_boundary": "gate-to-gate from biogas purification through hydrogen production and purification to 99.9% H2",
+        "product_purity_fraction": 0.999,
+        "plant_lifetime_years": 20,
+        "capacity_factor_fraction": 0.9,
+        "currency_year": 2025,
+        "excluded_from_cost_boundary": [
+          "infrastructure construction",
+          "transportation",
+          "downstream compression",
+          "storage"
+        ],
+        "method": "literature-derived equilibrium/stoichiometric process basis with 10,000-iteration Monte Carlo and six-parameter sensitivity analysis"
+      },
+      "observations": [
+        {
+          "metric": "lcoh_mean",
+          "value": 5.21,
+          "qualifier": "steam reforming mean under source gate-to-gate boundary, 2025 USD; P10=4.32, P90=6.10",
+          "unit": "USD_2025/kg_H2"
+        },
+        {
+          "metric": "lcoh_mean",
+          "value": 5.47,
+          "qualifier": "partial oxidation mean; P10=4.57, P90=6.41",
+          "unit": "USD_2025/kg_H2"
+        },
+        {
+          "metric": "lcoh_mean",
+          "value": 5.82,
+          "qualifier": "autothermal reforming mean; P10=4.90, P90=6.72",
+          "unit": "USD_2025/kg_H2"
+        },
+        {
+          "metric": "lcoh_mean",
+          "value": 6.1,
+          "qualifier": "dry reforming mean; P10=5.08, P90=7.22",
+          "unit": "USD_2025/kg_H2"
+        },
+        {
+          "metric": "gwp",
+          "value_min": 5.59,
+          "value_max": 6.5,
+          "qualifier": "steam reforming source-reported life-cycle global-warming range",
+          "unit": "kg_CO2e/kg_H2"
+        },
+        {
+          "metric": "hydrogen_yield",
+          "value_min": 2.5,
+          "value_max": 3,
+          "qualifier": "steam reforming H2 yield per mol CH4",
+          "unit": "mol_H2/mol_CH4"
+        },
+        {
+          "metric": "cold_gas_efficiency",
+          "value_min": 0.75,
+          "value_max": 0.85,
+          "qualifier": "steam reforming range",
+          "unit": "fraction"
+        }
+      ],
+      "route_results": [
+        {
+          "route": "steam_reforming",
+          "lcoh_mean_usd_2025_per_kg_h2": 5.21,
+          "p10": 4.32,
+          "p90": 6.1,
+          "gwp_kg_co2e_per_kg_h2": [
+            5.59,
+            6.5
+          ],
+          "hydrogen_yield_mol_per_mol_ch4": [
+            2.5,
+            3
+          ],
+          "cold_gas_efficiency_fraction": [
+            0.75,
+            0.85
+          ]
+        },
+        {
+          "route": "partial_oxidation",
+          "lcoh_mean_usd_2025_per_kg_h2": 5.47,
+          "p10": 4.57,
+          "p90": 6.41,
+          "gwp_kg_co2e_per_kg_h2": [
+            7.5,
+            8.2
+          ]
+        },
+        {
+          "route": "autothermal_reforming",
+          "lcoh_mean_usd_2025_per_kg_h2": 5.82,
+          "p10": 4.9,
+          "p90": 6.72,
+          "gwp_kg_co2e_per_kg_h2": [
+            7.24,
+            7.89
+          ]
+        },
+        {
+          "route": "dry_reforming",
+          "lcoh_mean_usd_2025_per_kg_h2": 6.1,
+          "p10": 5.08,
+          "p90": 7.22,
+          "gwp_kg_co2e_per_kg_h2": [
+            6.8,
+            7.8
+          ]
+        }
+      ],
+      "source_conclusion": "The harmonized study reports steam reforming as the lowest-mean-LCOH, highest-yield, highest-efficiency and lowest-GWP route among its four modeled thermochemical biogas pathways. It uses 10,000 Monte Carlo iterations and a common gate-to-gate product boundary. These are modeled, literature-derived route estimates, not four new physical demonstrations.",
+      "comparison_status": "HARMONIZED_NON_PLASMA_TECHNO_ECONOMIC_BASELINE_WITH_DECLARED_GATE_TO_GATE_BOUNDARY",
+      "blockers": [
+        "The model uses equilibrium/stoichiometric literature-derived bases rather than route-specific physical reactor validation.",
+        "The gate-to-gate cost excludes infrastructure, transport, downstream compression and storage; those exclusions must not be silently added or omitted in plasma comparisons.",
+        "This 2025 USD/kg H2 measure is not directly comparable to the plasma P2X study's EUR/t syngas without functional-unit, currency, boundary and product-quality normalization.",
+        "The 10,000 draws use independent assumptions as described by the paper; a future paired cross-route analysis must define correlated exogenous scenarios rather than infer that the source's samples are paired.",
+        "No Luminous reproduction has occurred."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "METHANE-PYROLYSIS-SHOCK-WAVE-REFERENCE-2026",
+      "lane": "METHANE_PYROLYSIS_NON_PLASMA_REFERENCE",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "title": "A comprehensive review of direct-heating modalities for low-emission hydrogen production via methane pyrolysis",
+        "publisher": "Journal of Analytical and Applied Pyrolysis",
+        "publication_date": "2026-06",
+        "volume": "196",
+        "article_number": "107776",
+        "doi": "10.1016/j.jaap.2026.107776",
+        "url": "https://doi.org/10.1016/j.jaap.2026.107776"
+      },
+      "configuration": {
+        "technology_family": "shock_wave_heating_methane_pyrolysis",
+        "data_basis": "review-derived Pareto reference from 156 experimental datasets across 26 peer-reviewed sources",
+        "heating_mode_as_classified_by_review": "shock-wave",
+        "non_plasma_reference": true
+      },
+      "observations": [
+        {
+          "metric": "methane_conversion",
+          "value": 0.92,
+          "qualifier": "approximately 92% for cost/conversion-prioritized review Pareto point",
+          "unit": "fraction"
+        },
+        {
+          "metric": "levelized_cost_hydrogen",
+          "value": 0.7,
+          "qualifier": "approximately USD/kg H2 for the reported shock-wave point",
+          "unit": "USD/kg_H2"
+        }
+      ],
+      "source_conclusion": "The review-derived shock-wave heating reference is approximately 92% methane conversion at approximately USD 0.70/kg H2 when cost and conversion are prioritized. This is a review/data-synthesis Pareto reference, not a single new experiment or Luminous reproduction.",
+      "comparison_status": "REVIEW_DERIVED_NON_PLASMA_PARETO_REFERENCE_NOT_INDEPENDENT_MEASUREMENT",
+      "blockers": [
+        "The point is synthesized from a review of 156 datasets and 26 sources; it must not be represented as a single experiment.",
+        "LCOH, methane conversion and product quality must be reconciled to the review's definitions and exact dataset grouping before comparing to the arc-plasma TEA.",
+        "Hydrogen selectivity is not supplied for this cost/conversion-prioritized point in the source summary.",
+        "The shock-wave point and the microwave selectivity-prioritized point are separate Pareto points."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "METHANE-PYROLYSIS-MICROWAVE-REFERENCE-2026",
+      "lane": "METHANE_PYROLYSIS_NON_PLASMA_REFERENCE",
+      "evidence_class": "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+      "source": {
+        "title": "A comprehensive review of direct-heating modalities for low-emission hydrogen production via methane pyrolysis",
+        "publisher": "Journal of Analytical and Applied Pyrolysis",
+        "publication_date": "2026-06",
+        "volume": "196",
+        "article_number": "107776",
+        "doi": "10.1016/j.jaap.2026.107776",
+        "url": "https://doi.org/10.1016/j.jaap.2026.107776"
+      },
+      "configuration": {
+        "technology_family": "microwave_heating_methane_pyrolysis",
+        "data_basis": "review-derived Pareto reference from 156 experimental datasets across 26 peer-reviewed sources",
+        "heating_mode_as_classified_by_review": "microwave; do not infer that this means microwave plasma",
+        "non_plasma_reference": true
+      },
+      "observations": [
+        {
+          "metric": "methane_conversion",
+          "value": 0.91,
+          "qualifier": "approximately 91% for the selectivity-prioritized review Pareto point",
+          "unit": "fraction"
+        },
+        {
+          "metric": "hydrogen_selectivity",
+          "value": 0.99,
+          "qualifier": "approximately 99% for the selectivity-prioritized review Pareto point",
+          "unit": "fraction"
+        },
+        {
+          "metric": "levelized_cost_hydrogen",
+          "value": 1.09,
+          "qualifier": "approximately USD/kg H2 for the reported microwave point",
+          "unit": "USD/kg_H2"
+        }
+      ],
+      "source_conclusion": "The review-derived microwave heating reference is approximately 91% methane conversion, 99% hydrogen selectivity and approximately USD 1.09/kg H2 when selectivity is prioritized. It is a review/data-synthesis Pareto reference, not a single new experiment or Luminous reproduction.",
+      "comparison_status": "REVIEW_DERIVED_NON_PLASMA_PARETO_REFERENCE_NOT_INDEPENDENT_MEASUREMENT",
+      "blockers": [
+        "The point is synthesized from a review of 156 datasets and 26 sources; it must not be represented as a single experiment.",
+        "The review classifies this as microwave heating; do not infer it is a plasma discharge.",
+        "The point is separate from the shock-wave cost/conversion point and must not be cross-paired with its 92% conversion or USD 0.70/kg cost.",
+        "Reconcile the review's functional unit, cost basis, selectivity and boundary before direct ranking."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -3479,6 +3841,46 @@
       "control_id": "NC-NH3-PLASMA-TEA-002",
       "condition": "Mix the 84 kWh/kg RGA-NORR, 154 kWh/kg RGA-LNT and 435 kWh/kg direct-DBD alternative as if they were one route or operating point.",
       "expected_disposition": "REJECT_ROUTE_MIX"
+    },
+    {
+      "control_id": "NC-PATH-001",
+      "condition": "Combine the 150 g/h ammonia microwave production rate with the >99% conversion / 45 g/kWh point despite the published abstract/conclusion discrepancy.",
+      "expected_disposition": "BLOCKED_SOURCE_OPERATING_POINT_PAIRING"
+    },
+    {
+      "control_id": "NC-PATH-002",
+      "condition": "Combine the 58% NH3 conversion maximum with the 1.8 g H2/kWh peak yield from argon-diluted nanosecond plasma as a single operating point.",
+      "expected_disposition": "REJECT_OPERATING_POINT_CROSS_PAIRING"
+    },
+    {
+      "control_id": "NC-PATH-003",
+      "condition": "Rank the plasma P2X EUR/t syngas TEA against the conventional biogas USD/kg H2 LCOH without matching product, currency-year, purification, downstream boundary and service specification.",
+      "expected_disposition": "NOT_COMPARABLE_FUNCTIONAL_UNIT_AND_BOUNDARY"
+    },
+    {
+      "control_id": "NC-PATH-004",
+      "condition": "Treat the ammonia thermal heat-integration TEA or harmonized biogas reforming TEA as a commissioned plant or Luminous experiment.",
+      "expected_disposition": "REJECT_EVIDENCE_CLASS_MISMATCH"
+    },
+    {
+      "control_id": "NC-PATH-005",
+      "condition": "Assume the review's microwave methane-pyrolysis heating point is a microwave plasma process.",
+      "expected_disposition": "REJECT_TECHNOLOGY_CLASS_INFERENCE"
+    },
+    {
+      "control_id": "NC-PATH-006",
+      "condition": "Choose a plasma route by weighted score when it violates a mandatory product purity, pressure, feed impurity, safety, emissions or lifecycle requirement.",
+      "expected_disposition": "REJECT_NON_COMPENSATORY_HARD_CONSTRAINT_VIOLATION"
+    },
+    {
+      "control_id": "NC-PATH-007",
+      "condition": "Report a technology winner where the product or full energy boundary is missing for one candidate.",
+      "expected_disposition": "BLOCKED_OR_NOT_COMPARABLE_MISSING_BOUNDARY"
+    },
+    {
+      "control_id": "NC-PATH-008",
+      "condition": "Use independently sampled route-level electricity/price assumptions and report paired dominance as though shared scenario uncertainty had been modeled.",
+      "expected_disposition": "REJECT_UNPAIRED_EXOGENOUS_SCENARIOS"
     }
   ],
   "derived_reference_checks": [
@@ -3957,6 +4359,105 @@
         "no_source_relative_waveguide_efficiency_gain_transferred_to_QWCCR": true
       },
       "rationale": "The September 2026 QWCCR study reports 1.31 ms ACR response on a 160→180 W step and 1.10 ms on a 180→160 W step, with OES/high-speed imaging proxies; those are not accepted H2 product delivery response times. The waveguide MWPJ study reports a separate approximately sevenfold relative H2 production efficiency gain and approximately 47.5% critical NH3 fraction under its own Ar-diluted feed and flow architecture. The benchmark's paradigm shift is to measure command→plasma→diagnostic→gas composition→purified H2→customer delivery separately, then optimize full grid-to-accepted-H2 service under realistic load profiles. The 1 s customer-service settling target is an aspirational research target, not a source-reported or achieved result."
+    },
+    {
+      "target_id": "PLASMA-PROCESS-PATHWAY-SELECTION-001",
+      "lane": "PLASMA_PROCESS_PATHWAY_SELECTION",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "NH3-CRACK-MW-ATM-MECHANISM-2026",
+        "NH3-PLASMA-DILUENTS-NSP-2026",
+        "NH3-THERMAL-HEAT-INTEGRATED-PLANT-TEA-2026",
+        "NH3-CRACK-TEA-LBNL-2023",
+        "METHANE-PYROLYSIS-ARC-PLASMA-TEA-2026",
+        "METHANE-PYROLYSIS-SHOCK-WAVE-REFERENCE-2026",
+        "METHANE-PYROLYSIS-MICROWAVE-REFERENCE-2026",
+        "PLASMA-POWERT0X-BIOGAS-REFORMING-TEA-2026",
+        "BIOGAS-REFORMING-THERMOCHEMICAL-HARMONIZED-TEA-2026"
+      ],
+      "metric_thresholds": {
+        "minimum_chemistry_groups": 3,
+        "minimum_routes_per_group": 2,
+        "minimum_non_plasma_incumbent_per_group": 1,
+        "minimum_monte_carlo_draws_per_decision": 10000,
+        "maximum_false_feasible_rate": 0,
+        "maximum_unsupported_route_rankings": 0,
+        "minimum_high_fidelity_budget_reduction_fraction": 0.25,
+        "all_ranked_candidates_share_same_service_contract": true,
+        "route_metrics_remain_pareto_not_scalarized": true
+      },
+      "claim_guards": {
+        "no_plasma_preference_or_plasma_only_candidate_set": true,
+        "all_routes_bind_to_one_accepted_product_and_service_contract_per_chemistry": true,
+        "matched_feedstock_and_impurity_envelope_required": true,
+        "full_grid_or_fuel_to_accepted_product_boundary_required": true,
+        "currency_year_functional_unit_and_cost_basis_match_required": true,
+        "source_evidence_classes_remain_separate": true,
+        "every_metric_binds_to_one_exact_source_operating_point": true,
+        "all_operating_point_pairing_discrepancies_remain_unresolved_until_source_reconciled": true,
+        "hard_product_and_safety_constraints_are_non_compensatory": true,
+        "missing_hard_constraint_or_boundary_forces_blocked_or_not_comparable": true,
+        "uncertainty_draws_use_pinned_seed_and_common_exogenous_scenarios_for_paired_route_comparison": true,
+        "robust_pareto_membership_and_regret_intervals_reported": true,
+        "decision_can_abstain_and_request_highest_value_next_measurement": true,
+        "no_credit_baseline_required_for_all_coproduct_dependent_route_economics": true,
+        "carbon_black_credit_requires_product_grade_market_capacity_and_offtake": true,
+        "lcoh_syngas_price_and_specific_energy_never_compared_without_functional_unit_normalization": true,
+        "review_derived_pareto_points_never_promoted_to_single_physical_experiments": true,
+        "microwave_heating_never_assumed_to_mean_microwave_plasma": true,
+        "thermal_heat_recovery_credited_only_from_measured_or_source_qualified_useful_duty": true
+      },
+      "candidate_groups": [
+        {
+          "group_id": "NH3-CRACKING",
+          "product_service": "accepted H2 at a frozen purity, pressure and delivery service contract",
+          "candidate_case_ids": [
+            "NH3-CRACK-MW-ATM-MECHANISM-2026",
+            "NH3-PLASMA-DILUENTS-NSP-2026",
+            "NH3-THERMAL-HEAT-INTEGRATED-PLANT-TEA-2026",
+            "NH3-CRACK-TEA-LBNL-2023"
+          ],
+          "source_point_policy": "all operating points separate; source abstract/conclusion mismatch blocks the disputed throughput point"
+        },
+        {
+          "group_id": "METHANE-PYROLYSIS",
+          "product_service": "accepted H2 and carbon coproduct under a frozen quality and credit contract",
+          "candidate_case_ids": [
+            "METHANE-PYROLYSIS-ARC-PLASMA-TEA-2026",
+            "METHANE-PYROLYSIS-SHOCK-WAVE-REFERENCE-2026",
+            "METHANE-PYROLYSIS-MICROWAVE-REFERENCE-2026"
+          ],
+          "source_point_policy": "shock-wave cost/conversion and microwave selectivity Pareto references remain distinct; no-credit case is mandatory"
+        },
+        {
+          "group_id": "BIOGAS-TO-HYDROGEN",
+          "product_service": "99.9% H2 at the same gate-to-gate or fully expanded delivered-product boundary",
+          "candidate_case_ids": [
+            "PLASMA-POWERT0X-BIOGAS-REFORMING-TEA-2026",
+            "BIOGAS-REFORMING-THERMOCHEMICAL-HARMONIZED-TEA-2026"
+          ],
+          "source_point_policy": "EUR/t syngas and USD/kg H2 are NOT_COMPARABLE until product, currency, year and system boundaries are normalized"
+        }
+      ],
+      "baseline_algorithms": [
+        "BEST_QUALIFIED_INCUMBENT_ONLY",
+        "FIXED_WEIGHTED_SUM",
+        "TOPSIS",
+        "NSGA_II_OR_EQUIVALENT",
+        "RANDOM_SPACE_FILLING",
+        "UNCERTAINTY_ONLY",
+        "FIXED_RATIO_MULTIFIDELITY",
+        "ROBUST_PARETO_WITH_ABSTENTION"
+      ],
+      "required_outputs": [
+        "ELIGIBILITY_DISPOSITIONS",
+        "NOT_COMPARABLE_PAIRS",
+        "ROBUST_PARETO_SET",
+        "PROBABILITY_OF_DOMINANCE",
+        "EXPECTED_AND_TAIL_REGRET",
+        "CALIBRATED_ABSTENTION",
+        "VALUE_OF_INFORMATION_NEXT_MEASUREMENT"
+      ]
     }
   ]
 }
