@@ -1,6 +1,6 @@
 # Local verification playbook — Symthaea Subterra research
 
-The four Subterra Cargo packages are nested research workspaces and intentionally do not join the production Symthaea workspace. A root-level cargo test --workspace therefore does not test them.
+The five Subterra Cargo packages are nested research workspaces and intentionally do not join the production Symthaea workspace. A root-level cargo test --workspace therefore does not test them.
 
 Run the explicit verification script from any directory inside the Symthaea checkout:
 
@@ -12,6 +12,7 @@ The script checks tool availability, then runs formatting, tests and strict Clip
 - subterra-voi-kernel
 - subterra-survival-planner
 - subterra-robust-voi
+- subterra-likelihood-calibration
 - subterra-evidence-adapter
 
 The robust EVSI package depends on the one-step EVSI package, which is ordered first.
