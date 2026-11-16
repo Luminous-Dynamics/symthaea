@@ -1,14 +1,12 @@
 use scientific_candidate_selection_audit::{
-    audit_submission, run_selector, CandidateSelectionPolicy, CandidateState, DevelopmentEligibility,
-    DevelopmentMetrics, EvaluatorAdmissibility, EvaluatorMetrics, EvaluatorOutcome,
-    EvaluatorStatus, EvidenceStage, MetricMask, PermittedEvidence, SelectionAuditError,
-    SelectionDecision, SelectionObservation, SelectorCandidate, SelectorPacket,
+    CandidateSelectionPolicy, CandidateState, DevelopmentEligibility, DevelopmentMetrics,
+    EvaluatorAdmissibility, EvaluatorMetrics, EvaluatorOutcome, EvaluatorStatus, EvidenceStage,
+    MetricMask, PermittedEvidence, SelectionAuditError, SelectionDecision, SelectionObservation,
+    SelectorCandidate, SelectorPacket, audit_submission, run_selector,
 };
 
-const POOL_SHA: &str =
-    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const EVIDENCE_SHA: &str =
-    "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+const POOL_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+const EVIDENCE_SHA: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
 struct DevelopmentSelector;
 
@@ -17,10 +15,7 @@ impl CandidateSelectionPolicy for DevelopmentSelector {
         "development-score-v0"
     }
 
-    fn select(
-        &self,
-        packet: &SelectorPacket,
-    ) -> Result<SelectionObservation, SelectionAuditError> {
+    fn select(&self, packet: &SelectorPacket) -> Result<SelectionObservation, SelectionAuditError> {
         // Deliberately simple reference selector for the audit fixture.
         // It reads only development evidence and does not receive the
         // evaluator outcomes supplied later to audit_submission.
@@ -60,11 +55,7 @@ impl CandidateSelectionPolicy for DevelopmentSelector {
     }
 }
 
-fn candidate(
-    id: &str,
-    model_sha: &str,
-    development_score: f64,
-) -> SelectorCandidate {
+fn candidate(id: &str, model_sha: &str, development_score: f64) -> SelectorCandidate {
     SelectorCandidate {
         candidate_id: id.to_owned(),
         canonical_model_sha256: Some(model_sha.to_owned()),
