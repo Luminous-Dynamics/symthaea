@@ -1,0 +1,457 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/culinary/ThermalObservationV1.schema.json",
+  "title": "ThermalObservationV1",
+  "description": "Versioned thermal time-series observation envelope. A schema-valid record is not a food-safety determination or appliance qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "observation_id",
+    "evidence_class",
+    "collected_at",
+    "clock_source",
+    "appliance_ref",
+    "batch_ref",
+    "probe_set",
+    "samples",
+    "raw_data_digest"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0.0"
+    },
+    "observation_id": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 128
+    },
+    "evidence_class": {
+      "enum": [
+        "simulated",
+        "modelled",
+        "uncalibrated_measured",
+        "calibration_qualified_measured",
+        "assayed"
+      ]
+    },
+    "collected_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "clock_source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "uncertainty_ms"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "monotonic_with_wall_mapping",
+            "wall_clock_only",
+            "simulator_clock",
+            "unknown"
+          ]
+        },
+        "uncertainty_ms": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "mapping_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "appliance_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "appliance_model_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "firmware_revision": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "batch_ref": {
+      "type": "string",
+      "minLength": 1
+    },
+    "input_manifest_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ambient_temperature_c": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": -273.15
+        },
+        "relative_humidity_percent": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0,
+          "maximum": 100
+        },
+        "supply_voltage_v": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "probe_set": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "probe_id",
+          "role",
+          "unit",
+          "placement_ref",
+          "uncertainty_c"
+        ],
+        "properties": {
+          "probe_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "enum": [
+              "core",
+              "surface",
+              "vessel_wall",
+              "ambient",
+              "steam",
+              "other"
+            ]
+          },
+          "unit": {
+            "const": "degC"
+          },
+          "placement_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "response_time_s": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "uncertainty_c": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "calibration_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "calibration_valid_at_collection": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "instrument_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "calibration_bundle_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "simulator_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model_revision_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "sequence",
+          "elapsed_s",
+          "probe_id",
+          "temperature_c",
+          "quality"
+        ],
+        "properties": {
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "elapsed_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "probe_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "temperature_c": {
+            "type": "number",
+            "minimum": -273.15
+          },
+          "quality": {
+            "enum": [
+              "valid",
+              "missing_replacement",
+              "saturated",
+              "outlier_flagged",
+              "clock_uncertain",
+              "probe_moved",
+              "unknown"
+            ]
+          },
+          "original_sample_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "operator_interventions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "elapsed_s",
+          "action"
+        ],
+        "properties": {
+          "elapsed_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "action": {
+            "type": "string"
+          },
+          "actor_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "missing_intervals": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "probe_id",
+          "start_elapsed_s",
+          "end_elapsed_s"
+        ],
+        "properties": {
+          "probe_id": {
+            "type": "string"
+          },
+          "start_elapsed_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "end_elapsed_s": {
+            "type": "number",
+            "minimum": 0
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "transformations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "transform_id",
+          "method_ref",
+          "input_digest",
+          "output_digest"
+        ],
+        "properties": {
+          "transform_id": {
+            "type": "string"
+          },
+          "method_ref": {
+            "type": "string"
+          },
+          "input_digest": {
+            "type": "string"
+          },
+          "output_digest": {
+            "type": "string"
+          },
+          "parameters_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "raw_data_digest": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "raw_data_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "review_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_ceiling": {
+      "const": "Observation record only; not a food-safety determination or product qualification."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "calibration_qualified_measured"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "required": [
+          "instrument_ref",
+          "calibration_bundle_ref"
+        ],
+        "properties": {
+          "instrument_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "calibration_bundle_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "simulated"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "required": [
+          "simulator_ref"
+        ],
+        "properties": {
+          "simulator_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "evidence_class": {
+            "const": "modelled"
+          }
+        },
+        "required": [
+          "evidence_class"
+        ]
+      },
+      "then": {
+        "required": [
+          "model_revision_ref"
+        ],
+        "properties": {
+          "model_revision_ref": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ]
+}
