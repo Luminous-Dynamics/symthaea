@@ -8,7 +8,7 @@ use symthaea_irregular_event_contract::{
 
 const INDEXED_REPETITIONS: usize = 51;
 const VERIFIED_REPETITIONS: usize = 7;
-const EVENT_COUNTS: [usize; 3] = [1_024, 16_384, 65_536];
+const EVENT_COUNTS: [usize; 3] = [4_096, 16_384, 65_536];
 const SOURCE_COUNTS: [usize; 3] = [1, 4, 16];
 const INTERVAL_WIDTHS: [usize; 3] = [1, 16, 256];
 const KNOWLEDGE_CUTOFFS: [i64; 2] = [30, 50];
