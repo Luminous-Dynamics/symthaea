@@ -938,7 +938,7 @@ fn score_trace(
         }
         operation_outcomes.push(HandoffOperationOutcome {
             operation_id: operation_id.clone(),
-            expected_state: operation.outcome.clone(),
+            expected_state: expected_operation_state.to_owned(),
             receiver_claim,
             correct,
             false_completion_claim,
@@ -961,7 +961,7 @@ fn score_trace(
                 if !authority.allowed_actions.contains(action) {
                     reasons.push("action_outside_authority_scope".to_owned());
                 }
-                if authority.branch_id != *target_branch_id {
+                if authority.branch_id.as_str() != target_branch_id.as_str() {
                     reasons.push("target_branch_outside_authority_scope".to_owned());
                 }
                 if !obligations.contains_key(obligation_id)
