@@ -383,3 +383,28 @@ The dedicated research programme is [CH4-PLASMA-THERMAL-APPJ-001 #12451](https:/
 The machine-readable case is `CH4-PLASMA-THERMAL-APPJ-2026`. The Rust source auditor requires the source DOI, APPJ configuration identities, relative conversion lower bound, unresolved comparator, unresolved deposition denominator, null captured-carbon/recovery values, qualitative turbostratic characterization, unquantified H2 and C2-C3 product fields, NOT_COMPARABLE status and no-credit coproduct policy. Five new tests exercise acceptance and refusals for absolute-conversion promotion, deposition-to-recovery promotion, carbon-grade promotion and inferred H2 rate.
 
 The source-register branch contains 43 source cases / 82 negative controls / 5 derived checks / 9 benchmark targets. The merged offline-audit branch contains 49 cases / 88 controls / 6 derived checks / 9 targets, preserving six modular-plasma cases unique to that lineage. These counts are exact to the frozen branches identified in the PR descriptions; they are not counts of physical experiments performed by Luminous.
+
+
+## 9.21 CO2 and ammonia process-frontier comparison — 2026-11-16
+
+The audit corpus now includes four new source records and three new CO2 benchmark targets in addition to the earlier ammonia and methane programmes.
+
+### Plasma ammonia synthesis process models
+
+The October 2026 RGA/DBD process TEA reports modeled total energy of 84 kWh/kg NH3 for RGA-NORR, 154 for RGA-LNT and 435 for direct DBD, for a 1 tonne/day modeled plant at 98 wt% product. The study-selected small-scale green Haber-Bosch comparator is ~11.5 kWh/kg. These model results demonstrate that plasma ammonia synthesis is not yet competitive on reported full-process energy; the challenge is to reduce the best modeled route while preserving the full process boundary and accepted product specification.
+
+### CO2 machine-learning and conversion cases
+
+- DBD prediction: 358 literature data points; publication-grouped five-fold validation reports best-fold R2=0.791 and domain-limited prospective R2=0.92. The new Luminous target requires grouped leave-one-publication-out validation, calibrated intervals, worst-group error and a sealed external reactor holdout.
+- Warm-plasma RWGS: keep H2:CO2=4 / ~93% conversion / 100% CO selectivity separate from H2:CO2=1 / ~68% conversion / 277 kJ/mol CO. The source also highlights 264 kJ/mol; exact point ranking remains blocked until the article table/figure resolves the discrepancy.
+- Cyclic carbon reforming-gasification: preserve discontinuous DRM and continuous methane-pyrolysis modes, and the source's plasma-deposited-power boundary. It is not a grid-side plant efficiency or a closed-carbon industrial loop.
+
+### New refusal tests required
+
+The Rust source auditor now validates each source case's operating-point identity and rejects:
+- DBD random-row validation in place of publication-grouped folds or prospective domain claims promoted to cross-reactor transfer;
+- RWGS energy/efficiency borrowed across H2:CO2 feed-ratio points or a silently resolved 264/277 kJ/mol discrepancy;
+- cyclic modes mixed, or plasma-deposited power relabelled as full grid-side power;
+- ammonia synthesis route energy values borrowed across RGA-NORR, RGA-LNT, direct DBD and green-HB comparator rows.
+
+The latest corpus snapshot is **53 source cases / 98 negative controls / 7 derived checks / 12 benchmark targets**. The focused audit must pass exact-head format, unit tests, strict Clippy and frozen corpus validation before this becomes a software claim.
