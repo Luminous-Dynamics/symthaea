@@ -278,10 +278,21 @@ minimum earliest endpoint. An optimistic upper bound, midpoint, or uncalibrated
 raw clock value cannot close an interval.
 
 The mapped-time and conservative-watermark types have private fields to
-prevent fabricated result structs. Ten clock-specific tests cover offset
+prevent fabricated result structs. Fourteen clock-specific tests cover offset
 uncertainty, drift growth and outward rounding, historical knowledge-time,
 validity expiry, domain mismatch, common-reference aggregation, empty source
-sets, invalid calibration and arithmetic overflow.
+sets, invalid calibration, arithmetic overflow, as-known revision selection,
+atomic batches, duplicate calibration IDs, transaction ordering and
+replay/digest parity.
+
+The append-only `ClockCalibrationLedger` indexes revisions by source/reference
+domain pair and enforces unique calibration IDs plus monotonic knowledge-time
+transactions. Historical lookups select the newest revision that was known at
+the decision cutoff and whose source-time validity covers the requested tick.
+Same-time multi-source calibration updates are atomic; a full history replay
+rebuilds its index and state digest. This selection boundary prevents a caller
+from accidentally applying a future calibration or a revision outside its
+validity range.
 
 **Integration boundary:** this module is not yet automatically wired into the
 v0.1 `SourceWatermarkLedger`. That ledger still expects callers to supply
