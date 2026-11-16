@@ -1610,6 +1610,27 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn legacy_v1_loft_parses_but_fails_v2_integrity_admission() {
+        let loft = loft_waterplane_capped_hull(&artifact(), profile()).unwrap();
+        let mut legacy = serde_json::to_value(&loft).unwrap();
+        let object = legacy.as_object_mut().unwrap();
+        object.insert("artifact_schema_version".into(), serde_json::json!(1));
+        object.insert(
+            "generator".into(),
+            serde_json::json!("symthaea-marine-waterplane-loft-v1"),
+        );
+        object.remove("bow_end_cap_face_range");
+        object.remove("stern_end_cap_face_range");
+        object.remove("station_count");
+        object.remove("section_point_count");
+        object.remove("longitudinal_end_conditions");
+        let parsed: LoftedHullArtifact = serde_json::from_value(legacy).unwrap();
+        let errors = verify_loft_artifact_integrity(&parsed).unwrap_err();
+        assert!(errors.iter().any(|item| item.code == "loft_artifact_version"));
+    }
+
     #[test]
     fn face_ranges_are_bound_to_the_loft_manifest_digest() {
         let mut result = loft_waterplane_capped_hull(&artifact(), profile()).unwrap();
