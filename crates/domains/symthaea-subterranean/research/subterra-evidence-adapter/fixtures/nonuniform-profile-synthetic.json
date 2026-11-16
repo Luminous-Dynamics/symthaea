@@ -1,0 +1,53 @@
+{
+  "profile_id": "synthetic-volcanic-void-profile-01",
+  "total_length_m": 40.0,
+  "segments": [
+    {
+      "segment_id": "section-a",
+      "start_m": 0.0,
+      "end_m": 8.0,
+      "cross_section": {
+        "width_m": { "value": 6.0, "standard_uncertainty": 0.15, "correlation_group": "lidar-scale-a" },
+        "height_m": { "value": 3.0, "standard_uncertainty": 0.10, "correlation_group": "lidar-scale-a" },
+        "roof_thickness_m": { "value": 2.4, "standard_uncertainty": 0.25, "correlation_group": "roof-profile-a" }
+      }
+    },
+    {
+      "segment_id": "section-b",
+      "start_m": 8.0,
+      "end_m": 16.0,
+      "cross_section": {
+        "width_m": { "value": 10.0, "standard_uncertainty": 0.20, "correlation_group": "lidar-scale-a" },
+        "height_m": { "value": 4.0, "standard_uncertainty": 0.10, "correlation_group": "lidar-scale-a" },
+        "roof_thickness_m": { "value": 2.1, "standard_uncertainty": 0.30, "correlation_group": "roof-profile-a" }
+      }
+    },
+    {
+      "segment_id": "unobserved-interval",
+      "start_m": 16.0,
+      "end_m": 24.0,
+      "cross_section": null
+    },
+    {
+      "segment_id": "section-d",
+      "start_m": 24.0,
+      "end_m": 32.0,
+      "cross_section": {
+        "width_m": { "value": 7.0, "standard_uncertainty": 0.18, "correlation_group": "lidar-scale-b" },
+        "height_m": { "value": 3.5, "standard_uncertainty": 0.12, "correlation_group": "lidar-scale-b" },
+        "roof_thickness_m": null
+      }
+    },
+    {
+      "segment_id": "section-e",
+      "start_m": 32.0,
+      "end_m": 40.0,
+      "cross_section": {
+        "width_m": { "value": 12.0, "standard_uncertainty": 0.25, "correlation_group": "lidar-scale-b" },
+        "height_m": { "value": 4.5, "standard_uncertainty": 0.15, "correlation_group": "lidar-scale-b" },
+        "roof_thickness_m": { "value": 1.8, "standard_uncertainty": 0.30, "correlation_group": "roof-profile-b" }
+      }
+    }
+  ],
+  "notes": "Synthetic fixture only. It contains one explicitly unobserved interval; the resulting 0.8 coverage fraction is a software test value, not measurements from a real cave or a planetary site."
+}
