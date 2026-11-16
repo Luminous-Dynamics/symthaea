@@ -1,0 +1,36 @@
+{
+  "profile_id": "luminous.cpir.parser-oracle.v1",
+  "corpus_id": "luminous.cpir.parser-oracle.seeds.v1",
+  "status": "research_seed_not_executed",
+  "vectors": [
+    {
+      "id": "dup-decoded-name-001",
+      "file": "fixtures/duplicate_decoded_name_001.raw.json",
+      "class": "duplicate_member_after_json_string_escape_decoding",
+      "expected_disposition": "reject_before_ordinary_object_construction",
+      "rationale": "The two member names decode to the same Unicode scalar sequence: a."
+    },
+    {
+      "id": "unicode-normalization-distinct-001",
+      "file": "fixtures/unicode_normalization_distinct_001.raw.json",
+      "class": "unicode_normalization_non_equivalence",
+      "expected_disposition": "preserve_distinct_member_names",
+      "rationale": "Precomposed U+00E9 and U+0065 U+0301 remain distinct; no Unicode normalization is applied."
+    },
+    {
+      "id": "jcs-utf16-order-001",
+      "file": "fixtures/jcs_utf16_order_001.raw.json",
+      "class": "rfc8785_utf16_property_order",
+      "expected_disposition": "accept_for_canonicalization_test",
+      "expected_canonical_json": "{\"😀\":2,\"\":1}",
+      "rationale": "U+1F600 sorts before U+E000 by UTF-16 code units because its leading surrogate D83D is less than E000."
+    }
+  ],
+  "execution": {
+    "rust_preflight": "not_run",
+    "javascript_oracle": "not_run",
+    "independent_rust_parser": "not_run",
+    "fuzz_campaign": "not_run",
+    "performance_benchmark": "not_run"
+  }
+}
