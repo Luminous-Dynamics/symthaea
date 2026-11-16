@@ -367,8 +367,12 @@ impl fmt::Display for SelectionAuditError {
             }
             Self::InvalidCost => write!(f, "all-in selector cost must be finite and nonnegative"),
             Self::InvalidCostUnitId => write!(f, "task-native cost unit ID must not be empty"),
-            Self::InvalidBudget => write!(f, "task-native cost budget must be finite and nonnegative"),
-            Self::TraceCostUnitMismatch => write!(f, "selector trace cost unit does not match task contract"),
+            Self::InvalidBudget => {
+                write!(f, "task-native cost budget must be finite and nonnegative")
+            }
+            Self::TraceCostUnitMismatch => {
+                write!(f, "selector trace cost unit does not match task contract")
+            }
             Self::BudgetExceeded => write!(f, "selector cost exceeds the task-native hard budget"),
             Self::EmptyAbstentionReason => write!(f, "abstention reason must not be empty"),
             Self::UnknownSelectedCandidate(id) => {
