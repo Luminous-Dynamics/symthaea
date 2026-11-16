@@ -621,6 +621,7 @@ fn regime_json(
         counts_json(null),
         counts_json(alternative),
         analytic_power,
+        conditional_ar1_analytic_power,
         conditional,
         null.rate() - ALPHA,
         moments.mean(),
@@ -677,6 +678,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "\"discrepancy\":{:.8},",
             "\"design_sigma\":{:.8},",
             "\"analytic_iid_terminal_power\":{:.8},",
+            "\"known_rho_ar1_analytic_conditional_power\":{:.8},",
             "\"claim\":\"fixed terminal IID-Gaussian test assumption-stress map plus separate known-rho AR1 conditional-innovation comparator; no blind noise identification\",",
             "\"regimes\":[{}]",
             "}}"
