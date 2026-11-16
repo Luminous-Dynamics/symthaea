@@ -1,0 +1,1 @@
+{"input_representation_id":"http-message","input_sha256":"5382261de838f40125e53a66fabce835e7c9e652fe842f458da90a85ff4ac697","map_version":"luminous.cpir.range-map.v1","output_representation_id":"transfer-body","output_sha256":"aa7e63b7bb02231967808f25fbbc8be1015edbdd8ecaee1d3271f2ed61ca431c","segments":[{"input_end":81,"input_start":71,"output_end":10,"output_start":0}]}
