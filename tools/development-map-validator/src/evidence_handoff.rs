@@ -588,6 +588,12 @@ fn expected_receipt_state(
                 if expected_authority_state(authority, cutoff) != "active" {
                     reasons.push("receipt_authority_not_active_at_cutoff".to_owned());
                 }
+                if receipt.observed_at < authority.valid_from {
+                    reasons.push("receipt_observed_before_authority_valid_from".to_owned());
+                }
+                if receipt.observed_at > authority.expires_at {
+                    reasons.push("receipt_observed_after_authority_expiry".to_owned());
+                }
                 if !authority.allowed_obligations.contains(obligation_id) {
                     reasons.push("receipt_authority_out_of_obligation_scope".to_owned());
                 }
@@ -1239,6 +1245,22 @@ mod tests {
         let report = evaluate_evidence_handoff_json(FIXTURE).expect("D6.14 fixture");
         let adversarial = trace(&report, "narrative-overtrust");
         assert_eq!(adversarial.false_completion_claim_count, 1);
+    }
+
+    #[test]
+    fn rejects_receipt_issued_before_authority_validity_window() {
+        let mut value = fixture_value();
+        value["candidate_view"]["receipts"][0]["observed_at"] = json!("2026-11-16T07:00:00Z");
+        value["candidate_view"]["receipts"][0]["available_at"] = json!("2026-11-16T07:01:00Z");
+        let report = report_for(&value);
+        let calibrated = trace(&report, "evidence-backed-minimal");
+        let build = calibrated.obligation_outcomes.iter()
+            .find(|item| item.obligation_id == "build-tests")
+            .expect("build obligation");
+        assert_eq!(build.expected_state, "historical_only");
+        assert!(build.invalid_receipt_reasons.iter().any(|reason| {
+            reason.contains("receipt_observed_before_authority_valid_from")
+        }));
     }
 
     #[test]
