@@ -53,6 +53,16 @@ D6.15 overlaps rather than claims an empty field. RigorBench measures planning, 
 
 Full revalidation; trust/no revalidation; static dependency closure; count-only D6.6; independently costed D6.7; cheapest-first; information-gain-first; expected-value/cost-aware planner; D6.11 pairwise uncertainty; D6.13 whole-DAG worlds; always-act; always-abstain; expert/operator; and the fixed-outcome minimum-sufficient subset oracle.
 
+
+## External benchmark landscape (checked 2026-11-16)
+
+- [RigorBench (June 2026)](https://arxiv.org/abs/2606.22678) explicitly measures planning fidelity, verification coverage, recovery efficiency, abstention quality and atomic transition integrity. Its authors report 30 tasks across five categories and a weighted composite score. D6.15 should report its axes alongside RigorBench's process measures, not claim process-discipline novelty.
+- [Informed abstention competence (June 2026)](https://arxiv.org/abs/2606.02965) distinguishes specification, verification and authority gaps. Its preliminary study reports 144 enterprise scenarios and up to 89.2% hazardous-action blocking with 87.5% usability on authorized scenarios. D6.15 must therefore prove useful action coverage as well as blocking, using positive and negative paired controls.
+- The [2026 long-horizon software-engineering survey](https://longhorizonswe.github.io/) frames accumulated project state and rechecking prior obligations as central. Its reported ChainSWE comparison gives 69.1% resolution from reference-fixed starting states, 49.0% from the agents' own patches and 47.4% when earlier dialogue is also retained. This supports measuring whether acquired evidence remains valid across revisions and handoffs.
+- [Engineering Reliable Coding Agents (August 2026)](https://arxiv.org/abs/2608.13867) treats the deployed agent as a system comprising harness, execution state, retrieval, memory, permissions, review and resource allocation. D6.15 therefore needs runner- and toolchain-bound cost evidence, not just token counts or model-reported estimates.
+
+These works are complementary. The defensible D6.15 contribution is the explicit coupling of evidence acquisition order, admissible-world reduction, action-specific risk envelopes, time cutoffs and independent cost distributions in one evaluator contract. This is a research hypothesis and design distinction, not evidence that D6.15 currently outperforms those systems.
+
 ## Limits and next gates
 
 v0.1 is an evaluator prototype, not an autonomous planner. Candidate traces are supplied records; acquisitions are not executed. It assumes evaluator probability weights are admissible, does not infer calibrated harm probabilities, and does not model stochastic observations, check dependencies, correlated costs or adaptive policy optimality. Cost distributions are supplied fixture inputs, not fresh runner measurements. No production authority, cryptographic authentication, side-effect reconciliation, blinded trial, external adjudication or replication has been performed.
