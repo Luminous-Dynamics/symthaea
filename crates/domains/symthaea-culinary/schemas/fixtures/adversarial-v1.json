@@ -1,0 +1,290 @@
+{
+  "schema_version": "1.0.0",
+  "description": "Synthetic fixtures only. The data are not from a real appliance or food batch.",
+  "cases": [
+    {
+      "case_id": "valid-synthetic-simulator-trajectory",
+      "expected_schema_valid": true,
+      "expected_stateful_validation": "valid_as_simulation_only",
+      "payload": {
+        "schema_version": "1.0.0",
+        "observation_id": "fixture-sim-0001",
+        "evidence_class": "simulated",
+        "collected_at": "2026-11-16T18:00:00+02:00",
+        "clock_source": {
+          "kind": "simulator_clock",
+          "uncertainty_ms": 0,
+          "mapping_ref": null
+        },
+        "appliance_ref": "simulator:kitchen-v1",
+        "appliance_model_revision": "toy-kitchen-0.1",
+        "firmware_revision": null,
+        "batch_ref": "synthetic:batch-001",
+        "input_manifest_ref": "fixture:recipe-001",
+        "environment": {
+          "ambient_temperature_c": 22,
+          "relative_humidity_percent": null,
+          "supply_voltage_v": null
+        },
+        "probe_set": [
+          {
+            "probe_id": "probe-core-sim",
+            "role": "core",
+            "unit": "degC",
+            "placement_ref": "simulated-core-state",
+            "response_time_s": 0,
+            "uncertainty_c": 0,
+            "calibration_ref": null,
+            "calibration_valid_at_collection": null
+          }
+        ],
+        "instrument_ref": null,
+        "calibration_bundle_ref": null,
+        "simulator_ref": "symthaea-culinary::Kitchen@fixture-revision",
+        "model_revision_ref": null,
+        "samples": [
+          {
+            "sequence": 0,
+            "elapsed_s": 0,
+            "probe_id": "probe-core-sim",
+            "temperature_c": 22,
+            "quality": "valid",
+            "original_sample_ref": null
+          },
+          {
+            "sequence": 1,
+            "elapsed_s": 5,
+            "probe_id": "probe-core-sim",
+            "temperature_c": 35,
+            "quality": "valid",
+            "original_sample_ref": null
+          },
+          {
+            "sequence": 2,
+            "elapsed_s": 10,
+            "probe_id": "probe-core-sim",
+            "temperature_c": 47,
+            "quality": "valid",
+            "original_sample_ref": null
+          }
+        ],
+        "operator_interventions": [],
+        "warnings": [
+          "SYNTHETIC ONLY; do not use for cooking decisions"
+        ],
+        "missing_intervals": [],
+        "transformations": [],
+        "raw_data_digest": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "raw_data_ref": null,
+        "review_refs": [],
+        "claim_ceiling": "Observation record only; not a food-safety determination or product qualification."
+      }
+    },
+    {
+      "case_id": "reject-calibration-qualified-without-calibration",
+      "expected_schema_valid": false,
+      "expected_stateful_validation": "reject",
+      "payload": {
+        "schema_version": "1.0.0",
+        "observation_id": "fixture-measured-0002",
+        "evidence_class": "calibration_qualified_measured",
+        "collected_at": "2026-11-16T18:00:00+02:00",
+        "clock_source": {
+          "kind": "monotonic_with_wall_mapping",
+          "uncertainty_ms": 5,
+          "mapping_ref": "clock-map:fixture"
+        },
+        "appliance_ref": "appliance:unknown",
+        "appliance_model_revision": "unknown",
+        "firmware_revision": null,
+        "batch_ref": "synthetic:batch-002",
+        "input_manifest_ref": null,
+        "environment": {
+          "ambient_temperature_c": 22,
+          "relative_humidity_percent": null,
+          "supply_voltage_v": 230
+        },
+        "probe_set": [
+          {
+            "probe_id": "probe-1",
+            "role": "core",
+            "unit": "degC",
+            "placement_ref": "fixture-core",
+            "response_time_s": 1,
+            "uncertainty_c": 0.2,
+            "calibration_ref": null,
+            "calibration_valid_at_collection": null
+          }
+        ],
+        "instrument_ref": "instrument:datalogger-1",
+        "calibration_bundle_ref": null,
+        "simulator_ref": null,
+        "model_revision_ref": null,
+        "samples": [
+          {
+            "sequence": 0,
+            "elapsed_s": 0,
+            "probe_id": "probe-1",
+            "temperature_c": 20,
+            "quality": "valid",
+            "original_sample_ref": null
+          },
+          {
+            "sequence": 1,
+            "elapsed_s": 5,
+            "probe_id": "probe-1",
+            "temperature_c": 30,
+            "quality": "valid",
+            "original_sample_ref": null
+          }
+        ],
+        "operator_interventions": [],
+        "warnings": [],
+        "missing_intervals": [],
+        "transformations": [],
+        "raw_data_digest": "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "raw_data_ref": null,
+        "review_refs": [],
+        "claim_ceiling": "Observation record only; not a food-safety determination or product qualification."
+      }
+    },
+    {
+      "case_id": "reject-non-monotonic-sample-sequence-with-stateful-verifier",
+      "expected_schema_valid": true,
+      "expected_stateful_validation": "reject",
+      "payload": {
+        "schema_version": "1.0.0",
+        "observation_id": "fixture-order-0003",
+        "evidence_class": "uncalibrated_measured",
+        "collected_at": "2026-11-16T18:00:00+02:00",
+        "clock_source": {
+          "kind": "monotonic_with_wall_mapping",
+          "uncertainty_ms": 5,
+          "mapping_ref": "clock-map:fixture"
+        },
+        "appliance_ref": "appliance:commercial-sku-1",
+        "appliance_model_revision": "revision-unverified",
+        "firmware_revision": null,
+        "batch_ref": "fixture:batch-003",
+        "input_manifest_ref": null,
+        "environment": {
+          "ambient_temperature_c": 22,
+          "relative_humidity_percent": null,
+          "supply_voltage_v": 230
+        },
+        "probe_set": [
+          {
+            "probe_id": "probe-1",
+            "role": "core",
+            "unit": "degC",
+            "placement_ref": "fixture-core",
+            "response_time_s": 1,
+            "uncertainty_c": 0.2,
+            "calibration_ref": null,
+            "calibration_valid_at_collection": null
+          }
+        ],
+        "instrument_ref": "instrument:datalogger-1",
+        "calibration_bundle_ref": null,
+        "simulator_ref": null,
+        "model_revision_ref": null,
+        "samples": [
+          {
+            "sequence": 0,
+            "elapsed_s": 5,
+            "probe_id": "probe-1",
+            "temperature_c": 30,
+            "quality": "valid",
+            "original_sample_ref": null
+          },
+          {
+            "sequence": 1,
+            "elapsed_s": 4,
+            "probe_id": "probe-1",
+            "temperature_c": 32,
+            "quality": "valid",
+            "original_sample_ref": null
+          }
+        ],
+        "operator_interventions": [],
+        "warnings": [
+          "Synthetic sequence-order adversarial case"
+        ],
+        "missing_intervals": [],
+        "transformations": [],
+        "raw_data_digest": "2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "raw_data_ref": null,
+        "review_refs": [],
+        "claim_ceiling": "Observation record only; not a food-safety determination or product qualification."
+      }
+    },
+    {
+      "case_id": "reject-modelled-observation-without-model-revision",
+      "expected_schema_valid": false,
+      "expected_stateful_validation": "reject",
+      "payload": {
+        "schema_version": "1.0.0",
+        "observation_id": "fixture-model-0004",
+        "evidence_class": "modelled",
+        "collected_at": "2026-11-16T18:00:00+02:00",
+        "clock_source": {
+          "kind": "simulator_clock",
+          "uncertainty_ms": 0,
+          "mapping_ref": null
+        },
+        "appliance_ref": "model:unknown",
+        "appliance_model_revision": null,
+        "firmware_revision": null,
+        "batch_ref": "fixture:batch-004",
+        "input_manifest_ref": null,
+        "environment": {
+          "ambient_temperature_c": null,
+          "relative_humidity_percent": null,
+          "supply_voltage_v": null
+        },
+        "probe_set": [
+          {
+            "probe_id": "virtual-core",
+            "role": "core",
+            "unit": "degC",
+            "placement_ref": "model-core-node",
+            "response_time_s": null,
+            "uncertainty_c": null,
+            "calibration_ref": null,
+            "calibration_valid_at_collection": null
+          }
+        ],
+        "instrument_ref": null,
+        "calibration_bundle_ref": null,
+        "simulator_ref": null,
+        "model_revision_ref": null,
+        "samples": [
+          {
+            "sequence": 0,
+            "elapsed_s": 0,
+            "probe_id": "virtual-core",
+            "temperature_c": 20,
+            "quality": "valid",
+            "original_sample_ref": null
+          },
+          {
+            "sequence": 1,
+            "elapsed_s": 5,
+            "probe_id": "virtual-core",
+            "temperature_c": 30,
+            "quality": "valid",
+            "original_sample_ref": null
+          }
+        ],
+        "operator_interventions": [],
+        "warnings": [],
+        "missing_intervals": [],
+        "transformations": [],
+        "raw_data_digest": "3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        "raw_data_ref": null,
+        "review_refs": [],
+        "claim_ceiling": "Observation record only; not a food-safety determination or product qualification."
+      }
+    }
+  ]
+}
