@@ -624,13 +624,13 @@ mod tests {
                 mechanism("b", &[1.0, 0.0]),
                 mechanism("c", &[1.0, 1.0]),
             ],
-            0.05, 0.80, 4,
+            0.05, 0.80, 6,
         ).unwrap();
         assert_eq!(report.disposition, SeparationDisposition::TargetAchievable);
         assert_eq!(report.equivalence_class_count, 3);
-        assert_eq!(report.total_observations, 4);
-        assert_eq!(report.replications[0].replicates, 2);
-        assert_eq!(report.replications[1].replicates, 2);
+        assert_eq!(report.total_observations, 6);
+        assert_eq!(report.replications[0].replicates, 3);
+        assert_eq!(report.replications[1].replicates, 3);
     }
 
     #[test]
