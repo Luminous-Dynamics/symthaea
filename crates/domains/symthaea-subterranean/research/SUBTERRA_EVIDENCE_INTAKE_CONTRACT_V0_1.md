@@ -124,7 +124,7 @@ A non-empty evidence reference is an opaque identifier. It does not prove that t
 
 Science-return events also carry `clock_id` and `clock_uncertainty_ms`; the v0.1 event-log check accepts canonical UTC `YYYY-MM-DDTHH:MM:SSZ` only and flags same-clock regressions only when uncertainty intervals prove them. Event sequence remains authoritative, and distinct clocks are not directly compared.
 
-An acquired science-return record now includes a canonical SHA-256 digest and exact byte length. The adapter can recompute the digest over supplied bytes and reject a mismatch before integrity verification or admission. This establishes byte equality relative to the declared digest, not source authenticity; a trusted signature/key binding, calibration chain, clock attestation and custody verifier are still required.
+An acquired science-return record now includes a canonical SHA-256 digest and exact byte length. The structural lifecycle validator checks that the metadata is present and well-formed; callers must separately invoke `verify_payload_bytes()` on the actual returned bytes to verify the digest and length before treating payload integrity as established. A pre-acquisition record cannot pass the byte-verification method without a declared payload. This establishes byte equality relative to the declared digest, not source authenticity; a trusted signature/key binding, calibration chain, clock attestation and custody verifier are still required.
 
 A later source-trust bridge should bind:
 - physical sensor and acquisition identity;

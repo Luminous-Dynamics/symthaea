@@ -11,12 +11,11 @@
 
 use std::collections::BTreeSet;
 
+use crate::{SiteEvidenceRecord, SiteIssue};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub const MIN_CLOCK_UNCERTAINTY_MS: u64 = 1_000;
-
-use crate::{SiteEvidenceRecord, SiteIssue};
 
 fn nonempty(value: &str) -> bool {
     !value.trim().is_empty()
@@ -140,6 +139,7 @@ pub enum ScienceReturnIssue {
     MalformedPayloadSha256,
     PayloadByteLengthMismatch { expected: u64, actual: u64 },
     PayloadSha256Mismatch,
+    PayloadNotDeclaredForVerification,
 }
 
 fn transition_allowed(
@@ -252,7 +252,7 @@ fn sha256_hex(payload: &[u8]) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
     let digest = Sha256::digest(payload);
     let mut output = String::with_capacity(64);
-    for byte in digest {
+    for byte in digest.iter().copied() {
         output.push(char::from(HEX[(byte >> 4) as usize]));
         output.push(char::from(HEX[(byte & 0x0f) as usize]));
     }
@@ -459,7 +459,13 @@ impl ScienceReturnRecord {
         payload_bytes: &[u8],
     ) -> Result<(), Vec<ScienceReturnIssue>> {
         let mut issues = self.validate().err().unwrap_or_default();
-        if let Some(declared) = &self.payload {
+        let Some(declared) = &self.payload else {
+            if !issues.contains(&ScienceReturnIssue::PayloadMissingAfterAcquisition) {
+                issues.push(ScienceReturnIssue::PayloadNotDeclaredForVerification);
+            }
+            return Err(issues);
+        };
+        {
             let actual_length = payload_bytes.len() as u64;
             if declared.byte_length != actual_length {
                 issues.push(ScienceReturnIssue::PayloadByteLengthMismatch {
@@ -876,6 +882,17 @@ mod tests {
             .validate()
             .unwrap_err()
             .contains(&ScienceReturnIssue::MalformedPayloadSha256));
+    }
+
+    #[test]
+    fn payload_verification_cannot_succeed_without_a_declared_payload() {
+        let mut record = complete_record();
+        record.events.truncate(2);
+        record.payload = None;
+        assert!(record
+            .verify_payload_bytes(b"abc")
+            .unwrap_err()
+            .contains(&ScienceReturnIssue::PayloadNotDeclaredForVerification));
     }
 
 }
