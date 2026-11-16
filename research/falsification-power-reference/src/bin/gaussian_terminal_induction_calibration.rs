@@ -193,8 +193,7 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
                 policy.early_stops += 1;
             }
             policy.total_stop_looks += stop.observations as u64;
-            let mut randomizer_rng =
-                SplitMix64::new(seed ^ RANDOMIZER_SALTS[policy_index]);
+            let mut randomizer_rng = SplitMix64::new(seed ^ RANDOMIZER_SALTS[policy_index]);
             if stop.randomized_reject(randomizer_rng.uniform())? {
                 policy.randomized_rejections += 1;
             }
