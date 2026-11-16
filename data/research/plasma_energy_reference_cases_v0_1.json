@@ -4494,6 +4494,11 @@
         "EXPECTED_AND_TAIL_REGRET",
         "CALIBRATED_ABSTENTION",
         "VALUE_OF_INFORMATION_NEXT_MEASUREMENT"
+      ],
+      "credit_policies": [
+        "NO_CREDIT",
+        "ALLOCATION",
+        "AVOIDED_PRODUCT_CREDIT"
       ]
     }
   ]
