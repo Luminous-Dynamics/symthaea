@@ -57,3 +57,45 @@ An AR(1) model with a known predictable conditional mean can be handled by a dis
 ## Claim ceiling
 
 A passing workflow validates the generator, deterministic replay, in-contract positive control and the stress-report schema for this finite synthetic campaign. It does not create a robust test, identify the true noise model from blind data, qualify optional stopping under these stressed conditions, prove real sensor behavior, or extend the Gaussian result beyond its stated assumptions.
+
+
+## 2026-11-16 exact-head result
+
+Exact source head: `b568eb92d8e985b9f5089ed30f6c559cb3e515df`  
+Workflow: https://github.com/Luminous-Dynamics/symthaea/actions/runs/43961429461
+
+The focused workflow passed:
+- rustfmt;
+- 46 Rust tests across the library and four binary test targets;
+- existing sequential Gaussian calibration and receipt;
+- existing single-seed terminal induction and receipt;
+- existing five-seed terminal calibration and receipt;
+- six-regime assumption-stress campaign and receipt;
+- strict Clippy with warnings denied.
+
+### Pooled empirical results
+
+| Observation process | Contract | Null rejection | 95% Wilson interval | Alternative power | Lag-1 residual correlation |
+|---|---|---:|---:|---:|---:|
+| Matched iid Gaussian | In contract | 4.984% | 4.797–5.178% | 79.268% | -0.0006 |
+| AR(1), rho = 0.65 | Out of contract | **21.820%** | 21.460–22.184% | 64.748% | 0.6502 |
+| Student-t(5), variance-standardized | Out of contract | 4.888% | 4.702–5.080% | 79.326% | 0.0000 |
+| Smooth heteroscedastic ramp | Out of contract | 4.792% | 4.608–4.983% | 79.322% | 0.0009 |
+| Abrupt variance regime shift | Out of contract | 5.112% | 4.922–5.309% | 79.318% | 0.0001 |
+| 2% sparse gross contamination | Out of contract | 4.860% | 4.675–5.052% | 81.594% | -0.0002 |
+
+The IID analytic terminal power is 79.2413%; its empirical alternative estimate is 79.268%, with a Wilson interval that contains the analytic value. All six generators had pooled residual variance near the design variance sigma² = 0.64, so the AR(1) false-alarm inflation is not explained by a marginal variance mismatch. The AR(1) generator's measured lag-one correlation was 0.6502, matching the declared 0.65 target.
+
+### Main finding
+
+The independent-Gaussian terminal test rejected the true null in 21.82% of the AR(1) paths, versus the nominal 5%. That is a 16.82 percentage-point excess and about 4.36× nominal rejection. This is a concrete failure when serial dependence is ignored.
+
+The other out-of-contract conditions happened to remain close to nominal size in this particular 80-look design. That does **not** qualify them: a near-nominal finite Monte Carlo estimate is not a theorem, and these rows remain explicitly OUT_OF_CONTRACT. The contamination alternative power also rose to 81.594%, illustrating that departures can change power as well as false-alarm behavior.
+
+The predictable conditional-innovation Gaussian reference in #12442 is the right separate comparator for a *known and correctly specified* AR(1) conditional mean. It must not be conflated with this misspecified independent-observation test. Unknown rho, estimated conditional means/variances and non-Gaussian innovations still require separate treatment.
+
+### Receipt identity
+
+- Stress report JSON SHA-256: `7a548f05a629a33363213afcca6b505edc167d49d4f8a588439fada4ab35579a`
+- Uploaded stress artifact ZIP SHA-256: `8c9e748f571513a9150cd104f39a533e3af564166c5197f4a87d08e993864499`
+- Multi-seed IID calibration artifact ZIP SHA-256: `7afd00a48cbb262909959ab01c744f2c93132d4b83f5f7097c4f7f496df2b42b`
