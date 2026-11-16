@@ -138,6 +138,7 @@
             "required": [
               "station_id",
               "starboard_point_id",
+              "port_source",
               "port_point_id"
             ],
             "properties": {
@@ -150,10 +151,60 @@
                 "minLength": 1
               },
               "port_point_id": {
-                "type": "string",
+                "type": [
+                  "string",
+                  "null"
+                ],
                 "minLength": 1
+              },
+              "port_source": {
+                "enum": [
+                  "MIRRORED_FROM_STARBOARD",
+                  "EXPLICIT_PORT_PROFILE"
+                ]
               }
-            }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "port_source": {
+                      "const": "MIRRORED_FROM_STARBOARD"
+                    }
+                  },
+                  "required": [
+                    "port_source"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "port_point_id": {
+                      "type": "null"
+                    }
+                  }
+                }
+              },
+              {
+                "if": {
+                  "properties": {
+                    "port_source": {
+                      "const": "EXPLICIT_PORT_PROFILE"
+                    }
+                  },
+                  "required": [
+                    "port_source"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "port_point_id": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            ]
           }
         }
       }
@@ -223,8 +274,8 @@
           "BOTTOM",
           "TOPSIDES",
           "DECK",
-          "BOW_STEM_CLOSURE",
-          "STERN_TRANSOM_CLOSURE",
+          "BOW_END_CLOSURE",
+          "STERN_END_CLOSURE",
           "CHINE_BREAKLINES",
           "KEEL_BREAKLINE"
         ]
@@ -301,7 +352,7 @@
               "SHAFT",
               "BILGE_KEEL",
               "BOW_THRUSTER",
-              "SKeg",
+              "SKEG",
               "SUPERSTRUCTURE",
               "BULWARK",
               "OTHER"
@@ -366,7 +417,8 @@
             "DECK_EDGE_TRANSITION",
             "STEM_CLOSURE",
             "TRANSOM_CLOSURE",
-            "UNSUPPORTED"
+            "UNSUPPORTED",
+            "NONE"
           ]
         }
       }
