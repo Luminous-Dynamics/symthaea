@@ -1131,6 +1131,31 @@ mod tests {
     }
 
     #[test]
+    fn candidate_cannot_move_cutoff_or_inflate_budget() {
+        let mut candidate: Value = serde_json::from_str(CANDIDATE).unwrap();
+        candidate["decision_cutoff"] = json!("2026-11-16T10:10:00Z");
+        let cutoff_error = evaluate_model_robust_acquisition_json(&candidate.to_string(), ORACLE)
+            .unwrap_err();
+        assert!(cutoff_error.contains("evaluator-authoritative cutoff"));
+
+        let mut candidate: Value = serde_json::from_str(CANDIDATE).unwrap();
+        candidate["budget_micros"] = json!(999_999);
+        let budget_error = evaluate_model_robust_acquisition_json(&candidate.to_string(), ORACLE)
+            .unwrap_err();
+        assert!(budget_error.contains("evaluator-authoritative budget"));
+    }
+
+    #[test]
+    fn candidate_view_contains_no_model_family_or_likelihood_oracle() {
+        let candidate: Value = serde_json::from_str(CANDIDATE).unwrap();
+        assert!(candidate.get("models").is_none());
+        assert!(candidate.get("likelihoods").is_none());
+        assert!(candidate.get("states").is_none());
+        assert!(candidate.get("actual_world_id").is_none());
+        assert_eq!(candidate["traces"].as_array().unwrap().len(), 9);
+    }
+
+    #[test]
     fn invalid_likelihood_rows_must_normalize_per_state() {
         let mut oracle: Value = serde_json::from_str(ORACLE).unwrap();
         oracle["models"][0]["likelihoods"][0]["outcomes"][0]["state_likelihoods"][0]["probability_bps"] = json!(9_999);
