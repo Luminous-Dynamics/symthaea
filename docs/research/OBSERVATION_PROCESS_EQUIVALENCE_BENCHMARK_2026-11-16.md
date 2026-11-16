@@ -70,9 +70,9 @@ The initial Rust integration test has five deterministic cases:
 4. Unavailable reference probe yields no realized information.
 5. Candidate-visible observation records are separate from evaluator-only latent truth.
 
-Command: `cargo test -p symthaea-fep --test observation_process_equivalence`.
+Command: `rustc --edition=2024 --test crates/core/symthaea-fep/tests/observation_process_equivalence.rs -o /tmp/observation-process-equivalence-tests && /tmp/observation-process-equivalence-tests --nocapture`.
 
-These tests have been authored but not executed in the current authoring environment. They do not establish runtime performance, calibration, sensor feasibility, physical energy savings, robustness to arbitrary MNAR mechanisms, or SOTA superiority.
+The hosted focused workflow compiles this dependency-free fixture directly with the pinned Rust compiler. It does not invoke Cargo because the current workspace glob includes `crates/core/symthaea`, which has no `Cargo.toml` (tracked separately by #12324/#9906). The test is kept under the FEP crate's `tests/` tree so it can also be picked up by Cargo once that workspace prerequisite is repaired. The fixture has not yet passed hosted execution. They do not establish runtime performance, calibration, sensor feasibility, physical energy savings, robustness to arbitrary MNAR mechanisms, or SOTA superiority.
 
 ## What this does not test yet
 
