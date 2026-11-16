@@ -55,7 +55,7 @@ fn make_case(index: usize) -> BlindHoldoutAssessmentCase {
     let test_stand = observation(
         &format!("test-stand-{index}"),
         &format!("test-stand-dataset-{index}"),
-        'z',
+        '9',
         "test-stand-facility",
         "test-stand-case",
         "test-stand-operating-point",
@@ -120,7 +120,7 @@ fn make_case(index: usize) -> BlindHoldoutAssessmentCase {
         _ => (80.0, 100.0, 95.0, 105.0),
     };
     let model_run_id = format!("model-run-{index}");
-    let model_output_sha256 = sha(char::from(b'j' + index as u8));
+    let model_output_sha256 = sha(char::from(b'7' + index as u8));
 
     BlindHoldoutAssessmentCase {
         plan,
@@ -129,7 +129,7 @@ fn make_case(index: usize) -> BlindHoldoutAssessmentCase {
         model_run: ModelRunIdentity {
             run_id: model_run_id.clone(),
             model_revision: "transport-model-r17".to_string(),
-            input_sha256: sha(char::from(b'g' + index as u8)),
+            input_sha256: sha(char::from(b'0' + index as u8)),
             output_sha256: model_output_sha256.clone(),
             run_receipt_ref: format!("model-run-receipt-{index}"),
         },
