@@ -345,6 +345,8 @@ The standalone fixture directory now contains:
 - request expiry equal to issue time;
 - delegated TLSNotary witness mislabeled as public cryptographic verification;
 - HTTPS origin port outside 1..=65535;
+- explicit default HTTPS port 443;
+- DNS server identity mismatch with the canonical origin host;
 - a machine-readable manifest describing the expected rejection stage.
 
 The fixtures are structural/semantic test inputs only. They contain zero digests and synthetic profile IDs, so they do not represent a valid cryptographic trust profile, issued credential, source session, or proof. The duplicate-member fixture must be rejected by the raw JSON admission parser before a normal JSON object is formed.
@@ -362,7 +364,7 @@ An isolated, research-only Rust workspace now exists at `research-tools/claim-pl
 
 Direct crate versions are pinned in `Cargo.toml`: `jsonschema 0.61.2`, `serde_json_canonicalizer 0.4.1`, `serde_json 1.0.151`, `serde 1.0.229`, `sha2 0.10.9` and `hex 0.4.3`. JSON Schema format assertion is explicitly enabled. Canonicalization follows the duplicate-aware parser because canonicalization cannot repair ambiguous duplicate-key input after an ordinary map parser has discarded a duplicate.
 
-The Rust source contains 15 authored unit tests for the three-field positive fixture, duplicate keys, unsafe integers, status maturity, origin paths, missing anti-rollback, unknown field references, freshness type mismatch, unused fields, floating-point inputs, invalid RFC 6901 pointer escapes, RFC 8785 UTF-16 object-key ordering, nonpositive request lifetime, source-mode/trust-scope consistency and HTTPS port range. **The crate has not been compiled or tested**: rustc/Cargo are absent in the authoring environment. A Cargo.lock is also not present, so the transitive dependency closure is not frozen. Authored tests remain unrun.
+The Rust source contains 17 authored unit tests for the three-field positive fixture, duplicate keys, unsafe integers, status maturity, origin paths, missing anti-rollback, unknown field references, freshness type mismatch, unused fields, floating-point inputs, invalid RFC 6901 pointer escapes, RFC 8785 UTF-16 object-key ordering, nonpositive request lifetime, source-mode/trust-scope consistency, HTTPS port range, explicit default-port rejection and DNS server/origin identity matching. **The crate has not been compiled or tested**: rustc/Cargo are absent in the authoring environment. A Cargo.lock is also not present, so the transitive dependency closure is not frozen. Authored tests remain unrun.
 
 ## 11. Implementation sequence
 
