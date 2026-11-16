@@ -134,5 +134,98 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Run multi-seed Gaussian terminal-test stability calibration
+        run: |
+          set -euo pipefail
+          manifest="research/falsification-power-reference/Cargo.toml"
+          report="$RUNNER_TEMP/gaussian-terminal-test-induction-multiseed.json"
+          cargo run --locked --manifest-path "$manifest" --bin gaussian_terminal_multiseed_calibration > "$report"
+          jq -e '
+            (.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0]) as $null
+            | (.scenarios | map(select(.scenario == "fixed_gaussian_declared_alternative"))[0]) as $alt
+            | (
+              .schema == "gaussian_terminal_test_induction_multiseed_v0" and
+              .root_seed_count == 5 and
+              (.root_seeds | length) == 5 and
+              ((.root_seeds | unique | length) == 5) and
+              .paths_per_root_seed == 20000 and
+              .paths_per_scenario == 100000 and
+              .maximum_looks == 80 and
+              .nominal_alpha == 0.05 and
+              .induced_stop_thresholds == [0.75, 0.90, 0.99] and
+              (.scenarios | length) == 2 and
+              all(.scenarios[];
+                .paths_per_root_seed == 20000 and
+                .paths == 100000 and
+                .horizon == 80 and
+                (.per_seed | length) == 5 and
+                .terminal_induced_mismatches == 0 and
+                .terminal_np_rejection_rate >= 0 and
+                .terminal_np_rejection_rate <= 1 and
+                .terminal_np_wilson95[0] <= .terminal_np_rejection_rate and
+                .terminal_np_rejection_rate <= .terminal_np_wilson95[1] and
+                (.induced_stop_policies | length) == 3 and
+                all(.induced_stop_policies[];
+                  .randomized_rejection_rate >= 0 and
+                  .randomized_rejection_rate <= 1 and
+                  .randomized_rejection_wilson95[0] <= .randomized_rejection_rate and
+                  .randomized_rejection_rate <= .randomized_rejection_wilson95[1] and
+                  .early_stop_rate >= 0 and .early_stop_rate <= 1 and
+                  .mean_stop_look >= 1 and .mean_stop_look <= 80
+                ) and
+                all(.per_seed[];
+                  .paths == 20000 and
+                  .terminal_induced_mismatches == 0 and
+                  .terminal_np_rejection_rate >= 0 and
+                  .terminal_np_rejection_rate <= 1 and
+                  .terminal_np_wilson95[0] <= .terminal_np_rejection_rate and
+                  .terminal_np_rejection_rate <= .terminal_np_wilson95[1] and
+                  (.induced_stop_policies | length) == 3 and
+                  all(.induced_stop_policies[];
+                    .randomized_rejection_rate >= 0 and
+                    .randomized_rejection_rate <= 1 and
+                    .randomized_rejection_wilson95[0] <= .randomized_rejection_rate and
+                    .randomized_rejection_rate <= .randomized_rejection_wilson95[1] and
+                    .early_stop_rate >= 0 and .early_stop_rate <= 1 and
+                    .mean_stop_look >= 1 and .mean_stop_look <= 80
+                  )
+                )
+              ) and
+              ($null.terminal_np_rejection_rate >= 0.04) and
+              ($null.terminal_np_rejection_rate <= 0.06) and
+              all($null.induced_stop_policies[];
+                .randomized_rejection_rate >= 0.04 and
+                .randomized_rejection_rate <= 0.06
+              ) and
+              all($null.per_seed[];
+                .terminal_np_rejection_rate >= 0.03 and
+                .terminal_np_rejection_rate <= 0.07 and
+                all(.induced_stop_policies[];
+                  .randomized_rejection_rate >= 0.03 and
+                  .randomized_rejection_rate <= 0.07
+                )
+              ) and
+              (($alt.terminal_np_rejection_rate - .analytic_terminal_np_power) | abs) < 0.007 and
+              ($alt.induced_stop_policies[0].randomized_rejection_rate <= $alt.induced_stop_policies[1].randomized_rejection_rate) and
+              ($alt.induced_stop_policies[1].randomized_rejection_rate <= $alt.induced_stop_policies[2].randomized_rejection_rate) and
+              ($alt.induced_stop_policies[0].early_stop_rate >= $alt.induced_stop_policies[1].early_stop_rate) and
+              ($alt.induced_stop_policies[1].early_stop_rate >= $alt.induced_stop_policies[2].early_stop_rate)
+            )
+          ' "$report"
+          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$report.source-sha"
+          sha256sum "$report" | tee "$report.sha256"
+          cat "$report"
+
+      - name: Upload multi-seed Gaussian terminal-test stability receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: gaussian-terminal-test-induction-multiseed-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/gaussian-terminal-test-induction-multiseed.json
+            ${{ runner.temp }}/gaussian-terminal-test-induction-multiseed.json.sha256
+            ${{ runner.temp }}/gaussian-terminal-test-induction-multiseed.json.source-sha
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets -- -D warnings
