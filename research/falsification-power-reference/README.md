@@ -162,7 +162,7 @@ The terminal NP method is an evaluator oracle because it knows the correct discr
 
 The mechanism_separation module computes quantized action-response equivalence classes for a finite mechanism set, then exhaustively searches bounded replicate vectors for the minimum-cost schedule that separates all distinct classes under a conservative Bonferroni family-wise Gaussian LR requirement across every cross-class mechanism pair.
 
-- Frozen action inputs carry known sigma, replicate cost and a separate response_quantum for numerical signature buckets.
+- Frozen action inputs carry known sigma, replicate cost and a separate exact response signature for numerical signature buckets.
 - Mechanisms in one signature class remain set-valued; no number of repeats of the declared actions can distinguish them under this evaluator contract.
 - Distinct classes produce a family-wise pairwise alpha and required information threshold.
 - TargetAchievable returns the minimum-cost schedule; BudgetInsufficient is distinct from SingleEquivalenceClass.
