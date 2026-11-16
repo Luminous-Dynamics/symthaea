@@ -166,3 +166,24 @@ The method uses the source's station spacing and a piecewise-linear longitudinal
 G2f-a2 supports upright horizontal waterplanes intersecting the station profiles between keel and sheer. It explicitly rejects planes above the sheer rather than inventing deck/flooding geometry. It does not implement trim, heel, hydrostatic equilibrium, free-surface corrections, GZ curves, intact/damage stability criteria, appendage volume, slamming, seakeeping, resistance, propulsion or CFD. It does not generate a loading-specific displacement mesh. Those remain separate geometry, hydrostatics and validation increments.
 
 The sectional-reference CLI also has an end-to-end integration test suite covering both the prismatic box and tapered hull fixtures, digest-bound output, rejection of non-positive density, and help/scope text. Run the focused package verification as described in the marine benchmark protocol; the current draft PR's exact-head focused result is linked from issue #12434.
+
+### Upright mass-balance waterplane solver
+
+For a known total mass and explicit density, the sectional reference can solve the upright waterplane elevation within a caller-supplied shallow/deep bracket:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-upright-mass-balance -- docs/research/marine/fixtures/marine-upright-mass-balance-box-001.json --output /tmp/marine-upright-mass-balance.json
+
+Independently recompute the receipt from the exact request:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-upright-mass-balance -- docs/research/marine/fixtures/marine-upright-mass-balance-box-001.json --verify /tmp/marine-upright-mass-balance.json
+
+The solver requires:
+- explicit total target mass in tonnes and water density in kg/m³;
+- explicit shallow/deep elevations in the source z-down frame;
+- a bracket whose displaced masses straddle the target;
+- positive mass and waterplane tolerances and a bounded iteration count;
+- monotonic displaced mass from shallow to deep; non-monotone or unbracketed inputs fail closed.
+
+For the synthetic 100 m × 20 m × 6 m box, 12,300 tonnes at 1,025 kg/m³ returns z=0 m; 10,250 tonnes returns z=1 m. These are analytical fixture results.
+
+**Scope boundary:** this is an upright sinkage / displacement-mass balance only. It does not solve longitudinal trim, heel, LCG/TCG equilibrium, KG, tank free-surface, flooding, GZ curves, intact/damage stability or statutory criteria. Commercial packages such as Maxsurf, Orca3D and NAPA already provide much more complete loading and stability workflows; this function is an evidence-bound primitive for research and pipeline integration, not a replacement.
