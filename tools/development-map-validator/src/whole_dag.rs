@@ -38,6 +38,8 @@ pub struct GraphPairOutcome {
     pub false_concurrency: bool,
     pub unsupported_causal_claim: bool,
     pub unnecessary_abstention: bool,
+    pub missed_compromise: bool,
+    pub unsupported_compromise_claim: bool,
     pub future_evidence_event_ids: Vec<String>,
     pub world_relations: Vec<WorldRelationReport>,
 }
@@ -56,6 +58,8 @@ pub struct WholeDagTraceReport {
     pub false_concurrency_claim_count: usize,
     pub unsupported_causal_claim_count: usize,
     pub unnecessary_abstention_count: usize,
+    pub missed_compromise_count: usize,
+    pub unsupported_compromise_claim_count: usize,
     pub future_evidence_leakage_count: usize,
     pub critical_unsupported_claim_count: usize,
 }
@@ -488,6 +492,8 @@ fn score_trace(
     let mut false_concurrency_claim_count = 0usize;
     let mut unsupported_causal_claim_count = 0usize;
     let mut unnecessary_abstention_count = 0usize;
+    let mut missed_compromise_count = 0usize;
+    let mut unsupported_compromise_claim_count = 0usize;
     let mut future_evidence_leakage_count = 0usize;
     let mut critical_unsupported_claim_count = 0usize;
 
@@ -511,6 +517,9 @@ fn score_trace(
             && !truth.possible_relations.contains(&claim.claimed_relation);
         let unnecessary_abstention = claim.claimed_relation == "underdetermined"
             && ["before", "after", "concurrent"].contains(&expected.as_str());
+        let missed_compromise = expected == "compromised" && claim.claimed_relation != "compromised";
+        let unsupported_compromise_claim =
+            claim.claimed_relation == "compromised" && expected != "compromised";
         let future: Vec<String> = claim
             .evidence_event_ids
             .iter()
@@ -531,8 +540,15 @@ fn score_trace(
         if unnecessary_abstention {
             unnecessary_abstention_count += 1;
         }
+        if missed_compromise {
+            missed_compromise_count += 1;
+        }
+        if unsupported_compromise_claim {
+            unsupported_compromise_claim_count += 1;
+        }
         let critical_unsupported = claim.critical
-            && ["before", "after", "concurrent"].contains(&claim.claimed_relation.as_str())
+            && ["before", "after", "concurrent", "compromised"]
+                .contains(&claim.claimed_relation.as_str())
             && !correct;
         if critical_unsupported {
             critical_unsupported_claim_count += 1;
@@ -549,6 +565,8 @@ fn score_trace(
             false_concurrency,
             unsupported_causal_claim: unsupported_causal,
             unnecessary_abstention,
+            missed_compromise,
+            unsupported_compromise_claim,
             future_evidence_event_ids: future,
             world_relations: truth.world_relations.clone(),
         });
@@ -573,6 +591,8 @@ fn score_trace(
         false_concurrency_claim_count,
         unsupported_causal_claim_count,
         unnecessary_abstention_count,
+        missed_compromise_count,
+        unsupported_compromise_claim_count,
         future_evidence_leakage_count,
         critical_unsupported_claim_count,
         pair_outcomes,
