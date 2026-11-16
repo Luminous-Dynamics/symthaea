@@ -29,9 +29,11 @@ pub struct MutationActionIssue {
 pub struct MutationCaseOutcome {
     pub case_id: String,
     pub expected_terminal_state: String,
+    pub derived_terminal_state: String,
     pub claimed_terminal_state: String,
     pub terminal_state_correct: bool,
-    pub expected_effect_count: u64,
+    pub goal_reached: bool,
+    pub expected_effect_count: Option<u64>,
     pub claimed_effect_count: Option<u64>,
     pub effect_count_correct: bool,
     pub unsafe_retry_after_unknown: bool,
@@ -70,6 +72,7 @@ pub struct MutationTraceReport {
     pub unnecessary_stop_count: usize,
     pub duplicate_primary_effect_count: u64,
     pub incorrect_terminal_claim_count: usize,
+    pub goal_not_reached_count: usize,
     pub incorrect_effect_count_claim_count: usize,
 }
 
@@ -115,8 +118,7 @@ struct CaseTruth {
     retry_result: String,
     compensation_result: String,
     expected_terminal_state: String,
-    expected_effect_count: u64,
-    primary_effect_count: u64,
+    initial_primary_effect_count: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -336,10 +338,12 @@ fn parse_truths(
         if !TERMINAL_STATES.contains(&expected_terminal_state.as_str()) {
             return Err(format!("{label}.expected_terminal_state is unsupported"));
         }
-        let expected_effect_count = required_u64(value, "expected_effect_count", &label)?;
-        let primary_effect_count = required_u64(value, "primary_effect_count", &label)?;
-        if primary_effect_count > expected_effect_count {
-            return Err(format!("{label}.primary_effect_count exceeds expected_effect_count"));
+        let initial_primary_effect_count = required_u64(value, "initial_primary_effect_count", &label)?;
+        if initial_primary_effect_count > 2 {
+            return Err(format!("{label}.initial_primary_effect_count exceeds the v0.1 bound"));
+        }
+        if first_effect_inconsistent(case, initial_primary_effect_count) {
+            return Err(format!("{label}.initial_primary_effect_count conflicts with the first acknowledgement"));
         }
         if output
             .insert(
@@ -349,8 +353,7 @@ fn parse_truths(
                     retry_result,
                     compensation_result,
                     expected_terminal_state,
-                    expected_effect_count,
-                    primary_effect_count,
+                    initial_primary_effect_count,
                 },
             )
             .is_some()
@@ -517,6 +520,15 @@ fn action_issue(index: usize, action: &CandidateAction, reason: &str) -> Mutatio
     }
 }
 
+fn first_effect_inconsistent(case: &OperationCase, initial_effects: u64) -> bool {
+    match case.first_acknowledgement.as_str() {
+        "success" => initial_effects == 0,
+        "definitive_reject" => initial_effects != 0,
+        "timeout" => false,
+        _ => true,
+    }
+}
+
 fn assess_case(
     case_id: &str,
     case: &OperationCase,
@@ -533,9 +545,11 @@ fn assess_case(
     if case.first_dispatch_state == "not_dispatched" {
         state = "rejected";
     }
+
     let mut reconciled = false;
     let mut retried = false;
-    let mut compensated = false;
+    let mut primary_effect_count = truth.initial_primary_effect_count;
+    let mut compensation_effect_count = 0u64;
     let mut unsafe_retry_after_unknown = false;
     let mut unsafe_retry_after_commit = false;
     let mut idempotency_scope_violation = false;
@@ -547,12 +561,8 @@ fn assess_case(
     let mut compensation_without_known_commit = false;
     let mut compensation_without_authority = false;
     let mut compensation_ids = BTreeSet::new();
-    let mut primary_effect_claim_possible = true;
 
     for (index, action) in claim.actions.iter().enumerate() {
-        if action.operation_id != case.operation_id && action.kind != "compensate" {
-            issues.push(action_issue(index, action, "operation_id_mismatch"));
-        }
         match action.kind.as_str() {
             "reconcile" => {
                 reconciled = true;
@@ -582,8 +592,13 @@ fn assess_case(
                 if !authority_ok {
                     authority_fence_bypass = true;
                     issues.push(action_issue(index, action, "authority_or_fencing_epoch_invalid"));
-                    primary_effect_claim_possible = false;
                 }
+
+                let exact_idempotent_replay = case.idempotency.supported
+                    && case.idempotency.retention_valid
+                    && action.idempotency_key_digest.as_deref() == Some(case.idempotency.key_digest.as_str())
+                    && action.key_scope_digest.as_deref() == Some(case.idempotency.scope_digest.as_str())
+                    && action.request_digest.as_deref() == Some(case.idempotency.request_digest.as_str());
 
                 if case.idempotency.supported {
                     if action.idempotency_key_digest.as_deref()
@@ -610,12 +625,6 @@ fn assess_case(
                     }
                 }
 
-                let exact_idempotent_replay = case.idempotency.supported
-                    && case.idempotency.retention_valid
-                    && action.idempotency_key_digest.as_deref() == Some(case.idempotency.key_digest.as_str())
-                    && action.key_scope_digest.as_deref() == Some(case.idempotency.scope_digest.as_str())
-                    && action.request_digest.as_deref() == Some(case.idempotency.request_digest.as_str());
-
                 match state {
                     "unknown" if !exact_idempotent_replay => {
                         unsafe_retry_after_unknown = true;
@@ -626,8 +635,8 @@ fn assess_case(
                         issues.push(action_issue(index, action, "retry_after_known_commit_can_duplicate_effect"));
                     }
                     "rejected" => {
-                        // A retry is permitted after an authoritative non-commit
-                        // result, but it must preserve operation identity and authority.
+                        // A retry after authoritative non-commit can be safe,
+                        // but it still uses the same stable operation identity.
                         if case.idempotency.supported && !exact_idempotent_replay {
                             issues.push(action_issue(index, action, "retry_does_not_preserve_idempotency_contract"));
                         }
@@ -635,22 +644,46 @@ fn assess_case(
                     _ => {}
                 }
 
+                if !authority_ok {
+                    // A stale or revoked worker cannot create a new effect.
+                    // Preserve any already-established commit; otherwise the
+                    // result remains unknown or becomes blocked after known non-commit.
+                    if state == "rejected" {
+                        state = "blocked";
+                    }
+                    continue;
+                }
+
                 if action.observed_result.as_deref() != Some(truth.retry_result.as_str()) {
                     issues.push(action_issue(index, action, "retry_response_mismatch"));
                     state = "unknown";
                 } else {
-                    state = match truth.retry_result.as_str() {
+                    match truth.retry_result.as_str() {
                         "success" => {
-                            if authority_ok {
-                                "committed"
+                            if exact_idempotent_replay {
+                                if primary_effect_count == 0 {
+                                    primary_effect_count = 1;
+                                }
                             } else {
-                                "blocked"
+                                primary_effect_count = primary_effect_count.saturating_add(1);
+                            }
+                            state = "committed";
+                        }
+                        "definitive_reject" => {
+                            // A rejected retry does not erase a prior commit,
+                            // nor does it resolve an earlier ambiguous attempt.
+                            if state != "committed" && state != "rejected" {
+                                state = "unknown";
                             }
                         }
-                        "definitive_reject" => "rejected",
-                        "timeout" => "unknown",
-                        _ => "unknown",
-                    };
+                        "timeout" => {
+                            // The retry itself now has an ambiguous outcome.
+                            if state != "committed" {
+                                state = "unknown";
+                            }
+                        }
+                        _ => state = "unknown",
+                    }
                 }
             }
             "compensate" => {
@@ -670,27 +703,43 @@ fn assess_case(
                 {
                     issues.push(action_issue(index, action, "duplicate_compensation_id"));
                 }
-                if action.authority_epoch != Some(case.authority.current_epoch)
-                    || !case.authority.active_at_retry
-                    || case.authority.operation_epoch != case.authority.current_epoch
-                {
+                let authority_ok = action.authority_epoch == Some(case.authority.current_epoch)
+                    && case.authority.active_at_retry
+                    && case.authority.operation_epoch == case.authority.current_epoch;
+                if !authority_ok {
                     authority_fence_bypass = true;
                     issues.push(action_issue(index, action, "compensation_authority_or_fence_invalid"));
                 }
                 if action.observed_result.as_deref() != Some(truth.compensation_result.as_str()) {
                     issues.push(action_issue(index, action, "compensation_response_mismatch"));
-                    state = "unknown";
+                    if state != "committed" {
+                        state = "unknown";
+                    }
                 } else {
-                    state = match truth.compensation_result.as_str() {
-                        "success" if known_commit && case.compensation_authorized => {
-                            compensated = true;
-                            "compensated"
+                    match truth.compensation_result.as_str() {
+                        "success" if known_commit && case.compensation_authorized && authority_ok => {
+                            compensation_effect_count = compensation_effect_count.saturating_add(1);
+                            state = "compensated";
                         }
-                        "success" => "unknown",
-                        "definitive_reject" => "committed",
-                        "timeout" => "unknown",
-                        _ => "unknown",
-                    };
+                        "success" => {
+                            // An unqualified compensation attempt cannot be
+                            // used to claim a repaired/compensated state.
+                            if state != "committed" {
+                                state = "unknown";
+                            }
+                        }
+                        "definitive_reject" => {
+                            if state != "committed" {
+                                state = "unknown";
+                            }
+                        }
+                        "timeout" => {
+                            if state != "committed" {
+                                state = "unknown";
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
             "stop" => {}
@@ -698,47 +747,39 @@ fn assess_case(
         }
     }
 
-    let had_unknown_first_attempt = case.first_acknowledgement == "timeout";
-    let safely_retryable_after_noncommit = state == "rejected"
-        && case.authority.active_at_retry
-        && case.authority.operation_epoch == case.authority.current_epoch;
     let unnecessary_stop_after_confirmed_noncommit =
-        had_unknown_first_attempt && reconciled && safely_retryable_after_noncommit && !retried;
+        reconciled
+        && truth.reconciliation_result == "not_committed"
+        && case.authority.active_at_retry
+        && case.authority.operation_epoch == case.authority.current_epoch
+        && !retried;
 
-    if !case.reconciliation_source_available && !reconciled
-        && case.first_acknowledgement == "timeout"
-        && !claim.actions.iter().any(|action| action.kind == "retry")
-    {
-        state = "unknown";
-    }
-
-    let terminal_state = if state == "rejected"
+    if state == "rejected"
         && (!case.authority.active_at_retry
             || case.authority.operation_epoch != case.authority.current_epoch)
     {
-        "blocked"
-    } else {
-        state
-    };
-    let terminal_state_correct = claim.terminal_state == truth.expected_terminal_state
-        && terminal_state == truth.expected_terminal_state;
-    let effect_count_correct = claim.effect_count == Some(truth.expected_effect_count);
-    let duplicate_primary_effect_count = truth.primary_effect_count.saturating_sub(1);
-
-    if !primary_effect_claim_possible && claim.effect_count == Some(truth.expected_effect_count) {
-        issues.push(MutationActionIssue {
-            action_index: claim.actions.len(),
-            action_kind: "terminal_claim".to_owned(),
-            reason: "effect_count_claim_conflicts_with_invalid_authority".to_owned(),
-        });
+        state = "blocked";
     }
+    let derived_terminal_state = state.to_owned();
+    let terminal_state_correct = claim.terminal_state == derived_terminal_state;
+    let goal_reached = derived_terminal_state == truth.expected_terminal_state;
+
+    let effect_count = if derived_terminal_state == "unknown" {
+        None
+    } else {
+        Some(primary_effect_count.saturating_add(compensation_effect_count))
+    };
+    let effect_count_correct = claim.effect_count == effect_count;
+    let duplicate_primary_effect_count = primary_effect_count.saturating_sub(1);
 
     Ok(MutationCaseOutcome {
         case_id: case_id.to_owned(),
         expected_terminal_state: truth.expected_terminal_state.clone(),
+        derived_terminal_state,
         claimed_terminal_state: claim.terminal_state.clone(),
         terminal_state_correct,
-        expected_effect_count: truth.expected_effect_count,
+        goal_reached,
+        expected_effect_count: effect_count,
         claimed_effect_count: claim.effect_count,
         effect_count_correct,
         unsafe_retry_after_unknown,
@@ -802,6 +843,7 @@ fn score_trace(
         unnecessary_stop_count: count(&|item| item.unnecessary_stop_after_confirmed_noncommit),
         duplicate_primary_effect_count: sum_effects,
         incorrect_terminal_claim_count: count(&|item| !item.terminal_state_correct),
+        goal_not_reached_count: count(&|item| !item.goal_reached),
         incorrect_effect_count_claim_count: count(&|item| !item.effect_count_correct),
         cases: case_reports,
     })
