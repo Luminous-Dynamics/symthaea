@@ -751,12 +751,14 @@ mod tests {
                 // The AR(1) conditional mean is completely determined by
                 // the previous observation and is committed before this draw.
                 let conditional_mean = RHO * previous_observation;
-                let observed = conditional_mean + SIGMA * deterministic_standard_normal(&mut state);
                 let conditional_id = format!("conditional-{path}-{step}");
                 let zero_mean_id = format!("zero-mean-{path}-{step}");
                 let conditional_digest = format!("conditional-decision-{path}-{step}");
                 let zero_mean_digest = format!("zero-mean-decision-{path}-{step}");
 
+                // Both monitor specifications are committed before drawing
+                // the current innovation. The wrong-mean arm is an explicit
+                // misspecification control, not an alternative policy.
                 if !conditional_crossed {
                     conditional
                         .commit_prediction_with_conditional_gaussian(
@@ -767,12 +769,7 @@ mod tests {
                             SIGMA,
                         )
                         .unwrap();
-                    let update = conditional
-                        .observe(&conditional_id, &conditional_digest, observed)
-                        .unwrap();
-                    conditional_crossed = update.crossed_alpha_boundary;
                 }
-
                 if !zero_mean_crossed {
                     zero_mean
                         .commit_prediction_with_sigma(
@@ -782,6 +779,17 @@ mod tests {
                             SIGMA,
                         )
                         .unwrap();
+                }
+
+                let observed = conditional_mean + SIGMA * deterministic_standard_normal(&mut state);
+
+                if !conditional_crossed {
+                    let update = conditional
+                        .observe(&conditional_id, &conditional_digest, observed)
+                        .unwrap();
+                    conditional_crossed = update.crossed_alpha_boundary;
+                }
+                if !zero_mean_crossed {
                     let update = zero_mean
                         .observe(&zero_mean_id, &zero_mean_digest, observed)
                         .unwrap();
