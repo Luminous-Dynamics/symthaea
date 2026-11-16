@@ -284,3 +284,52 @@ The programme must not claim feature parity or a more accurate hydrostatics/stab
 - **C5 — design decisions:** compare engineering time, invalid/false-feasible rate, independent-evaluation cost, and independently verified Pareto improvement per unit cost.
 
 The desired advantage is not to beat a mature product at every calculation. It is to deliver a more reproducible, uncertainty-aware and independently auditable design/verification loop while delegating specialist calculations to qualified tools. This is a research hypothesis and requires matched evidence.
+
+
+## 12. G2f-a2 — independent sectional loading-curve reference (16 Nov 2026)
+
+The next implementation slice is `crates/domains/symthaea-marine-geometry/src/sectional_reference.rs`, exposed as `sectional_reference`, with a matching command-line binary `marine-sectional-hydrostatics-reference`.
+
+This is intentionally a second numerical method, not a competing hydrostatics owner:
+- G2c #12366/#12369 integrates oriented tetrahedra from a waterplane-capped displacement mesh.
+- G2f-a2 clips full-envelope station polygons at a declared horizontal waterplane, computes sectional submerged area and section centroid, computes port/starboard waterline breadth, and integrates the curves longitudinally with a piecewise-linear trapezoidal rule.
+- First longitudinal moments use the exact interval integral for the piecewise-linear sectional curve; accumulated sums use Kahan compensation.
+- Results bind the exact source-spec digest, loading-condition ID, waterplane elevation, explicit density and an independent result digest. The complete sweep has its own digest and a fresh recomputation verifier.
+
+### Request and CLI
+
+`docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json` contains the full-envelope input and three ordered upright loading conditions.
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-sectional-hydrostatics-reference -- docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json --output /tmp/marine-sectional-reference.json
+
+The v1 loading contract uses a horizontal plane in the source frame, z-down, and an explicit positive density in kg/m³. A waterplane elevation of -2 m is 2 m above the design waterplane in the vessel frame and represents deeper immersion; +2 m is a shallower loading. Conditions must be uniquely identified and ordered by ascending z. Density is never inferred.
+
+### Synthetic known-answer results
+
+The 100 m × 20 m prismatic box hull has analytic values:
+| Waterplane z | Displacement | Waterplane area | VCB |
+| ---: | ---: | ---: | ---: |
+| -2 m | 16,000 m³ | 2,000 m² | 2 m |
+| 0 m | 12,000 m³ | 2,000 m² | 3 m |
+| +2 m | 8,000 m³ | 2,000 m² | 4 m |
+
+For all three conditions, LCB = LCF = 50 m, TCB = 0, and at 1,025 kg/m³ TPC = 20.5 t/cm. These are analytical synthetic results. They are not measured vessel data.
+
+An explicit asymmetric-port negative/positive fixture uses the actual port profile rather than silently mirroring it. The analytic design-waterplane result is 11,400 m³ and TCB = +0.5 m for a 10% narrower port half-section than starboard. Pointed ends can contribute zero area at their terminal stations while remaining valid longitudinal integration endpoints.
+
+### Validation and claim boundary
+
+The request must first pass the G2f full-envelope input contract. The method only supports upright horizontal waterplanes that intersect every station profile between keel and sheer. It rejects a waterplane above the sheer instead of inventing deck immersion/flooding. It does not produce a displacement mesh and does not support trim, heel, free-surface corrections, equilibrium solving, GM/GZ stability, damaged compartments, appendage volume or class approval.
+
+The longitudinal integral is piecewise linear between the supplied stations. It is exact for the prismatic known-answer fixture and is an independent reference for station-fair hulls only to the degree that the station spacing resolves their sectional-area and waterline-breadth curves. Sparse station sets must be refined and convergence reported. A mismatch with G2c is a diagnostic; do not average the methods or select the preferred answer without identifying the source of the discrepancy.
+
+### Composition with existing owners
+
+This reference composes with:
+- [G2c hydrostatics #12366 / implementation PR #12369](https://github.com/Luminous-Dynamics/symthaea/issues/12366);
+- [G2d finite-difference sensitivity #12383 / PR #12384](https://github.com/Luminous-Dynamics/symthaea/issues/12383);
+- [MARINE-ENVELOPE-001 #8130](https://github.com/Luminous-Dynamics/symthaea/issues/8130) for frozen operating-condition evidence coverage;
+- [MARINE-MF-001 #8138](https://github.com/Luminous-Dynamics/symthaea/issues/8138) and [validated multifidelity design #11513](https://github.com/Luminous-Dynamics/symthaea/issues/11513) for cost and fidelity selection;
+- [MARINE-HYDRODYNAMIC-VALIDATION-001 #11442](https://github.com/Luminous-Dynamics/symthaea/issues/11442) for specialist solver V&V.
+
+It is a geometry-derived reference and evidence adapter, not a new hydrostatic stability package, experiment selector or CFD implementation.
