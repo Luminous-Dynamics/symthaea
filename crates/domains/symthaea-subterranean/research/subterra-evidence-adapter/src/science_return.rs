@@ -4,15 +4,16 @@
 //! verification, local persistence, store-and-forward, delivery, and admission
 //! to a scientific belief update.
 //!
-//! The record validator checks event order and required references only.
+//! The record validator checks lifecycle sequence, canonical UTC timestamp
+//! syntax, clock identity and uncertainty, and definite same-clock regressions.
 //! Evidence references are opaque: this module does not authenticate them,
 //! verify signatures, prove durable storage, or establish custody authority.
 
 use std::collections::BTreeSet;
 
-pub const MIN_CLOCK_UNCERTAINTY_MS: u64 = 1_000;
-
 use serde::{Deserialize, Serialize};
+
+pub const MIN_CLOCK_UNCERTAINTY_MS: u64 = 1_000;
 
 use crate::{SiteEvidenceRecord, SiteIssue};
 
