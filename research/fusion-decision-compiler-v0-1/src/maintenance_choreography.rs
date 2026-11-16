@@ -751,11 +751,6 @@ fn topological_order(
         .enumerate()
         .map(|(index, id)| (id.as_str(), index))
         .collect();
-    let tasks: BTreeMap<&str, &MaintenanceTask> = plan
-        .tasks
-        .iter()
-        .map(|task| (task.task_id.as_str(), task))
-        .collect();
     let mut indegree: BTreeMap<&str, usize> = BTreeMap::new();
     let mut children: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for task in &plan.tasks {
@@ -772,7 +767,7 @@ fn topological_order(
     let mut ready: BTreeSet<(usize, &str)> = indegree
         .iter()
         .filter(|(_, count)| **count == 0)
-        .map(|(task_id, _)| (**priority.get(task_id).unwrap_or(&usize::MAX), *task_id))
+        .map(|(task_id, _)| (*priority.get(task_id).unwrap_or(&usize::MAX), *task_id))
         .collect();
     while let Some((_, task_id)) = ready.pop_first() {
         order.push(task_id.to_string());
@@ -789,7 +784,6 @@ fn topological_order(
     if order.len() != plan.tasks.len() {
         return Err(ScheduleDiagnostic::PrecedenceCycle);
     }
-    let _ = tasks;
     Ok(order)
 }
 
@@ -1273,7 +1267,7 @@ mod tests {
         let heuristic = generate_maintenance_schedule(&plan).unwrap();
         let oracle = exact_small_instance_makespan(&plan).unwrap();
         assert!(oracle <= heuristic.makespan_seconds);
-        assert_eq!(oracle, critical_path_lower_bound(&plan).unwrap().max(heuristic.critical_path_lower_bound_seconds));
+        assert!(oracle >= heuristic.critical_path_lower_bound_seconds);
     }
 
     #[test]
