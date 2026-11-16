@@ -129,5 +129,5 @@ fn cli_help_documents_the_method_boundary() {
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("upright horizontal waterplanes"));
     assert!(stdout.contains("does not generate displacement meshes"));
-    assert!(stdout.contains("does not approve vessel stability"));
+    assert!(stdout.contains("or approve vessel stability"));
 }
