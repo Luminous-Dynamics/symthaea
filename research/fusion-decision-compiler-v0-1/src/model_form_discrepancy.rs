@@ -89,6 +89,7 @@ pub enum ModelFormDiagnostic {
     NonFinitePointEstimate,
     ParametricBoundAbovePointEstimate,
     InvalidParametricCoverage,
+    ParametricCoverageMismatch,
     EmptyCoverageScope,
     InvalidDecisionEvidence,
     ConformalRankUnavailable,
@@ -105,6 +106,7 @@ pub struct ModelFormDiscrepancyProfile {
     pub unit_ref: String,
     pub service_boundary_ref: String,
     pub averaging_window_ref: String,
+    pub sign_convention_ref: String,
     pub regime_ref: String,
     pub geometry_sha256: String,
     pub validity_domain_ref: String,
@@ -125,6 +127,7 @@ pub struct ModelFormDiscrepancyProfile {
 pub struct ModelUseIdentity {
     pub run_id: String,
     pub candidate_revision: String,
+    pub solver_id: String,
     pub solver_revision: String,
     pub input_sha256: String,
     pub output_sha256: String,
@@ -135,6 +138,7 @@ pub struct ModelUseIdentity {
     pub unit_ref: String,
     pub service_boundary_ref: String,
     pub averaging_window_ref: String,
+    pub sign_convention_ref: String,
     pub regime_ref: String,
     pub geometry_sha256: String,
     pub requested_model_use_ref: String,
@@ -146,6 +150,8 @@ pub struct CalibrationResidual {
     pub source_case_id: String,
     pub episode_id: String,
     pub facility_id: String,
+    pub solver_id: String,
+    pub solver_revision: String,
     pub model_run_id: String,
     pub model_output_sha256: String,
     pub measured_observation_id: String,
@@ -154,6 +160,7 @@ pub struct CalibrationResidual {
     pub unit_ref: String,
     pub service_boundary_ref: String,
     pub averaging_window_ref: String,
+    pub sign_convention_ref: String,
     pub regime_ref: String,
     pub geometry_sha256: String,
     pub absolute_residual_mwe: f64,
@@ -202,6 +209,7 @@ pub struct ParametricNetPowerLowerBound {
     pub unit_ref: String,
     pub service_boundary_ref: String,
     pub averaging_window_ref: String,
+    pub sign_convention_ref: String,
     pub evidence_ref: String,
     pub evidence_sha256: String,
 }
@@ -274,7 +282,7 @@ impl ModelFormDiscrepancyReport {
             service_boundary_ref: target.service_boundary_ref.clone(),
             unit_ref: target.unit_ref.clone(),
             averaging_window_ref: target.averaging_window_ref.clone(),
-            sign_convention_ref: "net-export-positive-import-negative-v1".to_string(),
+            sign_convention_ref: target.sign_convention_ref.clone(),
             lower_bound_mwe,
             one_sided_coverage_level: combined_coverage,
             evidence_class: NetExportEvidenceClass::ModelledOutput,
@@ -401,6 +409,22 @@ pub fn evaluate_model_form_discrepancy(
     residual_values.sort_by(f64::total_cmp);
 
     let n = residual_values.len();
+    if n < plan.profile.minimum_calibration_samples {
+        return report(
+            plan,
+            ModelFormDisposition::InsufficientCalibration,
+            Vec::new(),
+            None,
+            None,
+            Some(plan.parametric_bound.lower_bound_mwe),
+            None,
+            Some(coverage_floor(
+                plan.parametric_bound.one_sided_coverage,
+                plan.profile.discrepancy_coverage,
+            )),
+            Some(residual_values),
+        );
+    }
     let rank = ((n + 1) as f64 * plan.profile.discrepancy_coverage).ceil() as usize;
     if rank == 0 || rank > n {
         return report(
@@ -503,6 +527,9 @@ fn validate_plan(plan: &ModelFormDiscrepancyPlan) -> Vec<ModelFormDiagnostic> {
     if profile.averaging_window_ref.trim().is_empty() {
         errors.push(ModelFormDiagnostic::EmptyAveragingWindow);
     }
+    if profile.sign_convention_ref.trim().is_empty() {
+        errors.push(ModelFormDiagnostic::EmptyServiceBoundary);
+    }
     if profile.regime_ref.trim().is_empty() {
         errors.push(ModelFormDiagnostic::EmptyRegime);
     }
@@ -544,6 +571,7 @@ fn validate_plan(plan: &ModelFormDiscrepancyPlan) -> Vec<ModelFormDiagnostic> {
 
     if target.run_id.trim().is_empty()
         || target.candidate_revision.trim().is_empty()
+        || target.solver_id.trim().is_empty()
         || target.solver_revision.trim().is_empty()
         || target.schema_ref.trim().is_empty()
         || target.observable_id.trim().is_empty()
@@ -568,6 +596,8 @@ fn validate_plan(plan: &ModelFormDiscrepancyPlan) -> Vec<ModelFormDiagnostic> {
         || profile.unit_ref != target.unit_ref
         || profile.service_boundary_ref != target.service_boundary_ref
         || profile.averaging_window_ref != target.averaging_window_ref
+        || profile.sign_convention_ref != target.sign_convention_ref
+        || profile.model_family != target.solver_id
         || profile.regime_ref != target.regime_ref
         || profile.geometry_sha256 != target.geometry_sha256
         || profile.requested_model_use_ref != target.requested_model_use_ref
@@ -588,6 +618,8 @@ fn validate_plan(plan: &ModelFormDiscrepancyPlan) -> Vec<ModelFormDiagnostic> {
             || residual.source_case_id.trim().is_empty()
             || residual.episode_id.trim().is_empty()
             || residual.facility_id.trim().is_empty()
+            || residual.solver_id.trim().is_empty()
+            || residual.solver_revision.trim().is_empty()
             || residual.model_run_id.trim().is_empty()
             || residual.measured_observation_id.trim().is_empty()
         {
@@ -691,6 +723,7 @@ fn validate_plan(plan: &ModelFormDiscrepancyPlan) -> Vec<ModelFormDiagnostic> {
         || parametric.unit_ref != target.unit_ref
         || parametric.service_boundary_ref != target.service_boundary_ref
         || parametric.averaging_window_ref != target.averaging_window_ref
+        || parametric.sign_convention_ref != target.sign_convention_ref
     {
         errors.push(ModelFormDiagnostic::ParametricReceiptMismatch);
     }
@@ -704,6 +737,8 @@ fn validate_plan(plan: &ModelFormDiscrepancyPlan) -> Vec<ModelFormDiagnostic> {
         || parametric.one_sided_coverage >= 1.0
     {
         errors.push(ModelFormDiagnostic::InvalidParametricCoverage);
+    } else if (parametric.one_sided_coverage - profile.parametric_coverage).abs() > 1e-12 {
+        errors.push(ModelFormDiagnostic::ParametricCoverageMismatch);
     }
     if !is_sha256(&plan.decision_receipt_sha256) || plan.decision_receipt_ref.trim().is_empty() {
         errors.push(ModelFormDiagnostic::InvalidDecisionEvidence);
@@ -718,6 +753,9 @@ impl CalibrationResidual {
             || self.unit_ref != profile.unit_ref
             || self.service_boundary_ref != profile.service_boundary_ref
             || self.averaging_window_ref != profile.averaging_window_ref
+            || self.sign_convention_ref != profile.sign_convention_ref
+            || self.solver_id != profile.model_family
+            || self.solver_revision != profile.solver_revision
             || self.regime_ref != profile.regime_ref
             || self.geometry_sha256 != profile.geometry_sha256
     }
@@ -792,6 +830,10 @@ mod tests {
         character.to_string().repeat(64)
     }
 
+    fn digest(value: usize) -> String {
+        format!("{value:064x}")
+    }
+
     fn profile() -> ModelFormDiscrepancyProfile {
         ModelFormDiscrepancyProfile {
             profile_id: "D0FUS-ITER-net-power-model-form-v1".to_string(),
@@ -823,6 +865,7 @@ mod tests {
         ModelUseIdentity {
             run_id: "target-run-900".to_string(),
             candidate_revision: "iter-reference-r1".to_string(),
+            solver_id: profile.model_family.clone(),
             solver_revision: profile.solver_revision.clone(),
             input_sha256: sha('e'),
             output_sha256: sha('f'),
@@ -833,6 +876,7 @@ mod tests {
             unit_ref: profile.unit_ref,
             service_boundary_ref: profile.service_boundary_ref,
             averaging_window_ref: profile.averaging_window_ref,
+            sign_convention_ref: profile.sign_convention_ref,
             regime_ref: profile.regime_ref,
             geometry_sha256: profile.geometry_sha256,
             requested_model_use_ref: profile.requested_model_use_ref,
@@ -846,14 +890,17 @@ mod tests {
             source_case_id: format!("case-{index}"),
             episode_id: format!("episode-{index}"),
             facility_id: "facility-a".to_string(),
+            solver_id: profile.model_family,
+            solver_revision: profile.solver_revision,
             model_run_id: format!("calibration-run-{index}"),
-            model_output_sha256: sha(char::from_u32('g' as u32 + (index % 10) as u32).unwrap()),
+            model_output_sha256: digest(index + 1),
             measured_observation_id: format!("measurement-{index}"),
-            measured_artifact_sha256: sha(char::from_u32('q' as u32 + (index % 8) as u32).unwrap()),
+            measured_artifact_sha256: digest(index + 100),
             observable_id: profile.observable_id,
             unit_ref: profile.unit_ref,
             service_boundary_ref: profile.service_boundary_ref,
             averaging_window_ref: profile.averaging_window_ref,
+            sign_convention_ref: profile.sign_convention_ref,
             regime_ref: profile.regime_ref,
             geometry_sha256: profile.geometry_sha256,
             absolute_residual_mwe: value,
@@ -881,6 +928,7 @@ mod tests {
                 receipt_ref: "applicability-receipt-900".to_string(),
                 receipt_sha256: sha('b'),
                 run_id: target.run_id.clone(),
+                solver_id: target.solver_id.clone(),
                 solver_revision: target.solver_revision.clone(),
                 input_sha256: target.input_sha256.clone(),
                 regime_ref: target.regime_ref.clone(),
@@ -909,6 +957,7 @@ mod tests {
                 unit_ref: target.unit_ref.clone(),
                 service_boundary_ref: target.service_boundary_ref.clone(),
                 averaging_window_ref: target.averaging_window_ref.clone(),
+                sign_convention_ref: target.sign_convention_ref.clone(),
                 evidence_ref: "parametric-bound-evidence-900".to_string(),
                 evidence_sha256: sha('f'),
             },
@@ -922,11 +971,14 @@ mod tests {
         let mut plan = plan(19, 1.0);
         plan.profile.discrepancy_coverage = 0.95;
         plan.profile.parametric_coverage = 0.975;
+        plan.profile.target_total_coverage = 0.925;
         let report = evaluate_model_form_discrepancy(&plan);
         assert_eq!(report.disposition, ModelFormDisposition::QualifiedWithinDeclaredDomain);
         assert_eq!(report.conformal_rank_one_based, Some(19));
-        assert_eq!(report.discrepancy_allowance_mwe, Some(1.18));
-        assert_eq!(report.combined_coverage_floor, Some(0.925));
+        assert!(
+            (report.discrepancy_allowance_mwe.unwrap() - 1.18).abs() < 1e-12
+        );
+        assert!((report.combined_coverage_floor.unwrap() - 0.925).abs() < 1e-12);
     }
 
     #[test]
@@ -962,7 +1014,7 @@ mod tests {
             report.disposition,
             ModelFormDisposition::CoverageAllocationInsufficient
         );
-        assert_eq!(report.combined_coverage_floor, Some(0.8999999999999999));
+        assert!((report.combined_coverage_floor.unwrap() - 0.90).abs() < 1e-12);
     }
 
     #[test]
@@ -1135,8 +1187,8 @@ mod tests {
             receipt.model_form_validity,
             ModelFormValidity::WithinDeclaredDomain
         );
-        assert!(receipt.lower_bound_mwe < receipt.one_sided_coverage_level + 100.0);
-        assert!(report.to_net_export_receipt(&plan).is_some());
+        assert!((receipt.lower_bound_mwe - (-46.38)).abs() < 1e-12);
+        assert_eq!(receipt.one_sided_coverage_level, 0.95);
     }
 
     #[test]
