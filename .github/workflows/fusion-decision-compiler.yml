@@ -49,3 +49,6 @@ jobs:
 
       - name: Run D0FUS ITER net-electric service gate
         run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin qualify_plant_service
+
+      - name: Run synthetic design-for-remote-maintenance procedure
+        run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_remote_maintenance
