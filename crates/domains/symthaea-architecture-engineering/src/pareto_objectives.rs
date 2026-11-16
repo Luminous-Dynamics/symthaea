@@ -950,7 +950,7 @@ mod tests {
             candidate("a", 0.8, 0.4, 80.0, true, vec![], H1),
             candidate("b", 0.4, 0.8, 20.0, true, vec![], H2),
             candidate("c", 0.7, 0.3, 90.0, true, vec![], H3),
-            candidate("d", 0.9, 0.9, 95.0, false, vec!["thermal limit".into()], H4),
+            candidate("d", 0.9, 0.9, 95.0, false, vec!["thermal limit"], H4),
         ])).unwrap();
 
         assert_eq!(summary.nondominated_candidate_ids, vec!["a", "b"]);
@@ -993,7 +993,7 @@ mod tests {
     fn infeasible_candidates_never_contribute_to_the_front_or_hypervolume() {
         let with_infeasible = plan(vec![
             candidate("a", 0.7, 0.7, 50.0, true, vec![], H1),
-            candidate("unsafe", 1.0, 1.0, 0.0, false, vec!["unsafe configuration".into()], H2),
+            candidate("unsafe", 1.0, 1.0, 0.0, false, vec!["unsafe configuration"], H2),
         ]);
         let without_infeasible = plan(vec![
             candidate("a", 0.7, 0.7, 50.0, true, vec![], H1),
