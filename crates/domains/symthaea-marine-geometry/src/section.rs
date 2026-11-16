@@ -295,14 +295,14 @@ pub fn verify_section_family_artifact_integrity(
                 "two collapsed endpoints require at least one positive-breadth interior station",
             );
         }
-        if let (Some(first), Some(last)) = (artifact.sections.first(), artifact.sections.last()) {
-            if !close_enough(first.x_m, 0.0) || !close_enough(last.x_m, artifact.length_m) {
-                violation(
-                    &mut errors,
-                    "station_extent",
-                    "section-family stations must span x=0 through the declared vessel length",
-                );
-            }
+        if let (Some(first), Some(last)) = (artifact.sections.first(), artifact.sections.last())
+            && (!close_enough(first.x_m, 0.0) || !close_enough(last.x_m, artifact.length_m))
+        {
+            violation(
+                &mut errors,
+                "station_extent",
+                "section-family stations must span x=0 through the declared vessel length",
+            );
         }
     }
 
@@ -464,14 +464,14 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
                 format!("station {station_index} x/L must be finite and within [0, 1]"),
             );
         }
-        if let Some(previous) = previous_x {
-            if station.x_over_length <= previous {
-                violation(
-                    &mut violations,
-                    "station_order",
-                    format!("station {station_index} must be strictly aft of its predecessor"),
-                );
-            }
+        if let Some(previous) = previous_x
+            && station.x_over_length <= previous
+        {
+            violation(
+                &mut violations,
+                "station_order",
+                format!("station {station_index} must be strictly aft of its predecessor"),
+            );
         }
         previous_x = Some(station.x_over_length);
 
