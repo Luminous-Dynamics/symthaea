@@ -791,7 +791,10 @@ mod tests {
         let proposal = match_signature(&signature, 8, budget()).unwrap();
         assert_eq!(proposal.status, MatchStatusV1::Ambiguous);
         assert!(!proposal.matching_hypotheses.is_empty());
-        assert_eq!(proposal.authority, TemplateAuthorityV1::CandidateProposalOnly);
+        assert_eq!(
+            proposal.authority,
+            TemplateAuthorityV1::CandidateProposalOnly
+        );
         let first = proposal.canonical_bytes();
         let second = match_signature(&signature, 8, budget())
             .unwrap()
