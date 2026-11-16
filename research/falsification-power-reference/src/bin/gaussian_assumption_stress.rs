@@ -78,21 +78,33 @@ impl NoiseRegime {
     fn description(self) -> &'static str {
         match self {
             Self::MatchedIidGaussian => "Independent Gaussian residuals with known constant sigma.",
-            Self::StationaryAr1 => "Stationary Gaussian AR(1) residuals with known generator rho but a test that assumes independence.",
-            Self::StandardizedStudentT5 => "Independent Student-t(5) residuals scaled to unit variance.",
-            Self::SmoothHeteroscedastic => "Independent Gaussian errors with a smooth variance ramp and mean variance sigma squared.",
-            Self::AbruptVarianceShift => "Independent Gaussian errors with a low-variance first regime and high-variance second regime; average variance is sigma squared.",
-            Self::SparseContamination => "Independent Gaussian scale mixture with two-percent gross-error component and unit marginal variance.",
+            Self::StationaryAr1 => {
+                "Stationary Gaussian AR(1) residuals with known generator rho but a test that assumes independence."
+            },
+            Self::StandardizedStudentT5 => {
+                "Independent Student-t(5) residuals scaled to unit variance."
+            },
+            Self::SmoothHeteroscedastic => {
+                "Independent Gaussian errors with a smooth variance ramp and mean variance sigma squared."
+            },
+            Self::AbruptVarianceShift => {
+                "Independent Gaussian errors with a low-variance first regime and high-variance second regime; average variance is sigma squared."
+            },
+            Self::SparseContamination => {
+                "Independent Gaussian scale mixture with two-percent gross-error component and unit marginal variance."
+            },
         }
     }
 
     fn variance_factor(self, look: usize) -> f64 {
         match self {
-            Self::SmoothHeteroscedastic => {
-                0.5 + (look as f64 + 0.5) / HORIZON as f64
-            }
+            Self::SmoothHeteroscedastic => 0.5 + (look as f64 + 0.5) / HORIZON as f64,
             Self::AbruptVarianceShift => {
-                if look < 32 { 0.25 } else { 1.5 }
+                if look < 32 {
+                    0.25
+                } else {
+                    1.5
+                }
             }
             _ => 1.0,
         }
@@ -179,8 +191,7 @@ impl SufficientMoments {
     fn lag_one_correlation(self) -> f64 {
         let n = self.pair_count.max(1) as f64;
         let covariance = self.lag_product - self.previous_sum * self.current_sum / n;
-        let previous_variance =
-            self.previous_squared - self.previous_sum * self.previous_sum / n;
+        let previous_variance = self.previous_squared - self.previous_sum * self.previous_sum / n;
         let current_variance = self.current_squared - self.current_sum * self.current_sum / n;
         let denominator = (previous_variance * current_variance).sqrt();
         if denominator <= 0.0 {
@@ -226,16 +237,11 @@ fn wilson_95(successes: u64, trials: u64) -> (f64, f64) {
     let z2 = WILSON_Z_95 * WILSON_Z_95;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let half = WILSON_Z_95
-        * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()
-        / denominator;
+    let half = WILSON_Z_95 * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt() / denominator;
     ((center - half).max(0.0), (center + half).min(1.0))
 }
 
-fn generate_residuals(
-    regime: NoiseRegime,
-    rng: &mut SplitMix64,
-) -> Vec<f64> {
+fn generate_residuals(regime: NoiseRegime, rng: &mut SplitMix64) -> Vec<f64> {
     let mut residuals = Vec::with_capacity(HORIZON);
     match regime {
         NoiseRegime::MatchedIidGaussian => {
@@ -463,7 +469,10 @@ fn regime_json(result: &RegimeResult, analytic_power: f64) -> String {
 fn main() -> Result<(), Box<dyn Error>> {
     let test =
         GaussianTerminalInducedTest::new(ALPHA, vec![DISCREPANCY; HORIZON], vec![SIGMA; HORIZON])?;
-    let unique_seeds = ROOT_SEEDS.iter().copied().collect::<std::collections::BTreeSet<_>>();
+    let unique_seeds = ROOT_SEEDS
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
     if unique_seeds.len() != ROOT_SEEDS.len() {
         return Err("root seed list contains duplicates".into());
     }
@@ -551,8 +560,7 @@ mod tests {
     #[test]
     fn contamination_mixture_has_unit_marginal_variance_by_construction() {
         let p = CONTAMINATION_PROBABILITY;
-        let variance = (1.0 - p) * CONTAMINATION_BASE_VARIANCE
-            + p * CONTAMINATION_OUTLIER_VARIANCE;
+        let variance = (1.0 - p) * CONTAMINATION_BASE_VARIANCE + p * CONTAMINATION_OUTLIER_VARIANCE;
         assert!((variance - 1.0).abs() < 1.0e-12);
     }
 
@@ -584,9 +592,12 @@ mod tests {
 
     #[test]
     fn fixed_iid_reference_has_expected_analytic_power() {
-        let test =
-            GaussianTerminalInducedTest::new(ALPHA, vec![DISCREPANCY; HORIZON], vec![SIGMA; HORIZON])
-                .unwrap();
+        let test = GaussianTerminalInducedTest::new(
+            ALPHA,
+            vec![DISCREPANCY; HORIZON],
+            vec![SIGMA; HORIZON],
+        )
+        .unwrap();
         assert!((test.total_information() - 6.05).abs() < 1.0e-12);
         assert!((test.terminal_power() - 0.792_412_72).abs() < 1.0e-7);
     }
