@@ -399,18 +399,26 @@ fn scalar_preference(
     tolerance: ObjectiveTolerance,
 ) -> ScalarPreference {
     match (first, second) {
-        (Some(first), Some(second)) if is_better(
-            first.q_eng,
-            second.q_eng,
-            ObjectiveDirection::Maximize,
-            tolerance,
-        ) => ScalarPreference::First,
-        (Some(first), Some(second)) if is_better(
-            second.q_eng,
-            first.q_eng,
-            ObjectiveDirection::Maximize,
-            tolerance,
-        ) => ScalarPreference::Second,
+        (Some(first), Some(second))
+            if is_better(
+                first.q_eng,
+                second.q_eng,
+                ObjectiveDirection::Maximize,
+                tolerance,
+            ) =>
+        {
+            ScalarPreference::First
+        }
+        (Some(first), Some(second))
+            if is_better(
+                second.q_eng,
+                first.q_eng,
+                ObjectiveDirection::Maximize,
+                tolerance,
+            ) =>
+        {
+            ScalarPreference::Second
+        }
         (Some(_), Some(_)) => ScalarPreference::Tie,
         _ => ScalarPreference::Unavailable,
     }
@@ -422,9 +430,9 @@ fn is_better(
     direction: ObjectiveDirection,
     tolerance: ObjectiveTolerance,
 ) -> bool {
-    let threshold = tolerance.absolute.max(
-        tolerance.relative * first.abs().max(second.abs()),
-    );
+    let threshold = tolerance
+        .absolute
+        .max(tolerance.relative * first.abs().max(second.abs()));
     match direction {
         ObjectiveDirection::Maximize => first - second > threshold,
         ObjectiveDirection::Minimize => second - first > threshold,
@@ -502,11 +510,7 @@ pub fn compare_pair(
 
     let first_q_eng = q_eng(first);
     let second_q_eng = q_eng(second);
-    let scalar_preference = scalar_preference(
-        first_q_eng,
-        second_q_eng,
-        profile.q_eng_tolerance,
-    );
+    let scalar_preference = scalar_preference(first_q_eng, second_q_eng, profile.q_eng_tolerance);
     let comparable = first_diagnostics.is_empty() && second_diagnostics.is_empty();
     let relation = if comparable {
         dominance(profile, first, second)
@@ -540,9 +544,10 @@ pub fn compare_pair(
         (DominanceRelation::Equivalent, _) => {
             ScalarTradeoffDisposition::ScalarPreferenceBetweenEquivalentVectors
         }
-        (DominanceRelation::NonDominatedTradeoff, ScalarPreference::First | ScalarPreference::Second) => {
-            ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff
-        }
+        (
+            DominanceRelation::NonDominatedTradeoff,
+            ScalarPreference::First | ScalarPreference::Second,
+        ) => ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff,
         (_, ScalarPreference::Tie) => ScalarTradeoffDisposition::NoScalarPreference,
     };
 
@@ -666,15 +671,39 @@ mod tests {
             ebi_normalization_ref: "qeng-ebi-normalization-paper-v1".to_string(),
             uncertainty_basis_ref: "net-export-one-sided-95pct-method-v1".to_string(),
             objective_tolerances: [
-                ObjectiveTolerance { absolute: 0.01, relative: 1e-9 },
-                ObjectiveTolerance { absolute: 0.01, relative: 1e-9 },
-                ObjectiveTolerance { absolute: 1e-6, relative: 0.0 },
-                ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
-                ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
-                ObjectiveTolerance { absolute: 1e-9, relative: 1e-9 },
-                ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
+                ObjectiveTolerance {
+                    absolute: 0.01,
+                    relative: 1e-9,
+                },
+                ObjectiveTolerance {
+                    absolute: 0.01,
+                    relative: 1e-9,
+                },
+                ObjectiveTolerance {
+                    absolute: 1e-6,
+                    relative: 0.0,
+                },
+                ObjectiveTolerance {
+                    absolute: 1e-4,
+                    relative: 1e-9,
+                },
+                ObjectiveTolerance {
+                    absolute: 1e-4,
+                    relative: 1e-9,
+                },
+                ObjectiveTolerance {
+                    absolute: 1e-9,
+                    relative: 1e-9,
+                },
+                ObjectiveTolerance {
+                    absolute: 1e-4,
+                    relative: 1e-9,
+                },
             ],
-            q_eng_tolerance: ObjectiveTolerance { absolute: 1e-9, relative: 1e-9 },
+            q_eng_tolerance: ObjectiveTolerance {
+                absolute: 1e-9,
+                relative: 1e-9,
+            },
         }
     }
 
@@ -718,7 +747,16 @@ mod tests {
     #[test]
     fn differences_inside_declared_objective_tolerances_do_not_create_false_dominance() {
         let profile = profile();
-        let first = candidate("epsilon-a", 9_000.0, 10_000.0, 0.9000000, 400.0, 300.0, 0.5, 20.0);
+        let first = candidate(
+            "epsilon-a",
+            9_000.0,
+            10_000.0,
+            0.9000000,
+            400.0,
+            300.0,
+            0.5,
+            20.0,
+        );
         let second = candidate(
             "epsilon-b",
             9_000.005,
@@ -737,8 +775,26 @@ mod tests {
     #[test]
     fn differences_outside_declared_objective_tolerances_create_dominance() {
         let profile = profile();
-        let first = candidate("epsilon-dominant", 9_001.0, 9_000.0, 0.91, 390.0, 290.0, 0.49, 19.0);
-        let second = candidate("epsilon-dominated", 9_000.0, 10_000.0, 0.90, 400.0, 300.0, 0.50, 20.0);
+        let first = candidate(
+            "epsilon-dominant",
+            9_001.0,
+            9_000.0,
+            0.91,
+            390.0,
+            290.0,
+            0.49,
+            19.0,
+        );
+        let second = candidate(
+            "epsilon-dominated",
+            9_000.0,
+            10_000.0,
+            0.90,
+            400.0,
+            300.0,
+            0.50,
+            20.0,
+        );
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::FirstDominatesSecond);
     }
@@ -771,10 +827,12 @@ mod tests {
 
     #[test]
     fn q_eng_is_monotone_in_each_input() {
-        assert!(calculate_q_eng(0.8, 0.5).unwrap().q_eng
-            > calculate_q_eng(0.7, 0.5).unwrap().q_eng);
-        assert!(calculate_q_eng(0.8, 0.4).unwrap().q_eng
-            > calculate_q_eng(0.8, 0.5).unwrap().q_eng);
+        assert!(
+            calculate_q_eng(0.8, 0.5).unwrap().q_eng > calculate_q_eng(0.7, 0.5).unwrap().q_eng
+        );
+        assert!(
+            calculate_q_eng(0.8, 0.4).unwrap().q_eng > calculate_q_eng(0.8, 0.5).unwrap().q_eng
+        );
     }
 
     #[test]
@@ -796,7 +854,16 @@ mod tests {
     #[test]
     fn q_eng_preference_can_hide_lifetime_energy_and_cost_tradeoff() {
         let profile = profile();
-        let high_qeng = candidate("high-qeng", 8_000.0, 12_000.0, 0.95, 500.0, 300.0, 0.8, 25.0);
+        let high_qeng = candidate(
+            "high-qeng",
+            8_000.0,
+            12_000.0,
+            0.95,
+            500.0,
+            300.0,
+            0.8,
+            25.0,
+        );
         let high_service = candidate(
             "high-service",
             12_000.0,
@@ -810,12 +877,16 @@ mod tests {
         let report = compare_pair(&profile, &high_qeng, &high_service);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
         assert_eq!(report.dominance, DominanceRelation::NonDominatedTradeoff);
-        assert!(report
-            .scalar_winner_worse_dimensions
-            .contains(&ObjectiveDimension::LifetimeNetElectricEnergyMwh));
-        assert!(report
-            .scalar_winner_worse_dimensions
-            .contains(&ObjectiveDimension::WholeLifeCost));
+        assert!(
+            report
+                .scalar_winner_worse_dimensions
+                .contains(&ObjectiveDimension::LifetimeNetElectricEnergyMwh)
+        );
+        assert!(
+            report
+                .scalar_winner_worse_dimensions
+                .contains(&ObjectiveDimension::WholeLifeCost)
+        );
         assert_eq!(
             report.scalar_tradeoff,
             ScalarTradeoffDisposition::ScalarPreferenceHidesOmittedObjectiveTradeoff
@@ -848,19 +919,32 @@ mod tests {
         let report = compare_pair(&profile, &lower_availability, &higher_availability);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
         assert_eq!(report.dominance, DominanceRelation::NonDominatedTradeoff);
-        assert!(report
-            .scalar_winner_worse_dimensions
-            .contains(&ObjectiveDimension::OperationalAvailability));
-        assert!(report
-            .scalar_winner_worse_dimensions
-            .contains(&ObjectiveDimension::LifetimeNetElectricEnergyMwh));
+        assert!(
+            report
+                .scalar_winner_worse_dimensions
+                .contains(&ObjectiveDimension::OperationalAvailability)
+        );
+        assert!(
+            report
+                .scalar_winner_worse_dimensions
+                .contains(&ObjectiveDimension::LifetimeNetElectricEnergyMwh)
+        );
     }
 
     #[test]
     fn q_eng_cannot_reverse_true_vector_dominance_when_its_inputs_are_in_vector() {
         let profile = profile();
         let first = candidate("dominant", 12_000.0, 7_000.0, 0.95, 300.0, 200.0, 0.5, 10.0);
-        let second = candidate("dominated", 10_000.0, 9_000.0, 0.85, 500.0, 300.0, 0.8, 20.0);
+        let second = candidate(
+            "dominated",
+            10_000.0,
+            9_000.0,
+            0.85,
+            500.0,
+            300.0,
+            0.8,
+            20.0,
+        );
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::FirstDominatesSecond);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
@@ -903,11 +987,13 @@ mod tests {
         let second = candidate("second", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
-        assert!(report
-            .first_diagnostics
-            .contains(&ComparisonDiagnostic::MissingObjective(
-                ObjectiveDimension::LifetimeNetElectricEnergyMwh
-            )));
+        assert!(
+            report
+                .first_diagnostics
+                .contains(&ComparisonDiagnostic::MissingObjective(
+                    ObjectiveDimension::LifetimeNetElectricEnergyMwh
+                ))
+        );
         assert_eq!(report.scalar_preference, ScalarPreference::First);
     }
 
@@ -919,7 +1005,11 @@ mod tests {
         second.profile_sha256 = sha('c');
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
-        assert!(report.second_diagnostics.contains(&ComparisonDiagnostic::ProfileDigestMismatch));
+        assert!(
+            report
+                .second_diagnostics
+                .contains(&ComparisonDiagnostic::ProfileDigestMismatch)
+        );
     }
 
     #[test]
@@ -930,7 +1020,11 @@ mod tests {
         second.ebi_normalization_ref.clear();
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
-        assert!(report.second_diagnostics.contains(&ComparisonDiagnostic::EbiNormalizationMismatch));
+        assert!(
+            report
+                .second_diagnostics
+                .contains(&ComparisonDiagnostic::EbiNormalizationMismatch)
+        );
     }
 
     #[test]
@@ -958,10 +1052,14 @@ mod tests {
         let first = candidate("z", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
         let second = candidate("a", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
         let third = candidate("dominated", 7_000.0, 12_000.0, 0.7, 600.0, 450.0, 0.8, 35.0);
-        let first_report = extract_pareto_front(&profile, &[first.clone(), second.clone(), third.clone()]);
+        let first_report =
+            extract_pareto_front(&profile, &[first.clone(), second.clone(), third.clone()]);
         let second_report = extract_pareto_front(&profile, &[third, second, first]);
         assert_eq!(first_report, second_report);
-        assert_eq!(first_report.frontier_candidate_ids, vec!["a".to_string(), "z".to_string()]);
+        assert_eq!(
+            first_report.frontier_candidate_ids,
+            vec!["a".to_string(), "z".to_string()]
+        );
     }
 
     #[test]
@@ -994,9 +1092,13 @@ mod tests {
         let second = candidate("second", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
-        assert!(report.first_diagnostics.contains(&ComparisonDiagnostic::NonFiniteObjective(
-            ObjectiveDimension::WholeLifeCost
-        )));
+        assert!(
+            report
+                .first_diagnostics
+                .contains(&ComparisonDiagnostic::NonFiniteObjective(
+                    ObjectiveDimension::WholeLifeCost
+                ))
+        );
     }
 
     #[test]
@@ -1007,12 +1109,16 @@ mod tests {
         second.candidate_revision = "same-r2".to_string();
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
-        assert!(report.first_diagnostics.contains(
-            &ComparisonDiagnostic::DuplicateCandidateIdentity
-        ));
-        assert!(report.second_diagnostics.contains(
-            &ComparisonDiagnostic::DuplicateCandidateIdentity
-        ));
+        assert!(
+            report
+                .first_diagnostics
+                .contains(&ComparisonDiagnostic::DuplicateCandidateIdentity)
+        );
+        assert!(
+            report
+                .second_diagnostics
+                .contains(&ComparisonDiagnostic::DuplicateCandidateIdentity)
+        );
     }
 
     #[test]
