@@ -187,6 +187,7 @@ All learned models must use a common, rights-cleared corpus, identical parent-hu
 
 **Generative distribution and diversity**
 - Noise Score, Diversity Score, Jensen–Shannon Divergence, Minimum Matching Distance and Coverage (reproduced exactly when a source provides definitions).
+- 1-Nearest-Neighbor Accuracy (1-NNA) as a supplementary extension; the 2026 GAN/VAE-PCT paper itself identifies 1-NNA as a future addition, so do not attribute it to that study's reported results.
 - Bidirectional Chamfer distance, Hausdorff distance and 95th-percentile surface deviation.
 - Normal deviation, curvature/fairness residual and breakline displacement.
 - Invalid/unsupported sample rate and duplicate-design rate.
