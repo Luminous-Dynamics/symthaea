@@ -1271,7 +1271,6 @@ mod tests {
         assert!((receipt.equilibrium.longitudinal_center_of_buoyancy_m - 50.0).abs() < 1.0e-8);
     }
 
-
     #[test]
     fn upright_mass_balance_stops_on_the_refined_bracket_width() {
         let mut request = box_mass_balance_request(11_000.0);
@@ -1513,9 +1512,7 @@ mod tests {
 
         assert!((result.displacement_volume_m3 - 9_000.0).abs() < 1.0e-8);
         assert!((result.waterplane_area_m2 - 1_500.0).abs() < 1.0e-8);
-        assert!(
-            (result.longitudinal_center_of_buoyancy_m - 55.555_555_555_555_56).abs() < 1.0e-10
-        );
+        assert!((result.longitudinal_center_of_buoyancy_m - 55.555_555_555_555_56).abs() < 1.0e-10);
         assert!(
             (result.longitudinal_center_of_flotation_m - 55.555_555_555_555_56).abs() < 1.0e-10
         );
@@ -1524,7 +1521,6 @@ mod tests {
         assert!((result.displaced_mass_tonnes - 9_225.0).abs() < 1.0e-8);
         assert!((result.tonnes_per_cm_immersion - 15.375).abs() < 1.0e-9);
     }
-
 
     #[test]
     fn displacement_curve_derivative_matches_waterplane_area_for_prismatic_hull() {
@@ -1541,8 +1537,7 @@ mod tests {
         // area for this prismatic known-answer fixture.
         let overload_immersion_step = design.waterplane_z_m - overload.waterplane_z_m;
         let design_immersion_step = light.waterplane_z_m - design.waterplane_z_m;
-        let overload_mean_area =
-            0.5 * (overload.waterplane_area_m2 + design.waterplane_area_m2);
+        let overload_mean_area = 0.5 * (overload.waterplane_area_m2 + design.waterplane_area_m2);
         let design_mean_area = 0.5 * (design.waterplane_area_m2 + light.waterplane_area_m2);
         assert!(
             ((overload.displacement_volume_m3 - design.displacement_volume_m3)
@@ -1580,8 +1575,13 @@ mod tests {
                 base.vertical_center_of_buoyancy_m,
                 changed.vertical_center_of_buoyancy_m
             );
-            assert!((changed.displaced_mass_tonnes / base.displaced_mass_tonnes - 1.01).abs() < 1.0e-12);
-            assert!((changed.tonnes_per_cm_immersion / base.tonnes_per_cm_immersion - 1.01).abs() < 1.0e-12);
+            assert!(
+                (changed.displaced_mass_tonnes / base.displaced_mass_tonnes - 1.01).abs() < 1.0e-12
+            );
+            assert!(
+                (changed.tonnes_per_cm_immersion / base.tonnes_per_cm_immersion - 1.01).abs()
+                    < 1.0e-12
+            );
         }
     }
 
