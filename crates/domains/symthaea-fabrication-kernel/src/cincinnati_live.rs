@@ -440,7 +440,10 @@ mod tests {
         let before_anomaly_count = monitor.anomaly_count();
 
         let alert = monitor.ingest_reading(make_reading("temperature_nozzle", 500.0, 5000));
-        assert!(alert.is_some(), "extreme sample should be evaluated against prior accepted data");
+        assert!(
+            alert.is_some(),
+            "extreme sample should be evaluated against prior accepted data"
+        );
 
         let after_stats = &monitor.channel_stats["temperature_nozzle"];
         assert_eq!(after_stats.count, before_stats.count);
@@ -448,10 +451,17 @@ mod tests {
         assert_eq!(after_stats.m2, before_stats.m2);
         assert_eq!(monitor.baselines["temperature_nozzle"], before_baseline);
         assert_eq!(monitor.anomaly_count(), before_anomaly_count + 1);
-        assert_eq!(monitor.history_len(), 21, "anomalous sample remains in the audit history");
+        assert_eq!(
+            monitor.history_len(),
+            21,
+            "anomalous sample remains in the audit history"
+        );
 
         let accepted = monitor.ingest_reading(make_reading("temperature_nozzle", 210.020, 5100));
-        assert!(accepted.is_none(), "an in-envelope sample should remain admissible");
+        assert!(
+            accepted.is_none(),
+            "an in-envelope sample should remain admissible"
+        );
         assert_eq!(monitor.channel_stats["temperature_nozzle"].count, before_stats.count + 1);
     }
 
@@ -468,7 +478,10 @@ mod tests {
                 value,
                 5000 + index as u64 * 100,
             ));
-            assert!(alert.is_some(), "outlier {value} must not become normal by repetition");
+            assert!(
+                alert.is_some(),
+                "outlier {value} must not become normal by repetition"
+            );
         }
 
         let after = &monitor.channel_stats["temperature_nozzle"];
