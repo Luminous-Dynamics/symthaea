@@ -120,13 +120,13 @@ SHA-256 over the exact input bytes.
 
 ## 7. Authored test inventory and limits
 
-The current source contains 79 authored Rust test functions:
+The current source contains 80 authored Rust test functions:
 - 16 event-contract tests in `lib.rs`;
 - 12 bitemporal ledger tests in `lib.rs`;
 - 8 purged-split tests;
 - 10 train-only-scaler tests;
 - 10 Time-IMM adapter tests;
-- 23 source-watermark/completeness tests.
+- 24 source-watermark/completeness tests.
 
 No Cargo build, rustfmt, Clippy, unit test, dataset adapter execution or
 benchmark has run in this environment. The source and fixture inventory is
@@ -180,7 +180,7 @@ complexity improvement by construction, not yet a measured throughput result;
 the benchmark records p50/p95/p99 query latency, late-breach candidates visited,
 and full-audit rebuild latency separately.
 
-Twenty-three source-authored tests cover missing progress, multi-source minimum,
+Twenty-four source-authored tests cover missing progress, multi-source minimum,
 exclusive boundary behavior, as-known watermarks, late arrivals, terminal
 sources, monotonicity/generation, policy identity, atomic batches, duplicate
 arrivals, unqualified no-progress arrivals, evidence-bound completeness and
