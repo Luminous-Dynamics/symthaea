@@ -238,3 +238,12 @@ The calibration digest is not a source signature and does not authenticate
 the calibration provider. A governed calibration registry, signature
 verification, key revocation, and durable calibration history remain future
 qualification work.
+
+
+The `ClockCalibrationLedger` adds append-only calibration revision selection.
+It enforces unique calibration IDs, monotonic knowledge-time transactions and
+atomic same-time batches. A lookup selects the newest revision that was known
+at the requested cutoff and whose source-time validity covers the timestamp.
+The full history can be replayed and its digest reproduced. A caller cannot
+silently substitute a future calibration or reuse a calibration that does not
+cover the queried source time.
