@@ -10,7 +10,7 @@
 Before asking whether a researcher selected the right mechanism, determine whether the available experiment actions could identify a unique mechanism at all.
 
 For a finite candidate set and a frozen action set, this reference:
-1. partitions mechanisms by their evaluator-declared quantized response signatures over every admissible action;
+1. partitions mechanisms by exact finite IEEE-754 expected-mean signatures over every admissible action, canonicalizing signed zero;
 2. retains mechanisms in an irreducible action-space equivalence class as a set;
 3. searches for the minimum-cost integer replication schedule that separates all distinct classes at a declared family-wise alpha and pairwise target power;
 4. returns BudgetInsufficient rather than pretending that an underpowered schedule proves equivalence.
@@ -49,7 +49,7 @@ Among qualifying schedules, choose minimum total cost; ties resolve by observati
 
 ## 3. Output and dispositions
 
-- SingleEquivalenceClass: all candidate mechanisms share one quantized action-response signature. No admissible replication schedule can uniquely identify a member under this finite action set.
+- SingleEquivalenceClass: all candidate mechanisms share one exact action-response signature. No admissible replication schedule can uniquely identify a member under this finite action set.
 - TargetAchievable: a minimum-cost schedule meets the declared all-pairs information requirement.
 - BudgetInsufficient: the classes are distinct, but no schedule under the observation cap reaches the declared target. This is not observational equivalence.
 
