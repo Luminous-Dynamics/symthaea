@@ -979,7 +979,7 @@ This paper studies carbon formation through DRM or methane pyrolysis and subsequ
 ### New benchmark targets
 
 The machine-readable register adds:
-- CO2 DBD: mean leave-one-publication-out R2 >= 0.80, 90% prediction interval coverage >= 90%, and declared applicability-domain coverage >= 80%, followed by sealed prospective reactor validation.
+- CO2 DBD: reproduce the 27-paper group five-fold result first; target mean grouped-fold R2 >= 0.55 (from 0.441) and worst-fold R2 >= 0.15 (from 0.024), with nominal 90% prediction interval coverage >= 90% and applicability coverage >= 80%. Separately target mean leave-one-publication-out R2 >= 0.45; do not equate it to the five-fold score. Require at least 20 independent points in a sealed prospective reactor holdout. Resolve the 358/357 source row count against the SI before claiming exact reproduction.
 - RWGS: preserve the H2-rich and stoichiometric points separately and resolve the 264/277 kJ/mol source discrepancy before point ranking.
 - Cyclic carbon utilization: 100 physical cycles, >=95% uncertainty-aware carbon inventory closure and >=90% accepted syngas productivity retention, with all grid-side auxiliaries and every failed cycle counted.
 
