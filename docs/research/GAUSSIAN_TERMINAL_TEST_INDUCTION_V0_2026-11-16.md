@@ -102,7 +102,7 @@ The terminal NP test is an oracle comparator because it knows the correct altern
 
 Koning & van Meer, *Anytime validity is free: inducing sequential tests*, Journal of the Royal Statistical Society Series B 88(4), 1366–1384 (published 21 February 2026), DOI: https://doi.org/10.1093/jrsssb/qkag050.
 
-Their result is general for a fixed valid terminal test; this module implements only the deterministic simple-Gaussian case. The paper also discusses optional continuation. The generic simple-null Bernoulli implementation remains under #9820, and generic anytime-valid confidence-sequence/e-process comparisons remain owned by AOBench #12197 / #12242 / #12271.
+Their result is general for a fixed valid terminal test; this module implements only the deterministic simple-Gaussian case. The paper also discusses optional continuation. The generic simple-null Bernoulli implementation remains under #9820, and generic anytime-valid confidence-sequence/e-process comparisons remain owned by AOBench #12197 / #12242 / #12271. The paired binary gaussian_terminal_induction_calibration is the fixed-design operating-characteristic comparison for the terminal NP, induced test, e-process and naive repeated-look methods.
 
 ## 7. Claim boundary
 
