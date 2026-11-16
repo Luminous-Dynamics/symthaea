@@ -78,5 +78,52 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Run paired Gaussian terminal-test induction calibration
+        run: |
+          set -euo pipefail
+          manifest="research/falsification-power-reference/Cargo.toml"
+          report="$RUNNER_TEMP/gaussian-terminal-test-induction-calibration.json"
+          cargo run --locked --manifest-path "$manifest" --bin gaussian_terminal_induction_calibration > "$report"
+          jq -e '
+            .schema == "gaussian_terminal_test_induction_calibration_v0" and
+            .nominal_alpha == 0.05 and
+            .paths_per_scenario == 20000 and
+            .maximum_looks == 80 and
+            (.scenarios | length) == 2 and
+            all(.scenarios[];
+              .paths == 20000 and
+              .horizon == 80 and
+              .terminal_induced_mismatches == 0 and
+              .terminal_np_rejection_rate >= 0 and .terminal_np_rejection_rate <= 1 and
+              .induced_randomized_rejection_rate >= 0 and .induced_randomized_rejection_rate <= 1 and
+              .e_process_crossing_rate >= 0 and .e_process_crossing_rate <= 1 and
+              .naive_repeated_fixed_time_rate >= 0 and .naive_repeated_fixed_time_rate <= 1
+            ) and
+            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].terminal_np_rejection_rate) >= 0.04) and
+            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].terminal_np_rejection_rate) <= 0.06) and
+            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].induced_randomized_rejection_rate) >= 0.04) and
+            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].induced_randomized_rejection_rate) <= 0.06) and
+            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].e_process_crossing_rate) <= 0.06) and
+            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].naive_repeated_fixed_time_rate) > 0.10) and
+            ((
+              (.scenarios | map(select(.scenario == "fixed_gaussian_declared_alternative"))[0].terminal_np_rejection_rate) -
+              .analytic_terminal_np_power
+            ) | abs) < 0.015
+          ' "$report"
+          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$report.source-sha"
+          sha256sum "$report" | tee "$report.sha256"
+          cat "$report"
+
+      - name: Upload Gaussian terminal-test induction receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: gaussian-terminal-test-induction-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/gaussian-terminal-test-induction-calibration.json
+            ${{ runner.temp }}/gaussian-terminal-test-induction-calibration.json.sha256
+            ${{ runner.temp }}/gaussian-terminal-test-induction-calibration.json.source-sha
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets -- -D warnings
