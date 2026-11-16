@@ -107,6 +107,14 @@ The site adapter preserves 'coordinate_frame', latitude/longitude/elevation and 
 
 The profile adapter is a 1D along-profile record. It is not a 3D mesh, cave connectivity graph, structural model, roof stability calculation, pressurization model or access envelope.
 
+### Science return
+
+The additional science-return record enforces the lifecycle:
+
+'Proposed → Executed → Acquired → IntegrityVerified → Persisted → Delivered → Admitted'.
+
+Failure/cancellation are explicit terminal dispositions. 'StoreAndForwarded' is a distinct branch from 'Persisted' and is not counted as delivered. Integrity verification requires a calibration reference; persistence requires a custody reference; delivery requires both custody and a delivery receipt; scientific admission requires a separate admission reference. These references are still opaque, caller-supplied identifiers: this state machine does not authenticate signatures, prove durable storage, verify transport or establish custody authority.
+
 The network adapter is a graph of evidence claims. It is not a SLAM map, path planner, geomechanics solver or robotic traversability certificate.
 
 ## 6. Source and evidence trust
@@ -135,10 +143,11 @@ Contents:
 - site-evidence JSON-to-typed adapter;
 - cave-network JSON-to-typed adapter and topology/route queries;
 - non-uniform profile adapter and observed-only summary;
+- science-return lifecycle validator and site/observation linkage;
 - copied synthetic site, network and profile fixtures;
-- 19 site/network tests and 6 profile tests (25 authored cases total).
+- 19 site/network tests, 6 profile tests and 10 science-return tests (35 adapter cases total).
 
-Across the complete current Symthaea Subterra PR, the one-step EVSI, survival planner, robust EVSI and evidence adapter together have 56 authored Rust unit tests. This count is source inspection only. None has been compiled or executed in the current environment.
+Across the complete current Symthaea Subterra PR, the one-step EVSI, survival planner, robust EVSI, site/network/profile adapter and science-return lifecycle together have 66 authored Rust unit tests. This count is source inspection only. None has been compiled or executed in the current environment.
 
 ### Verification status
 
@@ -157,7 +166,7 @@ Across the complete current Symthaea Subterra PR, the one-step EVSI, survival pl
 2. Connect verified observation lineage and source-trust receipts; retain common-cause correlations.
 3. Create a separate calibration model that maps site evidence to prior/likelihood distributions with non-zero unknown mass.
 4. Add direct adapters from validated site/network/profile packets into finite model-ensemble EVSI inputs, without copying source claims into numeric probabilities.
-5. Add a science-return record lifecycle that distinguishes proposal, execution, acquisition, integrity verification, persistence, delivery and scientific admission.
+5. Extend science-return records with verifier-bound signatures, immutable custody receipts, transport-delivery reconciliation and cross-agent identity evidence; the current state machine only validates local event ordering and required reference fields.
 6. Compare planner outputs against one-step EVSI, entropy, frontier, FEP and survival-conditioned baselines under identical evidence and resource budgets.
 7. Only after exact-head source/test qualification should production runtime interfaces be proposed.
 
