@@ -3,7 +3,7 @@
 # Run from any directory inside a Symthaea checkout:
 #   bash crates/domains/symthaea-subterranean/research/verify-subterra-reference-packages.sh
 #
-# The packages are nested Cargo workspaces, so root cargo test --workspace
+# These packages are nested Cargo workspaces, so root cargo test --workspace
 # does not include them.
 
 set -euo pipefail
@@ -22,6 +22,7 @@ CRATES=(
   "subterra-survival-planner"
   "subterra-robust-voi"
   "subterra-likelihood-calibration"
+  "subterra-dependence-audit"
   "subterra-evidence-adapter"
 )
 
@@ -54,5 +55,5 @@ for crate in "${CRATES[@]}"; do
   cargo clippy --manifest-path "$ROOT/$BASE/$crate/Cargo.toml" --all-targets -- -D warnings
 done
 
-printf '\nPASS: five standalone Subterra packages passed formatting, tests and strict Clippy.\n'
+printf '\nPASS: six standalone Subterra packages passed formatting, tests and strict Clippy.\n'
 printf 'This does not establish physical, analogue, flight or planetary qualification.\n'

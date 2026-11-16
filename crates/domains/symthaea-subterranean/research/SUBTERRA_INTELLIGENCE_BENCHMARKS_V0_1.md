@@ -318,3 +318,30 @@ This is particularly important for physical world models: recent 2026 work notes
 ### Evidence boundary
 
 The calibration crate's 19 unit tests are AUTHORED, not executed. Five cover guarded EVSI conversion, including under-supported-cell rejection, hypothesis-order consistency and preservation of external gate denial. Its Dirichlet-smoothed empirical frequencies are not a general Bayesian sensor model and are not evidence of planetary transfer. Qualitative Candidate, Supported or DirectlyObserved site claim states must never be converted directly into probability values. Only independently adjudicated site/action observation cases with provenance are eligible for calibration.
+
+
+## 13. Hierarchy-aware dependence and split-leakage benchmarks
+
+The calibration package's one-row-per-site/action rule is safe but intentionally restrictive. Real evidence pipelines produce multiple derived records from one acquisition and contain cross-site common causes such as calibration sessions, environmental episodes, processing runs and adjudication campaigns. The new standalone `subterra-dependence-audit` package computes transitive split-grouping components over these declarations.
+
+| Benchmark | Question | Proposed gate |
+|---|---|---|
+| HierarchyLeakageBench | Do sites, acquisitions or declared common causes cross Training/Calibration/Evaluation? | Zero dependency-component overlap |
+| DerivedArtifactInflationBench | Are raw rows, unique acquisitions and dependency components reported separately? | All denominators published; derived products never counted as independent acquisitions |
+| TransitiveCauseBench | Does A↔B and B↔C common-cause linkage join A/B/C? | One component; zero split crossing |
+| CalibrationEpisodeHoldoutBench | Does performance transfer to an unseen calibration episode? | Leave-one-episode-out result with coverage and uncertainty |
+| EnvironmentEpisodeHoldoutBench | Does performance transfer across lighting, dust, moisture or temperature episodes? | Separate held-out episode report; no row-random headline |
+| DeviceTransferBench | Does performance generalize to a held-out instrument or calibration family? | Leave-device/session-out score, explicitly separate from site transfer |
+| LabelCampaignHoldoutBench | Are shared adjudication campaigns leaking reference-label bias? | No campaign crosses splits; report campaign-held-out sensitivity |
+| GroupedUncertaintyBench | Are uncertainty intervals clustered at the declared dependency level? | Publish independent component count and the interval method; no iid-row interval claim |
+
+The auditor forms connected components using site ID, physical acquisition lineage and caller-declared shared-cause episode IDs. It reports row/site/acquisition/component denominators and refuses a split assignment that separates a declared group. It does **not** prove statistical independence between components or detect undeclared confounders.
+
+A 2026 *Earth and Planetary Science Letters* analysis reports that ignoring hierarchical geoscience structure can inflate F1 by more than 20 percentage points in its case studies (DOI 10.1016/j.epsl.2026.120250). A November 2026 review likewise emphasizes grouped and blocked validation for small experimental data nested within specimens, tools and batches (DOI 10.3390/info17111095). These results reinforce why Subterra should lead with site-/episode-disjoint evaluation rather than random-row splits; they are not Subterra benchmark results.
+
+### Current authored state
+
+- `subterra-dependence-audit/`: 15 authored tests.
+- Six standalone packages are now listed in the verification script.
+- This package is a raw-manifest preflight only. It does not rewrite the current likelihood-calibration dataset or claim integrated hierarchical estimation.
+- Rust formatting, compilation, tests and Clippy remain unexecuted until the six-package script runs on a Rust-equipped environment.

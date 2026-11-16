@@ -1,0 +1,657 @@
+//! Conservative hierarchy-aware split-leakage auditing for Subterra datasets.
+//!
+//! A row is not an independent scientific unit merely because it has a
+//! different filename or case ID. This auditor connects rows that share a
+//! site, physical acquisition, or declared common-cause group, then requires
+//! every connected component to remain inside one data split.
+//!
+//! The resulting components are conservative split-grouping units, NOT proof
+//! of statistical independence. Undeclared common causes remain undetected;
+//! group IDs are caller assertions and are not authenticated here.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DataSplit {
+    Training,
+    Calibration,
+    Evaluation,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum SharedCauseKind {
+    InstrumentCalibration,
+    EnvironmentalEpisode,
+    ProcessingLineage,
+    ReferenceLabelCampaign,
+    Other,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DependencyKind {
+    Site,
+    PhysicalAcquisition,
+    InstrumentCalibration,
+    EnvironmentalEpisode,
+    ProcessingLineage,
+    ReferenceLabelCampaign,
+    Other,
+}
+
+impl From<SharedCauseKind> for DependencyKind {
+    fn from(value: SharedCauseKind) -> Self {
+        match value {
+            SharedCauseKind::InstrumentCalibration => Self::InstrumentCalibration,
+            SharedCauseKind::EnvironmentalEpisode => Self::EnvironmentalEpisode,
+            SharedCauseKind::ProcessingLineage => Self::ProcessingLineage,
+            SharedCauseKind::ReferenceLabelCampaign => Self::ReferenceLabelCampaign,
+            SharedCauseKind::Other => Self::Other,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedCauseGroup {
+    pub kind: SharedCauseKind,
+    /// Stable ID for one shared episode/campaign/lineage, not a global
+    /// instrument or software name that would join the entire dataset.
+    pub group_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineageCase {
+    pub case_id: String,
+    pub site_id: String,
+    /// Several derived records may legitimately share one physical acquisition.
+    /// They are retained as separate rows but joined into one dependency group.
+    pub acquisition_lineage_id: String,
+    pub split: DataSplit,
+    /// Caller-declared shared causes that must not cross split boundaries.
+    pub shared_causes: Vec<SharedCauseGroup>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LineageDataset {
+    pub dataset_id: String,
+    pub cases: Vec<LineageCase>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AuditError {
+    EmptyDatasetId,
+    EmptyCaseSet,
+    EmptyField {
+        case_id: String,
+        field: &'static str,
+    },
+    DuplicateCaseId(String),
+    SiteAppearsInMultipleSplits {
+        site_id: String,
+        first_split: DataSplit,
+        conflicting_split: DataSplit,
+    },
+    DependencyGroupCrossesSplits {
+        kind: DependencyKind,
+        group_id: String,
+        first_split: DataSplit,
+        conflicting_split: DataSplit,
+    },
+    DuplicateSharedCauseGroup {
+        case_id: String,
+        kind: SharedCauseKind,
+        group_id: String,
+    },
+}
+
+impl std::fmt::Display for AuditError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for AuditError {}
+
+fn nonempty(value: &str) -> bool {
+    !value.trim().is_empty()
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct GroupKey {
+    kind: DependencyKind,
+    group_id: String,
+}
+
+impl GroupKey {
+    fn new(kind: DependencyKind, group_id: &str) -> Self {
+        Self {
+            kind,
+            group_id: group_id.to_string(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DependencyGroupAudit {
+    pub kind: DependencyKind,
+    pub group_id: String,
+    pub case_count: usize,
+    pub distinct_site_count: usize,
+    pub split: DataSplit,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DependencyComponent {
+    /// Lexicographically smallest case ID in this component; deterministic
+    /// for the same input identities regardless of row order.
+    pub representative_case_id: String,
+    pub split: DataSplit,
+    pub case_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DependencyAuditReport {
+    pub dataset_id: String,
+    pub total_cases: usize,
+    pub unique_sites: usize,
+    pub unique_acquisitions: usize,
+    pub declared_shared_cause_memberships: usize,
+    /// Includes automatic Site and PhysicalAcquisition groups.
+    pub dependency_group_count: usize,
+    /// Transitive connected components under the declared grouping contract.
+    pub dependency_component_count: usize,
+    pub singleton_component_count: usize,
+    pub largest_component_case_count: usize,
+    pub groups: Vec<DependencyGroupAudit>,
+    pub components: Vec<DependencyComponent>,
+}
+
+#[derive(Debug, Clone)]
+struct UnionFind {
+    parent: Vec<usize>,
+    rank: Vec<u8>,
+}
+
+impl UnionFind {
+    fn new(size: usize) -> Self {
+        Self {
+            parent: (0..size).collect(),
+            rank: vec![0; size],
+        }
+    }
+
+    fn find(&mut self, value: usize) -> usize {
+        if self.parent[value] != value {
+            let root = self.find(self.parent[value]);
+            self.parent[value] = root;
+        }
+        self.parent[value]
+    }
+
+    fn union(&mut self, left: usize, right: usize) {
+        let left_root = self.find(left);
+        let right_root = self.find(right);
+        if left_root == right_root {
+            return;
+        }
+
+        if self.rank[left_root] < self.rank[right_root] {
+            self.parent[left_root] = right_root;
+        } else if self.rank[left_root] > self.rank[right_root] {
+            self.parent[right_root] = left_root;
+        } else {
+            self.parent[right_root] = left_root;
+            self.rank[left_root] = self.rank[left_root].saturating_add(1);
+        }
+    }
+}
+
+impl LineageDataset {
+    /// Validate split isolation and calculate conservative dependency
+    /// components. Repeated rows from one acquisition are allowed, but they
+    /// can never increase the number of dependency components.
+    pub fn audit(&self) -> Result<DependencyAuditReport, AuditError> {
+        if !nonempty(&self.dataset_id) {
+            return Err(AuditError::EmptyDatasetId);
+        }
+        if self.cases.is_empty() {
+            return Err(AuditError::EmptyCaseSet);
+        }
+
+        let mut case_ids = BTreeSet::new();
+        let mut site_splits = BTreeMap::<String, DataSplit>::new();
+        let mut group_splits = BTreeMap::<GroupKey, DataSplit>::new();
+        let mut group_members = BTreeMap::<GroupKey, Vec<usize>>::new();
+        let mut unique_sites = BTreeSet::new();
+        let mut unique_acquisitions = BTreeSet::new();
+        let mut declared_shared_cause_memberships = 0usize;
+
+        for (case_index, case) in self.cases.iter().enumerate() {
+            for (value, field) in [
+                (case.case_id.as_str(), "case_id"),
+                (case.site_id.as_str(), "site_id"),
+                (case.acquisition_lineage_id.as_str(), "acquisition_lineage_id"),
+            ] {
+                if !nonempty(value) {
+                    return Err(AuditError::EmptyField {
+                        case_id: case.case_id.clone(),
+                        field,
+                    });
+                }
+            }
+
+            if !case_ids.insert(case.case_id.as_str()) {
+                return Err(AuditError::DuplicateCaseId(case.case_id.clone()));
+            }
+            unique_sites.insert(case.site_id.as_str());
+            unique_acquisitions.insert(case.acquisition_lineage_id.as_str());
+
+            match site_splits.get(&case.site_id) {
+                Some(first_split) if *first_split != case.split => {
+                    return Err(AuditError::SiteAppearsInMultipleSplits {
+                        site_id: case.site_id.clone(),
+                        first_split: *first_split,
+                        conflicting_split: case.split,
+                    });
+                }
+                Some(_) => {}
+                None => {
+                    site_splits.insert(case.site_id.clone(), case.split);
+                }
+            }
+
+            let mut case_groups = BTreeSet::new();
+            let mut keys = vec![
+                GroupKey::new(DependencyKind::Site, &case.site_id),
+                GroupKey::new(
+                    DependencyKind::PhysicalAcquisition,
+                    &case.acquisition_lineage_id,
+                ),
+            ];
+
+            for shared_cause in &case.shared_causes {
+                if !nonempty(&shared_cause.group_id) {
+                    return Err(AuditError::EmptyField {
+                        case_id: case.case_id.clone(),
+                        field: "shared_cause_group_id",
+                    });
+                }
+                if !case_groups.insert((shared_cause.kind, shared_cause.group_id.as_str())) {
+                    return Err(AuditError::DuplicateSharedCauseGroup {
+                        case_id: case.case_id.clone(),
+                        kind: shared_cause.kind,
+                        group_id: shared_cause.group_id.clone(),
+                    });
+                }
+                declared_shared_cause_memberships += 1;
+                keys.push(GroupKey::new(
+                    shared_cause.kind.into(),
+                    &shared_cause.group_id,
+                ));
+            }
+
+            for key in keys {
+                match group_splits.get(&key) {
+                    Some(first_split) if *first_split != case.split => {
+                        if key.kind == DependencyKind::Site {
+                            return Err(AuditError::SiteAppearsInMultipleSplits {
+                                site_id: key.group_id,
+                                first_split: *first_split,
+                                conflicting_split: case.split,
+                            });
+                        }
+                        return Err(AuditError::DependencyGroupCrossesSplits {
+                            kind: key.kind,
+                            group_id: key.group_id,
+                            first_split: *first_split,
+                            conflicting_split: case.split,
+                        });
+                    }
+                    Some(_) => {}
+                    None => {
+                        group_splits.insert(key.clone(), case.split);
+                    }
+                }
+                group_members.entry(key).or_default().push(case_index);
+            }
+        }
+
+        let mut union_find = UnionFind::new(self.cases.len());
+        for members in group_members.values() {
+            if let Some(first) = members.first().copied() {
+                for member in members.iter().skip(1).copied() {
+                    union_find.union(first, member);
+                }
+            }
+        }
+
+        let mut component_members = BTreeMap::<usize, Vec<usize>>::new();
+        for case_index in 0..self.cases.len() {
+            let root = union_find.find(case_index);
+            component_members.entry(root).or_default().push(case_index);
+        }
+
+        let mut components = component_members
+            .into_values()
+            .map(|members| {
+                let mut case_ids = members
+                    .iter()
+                    .map(|index| self.cases[*index].case_id.clone())
+                    .collect::<Vec<_>>();
+                case_ids.sort();
+                DependencyComponent {
+                    representative_case_id: case_ids[0].clone(),
+                    split: self.cases[members[0]].split,
+                    case_ids,
+                }
+            })
+            .collect::<Vec<_>>();
+        components.sort_by(|left, right| {
+            left.representative_case_id
+                .cmp(&right.representative_case_id)
+        });
+
+        let mut groups = group_members
+            .into_iter()
+            .map(|(key, members)| {
+                let distinct_sites = members
+                    .iter()
+                    .map(|index| self.cases[*index].site_id.as_str())
+                    .collect::<BTreeSet<_>>();
+                DependencyGroupAudit {
+                    kind: key.kind,
+                    group_id: key.group_id,
+                    case_count: members.len(),
+                    distinct_site_count: distinct_sites.len(),
+                    split: self.cases[members[0]].split,
+                }
+            })
+            .collect::<Vec<_>>();
+        groups.sort_by(|left, right| {
+            left.kind
+                .cmp(&right.kind)
+                .then_with(|| left.group_id.cmp(&right.group_id))
+        });
+
+        let singleton_component_count = components
+            .iter()
+            .filter(|component| component.case_ids.len() == 1)
+            .count();
+        let largest_component_case_count = components
+            .iter()
+            .map(|component| component.case_ids.len())
+            .max()
+            .unwrap_or(0);
+
+        Ok(DependencyAuditReport {
+            dataset_id: self.dataset_id.clone(),
+            total_cases: self.cases.len(),
+            unique_sites: unique_sites.len(),
+            unique_acquisitions: unique_acquisitions.len(),
+            declared_shared_cause_memberships,
+            dependency_group_count: groups.len(),
+            dependency_component_count: components.len(),
+            singleton_component_count,
+            largest_component_case_count,
+            groups,
+            components,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn case(
+        case_id: &str,
+        site_id: &str,
+        acquisition_id: &str,
+        split: DataSplit,
+    ) -> LineageCase {
+        LineageCase {
+            case_id: case_id.into(),
+            site_id: site_id.into(),
+            acquisition_lineage_id: acquisition_id.into(),
+            split,
+            shared_causes: Vec::new(),
+        }
+    }
+
+    fn shared(kind: SharedCauseKind, id: &str) -> SharedCauseGroup {
+        SharedCauseGroup {
+            kind,
+            group_id: id.into(),
+        }
+    }
+
+    fn dataset(cases: Vec<LineageCase>) -> LineageDataset {
+        LineageDataset {
+            dataset_id: "subterra-lineage-fixture-v1".into(),
+            cases,
+        }
+    }
+
+    #[test]
+    fn repeated_derived_records_from_one_acquisition_form_one_component() {
+        let data = dataset(vec![
+            case("raw", "site-a", "acq-1", DataSplit::Training),
+            case("mesh", "site-a", "acq-1", DataSplit::Training),
+            case("features", "site-a", "acq-1", DataSplit::Training),
+        ]);
+        let report = data.audit().unwrap();
+        assert_eq!(report.total_cases, 3);
+        assert_eq!(report.unique_acquisitions, 1);
+        assert_eq!(report.dependency_component_count, 1);
+        assert_eq!(report.largest_component_case_count, 3);
+    }
+
+    #[test]
+    fn different_acquisitions_from_one_site_remain_one_site_component() {
+        let data = dataset(vec![
+            case("scan-1", "site-a", "acq-1", DataSplit::Training),
+            case("scan-2", "site-a", "acq-2", DataSplit::Training),
+        ]);
+        let report = data.audit().unwrap();
+        assert_eq!(report.unique_acquisitions, 2);
+        assert_eq!(report.dependency_component_count, 1);
+        assert_eq!(report.components[0].case_ids, vec!["scan-1", "scan-2"]);
+    }
+
+    #[test]
+    fn shared_calibration_session_joins_distinct_sites() {
+        let mut left = case("left", "site-a", "acq-a", DataSplit::Training);
+        left.shared_causes.push(shared(
+            SharedCauseKind::InstrumentCalibration,
+            "cal-session-7",
+        ));
+        let mut right = case("right", "site-b", "acq-b", DataSplit::Training);
+        right.shared_causes.push(shared(
+            SharedCauseKind::InstrumentCalibration,
+            "cal-session-7",
+        ));
+        let report = dataset(vec![left, right]).audit().unwrap();
+        assert_eq!(report.unique_sites, 2);
+        assert_eq!(report.dependency_component_count, 1);
+        assert_eq!(report.components[0].case_ids, vec!["left", "right"]);
+    }
+
+    #[test]
+    fn transitive_shared_causes_join_components() {
+        let mut a = case("a", "site-a", "acq-a", DataSplit::Training);
+        a.shared_causes
+            .push(shared(SharedCauseKind::EnvironmentalEpisode, "storm-1"));
+        let mut b = case("b", "site-b", "acq-b", DataSplit::Training);
+        b.shared_causes
+            .push(shared(SharedCauseKind::EnvironmentalEpisode, "storm-1"));
+        b.shared_causes
+            .push(shared(SharedCauseKind::ProcessingLineage, "pipeline-run-9"));
+        let mut c = case("c", "site-c", "acq-c", DataSplit::Training);
+        c.shared_causes
+            .push(shared(SharedCauseKind::ProcessingLineage, "pipeline-run-9"));
+        let report = dataset(vec![a, b, c]).audit().unwrap();
+        assert_eq!(report.dependency_component_count, 1);
+        assert_eq!(report.largest_component_case_count, 3);
+    }
+
+    #[test]
+    fn shared_cause_group_crossing_splits_is_rejected() {
+        let mut a = case("a", "site-a", "acq-a", DataSplit::Training);
+        a.shared_causes
+            .push(shared(SharedCauseKind::EnvironmentalEpisode, "cave-episode-1"));
+        let mut b = case("b", "site-b", "acq-b", DataSplit::Evaluation);
+        b.shared_causes
+            .push(shared(SharedCauseKind::EnvironmentalEpisode, "cave-episode-1"));
+        assert_eq!(
+            dataset(vec![a, b]).audit(),
+            Err(AuditError::DependencyGroupCrossesSplits {
+                kind: DependencyKind::EnvironmentalEpisode,
+                group_id: "cave-episode-1".into(),
+                first_split: DataSplit::Training,
+                conflicting_split: DataSplit::Evaluation,
+            })
+        );
+    }
+
+    #[test]
+    fn physical_acquisition_cannot_cross_splits() {
+        let data = dataset(vec![
+            case("raw", "site-a", "acq-shared", DataSplit::Training),
+            case("derived", "site-b", "acq-shared", DataSplit::Evaluation),
+        ]);
+        assert_eq!(
+            data.audit(),
+            Err(AuditError::DependencyGroupCrossesSplits {
+                kind: DependencyKind::PhysicalAcquisition,
+                group_id: "acq-shared".into(),
+                first_split: DataSplit::Training,
+                conflicting_split: DataSplit::Evaluation,
+            })
+        );
+    }
+
+    #[test]
+    fn site_cannot_cross_splits() {
+        let data = dataset(vec![
+            case("a", "site-shared", "acq-a", DataSplit::Training),
+            case("b", "site-shared", "acq-b", DataSplit::Calibration),
+        ]);
+        assert!(matches!(
+            data.audit(),
+            Err(AuditError::SiteAppearsInMultipleSplits { site_id, .. })
+                if site_id == "site-shared"
+        ));
+    }
+
+    #[test]
+    fn duplicate_case_ids_are_rejected() {
+        let data = dataset(vec![
+            case("same", "site-a", "acq-a", DataSplit::Training),
+            case("same", "site-b", "acq-b", DataSplit::Training),
+        ]);
+        assert_eq!(data.audit(), Err(AuditError::DuplicateCaseId("same".into())));
+    }
+
+    #[test]
+    fn blank_dataset_and_empty_case_set_are_rejected() {
+        assert_eq!(
+            dataset(vec![]).audit(),
+            Err(AuditError::EmptyCaseSet)
+        );
+        let mut data = dataset(vec![case("a", "site-a", "acq-a", DataSplit::Training)]);
+        data.dataset_id = "  ".into();
+        assert_eq!(data.audit(), Err(AuditError::EmptyDatasetId));
+    }
+
+    #[test]
+    fn blank_case_identity_fields_are_rejected() {
+        let mut data = dataset(vec![case("a", "site-a", "acq-a", DataSplit::Training)]);
+        data.cases[0].site_id.clear();
+        assert_eq!(
+            data.audit(),
+            Err(AuditError::EmptyField {
+                case_id: "a".into(),
+                field: "site_id",
+            })
+        );
+    }
+
+    #[test]
+    fn duplicate_shared_cause_in_one_case_is_rejected() {
+        let mut record = case("a", "site-a", "acq-a", DataSplit::Training);
+        record.shared_causes = vec![
+            shared(SharedCauseKind::InstrumentCalibration, "cal-1"),
+            shared(SharedCauseKind::InstrumentCalibration, "cal-1"),
+        ];
+        assert_eq!(
+            dataset(vec![record]).audit(),
+            Err(AuditError::DuplicateSharedCauseGroup {
+                case_id: "a".into(),
+                kind: SharedCauseKind::InstrumentCalibration,
+                group_id: "cal-1".into(),
+            })
+        );
+    }
+
+    #[test]
+    fn blank_shared_cause_group_id_is_rejected() {
+        let mut record = case("a", "site-a", "acq-a", DataSplit::Training);
+        record
+            .shared_causes
+            .push(shared(SharedCauseKind::ProcessingLineage, " "));
+        assert_eq!(
+            dataset(vec![record]).audit(),
+            Err(AuditError::EmptyField {
+                case_id: "a".into(),
+                field: "shared_cause_group_id",
+            })
+        );
+    }
+
+    #[test]
+    fn unrelated_sites_and_acquisitions_form_separate_components() {
+        let data = dataset(vec![
+            case("a", "site-a", "acq-a", DataSplit::Training),
+            case("b", "site-b", "acq-b", DataSplit::Training),
+            case("c", "site-c", "acq-c", DataSplit::Evaluation),
+        ]);
+        let report = data.audit().unwrap();
+        assert_eq!(report.dependency_component_count, 3);
+        assert_eq!(report.singleton_component_count, 3);
+    }
+
+    #[test]
+    fn group_and_component_summaries_are_exact() {
+        let mut a = case("a", "site-a", "acq-a", DataSplit::Training);
+        a.shared_causes
+            .push(shared(SharedCauseKind::ReferenceLabelCampaign, "panel-2"));
+        let mut b = case("b", "site-b", "acq-b", DataSplit::Training);
+        b.shared_causes
+            .push(shared(SharedCauseKind::ReferenceLabelCampaign, "panel-2"));
+        let c = case("c", "site-c", "acq-c", DataSplit::Evaluation);
+        let report = dataset(vec![a, b, c]).audit().unwrap();
+        assert_eq!(report.total_cases, 3);
+        assert_eq!(report.unique_sites, 3);
+        assert_eq!(report.unique_acquisitions, 3);
+        assert_eq!(report.declared_shared_cause_memberships, 2);
+        assert_eq!(report.dependency_group_count, 7);
+        assert_eq!(report.dependency_component_count, 2);
+        assert_eq!(report.singleton_component_count, 1);
+        assert_eq!(report.largest_component_case_count, 2);
+        let label_group = report.groups.iter().find(|group| {
+            group.kind == DependencyKind::ReferenceLabelCampaign
+                && group.group_id == "panel-2"
+        }).unwrap();
+        assert_eq!(label_group.case_count, 2);
+        assert_eq!(label_group.distinct_site_count, 2);
+    }
+
+    #[test]
+    fn audit_is_deterministic_under_row_permutation() {
+        let a = case("a", "site-a", "acq-a", DataSplit::Training);
+        let b = case("b", "site-b", "acq-b", DataSplit::Training);
+        let c = case("c", "site-c", "acq-c", DataSplit::Evaluation);
+        let left = dataset(vec![a.clone(), b.clone(), c.clone()]).audit().unwrap();
+        let right = dataset(vec![c, b, a]).audit().unwrap();
+        assert_eq!(left, right);
+    }
+}

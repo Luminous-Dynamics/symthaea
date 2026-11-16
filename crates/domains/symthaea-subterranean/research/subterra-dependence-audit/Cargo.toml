@@ -1,0 +1,14 @@
+[package]
+name = "subterra-dependence-audit"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Conservative hierarchy-aware split-leakage auditor for Subterra evidence datasets"
+
+[lib]
+path = "src/lib.rs"
+
+# Standalone research crate; intentionally outside the production workspace.
+[workspace]
