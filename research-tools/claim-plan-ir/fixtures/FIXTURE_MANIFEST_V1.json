@@ -68,6 +68,11 @@
       "path": "negative/dns_server_identity_mismatch.json",
       "expected": "reject-semantic-preflight",
       "reason": "When DNS server identity is the selected identity kind, it must exactly equal the canonical origin host."
+    },
+    {
+      "path": "negative/ipv4_origin_literal.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "The v1 canonical HTTPS origin profile admits lowercase ASCII DNS names only; IPv4/IPv6 address literals are outside the profile."
     }
   ],
   "nonclaims": [
