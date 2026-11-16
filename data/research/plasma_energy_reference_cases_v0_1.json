@@ -2089,6 +2089,277 @@
         "Do not combine this component reference with the integrated SOEC-HB plant model without reconciling its different system boundary."
       ],
       "luminous_reproduction": false
+    },
+    {
+      "case_id": "CH4-PLASMA-PULSED-HEATING-REGEN-2026",
+      "lane": "METHANE_PYROLYSIS",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "A plasma-assisted pulsed heating approach for efficient methane pyrolysis",
+        "publisher": "Chemical Engineering Journal",
+        "publication_date": "2026-11-01",
+        "volume": 547,
+        "article_number": "180735",
+        "doi": "10.1016/j.cej.2026.180735",
+        "url": "https://doi.org/10.1016/j.cej.2026.180735"
+      },
+      "configuration": {
+        "process": "dielectric-barrier-discharge plasma + pulsed resistive/Joule heating",
+        "catalyst": "Ni-Fe/SiO2",
+        "heating_element_and_discharge_ground": "bifunctional carbon paper",
+        "reported_transient_field_V_per_m_greater_than": 3000000,
+        "reported_transient_temperature_K_greater_than": 1500,
+        "source_flow_context": {
+          "methane_pyrolysis_total_flow_sccm": 50,
+          "catalyst_regeneration_total_flow_sccm": 100
+        }
+      },
+      "operating_points": [
+        {
+          "operating_point_id": "CH4-PPH-DILUTED-HIGH-CONVERSION",
+          "methane_mole_fraction": 0.1,
+          "helium_mole_fraction": 0.9,
+          "pulsed_heating_voltage_V": 46,
+          "discharge_voltage_kV": 5,
+          "methane_conversion_fraction": 0.95,
+          "hydrogen_selectivity_fraction": 1,
+          "specific_energy_kWh_per_kg_H2": null,
+          "qualifier": "source-reported maximum conversion/selectivity point on 10% CH4 / 90% He; do not borrow pure-CH4 energy figure"
+        },
+        {
+          "operating_point_id": "CH4-PPH-PURE-METHANE-LOWEST-ENERGY",
+          "methane_mole_fraction": 1,
+          "helium_mole_fraction": 0,
+          "pulsed_heating_voltage_V": 46,
+          "discharge_voltage_kV": 3,
+          "methane_conversion_fraction": null,
+          "hydrogen_selectivity_fraction": null,
+          "specific_energy_kWh_per_kg_H2": 27,
+          "qualifier": "source-reported minimum energy point under pure CH4; conversion/selectivity values from diluted feed must not be borrowed"
+        }
+      ],
+      "regeneration_evidence": {
+        "method": "CO2 plasma",
+        "reported_regeneration_cycles": 4,
+        "reported_mechanism": "CO2 plasma removes deposited carbon, converting deposits to CO and reactivating the catalyst",
+        "energy_per_regeneration_cycle_kWh": null,
+        "carbon_capture_and_offtake_qualified": false,
+        "long_run_durability_beyond_reported_cycles": "NOT_ESTABLISHED"
+      },
+      "observations": [
+        {
+          "metric": "maximum_diluted_feed_methane_conversion",
+          "value": 95,
+          "unit": "percent",
+          "qualifier": "10% CH4 / 90% He; 46 V pulsed heating / 5 kV discharge"
+        },
+        {
+          "metric": "maximum_diluted_feed_hydrogen_selectivity",
+          "value": 100,
+          "unit": "percent",
+          "qualifier": "same diluted-feed operating point"
+        },
+        {
+          "metric": "minimum_pure_methane_specific_energy",
+          "value": 27,
+          "unit": "kWh_per_kg_H2",
+          "qualifier": "pure CH4; 46 V pulsed heating / 3 kV discharge; not paired with the 95% / 100% diluted-feed point"
+        },
+        {
+          "metric": "reported_catalyst_regeneration_cycles",
+          "value": 4,
+          "unit": "cycles",
+          "qualifier": "source reports CO2 plasma carbon removal and catalyst reactivation over four cycles"
+        }
+      ],
+      "source_conclusion": "The study couples DBD plasma activation with pulsed resistive heating and CO2-plasma catalyst regeneration. It reports up to 95% CH4 conversion and 100% H2 selectivity for a 10% CH4 / 90% He feed at 46 V heating / 5 kV discharge. Separately, it reports a minimum 27 kWh/kg H2 under pure methane at 46 V / 3 kV. CO2 plasma removes deposited carbon as CO and reactivates catalyst for four cycles. These are distinct operating points; full plant energy, regeneration energy, product recovery and long-life performance remain unestablished in this register.",
+      "comparison_status": "SOURCE_OPERATING_POINTS_DISTINCT_NOT_FULL_CHAIN_QUALIFIED",
+      "blockers": [
+        "The 95% conversion / 100% H2 selectivity result uses a diluted 10% CH4 / 90% He feed at 5 kV discharge; the 27 kWh/kg H2 result uses pure CH4 at 3 kV discharge. Do not combine these metrics.",
+        "The source's exact wall-plug meter boundary and whether all power conversion/auxiliary loads are included require reconstruction.",
+        "H2 separation, purification, compression, purity, pressure, accepted mass and rejected product require explicit accounting.",
+        "CO2-plasma regeneration energy and CO/CO2 gas handling are not quantified in the headline 27 kWh/kg figure in this register.",
+        "Four regeneration cycles do not establish 100-cycle or industrial catalyst lifetime.",
+        "The carbon paper electrode/heater and catalyst/support degradation, carbon collection, carbon quality and replacement burden require independent evidence."
+      ],
+      "luminous_reproduction": false,
+      "coproduct_accounting": {
+        "policy": "NO_SOURCE_COPRODUCT_CREDIT_REPORTED",
+        "credit_claim_status": "SOURCE_MODEL_ONLY",
+        "carbon_product_qualification_status": "NOT_VALIDATED",
+        "carbon_market_capacity_status": "NOT_VALIDATED",
+        "offtake_status": "NOT_VALIDATED",
+        "realized_revenue_evidence": false,
+        "no_credit_baseline_required": true
+      }
+    },
+    {
+      "case_id": "NH3-HB-ROBUST-LOAD-FLEX-2026",
+      "lane": "AMMONIA_SYNTHESIS_DYNAMIC_BASELINE",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "Optimisation and robust control of a load-flexible Haber-Bosch ammonia synthesis loop",
+        "publisher": "Computers & Chemical Engineering",
+        "publication_date": "2026-07",
+        "volume": 210,
+        "article_number": "109614",
+        "doi": "10.1016/j.compchemeng.2026.109614",
+        "url": "https://doi.org/10.1016/j.compchemeng.2026.109614"
+      },
+      "configuration": {
+        "process": "dynamic simulation and robust control of Haber-Bosch synthesis loop",
+        "included_components": [
+          "catalytic beds",
+          "heat exchangers",
+          "compressors",
+          "steam turbines",
+          "flash separators"
+        ],
+        "control_approach": "self-optimizing controlled variables; disturbance sensitivity analysis",
+        "evidence_scope": "published rigorous model and simulation, not physical plant demonstration"
+      },
+      "operating_envelope": {
+        "minimum_load_fraction": 0.1,
+        "maximum_load_fraction": 1.2,
+        "demonstrated_load_change_rate_fraction_of_nominal_per_minute": 0.03
+      },
+      "observations": [
+        {
+          "metric": "minimum_load_fraction",
+          "value": 0.1,
+          "unit": "fraction_rated_load"
+        },
+        {
+          "metric": "maximum_load_fraction",
+          "value": 1.2,
+          "unit": "fraction_rated_load"
+        },
+        {
+          "metric": "load_change_rate",
+          "value": 3,
+          "unit": "percent_nominal_per_minute"
+        },
+        {
+          "metric": "fatigue_limit_claim",
+          "value": "source-model-verified",
+          "unit": "qualitative",
+          "qualifier": "subject to the study's modeled design and applicable ASME/EN fatigue criteria"
+        }
+      ],
+      "source_conclusion": "A rigorous dynamic Haber-Bosch synthesis-loop model optimizes 10–120% load and reports flexible operation at up to 3%/min load change under the modeled control architecture. The result is a strong simulation baseline, not a claim that any arbitrary commercial plant meets this envelope.",
+      "comparison_status": "PUBLISHED_DYNAMIC_MODEL_BASELINE_NOT_HARDWARE_CERTIFICATION",
+      "blockers": [
+        "Model result is design/configuration-specific; it is not a universal commercial plant guarantee.",
+        "Its product quality and upstream H2/N2 chain boundary must be matched when comparing a complete plasma route.",
+        "No Luminous dynamic reproduction has been completed."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-HB-FATIGUE-YEAR-SCHEDULING-2026",
+      "lane": "AMMONIA_SYNTHESIS_DYNAMIC_BASELINE",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "How to avoid fatigue in load-flexible green ammonia plants — A scheduling and control framework",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2026-07-08",
+        "volume": 249,
+        "article_number": "155978",
+        "doi": "10.1016/j.ijhydene.2026.155978",
+        "url": "https://doi.org/10.1016/j.ijhydene.2026.155978"
+      },
+      "configuration": {
+        "process": "year-long renewable-powered green-ammonia plant dynamic simulation",
+        "simulation_horizon": "one year of renewable-based operation",
+        "approach": "rolling-horizon scheduling, feedforward control and dynamic UniSim Design process simulation",
+        "evidence_scope": "published simulation and fatigue analysis"
+      },
+      "operating_envelope": {
+        "minimum_load_fraction": 0.1,
+        "maximum_load_fraction": 1,
+        "load_change_rate_fraction_per_minute": 0.03
+      },
+      "observations": [
+        {
+          "metric": "minimum_load_fraction",
+          "value": 0.1,
+          "unit": "fraction_rated_load"
+        },
+        {
+          "metric": "maximum_load_fraction",
+          "value": 1,
+          "unit": "fraction_rated_load"
+        },
+        {
+          "metric": "load_change_rate",
+          "value": 3,
+          "unit": "percent_nominal_per_minute"
+        },
+        {
+          "metric": "fatigue_limit_status",
+          "value": "reported-within-modeled-limits",
+          "unit": "qualitative"
+        },
+        {
+          "metric": "pressure_reduction_part_load_effect",
+          "value": "modest-cost-reduction",
+          "unit": "qualitative"
+        }
+      ],
+      "source_conclusion": "The study models one year of renewable-powered operation and reports 10–100% load flexibility with feedforward control while maintaining modeled pressure/thermal cycling within fatigue limits. Moderate pressure reductions at part load were also reported to lower LCOA slightly. This is numerical evidence, not hardware certification.",
+      "comparison_status": "PUBLISHED_YEAR_LONG_DYNAMIC_MODEL_NOT_PHYSICAL_OPERATION",
+      "blockers": [
+        "The year-long profile, forecast assumptions, plant design, fatigue model and time resolution must be pinned before replay.",
+        "A plasma route must include H2 generation, nitrogen supply, separation and synthesis rather than comparing a plasma-source ramp to whole-plant output.",
+        "No physical fatigue certification or field operating data are implied."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "NH3-P2A-THREE-LEVEL-DISPATCH-2026",
+      "lane": "AMMONIA_SYNTHESIS_DYNAMIC_BASELINE",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "Quantifying the role of process flexibility in power-to-ammonia: Hierarchical rule-based scheduling for dispatch optimization and plant sizing",
+        "publisher": "International Journal of Hydrogen Energy",
+        "publication_date": "2026-06-01",
+        "article_number": "155281",
+        "doi": "10.1016/j.ijhydene.2026.155281",
+        "url": "https://doi.org/10.1016/j.ijhydene.2026.155281"
+      },
+      "configuration": {
+        "process": "hierarchical dispatch and plant-sizing model for renewable Power-to-Ammonia",
+        "approach": "rule-based scheduling at three synthesis-loop load levels versus continuously flexible operation",
+        "evidence_scope": "published system scheduling and techno-economic model"
+      },
+      "observations": [
+        {
+          "metric": "annual_reactor_cycle_reduction",
+          "value": 80,
+          "qualifier": "more than; modeled reduction when limiting the synthesis loop to three load levels",
+          "unit": "percent"
+        },
+        {
+          "metric": "lowest_reported_levelized_cost_ammonia",
+          "value": 492,
+          "qualifier": "Denmark scenario; study-specific renewable/power-cost assumptions",
+          "unit": "EUR_per_tonne_NH3"
+        },
+        {
+          "metric": "PEM_hydrogen_chain_rigidity_effect",
+          "value": 50,
+          "qualifier": "source reports LCOA can increase by more than this under rigid PEM operation in some scenarios",
+          "unit": "percent"
+        }
+      ],
+      "source_conclusion": "The study finds that three discrete synthesis-loop load levels can preserve much of the fully flexible economic result while reducing annual reactor cycling by more than 80%. It also finds that flexibility in the hydrogen chain strongly affects LCOA. This is a system-level scheduling baseline, not a measured physical performance point.",
+      "comparison_status": "PUBLISHED_DISPATCH_MODEL_NOT_PHYSICAL_OPERATION",
+      "blockers": [
+        "The three-level scheduler must be compared under the same renewable trace, forecast accuracy, equipment limits and product contract.",
+        "The Denmark LCOA is scenario-specific and cannot be transferred as a universal benchmark.",
+        "The reported >80% cycling reduction is model-specific and is not a measured plant fatigue result."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -2441,6 +2712,36 @@
       "control_id": "NC-082",
       "condition": "Treat electrochemical Faradaic efficiency, isotope attribution, plasma vibrational temperature or an area-normalized NH3 rate as a substitute for complete grid-to-accepted-NH3 plant energy.",
       "expected_disposition": "REJECT_COMPONENT_METRIC_AS_PLANT_PERFORMANCE"
+    },
+    {
+      "control_id": "NC-083",
+      "condition": "Pair the 95% conversion / 100% H2 selectivity diluted CH4/He point from the PPH study with the separate 27 kWh/kg H2 pure-methane point.",
+      "expected_disposition": "REJECT_OPERATING_POINT_AND_FEED_MISMATCH"
+    },
+    {
+      "control_id": "NC-084",
+      "condition": "Count CO2-plasma catalyst regeneration energy, CO formation, carbon transfer or downtime as zero/outside the methane-pyrolysis lifecycle boundary.",
+      "expected_disposition": "BLOCKED_INCOMPLETE_REGENERATION_AND_CARBON_BALANCE"
+    },
+    {
+      "control_id": "NC-085",
+      "condition": "Promote four reported regeneration cycles to a 100-cycle or industrial catalyst lifetime claim.",
+      "expected_disposition": "REJECT_LIFETIME_EVIDENCE_EXTRAPOLATION"
+    },
+    {
+      "control_id": "NC-086",
+      "condition": "Claim that plasma-enabled ammonia synthesis is more flexible than Haber-Bosch using only discharge ramp time while ignoring published 10–120% load and 3%/min dynamic HB results.",
+      "expected_disposition": "REJECT_INCOMPLETE_DYNAMIC_COMPETITOR"
+    },
+    {
+      "control_id": "NC-087",
+      "condition": "Treat the 2026 three-load-level scheduling model's >80% cycle reduction as a physical plant fatigue test or universal result.",
+      "expected_disposition": "REJECT_MODEL_TO_HARDWARE_PROMOTION"
+    },
+    {
+      "control_id": "NC-088",
+      "condition": "Compare a plasma-source load trace with plant-level accepted NH3 delivery without matching the hydrogen chain, N2 supply, synthesis loop, storage and product specification.",
+      "expected_disposition": "NOT_COMPARABLE_SERVICE_BOUNDARY_MISMATCH"
     }
   ],
   "derived_reference_checks": [
@@ -2713,6 +3014,66 @@
         "no_superiority_claim_before_source_data_reconstruction_and_uncertainty_analysis": true
       },
       "rationale": "The 2026 gas-liquid plasma-electrocatalytic tandem source reports 1,161 kWh/kg NH3; a separate 2026 integrated SOEC-Haber-Bosch plant model reports 8.14 kWh/kg NH3 at plant boundary and 63% LHV efficiency. The plasma route is currently far from this benchmark on its reported energy metric. The challenge target is not merely to exceed the 3 g/kWh intermediate research threshold: it requires at least 10% lower energy than 8.14 kWh/kg (<=7.32 kWh/kg) at the same accepted NH3 specification and reconciled complete boundary. This target remains blocked until source system boundaries, including desalination, storage and product delivery exclusions, are normalized."
+    },
+    {
+      "target_id": "CH4-PPH-FULL-CHAIN-PARETO-001",
+      "lane": "METHANE_PYROLYSIS_PULSED_HEATING",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "CH4-PLASMA-PULSED-HEATING-REGEN-2026",
+        "METHANE-PYROLYSIS-HEATING-REVIEW-2026",
+        "METHANE-PYROLYSIS-ARC-PLASMA-TEA-2026"
+      ],
+      "metric_thresholds": {
+        "methane_conversion_min_fraction": 0.9,
+        "hydrogen_selectivity_min_fraction": 0.99,
+        "accepted_h2_specific_energy_max_kWh_per_kg": 25,
+        "minimum_reaction_regeneration_cycles": 100,
+        "accepted_h2_productivity_retention_after_cycles_min_fraction": 0.9,
+        "all_thresholds_must_hold_at_same_operating_point_and_feed": true
+      },
+      "claim_guards": {
+        "diluted_and_pure_methane_operating_points_must_remain_separate": true,
+        "full_grid_to_accepted_h2_energy_boundary_required": true,
+        "gas_separation_purification_and_compression_included": true,
+        "co2_plasma_regeneration_energy_and_carbon_streams_included": true,
+        "methane_derived_carbon_balance_and_unknowns_reported": true,
+        "no_credit_carbon_baseline_required": true,
+        "catalyst_support_electrode_and_replacement_lifecycle_included": true,
+        "long_run_cycles_and_failed_batches_in_denominator": true,
+        "matched_shock_wave_and_microwave_comparators_required": true
+      },
+      "rationale": "The November 2026 PPH study reports 95% conversion/100% selectivity on diluted CH4/He and a separate 27 kWh/kg H2 minimum energy under pure methane. This stretch target intentionally requires >=90% conversion, >=99% selectivity and <=25 kWh/kg accepted H2 at one matched feed/operating point, while including CO2-plasma regeneration and 100 reaction/regeneration cycles with >=90% productivity retention. No such combined point or durability is currently established."
+    },
+    {
+      "target_id": "AMMONIA-SUPPLY-CHAIN-DYNAMIC-FLEX-001",
+      "lane": "AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "NH3-HB-ROBUST-LOAD-FLEX-2026",
+        "NH3-HB-FATIGUE-YEAR-SCHEDULING-2026",
+        "NH3-P2A-THREE-LEVEL-DISPATCH-2026",
+        "NH3-SOEC-HB-OFFSHORE-2026"
+      ],
+      "metric_thresholds": {
+        "accepted_nh3_min_load_fraction": 0.1,
+        "accepted_nh3_max_load_fraction": 1.2,
+        "accepted_nh3_ramp_rate_percent_nominal_per_minute": 3,
+        "year_long_renewable_profile_required": true,
+        "all_full_chain_quality_and_fatigue_gates_must_hold": true
+      },
+      "claim_guards": {
+        "plant_level_accepted_nh3_ramp_measured_not_plasma_source_ramp": true,
+        "hydrogen_generation_and_storage_dynamics_included": true,
+        "nitrogen_and_plasma_or_nox_capture_transfer_dynamics_included": true,
+        "synthesis_loop_pressure_and_temperature_fatigue_included": true,
+        "accepted_product_purity_pressure_and_delivery_contract_matched": true,
+        "startup_shutdown_standby_and_failed_batches_counted": true,
+        "buffer_capacity_and_renewable_curtailment_reported": true,
+        "baseline_uses_10_to_120_percent_3_percent_per_minute_haber_bosch_model": true,
+        "no_flexibility_superiority_claim_without_same_trace_replay": true
+      },
+      "rationale": "The 2026 flexible Haber-Bosch model reports 10–120% load and 3%/min ramp; a separate year-long fatigue/scheduling model reports 10–100% load at 3%/min, and a three-level dispatch study reports >80% lower modeled reactor cycling. The plasma challenge must therefore match plant-level service across the same renewable profiles and fatigue boundaries before claiming flexibility advantage."
     }
   ]
 }
