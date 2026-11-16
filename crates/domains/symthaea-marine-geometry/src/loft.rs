@@ -1858,8 +1858,7 @@ mod tests {
             LongitudinalEndCondition::PlanarEndCap,
         );
         let face_index = loft.waterplane_face_range.first_face;
-        loft.candidate.geometry.faces[face_index][0] =
-            loft.candidate.geometry.faces[face_index][1];
+        loft.candidate.geometry.faces[face_index][0] = loft.candidate.geometry.faces[face_index][1];
         rebind_loft_after_test_mutation(&mut loft);
         let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
         assert!(
