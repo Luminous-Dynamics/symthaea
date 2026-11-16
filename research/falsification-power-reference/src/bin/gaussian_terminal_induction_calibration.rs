@@ -98,6 +98,8 @@ struct Counts {
     induced_policies: Vec<StopPolicyCounts>,
     e_process_crossings: u64,
     naive_repeated_rejections: u64,
+    naive_first_rejection_looks: u64,
+    naive_crossers: u64,
     e_process_first_crossing_looks: u64,
     e_process_crossers: u64,
     terminal_induced_mismatches: u64,
@@ -139,7 +141,7 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
         let mut cumulative_standardized = 0.0;
         let mut induced_stops = vec![None; INDUCED_STOP_THRESHOLDS.len()];
         let mut e_process_first_crossing = None;
-        let mut naive_rejected = false;
+        let mut naive_first_rejection_look = None;
 
         for look in 1..=HORIZON {
             let observed = scenario.mean() + SIGMA * observation_rng.standard_normal();
@@ -162,8 +164,8 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
             // Deliberately invalid negative control: repeat an unadjusted
             // one-sided fixed-time 5% z test at every prefix.
             let naive_z = cumulative_standardized / (look as f64).sqrt();
-            if naive_z >= Z_CRITICAL_ONE_SIDED_05 {
-                naive_rejected = true;
+            if naive_z >= Z_CRITICAL_ONE_SIDED_05 && naive_first_rejection_look.is_none() {
+                naive_first_rejection_look = Some(look as u64);
             }
 
             let induced = design.evaluate_prefix(&observations)?;
@@ -205,8 +207,10 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
             counts.e_process_first_crossing_looks +=
                 e_process_first_crossing.unwrap_or(HORIZON as u64);
         }
-        if naive_rejected {
+        if let Some(look) = naive_first_rejection_look {
             counts.naive_repeated_rejections += 1;
+            counts.naive_crossers += 1;
+            counts.naive_first_rejection_looks += look;
         }
     }
 
@@ -222,6 +226,12 @@ fn emit_counts(scenario: Scenario, counts: &Counts, expected_terminal_power: f64
     } else {
         counts.e_process_first_crossing_looks as f64 / counts.e_process_crossers as f64
     };
+    let mean_e_process_observations_used = (counts.e_process_first_crossing_looks
+        + (PATHS - counts.e_process_crossers) * HORIZON as u64) as f64
+        / PATHS as f64;
+    let mean_naive_repeated_observations_used = (counts.naive_first_rejection_looks
+        + (PATHS - counts.naive_crossers) * HORIZON as u64) as f64
+        / PATHS as f64;
     let policy_json = counts
         .induced_policies
         .iter()
@@ -260,7 +270,9 @@ fn emit_counts(scenario: Scenario, counts: &Counts, expected_terminal_power: f64
             "\"e_process_crossing_rate\":{:.8},",
             "\"e_process_wilson95\":[{:.8},{:.8}],",
             "\"e_process_mean_crossing_look\":{:.4},",
+            "\"e_process_mean_observations_used\":{:.4},",
             "\"naive_repeated_fixed_time_rate\":{:.8},",
+            "\"naive_repeated_mean_observations_used\":{:.4},",
             "\"naive_repeated_wilson95\":[{:.8},{:.8}],",
             "\"analytic_terminal_np_power\":{:.8},",
             "\"terminal_induced_mismatches\":{}",
@@ -277,7 +289,9 @@ fn emit_counts(scenario: Scenario, counts: &Counts, expected_terminal_power: f64
         e_low,
         e_high,
         mean_e_crossing_look,
+        mean_e_process_observations_used,
         counts.naive_repeated_rejections as f64 / PATHS as f64,
+        mean_naive_repeated_observations_used,
         naive_low,
         naive_high,
         expected_terminal_power,
