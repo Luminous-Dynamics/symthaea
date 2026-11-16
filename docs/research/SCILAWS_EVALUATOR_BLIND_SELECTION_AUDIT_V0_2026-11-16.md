@@ -188,13 +188,18 @@ External foundation models can contribute candidate generation and method propos
 
 ## 8. Verification status and next work
 
-The full `symthaea-architecture-engineering` package test command on the stacked branch currently fails in unrelated modules (including event_tape, synthetic_search, analytical_benchmark and direction_board), before isolating the SciLaws module. The branch also has a Cargo lock-resolution mismatch when this package test is run with `--locked`. Those are repository/base-branch issues, not evidence that this module passes or fails.
+The full `symthaea-architecture-engineering` package test command on the stacked branch fails in unrelated modules (including event_tape, synthetic_search, analytical_benchmark and direction_board), before isolating the SciLaws module. A direct whole-package compile reported 37 errors in those unrelated modules. Those are repository/base-branch issues, not errors in this SciLaws audit; the whole package remains unqualified by this work.
 
-To avoid changing unrelated modules or weakening workspace gates, PR #12492 now has an isolated harness at `research/scilaws-candidate-selection-audit-harness`. Its `src/lib.rs` imports the exact two repository sources by path:
+To avoid changing unrelated modules or weakening workspace gates, PR #12492 has an isolated harness at `research/scilaws-candidate-selection-audit-harness`. Its `src/lib.rs` imports the exact two repository sources by path:
 - `crates/domains/symthaea-architecture-engineering/src/pareto_objectives.rs`;
 - `crates/domains/symthaea-architecture-engineering/src/scilaws_candidate_selection.rs`.
 
-This does not copy or fork the implementations. The harness has its own pinned `Cargo.lock`, Rust 1.96 format/test/Clippy gates, and is deliberately narrower than a whole-package/workspace claim. Its exact-head workflow has passed once before the latest lockfile pin and fixture-cleanup commits; the current exact head is being requalified with `--locked` enabled for both tests and Clippy. Until the latest head passes, do not claim current-head qualification.
+This does not copy or fork the implementations. The harness has its own pinned `Cargo.lock` and Rust 1.96 format/test/Clippy gates. Exact head `8e5ed419431458cd762e198def03b5f5d4808994` passed workflow [43932564231](https://github.com/Luminous-Dynamics/symthaea/actions/runs/43932564231):
+- rustfmt: PASS;
+- source compile and all-target tests: PASS (28 tests: 16 shared Pareto + 12 SciLaws);
+- strict Clippy with warnings denied: PASS.
+
+This is a narrow exact-source qualification, not a pass for the entire architecture-engineering crate or workspace.
 
 No SciLaws dataset has been imported. No official SciLaws run or leaderboard result has been reproduced. The next increments are:
 1. pass the newest exact-head isolated harness with locked dependencies;
