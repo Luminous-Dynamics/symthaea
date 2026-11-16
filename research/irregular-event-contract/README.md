@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Seventy-nine Rust test functions are authored (28 event/bitemporal contract, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter, 23 source-watermark tests) for delayed-observation non-leakage,
+Eighty Rust test functions are authored (28 event/bitemporal contract, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter, 24 source-watermark tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. No Cargo build, rustfmt, Clippy, tests or dataset adapter
@@ -167,7 +167,7 @@ remain unchanged. The caller must also append the raw event to the bitemporal
 event ledger; the watermark module records the breach receipt, not the
 authoritative event itself.
 
-Twenty-three source-authored watermark tests cover empty progress, multi-source
+Twenty-four source-authored watermark tests cover empty progress, multi-source
 minimum progress, exclusive boundaries, as-known progress, late-breach
 reopening, terminal streams, generation and monotonicity, atomic batches,
 idempotent event arrivals, evidence-bound completeness and breach receipts,
@@ -187,3 +187,6 @@ qualification thresholds are targets, not measured results.
 
 
 The completeness hot path uses the ordered per-source progress chain and a secondary index keyed by (source, event_time_us) for late breaches. It no longer rebuilds the entire append-only ledger on every read. The `completeness_verified` method performs an explicit full-history replay/index audit before returning the same report. Both paths are checked for exact report parity. This separates per-query work from audit cost; throughput and p50/p95/p99 latency remain to be measured.
+
+
+The deterministic multi-source differential regression generates 48 event arrivals under three distinct source watermarks, then compares indexed and fully audited reports across six required-source sets, five half-open intervals and six knowledge-time cutoffs (180 exact report comparisons). This exercises late-event indexing, source scoping and historical visibility without nondeterministic fixtures.
