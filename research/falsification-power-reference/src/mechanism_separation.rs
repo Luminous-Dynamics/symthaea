@@ -721,7 +721,10 @@ mod tests {
             6,
         )
         .unwrap();
-        assert_eq!(report.disposition, SeparationDisposition::BudgetInsufficient);
+        assert_eq!(
+            report.disposition,
+            SeparationDisposition::BudgetInsufficient
+        );
         assert_eq!(report.equivalence_class_count, 2);
         assert_eq!(report.total_observations, 6);
         assert!(report.worst_pair.unwrap().power < 0.80);
@@ -899,7 +902,10 @@ mod tests {
         )
         .unwrap();
         assert_eq!(report.equivalence_class_count, 2);
-        assert_eq!(report.disposition, SeparationDisposition::BudgetInsufficient);
+        assert_eq!(
+            report.disposition,
+            SeparationDisposition::BudgetInsufficient
+        );
         assert!(report.worst_pair.unwrap().power < 0.80);
     }
 
