@@ -235,3 +235,50 @@ The key experimental question is therefore:
 **At equal compute and engineering-evaluation budgets, which system produces the most independently verified Pareto improvements while maintaining zero false-feasible geometry/physics claims?**
 
 This must be tested. It is not an assumed advantage.
+
+
+## 12. Industry capability comparison — current product baselines
+
+The nearest industry comparators are established naval-architecture packages, not only generative-model papers. Their published product descriptions show that the bar is already high:
+
+| Product | Published capability baseline | What we must compare |
+|---|---|---|
+| **Bentley Maxsurf** | Parametric 3D vessel model, trimmed NURBS/mesh/point data, fairing and curvature, hydrostatics, intact/damaged/partially flooded stability, compartment editor, regulatory criteria, resistance methods, motions, structural modeling and CAD exchange | Hull reconstruction/fairness, offsets and coefficients, loading cases, hydrostatics, stability, resistance, geometry exchange |
+| **NAPA / NAPA Designer** | 3D hull form design, parameterized variations, hydrostatics, intact and damage stability, SOLAS support, hydrodynamic analysis, powering/propulsion workflows, rule-compliance and operational calculations | Same exact hull, loading, subdivision, trim/heel and statutory calculation cases; independent outputs from a qualified NAPA build |
+| **Orca3D v3** | Rhino-integrated hull design/fairing, basic hydrostatics/stability, resistance/power prediction, weight/cost tracking, advanced compartmentation/tank loads and intact/damaged stability; its October 2026 v3.2 announcement adds automated wave and self-propelled CFD setup | Model-editing workflow, real-time hydrostatics, damage/load-case semantics, model-test correlation and CFD setup/replay |
+| **HydroComp NavCad** | More than 40 resistance methods, monohull/catamaran and planing/displacement cases, appendage/wave/shallow-water allowances, hull–propulsor interaction, power/efficiency, propeller sizing and model-test/sea-trial correlation | Resistance prediction across regimes, propulsion equilibrium, wake/propulsor coupling, calibration and model-test/sea-trial residuals |
+
+Official product references:
+- Bentley Maxsurf: https://www.bentley.com/en/products/maxsurf/
+- NAPA naval architecture and calculations: https://www.napa.fi/software-and-services/ship-design/software/napa/
+- NAPA hull-form design and hydrodynamics: https://www.napa.fi/software-and-services/ship-design/hull-form-design-and-hydrodynamics/
+- Orca3D capabilities and modules: https://orca3d.com/pages/capabilities
+- Orca3D v3.2 (6 October 2026): https://orca3d.com/blogs/news/orca3d-version-3-2-more-powerful-cfd-smarter-workflows-and-better-control-of-your-analysis
+- HydroComp NavCad: https://www.hydrocompinc.com/solutions/navcad/
+
+These are vendor-published capability descriptions, not independent product performance benchmarks. For a fair comparison, freeze versions, configurations, input models, criteria, solver settings and licensing/compute costs. Do not infer that every advertised method is applicable to every hull class or operating regime.
+
+### Where this project is behind the industry today
+
+G2f-a1 validates input semantics; it does not yet generate the external hull. G2e generates a bounded convex waterplane-capped displacement-volume mesh and is not a full external hull, fair B-rep, compartments model or statutory stability solver. The industry products above already provide much of the mature end-user functionality that our current crate does not.
+
+The programme must not claim feature parity or a more accurate hydrostatics/stability/resistance result until the identical cases have been run against a frozen, independent product build and benchmark corpus.
+
+### Narrow areas where we can plausibly create a differentiated advantage
+
+1. **Evidence lineage:** every source profile, revision, transform, surface region, loading shell, solver input/output and decision is tied to exact source digests, persistent IDs, tool versions, tolerances and independent verification.
+2. **External-envelope / loading-shell separation:** maintain one full external hull revision while deriving many waterline-, draft- and later trim/heel-specific displacement shells without mutating the external source geometry.
+3. **Uncertainty as first-class geometry:** retain alternative reconstructions and bounded profile/survey uncertainty through geometry, hydrostatics and solver comparisons. Do not collapse epistemic reconstruction uncertainty, measurement uncertainty, numerical error and model discrepancy into one confidence score.
+4. **Decision-aware multifidelity:** select the next evaluation by its potential to change a constrained engineering decision, not only by entropy reduction or surrogate-predicted improvement. Compose with the existing marine multi-fidelity/robust-Pareto/experiment-value owners rather than introducing a second optimizer.
+5. **Independent qualification receipts:** no candidate is called improved merely because the same generator or surrogate that proposed it also evaluated it. Require specialist solver or physical evidence appropriate to each claimed observable.
+
+### Competitive comparison ladder
+
+- **C0 — shared geometry:** identical section/profile input, dimensions, frame, station positions, waterline and end conditions.
+- **C1 — geometric output:** compare surface coverage, NURBS/mesh fidelity, curvature/fairness, seam residuals, boundary loops, volume, area, centroid and principal dimensions.
+- **C2 — hydrostatics:** compare displacement, LCB/VCB, LCF, waterplane area and second moments over the same loading conditions and density; report residual and uncertainty for each property.
+- **C3 — stability:** only after compartmentation, tanks, loads, free surfaces, downflooding points and regulatory criteria are modeled; compare intact and damage cases separately.
+- **C4 — resistance/propulsion:** compare matching methods inside their supported regimes, then validated CFD and model-test/sea-trial evidence; include hull–propulsor interaction and operating-condition effects.
+- **C5 — design decisions:** compare engineering time, invalid/false-feasible rate, independent-evaluation cost, and independently verified Pareto improvement per unit cost.
+
+The desired advantage is not to beat a mature product at every calculation. It is to deliver a more reproducible, uncertainty-aware and independently auditable design/verification loop while delegating specialist calculations to qualified tools. This is a research hypothesis and requires matched evidence.
