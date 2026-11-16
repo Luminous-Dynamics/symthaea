@@ -468,14 +468,13 @@ fn world_satisfies_claims(
         if claim.claimed_relation == "underdetermined" || claim.claimed_relation == "compromised" {
             return true;
         }
-        let Some(truth) = pair_truths.get(pair) else {
+        if !pair_truths.contains_key(pair) {
             return false;
-        };
+        }
         // Joint-world consistency asks whether a world supports the
         // candidate's concrete relation. Entailment is scored separately:
         // a merely possible concurrent claim can be world-consistent but
         // still false as an unconditional claim when coverage is incomplete.
-        let _ = truth;
         pair_relation(&pair.0, &pair.1, &world.closure) == claim.claimed_relation
     })
 }
