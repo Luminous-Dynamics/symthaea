@@ -65,6 +65,45 @@ The initial 15 authored tests cover matched outputs, descriptive-only and covari
 
 The graph helper returns the changed nodes and their full transitive downstream closure. Cycles are tolerated and traversal is deterministic. This is a structural impact calculation, not automatic revocation of an external certificate or authority decision.
 
+
+## Decision-focused value of information for fusion experiments
+
+The `decision_value_of_information` module evaluates finite-ensemble experiment value from a source-owned joint scenario/utility/signal manifest. It does not generate scenario probabilities, infer covariance, fit experiment likelihoods or assign engineering utility. Those remain producer inputs and must be frozen with their own evidence references.
+
+For scenario (s), alternative (a), source weight (p(s)) and utility (U(a,s)), the current decision value is:
+
+`V0 = max_a Σ_s p(s) U(a,s)`
+
+The perfect-information ceiling is:
+
+`VPI = Σ_s p(s) max_a U(a,s)`
+
+For experiment (e), its declared observation signal partitions the scenarios. The value after observing a signal is computed by conditioning the supplied joint weights, then selecting the best eligible alternative for that signal:
+
+`Ve = Σ_y P(y) max_a E[U(a,s) | y]`
+
+The report emits:
+- `EVPI = VPI - V0`;
+- `EVSI_e = Ve - V0`;
+- `expected_regret_e = VPI - Ve`;
+- `NetVoI_e = EVSI_e - direct_cost_e - opportunity_cost_e`.
+
+Weights must sum to one within a declared tolerance and are never silently renormalized. A zero-weight scenario can be present if it has a complete signal mapping; zero-mass signals are omitted from conditional posterior calculations. Missing utility, signal, cost, unit or source evidence makes the plan NotEvaluable. Hard-gate blocked/unknown alternatives cannot enter the utility table or win the decision. All experiment costs must use the exact same decision-value unit and cost basis as utilities.
+
+Experiments are sorted by NetVoI descending with an explicit deterministic ID tie-break. No positive NetVoI yields `NoPositiveValueExperiment`. Synthetic fixtures yield `SyntheticOnly`; assumption-only ensembles yield `AssumptionOnly` even when their arithmetic selects an experiment. This prevents a synthetic known-answer benchmark from recommending a real experiment.
+
+The module adds 20 authored Rust tests. The synthetic `audit_decision_voi` runner contains four equally weighted scenarios and two actions:
+- baseline best action B, expected value 85;
+- expected value with perfect information 98.75 and EVPI 13.75;
+- a decision-discriminating test has EVSI 13.75, direct+opportunity cost 5, net VoI 8.75 and zero remaining regret;
+- a high-variance but uninformative test has EVSI 0;
+- a perfect-information but overpriced test has EVSI 13.75 but negative net VoI.
+
+The runner is a finite synthetic arithmetic fixture, not a calibrated fusion scenario model or physical experiment recommendation. The benchmark is designed to compare random selection, predictive-variance reduction, expected hypervolume improvement and decision-focused NetVoI over matched frozen cases. The current v0.1 implementation only supplies the deterministic VoI contract and known-answer runner; it does not yet claim a comparative acquisition benchmark win.
+
+Claim ceiling: correct finite-ensemble decision-value arithmetic over the supplied scenario weights, utilities, signal mappings and cost basis only. It does not validate scenario probabilities, utility functions, physical model accuracy, evidence informativeness or real experiment outcomes.
+
+
 ## Run locally
 
 From this directory:
