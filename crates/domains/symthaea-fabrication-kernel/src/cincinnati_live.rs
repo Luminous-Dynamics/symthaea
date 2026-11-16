@@ -194,6 +194,12 @@ impl CincinnatiMonitor {
     /// explicit baseline requalification rather than silently normalizing a
     /// persistent fault.
     ///
+    /// During the initial minimum-sample warm-up, the current API still admits
+    /// observations into the seed population because `None` also represents
+    /// insufficient history. Callers must not treat that warm-up as qualified;
+    /// a typed warm-up/accepted/rejected result and explicit baseline
+    /// requalification remain separate follow-up work.
+    ///
     /// Returns `Some(AnomalyAlert)` if the reading is anomalous, `None` otherwise.
     pub fn ingest_reading(&mut self, reading: SensorReading) -> Option<AnomalyAlert> {
         // Evaluate before updating any reference state: a sample must not
