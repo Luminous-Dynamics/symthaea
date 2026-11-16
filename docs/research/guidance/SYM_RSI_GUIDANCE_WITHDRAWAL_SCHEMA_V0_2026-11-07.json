@@ -1,0 +1,293 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea ASI-Bench guidance withdrawal manifest v0",
+  "description": "Pinned external comparator and design-stage claim boundary. This schema does not preregister or execute a benchmark run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "authored_date",
+    "owner_issue",
+    "purpose",
+    "upstream",
+    "guidance_levels",
+    "invariants",
+    "data_seeds",
+    "leaderboard_status",
+    "symthaea_claims",
+    "composition"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-guidance-withdrawal-manifest-v0"
+    },
+    "status": {
+      "const": "DESIGN_ONLY_NOT_PREREGISTERED"
+    },
+    "authored_date": {
+      "const": "2026-11-07"
+    },
+    "owner_issue": {
+      "const": "#11006"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "url",
+        "release",
+        "commit",
+        "commit_url",
+        "paper",
+        "license",
+        "pinned_files",
+        "reported_scope"
+      ],
+      "properties": {
+        "repository": {
+          "const": "apexin-ai/ASI-Bench"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "release": {
+          "type": "string"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "commit_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "paper": {
+          "type": "string",
+          "format": "uri"
+        },
+        "license": {
+          "const": "Apache-2.0"
+        },
+        "pinned_files": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "git_blob_sha",
+              "purpose"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "git_blob_sha": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{40}$"
+              },
+              "purpose": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "reported_scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "project_level_tasks",
+            "scientific_domains",
+            "evaluated_agent_model_configurations",
+            "reported_interaction_turns_over",
+            "reported_execution_steps_over",
+            "reported_agent_execution_hours_over",
+            "note"
+          ],
+          "properties": {
+            "project_level_tasks": {
+              "const": 60
+            },
+            "scientific_domains": {
+              "const": 11
+            },
+            "evaluated_agent_model_configurations": {
+              "const": 18
+            },
+            "reported_interaction_turns_over": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reported_execution_steps_over": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "reported_agent_execution_hours_over": {
+              "type": "number",
+              "minimum": 1
+            },
+            "note": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "guidance_levels": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "information",
+          "required_capability"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "B1",
+              "B2",
+              "B3",
+              "B4"
+            ]
+          },
+          "information": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_capability": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "invariants": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "data_seeds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seed31415",
+        "seed42"
+      ],
+      "properties": {
+        "seed31415": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "purpose",
+            "official_submission"
+          ],
+          "properties": {
+            "purpose": {
+              "type": "string",
+              "minLength": 1
+            },
+            "official_submission": {
+              "const": false
+            }
+          }
+        },
+        "seed42": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "purpose",
+            "official_submission",
+            "requirements"
+          ],
+          "properties": {
+            "purpose": {
+              "type": "string",
+              "minLength": 1
+            },
+            "official_submission": {
+              "const": true
+            },
+            "requirements": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "leaderboard_status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "source",
+        "note"
+      ],
+      "properties": {
+        "status": {
+          "const": "PUBLIC_PAGE_SNAPSHOT_NOT_FINAL_OFFICIAL_BASELINE"
+        },
+        "source": {
+          "type": "string",
+          "format": "uri"
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "symthaea_claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "planned_outputs",
+        "excluded_claims"
+      ],
+      "properties": {
+        "planned_outputs": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "excluded_claims": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  }
+}

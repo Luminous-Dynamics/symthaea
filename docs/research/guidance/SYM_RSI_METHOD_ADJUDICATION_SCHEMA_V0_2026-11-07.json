@@ -1,0 +1,265 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea set-valued method adjudication fixture v0",
+  "description": "A structural contract for B3 method selection. Synthetic cases are not expert gold labels or scientific outcomes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "source_issue",
+    "purpose",
+    "policy",
+    "admissibility_dimensions",
+    "decision_outcomes",
+    "evidence_requirements",
+    "synthetic_cases",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-method-adjudication-v0"
+    },
+    "status": {
+      "const": "SYNTHETIC_POLICY_CONTRACT_NOT_EXPERT_GOLD"
+    },
+    "source_issue": {
+      "const": "#11006"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exact_method_name_match_required",
+        "accept_multiple_admissible_methods",
+        "accept_novel_method_if_independently_justified",
+        "reject_unsupported_assumptions",
+        "reject_infeasible_resource_plan",
+        "abstention_or_escalation_allowed",
+        "adjudicator_must_be_blinded_to_agent_identity"
+      ],
+      "properties": {
+        "exact_method_name_match_required": {
+          "const": false
+        },
+        "accept_multiple_admissible_methods": {
+          "const": true
+        },
+        "accept_novel_method_if_independently_justified": {
+          "const": true
+        },
+        "reject_unsupported_assumptions": {
+          "const": true
+        },
+        "reject_infeasible_resource_plan": {
+          "const": true
+        },
+        "abstention_or_escalation_allowed": {
+          "const": true
+        },
+        "adjudicator_must_be_blinded_to_agent_identity": {
+          "const": true
+        }
+      }
+    },
+    "admissibility_dimensions": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "decision_outcomes": {
+      "type": "array",
+      "minItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "VALID_ADMISSIBLE_METHOD",
+          "VALID_ALTERNATIVE_METHOD",
+          "INVALID_ASSUMPTION",
+          "UNSUPPORTED_BY_EVIDENCE",
+          "INFEASIBLE_RESOURCE_PLAN",
+          "NON_IDENTIFIABLE_ACKNOWLEDGED",
+          "UNDERDETERMINED_ESCALATE",
+          "INVALID_OUTPUT_OR_EXECUTION"
+        ]
+      }
+    },
+    "evidence_requirements": {
+      "type": "array",
+      "minItems": 7,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "synthetic_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "status",
+          "objective",
+          "facts",
+          "admissible_method_families",
+          "expected_disposition",
+          "prohibited_inferences",
+          "evidence_to_request"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "const": "SYNTHETIC_KNOWN_FUNCTION_NOT_EXPERT_GOLD"
+          },
+          "objective": {
+            "type": "string",
+            "minLength": 1
+          },
+          "facts": {
+            "type": "object",
+            "required": [
+              "domain",
+              "response_definition",
+              "measurement_budget",
+              "observed_designs",
+              "required_outputs",
+              "data_modality",
+              "evaluation_truth"
+            ],
+            "properties": {
+              "domain": {
+                "type": "string"
+              },
+              "response_definition": {
+                "type": "string"
+              },
+              "measurement_budget": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "observed_designs": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "required_outputs": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "data_modality": {
+                "type": "string"
+              },
+              "evaluation_truth": {
+                "type": "string"
+              }
+            }
+          },
+          "admissible_method_families": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "method_id",
+                "family",
+                "assumptions",
+                "failure_modes",
+                "required_checks"
+              ],
+              "properties": {
+                "method_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "family": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "assumptions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "failure_modes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required_checks": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          },
+          "expected_disposition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prohibited_inferences": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_to_request": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

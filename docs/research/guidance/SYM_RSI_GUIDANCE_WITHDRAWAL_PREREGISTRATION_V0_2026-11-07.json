@@ -1,0 +1,182 @@
+{
+  "schema_version": "sym-rsi-guidance-withdrawal-preregistration-v0",
+  "status": "TEMPLATE_NOT_PREREGISTERED",
+  "owner_issue": "#11006",
+  "external_manifest": "docs/research/guidance/SYM_RSI_GUIDANCE_WITHDRAWAL_MANIFEST_V0_2026-11-07.json",
+  "protocol": "docs/research/guidance/SYM_RSI_GUIDANCE_WITHDRAWAL_PROTOCOL_V0_2026-11-07.md",
+  "version": "v0",
+  "preregistration": {
+    "title": "Symthaea B1-B4 methodological autonomy and context-distraction experiment",
+    "created_utc": "UNRESOLVED: freeze before any confirmatory run",
+    "authors": "UNRESOLVED: named investigators and roles",
+    "status_note": "This template is not preregistered. No run may be described as confirmatory until all required placeholders are resolved, reviewed and frozen."
+  },
+  "upstream": {
+    "repository": "apexin-ai/ASI-Bench",
+    "commit": "eb60952124b90e9f0886c1212bf7463e26d0bc19",
+    "release": "0.3.0",
+    "dataset_seed": "UNRESOLVED: choose seed31415 for public local pilot; seed42 has private-reference official-scoring constraints",
+    "task_manifest_digest": "UNRESOLVED: hash of the selected task IDs, revisions and input files",
+    "prompt_bundle_digest": "UNRESOLVED: exact task prompts for B1-B4 and local controls",
+    "scorer_bundle_digest": "UNRESOLVED: exact scoring code, rubric and dependencies",
+    "task_ids": [
+      "UNRESOLVED: task IDs stratified across domains and methodological families"
+    ],
+    "task_family_split_digest": "UNRESOLVED: disjoint development, calibration, confirmation and transfer manifests"
+  },
+  "arms": [
+    {
+      "id": "B1",
+      "kind": "official",
+      "description": "Full procedure: scientific background, method, equations and complete procedure."
+    },
+    {
+      "id": "B2",
+      "kind": "official",
+      "description": "Method and constraints, without full procedure."
+    },
+    {
+      "id": "B3",
+      "kind": "official",
+      "description": "Objective, data, constraints and required outputs; researcher selects method."
+    },
+    {
+      "id": "B4",
+      "kind": "official",
+      "description": "B3 plus factually correct non-essential context."
+    },
+    {
+      "id": "B3_NEUTRAL_LENGTH",
+      "kind": "local_control",
+      "description": "B3 with semantically neutral padding matched in token count/placement to B4; not an official ASI-Bench condition."
+    }
+  ],
+  "matching": {
+    "task_objective_fixed": true,
+    "input_data_fixed": true,
+    "constraints_fixed": true,
+    "required_artifacts_fixed": true,
+    "scoring_fixed": true,
+    "model_id": "UNRESOLVED: exact provider model and snapshot",
+    "agent_harness_id": "UNRESOLVED: exact agent/harness commit",
+    "tools_allowlist_digest": "UNRESOLVED: tool registry and permission manifest",
+    "context_policy_digest": "UNRESOLVED: context size/truncation/memory policy",
+    "reasoning_mode": "UNRESOLVED: fixed reasoning effort/mode",
+    "total_budget_manifest_digest": "UNRESOLVED: tokens, model cost, compute, wall clock, evaluator and human review boundaries",
+    "randomization_and_order": "UNRESOLVED: paired randomization/order and carry-over prevention",
+    "cold_start_policy": "UNRESOLVED: byte-identical model/harness/memory starting state per treatment"
+  },
+  "research_conditions": {
+    "method_adjudication_rubric_digest": "UNRESOLVED: domain-expert admissible-method rubric and assumptions",
+    "independent_reviewers": "UNRESOLVED: minimum two independent experts per task or justified alternative",
+    "method_set_policy": "Set-valued: multiple valid methods may pass if assumptions and evidence satisfy the task contract.",
+    "b4_context_audit": "UNRESOLVED: blinded reviewer classification of essential/non-essential facts and policy-use trace",
+    "claim_evidence_contract": "UNRESOLVED: required mapping of every material claim to output artifact, execution trace or source"
+  },
+  "splits": {
+    "development_manifest_digest": "UNRESOLVED",
+    "calibration_manifest_digest": "UNRESOLVED",
+    "sealed_confirmation_manifest_digest": "UNRESOLVED",
+    "fresh_family_transfer_manifest_digest": "UNRESOLVED",
+    "independent_custodian_ids": "UNRESOLVED: separate custodians for confirmation and transfer sets",
+    "overlap_audit": "UNRESOLVED: zero task, family, method and source-paper lineage overlap declaration plus independent audit"
+  },
+  "resource_budget": {
+    "total_model_tokens_per_task": "UNRESOLVED",
+    "total_api_cost_per_task": "UNRESOLVED",
+    "cpu_gpu_compute_per_task": "UNRESOLVED",
+    "wall_clock_limit_per_task": "UNRESOLVED",
+    "evaluator_call_limit_per_task": "UNRESOLVED",
+    "human_review_budget": "UNRESOLVED",
+    "retries_and_invalid_runs": "Included in total inclusive budget; exact ceiling UNRESOLVED"
+  },
+  "outcomes": {
+    "primary": [
+      {
+        "id": "task_score_by_level",
+        "definition": "Raw upstream score and each required gate outcome for each task and B1-B4."
+      },
+      {
+        "id": "method_validity_b3",
+        "definition": "Independent blinded adjudication of the chosen B3 method, assumptions, applicability and evidence; legitimate alternatives accepted."
+      },
+      {
+        "id": "claim_evidence_integrity",
+        "definition": "Hard gate for material claims consistent with source artifacts, execution traces and reported measurements."
+      }
+    ],
+    "secondary": [
+      {
+        "id": "b1_to_b2_delta",
+        "definition": "Paired per-task difference."
+      },
+      {
+        "id": "b2_to_b3_delta",
+        "definition": "Paired per-task difference."
+      },
+      {
+        "id": "b3_to_b4_delta",
+        "definition": "Paired per-task difference."
+      },
+      {
+        "id": "b3_to_b3_neutral_length_delta",
+        "definition": "Paired context-length effect."
+      },
+      {
+        "id": "b3_neutral_length_to_b4_delta",
+        "definition": "Paired semantic-distraction effect."
+      },
+      {
+        "id": "cost_to_valid_result",
+        "definition": "All-in cost including inference, execution, evaluator, retries, compute, wall-clock and human review."
+      },
+      {
+        "id": "transfer",
+        "definition": "Raw results on held-out task families and at least one fresh scientific domain."
+      }
+    ],
+    "protected_floors": "UNRESOLVED: B1 execution and artifact correctness retention floors",
+    "noncompensating_integrity_gate": true,
+    "aggregation": "No single scalar may compensate for a failed integrity gate, missing artifact, or failed required task gate."
+  },
+  "analysis": {
+    "estimands": "UNRESOLVED: paired treatment contrasts and task/domain clustered estimates",
+    "multiple_comparisons": "UNRESOLVED: planned primary endpoints, multiplicity control and any exploratory labels",
+    "sequential_looks_and_stopping": "UNRESOLVED: frozen stopping/exclusion rules; no unregistered peeking",
+    "missingness": "Retain failed, invalid, incomplete, timed-out, refused and not-run attempts in denominators and status counts.",
+    "sample_size_power_precision": "UNRESOLVED: confirmatory sample size from pilot variance, practical effect threshold and desired interval width",
+    "pilot_repetitions": "UNRESOLVED: pilot only; five paired seeds may be used for debugging stochastic tasks but cannot establish superiority",
+    "confidence_interval_method": "UNRESOLVED: paired/hierarchical cluster-aware method"
+  },
+  "claims": {
+    "allowed_before_execution": [
+      "Design and compatibility protocol only."
+    ],
+    "prohibited_until_evidenced": [
+      "Official ASI-Bench leaderboard standing",
+      "Human-level scientific research",
+      "Scientific discovery",
+      "General methodological autonomy",
+      "R4 recursive self-improvement"
+    ],
+    "local_public_seed_claim": "Local public-reference scoring only; not an official private-reference submission.",
+    "official_private_seed_claim": "Only after the documented seed42 submission process is completed and accepted."
+  },
+  "approvals": {
+    "domain_expert_review": "UNRESOLVED",
+    "statistician_review": "UNRESOLVED",
+    "evaluator_independence_review": "UNRESOLVED",
+    "data_license_and_provenance_review": "UNRESOLVED",
+    "freeze_receipt_ref": "UNRESOLVED: existing canonical receipt/attestation owner",
+    "freeze_timestamp": "UNRESOLVED"
+  },
+  "composition": {
+    "research_taste_issue": 10877,
+    "direction_board_issue": 9230,
+    "evaluator_integrity_issue": 10756,
+    "adaptive_benchmark_issue": 9332,
+    "causal_attribution_issue": 10717,
+    "evidence_continuity_issue": 10630,
+    "r4_issue": 10497
+  }
+}

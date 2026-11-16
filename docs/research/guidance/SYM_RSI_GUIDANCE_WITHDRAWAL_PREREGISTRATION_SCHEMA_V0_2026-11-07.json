@@ -1,0 +1,541 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Symthaea guidance withdrawal preregistration v0",
+  "description": "Structural contract for a preregistration template. A structurally valid template can still be unresolved and is not preregistered.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "status",
+    "owner_issue",
+    "external_manifest",
+    "protocol",
+    "version",
+    "preregistration",
+    "upstream",
+    "arms",
+    "matching",
+    "research_conditions",
+    "splits",
+    "resource_budget",
+    "outcomes",
+    "analysis",
+    "claims",
+    "approvals",
+    "composition"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sym-rsi-guidance-withdrawal-preregistration-v0"
+    },
+    "status": {
+      "const": "TEMPLATE_NOT_PREREGISTERED"
+    },
+    "owner_issue": {
+      "const": "#11006"
+    },
+    "external_manifest": {
+      "type": "string",
+      "minLength": 1
+    },
+    "protocol": {
+      "type": "string",
+      "minLength": 1
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "preregistration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "created_utc",
+        "authors",
+        "status_note"
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "created_utc": {
+          "type": "string",
+          "minLength": 1
+        },
+        "authors": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "upstream": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit",
+        "release",
+        "dataset_seed",
+        "task_manifest_digest",
+        "prompt_bundle_digest",
+        "scorer_bundle_digest",
+        "task_ids",
+        "task_family_split_digest"
+      ],
+      "properties": {
+        "repository": {
+          "const": "apexin-ai/ASI-Bench"
+        },
+        "commit": {
+          "const": "eb60952124b90e9f0886c1212bf7463e26d0bc19"
+        },
+        "release": {
+          "const": "0.3.0"
+        },
+        "dataset_seed": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_manifest_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prompt_bundle_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scorer_bundle_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "task_family_split_digest": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "arms": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "description"
+        ],
+        "properties": {
+          "id": {
+            "enum": [
+              "B1",
+              "B2",
+              "B3",
+              "B4",
+              "B3_NEUTRAL_LENGTH"
+            ]
+          },
+          "kind": {
+            "enum": [
+              "official",
+              "local_control"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "matching": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "task_objective_fixed",
+        "input_data_fixed",
+        "constraints_fixed",
+        "required_artifacts_fixed",
+        "scoring_fixed",
+        "model_id",
+        "agent_harness_id",
+        "tools_allowlist_digest",
+        "context_policy_digest",
+        "reasoning_mode",
+        "total_budget_manifest_digest",
+        "randomization_and_order",
+        "cold_start_policy"
+      ],
+      "properties": {
+        "task_objective_fixed": {
+          "const": true
+        },
+        "input_data_fixed": {
+          "const": true
+        },
+        "constraints_fixed": {
+          "const": true
+        },
+        "required_artifacts_fixed": {
+          "const": true
+        },
+        "scoring_fixed": {
+          "const": true
+        },
+        "model_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "agent_harness_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tools_allowlist_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context_policy_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reasoning_mode": {
+          "type": "string",
+          "minLength": 1
+        },
+        "total_budget_manifest_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "randomization_and_order": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cold_start_policy": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "research_conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "method_adjudication_rubric_digest",
+        "independent_reviewers",
+        "method_set_policy",
+        "b4_context_audit",
+        "claim_evidence_contract"
+      ],
+      "properties": {
+        "method_adjudication_rubric_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_reviewers": {
+          "type": "string",
+          "minLength": 1
+        },
+        "method_set_policy": {
+          "type": "string",
+          "minLength": 1
+        },
+        "b4_context_audit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "claim_evidence_contract": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "splits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "development_manifest_digest",
+        "calibration_manifest_digest",
+        "sealed_confirmation_manifest_digest",
+        "fresh_family_transfer_manifest_digest",
+        "independent_custodian_ids",
+        "overlap_audit"
+      ],
+      "properties": {
+        "development_manifest_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_manifest_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sealed_confirmation_manifest_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fresh_family_transfer_manifest_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_custodian_ids": {
+          "type": "string",
+          "minLength": 1
+        },
+        "overlap_audit": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "resource_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_model_tokens_per_task",
+        "total_api_cost_per_task",
+        "cpu_gpu_compute_per_task",
+        "wall_clock_limit_per_task",
+        "evaluator_call_limit_per_task",
+        "human_review_budget",
+        "retries_and_invalid_runs"
+      ],
+      "properties": {
+        "total_model_tokens_per_task": {
+          "type": "string",
+          "minLength": 1
+        },
+        "total_api_cost_per_task": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cpu_gpu_compute_per_task": {
+          "type": "string",
+          "minLength": 1
+        },
+        "wall_clock_limit_per_task": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluator_call_limit_per_task": {
+          "type": "string",
+          "minLength": 1
+        },
+        "human_review_budget": {
+          "type": "string",
+          "minLength": 1
+        },
+        "retries_and_invalid_runs": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "outcomes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primary",
+        "secondary",
+        "protected_floors",
+        "noncompensating_integrity_gate",
+        "aggregation"
+      ],
+      "properties": {
+        "primary": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "definition"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "definition": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "secondary": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "definition"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "definition": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "protected_floors": {
+          "type": "string",
+          "minLength": 1
+        },
+        "noncompensating_integrity_gate": {
+          "const": true
+        },
+        "aggregation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "analysis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "estimands",
+        "multiple_comparisons",
+        "sequential_looks_and_stopping",
+        "missingness",
+        "sample_size_power_precision",
+        "pilot_repetitions",
+        "confidence_interval_method"
+      ],
+      "properties": {
+        "estimands": {
+          "type": "string",
+          "minLength": 1
+        },
+        "multiple_comparisons": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sequential_looks_and_stopping": {
+          "type": "string",
+          "minLength": 1
+        },
+        "missingness": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sample_size_power_precision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pilot_repetitions": {
+          "type": "string",
+          "minLength": 1
+        },
+        "confidence_interval_method": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "allowed_before_execution",
+        "prohibited_until_evidenced",
+        "local_public_seed_claim",
+        "official_private_seed_claim"
+      ],
+      "properties": {
+        "allowed_before_execution": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "prohibited_until_evidenced": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "local_public_seed_claim": {
+          "type": "string",
+          "minLength": 1
+        },
+        "official_private_seed_claim": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "domain_expert_review",
+        "statistician_review",
+        "evaluator_independence_review",
+        "data_license_and_provenance_review",
+        "freeze_receipt_ref",
+        "freeze_timestamp"
+      ],
+      "properties": {
+        "domain_expert_review": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statistician_review": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evaluator_independence_review": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data_license_and_provenance_review": {
+          "type": "string",
+          "minLength": 1
+        },
+        "freeze_receipt_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "freeze_timestamp": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "composition": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 1
+      }
+    }
+  }
+}
