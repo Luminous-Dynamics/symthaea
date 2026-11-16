@@ -127,3 +127,20 @@ These are separate task families and target counts; they are not a current 1,500
 ## Present claim boundary
 
 As of 2026-11-16, D6.8–D6.12 have draft evaluator/protocol work and synthetic known-answer fixtures. No Rust compilation/test/Clippy/CI, independent gold adjudication, real agent trials, measured cost study, production isolation proof or external replication has been established in this execution environment. The current contribution is a research and evaluator implementation programme, not a validated benchmark ranking.
+## Industry update — temporal understanding, roadmap execution and project continuity (2026-11-16)
+
+Recent work makes the competitive boundary more specific:
+
+- [Long-Horizon Software Engineering Agents: From Tasks to Projects](https://longhorizonswe.github.io/) synthesizes the shift from one-off issues to projects that inherit agent-produced state. Its survey reports ChainSWE results of 69.1% in the reference-fix Oracle setting, 49.0% when later work inherits agents' own patches, and 47.4% when dialogue is also retained. The survey emphasizes retained functionality, active-requirement conformance, selective revision and interruption/handoff—not chain length alone.
+- [SWE-Time](https://arxiv.org/abs/2611.12083), posted Nov 9, 2026, evaluates temporal repository understanding across 1,661 cases and 65 GitHub repositories. It covers retrospective regression analysis and prospective change-intent understanding; the paper reports 15 coding agents and a highest cited average of 61.9 for Claude Opus 4.8 within Claude Code.
+- [RoadmapBench](https://arxiv.org/abs/2605.15846) evaluates 115 long-horizon version-upgrade tasks across 17 repositories and five programming languages. It reports a best task-resolution rate of 39.1% in its evaluated set and a median task involving 3,700 changed lines across 51 files.
+- [SWE-fficiency](https://proceedings.mlr.press/v306/ma26l.html) tests optimization on 498 real-workload tasks across nine repositories. Its authors report that top agents achieve, on average, less than 0.23× the expert speedup, showing that real engineering quality includes performance and workload fidelity—not just passing tests.
+
+### What this changes for EGDDM
+
+1. **Temporal comprehension is no longer an empty niche.** SWE-Time explicitly evaluates repository evolution, and SWE-Milestone/ChainSWE cover continuous or dependent work. EGDDM must differentiate through evidence validity, causal identifiability, branch/authority continuity, adversarial changes and evaluator trust—not merely historical repository understanding.
+2. **Project continuity requires selective revision.** Retained conversation alone does not preserve project capability. EGDDM should measure which prior guarantees remain valid, which became invalid, and whether agents repair only the affected obligations without stale-evidence reuse.
+3. **Broader engineering matters.** RoadmapBench spans five languages; SWE-fficiency demonstrates the value of real workloads and measured performance. EGDDM should add Rust/Go/infrastructure/database tracks after the software pilot, with domain-specific gold adjudication and cost models.
+4. **Report richer outcomes.** Alongside resolve rate, report retained functionality, active-requirement conformance, evidence support, graph-level consistency, justified abstention, evaluator integrity, cost and recovery latency. A safe-performance Pareto frontier is more informative than one aggregate rank.
+
+These papers are complementary baselines, not evidence that EGDDM currently outperforms them. Matched trials remain necessary.
