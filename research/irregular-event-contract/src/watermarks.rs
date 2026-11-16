@@ -1085,9 +1085,7 @@ mod tests {
     #[test]
     fn historical_range_index_prunes_future_known_late_receipts_before_visit() {
         let mut ledger = SourceWatermarkLedger::default();
-        ledger
-            .append(progress(1, 1, 1, 1, 10, 100, false))
-            .unwrap();
+        ledger.append(progress(1, 1, 1, 1, 10, 100, false)).unwrap();
         ledger
             .record_event_arrival(event(1, 1, 10, 20), 20)
             .unwrap();
@@ -1098,23 +1096,17 @@ mod tests {
             .record_event_arrival(event(3, 1, 30, 20), 40)
             .unwrap();
 
-        let before_first = ledger
-            .completeness(1, &[source(1)], 0, 100, 15)
-            .unwrap();
+        let before_first = ledger.completeness(1, &[source(1)], 0, 100, 15).unwrap();
         assert_eq!(before_first.verdict, CompletenessVerdict::Complete);
         assert!(before_first.late_breaches.is_empty());
         assert_eq!(before_first.late_breach_candidates_examined, 0);
         assert_eq!(before_first.late_breach_index_buckets_examined, 3);
 
-        let as_known_first = ledger
-            .completeness(1, &[source(1)], 0, 100, 20)
-            .unwrap();
+        let as_known_first = ledger.completeness(1, &[source(1)], 0, 100, 20).unwrap();
         assert_eq!(as_known_first.late_breaches.len(), 1);
         assert_eq!(as_known_first.late_breach_candidates_examined, 1);
 
-        let as_known_all = ledger
-            .completeness(1, &[source(1)], 0, 100, 40)
-            .unwrap();
+        let as_known_all = ledger.completeness(1, &[source(1)], 0, 100, 40).unwrap();
         assert_eq!(as_known_all.late_breaches.len(), 3);
         assert_eq!(as_known_all.late_breach_candidates_examined, 3);
         assert_eq!(ledger.verify_consistency(), Ok(()));
