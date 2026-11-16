@@ -643,7 +643,6 @@ mod tests {
         assert_eq!(prices.validate(), Err(ResourceError::AllShadowPricesZero));
     }
 
-
     #[test]
     fn campaign_ledger_applies_actions_atomically_against_remaining_budget() {
         let mut ledger = CampaignLedger::new(&budget()).unwrap();
