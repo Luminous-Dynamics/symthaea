@@ -6,6 +6,7 @@
 
 use std::collections::{BTreeSet, VecDeque};
 
+pub mod authority_to_recovery;
 pub mod cross_solver_comparison;
 pub mod evidence_dependence;
 pub mod plant_service_gate;
