@@ -91,7 +91,8 @@ fn trial(
         task_scope_sha256: manifest.task_scope_sha256.clone(),
         operator_competency_stratum: manifest.operator_competency_stratum.clone(),
         clock_synchronization_ref: manifest.clock_synchronization_ref.clone(),
-        metrology_calibration_ref: alignment_error.map(|_| manifest.metrology_calibration_ref.clone()),
+        metrology_calibration_ref: alignment_error
+            .map(|_| manifest.metrology_calibration_ref.clone()),
         evidence_class: manifest.evidence_class,
         raw_data_ref: format!("synthetic-raw-artifact-{id}"),
         raw_data_sha256: raw_digest(id),
@@ -121,10 +122,34 @@ fn main() {
             )
         })
         .collect();
-    trials.push(trial(&manifest, "failed-attempt-a", 420, TrialStatus::Failed, None));
-    trials.push(trial(&manifest, "failed-attempt-b", 510, TrialStatus::Failed, None));
-    trials.push(trial(&manifest, "aborted-attempt-a", 350, TrialStatus::Aborted, None));
-    trials.push(trial(&manifest, "aborted-attempt-b", 390, TrialStatus::Aborted, None));
+    trials.push(trial(
+        &manifest,
+        "failed-attempt-a",
+        420,
+        TrialStatus::Failed,
+        None,
+    ));
+    trials.push(trial(
+        &manifest,
+        "failed-attempt-b",
+        510,
+        TrialStatus::Failed,
+        None,
+    ));
+    trials.push(trial(
+        &manifest,
+        "aborted-attempt-a",
+        350,
+        TrialStatus::Aborted,
+        None,
+    ));
+    trials.push(trial(
+        &manifest,
+        "aborted-attempt-b",
+        390,
+        TrialStatus::Aborted,
+        None,
+    ));
 
     let report = summarize_remote_handling_benchmark(&manifest, &trials);
     println!("contract_version={}", report.contract_version);
@@ -134,21 +159,40 @@ fn main() {
     println!("completed_trials={}", report.completed_trials);
     println!("failed_trials={}", report.failed_trials);
     println!("aborted_trials={}", report.aborted_trials);
-    println!("completion_fraction={:.6}", report.completion_fraction.unwrap_or(f64::NAN));
+    println!(
+        "completion_fraction={:.6}",
+        report.completion_fraction.unwrap_or(f64::NAN)
+    );
     println!(
         "completion_fraction_one_sided_lower_bound={:.6}",
-        report.completion_fraction_one_sided_lower_bound.unwrap_or(f64::NAN)
+        report
+            .completion_fraction_one_sided_lower_bound
+            .unwrap_or(f64::NAN)
     );
-    println!("completed_time_p50_seconds={}", report.completed_duration_p50_seconds.unwrap_or_default());
-    println!("completed_time_p90_seconds={}", report.completed_duration_p90_seconds.unwrap_or_default());
+    println!(
+        "completed_time_p50_seconds={}",
+        report.completed_duration_p50_seconds.unwrap_or_default()
+    );
+    println!(
+        "completed_time_p90_seconds={}",
+        report.completed_duration_p90_seconds.unwrap_or_default()
+    );
     println!(
         "completion_time_p90_upper_confidence_seconds={}",
-        report.completion_time_quantile_upper_confidence_seconds.unwrap_or_default()
+        report
+            .completion_time_quantile_upper_confidence_seconds
+            .unwrap_or_default()
     );
-    println!("completed_duration_sample_count={}", report.completed_duration_sample_count);
+    println!(
+        "completed_duration_sample_count={}",
+        report.completed_duration_sample_count
+    );
     println!("unsafe_terminal_trials={}", report.unsafe_terminal_trials);
     println!("interventions_total={}", report.interventions_total);
-    println!("alignment_tolerance_failures={}", report.alignment_tolerance_failures);
+    println!(
+        "alignment_tolerance_failures={}",
+        report.alignment_tolerance_failures
+    );
     println!(
         "SCOPE: synthetic repeated-trial corpus and exact statistical contract only; no physical mockup or fusion-plant evidence"
     );
