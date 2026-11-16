@@ -10,6 +10,8 @@
 
 use std::fmt;
 
+pub mod robust;
+
 pub const MAX_TEMPLATE_DEGREE: usize = 11;
 pub const CRYSTALLOGRAPHIC_POINT_GROUP_COUNT: usize = 32;
 
