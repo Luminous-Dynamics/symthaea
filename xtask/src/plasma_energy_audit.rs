@@ -3489,14 +3489,6 @@ mod tests {
     }
 
     fn nh3_synthesis_energy_gap_manifest() -> Value {
-        let mut comparator_case_ids = vec![comparator_case_id];
-        let mut comparator_cases = vec![comparator_case];
-        if lane == "AMMONIA_CRACKING_DYNAMIC_RESPONSE" {
-            comparator_case_ids.push("NH3-CRACK-WAVEGUIDE-MWPJ-2026");
-            comparator_case_ids.push("NH3-CRACK-MW-ATM-MECHANISM-2026");
-            comparator_cases.push(registered_source_case("NH3-CRACK-WAVEGUIDE-MWPJ-2026"));
-            comparator_cases.push(registered_source_case("NH3-CRACK-MW-ATM-MECHANISM-2026"));
-        }
         serde_json::json!({
             "programme": "PLASMA-ENERGY-001",
             "claim_ceiling": "SOURCE_REGISTER_ONLY",
@@ -4406,6 +4398,14 @@ mod tests {
                 }),
             ),
         };
+        let mut comparator_case_ids = vec![comparator_case_id];
+        let mut comparator_cases = vec![comparator_case];
+        if lane == "AMMONIA_CRACKING_DYNAMIC_RESPONSE" {
+            comparator_case_ids.push("NH3-CRACK-WAVEGUIDE-MWPJ-2026");
+            comparator_case_ids.push("NH3-CRACK-MW-ATM-MECHANISM-2026");
+            comparator_cases.push(registered_source_case("NH3-CRACK-WAVEGUIDE-MWPJ-2026"));
+            comparator_cases.push(registered_source_case("NH3-CRACK-MW-ATM-MECHANISM-2026"));
+        }
         serde_json::json!({
             "programme": "PLASMA-ENERGY-001",
             "claim_ceiling": "SOURCE_REGISTER_ONLY",
