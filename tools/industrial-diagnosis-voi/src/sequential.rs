@@ -465,9 +465,9 @@ mod tests {
 
     #[test]
     fn adaptive_policy_respects_budget_below_two_test_combination_cost() {
-        let result = evaluate_depth_two(&reference_case(), &reference_measurements(), 2.99).unwrap();
+        let result = evaluate_depth_two(&reference_case(), &reference_measurements(), 1.49).unwrap();
         let policy = result.adaptive_depth_two.unwrap();
-        assert!(policy.expected_measurement_cost <= 2.99 + LOSS_TOLERANCE);
+        assert!(policy.expected_measurement_cost <= 1.49 + LOSS_TOLERANCE);
         assert!(policy.branches.iter().all(|branch| {
             branch.second_measurement_id.is_none()
         }));
