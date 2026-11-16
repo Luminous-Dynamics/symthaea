@@ -316,9 +316,7 @@ fn close(left: f64, right: f64) -> bool {
     (left - right).abs() <= COORDINATE_TOLERANCE_M
 }
 
-fn deserialize_present_nullable_string<'de, D>(
-    deserializer: D,
-) -> Result<Option<String>, D::Error>
+fn deserialize_present_nullable_string<'de, D>(deserializer: D) -> Result<Option<String>, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -414,7 +412,10 @@ fn validate_profile(
             format!("station {station_id} profile must start at a below-waterline keel on y=0"),
         );
     }
-    if !matches!(last.role, ProfilePointRole::Sheer | ProfilePointRole::DeckEdge) {
+    if !matches!(
+        last.role,
+        ProfilePointRole::Sheer | ProfilePointRole::DeckEdge
+    ) {
         reject(
             issues,
             "sheer_profile_endpoint",
@@ -422,7 +423,10 @@ fn validate_profile(
         );
     }
 
-    let keel_count = profile.iter().filter(|point| point.role == ProfilePointRole::Keel).count();
+    let keel_count = profile
+        .iter()
+        .filter(|point| point.role == ProfilePointRole::Keel)
+        .count();
     let waterline_indices = profile
         .iter()
         .enumerate()
@@ -431,7 +435,12 @@ fn validate_profile(
         .collect::<Vec<_>>();
     let sheer_count = profile
         .iter()
-        .filter(|point| matches!(point.role, ProfilePointRole::Sheer | ProfilePointRole::DeckEdge))
+        .filter(|point| {
+            matches!(
+                point.role,
+                ProfilePointRole::Sheer | ProfilePointRole::DeckEdge
+            )
+        })
         .count();
     let bottom_count = profile
         .iter()
@@ -453,7 +462,10 @@ fn validate_profile(
     }
     if let Some(waterline_index) = waterline_indices.first().copied() {
         let waterline = &profile[waterline_index];
-        if waterline_index == 0 || waterline_index + 1 >= profile.len() || !close(waterline.z_m, 0.0) {
+        if waterline_index == 0
+            || waterline_index + 1 >= profile.len()
+            || !close(waterline.z_m, 0.0)
+        {
             reject(
                 issues,
                 "profile_waterline_position",
@@ -472,7 +484,9 @@ fn validate_profile(
             reject(
                 issues,
                 "profile_transverse_order",
-                format!("station {station_id} profile is not monotonically ordered from keel to sheer"),
+                format!(
+                    "station {station_id} profile is not monotonically ordered from keel to sheer"
+                ),
             );
         }
         if pair[1].z_m > pair[0].z_m + COORDINATE_TOLERANCE_M {
@@ -524,7 +538,10 @@ fn validate_symmetry_and_port_profiles(
                     reject(
                         issues,
                         "explicit_port_profile_missing",
-                        format!("station {} requires an explicit port profile", station.station_id),
+                        format!(
+                            "station {} requires an explicit port profile",
+                            station.station_id
+                        ),
                     );
                     continue;
                 };
@@ -539,7 +556,10 @@ fn validate_symmetry_and_port_profiles(
                     reject(
                         issues,
                         "port_starboard_point_count",
-                        format!("station {} port/starboard profile point counts differ", station.station_id),
+                        format!(
+                            "station {} port/starboard profile point counts differ",
+                            station.station_id
+                        ),
                     );
                     continue;
                 }
@@ -597,7 +617,9 @@ fn validate_end_condition(
                     reject(
                         issues,
                         "pointed_port_end_not_collapsed",
-                        format!("{end_name} pointed-stem port profile must collapse exactly to y=0"),
+                        format!(
+                            "{end_name} pointed-stem port profile must collapse exactly to y=0"
+                        ),
                     );
                 }
             }
@@ -617,7 +639,11 @@ fn validate_end_condition(
 fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
     let waterline = &spec.design_waterline;
     if waterline.waterline_id.trim().is_empty() {
-        reject(issues, "waterline_identity", "design waterline ID must not be empty");
+        reject(
+            issues,
+            "waterline_identity",
+            "design waterline ID must not be empty",
+        );
     }
     if !finite(waterline.plane_z_m) || !close(waterline.plane_z_m, 0.0) {
         reject(
@@ -634,12 +660,19 @@ fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssu
         );
         return;
     }
-    for (station, intersection) in spec.stations.iter().zip(waterline.station_intersections.iter()) {
+    for (station, intersection) in spec
+        .stations
+        .iter()
+        .zip(waterline.station_intersections.iter())
+    {
         if intersection.station_id != station.station_id {
             reject(
                 issues,
                 "waterline_station_order",
-                format!("waterline intersection does not match station {}", station.station_id),
+                format!(
+                    "waterline intersection does not match station {}",
+                    station.station_id
+                ),
             );
             continue;
         }
@@ -649,7 +682,10 @@ fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssu
             reject(
                 issues,
                 "waterline_starboard_reference",
-                format!("station {} waterline starboard point reference does not resolve", station.station_id),
+                format!(
+                    "station {} waterline starboard point reference does not resolve",
+                    station.station_id
+                ),
             );
             continue;
         };
@@ -657,7 +693,10 @@ fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssu
             reject(
                 issues,
                 "waterline_starboard_semantics",
-                format!("station {} reference is not its z=0 waterline point", station.station_id),
+                format!(
+                    "station {} reference is not its z=0 waterline point",
+                    station.station_id
+                ),
             );
         }
 
@@ -667,16 +706,25 @@ fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssu
                     reject(
                         issues,
                         "mirrored_waterline_port_reference",
-                        format!("station {} mirrored port intersection must not name a source port point", station.station_id),
+                        format!(
+                            "station {} mirrored port intersection must not name a source port point",
+                            station.station_id
+                        ),
                     );
                 }
             }
-            (SymmetryPolicy::ExplicitPortAndStarboard, WaterlinePortSource::ExplicitPortProfile) => {
+            (
+                SymmetryPolicy::ExplicitPortAndStarboard,
+                WaterlinePortSource::ExplicitPortProfile,
+            ) => {
                 let Some(port_id) = intersection.port_point_id.as_deref() else {
                     reject(
                         issues,
                         "explicit_waterline_port_reference",
-                        format!("station {} requires an explicit port waterline point ID", station.station_id),
+                        format!(
+                            "station {} requires an explicit port waterline point ID",
+                            station.station_id
+                        ),
                     );
                     continue;
                 };
@@ -687,7 +735,10 @@ fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssu
                     reject(
                         issues,
                         "waterline_port_reference",
-                        format!("station {} waterline port point reference does not resolve", station.station_id),
+                        format!(
+                            "station {} waterline port point reference does not resolve",
+                            station.station_id
+                        ),
                     );
                     continue;
                 };
@@ -698,14 +749,20 @@ fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssu
                     reject(
                         issues,
                         "waterline_port_semantics",
-                        format!("station {} port reference is not the mirrored z=0 waterline point", station.station_id),
+                        format!(
+                            "station {} port reference is not the mirrored z=0 waterline point",
+                            station.station_id
+                        ),
                     );
                 }
             }
             _ => reject(
                 issues,
                 "waterline_port_source_policy",
-                format!("station {} port source conflicts with declared symmetry policy", station.station_id),
+                format!(
+                    "station {} port source conflicts with declared symmetry policy",
+                    station.station_id
+                ),
             ),
         }
     }
@@ -714,7 +771,11 @@ fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssu
 fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
     let deck = &spec.deck_surface;
     if deck.surface_id.trim().is_empty() {
-        reject(issues, "deck_surface_identity", "deck surface ID must not be empty");
+        reject(
+            issues,
+            "deck_surface_identity",
+            "deck surface ID must not be empty",
+        );
     }
     if deck.construction == DeckConstruction::Unsupported {
         incomplete(
@@ -736,7 +797,10 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
             reject(
                 issues,
                 "deck_station_order",
-                format!("deck section does not match hull station {}", station.station_id),
+                format!(
+                    "deck section does not match hull station {}",
+                    station.station_id
+                ),
             );
             continue;
         }
@@ -774,7 +838,10 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
                 reject(
                     issues,
                     "pointed_deck_endpoint",
-                    format!("pointed-end deck section {} must collapse to one above-waterline centreplane crown point", station.station_id),
+                    format!(
+                        "pointed-end deck section {} must collapse to one above-waterline centreplane crown point",
+                        station.station_id
+                    ),
                 );
             }
             continue;
@@ -785,14 +852,20 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
                 reject(
                     issues,
                     "deck_point_identity",
-                    format!("deck section {} contains an empty or duplicate point ID", station.station_id),
+                    format!(
+                        "deck section {} contains an empty or duplicate point ID",
+                        station.station_id
+                    ),
                 );
             }
             if !finite(point.y_m) || !finite(point.z_m) || point.z_m >= -COORDINATE_TOLERANCE_M {
                 reject(
                     issues,
                     "deck_coordinate",
-                    format!("deck section {} must have finite points above the z=0 waterline", station.station_id),
+                    format!(
+                        "deck section {} must have finite points above the z=0 waterline",
+                        station.station_id
+                    ),
                 );
             }
         }
@@ -801,26 +874,34 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
                 reject(
                     issues,
                     "deck_transverse_order",
-                    format!("deck section {} points must be strictly ordered from port to starboard", station.station_id),
+                    format!(
+                        "deck section {} points must be strictly ordered from port to starboard",
+                        station.station_id
+                    ),
                 );
             }
         }
-        if deck_section.points.first().map(|point| point.role)
-            != Some(DeckPointRole::PortDeckEdge)
+        if deck_section.points.first().map(|point| point.role) != Some(DeckPointRole::PortDeckEdge)
             || deck_section.points.last().map(|point| point.role)
                 != Some(DeckPointRole::StarboardDeckEdge)
         {
             reject(
                 issues,
                 "deck_edge_markers",
-                format!("deck section {} must start/end at port/starboard deck edges", station.station_id),
+                format!(
+                    "deck section {} must start/end at port/starboard deck edges",
+                    station.station_id
+                ),
             );
         }
 
         let Some(starboard_sheer) = station.starboard_profile.last() else {
             continue;
         };
-        let deck_starboard = deck_section.points.last().expect("deck point count checked");
+        let deck_starboard = deck_section
+            .points
+            .last()
+            .expect("deck point count checked");
         if deck_starboard.point_id != starboard_sheer.point_id
             || !close(deck_starboard.y_m, starboard_sheer.y_m)
             || !close(deck_starboard.z_m, starboard_sheer.z_m)
@@ -828,11 +909,17 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
             reject(
                 issues,
                 "deck_starboard_seam",
-                format!("deck section {} starboard deck edge does not resolve to its sheer point", station.station_id),
+                format!(
+                    "deck section {} starboard deck edge does not resolve to its sheer point",
+                    station.station_id
+                ),
             );
         }
 
-        let deck_port = deck_section.points.first().expect("deck point count checked");
+        let deck_port = deck_section
+            .points
+            .first()
+            .expect("deck point count checked");
         match spec.symmetry {
             SymmetryPolicy::SymmetricAboutY0 => {
                 let expected_id = format!("MIRROR:{}", starboard_sheer.point_id);
@@ -843,7 +930,10 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
                     reject(
                         issues,
                         "deck_port_mirror_seam",
-                        format!("deck section {} port deck edge must be the exact mirrored sheer identity", station.station_id),
+                        format!(
+                            "deck section {} port deck edge must be the exact mirrored sheer identity",
+                            station.station_id
+                        ),
                     );
                 }
             }
@@ -861,7 +951,10 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
                     reject(
                         issues,
                         "deck_port_seam",
-                        format!("deck section {} port deck edge does not resolve to its port sheer point", station.station_id),
+                        format!(
+                            "deck section {} port deck edge does not resolve to its port sheer point",
+                            station.station_id
+                        ),
                     );
                 }
             }
@@ -935,7 +1028,8 @@ fn validate_boundary_and_components(spec: &FullEnvelopeSpec, issues: &mut Vec<Fu
 
     let mut opening_ids = BTreeSet::new();
     for opening in &boundary.openings {
-        if opening.opening_id.trim().is_empty() || !opening_ids.insert(opening.opening_id.as_str()) {
+        if opening.opening_id.trim().is_empty() || !opening_ids.insert(opening.opening_id.as_str())
+        {
             reject(
                 issues,
                 "opening_identity",
@@ -946,17 +1040,25 @@ fn validate_boundary_and_components(spec: &FullEnvelopeSpec, issues: &mut Vec<Fu
             reject(
                 issues,
                 "opening_boundary_size",
-                format!("opening {} requires at least three boundary point references", opening.opening_id),
+                format!(
+                    "opening {} requires at least three boundary point references",
+                    opening.opening_id
+                ),
             );
         }
         let mut refs = BTreeSet::new();
-        if opening.boundary_point_refs.iter().any(|point_id| {
-            point_id.trim().is_empty() || !refs.insert(point_id.as_str())
-        }) {
+        if opening
+            .boundary_point_refs
+            .iter()
+            .any(|point_id| point_id.trim().is_empty() || !refs.insert(point_id.as_str()))
+        {
             reject(
                 issues,
                 "opening_boundary_references",
-                format!("opening {} has empty or duplicate point references", opening.opening_id),
+                format!(
+                    "opening {} has empty or duplicate point references",
+                    opening.opening_id
+                ),
             );
         }
         for point_id in &opening.boundary_point_refs {
@@ -964,7 +1066,10 @@ fn validate_boundary_and_components(spec: &FullEnvelopeSpec, issues: &mut Vec<Fu
                 reject(
                     issues,
                     "opening_boundary_point_reference",
-                    format!("opening {} references unknown point {}", opening.opening_id, point_id),
+                    format!(
+                        "opening {} references unknown point {}",
+                        opening.opening_id, point_id
+                    ),
                 );
             }
         }
@@ -972,7 +1077,10 @@ fn validate_boundary_and_components(spec: &FullEnvelopeSpec, issues: &mut Vec<Fu
             incomplete(
                 issues,
                 "unsupported_opening",
-                format!("opening {} requires a geometry/topology implementation not supported by G2f-a", opening.opening_id),
+                format!(
+                    "opening {} requires a geometry/topology implementation not supported by G2f-a",
+                    opening.opening_id
+                ),
             );
         }
     }
@@ -992,7 +1100,10 @@ fn validate_boundary_and_components(spec: &FullEnvelopeSpec, issues: &mut Vec<Fu
             reject(
                 issues,
                 "external_component_digest",
-                format!("component {} source digest must be 64 hexadecimal characters", component.component_id),
+                format!(
+                    "component {} source digest must be 64 hexadecimal characters",
+                    component.component_id
+                ),
             );
         }
     }
@@ -1024,7 +1135,11 @@ pub fn validate_full_envelope_spec(spec: &FullEnvelopeSpec) -> FullEnvelopeValid
         );
     }
     if spec.candidate_id.trim().is_empty() {
-        reject(&mut issues, "candidate_id", "candidate ID must not be empty");
+        reject(
+            &mut issues,
+            "candidate_id",
+            "candidate ID must not be empty",
+        );
     }
     if spec.units != "m" {
         reject(
@@ -1071,9 +1186,7 @@ pub fn validate_full_envelope_spec(spec: &FullEnvelopeSpec) -> FullEnvelopeValid
             format!("full-envelope station count must be within 2..={MAX_FULL_ENVELOPE_STATIONS}"),
         );
     } else {
-        if !finite(spec.stations[0].x_over_length)
-            || !close(spec.stations[0].x_over_length, 0.0)
-        {
+        if !finite(spec.stations[0].x_over_length) || !close(spec.stations[0].x_over_length, 0.0) {
             reject(
                 &mut issues,
                 "first_station_extent",
@@ -1089,22 +1202,24 @@ pub fn validate_full_envelope_spec(spec: &FullEnvelopeSpec) -> FullEnvelopeValid
             );
         }
         for (index, station) in spec.stations.iter().enumerate() {
-            if !finite(station.x_over_length)
-                || !(0.0..=1.0).contains(&station.x_over_length)
-            {
+            if !finite(station.x_over_length) || !(0.0..=1.0).contains(&station.x_over_length) {
                 reject(
                     &mut issues,
                     "station_coordinate",
-                    format!("station {} x/L must be finite and within [0,1]", station.station_id),
+                    format!(
+                        "station {} x/L must be finite and within [0,1]",
+                        station.station_id
+                    ),
                 );
             }
-            if index > 0
-                && station.x_over_length <= spec.stations[index - 1].x_over_length
-            {
+            if index > 0 && station.x_over_length <= spec.stations[index - 1].x_over_length {
                 reject(
                     &mut issues,
                     "station_order",
-                    format!("station {} is not strictly after its predecessor", station.station_id),
+                    format!(
+                        "station {} is not strictly after its predecessor",
+                        station.station_id
+                    ),
                 );
             }
             validate_profile(
@@ -1114,15 +1229,16 @@ pub fn validate_full_envelope_spec(spec: &FullEnvelopeSpec) -> FullEnvelopeValid
                 dimensions,
                 &mut issues,
             );
-            if station
-                .starboard_profile
-                .last()
-                .is_some_and(|point| -point.z_m + COORDINATE_TOLERANCE_M < dimensions.design_freeboard_m)
-            {
+            if station.starboard_profile.last().is_some_and(|point| {
+                -point.z_m + COORDINATE_TOLERANCE_M < dimensions.design_freeboard_m
+            }) {
                 reject(
                     &mut issues,
                     "design_freeboard",
-                    format!("station {} sheer is below the declared design freeboard", station.station_id),
+                    format!(
+                        "station {} sheer is below the declared design freeboard",
+                        station.station_id
+                    ),
                 );
             }
         }
@@ -1199,9 +1315,15 @@ mod tests {
     fn synthetic_box_fixture_satisfies_full_envelope_input_contract() {
         let spec = box_fixture();
         let report = validate_full_envelope_spec(&spec);
-        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert_eq!(
+            report.disposition,
+            FullEnvelopeDisposition::ValidInputContract
+        );
         assert!(report.issues.is_empty());
-        assert_eq!(report.source_spec_digest_blake3.as_deref().unwrap().len(), 64);
+        assert_eq!(
+            report.source_spec_digest_blake3.as_deref().unwrap().len(),
+            64
+        );
     }
 
     #[test]
@@ -1219,7 +1341,12 @@ mod tests {
         spec.deck_surface.construction = DeckConstruction::Unsupported;
         let report = validate_full_envelope_spec(&spec);
         assert_eq!(report.disposition, FullEnvelopeDisposition::Incomplete);
-        assert!(report.issues.iter().any(|item| item.code == "unsupported_deck_construction"));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|item| item.code == "unsupported_deck_construction")
+        );
     }
 
     #[test]
@@ -1295,13 +1422,20 @@ mod tests {
             intersection.port_source = WaterlinePortSource::ExplicitPortProfile;
             intersection.port_point_id = Some(format!("PORT-{}", intersection.starboard_point_id));
         }
-        for (station, deck_section) in spec.stations.iter().zip(spec.deck_surface.sections.iter_mut()) {
+        for (station, deck_section) in spec
+            .stations
+            .iter()
+            .zip(spec.deck_surface.sections.iter_mut())
+        {
             let port_sheer = station.port_profile.as_ref().unwrap().last().unwrap();
             let deck_port = deck_section.points.first_mut().unwrap();
             deck_port.point_id = port_sheer.point_id.clone();
         }
         let report = validate_full_envelope_spec(&spec);
-        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert_eq!(
+            report.disposition,
+            FullEnvelopeDisposition::ValidInputContract
+        );
         assert!(report.issues.is_empty());
     }
 
@@ -1336,16 +1470,17 @@ mod tests {
         spec.boundary_semantics.exterior_shell = ExteriorShellSemantics::ExplicitBoundaryLoops;
         spec.boundary_semantics.openings.push(OpeningBoundary {
             opening_id: "UNMODELED-OPENING".into(),
-            boundary_point_refs: vec![
-                "BOW-KEEL".into(),
-                "BOW-WL-S".into(),
-                "BOW-SHEER-S".into(),
-            ],
+            boundary_point_refs: vec!["BOW-KEEL".into(), "BOW-WL-S".into(), "BOW-SHEER-S".into()],
             status: OpeningStatus::UnsupportedRequiresReview,
         });
         let report = validate_full_envelope_spec(&spec);
         assert_eq!(report.disposition, FullEnvelopeDisposition::Incomplete);
-        assert!(report.issues.iter().any(|item| item.code == "unsupported_opening"));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|item| item.code == "unsupported_opening")
+        );
     }
 
     #[test]
@@ -1358,7 +1493,8 @@ mod tests {
     #[test]
     fn missing_stern_closure_region_is_rejected() {
         let mut spec = box_fixture();
-        spec.surface_inventory.retain(|region| *region != SurfaceRegion::SternEndClosure);
+        spec.surface_inventory
+            .retain(|region| *region != SurfaceRegion::SternEndClosure);
         assert_rejected(&spec, "missing_surface_region");
     }
 
@@ -1402,7 +1538,6 @@ mod tests {
         assert!(serde_json::from_value::<FullEnvelopeSpec>(value).is_err());
     }
 
-
     #[test]
     fn pointed_bow_deck_may_collapse_to_one_centreplane_point() {
         let mut spec = box_fixture();
@@ -1417,7 +1552,10 @@ mod tests {
             role: DeckPointRole::DeckCrown,
         }];
         let report = validate_full_envelope_spec(&spec);
-        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert_eq!(
+            report.disposition,
+            FullEnvelopeDisposition::ValidInputContract
+        );
         assert!(report.issues.is_empty());
     }
 
@@ -1439,7 +1577,12 @@ mod tests {
         spec.stations[0].starboard_profile.clear();
         let report = validate_full_envelope_spec(&spec);
         assert_eq!(report.disposition, FullEnvelopeDisposition::Rejected);
-        assert!(report.issues.iter().any(|item| item.code == "profile_point_count"));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|item| item.code == "profile_point_count")
+        );
     }
 
     #[test]
@@ -1448,9 +1591,13 @@ mod tests {
         spec.stations[0].starboard_profile[0].region_to_next = ProfileRegion::Unsupported;
         let report = validate_full_envelope_spec(&spec);
         assert_eq!(report.disposition, FullEnvelopeDisposition::Incomplete);
-        assert!(report.issues.iter().any(|item| item.code == "unsupported_profile_region"));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|item| item.code == "unsupported_profile_region")
+        );
     }
-
 
     #[test]
     fn required_nullable_port_point_id_must_be_present_in_json() {
@@ -1465,7 +1612,10 @@ mod tests {
     #[test]
     fn missing_openings_array_is_not_silently_defaulted() {
         let mut value = serde_json::to_value(box_fixture()).unwrap();
-        value["boundary_semantics"].as_object_mut().unwrap().remove("openings");
+        value["boundary_semantics"]
+            .as_object_mut()
+            .unwrap()
+            .remove("openings");
         assert!(serde_json::from_value::<FullEnvelopeSpec>(value).is_err());
     }
 
@@ -1490,6 +1640,11 @@ mod tests {
             .collect();
         let report = validate_full_envelope_spec(&spec);
         assert_eq!(report.disposition, FullEnvelopeDisposition::Rejected);
-        assert!(report.issues.iter().any(|item| item.code == "station_count"));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|item| item.code == "station_count")
+        );
     }
 }
