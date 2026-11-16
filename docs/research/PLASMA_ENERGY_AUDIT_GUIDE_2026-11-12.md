@@ -433,3 +433,41 @@ The offline audit corpus includes:
 The audit validates source step direction, pressure, power pair, response time and measurand layer. It refuses an ACR/optical diagnostic response promoted into accepted H2 product response. The benchmark target separately requires sample-train delay, independently measured H2 flow/purity, held-out OES proxy domains, storage/compression accounting and transient product-quality gates.
 
 The corpus contains 55 source cases / 101 negative controls / 7 derived arithmetic checks / 13 research benchmark targets. All target status fields remain `RESEARCH_TARGET_NOT_RESULT`; no Luminous measurement is claimed.
+
+
+## 9.24 Integrated ammonia cracking: plasma, catalyst, membrane and electrochemical routes — 2026-11-16
+
+The source corpus now includes six additional route-specific records:
+
+- **PEDMADS dual-membrane experiment (JACS, 11 November 2025; DOI 10.1021/jacs.5c15789):** DBD + Ru/SiO2 + 1.8 um Pd H2 membrane + five-stage Silicalite-1 NH3 recovery. The source reports 1,567 mmol H2 g_cat^-1 h^-1 at 400 C, 87% ammonia removal and effluent NH3 below 4 vol% after the cascade. The below-4% effluent NH3 observation is not accepted H2 purity. The $0.92/kg H2 LCOH and 95.9% carbon-footprint reduction are modeled comparisons, not realized market or plant results.
+- **Catalytic membrane model (IJHE, 27 May 2026; DOI 10.1016/j.ijhydene.2026.154910):** 85.4% energy / 85.8% exergy efficiency at 550 C, 30 bar retentate and 1 bar permeate, including H2 compression to 30 bar. A separate 5 bar permeate case with 50% more membrane area reports 87.5% energy efficiency. The configurations are kept distinct and are model outputs, not plant measurements.
+- **Electrochemical MEA (NTU/AEDO institutional report, 19 October 2026):** 80 C high-throughput mode at 0.47 A/cm2, 0.35 V and 9.38 kWh/kg H2; distinct low-energy mode at 0.10 A/cm2, 76 mV and 2.03 kWh/kg H2 with reported electrical output up to 5.9 mW/cm2. The modes cannot be cross-paired; cell data do not establish full balance-of-plant energy or accepted product purity.
+- **Packed-bed membrane optimization model (IJHE, 11 November 2026; DOI 10.1016/j.ijhydene.2026.158072):** source-predicted >98% conversion/recovery, 0.207 mmol/s H2 recovery and ANN R2 >0.99 / 0.027 s evaluation. These remain model outputs; the surrogate fit is not physical accuracy or external reactor transfer.
+- **Process-intensification review (IJHE, June 2026; DOI 10.1016/j.ijhydene.2026.155298):** synthesis of plasma, microwave, photothermal, thermoelectric, microreactor and membrane routes. Its temperature/activity/purity claims remain source-specific across the reviewed studies.
+- **System-modeling review (2026, MDPI 7(1):37):** highlights omitted non-ideal membrane transport, concentration polarization, fouling, temperature-dependent permeance, catalyst deactivation, explicit plasma EEDF/surface coupling, spatial non-equilibrium and transient discharge stability.
+
+### Integrated benchmark: accepted H2 service, not an isolated reactor figure
+
+New target: `NH3-INTEGRATED-DELIVERED-H2-PARETO-001`, status `RESEARCH_TARGET_NOT_RESULT`.
+
+Compare plasma-only, plasma/catalyst/membrane, catalytic membrane, electrochemical MEA and conventional thermal routes at:
+- same H2 purity and contaminant contract;
+- same delivery pressure, customer mass-flow and accepted service interval;
+- complete grid-to-accepted-H2 energy boundary, including source power conversion, heaters, pumps, sweep/vacuum, NH3 conditioning/recycle, membrane separation, polishing, drying, compression, cooling, controls, standby and service;
+- closed NH3/N2/H2 material balance, with purge, slip, recycle and unrecovered inventory explicit;
+- catalyst, membrane and electrode critical-material intensity, replacement, fouling, deactivation and maintenance;
+- measured useful heat recovery at the declared temperature grade; no recirculated heat or reaction enthalpy double counting.
+
+Prospective research gates include at least 99% H2 recovery and 99% product acceptance under the frozen customer contract; at least 10% improvement in full-grid energy or risk-adjusted cost versus the best matched incumbent; 1,000 h physical operation and 100 start/stop or load-following cycles before durability/dynamic superiority claims. A 1 s accepted-H2 delivery settling target is aspirational and is not the 1.31/1.10 ms plasma diagnostic response.
+
+### Executable source audit
+
+The exact Rust audit branch now includes six source-specific ammonia validators and six additional tests:
+- six source cases are checked against their own route-specific claim ceilings;
+- 85.4% and 87.5% membrane configurations cannot be cross-paired;
+- MEA high-throughput and low-energy modes cannot be cross-paired;
+- PEDMADS effluent NH3 is not promoted into accepted H2 purity;
+- membrane ANN fit is not promoted into physical accuracy;
+- the benchmark comparator IDs must resolve to registered source cases.
+
+Current source register: **61 unique cases / 106 unique negative controls / 7 derived checks / 14 benchmark targets**. All new target statuses remain `RESEARCH_TARGET_NOT_RESULT`; no Luminous physical measurement or process superiority is claimed.
