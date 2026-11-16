@@ -192,6 +192,8 @@ pub enum ValidationAssessmentErrorKind {
     EmptyMeasurementLocator,
     EmptyPredictionEvidence,
     EmptyMeasurementEvidence,
+    DuplicatePredictionEvidence,
+    DuplicateMeasurementEvidence,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -846,9 +848,13 @@ fn validate_case_observables(
         }
         if predicted.evidence_ref.trim().is_empty() {
             push_error(errors, ValidationAssessmentErrorKind::EmptyPredictionEvidence, Some(case_id.clone()), Some(spec.observable_id.clone()));
+        } else if !prediction_refs.insert(predicted.evidence_ref.clone()) {
+            push_error(errors, ValidationAssessmentErrorKind::DuplicatePredictionEvidence, Some(case_id.clone()), Some(spec.observable_id.clone()));
         }
         if measured.evidence_ref.trim().is_empty() {
             push_error(errors, ValidationAssessmentErrorKind::EmptyMeasurementEvidence, Some(case_id.clone()), Some(spec.observable_id.clone()));
+        } else if !measurement_refs.insert(measured.evidence_ref.clone()) {
+            push_error(errors, ValidationAssessmentErrorKind::DuplicateMeasurementEvidence, Some(case_id.clone()), Some(spec.observable_id.clone()));
         }
 
         if [
@@ -869,10 +875,10 @@ fn validate_case_observables(
             && measured.service_boundary_ref == spec.service_boundary_ref
             && predicted.averaging_window_ref == spec.averaging_window_ref
             && measured.averaging_window_ref == spec.averaging_window_ref
-            && predicted.source_locator.trim() != ""
-            && measured.source_locator.trim() != ""
-            && predicted.evidence_ref.trim() != ""
-            && measured.evidence_ref.trim() != ""
+            && !predicted.source_locator.trim().is_empty()
+            && !measured.source_locator.trim().is_empty()
+            && !predicted.evidence_ref.trim().is_empty()
+            && !measured.evidence_ref.trim().is_empty()
             && predicted.model_run_id == case.model_run.run_id
             && predicted.model_output_sha256 == case.model_run.output_sha256
             && predicted.interval_method_ref == spec.interval_method_ref
@@ -914,8 +920,6 @@ fn validate_case_observables(
                 prediction_evidence_ref: predicted.evidence_ref.clone(),
                 measurement_evidence_ref: measured.evidence_ref.clone(),
             });
-            prediction_refs.insert(predicted.evidence_ref.clone());
-            measurement_refs.insert(measured.evidence_ref.clone());
         }
     }
 }
