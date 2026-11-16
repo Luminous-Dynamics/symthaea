@@ -430,6 +430,7 @@ fn parse_boundary_truths(
 fn parse_pair_truths(
     gold: &Value,
     pair_tasks: &BTreeMap<String, PairTask>,
+    events: &BTreeMap<String, Event>,
     boundary_truths: &BTreeMap<String, String>,
 ) -> Result<BTreeMap<String, PairTruth>, String> {
     let values = gold
@@ -473,6 +474,29 @@ fn parse_pair_truths(
         let truth = output
             .get(pair_id)
             .ok_or_else(|| format!("missing pair truth {pair_id:?}"))?;
+        let left_event = events
+            .get(&task.left_event_id)
+            .ok_or_else(|| format!("pair {pair_id:?} references missing left event"))?;
+        let right_event = events
+            .get(&task.right_event_id)
+            .ok_or_else(|| format!("pair {pair_id:?} references missing right event"))?;
+        if left_event.producer_id == right_event.producer_id
+            && boundary_truths.get(&left_event.producer_id).is_some_and(|state| state != "compromised")
+            && left_event.sequence_number != right_event.sequence_number
+        {
+            let sequence_relation = if left_event.sequence_number < right_event.sequence_number {
+                "before"
+            } else {
+                "after"
+            };
+            if truth.admissible_relations.len() != 1
+                || !truth.admissible_relations.contains(sequence_relation)
+            {
+                return Err(format!(
+                    "pair {pair_id:?} contradicts trusted same-producer sequence ordering: expected {sequence_relation:?}"
+                ));
+            }
+        }
         let has_compromised = task
             .relevant_producers
             .iter()
@@ -746,7 +770,7 @@ pub fn evaluate_identifiability_json(input: &str) -> Result<IdentifiabilityRepor
         return Err(format!("unsupported D6.11 v0.1 adjudication status {adjudication_status:?}"));
     }
     let boundary_truths = parse_boundary_truths(gold, &boundaries)?;
-    let pair_truths = parse_pair_truths(gold, &pair_tasks, &boundary_truths)?;
+    let pair_truths = parse_pair_truths(gold, &pair_tasks, &events, &boundary_truths)?;
 
     let traces = bundle
         .get("candidate_traces")
