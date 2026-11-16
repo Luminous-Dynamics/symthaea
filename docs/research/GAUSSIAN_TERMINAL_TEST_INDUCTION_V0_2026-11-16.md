@@ -89,6 +89,7 @@ On identical fixed Gaussian designs and common outcome streams, compare:
 
 Report:
 - null rejection rate and episode-level confidence interval;
+- mean observations used per attempted path, counting non-crossers as running to the frozen horizon;
 - terminal power and exact terminal-decision equality;
 - power at each separated alternative;
 - early stopping frequency and stopping-look distribution at each frozen threshold;
@@ -103,6 +104,31 @@ The terminal NP test is an oracle comparator because it knows the correct altern
 Koning & van Meer, *Anytime validity is free: inducing sequential tests*, Journal of the Royal Statistical Society Series B 88(4), 1366–1384 (published 21 February 2026), DOI: https://doi.org/10.1093/jrsssb/qkag050.
 
 Their result is general for a fixed valid terminal test; this module implements only the deterministic simple-Gaussian case. The paper also discusses optional continuation. The generic simple-null Bernoulli implementation remains under #9820, and generic anytime-valid confidence-sequence/e-process comparisons remain owned by AOBench #12197 / #12242 / #12271. The paired binary gaussian_terminal_induction_calibration is the fixed-design operating-characteristic comparison for the terminal NP, induced test, e-process and naive repeated-look methods.
+
+
+
+### Executed paired frontier (exact head)
+
+Exact source head: 950d80181d043470357863d43256519cb1b025c6  
+Focused workflow: https://github.com/Luminous-Dynamics/symthaea/actions/runs/43821865007  
+Rust 1.96.0: rustfmt PASS; all-target tests PASS; both calibration binaries PASS; artifacts uploaded; strict Clippy PASS. The crate and binaries ran 36 tests in total (32 library, two sequential-binary, two Gaussian-calibration-binary tests).
+
+The paired 20,000-path / 80-look fixed Gaussian campaign at alpha 0.05 (d=0.22, sigma=0.80) gave:
+
+| Method | Null rejection | Alternative power | Mean observations used |
+|---|---:|---:|---:|
+| Terminal NP | 5.435% | 79.970% | 80.00 |
+| Induced phi ≥ 0.75 | 5.320% | 66.055% | 60.69 |
+| Induced phi ≥ 0.90 | 5.415% | 75.150% | 65.95 |
+| Induced phi ≥ 0.99 | 5.410% | 79.550% | 71.43 |
+| Gaussian e-process | 2.815% | 62.420% | 58.53 |
+| Naive repeated fixed-time | 29.795% | 91.055% | 26.21 |
+
+Mean observations used count non-crossers as reaching the 80-observation horizon. The induced null Wilson intervals are [5.017%,5.640%], [5.110%,5.737%] and [5.105%,5.732%]. The terminal NP interval is [5.129%,5.758%], and the e-process interval is [2.595%,3.053%]. The naive repeated-test interval is [29.165%,30.433%].
+
+The analytic terminal NP power is 79.241%; the empirical estimate is 79.970% (Wilson 95% [79.410%,80.519%]), a 0.73 pp deviation in this 20k-path draw. Terminal induced decision mismatches: zero.
+
+This is a stopping cost / power frontier for one frozen simple-vs-simple Gaussian design. Threshold 0.99 is near terminal power at ~10.7% lower mean observations; threshold 0.90 trades ~17.6% lower observations for 75.15% power; threshold 0.75 trades ~24.1% lower observations for 66.06% power. The e-process is more conservative in this design. The naive method is cheaper/more powerful but violates the error target and is not a valid comparator. The terminal NP test is an evaluator oracle, not an unknown-model discovery policy.
 
 ## 7. Claim boundary
 
