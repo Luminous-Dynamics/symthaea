@@ -119,6 +119,6 @@ Standalone package:
 - Transitive dependency components.
 - Fail-closed split-crossing checks.
 - Exact component/group counts and maximum component size.
-- 38 authored tests, including 10 paired cluster-bootstrap cases, 3 multi-acquisition grouping cases and 10 strict JSON-manifest consumer cases.
+- 39 authored tests, including 10 paired cluster-bootstrap cases, 3 multi-acquisition grouping cases and 11 strict JSON-manifest consumer cases.
 
 The package is AUTHORED, not compiled or executed in the current environment. It does not estimate correlations or effective sample size, detect undeclared causes, authenticate IDs, or integrate with the likelihood fitter. Those are follow-on work, not implied capabilities.
