@@ -381,7 +381,9 @@ pub fn compile_remote_maintenance_plan(plan: &RemoteMaintenancePlan) -> DfrmRepo
         );
     }
     for operation in &plan.operations {
-        let item = utilization.get_mut(&operation.resource_id).expect("validated resource");
+        let item = utilization
+            .get_mut(&operation.resource_id)
+            .expect("validated resource");
         let duration = operation.end_second - operation.start_second;
         item.busy_seconds = item.busy_seconds.saturating_add(duration);
         item.idle_seconds_within_campaign =
@@ -482,8 +484,7 @@ fn validate_plan(plan: &RemoteMaintenancePlan) -> Vec<DfrmDiagnostic> {
 
     let mut interface_map: BTreeMap<&str, &ServiceInterface> = BTreeMap::new();
     for interface in &plan.interfaces {
-        if interface.interface_id.trim().is_empty()
-            || interface.compatibility_key.trim().is_empty()
+        if interface.interface_id.trim().is_empty() || interface.compatibility_key.trim().is_empty()
         {
             diagnostics.push(DfrmDiagnostic::DuplicateInterfaceIdentity);
         }
@@ -529,9 +530,7 @@ fn validate_plan(plan: &RemoteMaintenancePlan) -> Vec<DfrmDiagnostic> {
     }
     let mut tools = BTreeMap::new();
     for tool in &plan.tools {
-        if tool.tool_id.trim().is_empty()
-            || tools.insert(tool.tool_id.as_str(), tool).is_some()
-        {
+        if tool.tool_id.trim().is_empty() || tools.insert(tool.tool_id.as_str(), tool).is_some() {
             diagnostics.push(DfrmDiagnostic::DuplicateToolIdentity);
         }
         if !tool.maximum_payload_kg.is_finite()
@@ -634,7 +633,6 @@ fn validate_plan(plan: &RemoteMaintenancePlan) -> Vec<DfrmDiagnostic> {
                 }
             }
         }
-
     }
 
     let operation_ids: BTreeSet<&str> = operations.keys().copied().collect();
@@ -678,7 +676,10 @@ fn validate_interface_bindings(
 ) {
     let mut binding_map = BTreeMap::new();
     for binding in &plan.interface_bindings {
-        if binding_map.insert(binding.interface_id.as_str(), binding).is_some() {
+        if binding_map
+            .insert(binding.interface_id.as_str(), binding)
+            .is_some()
+        {
             diagnostics.push(DfrmDiagnostic::DuplicateInterfaceBinding);
         }
     }
@@ -690,13 +691,17 @@ fn validate_interface_bindings(
         let isolation = operations.get(binding.isolation_operation_id.as_str());
         if isolation.is_none() {
             diagnostics.push(DfrmDiagnostic::UnknownIsolationOperation);
-        } else if isolation.is_some_and(|operation| operation.action != MaintenanceAction::IsolateSystem) {
+        } else if isolation
+            .is_some_and(|operation| operation.action != MaintenanceAction::IsolateSystem)
+        {
             diagnostics.push(DfrmDiagnostic::WrongIsolationAction);
         }
         let safe = operations.get(binding.prove_safe_operation_id.as_str());
         if safe.is_none() {
             diagnostics.push(DfrmDiagnostic::UnknownProveSafeOperation);
-        } else if safe.is_some_and(|operation| operation.action != MaintenanceAction::ProveSafeState) {
+        } else if safe
+            .is_some_and(|operation| operation.action != MaintenanceAction::ProveSafeState)
+        {
             diagnostics.push(DfrmDiagnostic::WrongProveSafeAction);
         }
         if let (Some(isolation), Some(safe)) = (isolation, safe) {
@@ -715,23 +720,21 @@ fn validate_interface_bindings(
         ) {
             (true, None) => diagnostics.push(DfrmDiagnostic::MissingRequiredPreparation),
             (false, Some(_)) => diagnostics.push(DfrmDiagnostic::UnexpectedPreparation),
-            (true, Some(preparation_id)) => {
-                match operations.get(preparation_id) {
-                    None => diagnostics.push(DfrmDiagnostic::UnknownPreparationOperation),
-                    Some(operation) => {
-                        if operation.action != MaintenanceAction::PrepareServiceBoundary {
-                            diagnostics.push(DfrmDiagnostic::WrongPreparationAction);
-                        }
-                        require_ancestor(
-                            operation.operation_id.as_str(),
-                            binding.prove_safe_operation_id.as_str(),
-                            ancestors,
-                            diagnostics,
-                            DfrmDiagnostic::WrongPreparationAction,
-                        );
+            (true, Some(preparation_id)) => match operations.get(preparation_id) {
+                None => diagnostics.push(DfrmDiagnostic::UnknownPreparationOperation),
+                Some(operation) => {
+                    if operation.action != MaintenanceAction::PrepareServiceBoundary {
+                        diagnostics.push(DfrmDiagnostic::WrongPreparationAction);
                     }
+                    require_ancestor(
+                        operation.operation_id.as_str(),
+                        binding.prove_safe_operation_id.as_str(),
+                        ancestors,
+                        diagnostics,
+                        DfrmDiagnostic::WrongPreparationAction,
+                    );
                 }
-            }
+            },
             (false, None) => {}
         }
 
@@ -974,48 +977,74 @@ fn validate_action_ordering(
     }
 
     if isolates.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::IsolateSystem));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::IsolateSystem,
+        ));
     }
     if safe_states.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::ProveSafeState));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::ProveSafeState,
+        ));
     }
     if disconnects.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::DisconnectInterface));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::DisconnectInterface,
+        ));
     }
     if releases.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::ReleaseRestraints));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::ReleaseRestraints,
+        ));
     }
     if extracts.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::ExtractModule));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::ExtractModule,
+        ));
     }
     if transfers.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::TransferToShieldedCask));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::TransferToShieldedCask,
+        ));
     }
     if hot_cell.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::HotCellInspectRepair));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::HotCellInspectRepair,
+        ));
     }
     if installs.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::InstallModule));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::InstallModule,
+        ));
     }
     if aligns.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::AlignMetrology));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::AlignMetrology,
+        ));
     }
     if secures.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::SecureRestraints));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::SecureRestraints,
+        ));
     }
     if reconnects.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::ReconnectInterface));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::ReconnectInterface,
+        ));
     }
     if integrity_tests.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::IntegrityTest(
-            IntegrityTestKind::PressureLeak,
-        )));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::IntegrityTest(IntegrityTestKind::PressureLeak),
+        ));
     }
     if requalifications.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::SystemRequalification));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::SystemRequalification,
+        ));
     }
     if restarts.is_empty() {
-        diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::RestartSystem));
+        diagnostics.push(DfrmDiagnostic::MissingAction(
+            MaintenanceAction::RestartSystem,
+        ));
     }
 
     // Restart is terminal: every other declared operation must be its ancestor.
@@ -1037,8 +1066,8 @@ fn validate_action_ordering(
 fn validate_schedules(plan: &RemoteMaintenancePlan, diagnostics: &mut Vec<DfrmDiagnostic>) {
     for (index, first) in plan.operations.iter().enumerate() {
         for second in plan.operations.iter().skip(index + 1) {
-            let overlaps = first.start_second < second.end_second
-                && second.start_second < first.end_second;
+            let overlaps =
+                first.start_second < second.end_second && second.start_second < first.end_second;
             if !overlaps {
                 continue;
             }
@@ -1084,7 +1113,12 @@ fn require_ancestor(
 fn topological_order(operations: &[MaintenanceOperation]) -> Option<Vec<String>> {
     let mut in_degree: BTreeMap<String, usize> = operations
         .iter()
-        .map(|operation| (operation.operation_id.clone(), operation.predecessor_ids.len()))
+        .map(|operation| {
+            (
+                operation.operation_id.clone(),
+                operation.predecessor_ids.len(),
+            )
+        })
         .collect();
     let mut downstream: BTreeMap<String, Vec<String>> = BTreeMap::new();
     for operation in operations {
@@ -1142,11 +1176,16 @@ fn ancestor_map(
 fn canonical_operation_receipts(plan: &RemoteMaintenancePlan) -> Vec<OperationEvidenceReceipt> {
     let mut operations = plan.operations.clone();
     operations.sort_by(|left, right| {
-        (left.start_second, left.end_second, left.operation_id.as_str()).cmp(&(
-            right.start_second,
-            right.end_second,
-            right.operation_id.as_str(),
-        ))
+        (
+            left.start_second,
+            left.end_second,
+            left.operation_id.as_str(),
+        )
+            .cmp(&(
+                right.start_second,
+                right.end_second,
+                right.operation_id.as_str(),
+            ))
     });
     operations
         .into_iter()
@@ -1196,7 +1235,10 @@ mod tests {
             operation_id: id.to_string(),
             action,
             interface_id: interface_id.map(str::to_string),
-            predecessor_ids: predecessors.iter().map(|value| (*value).to_string()).collect(),
+            predecessor_ids: predecessors
+                .iter()
+                .map(|value| (*value).to_string())
+                .collect(),
             required_capabilities: vec!["remote-maintenance".to_string()],
             resource_id: "robot-a".to_string(),
             tool_id: "tool-a".to_string(),
@@ -1238,24 +1280,150 @@ mod tests {
 
     fn base_plan() -> RemoteMaintenancePlan {
         let mut operations = vec![
-            operation("isolate", MaintenanceAction::IsolateSystem, None, &[], 0, 10),
-            operation("safe", MaintenanceAction::ProveSafeState, None, &["isolate"], 10, 20),
-            operation("prep-coolant", MaintenanceAction::PrepareServiceBoundary, None, &["safe"], 20, 30),
-            operation("disconnect-coolant", MaintenanceAction::DisconnectInterface, Some("coolant-a"), &["safe", "prep-coolant"], 30, 40),
-            operation("disconnect-power", MaintenanceAction::DisconnectInterface, Some("power-a"), &["safe"], 40, 50),
-            operation("release", MaintenanceAction::ReleaseRestraints, None, &["disconnect-coolant", "disconnect-power"], 50, 60),
-            operation("extract", MaintenanceAction::ExtractModule, None, &["release"], 60, 80),
-            operation("transfer", MaintenanceAction::TransferToShieldedCask, None, &["extract"], 80, 100),
-            operation("inspect", MaintenanceAction::HotCellInspectRepair, None, &["transfer"], 100, 150),
-            operation("install", MaintenanceAction::InstallModule, None, &["inspect"], 150, 170),
-            operation("align", MaintenanceAction::AlignMetrology, None, &["install"], 170, 180),
-            operation("secure", MaintenanceAction::SecureRestraints, None, &["align"], 180, 190),
-            operation("reconnect-coolant", MaintenanceAction::ReconnectInterface, Some("coolant-a"), &["secure"], 190, 200),
-            operation("reconnect-power", MaintenanceAction::ReconnectInterface, Some("power-a"), &["secure"], 200, 210),
-            operation("test-coolant", MaintenanceAction::IntegrityTest(IntegrityTestKind::PressureLeak), Some("coolant-a"), &["reconnect-coolant"], 210, 220),
-            operation("test-power", MaintenanceAction::IntegrityTest(IntegrityTestKind::ElectricalContinuity), Some("power-a"), &["reconnect-power"], 220, 230),
-            operation("requalify", MaintenanceAction::SystemRequalification, None, &["test-coolant", "test-power"], 230, 240),
-            operation("restart", MaintenanceAction::RestartSystem, None, &["requalify"], 240, 250),
+            operation(
+                "isolate",
+                MaintenanceAction::IsolateSystem,
+                None,
+                &[],
+                0,
+                10,
+            ),
+            operation(
+                "safe",
+                MaintenanceAction::ProveSafeState,
+                None,
+                &["isolate"],
+                10,
+                20,
+            ),
+            operation(
+                "prep-coolant",
+                MaintenanceAction::PrepareServiceBoundary,
+                None,
+                &["safe"],
+                20,
+                30,
+            ),
+            operation(
+                "disconnect-coolant",
+                MaintenanceAction::DisconnectInterface,
+                Some("coolant-a"),
+                &["safe", "prep-coolant"],
+                30,
+                40,
+            ),
+            operation(
+                "disconnect-power",
+                MaintenanceAction::DisconnectInterface,
+                Some("power-a"),
+                &["safe"],
+                40,
+                50,
+            ),
+            operation(
+                "release",
+                MaintenanceAction::ReleaseRestraints,
+                None,
+                &["disconnect-coolant", "disconnect-power"],
+                50,
+                60,
+            ),
+            operation(
+                "extract",
+                MaintenanceAction::ExtractModule,
+                None,
+                &["release"],
+                60,
+                80,
+            ),
+            operation(
+                "transfer",
+                MaintenanceAction::TransferToShieldedCask,
+                None,
+                &["extract"],
+                80,
+                100,
+            ),
+            operation(
+                "inspect",
+                MaintenanceAction::HotCellInspectRepair,
+                None,
+                &["transfer"],
+                100,
+                150,
+            ),
+            operation(
+                "install",
+                MaintenanceAction::InstallModule,
+                None,
+                &["inspect"],
+                150,
+                170,
+            ),
+            operation(
+                "align",
+                MaintenanceAction::AlignMetrology,
+                None,
+                &["install"],
+                170,
+                180,
+            ),
+            operation(
+                "secure",
+                MaintenanceAction::SecureRestraints,
+                None,
+                &["align"],
+                180,
+                190,
+            ),
+            operation(
+                "reconnect-coolant",
+                MaintenanceAction::ReconnectInterface,
+                Some("coolant-a"),
+                &["secure"],
+                190,
+                200,
+            ),
+            operation(
+                "reconnect-power",
+                MaintenanceAction::ReconnectInterface,
+                Some("power-a"),
+                &["secure"],
+                200,
+                210,
+            ),
+            operation(
+                "test-coolant",
+                MaintenanceAction::IntegrityTest(IntegrityTestKind::PressureLeak),
+                Some("coolant-a"),
+                &["reconnect-coolant"],
+                210,
+                220,
+            ),
+            operation(
+                "test-power",
+                MaintenanceAction::IntegrityTest(IntegrityTestKind::ElectricalContinuity),
+                Some("power-a"),
+                &["reconnect-power"],
+                220,
+                230,
+            ),
+            operation(
+                "requalify",
+                MaintenanceAction::SystemRequalification,
+                None,
+                &["test-coolant", "test-power"],
+                230,
+                240,
+            ),
+            operation(
+                "restart",
+                MaintenanceAction::RestartSystem,
+                None,
+                &["requalify"],
+                240,
+                250,
+            ),
         ];
         operations.reverse();
 
@@ -1373,7 +1541,11 @@ mod tests {
             integrity_test_operation_id: "test-coolant".to_string(),
         });
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::UnknownBindingInterface));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::UnknownBindingInterface)
+        );
     }
 
     #[test]
@@ -1382,25 +1554,45 @@ mod tests {
         plan.interface_bindings[0].preparation_operation_id = None;
         let report = compile_remote_maintenance_plan(&plan);
         assert_eq!(report.disposition, DfrmDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::MissingRequiredPreparation));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::MissingRequiredPreparation)
+        );
     }
 
     #[test]
     fn restraint_release_before_every_disconnect_is_refused() {
         let mut plan = base_plan();
-        let release = plan.operations.iter_mut().find(|item| item.operation_id == "release").unwrap();
+        let release = plan
+            .operations
+            .iter_mut()
+            .find(|item| item.operation_id == "release")
+            .unwrap();
         release.predecessor_ids = vec!["disconnect-coolant".to_string()];
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::RestraintReleaseBeforeDisconnect));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::RestraintReleaseBeforeDisconnect)
+        );
     }
 
     #[test]
     fn extraction_before_restraint_release_is_refused() {
         let mut plan = base_plan();
-        let extract = plan.operations.iter_mut().find(|item| item.operation_id == "extract").unwrap();
+        let extract = plan
+            .operations
+            .iter_mut()
+            .find(|item| item.operation_id == "extract")
+            .unwrap();
         extract.predecessor_ids.clear();
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::ExtractionBeforeRestraintRelease));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::ExtractionBeforeRestraintRelease)
+        );
     }
 
     #[test]
@@ -1408,20 +1600,32 @@ mod tests {
         let mut plan = base_plan();
         plan.interfaces[1].compatibility_key = "wrong-size".to_string();
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::IncompatibleInterfaceMate));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::IncompatibleInterfaceMate)
+        );
     }
 
     #[test]
     fn resource_overlap_is_refused() {
         let mut plan = base_plan();
-        let operation = plan.operations.iter_mut().find(|item| item.operation_id == "safe").unwrap();
+        let operation = plan
+            .operations
+            .iter_mut()
+            .find(|item| item.operation_id == "safe")
+            .unwrap();
         operation.start_second = 5;
         operation.end_second = 15;
         operation.minimum_duration_seconds = 10;
         operation.nominal_duration_seconds = 10;
         operation.maximum_duration_seconds = 10;
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::ResourceScheduleCollision));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::ResourceScheduleCollision)
+        );
     }
 
     #[test]
@@ -1431,7 +1635,11 @@ mod tests {
             resource_id: "robot-b".to_string(),
             capabilities: vec!["remote-maintenance".to_string()],
         });
-        let operation = plan.operations.iter_mut().find(|item| item.operation_id == "safe").unwrap();
+        let operation = plan
+            .operations
+            .iter_mut()
+            .find(|item| item.operation_id == "safe")
+            .unwrap();
         operation.resource_id = "robot-b".to_string();
         operation.start_second = 5;
         operation.end_second = 15;
@@ -1439,7 +1647,11 @@ mod tests {
         operation.nominal_duration_seconds = 10;
         operation.maximum_duration_seconds = 10;
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::ToolScheduleCollision));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::ToolScheduleCollision)
+        );
     }
 
     #[test]
@@ -1447,7 +1659,11 @@ mod tests {
         let mut plan = base_plan();
         plan.tools[0].capabilities.clear();
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::ToolCapabilityMissing));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::ToolCapabilityMissing)
+        );
     }
 
     #[test]
@@ -1455,12 +1671,20 @@ mod tests {
         let mut plan = base_plan();
         plan.tools[0].maximum_payload_kg = 1000.0;
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::PayloadLimitExceeded));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::PayloadLimitExceeded)
+        );
 
         let mut plan = base_plan();
         plan.tools[0].maximum_centre_of_gravity_offset_m = 0.1;
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::CentreOfGravityLimitExceeded));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::CentreOfGravityLimitExceeded)
+        );
     }
 
     #[test]
@@ -1468,30 +1692,54 @@ mod tests {
         let mut plan = base_plan();
         plan.operations[0].clearance_reachability_ref.clear();
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::MissingClearanceReachabilityProof));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::MissingClearanceReachabilityProof)
+        );
 
         let mut plan = base_plan();
         plan.operations[0].clearance_reachability_sha256 = "bad".to_string();
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::InvalidClearanceReachabilityDigest));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::InvalidClearanceReachabilityDigest)
+        );
     }
 
     #[test]
     fn restart_must_follow_requalification_and_integrity_tests() {
         let mut plan = base_plan();
-        let restart = plan.operations.iter_mut().find(|item| item.operation_id == "restart").unwrap();
+        let restart = plan
+            .operations
+            .iter_mut()
+            .find(|item| item.operation_id == "restart")
+            .unwrap();
         restart.predecessor_ids.clear();
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::RestartBeforeRequalification));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::RestartBeforeRequalification)
+        );
     }
 
     #[test]
     fn cycle_is_refused() {
         let mut plan = base_plan();
-        let isolate = plan.operations.iter_mut().find(|item| item.operation_id == "isolate").unwrap();
+        let isolate = plan
+            .operations
+            .iter_mut()
+            .find(|item| item.operation_id == "isolate")
+            .unwrap();
         isolate.predecessor_ids = vec!["restart".to_string()];
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::DependencyCycle));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::DependencyCycle)
+        );
     }
 
     #[test]
@@ -1499,12 +1747,20 @@ mod tests {
         let mut plan = base_plan();
         plan.operations[0].minimum_duration_seconds = 100;
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::InvalidOperationDuration));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::InvalidOperationDuration)
+        );
 
         let mut plan = base_plan();
         plan.operations[0].maximum_duration_seconds = 1;
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::ScheduleDurationOutsideDeclaredRange));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::ScheduleDurationOutsideDeclaredRange)
+        );
     }
 
     #[test]
@@ -1512,12 +1768,20 @@ mod tests {
         let mut plan = base_plan();
         plan.operations[0].predecessor_ids = vec!["safe".to_string(), "safe".to_string()];
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::DuplicatePredecessor));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::DuplicatePredecessor)
+        );
 
         let mut plan = base_plan();
         plan.operations[0].failure_recovery_ref.clear();
         let report = compile_remote_maintenance_plan(&plan);
-        assert!(report.diagnostics.contains(&DfrmDiagnostic::MissingFailureRecoveryReference));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DfrmDiagnostic::MissingFailureRecoveryReference)
+        );
     }
 
     #[test]
@@ -1535,7 +1799,10 @@ mod tests {
     fn modelled_evidence_is_not_promoted_to_mockup_validated() {
         let report = compile_remote_maintenance_plan(&base_plan());
         assert_eq!(report.evidence_class_counts.len(), 1);
-        assert_eq!(report.evidence_class_counts[0].evidence_class, MaintenanceEvidenceClass::Modelled);
+        assert_eq!(
+            report.evidence_class_counts[0].evidence_class,
+            MaintenanceEvidenceClass::Modelled
+        );
         assert_eq!(report.evidence_class_counts[0].operation_count, 18);
     }
 }
