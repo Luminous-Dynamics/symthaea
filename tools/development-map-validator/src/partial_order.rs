@@ -717,11 +717,18 @@ fn assess_receipt_use(
     let target = branches
         .get(target_branch_id)
         .ok_or_else(|| format!("unknown target branch {target_branch_id:?}"))?;
+    let source_branch = branches
+        .get(&receipt.branch_id)
+        .ok_or_else(|| format!("unknown receipt source branch {:?}", receipt.branch_id))?;
     let ancestors = branch_ancestors(target_branch_id, branches)?;
     let mut reasons = Vec::new();
     let mut contamination = false;
     let future = receipt.available_at > *cutoff;
 
+    if receipt.context_digest != source_branch.context_digest {
+        reasons.push("receipt_context_digest_does_not_match_origin_branch".to_owned());
+        contamination = true;
+    }
     if !ancestors.contains(&receipt.branch_id) {
         reasons.push("receipt_branch_is_not_an_ancestor".to_owned());
         contamination = true;
@@ -757,6 +764,9 @@ fn assess_receipt_use(
         let source_event = events
             .get(source_event_id)
             .ok_or_else(|| format!("receipt {receipt_id:?} references missing event"))?;
+        if source_event.available_at > receipt.observed_at {
+            reasons.push(format!("receipt_observed_before_source_event_available:{source_event_id}"));
+        }
         if !ancestors.contains(&source_event.branch_id) {
             reasons.push(format!("receipt_source_event_outside_target_ancestry:{source_event_id}"));
             contamination = true;
@@ -826,6 +836,9 @@ fn assess_fresh_join_receipt(
         let event = events
             .get(event_id)
             .ok_or_else(|| format!("fresh receipt {receipt_id:?} references missing event"))?;
+        if event.available_at > receipt.observed_at {
+            reasons.push(format!("fresh_receipt_observed_before_source_event_available:{event_id}"));
+        }
         if event.available_at > *cutoff {
             reasons.push(format!("fresh_receipt_source_event_unavailable:{event_id}"));
         }
