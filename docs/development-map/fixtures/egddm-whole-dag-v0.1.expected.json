@@ -36,7 +36,9 @@
               "world_id": "world-reverse",
               "relation": "after"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -62,7 +64,9 @@
               "world_id": "world-reverse",
               "relation": "after"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -87,7 +91,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -112,7 +118,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -137,7 +145,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -163,7 +173,9 @@
               "world_id": "world-reverse",
               "relation": "after"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -188,7 +200,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -213,7 +227,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -238,7 +254,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "C",
@@ -263,7 +281,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "C",
@@ -288,7 +308,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "C",
@@ -313,7 +335,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "E",
@@ -338,7 +362,9 @@
               "world_id": "world-reverse",
               "relation": "before"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "E",
@@ -363,7 +389,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "F",
@@ -388,7 +416,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         }
       ],
       "pair_count": 15,
@@ -403,7 +433,9 @@
       "unsupported_causal_claim_count": 0,
       "unnecessary_abstention_count": 12,
       "future_evidence_leakage_count": 0,
-      "critical_unsupported_claim_count": 0
+      "critical_unsupported_claim_count": 0,
+      "missed_compromise_count": 0,
+      "unsupported_compromise_claim_count": 0
     },
     {
       "trace_id": "jointly-impossible-cycle",
@@ -436,7 +468,9 @@
               "world_id": "world-reverse",
               "relation": "after"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -462,7 +496,9 @@
               "world_id": "world-reverse",
               "relation": "after"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -487,7 +523,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -512,7 +550,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -537,7 +577,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -563,7 +605,9 @@
               "world_id": "world-reverse",
               "relation": "after"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -588,7 +632,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -613,7 +659,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -638,7 +686,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "C",
@@ -663,7 +713,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "C",
@@ -688,7 +740,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "C",
@@ -713,7 +767,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "E",
@@ -738,7 +794,9 @@
               "world_id": "world-reverse",
               "relation": "before"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "E",
@@ -763,7 +821,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "F",
@@ -788,7 +848,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         }
       ],
       "pair_count": 15,
@@ -800,7 +862,9 @@
       "unsupported_causal_claim_count": 0,
       "unnecessary_abstention_count": 0,
       "future_evidence_leakage_count": 1,
-      "critical_unsupported_claim_count": 3
+      "critical_unsupported_claim_count": 3,
+      "missed_compromise_count": 0,
+      "unsupported_compromise_claim_count": 0
     },
     {
       "trace_id": "world-consistent-agent",
@@ -831,7 +895,9 @@
               "world_id": "world-reverse",
               "relation": "after"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -857,7 +923,9 @@
               "world_id": "world-reverse",
               "relation": "after"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -882,7 +950,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -907,7 +977,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "A",
@@ -932,7 +1004,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -958,7 +1032,9 @@
               "world_id": "world-reverse",
               "relation": "after"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -983,7 +1059,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -1008,7 +1086,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "B",
@@ -1033,7 +1113,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "C",
@@ -1058,7 +1140,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "C",
@@ -1083,7 +1167,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "C",
@@ -1108,7 +1194,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "E",
@@ -1133,7 +1221,9 @@
               "world_id": "world-reverse",
               "relation": "before"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "E",
@@ -1158,7 +1248,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         },
         {
           "left_event_id": "F",
@@ -1183,7 +1275,9 @@
               "world_id": "world-reverse",
               "relation": "concurrent"
             }
-          ]
+          ],
+          "missed_compromise": false,
+          "unsupported_compromise_claim": false
         }
       ],
       "pair_count": 15,
@@ -1198,7 +1292,9 @@
       "unsupported_causal_claim_count": 0,
       "unnecessary_abstention_count": 0,
       "future_evidence_leakage_count": 0,
-      "critical_unsupported_claim_count": 0
+      "critical_unsupported_claim_count": 0,
+      "missed_compromise_count": 0,
+      "unsupported_compromise_claim_count": 0
     }
   ],
   "claim_ceiling": "Finite whole-DAG possible-world evaluation of supplied admissible completions, trusted/forbidden relations, observation-boundary state, candidate claims, and decision-cutoff evidence availability. Does not prove the admissible-world set complete, authenticate real observation certificates, solve arbitrary causal discovery, or establish agent performance."
