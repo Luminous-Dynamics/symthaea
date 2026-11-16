@@ -72,6 +72,73 @@ pub struct LoadingSweepReceipt {
     pub sweep_digest_blake3: String,
 }
 
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UprightMassBalanceRequest {
+    pub schema_version: u32,
+    pub source_spec: FullEnvelopeSpec,
+    pub load_case_id: String,
+    pub target_mass_tonnes: f64,
+    pub water_density_kg_m3: f64,
+    /// Shallower elevation (smaller z in the z-down frame), expected to
+    /// displace at least the target mass.
+    pub lower_waterplane_z_m: f64,
+    /// Deeper elevation (larger z in the z-down frame), expected to displace
+    /// no more than the target mass.
+    pub upper_waterplane_z_m: f64,
+    pub mass_tolerance_tonnes: f64,
+    pub plane_tolerance_m: f64,
+    pub maximum_iterations: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum UprightMassBalanceStopReason {
+    MassResidualWithinTolerance,
+    WaterplaneBracketWithinTolerance,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UprightMassBalanceReceipt {
+    pub receipt_schema_version: u32,
+    pub algorithm: String,
+    pub source_spec_digest_blake3: String,
+    pub load_case_id: String,
+    pub target_mass_tonnes: f64,
+    pub water_density_kg_m3: f64,
+    pub initial_lower_waterplane_z_m: f64,
+    pub initial_upper_waterplane_z_m: f64,
+    pub final_lower_waterplane_z_m: f64,
+    pub final_upper_waterplane_z_m: f64,
+    pub equilibrium: SectionalHydrostaticResult,
+    pub mass_residual_tonnes: f64,
+    pub iteration_count: u32,
+    pub stop_reason: UprightMassBalanceStopReason,
+    pub receipt_digest_blake3: String,
+}
+
+#[derive(Serialize)]
+struct UprightMassBalanceDigestIdentity<'a> {
+    receipt_schema_version: u32,
+    algorithm: &'a str,
+    source_spec_digest_blake3: &'a str,
+    load_case_id: &'a str,
+    target_mass_tonnes: f64,
+    water_density_kg_m3: f64,
+    initial_lower_waterplane_z_m: f64,
+    initial_upper_waterplane_z_m: f64,
+    final_lower_waterplane_z_m: f64,
+    final_upper_waterplane_z_m: f64,
+    equilibrium: &'a SectionalHydrostaticResult,
+    mass_residual_tonnes: f64,
+    iteration_count: u32,
+    stop_reason: UprightMassBalanceStopReason,
+}
+
+const UPRIGHT_MASS_BALANCE_ALGORITHM: &str = "upright-mass-balance-bisection-v1";
+const MAX_MASS_BALANCE_ITERATIONS: u32 = 128;
+
 #[derive(Debug, Clone, Copy)]
 struct Point2 {
     y: f64,
@@ -662,6 +729,268 @@ pub fn verify_loading_sweep_receipt(
     Ok(())
 }
 
+
+pub fn compute_upright_mass_balance_digest(
+    receipt: &UprightMassBalanceReceipt,
+) -> Result<String, serde_json::Error> {
+    let identity = UprightMassBalanceDigestIdentity {
+        receipt_schema_version: receipt.receipt_schema_version,
+        algorithm: &receipt.algorithm,
+        source_spec_digest_blake3: &receipt.source_spec_digest_blake3,
+        load_case_id: &receipt.load_case_id,
+        target_mass_tonnes: receipt.target_mass_tonnes,
+        water_density_kg_m3: receipt.water_density_kg_m3,
+        initial_lower_waterplane_z_m: receipt.initial_lower_waterplane_z_m,
+        initial_upper_waterplane_z_m: receipt.initial_upper_waterplane_z_m,
+        final_lower_waterplane_z_m: receipt.final_lower_waterplane_z_m,
+        final_upper_waterplane_z_m: receipt.final_upper_waterplane_z_m,
+        equilibrium: &receipt.equilibrium,
+        mass_residual_tonnes: receipt.mass_residual_tonnes,
+        iteration_count: receipt.iteration_count,
+        stop_reason: receipt.stop_reason,
+    };
+    Ok(blake3::hash(&serde_json::to_vec(&identity)?)
+        .to_hex()
+        .to_string())
+}
+
+/// Find the upright horizontal waterplane whose displaced mass matches an
+/// explicit target mass, using a monotonic bracketed bisection over z-down
+/// elevations. This solves sinkage only; it does not solve trim, heel, KG,
+/// tank free-surface, or stability.
+pub fn solve_upright_mass_balance(
+    request: &UprightMassBalanceRequest,
+) -> Result<UprightMassBalanceReceipt, Vec<SectionalReferenceIssue>> {
+    let mut issues = Vec::new();
+    if request.schema_version != 1 {
+        push_issue(
+            &mut issues,
+            "mass_balance_schema_version",
+            "upright mass-balance request schema version 1 is required",
+        );
+    }
+    if request.load_case_id.trim().is_empty() {
+        push_issue(
+            &mut issues,
+            "load_case_identity",
+            "load-case ID must not be empty",
+        );
+    }
+    if !request.target_mass_tonnes.is_finite() || request.target_mass_tonnes <= 0.0 {
+        push_issue(
+            &mut issues,
+            "target_mass",
+            "target mass must be finite and greater than zero tonnes",
+        );
+    }
+    if !request.water_density_kg_m3.is_finite() || request.water_density_kg_m3 <= 0.0 {
+        push_issue(
+            &mut issues,
+            "water_density",
+            "water density must be finite and explicitly greater than zero",
+        );
+    }
+    if !request.lower_waterplane_z_m.is_finite()
+        || !request.upper_waterplane_z_m.is_finite()
+        || request.lower_waterplane_z_m >= request.upper_waterplane_z_m
+    {
+        push_issue(
+            &mut issues,
+            "waterplane_bracket",
+            "waterplane bracket must be finite and ordered shallow-to-deep in the z-down frame",
+        );
+    }
+    if !request.mass_tolerance_tonnes.is_finite() || request.mass_tolerance_tonnes <= 0.0 {
+        push_issue(
+            &mut issues,
+            "mass_tolerance",
+            "mass tolerance must be finite and greater than zero tonnes",
+        );
+    }
+    if !request.plane_tolerance_m.is_finite() || request.plane_tolerance_m <= 0.0 {
+        push_issue(
+            &mut issues,
+            "plane_tolerance",
+            "waterplane elevation tolerance must be finite and greater than zero metres",
+        );
+    }
+    if request.maximum_iterations == 0
+        || request.maximum_iterations > MAX_MASS_BALANCE_ITERATIONS
+    {
+        push_issue(
+            &mut issues,
+            "iteration_limit",
+            format!("maximum iterations must be within 1..={MAX_MASS_BALANCE_ITERATIONS}"),
+        );
+    }
+
+    let source_validation = validate_full_envelope_spec(&request.source_spec);
+    match source_validation.disposition {
+        FullEnvelopeDisposition::ValidInputContract => {}
+        FullEnvelopeDisposition::Incomplete => push_issue(
+            &mut issues,
+            "source_spec_incomplete",
+            "source full-envelope specification has unsupported/incomplete features",
+        ),
+        FullEnvelopeDisposition::Rejected => push_issue(
+            &mut issues,
+            "source_spec_rejected",
+            "source full-envelope specification fails its input contract",
+        ),
+    }
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+
+    let source_digest = compute_full_envelope_spec_digest(&request.source_spec).map_err(|error| {
+        vec![SectionalReferenceIssue {
+            code: "source_spec_digest".into(),
+            detail: format!("could not serialize source full-envelope identity: {error}"),
+        }]
+    })?;
+
+    let loading_condition = |waterplane_z_m| LoadingCondition {
+        condition_id: request.load_case_id.clone(),
+        waterplane_z_m,
+        water_density_kg_m3: request.water_density_kg_m3,
+    };
+    let mut lower_z = request.lower_waterplane_z_m;
+    let mut upper_z = request.upper_waterplane_z_m;
+    let mut lower_result = evaluate_one(
+        &request.source_spec,
+        &source_digest,
+        &loading_condition(lower_z),
+    )
+    .map_err(|issue| vec![issue])?;
+    let upper_result = evaluate_one(
+        &request.source_spec,
+        &source_digest,
+        &loading_condition(upper_z),
+    )
+    .map_err(|issue| vec![issue])?;
+
+    if lower_result.displaced_mass_tonnes + request.mass_tolerance_tonnes
+        < request.target_mass_tonnes
+        || upper_result.displaced_mass_tonnes - request.mass_tolerance_tonnes
+            > request.target_mass_tonnes
+    {
+        return Err(vec![SectionalReferenceIssue {
+            code: "mass_balance_not_bracketed".into(),
+            detail: format!(
+                "target {} t must lie between shallow-bracket mass {} t and deep-bracket mass {} t",
+                request.target_mass_tonnes,
+                lower_result.displaced_mass_tonnes,
+                upper_result.displaced_mass_tonnes
+            ),
+        }]);
+    }
+
+    let mut best_result = if (lower_result.displaced_mass_tonnes - request.target_mass_tonnes).abs()
+        <= request.mass_tolerance_tonnes
+    {
+        lower_result.clone()
+    } else if (upper_result.displaced_mass_tonnes - request.target_mass_tonnes).abs()
+        <= request.mass_tolerance_tonnes
+    {
+        upper_result.clone()
+    } else {
+        lower_result.clone()
+    };
+    let mut iteration_count = 0;
+    let mut stop_reason = if (best_result.displaced_mass_tonnes - request.target_mass_tonnes).abs()
+        <= request.mass_tolerance_tonnes
+    {
+        Some(UprightMassBalanceStopReason::MassResidualWithinTolerance)
+    } else {
+        None
+    };
+
+    for iteration in 1..=request.maximum_iterations {
+        if stop_reason.is_some() {
+            break;
+        }
+        let midpoint_z = lower_z + 0.5 * (upper_z - lower_z);
+        let midpoint_result = evaluate_one(
+            &request.source_spec,
+            &source_digest,
+            &loading_condition(midpoint_z),
+        )
+        .map_err(|issue| vec![issue])?;
+        iteration_count = iteration;
+        best_result = midpoint_result;
+
+        let residual = (best_result.displaced_mass_tonnes - request.target_mass_tonnes).abs();
+        if residual <= request.mass_tolerance_tonnes {
+            stop_reason = Some(UprightMassBalanceStopReason::MassResidualWithinTolerance);
+            break;
+        }
+        if upper_z - lower_z <= request.plane_tolerance_m {
+            stop_reason = Some(UprightMassBalanceStopReason::WaterplaneBracketWithinTolerance);
+            break;
+        }
+        if best_result.displaced_mass_tonnes > request.target_mass_tonnes {
+            lower_z = midpoint_z;
+            lower_result = best_result.clone();
+        } else {
+            upper_z = midpoint_z;
+        }
+    }
+
+    let Some(stop_reason) = stop_reason else {
+        return Err(vec![SectionalReferenceIssue {
+            code: "mass_balance_iteration_limit",
+            detail: format!(
+                "did not reach mass residual {} t or waterplane bracket {} m within {} iterations",
+                request.mass_tolerance_tonnes,
+                request.plane_tolerance_m,
+                request.maximum_iterations
+            )
+            .into(),
+        }]);
+    };
+    let residual = (best_result.displaced_mass_tonnes - request.target_mass_tonnes).abs();
+    let mut receipt = UprightMassBalanceReceipt {
+        receipt_schema_version: 1,
+        algorithm: UPRIGHT_MASS_BALANCE_ALGORITHM.into(),
+        source_spec_digest_blake3: source_digest,
+        load_case_id: request.load_case_id.clone(),
+        target_mass_tonnes: request.target_mass_tonnes,
+        water_density_kg_m3: request.water_density_kg_m3,
+        initial_lower_waterplane_z_m: request.lower_waterplane_z_m,
+        initial_upper_waterplane_z_m: request.upper_waterplane_z_m,
+        final_lower_waterplane_z_m: lower_z,
+        final_upper_waterplane_z_m: upper_z,
+        equilibrium: best_result,
+        mass_residual_tonnes: residual,
+        iteration_count,
+        stop_reason,
+        receipt_digest_blake3: String::new(),
+    };
+    receipt.receipt_digest_blake3 =
+        compute_upright_mass_balance_digest(&receipt).map_err(|error| {
+            vec![SectionalReferenceIssue {
+                code: "mass_balance_receipt_digest".into(),
+                detail: format!("could not serialize mass-balance receipt: {error}"),
+            }]
+        })?;
+    Ok(receipt)
+}
+
+pub fn verify_upright_mass_balance_receipt(
+    request: &UprightMassBalanceRequest,
+    receipt: &UprightMassBalanceReceipt,
+) -> Result<(), Vec<SectionalReferenceIssue>> {
+    let expected = solve_upright_mass_balance(request)?;
+    if &expected != receipt {
+        return Err(vec![SectionalReferenceIssue {
+            code: "mass_balance_receipt_mismatch".into(),
+            detail: "receipt does not match a fresh solve of the exact source/load-case request"
+                .into(),
+        }]);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -864,6 +1193,72 @@ mod tests {
             .iter()
             .find(|result| result.loading_condition_id == id)
             .unwrap()
+    }
+
+
+    fn box_mass_balance_request(target_mass_tonnes: f64) -> UprightMassBalanceRequest {
+        let source_spec = fixture_request().source_spec;
+        UprightMassBalanceRequest {
+            schema_version: 1,
+            source_spec,
+            load_case_id: "BOX-LOAD-CASE-001".into(),
+            target_mass_tonnes,
+            water_density_kg_m3: 1025.0,
+            lower_waterplane_z_m: -2.0,
+            upper_waterplane_z_m: 2.0,
+            mass_tolerance_tonnes: 1.0e-8,
+            plane_tolerance_m: 1.0e-10,
+            maximum_iterations: 64,
+        }
+    }
+
+    #[test]
+    fn upright_mass_balance_solves_design_displacement_for_box_hull() {
+        let request = box_mass_balance_request(12_300.0);
+        let receipt = solve_upright_mass_balance(&request).unwrap();
+        assert_eq!(receipt.stop_reason, UprightMassBalanceStopReason::MassResidualWithinTolerance);
+        assert!((receipt.equilibrium.waterplane_z_m - 0.0).abs() < 1.0e-12);
+        assert!((receipt.equilibrium.displacement_volume_m3 - 12_000.0).abs() < 1.0e-8);
+        assert!((receipt.equilibrium.displaced_mass_tonnes - 12_300.0).abs() < 1.0e-8);
+        assert!(receipt.mass_residual_tonnes <= request.mass_tolerance_tonnes);
+        assert_eq!(receipt.iteration_count, 2);
+        verify_upright_mass_balance_receipt(&request, &receipt).unwrap();
+    }
+
+    #[test]
+    fn upright_mass_balance_solves_non_design_draft_for_box_hull() {
+        let request = box_mass_balance_request(10_250.0);
+        let receipt = solve_upright_mass_balance(&request).unwrap();
+        assert!((receipt.equilibrium.waterplane_z_m - 1.0).abs() < 1.0e-12);
+        assert!((receipt.equilibrium.displacement_volume_m3 - 10_000.0).abs() < 1.0e-8);
+        assert!((receipt.equilibrium.longitudinal_center_of_buoyancy_m - 50.0).abs() < 1.0e-8);
+    }
+
+    #[test]
+    fn upright_mass_balance_rejects_unbracketed_target_mass() {
+        let request = box_mass_balance_request(20_000.0);
+        let errors = solve_upright_mass_balance(&request).unwrap_err();
+        assert!(errors.iter().any(|issue| issue.code == "mass_balance_not_bracketed"));
+    }
+
+    #[test]
+    fn upright_mass_balance_rejects_non_positive_density_and_invalid_iterations() {
+        let mut request = box_mass_balance_request(12_300.0);
+        request.water_density_kg_m3 = 0.0;
+        request.maximum_iterations = MAX_MASS_BALANCE_ITERATIONS + 1;
+        let errors = solve_upright_mass_balance(&request).unwrap_err();
+        assert!(errors.iter().any(|issue| issue.code == "water_density"));
+        assert!(errors.iter().any(|issue| issue.code == "iteration_limit"));
+    }
+
+    #[test]
+    fn upright_mass_balance_receipt_detects_rebound_mutation() {
+        let request = box_mass_balance_request(12_300.0);
+        let mut receipt = solve_upright_mass_balance(&request).unwrap();
+        receipt.equilibrium.waterplane_z_m += 0.1;
+        receipt.receipt_digest_blake3 =
+            compute_upright_mass_balance_digest(&receipt).unwrap();
+        assert!(verify_upright_mass_balance_receipt(&request, &receipt).is_err());
     }
 
     #[test]
