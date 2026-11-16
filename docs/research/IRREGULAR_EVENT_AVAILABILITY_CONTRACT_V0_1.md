@@ -177,12 +177,13 @@ is the explicit audit path: it rebuilds progress and arrival indexes from the
 history, checks digest/replay parity, then returns the same completeness report.
 The fast and audited paths are tested for exact report equality.
 
-The breach index key now includes source identity, event time and
-receipt/knowledge time. Historical `known_at` queries prune future receipts in
-the ordered range scan itself rather than visiting them and filtering afterward.
-A regression checks zero indexed candidates before the first receipt, one at
-the first receipt and three after all receipts, then verifies replay/index
-parity. This is a query
+The breach index is nested by source identity and event time, with a
+receipt/knowledge-time sub-index inside every event-time bucket. Historical
+`known_at` queries prune future receipts within each bucket. The report counts
+event-time buckets visited separately from receipt candidates examined; this
+makes the remaining range-scan cost visible. A regression with distinct event
+times checks zero visible candidates before the first receipt, one at the first
+receipt and three after all receipts, then verifies replay/index parity. This is a query
 complexity improvement by construction, not yet a measured throughput result;
 the benchmark records p50/p95/p99 query latency, late-breach candidates visited,
 and full-audit rebuild latency separately.
@@ -218,7 +219,7 @@ fixed, deterministic source-watermark ledgers containing 1k, 10k and 100k
 late-arrival receipts. Each generated history permutes event-time order relative
 to availability/arrival order. It queries a 16-unit half-open interval and
 compares 101 indexed reads with 15 full-history verified reads. It records
-p50/p95/p99 latency and the number of indexed breach entries examined, and
+p50/p95/p99 latency, event-time buckets visited and receipt entries examined, and
 checks exact report parity plus the expected 16 matching breaches before timing.
 The hosted workflow retains the CSV output with the exact commit, toolchain,
 dependency lock and fixture/source digests. This measures in-memory CPU query
