@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-partial-order-report-v0.1.schema.json",
+  "title": "EGDDM D6.10 partial-order report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "event_count",
+    "branch_count",
+    "obligation_count",
+    "receipt_count",
+    "traces",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "adjudication_status": {
+      "type": "string"
+    },
+    "event_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "branch_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "obligation_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "receipt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "claim_ceiling": {
+      "type": "string"
+    },
+    "traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "causal_order",
+          "confluence",
+          "future_evidence_leakage_event_ids",
+          "future_evidence_leakage_receipt_ids",
+          "out_of_scope_event_ids",
+          "branch_receipt_contamination_ids",
+          "invalid_receipt_uses",
+          "unsupported_current_claims",
+          "critical_unsupported_current_claims",
+          "join_reports"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "causal_order": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reference_ordered_pairs",
+              "declared_ordered_pairs",
+              "correctly_ordered_pairs",
+              "false_serialization_pairs",
+              "missing_order_pairs",
+              "wrong_direction_pairs"
+            ],
+            "properties": {
+              "reference_ordered_pairs": {
+                "type": "integer"
+              },
+              "declared_ordered_pairs": {
+                "type": "integer"
+              },
+              "correctly_ordered_pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              },
+              "false_serialization_pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              },
+              "missing_order_pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              },
+              "wrong_direction_pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              }
+            }
+          },
+          "confluence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "reference_commuting_pairs",
+              "claimed_confluent_pairs",
+              "true_confluence_pairs",
+              "false_confluence_pairs",
+              "missed_confluence_pairs",
+              "false_noncommuting_confluence_pairs"
+            ],
+            "properties": {
+              "reference_commuting_pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              },
+              "claimed_confluent_pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              },
+              "true_confluence_pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              },
+              "false_confluence_pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              },
+              "missed_confluence_pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              },
+              "false_noncommuting_confluence_pairs": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              }
+            }
+          },
+          "future_evidence_leakage_event_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "future_evidence_leakage_receipt_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "out_of_scope_event_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "branch_receipt_contamination_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "invalid_receipt_uses": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "receipt_id",
+                "target_branch_id",
+                "reasons"
+              ],
+              "properties": {
+                "receipt_id": {
+                  "type": "string"
+                },
+                "target_branch_id": {
+                  "type": "string"
+                },
+                "reasons": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "unsupported_current_claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "critical_unsupported_current_claims": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "join_reports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "branch_id",
+                "required_requalification_obligations",
+                "freshly_requalified_obligations",
+                "missing_requalification_obligations",
+                "invalid_fresh_receipt_ids"
+              ],
+              "properties": {
+                "branch_id": {
+                  "type": "string"
+                },
+                "required_requalification_obligations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "freshly_requalified_obligations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "missing_requalification_obligations": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "invalid_fresh_receipt_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pair": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
