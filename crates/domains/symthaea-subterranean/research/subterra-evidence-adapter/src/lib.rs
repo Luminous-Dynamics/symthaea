@@ -323,6 +323,7 @@ pub enum SiteIssue {
     MissingEvidenceReference(&'static str),
     EmptyEvidenceReference(&'static str),
     DuplicateEvidenceReference(&'static str),
+    DuplicateEngineeringUseCase,
     DemonstratedAccessMissingMethod,
     DemonstratedAccessMissingEgress,
     DemonstratedAccessMissingEvidence,
@@ -331,7 +332,6 @@ pub enum SiteIssue {
     DuplicateObservationId(String),
     EmptyObservationField(&'static str),
     NoObservations,
-    NonEarthActivityNeedsExternalAuthorityReview,
     AuthorizedActivityMissingBasis,
     RestrictedSiteHasDeclaredAuthorizedActivity,
 }
@@ -505,13 +505,14 @@ impl SiteEvidenceRecord {
             if !use_cases.insert(assessment.use_case as u8) {
                 // The schema permits duplicates; the typed intake rejects them
                 // because contradictory states for one use case are ambiguous.
-                issues.push(SiteIssue::DuplicateEvidenceReference(
-                    "engineering_assessments.use_case",
-                ));
+                issues.push(SiteIssue::DuplicateEngineeringUseCase);
             }
             if assessment.state == EngineeringClaimState::QualifiedForDeclaredEnvelope {
                 if !assessment.envelope_id.as_deref().is_some_and(nonempty) {
                     issues.push(SiteIssue::QualifiedEngineeringMissingEnvelope);
+                }
+                if assessment.evidence_refs.is_empty() {
+                    issues.push(SiteIssue::QualifiedEngineeringMissingEvidence);
                 }
                 inspect_refs(
                     &assessment.evidence_refs,
@@ -576,12 +577,10 @@ impl SiteEvidenceRecord {
             &mut issues,
         );
 
-        if !self.body.is_earth() && any_activity_authorized {
-            // The v0.1 JSON contract has no named authorization-case field.
-            // Preserve the declaration, but require an external authority check
-            // before any caller can treat the activity as admissible.
-            issues.push(SiteIssue::NonEarthActivityNeedsExternalAuthorityReview);
-        }
+        // A declared non-Earth permission is preserved as source data. The
+        // converted belief input always marks planetary-protection review as
+        // required, so this adapter cannot turn the declaration into action
+        // authority. The v0.1 record has no named authorization-case field.
         if self.preservation.planetary_protection_state == PlanetaryProtectionState::Restricted
             && any_activity_authorized
         {
@@ -1108,11 +1107,11 @@ impl CaveNetworkRecord {
                             neighbour.clone(),
                             (current.clone(), edge_id.clone()),
                         );
-                        if neighbour == goal_node {
+                        if neighbour.as_str() == goal_node {
                             let mut nodes = vec![goal_node.to_string()];
                             let mut edges = Vec::new();
                             let mut cursor = goal_node.to_string();
-                            while cursor != start_node {
+                            while cursor.as_str() != start_node {
                                 let Some((previous, used_edge)) = predecessor.get(&cursor) else {
                                     return Ok(RouteKnowledge::NoDemonstratedRoute);
                                 };
@@ -1251,10 +1250,9 @@ mod tests {
             ActivityPermission::AuthorizedForDeclaredActivity;
         record.preservation.basis_refs = vec!["declared-review-reference".into()];
 
-        assert!(record
-            .validate()
-            .unwrap_err()
-            .contains(&SiteIssue::NonEarthActivityNeedsExternalAuthorityReview));
+        // Preserve the source declaration while retaining the external
+        // planetary-protection gate in the typed belief input.
+        assert!(record.validate().is_ok());
         let input = record.into_belief_input();
         assert!(input.has_declared_authorized_activity);
         assert!(input.planetary_protection_review_required);
@@ -1282,9 +1280,9 @@ mod tests {
             summary.directly_observed_components,
             vec![
                 vec![
+                    "chamber-a".to_string(),
                     "chamber-b".to_string(),
-                    "entrance".to_string(),
-                    "chamber-a".to_string()
+                    "entrance".to_string()
                 ],
                 vec!["suspected-chamber".to_string()]
             ]
