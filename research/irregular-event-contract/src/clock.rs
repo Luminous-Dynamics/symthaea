@@ -33,13 +33,43 @@ impl ClockDomainId {
 /// knowledge-time cutoff.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MappedClockTime {
-    pub source_domain: ClockDomainId,
-    pub reference_domain: ClockDomainId,
-    pub source_time_us: i64,
-    pub earliest_reference_us: i64,
-    pub latest_reference_us: i64,
-    pub calibration_id: u64,
-    pub calibration_sha256: [u8; 32],
+    source_domain: ClockDomainId,
+    reference_domain: ClockDomainId,
+    source_time_us: i64,
+    earliest_reference_us: i64,
+    latest_reference_us: i64,
+    calibration_id: u64,
+    calibration_sha256: [u8; 32],
+}
+
+impl MappedClockTime {
+    pub fn source_domain(&self) -> ClockDomainId {
+        self.source_domain
+    }
+
+    pub fn reference_domain(&self) -> ClockDomainId {
+        self.reference_domain
+    }
+
+    pub fn source_time_us(&self) -> i64 {
+        self.source_time_us
+    }
+
+    pub fn earliest_reference_us(&self) -> i64 {
+        self.earliest_reference_us
+    }
+
+    pub fn latest_reference_us(&self) -> i64 {
+        self.latest_reference_us
+    }
+
+    pub fn calibration_id(&self) -> u64 {
+        self.calibration_id
+    }
+
+    pub fn calibration_sha256(&self) -> [u8; 32] {
+        self.calibration_sha256
+    }
 }
 
 /// An exclusive source watermark mapped to a common reference clock.
@@ -49,16 +79,46 @@ pub struct MappedClockTime {
 /// only; it must not be used to make an absence claim.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct MappedExclusiveWatermark {
-    pub source_domain: ClockDomainId,
-    pub reference_domain: ClockDomainId,
-    pub source_exclusive_watermark_us: i64,
-    pub earliest_reference_bound_us: i64,
-    pub latest_reference_bound_us: i64,
-    pub calibration_id: u64,
-    pub calibration_sha256: [u8; 32],
+    source_domain: ClockDomainId,
+    reference_domain: ClockDomainId,
+    source_exclusive_watermark_us: i64,
+    earliest_reference_bound_us: i64,
+    latest_reference_bound_us: i64,
+    calibration_id: u64,
+    calibration_sha256: [u8; 32],
 }
 
 impl MappedExclusiveWatermark {
+    pub fn source_domain(&self) -> ClockDomainId {
+        self.source_domain
+    }
+
+    pub fn reference_domain(&self) -> ClockDomainId {
+        self.reference_domain
+    }
+
+    pub fn source_exclusive_watermark_us(&self) -> i64 {
+        self.source_exclusive_watermark_us
+    }
+
+    /// Conservative lower endpoint in the reference clock.
+    pub fn earliest_reference_bound_us(&self) -> i64 {
+        self.earliest_reference_bound_us
+    }
+
+    /// Optimistic upper endpoint for diagnostics only.
+    pub fn latest_reference_bound_us(&self) -> i64 {
+        self.latest_reference_bound_us
+    }
+
+    pub fn calibration_id(&self) -> u64 {
+        self.calibration_id
+    }
+
+    pub fn calibration_sha256(&self) -> [u8; 32] {
+        self.calibration_sha256
+    }
+
     /// Whether this source alone conservatively closes [start, end).
     pub fn closes_half_open_interval(&self, end_exclusive_us: i64) -> bool {
         self.earliest_reference_bound_us >= end_exclusive_us
@@ -69,12 +129,24 @@ impl MappedExclusiveWatermark {
 /// sources, expressed in exactly one reference clock domain.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct ConservativeExclusiveWatermark {
-    pub reference_domain: ClockDomainId,
-    pub earliest_guaranteed_exclusive_us: i64,
-    pub source_count: usize,
+    reference_domain: ClockDomainId,
+    earliest_guaranteed_exclusive_us: i64,
+    source_count: usize,
 }
 
 impl ConservativeExclusiveWatermark {
+    pub fn reference_domain(&self) -> ClockDomainId {
+        self.reference_domain
+    }
+
+    pub fn earliest_guaranteed_exclusive_us(&self) -> i64 {
+        self.earliest_guaranteed_exclusive_us
+    }
+
+    pub fn source_count(&self) -> usize {
+        self.source_count
+    }
+
     pub fn closes_half_open_interval(&self, end_exclusive_us: i64) -> bool {
         self.earliest_guaranteed_exclusive_us >= end_exclusive_us
     }
@@ -368,9 +440,9 @@ mod tests {
             .map_time(ClockDomainId(1), 1_000, 100)
             .unwrap();
 
-        assert_eq!(mapped.earliest_reference_us, 11_002);
-        assert_eq!(mapped.latest_reference_us, 11_004);
-        assert_eq!(mapped.calibration_id, 7);
+        assert_eq!(mapped.earliest_reference_us(), 11_002);
+        assert_eq!(mapped.latest_reference_us(), 11_004);
+        assert_eq!(mapped.calibration_id(), 7);
     }
 
     #[test]
@@ -382,8 +454,8 @@ mod tests {
         clock.max_abs_drift_ppb = 1_000_000;
 
         let mapped = clock.map_time(ClockDomainId(1), 1_001, 100).unwrap();
-        assert_eq!(mapped.earliest_reference_us, 998);
-        assert_eq!(mapped.latest_reference_us, 1_004);
+        assert_eq!(mapped.earliest_reference_us(), 998);
+        assert_eq!(mapped.latest_reference_us(), 1_004);
     }
 
     #[test]
@@ -433,8 +505,8 @@ mod tests {
     fn watermark_uses_the_earliest_not_latest_mapped_bound() {
         let clock = calibration();
         let mapped = clock.map_exclusive_watermark(1_000, 100).unwrap();
-        assert_eq!(mapped.earliest_reference_bound_us, 11_002);
-        assert_eq!(mapped.latest_reference_bound_us, 11_004);
+        assert_eq!(mapped.earliest_reference_bound_us(), 11_002);
+        assert_eq!(mapped.latest_reference_bound_us(), 11_004);
         assert!(mapped.closes_half_open_interval(11_002));
         assert!(!mapped.closes_half_open_interval(11_003));
     }
@@ -449,8 +521,8 @@ mod tests {
 
         let combined = conservative_min_exclusive_watermark(ClockDomainId(2), &[first, second])
             .unwrap();
-        assert_eq!(combined.earliest_guaranteed_exclusive_us, 10_502);
-        assert_eq!(combined.source_count, 2);
+        assert_eq!(combined.earliest_guaranteed_exclusive_us(), 10_502);
+        assert_eq!(combined.source_count(), 2);
         assert!(combined.closes_half_open_interval(10_502));
         assert!(!combined.closes_half_open_interval(10_503));
     }
