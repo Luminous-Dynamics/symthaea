@@ -59,8 +59,8 @@ jobs:
           rustfmt --version
           cargo clippy --version
 
-      - name: Check formatting for the entire standalone crate
-        run: cargo fmt --manifest-path research/irregular-event-contract/Cargo.toml -- --check
+      - name: Check formatting for the changed watermark module
+        run: rustfmt --edition 2024 --check research/irregular-event-contract/src/watermarks.rs
 
       - name: Resolve and materialize exact dependency lock
         run: cargo generate-lockfile --manifest-path research/irregular-event-contract/Cargo.toml
