@@ -253,17 +253,19 @@
       "class": "rfc3339_unknown_local_offset",
       "expected_disposition": "preserve_unknown_local_offset_with_equal_utc_instant",
       "conversion": {
-        "unknown": "2026-11-16T07:30:00-00:00",
-        "known": "2026-11-16T07:30:00Z",
-        "expected_same_instant": true,
-        "expected_offset_state": "unknown_local_offset",
-        "profile_dependency": "RFC 3339 section 4.3 semantics must be preserved",
-        "expected_known_reference_state": "utc_reference"
+        "legacy_unknown": "2026-11-16T07:30:00-00:00",
+        "z_unknown": "2026-11-16T07:30:00Z",
+        "utc_preferred": "2026-11-16T07:30:00+00:00",
+        "expected_legacy_and_z_same_instant": true,
+        "expected_legacy_and_z_same_offset_state": true,
+        "expected_plus_zero_same_instant": true,
+        "expected_plus_zero_offset_state": "utc_preferred",
+        "profile_dependency": "RFC 9557 update to RFC 3339 section 4.3"
       },
-      "rationale": "Both timestamps identify the same UTC instant. -00:00 preserves the fact that the local offset is unknown; Z expresses UTC as the preferred reference point.",
+      "rationale": "RFC 9557 aligns Z with legacy -00:00: both indicate known UTC time with unknown local offset. +00:00 has the distinct semantic meaning that UTC is the preferred reference point; all three strings identify the same instant.",
       "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
-      "byte_length": 70,
-      "sha256": "cbee7314c58c92fe5f7c310860018d0daf3ca02b560698fc7d8612e09d984a04"
+      "byte_length": 125,
+      "sha256": "603626e34f1e42deeac2013a553a5b587ce6b274cbe6aadc5654db754e4ef38f"
     },
     {
       "id": "jcs-order-a-001",
@@ -332,6 +334,11 @@
       "id": "ISO-4217",
       "url": "https://www.iso.org/iso-4217-currency-codes.html",
       "scope": "currency codes and minor-unit relationships; a dated table snapshot must be pinned by the conversion profile"
+    },
+    {
+      "id": "RFC-9557",
+      "url": "https://www.rfc-editor.org/rfc/rfc9557.html",
+      "scope": "Updates RFC 3339 section 4.3: Z and legacy -00:00 denote known UTC time with unknown local offset, while +00:00 denotes UTC as preferred reference point"
     }
   ],
   "execution": {
@@ -346,8 +353,8 @@
     "performance_benchmark": "not_run",
     "tls_session_or_proof": "not_run",
     "standards_adjudication": {
-      "status": "profile_rule_corrected_against_RFC3339_section_4_3",
-      "note": "-00:00 means UTC time is known while local offset is unknown; preserve the metadata distinction without treating it as a different instant."
+      "status": "corrected_to_RFC9557",
+      "note": "Z and legacy -00:00 share unknown-local-offset semantics; +00:00 denotes UTC as preferred reference point. All denote the same UTC instant when the time fields are the same."
     }
   }
 }
