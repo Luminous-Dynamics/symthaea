@@ -179,3 +179,26 @@ Exact head `eadfdca561b50fda49ba5f61591e08071aaf9b04` passed format, all-target 
 - zero terminal-induced mismatches across 200,000 paths.
 
 The five-seed output retains every per-seed record and is source/report-digest bound. This remains a fixed Gaussian simulation calibration, not a general sequential-test or physical-validation claim. Details and digests are in `docs/research/GAUSSIAN_TERMINAL_MULTISEED_CALIBRATION_V0_2026-11-16.md` and workflow https://github.com/Luminous-Dynamics/symthaea/actions/runs/43849094332.
+
+
+## Gaussian assumption-stress campaign
+
+Run the fixed terminal-test assumption map:
+
+    cargo run --locked --manifest-path research/falsification-power-reference/Cargo.toml --bin gaussian_assumption_stress
+
+The binary holds the fixed iid-Gaussian test unchanged and measures its terminal rejection rate under matched iid Gaussian, stationary AR(1), variance-standardized Student-t(5), smooth heteroscedasticity, abrupt variance-regime shift and sparse gross contamination. Only the iid Gaussian positive control is labelled IN_CONTRACT. Every other stress row is labelled OUT_OF_CONTRACT regardless of its empirical rate.
+
+Five frozen root seeds × 10,000 paths per seed × two paired scenarios are reported per regime, with Wilson intervals, residual moments and lag-one autocorrelation. This is an assumption-failure map for a fixed terminal test, not a robust replacement method or an extension of the Gaussian theorem.
+
+See docs/research/GAUSSIAN_ASSUMPTION_STRESS_V0_2026-11-16.md and Symthaea issue #12540.
+
+
+### Known-rho conditional AR(1) comparator
+
+The v1 stress report adds a separately labelled conditional-innovation terminal-test comparator for the AR(1) regime only. It uses the frozen evaluator-known rho=0.65 and transforms raw residuals into independent innovations with per-look conditional means and standard deviations. The comparator has its own analytic power and null/alternative rates; it is not the same test as the original IID Gaussian terminal statistic and is not a blind rho estimator.
+
+Only the AR(1) row contains `conditional_known_rho_ar1`; all other rows emit null. This comparator is valid only under the explicitly known, correctly specified Gaussian AR(1) conditional model. See #12442 for the conditional-innovation scope and the stress note for the exact transformation.
+
+
+The stress report v1 also includes a **known-rho conditional AR(1) comparator** using the same 50k+50k AR(1) paths. On the exact run, the naive IID test's null rejection was 21.820%; the known-rho innovation test returned 5.026% null rejection (95% Wilson 4.838–5.221%) and 31.112% alternative power versus analytic 31.348%. This restores null size at the cost of lower power under the correctly specified AR(1) model. It is an evaluator-known-rho fixed-terminal comparator, not a blind noise estimator and not #12442's sequential e-process.
