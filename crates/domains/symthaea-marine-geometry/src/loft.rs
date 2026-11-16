@@ -6,8 +6,8 @@
 use serde::{Deserialize, Serialize};
 
 use crate::section::{
-    compute_sampled_sections_digest, LongitudinalEndCondition, LongitudinalEndConditions,
-    SectionFamilyArtifact,
+    compute_sampled_sections_digest, verify_section_family_artifact_integrity,
+    LongitudinalEndCondition, LongitudinalEndConditions, SectionFamilyArtifact,
 };
 use crate::{
     admit, compute_geometry_digest, AdmissionProfile, AdmissionReport, CandidateInput,
@@ -143,12 +143,21 @@ fn validate_section_family(
 ) -> Result<usize, Vec<LoftViolation>> {
     let mut violations = Vec::new();
 
-    if artifact.artifact_schema_version != 1 {
+    if artifact.artifact_schema_version != 2 {
         violation(
             &mut violations,
             "section_artifact_version",
-            "only section artifact schema version 1 is supported",
+            "only section artifact schema version 2 is supported by G2e",
         );
+    }
+    if let Err(errors) = verify_section_family_artifact_integrity(artifact) {
+        for error in errors {
+            violation(
+                &mut violations,
+                &format!("section_family_{}", error.code),
+                error.detail,
+            );
+        }
     }
     if artifact.candidate_id.trim().is_empty() {
         violation(
@@ -1236,6 +1245,7 @@ mod tests {
     ) -> SectionHullSpec {
         let mut spec = convex_spec();
         spec.candidate_id = format!("end-closure-{bow:?}-{stern:?}");
+        spec.schema_version = 2;
         spec.longitudinal_end_conditions = LongitudinalEndConditions { bow, stern };
         if bow == LongitudinalEndCondition::CollapsedCentreline {
             spec.stations[0].half_breadth_fraction = 0.0;
