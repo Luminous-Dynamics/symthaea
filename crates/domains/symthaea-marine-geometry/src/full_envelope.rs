@@ -1486,7 +1486,7 @@ mod tests {
             let mut port = station.starboard_profile.clone();
             for point in &mut port {
                 point.point_id = format!("PORT-{}", point.point_id);
-                point.y_m = -0.9 * point.y_m;
+                point.y_m *= -0.9;
             }
             station.port_profile = Some(port);
         }
@@ -1521,7 +1521,7 @@ mod tests {
             let mut port = station.starboard_profile.clone();
             for point in &mut port {
                 point.point_id = format!("PORT-{}", point.point_id);
-                point.y_m = -0.8 * point.y_m;
+                point.y_m *= -0.8;
             }
             station.port_profile = Some(port);
         }
@@ -1586,7 +1586,7 @@ mod tests {
         let mut stern_port = spec.stations[1].starboard_profile.clone();
         for point in &mut stern_port {
             point.point_id = format!("PORT-{}", point.point_id);
-            point.y_m = -0.9 * point.y_m;
+            point.y_m *= -0.9;
         }
         spec.stations[1].port_profile = Some(stern_port);
 
