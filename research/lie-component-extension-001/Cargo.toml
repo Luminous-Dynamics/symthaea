@@ -1,0 +1,13 @@
+[package]
+name = "lie-component-extension-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact structural qualification for split finite-component Lie-group extensions"
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
