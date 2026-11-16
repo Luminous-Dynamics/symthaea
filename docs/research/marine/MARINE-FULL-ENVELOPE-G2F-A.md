@@ -400,3 +400,43 @@ For explicitly asymmetric port/starboard sections, the keel is a common centreli
 This distinction is now enforced by the typed validator and tested against split keel identity and mismatched keel elevation. It matters for later G2f-b shell construction: the independent reference must not close a polygon by connecting two nominally different keel vertices whose z coordinates differ.
 
 Latest focused evidence is recorded in issue #12434 and PR #12438; it remains focused crate verification, not full workspace CI or physical qualification.
+
+
+## 17. Nonlinear station-resolution convergence benchmark (G2f-a4)
+
+The current linear-taper fixture is analytically exact under piecewise-linear longitudinal integration. It proves implementation consistency but does not measure discretization convergence. A second, intentionally nonlinear known-answer hull is therefore included in `sectional_reference.rs` tests.
+
+### Frozen analytic shape
+
+A 100 m prismatic-depth hull has half-breadth:
+
+`b(u) = 8 + 4u(1-u)` metres, where `u = x/L` and `0 ≤ u ≤ 1`.
+
+Draft is 6 m; the section is rectangular below the z=0 waterplane. Therefore:
+
+- sectional area: `A(u) = 12 b(u)` m²;
+- exact displacement: `L ∫₀¹ A(u) du = 10,400 m³`;
+- exact waterplane area: `L ∫₀¹ 2b(u) du = 5,200/3 m²`;
+- LCB = 50 m by longitudinal symmetry;
+- TCB = 0 and VCB = 3 m at z=0.
+
+The geometry and condition are kept fixed while only the station sampling density changes. Three samplings are compared: 3, 5 and 9 equally spaced stations.
+
+### Expected trapezoidal integration convergence
+
+| Stations | Displacement estimate (m³) | Absolute error (m³) | Waterplane estimate (m²) | Absolute error (m²) |
+|---:|---:|---:|---:|---:|
+| 3 | 10,200.0 | 200.0 | 1,700.0000 | 33.3333 |
+| 5 | 10,350.0 | 50.0 | 1,725.0000 | 8.3333 |
+| 9 | 10,387.5 | 12.5 | 1,731.2500 | 2.0833 |
+| Analytic | 10,400.0 | 0 | 1,733.3333 | 0 |
+
+Doubling interval count reduces the error by exactly four for this quadratic shape, demonstrating the expected second-order convergence of the composite trapezoid rule. Tests assert the actual errors and both 4× ratios; they do not infer convergence from a plot or paper claim.
+
+### What this establishes and what it does not
+
+It establishes numerical quadrature behavior for a known analytic longitudinal sectional-area / waterline-breadth field. It does not establish that a sparse station set reconstructs an unknown real hull, that station interpolation is physically accurate, or that this method converges for discontinuous/transom/wave-making phenomena without additional treatment.
+
+For real vessels, publish the original station data, sampling policy and a nested-resolution comparison from the same frozen CAD/survey source. Compare displacement, waterplane area, LCB/LCF, VCB and sectional-area curve changes; record the denominator when a reference value approaches zero. Only call a result converged when the refinement residual is below a predeclared tolerance and remains stable over at least two consecutive refinements.
+
+The sectional reference CLI now has `--verify <receipt.json>`. That mode re-evaluates the exact input request, compares the complete receipt and returns a typed integrity rejection on mismatch. It verifies reproducibility of this particular algorithm/request; it is not an independent implementation. The separately authored sectional method remains independent from the G2c polyhedral mesh integration path.
