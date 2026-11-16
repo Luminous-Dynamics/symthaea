@@ -12,6 +12,7 @@
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 pub const MIN_CLOCK_UNCERTAINTY_MS: u64 = 1_000;
 
@@ -78,11 +79,23 @@ pub struct ScienceReturnEvent {
     pub disposition_reason: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ScienceReturnPayload {
+    /// Lowercase, canonical 64-character SHA-256 digest of the acquired bytes.
+    pub sha256: String,
+    /// Exact byte length of the acquired payload.
+    pub byte_length: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScienceReturnRecord {
     pub site_id: String,
     pub observation_id: String,
+    /// Required once an observation has been acquired; absent for pre-acquisition failure.
+    #[serde(default)]
+    pub payload: Option<ScienceReturnPayload>,
     pub events: Vec<ScienceReturnEvent>,
 }
 
@@ -122,6 +135,11 @@ pub enum ScienceReturnIssue {
     SiteIdMismatch { record: String, source: String },
     ObservationNotInSite(String),
     InvalidSiteEvidence(Vec<SiteIssue>),
+    PayloadMissingAfterAcquisition,
+    PayloadPresentBeforeAcquisition,
+    MalformedPayloadSha256,
+    PayloadByteLengthMismatch { expected: u64, actual: u64 },
+    PayloadSha256Mismatch,
 }
 
 fn transition_allowed(
@@ -221,6 +239,26 @@ fn parse_canonical_utc_millis(value: &str) -> Option<i128> {
     Some(seconds_from_epoch * 1_000)
 }
 
+
+fn is_canonical_sha256(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .as_bytes()
+            .iter()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
+}
+
+fn sha256_hex(payload: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let digest = Sha256::digest(payload);
+    let mut output = String::with_capacity(64);
+    for byte in digest {
+        output.push(char::from(HEX[(byte >> 4) as usize]));
+        output.push(char::from(HEX[(byte & 0x0f) as usize]));
+    }
+    output
+}
+
 impl ScienceReturnRecord {
     /// Validate event ordering and stage-specific references.
     ///
@@ -238,6 +276,28 @@ impl ScienceReturnRecord {
         if self.events.is_empty() {
             issues.push(ScienceReturnIssue::EmptyEventLog);
             return Err(issues);
+        }
+
+        let has_acquired_payload = self.events.iter().any(|event| {
+            matches!(
+                event.stage,
+                ScienceReturnStage::Acquired
+                    | ScienceReturnStage::IntegrityVerified
+                    | ScienceReturnStage::Persisted
+                    | ScienceReturnStage::StoreAndForwarded
+                    | ScienceReturnStage::Delivered
+                    | ScienceReturnStage::Admitted
+            )
+        });
+        match (&self.payload, has_acquired_payload) {
+            (None, true) => issues.push(ScienceReturnIssue::PayloadMissingAfterAcquisition),
+            (Some(_), false) => issues.push(ScienceReturnIssue::PayloadPresentBeforeAcquisition),
+            (Some(payload), true) => {
+                if !is_canonical_sha256(&payload.sha256) {
+                    issues.push(ScienceReturnIssue::MalformedPayloadSha256);
+                }
+            }
+            (None, false) => {}
         }
 
         let mut event_ids = BTreeSet::new();
@@ -391,6 +451,37 @@ impl ScienceReturnRecord {
         }
     }
 
+    /// Verify the received payload bytes against the record's declared
+    /// SHA-256 digest and byte length. This proves byte equality relative to
+    /// the declaration; it does not authenticate who supplied the digest.
+    pub fn verify_payload_bytes(
+        &self,
+        payload_bytes: &[u8],
+    ) -> Result<(), Vec<ScienceReturnIssue>> {
+        let mut issues = self.validate().err().unwrap_or_default();
+        if let Some(declared) = &self.payload {
+            let actual_length = payload_bytes.len() as u64;
+            if declared.byte_length != actual_length {
+                issues.push(ScienceReturnIssue::PayloadByteLengthMismatch {
+                    expected: declared.byte_length,
+                    actual: actual_length,
+                });
+            }
+            if !is_canonical_sha256(&declared.sha256) {
+                if !issues.contains(&ScienceReturnIssue::MalformedPayloadSha256) {
+                    issues.push(ScienceReturnIssue::MalformedPayloadSha256);
+                }
+            } else if declared.sha256 != sha256_hex(payload_bytes) {
+                issues.push(ScienceReturnIssue::PayloadSha256Mismatch);
+            }
+        }
+        if issues.is_empty() {
+            Ok(())
+        } else {
+            Err(issues)
+        }
+    }
+
     /// Check that this record refers to a known observation in the source site
     /// record. This checks identifier linkage only; it does not authenticate
     /// the observation or any event evidence.
@@ -498,6 +589,10 @@ mod tests {
         ScienceReturnRecord {
             site_id: "synthetic-mars-subterranean-candidate-01".into(),
             observation_id: "synthetic-optical-001".into(),
+            payload: Some(ScienceReturnPayload {
+                sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".into(),
+                byte_length: 3,
+            }),
             events,
         }
     }
@@ -720,6 +815,67 @@ mod tests {
                 minimum_ms: MIN_CLOCK_UNCERTAINTY_MS,
             }
         ));
+    }
+
+    #[test]
+    fn sha256_payload_digest_matches_actual_acquired_bytes() {
+        let record = complete_record();
+        assert!(record.verify_payload_bytes(b"abc").is_ok());
+        assert_eq!(
+            sha256_hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
+
+    #[test]
+    fn altered_payload_bytes_are_rejected() {
+        let record = complete_record();
+        assert!(record
+            .verify_payload_bytes(b"abd")
+            .unwrap_err()
+            .contains(&ScienceReturnIssue::PayloadSha256Mismatch));
+    }
+
+    #[test]
+    fn payload_byte_length_is_checked_separately_from_digest() {
+        let record = complete_record();
+        assert!(record
+            .verify_payload_bytes(b"abcd")
+            .unwrap_err()
+            .contains(&ScienceReturnIssue::PayloadByteLengthMismatch {
+                expected: 3,
+                actual: 4
+            }));
+    }
+
+    #[test]
+    fn acquired_observation_requires_content_addressed_payload_metadata() {
+        let mut record = complete_record();
+        record.payload = None;
+        assert!(record
+            .validate()
+            .unwrap_err()
+            .contains(&ScienceReturnIssue::PayloadMissingAfterAcquisition));
+    }
+
+    #[test]
+    fn content_addressed_payload_cannot_precede_acquisition() {
+        let mut record = complete_record();
+        record.events.truncate(2);
+        assert!(record
+            .validate()
+            .unwrap_err()
+            .contains(&ScienceReturnIssue::PayloadPresentBeforeAcquisition));
+    }
+
+    #[test]
+    fn malformed_or_noncanonical_payload_digest_is_rejected() {
+        let mut record = complete_record();
+        record.payload.as_mut().unwrap().sha256 = "ABC".into();
+        assert!(record
+            .validate()
+            .unwrap_err()
+            .contains(&ScienceReturnIssue::MalformedPayloadSha256));
     }
 
 }

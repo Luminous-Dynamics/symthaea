@@ -458,3 +458,18 @@ Reference: https://doi.org/10.3390/s26206544
 Proposed targets remain research targets, not current results: at least 20% lower preregistered decision regret than the strongest matched baseline; at least 15% more independently supported, decision-relevant observations returned at equal expected resource use; zero dependency split leakage; zero unauthorized proposals crossing external gates; zero hard budget/risk-ceiling violations. These targets require independent validation and confidence intervals over enough genuinely distinct sites/components.
 
 A result that improves mapping but not scientific decision quality belongs to the mapping benchmark. A result that improves decision quality but loses the evidence on return does not count as a successful scientific return.
+
+
+## 18. Content-addressed science-return integrity
+
+An acquired science-return record now binds a canonical SHA-256 digest and byte length. The consumer can recompute these values over the returned payload before treating the integrity stage as satisfied.
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| AcquiredPayloadBindingBench | An acquired or later-stage record includes one canonical SHA-256 digest and byte length | Zero acquired records without payload metadata |
+| PayloadDigestVerificationBench | Returned bytes recompute to the declared digest | Zero altered payloads accepted |
+| PayloadLengthIntegrityBench | Actual and declared byte lengths match | Zero mismatches accepted |
+| DigestCanonicalizationBench | SHA-256 is exactly 64 lowercase hex characters | All malformed/uppercase/short digests rejected |
+| PayloadStageBoundaryBench | Payload metadata cannot precede acquisition | Zero pre-acquisition payload promotions |
+
+A digest only detects byte changes relative to the digest value. It does not authenticate who declared the digest or prove sensor identity, calibration, durable custody or delivery. Those require separate signed, verifier-bound receipts.

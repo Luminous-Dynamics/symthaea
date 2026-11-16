@@ -52,9 +52,9 @@ The package has its own Cargo workspace and does not join the production Symthae
 ## Validation boundary
 
 - Site, cave-network and non-uniform-profile adapters, science-return lifecycle, pinned upstream-schema manifest and unit-test fixtures: AUTHORED.
-- Authored tests: 21 site/network + 6 profile + 19 science-return = 46 adapter tests.
+- Authored tests: 21 site/network + 6 profile + 25 science-return = 52 adapter tests.
 - The profile adapter validates ordered contiguous coverage and computes observed-only geometry summaries; it does not yet propagate uncertainty through the summary statistics.
-- The science-return record validates stage sequence, canonical UTC timestamp syntax, clock identity, declared uncertainty (at least 1,000 ms for whole-second timestamps) and definite same-clock regressions. It does not prove clock synchronization, cryptographic authenticity, immutable storage, custody authority or transport delivery.
+- The science-return record validates stage sequence, canonical UTC timestamp syntax, clock identity, declared uncertainty (at least 1,000 ms for whole-second timestamps), definite same-clock regressions, and acquired-payload SHA-256/byte-length integrity. Hash equality does not prove source authenticity, clock synchronization, immutable storage, custody authority or transport delivery.
 - The upstream manifest pins source Git objects but does not fetch or authenticate upstream content at runtime.
 - The adapter rejects malformed required fields and unknown fields, but does not replace full Draft 2020-12 schema validation. Science-return uses a deliberately narrow UTC timestamp subset, not a general RFC 3339 parser.
 - Rust source and unit-test fixtures: AUTHORED.
