@@ -245,6 +245,7 @@ pub fn validate_event_batch(events: &[EventRecord]) -> Result<(), ContractError>
             return Err(ContractError::DuplicateSourceSequence {
                 entity_id: event.entity_id,
                 modality_id: event.modality_id,
+                source_id: event.source_id,
                 source_sequence: event.source_sequence,
             });
         }
