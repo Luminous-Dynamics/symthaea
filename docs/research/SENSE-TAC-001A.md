@@ -126,6 +126,29 @@ A commanded stage position is not measured force. A fixture motor command is not
 
 For every reference and candidate channel, bind exact instrument/article/channel identity, calibration record and source digest, covered measurand/unit/range/method, calibration conditions and uncertainty, installation/fixture geometry, firmware/readout profile, timing identity, and sample lineage. The verifier must resolve applicability; a producer-declared calibrated flag is insufficient.
 
+### Existing owner integration (do not duplicate)
+
+The Symthaea tactile campaign is a co-design / task-comparison consumer. It must reuse the physical metrology and test-cell owners:
+
+- **Symtropy #4753 — PHRI-TAC-PHANTOM-001:** owns the traceable non-human tactile calibration phantom, independently calibrated six-axis force/torque reference, surface geometry/registration, replaceable tactile tiles, normal/tangential loading, creep/slip, temperature/cycle testing, and phantom-specific uncertainty/acceptance. This document does not define a second phantom design. Any T1/T2 fixture instantiation must bind the exact #4753 article, reference, surface, fixture and test revisions.
+- **Symtropy #4754 — PHRI-QUAL-BENCH-001:** owns the matched physical-interaction / tactile-coupling comparative benchmark and its system scorecards. This campaign contributes sensor-specific co-design arms and must not duplicate the pHRI controller/passivity or human-agency benchmark.
+- **Symtropy #4790 — PHRI-CONTACT-EXPOSURE-001:** owns spatially resolved non-human phantom contact pressure/deformation/exposure envelopes. This campaign may consume those measurements where relevant; it does not infer human injury, comfort, consent or safety thresholds.
+- **Symtropy #4531 and #5335:** own the unoccupied room-scale service test cell and WaterLoop physical demonstrator, respectively. A future water-quality/flow instrument is a separate application projection, not part of the tactile phantom.
+- **Mycelix #6034 — MYC-BUILD-METROLOGY-002:** owns instrument/channel/capability, calibration, installation and sample-level evidence records. Use its canonical record types; do not make this document a second instrument passport.
+- **Mycelix #6047:** owns digital calibration-certificate interoperability/verification. Preserve certificate source bytes, signature verification, trust policy, accreditation scope and applicability as distinct results; do not invent a second certificate format.
+- **Mycelix #6048 — MYC-BUILD-UQ-001:** owns measurement-equation, covariance/common-cause and nonlinear/Monte-Carlo uncertainty computation. This benchmark binds its exact uncertainty-model receipt rather than implementing an uncertainty engine here.
+- **Mycelix #6054 / #6065:** own stream identity/timebase/replay and measurement-condition applicability. Exact sample epoch, sequence, condition values and condition-profile digest must survive all adapters.
+- **Symthaea FIELD/SE-OBS/SE-SEM and #4918:** remain the semantic and evidence-dependence authorities. Do not add local quantity, unit, observation, calibration or common-mode ontologies.
+- **Sol-Atlas #633 / #700:** consume owner-native spatial and service-outcome projections. They do not recalculate sensor calibration or reinterpret source sample time.
+
+If an owner contract is not yet implemented or not on the exact consuming branch, preserve the required evidence as an unresolved reference and do not imply the integration is executable.
+
+### Measurement-uncertainty reference
+
+Use the current JCGM/BIPM uncertainty guidance as the method anchor: GUM linearization, the 2026 amendment addressing nonlinearity in measurement models, Monte Carlo distribution propagation (JCGM 101), multiple output quantities/covariance (JCGM 102), conformity assessment/guard bands (JCGM 106), and measurement-model development (GUM-6). Choose the propagation method from the model and input distributions; do not use Monte Carlo merely as decoration or assume unrecorded covariance is zero.
+
+Official catalogue: https://www.bipm.org/en/committees/jc/jcgm/publications/
+
 ## 6. Comparison and causal attribution
 
 Minimum arm set where physically feasible:
