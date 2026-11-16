@@ -108,6 +108,9 @@ pub struct UprightMassBalanceReceipt {
     pub water_density_kg_m3: f64,
     pub initial_lower_waterplane_z_m: f64,
     pub initial_upper_waterplane_z_m: f64,
+    pub mass_tolerance_tonnes: f64,
+    pub plane_tolerance_m: f64,
+    pub maximum_iterations_limit: u32,
     pub final_lower_waterplane_z_m: f64,
     pub final_upper_waterplane_z_m: f64,
     pub equilibrium: SectionalHydrostaticResult,
@@ -127,6 +130,9 @@ struct UprightMassBalanceDigestIdentity<'a> {
     water_density_kg_m3: f64,
     initial_lower_waterplane_z_m: f64,
     initial_upper_waterplane_z_m: f64,
+    mass_tolerance_tonnes: f64,
+    plane_tolerance_m: f64,
+    maximum_iterations_limit: u32,
     final_lower_waterplane_z_m: f64,
     final_upper_waterplane_z_m: f64,
     equilibrium: &'a SectionalHydrostaticResult,
@@ -135,7 +141,7 @@ struct UprightMassBalanceDigestIdentity<'a> {
     stop_reason: UprightMassBalanceStopReason,
 }
 
-const UPRIGHT_MASS_BALANCE_ALGORITHM: &str = "upright-mass-balance-bisection-v1";
+const UPRIGHT_MASS_BALANCE_ALGORITHM: &str = "upright-mass-balance-bisection-v2";
 const MAX_MASS_BALANCE_ITERATIONS: u32 = 128;
 
 #[derive(Debug, Clone, Copy)]
@@ -740,6 +746,9 @@ pub fn compute_upright_mass_balance_digest(
         water_density_kg_m3: receipt.water_density_kg_m3,
         initial_lower_waterplane_z_m: receipt.initial_lower_waterplane_z_m,
         initial_upper_waterplane_z_m: receipt.initial_upper_waterplane_z_m,
+        mass_tolerance_tonnes: receipt.mass_tolerance_tonnes,
+        plane_tolerance_m: receipt.plane_tolerance_m,
+        maximum_iterations_limit: receipt.maximum_iterations_limit,
         final_lower_waterplane_z_m: receipt.final_lower_waterplane_z_m,
         final_upper_waterplane_z_m: receipt.final_upper_waterplane_z_m,
         equilibrium: &receipt.equilibrium,
@@ -954,7 +963,7 @@ pub fn solve_upright_mass_balance(
     };
     let residual = (best_result.displaced_mass_tonnes - request.target_mass_tonnes).abs();
     let mut receipt = UprightMassBalanceReceipt {
-        receipt_schema_version: 1,
+        receipt_schema_version: 2,
         algorithm: UPRIGHT_MASS_BALANCE_ALGORITHM.into(),
         source_spec_digest_blake3: source_digest,
         load_case_id: request.load_case_id.clone(),
@@ -962,6 +971,9 @@ pub fn solve_upright_mass_balance(
         water_density_kg_m3: request.water_density_kg_m3,
         initial_lower_waterplane_z_m: request.lower_waterplane_z_m,
         initial_upper_waterplane_z_m: request.upper_waterplane_z_m,
+        mass_tolerance_tonnes: request.mass_tolerance_tonnes,
+        plane_tolerance_m: request.plane_tolerance_m,
+        maximum_iterations_limit: request.maximum_iterations,
         final_lower_waterplane_z_m: lower_z,
         final_upper_waterplane_z_m: upper_z,
         equilibrium: best_result,
@@ -1278,6 +1290,33 @@ mod tests {
         let errors = solve_upright_mass_balance(&request).unwrap_err();
         assert!(errors.iter().any(|issue| issue.code == "water_density"));
         assert!(errors.iter().any(|issue| issue.code == "iteration_limit"));
+    }
+
+
+    #[test]
+    fn upright_mass_balance_receipt_binds_numerical_stopping_configuration() {
+        let mut first_request = box_mass_balance_request(12_300.0);
+        let first_receipt = solve_upright_mass_balance(&first_request).unwrap();
+        assert_eq!(first_receipt.receipt_schema_version, 2);
+        assert_eq!(first_receipt.algorithm, UPRIGHT_MASS_BALANCE_ALGORITHM);
+        assert_eq!(first_receipt.mass_tolerance_tonnes, first_request.mass_tolerance_tonnes);
+        assert_eq!(first_receipt.plane_tolerance_m, first_request.plane_tolerance_m);
+        assert_eq!(first_receipt.maximum_iterations_limit, first_request.maximum_iterations);
+
+        first_request.maximum_iterations = 32;
+        let second_receipt = solve_upright_mass_balance(&first_request).unwrap();
+        assert_eq!(
+            first_receipt.equilibrium.waterplane_z_m,
+            second_receipt.equilibrium.waterplane_z_m
+        );
+        assert_ne!(
+            first_receipt.receipt_digest_blake3,
+            second_receipt.receipt_digest_blake3
+        );
+        assert_ne!(
+            first_receipt.maximum_iterations_limit,
+            second_receipt.maximum_iterations_limit
+        );
     }
 
     #[test]
