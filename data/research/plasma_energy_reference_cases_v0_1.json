@@ -2599,20 +2599,52 @@
           "random forest",
           "extreme gradient boosting",
           "hybrid ensemble"
-        ]
+        ],
+        "data_point_count_reported_in_conclusion": 357,
+        "source_paper_count": 27,
+        "prospective_validation_new_data_points": 10,
+        "row_count_discrepancy": {
+          "abstract_and_methods_report": 358,
+          "conclusion_reports": 357,
+          "resolution": "UNRESOLVED_IN_PUBLISHED_TEXT; retain source-specific count variants until supplementary dataset row count is independently reconciled"
+        }
       },
       "observations": [
         {
-          "metric": "best_fold_grouped_cross_validation_r2",
+          "metric": "grouped_cv_mean_hybrid_r2",
+          "value": 0.441,
+          "unit": "R2",
+          "qualifier": "reported five-fold publication-grouped mean; the central source baseline, not the best-fold value"
+        },
+        {
+          "metric": "grouped_cv_best_fold_hybrid_r2",
           "value": 0.791,
           "unit": "R2",
-          "qualifier": "best-fold result reported under publication-grouped five-fold CV; not a universal cross-reactor score"
+          "qualifier": "best fold only; not the five-fold mean"
+        },
+        {
+          "metric": "grouped_cv_worst_fold_hybrid_r2",
+          "value": 0.024,
+          "unit": "R2",
+          "qualifier": "worst of the five hybrid ensemble folds; exposes substantial between-publication heterogeneity"
+        },
+        {
+          "metric": "grouped_cv_mean_best_single_learner_r2",
+          "value": 0.362,
+          "unit": "R2",
+          "qualifier": "mean of the strongest single baseline, XGBoost"
         },
         {
           "metric": "prospective_unseen_data_r2",
           "value": 0.92,
           "unit": "R2",
-          "qualifier": "source-reported prospective validation within the explored data domain"
+          "qualifier": "source-reported validation on 10 new points within explored domain; not cross-reactor/cross-regime validation"
+        },
+        {
+          "metric": "prospective_validation_sample_count",
+          "value": 10,
+          "unit": "data_points",
+          "qualifier": "prospective in-domain validation set"
         },
         {
           "metric": "flow_rate_and_power_feature_importance_min",
@@ -2625,15 +2657,29 @@
           "value": 0.71,
           "unit": "fraction",
           "qualifier": "upper end of the reported combined SHAP contribution range"
+        },
+        {
+          "metric": "grouped_cv_mean_hybrid_mae",
+          "value": 3.463,
+          "unit": "percentage_points",
+          "qualifier": "source Table 4 five-fold hybrid mean MAE"
+        },
+        {
+          "metric": "grouped_cv_mean_hybrid_rmse",
+          "value": 4.544,
+          "unit": "percentage_points",
+          "qualifier": "source Table 4 five-fold hybrid mean RMSE"
         }
       ],
-      "source_conclusion": "The study assembles 358 literature data points and trains a PINN/RF/XGBoost hybrid ensemble. It reports a best-fold R2 of 0.791 under publication-wise grouped five-fold validation and R2=0.92 on prospective unseen data within the explored domain. Flow rate and power dominate reported feature importance. This is a DBD-specific data/model result, not evidence of universal plasma-reactor transfer.",
-      "comparison_status": "PUBLISHED_GROUPED_DATA_MODEL_WITH_DOMAIN_LIMITED_PROSPECTIVE_VALIDATION",
+      "source_conclusion": "The study assembles 358 data points across 27 published papers in the abstract/methods, while the conclusion states 357 observations; this one-point source-text discrepancy remains unresolved pending SI row-count reconciliation. Under publication-wise grouped five-fold CV, the hybrid ensemble reports mean R2=0.441, best-fold R2=0.791 and worst-fold R2=0.024; the best single learner (XGBoost) averages R2=0.362. Prospective validation on 10 new points within the explored domain reports R2=0.92. Flow rate and power dominate reported feature importance. These results are DBD-specific and do not establish cross-reactor or cross-regime transfer.",
+      "comparison_status": "PUBLISHED_GROUPED_DATA_MODEL_WITH_TEN_POINT_IN_DOMAIN_PROSPECTIVE_VALIDATION_AND_UNRESOLVED_357_358_ROW_COUNT_DISCREPANCY",
       "blockers": [
-        "Best-fold R2 is not the same as mean grouped-fold performance or a lower confidence bound.",
-        "Prospective validation is within the explored domain; it does not establish cross-reactor, cross-pressure, cross-chemistry or cross-regime transfer.",
-        "The underlying 358-row corpus, source labels, preprocessing and feature provenance must be pinned before independent reproduction.",
-        "The six common descriptors omit potentially important physical descriptors such as reduced electric field, electron density and discharge morphology when those are not available in the source literature.",
+        "The paper reports 358 data points in abstract/methods and 357 in the conclusion; do not silently select one without the SI row-count audit.",
+        "The reported group 5-fold mean hybrid R2 is 0.441; 0.791 is only the best fold and 0.024 the worst fold.",
+        "The reported prospective R2=0.92 uses 10 new points within the explored domain and does not establish transfer beyond the source domain.",
+        "The 358/357-row source corpus must be reconstructed and row-mapped to the 27 source papers before independent reproduction.",
+        "The source's six common descriptors omit potentially important physical descriptors such as reduced electric field, electron density and discharge morphology when those are not available in source literature.",
+        "The paper reports residual unquantifiable heterogeneity in diagnostics (including GC vs FTIR) and uses source-grouped splits; Luminous should preserve and model measurement-method effects.",
         "No source model prediction may be promoted to a physical CO2 conversion measurement."
       ],
       "luminous_reproduction": false
@@ -3662,11 +3708,17 @@
         "CO2-DBD-ML-358-DATASET-2026"
       ],
       "metric_thresholds": {
-        "baseline_best_publication_grouped_cv_r2": 0.791,
-        "target_mean_leave_one_publication_out_r2_min": 0.8,
+        "published_mean_publication_grouped_5fold_hybrid_r2": 0.441,
+        "published_best_fold_publication_grouped_5fold_hybrid_r2": 0.791,
+        "published_worst_fold_publication_grouped_5fold_hybrid_r2": 0.024,
+        "target_mean_publication_grouped_5fold_r2_min": 0.55,
+        "target_worst_publication_grouped_5fold_r2_min": 0.15,
+        "target_mean_leave_one_publication_out_r2_min": 0.45,
         "nominal_prediction_interval_coverage_min": 0.9,
         "minimum_applicability_domain_coverage_fraction": 0.8,
-        "sealed_prospective_reactor_holdout_required": true
+        "prospective_validation_minimum_independent_points": 20,
+        "sealed_prospective_reactor_holdout_required": true,
+        "all_prediction_and_uncertainty_thresholds_must_hold_on_same_sealed_protocol": true
       },
       "claim_guards": {
         "source_paper_grouped_splits_required": true,
@@ -3678,7 +3730,7 @@
         "no_extrapolation_claim_without_sealed_external_measurements": true,
         "only_measured_physical_descriptors_may_be_used": true
       },
-      "rationale": "The 2026 DBD study reports 358 data points, best-fold grouped-CV R2=0.791 and prospective in-domain R2=0.92. The Luminous target is a source-held-out mean R2 >=0.80 with calibrated uncertainty and at least 80% declared applicability coverage. The prospective .92 number is not a cross-reactor baseline."
+      "rationale": "The published hybrid DBD model reports mean publication-grouped five-fold R2=0.441, best fold 0.791, worst fold 0.024, and prospective R2=0.92 on 10 new points within the explored domain. The Luminous challenge is to reproduce the exact 27-paper split, then target mean grouped R2>=0.55 and worst-fold R2>=0.15 with calibrated intervals and applicability reporting. The LOPO target is reported separately and is not directly equated with the five-fold score. A sealed prospective reactor holdout must include at least 20 independent points. The source's 358 abstract/methods versus 357 conclusion row-count discrepancy must be resolved against SI before any exact reproduction claim."
     },
     {
       "target_id": "CO2-RWGS-ACCEPTED-SYNGAS-PARETO-001",
