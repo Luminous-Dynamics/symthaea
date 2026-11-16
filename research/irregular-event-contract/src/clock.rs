@@ -11,6 +11,7 @@
 //! needs an independently governed calibration/authority registry.
 
 use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 const DRIFT_DENOMINATOR: i128 = 1_000_000_000;
@@ -196,6 +197,22 @@ pub enum ClockCalibrationError {
         valid_through_source_us: i64,
     },
     EmptyWatermarkSet,
+    EmptyCalibrationBatch,
+    CalibrationBatchTimestampMismatch,
+    NonIncreasingCalibrationTransactionTime {
+        previous: i64,
+        actual: i64,
+    },
+    DuplicateCalibrationId {
+        calibration_id: u64,
+    },
+    NoCalibrationKnownForSourceTime {
+        source_domain: ClockDomainId,
+        reference_domain: ClockDomainId,
+        source_time_us: i64,
+        known_at_knowledge_us: i64,
+    },
+    InvalidCalibrationHistory,
     ReferenceDomainMismatch {
         expected: ClockDomainId,
         actual: ClockDomainId,
@@ -242,6 +259,33 @@ impl fmt::Display for ClockCalibrationError {
             ),
             Self::EmptyWatermarkSet => {
                 write!(f, "at least one mapped source watermark is required")
+            }
+            Self::EmptyCalibrationBatch => {
+                write!(f, "clock calibration transaction batch must not be empty")
+            }
+            Self::CalibrationBatchTimestampMismatch => write!(
+                f,
+                "all clock calibration revisions in a transaction must share recorded_at_knowledge_us"
+            ),
+            Self::NonIncreasingCalibrationTransactionTime { previous, actual } => write!(
+                f,
+                "clock calibration transaction time {actual} must be later than previous commit {previous}"
+            ),
+            Self::DuplicateCalibrationId { calibration_id } => {
+                write!(f, "duplicate clock calibration ID {calibration_id}")
+            }
+            Self::NoCalibrationKnownForSourceTime {
+                source_domain,
+                reference_domain,
+                source_time_us,
+                known_at_knowledge_us,
+            } => write!(
+                f,
+                "no calibration from {:?} to {:?} covers source time {source_time_us} and is known at {known_at_knowledge_us}",
+                source_domain, reference_domain
+            ),
+            Self::InvalidCalibrationHistory => {
+                write!(f, "clock calibration ledger history or indexes are inconsistent")
             }
             Self::ReferenceDomainMismatch { expected, actual } => write!(
                 f,
@@ -401,6 +445,192 @@ impl ClockCalibrationV1 {
             calibration_id: mapped.calibration_id,
             calibration_sha256: mapped.calibration_sha256,
         })
+    }
+}
+
+/// Append-only, as-known calibration history. For one source/reference
+/// domain pair, the selected calibration is the newest revision visible at the
+/// decision cutoff whose source-time validity covers the requested timestamp.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct ClockCalibrationLedger {
+    revisions: Vec<ClockCalibrationV1>,
+    revisions_by_domain_pair: BTreeMap<(ClockDomainId, ClockDomainId), Vec<usize>>,
+    calibration_ids: BTreeSet<u64>,
+    last_transaction_time_knowledge_us: Option<i64>,
+}
+
+impl ClockCalibrationLedger {
+    pub fn revisions(&self) -> &[ClockCalibrationV1] {
+        &self.revisions
+    }
+
+    pub fn append(
+        &mut self,
+        calibration: ClockCalibrationV1,
+    ) -> Result<(), ClockCalibrationError> {
+        if let Some(previous) = self.last_transaction_time_knowledge_us {
+            if calibration.recorded_at_knowledge_us <= previous {
+                return Err(ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
+                    previous,
+                    actual: calibration.recorded_at_knowledge_us,
+                });
+            }
+        }
+        self.append_unchecked(calibration)?;
+        self.last_transaction_time_knowledge_us = Some(calibration.recorded_at_knowledge_us);
+        Ok(())
+    }
+
+    /// Atomically append several calibrations recorded at one knowledge time.
+    pub fn append_batch(
+        &mut self,
+        calibrations: impl IntoIterator<Item = ClockCalibrationV1>,
+    ) -> Result<(), ClockCalibrationError> {
+        let incoming: Vec<_> = calibrations.into_iter().collect();
+        if incoming.is_empty() {
+            return Err(ClockCalibrationError::EmptyCalibrationBatch);
+        }
+        let transaction_time = incoming[0].recorded_at_knowledge_us;
+        if incoming
+            .iter()
+            .any(|calibration| calibration.recorded_at_knowledge_us != transaction_time)
+        {
+            return Err(ClockCalibrationError::CalibrationBatchTimestampMismatch);
+        }
+        if let Some(previous) = self.last_transaction_time_knowledge_us {
+            if transaction_time <= previous {
+                return Err(ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
+                    previous,
+                    actual: transaction_time,
+                });
+            }
+        }
+
+        let mut candidate = self.clone();
+        for calibration in incoming {
+            candidate.append_unchecked(calibration)?;
+        }
+        candidate.last_transaction_time_knowledge_us = Some(transaction_time);
+        *self = candidate;
+        Ok(())
+    }
+
+    fn append_unchecked(
+        &mut self,
+        calibration: ClockCalibrationV1,
+    ) -> Result<(), ClockCalibrationError> {
+        calibration.validate()?;
+        if !self.calibration_ids.insert(calibration.calibration_id) {
+            return Err(ClockCalibrationError::DuplicateCalibrationId {
+                calibration_id: calibration.calibration_id,
+            });
+        }
+        let index = self.revisions.len();
+        self.revisions.push(calibration);
+        self.revisions_by_domain_pair
+            .entry((calibration.source_domain, calibration.reference_domain))
+            .or_default()
+            .push(index);
+        Ok(())
+    }
+
+    fn latest_known_for_source_time(
+        &self,
+        source_domain: ClockDomainId,
+        reference_domain: ClockDomainId,
+        source_time_us: i64,
+        known_at_knowledge_us: i64,
+    ) -> Result<&ClockCalibrationV1, ClockCalibrationError> {
+        let key = (source_domain, reference_domain);
+        let chain = self
+            .revisions_by_domain_pair
+            .get(&key)
+            .ok_or(ClockCalibrationError::NoCalibrationKnownForSourceTime {
+                source_domain,
+                reference_domain,
+                source_time_us,
+                known_at_knowledge_us,
+            })?;
+        let visible_count = chain.partition_point(|index| {
+            self.revisions[*index].recorded_at_knowledge_us <= known_at_knowledge_us
+        });
+        chain[..visible_count]
+            .iter()
+            .rev()
+            .map(|index| &self.revisions[*index])
+            .find(|calibration| {
+                source_time_us >= calibration.valid_from_source_us
+                    && source_time_us <= calibration.valid_through_source_us
+            })
+            .ok_or(ClockCalibrationError::NoCalibrationKnownForSourceTime {
+                source_domain,
+                reference_domain,
+                source_time_us,
+                known_at_knowledge_us,
+            })
+    }
+
+    pub fn map_time(
+        &self,
+        source_domain: ClockDomainId,
+        reference_domain: ClockDomainId,
+        source_time_us: i64,
+        known_at_knowledge_us: i64,
+    ) -> Result<MappedClockTime, ClockCalibrationError> {
+        self.latest_known_for_source_time(
+            source_domain,
+            reference_domain,
+            source_time_us,
+            known_at_knowledge_us,
+        )?
+        .map_time(source_domain, source_time_us, known_at_knowledge_us)
+    }
+
+    pub fn map_exclusive_watermark(
+        &self,
+        source_domain: ClockDomainId,
+        reference_domain: ClockDomainId,
+        source_exclusive_watermark_us: i64,
+        known_at_knowledge_us: i64,
+    ) -> Result<MappedExclusiveWatermark, ClockCalibrationError> {
+        self.latest_known_for_source_time(
+            source_domain,
+            reference_domain,
+            source_exclusive_watermark_us,
+            known_at_knowledge_us,
+        )?
+        .map_exclusive_watermark(source_exclusive_watermark_us, known_at_knowledge_us)
+    }
+
+    /// Rebuild the index from append-only records and compare the exact state.
+    pub fn verify_consistency(&self) -> Result<(), ClockCalibrationError> {
+        let mut rebuilt = Self::default();
+        let mut offset = 0;
+        while offset < self.revisions.len() {
+            let transaction_time = self.revisions[offset].recorded_at_knowledge_us;
+            let mut end = offset + 1;
+            while end < self.revisions.len()
+                && self.revisions[end].recorded_at_knowledge_us == transaction_time
+            {
+                end += 1;
+            }
+            rebuilt.append_batch(self.revisions[offset..end].iter().copied())?;
+            offset = end;
+        }
+        if rebuilt != *self {
+            return Err(ClockCalibrationError::InvalidCalibrationHistory);
+        }
+        Ok(())
+    }
+
+    pub fn state_sha256(&self) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(b"SYMTHAEA-CLOCK-CALIBRATION-LEDGER-V1\\0");
+        for calibration in &self.revisions {
+            hasher.update(calibration.calibration_id.to_le_bytes());
+            hasher.update(calibration.calibration_sha256());
+        }
+        hasher.finalize().into()
     }
 }
 
@@ -571,6 +801,97 @@ mod tests {
             conservative_min_exclusive_watermark(ClockDomainId(2), &[]),
             Err(ClockCalibrationError::EmptyWatermarkSet)
         );
+    }
+
+    #[test]
+    fn calibration_ledger_selects_latest_revision_as_known() {
+        let mut ledger = ClockCalibrationLedger::default();
+        let first = calibration();
+        ledger.append(first).unwrap();
+
+        let mut second = calibration();
+        second.calibration_id = 8;
+        second.recorded_at_knowledge_us = 200;
+        second.offset_lower_us = 10;
+        second.offset_upper_us = 12;
+        ledger.append(second).unwrap();
+
+        let as_known_first = ledger
+            .map_time(ClockDomainId(1), ClockDomainId(2), 1_000, 150)
+            .unwrap();
+        let as_known_latest = ledger
+            .map_time(ClockDomainId(1), ClockDomainId(2), 1_000, 250)
+            .unwrap();
+
+        assert_eq!(as_known_first.calibration_id(), 7);
+        assert_eq!(as_known_first.earliest_reference_us(), 11_002);
+        assert_eq!(as_known_latest.calibration_id(), 8);
+        assert_eq!(as_known_latest.earliest_reference_us(), 11_010);
+    }
+
+    #[test]
+    fn calibration_ledger_does_not_select_a_future_revision() {
+        let mut ledger = ClockCalibrationLedger::default();
+        ledger.append(calibration()).unwrap();
+        assert_eq!(
+            ledger.map_time(ClockDomainId(1), ClockDomainId(2), 1_000, 99),
+            Err(ClockCalibrationError::NoCalibrationKnownForSourceTime {
+                source_domain: ClockDomainId(1),
+                reference_domain: ClockDomainId(2),
+                source_time_us: 1_000,
+                known_at_knowledge_us: 99,
+            })
+        );
+    }
+
+    #[test]
+    fn calibration_ledger_batch_is_atomic_and_enforces_transaction_order() {
+        let mut ledger = ClockCalibrationLedger::default();
+        let before = ledger.state_sha256();
+        let first = calibration();
+        let mut duplicate = calibration();
+        duplicate.recorded_at_knowledge_us = 100;
+        assert_eq!(
+            ledger.append_batch([first, duplicate]),
+            Err(ClockCalibrationError::DuplicateCalibrationId {
+                calibration_id: 7,
+            })
+        );
+        assert_eq!(ledger.revisions().len(), 0);
+        assert_eq!(ledger.state_sha256(), before);
+
+        ledger.append(first).unwrap();
+        let mut earlier = calibration();
+        earlier.calibration_id = 8;
+        earlier.recorded_at_knowledge_us = 99;
+        assert_eq!(
+            ledger.append(earlier),
+            Err(ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
+                previous: 100,
+                actual: 99,
+            })
+        );
+    }
+
+    #[test]
+    fn calibration_ledger_replay_and_digest_are_deterministic() {
+        let first = calibration();
+        let mut second = calibration();
+        second.calibration_id = 8;
+        second.recorded_at_knowledge_us = 200;
+        second.offset_lower_us = 5;
+        second.offset_upper_us = 6;
+
+        let mut left = ClockCalibrationLedger::default();
+        let mut right = ClockCalibrationLedger::default();
+        left.append(first).unwrap();
+        right.append(first).unwrap();
+        left.append(second).unwrap();
+        right.append(second).unwrap();
+
+        assert_eq!(left.state_sha256(), right.state_sha256());
+        assert_eq!(left.verify_consistency(), Ok(()));
+        assert_eq!(right.verify_consistency(), Ok(()));
     }
 
     #[test]
