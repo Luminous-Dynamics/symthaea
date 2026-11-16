@@ -1,8 +1,8 @@
 use fusion_decision_compiler_contract::cross_solver_comparison::ApplicabilityState;
 use fusion_decision_compiler_contract::model_discrepancy::{
-    ApplicabilityReceipt, CalibrationExposure, CalibrationResidual,
-    DiscrepancyCalibrationProfile, DiscrepancyTarget, ModelDiscrepancyDisposition,
-    ParametricLowerBoundReceipt, evaluate_model_discrepancy,
+    ApplicabilityReceipt, CalibrationExposure, CalibrationResidual, DiscrepancyCalibrationProfile,
+    DiscrepancyTarget, ModelDiscrepancyDisposition, ParametricLowerBoundReceipt,
+    evaluate_model_discrepancy,
 };
 use fusion_decision_compiler_contract::plant_service_gate::{
     PowerBalanceProfile, PowerBalanceRun, PowerObservable, PowerTermEvidence,
@@ -199,7 +199,10 @@ fn main() {
     println!("disposition={:?}", report.disposition);
     println!("model_form_validity={:?}", report.model_form_validity);
     println!("calibration_samples={}", report.calibration_sample_count);
-    println!("conformal_rank={}", report.conformal_rank.unwrap_or_default());
+    println!(
+        "conformal_rank={}",
+        report.conformal_rank.unwrap_or_default()
+    );
     println!(
         "discrepancy_bound_mwe={:.6}",
         report.discrepancy_bound_mwe.unwrap_or(f64::NAN)
@@ -214,7 +217,9 @@ fn main() {
     );
     println!(
         "combined_coverage_floor_basis_points={}",
-        report.combined_coverage_floor_basis_points.unwrap_or_default()
+        report
+            .combined_coverage_floor_basis_points
+            .unwrap_or_default()
     );
     println!(
         "required_total_coverage_basis_points={}",
