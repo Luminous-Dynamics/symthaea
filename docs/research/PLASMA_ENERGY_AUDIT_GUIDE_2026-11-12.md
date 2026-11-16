@@ -335,3 +335,14 @@ The merged manifest now contains 41 source cases / 64 negative controls / 5 deri
 The six-target corpus includes `NH3-PLASMA-N2V-TRANSFER-CAUSAL-001`; its target validator requires a state-resolved catalyst-interface measurement or independently qualified measurement operator, discharge-to-interface transfer uncertainty, isotope attribution, matched thermal/electrical controls and full plant boundary.
 
 The Rust audit module now has 55 authored tests. The latest run on the earlier 55-test revision exposed one valid-target test-fixture omission; the production validator was retained and the fixture guard routing corrected. The corrected exact-head workflow is queued; no pass is claimed until it completes.
+
+
+## 9.26 Integrated ammonia competitiveness baseline and challenge — 2026-11-16
+
+The audit corpus now includes the integrated SOEC–Haber–Bosch model (Díaz-Motta et al., IJHE 236, published 22 May 2026, DOI 10.1016/j.ijhydene.2026.155184) and the IEA 2026 Haber–Bosch-plus-ASU component assumptions. The former reports 8.14 kWh/kg NH3 at 3,037 t/day and 63% LHV plant efficiency, but is a steady-state model whose stated boundary excludes offshore generation, storage and downstream transport. The latter reports 2.22 GJ/t NH3 electricity for HB+ASU and 0.18 t H2/t NH3 feed; hydrogen production is not included.
+
+The new derived source check computes reciprocal yields, the source-metric ratio and the JACS area-rate geometric extrapolation. It deliberately carries `comparison_status=NOT_COMPARABLE_BOUNDARIES_UNRESOLVED`; it is not a head-to-head result.
+
+A seventh target, `NH3-PLASMA-SYNTHESIS-SOEC-HB-COMPETITIVENESS-001`, now requires <=7.32 kWh/kg accepted NH3 (at least 10% below the 8.14 kWh/kg modeled baseline) with matching product and plant boundaries, including H2 generation, nitrogen supply, feedwater conditioning/desalination, auxiliaries, duty cycle and explicit baseline exclusions. The prior >=3 g/kWh target remains an intermediate research milestone, not industrial parity.
+
+The corpus now has 44 unique cases / 76 unique negative controls / 6 derived checks / 7 research targets.
