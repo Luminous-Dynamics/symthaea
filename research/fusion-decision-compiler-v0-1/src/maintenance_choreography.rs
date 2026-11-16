@@ -277,9 +277,9 @@ pub fn generate_maintenance_schedule(
             .max()
             .unwrap_or(plan.campaign_start_second);
         let start = earliest_resource_start(task, predecessor_finish, &scheduled, &resources)
-            .map_err(|diagnostic| {
+            .ok_or_else(|| {
                 vec![error(
-                    diagnostic,
+                    ScheduleDiagnostic::ResourceCapacityViolation,
                     &task.task_id,
                     "no feasible resource allocation found",
                 )]
@@ -1583,24 +1583,24 @@ mod tests {
 
     #[test]
     fn missing_or_stale_access_certificate_refuses_task_schedule() {
-        let mut plan = plan(
+        let mut first_plan = plan(
             vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
             vec![resource("robot", 1)],
         );
-        plan.tasks[0].access_certificate.certificate_ref.clear();
-        let errors = generate_maintenance_schedule(&plan).unwrap_err();
+        first_plan.tasks[0].access_certificate.certificate_ref.clear();
+        let errors = generate_maintenance_schedule(&first_plan).unwrap_err();
         assert!(
             errors
                 .iter()
                 .any(|error| error.diagnostic == ScheduleDiagnostic::MissingAccessCertificate)
         );
 
-        let mut plan = plan(
+        let mut first_plan = plan(
             vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
             vec![resource("robot", 1)],
         );
-        plan.tasks[0].access_certificate.bound_geometry_sha256 = sha('b');
-        let errors = generate_maintenance_schedule(&plan).unwrap_err();
+        first_plan.tasks[0].access_certificate.bound_geometry_sha256 = sha('b');
+        let errors = generate_maintenance_schedule(&first_plan).unwrap_err();
         assert!(
             errors
                 .iter()
@@ -1610,24 +1610,24 @@ mod tests {
 
     #[test]
     fn blocked_or_unknown_access_cannot_be_scheduled_as_feasible() {
-        let mut plan = plan(
+        let mut first_plan = plan(
             vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
             vec![resource("robot", 1)],
         );
-        plan.tasks[0].access_certificate.disposition = AccessAssessmentDisposition::Blocked;
-        let errors = generate_maintenance_schedule(&plan).unwrap_err();
+        first_plan.tasks[0].access_certificate.disposition = AccessAssessmentDisposition::Blocked;
+        let errors = generate_maintenance_schedule(&first_plan).unwrap_err();
         assert!(
             errors
                 .iter()
                 .any(|error| error.diagnostic == ScheduleDiagnostic::AccessAssessmentBlocked)
         );
 
-        let mut plan = plan(
+        let mut first_plan = plan(
             vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
             vec![resource("robot", 1)],
         );
-        plan.tasks[0].access_certificate.disposition = AccessAssessmentDisposition::Unknown;
-        let errors = generate_maintenance_schedule(&plan).unwrap_err();
+        first_plan.tasks[0].access_certificate.disposition = AccessAssessmentDisposition::Unknown;
+        let errors = generate_maintenance_schedule(&first_plan).unwrap_err();
         assert!(
             errors
                 .iter()
