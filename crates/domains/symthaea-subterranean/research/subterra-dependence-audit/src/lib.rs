@@ -399,7 +399,7 @@ impl LineageDataset {
 }
 
 
-pub const MINIMUM_CLUSTER_BOOTSTRAP_CLUSTERS: usize = 10;
+pub const MINIMUM_CLUSTER_BOOTSTRAP_CLUSTERS: usize = 20;
 pub const MINIMUM_CLUSTER_BOOTSTRAP_REPLICATES: usize = 200;
 pub const MAXIMUM_CLUSTER_BOOTSTRAP_REPLICATES: usize = 1_000_000;
 
@@ -866,7 +866,7 @@ mod tests {
     }
 
     fn bootstrap_scores() -> Vec<ClusterScorePair> {
-        (0..12)
+        (0..20)
             .map(|index| ClusterScorePair {
                 dependency_component_id: format!("component-{index:02}"),
                 baseline_score: 2.0 + index as f64 / 10.0,
@@ -886,11 +886,11 @@ mod tests {
     #[test]
     fn paired_bootstrap_uses_equal_component_weight_and_reports_effect() {
         let report = paired_cluster_bootstrap(&bootstrap_scores(), bootstrap_config()).unwrap();
-        assert_eq!(report.cluster_count, 12);
+        assert_eq!(report.cluster_count, 20);
         assert_eq!(report.replicates, 1_000);
         assert_eq!(report.seed, 0x5EED_2026);
-        assert!((report.mean_baseline_score - 2.55).abs() < 1.0e-12);
-        assert!((report.mean_candidate_score - 1.55).abs() < 1.0e-12);
+        assert!((report.mean_baseline_score - 2.95).abs() < 1.0e-12);
+        assert!((report.mean_candidate_score - 1.95).abs() < 1.0e-12);
         assert!((report.mean_candidate_minus_baseline + 1.0).abs() < 1.0e-12);
     }
 
@@ -935,11 +935,11 @@ mod tests {
 
     #[test]
     fn bootstrap_rejects_too_few_dependency_components() {
-        let scores = bootstrap_scores().into_iter().take(9).collect::<Vec<_>>();
+        let scores = bootstrap_scores().into_iter().take(19).collect::<Vec<_>>();
         assert_eq!(
             paired_cluster_bootstrap(&scores, bootstrap_config()),
             Err(BootstrapError::TooFewClusters {
-                observed: 9,
+                observed: 19,
                 minimum: MINIMUM_CLUSTER_BOOTSTRAP_CLUSTERS,
             })
         );

@@ -355,7 +355,7 @@ A new paired percentile bootstrap consumes one aggregate baseline/candidate scor
 |---|---|---|
 | PairedClusterBootstrapBench | Resample dependency components, not raw evidence rows | Equal component weight; deterministic fixed seed; no duplicate IDs |
 | BootstrapReproducibilityBench | Same frozen component scores, order and seed produce byte-for-byte same report | Exact repeatability |
-| ClusterCountDisclosureBench | Confidence intervals expose the number of distinct components | Always publish component count; treat fewer than 20–30 as exploratory |
+| ClusterCountDisclosureBench | Confidence intervals expose the number of distinct components | Always publish component count; 20 is the minimum and 30+ is preferred; report fewer as descriptive only |
 | PairedEffectBench | Baseline and candidate evaluated on the same components | Report paired mean difference and percentile interval |
 | NumericalIntegrityBench | NaN, infinity, duplicate component IDs and excessive/insufficient replicates fail closed | Zero silently accepted invalid inputs |
 
