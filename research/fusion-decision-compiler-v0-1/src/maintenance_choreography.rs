@@ -1587,7 +1587,10 @@ mod tests {
             vec![task("a", 10, &[], "robot", ServiceImpact::FullOutage)],
             vec![resource("robot", 1)],
         );
-        first_plan.tasks[0].access_certificate.certificate_ref.clear();
+        first_plan.tasks[0]
+            .access_certificate
+            .certificate_ref
+            .clear();
         let errors = generate_maintenance_schedule(&first_plan).unwrap_err();
         assert!(
             errors
