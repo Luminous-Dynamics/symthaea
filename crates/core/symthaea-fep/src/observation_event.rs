@@ -379,9 +379,12 @@ mod tests {
             .evaluate_gaussian_likelihood(&[0.5], 1.0)
             .expect("valid high precision");
 
-        assert!((high_score.weighted_squared_error - 4.0 * low_score.weighted_squared_error).abs() < 1e-12);
-        // The log-normalizer prevents precision from acting as a free,
-        // unbounded confidence multiplier.
+        assert!(
+            (high_score.weighted_squared_error - 4.0 * low_score.weighted_squared_error).abs()
+                < 1e-12
+        );
+        // The normalization term makes scores comparable across precision
+        // values; weighted squared error alone is not a Gaussian likelihood.
         assert!(high_score.log_likelihood.is_finite());
         assert!(low_score.log_likelihood.is_finite());
     }
