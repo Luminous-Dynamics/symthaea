@@ -740,10 +740,8 @@ mod tests {
         let mut zero_mean_false_alarms = 0_u64;
 
         for path in 0..PATHS {
-            let mut state = 0x7a31_9cde_0428_b5f1_u64
-                ^ path.wrapping_mul(0xd6e8_feb8_6659_fd93);
-            let mut conditional =
-                PredictableGaussianEProcess::new(SIGMA, 0.05).unwrap();
+            let mut state = 0x7a31_9cde_0428_b5f1_u64 ^ path.wrapping_mul(0xd6e8_feb8_6659_fd93);
+            let mut conditional = PredictableGaussianEProcess::new(SIGMA, 0.05).unwrap();
             let mut zero_mean = PredictableGaussianEProcess::new(SIGMA, 0.05).unwrap();
             let mut previous_observation = 0.0;
             let mut conditional_crossed = false;
@@ -753,8 +751,7 @@ mod tests {
                 // The AR(1) conditional mean is completely determined by
                 // the previous observation and is committed before this draw.
                 let conditional_mean = RHO * previous_observation;
-                let observed = conditional_mean
-                    + SIGMA * deterministic_standard_normal(&mut state);
+                let observed = conditional_mean + SIGMA * deterministic_standard_normal(&mut state);
                 let conditional_id = format!("conditional-{path}-{step}");
                 let zero_mean_id = format!("zero-mean-{path}-{step}");
                 let conditional_digest = format!("conditional-decision-{path}-{step}");
@@ -863,8 +860,7 @@ mod tests {
         assert_eq!(result.components[1].expected_residual, -0.2);
         let positive_log_e = 0.08;
         let negative_log_e = -0.24;
-        let expected_mix =
-            (0.5_f64 * positive_log_e.exp() + 0.5_f64 * negative_log_e.exp()).ln();
+        let expected_mix = (0.5_f64 * positive_log_e.exp() + 0.5_f64 * negative_log_e.exp()).ln();
         assert!((result.log_e_value - expected_mix).abs() < 1.0e-12);
     }
 
