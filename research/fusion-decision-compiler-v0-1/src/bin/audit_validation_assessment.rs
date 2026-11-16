@@ -1,8 +1,7 @@
 use fusion_decision_compiler_contract::validation_assessment::{
-    BlindHoldoutAssessmentCase, MeasuredObservable, ModelRunIdentity,
-    ObservableValidationSpec, PredictedObservable, ValidationAssessmentCampaign,
-    ValidationAssessmentProfile, PredictiveAssessmentDisposition,
-    assess_blind_holdout_campaign,
+    BlindHoldoutAssessmentCase, MeasuredObservable, ModelRunIdentity, ObservableValidationSpec,
+    PredictedObservable, PredictiveAssessmentDisposition, ValidationAssessmentCampaign,
+    ValidationAssessmentProfile, assess_blind_holdout_campaign,
 };
 use fusion_decision_compiler_contract::validation_domain::{
     BlindHoldoutMeasurement, CalibrationExposure, HoldoutExposure, MeasuredObservation,
@@ -66,7 +65,11 @@ fn make_case(index: usize) -> BlindHoldoutAssessmentCase {
         &holdout_id,
         &format!("validation-dataset-{index}"),
         holdout_artifact,
-        if index == 0 { "facility-a" } else { "facility-b" },
+        if index == 0 {
+            "facility-a"
+        } else {
+            "facility-b"
+        },
         &format!("validation-case-{index}"),
         &format!("operating-point-{index}"),
         &format!("validation-episode-{index}"),
@@ -190,17 +193,19 @@ fn main() {
         cases: vec![make_case(0), make_case(1), make_case(2)],
     };
 
-    let report = assess_blind_holdout_campaign(&campaign)
-        .unwrap_or_else(|errors| {
-            eprintln!("blind-holdout assessment refused: {errors:?}");
-            std::process::exit(1);
-        });
+    let report = assess_blind_holdout_campaign(&campaign).unwrap_or_else(|errors| {
+        eprintln!("blind-holdout assessment refused: {errors:?}");
+        std::process::exit(1);
+    });
     println!("contract_version={}", report.contract_version);
     println!("profile={}", report.profile_id);
     println!("model_revision={}", report.model_revision);
     println!("holdout_count={}", report.holdout_count);
     println!("distinct_facility_count={}", report.distinct_facility_count);
-    println!("distinct_operating_point_count={}", report.distinct_operating_point_count);
+    println!(
+        "distinct_operating_point_count={}",
+        report.distinct_operating_point_count
+    );
     println!("disposition={:?}", report.disposition);
 
     for metric in &report.per_observable_metrics {
