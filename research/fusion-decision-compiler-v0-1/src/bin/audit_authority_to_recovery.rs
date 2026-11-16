@@ -1,9 +1,9 @@
 use fusion_decision_compiler_contract::authority_to_recovery::{
-    ActuatorChannelProfile, ControlDecisionDisposition, ControlEvidenceClass,
-    ControlTimingClass, ControlTimingEvidence, ControllerAuthority, ControllerProposal,
-    GuardEvidence, GuardResult, OperatingState, OperatingStateManifest, RequalificationResult,
-    SafetyAuthorityReceipt, SafetyDecision, TransitionAcknowledgement, TransitionAttempt,
-    TransitionRule, arbitrate_actuator_channel, evaluate_state_transition,
+    ActuatorChannelProfile, ControlDecisionDisposition, ControlEvidenceClass, ControlTimingClass,
+    ControlTimingEvidence, ControllerAuthority, ControllerProposal, GuardEvidence, GuardResult,
+    OperatingState, OperatingStateManifest, RequalificationResult, SafetyAuthorityReceipt,
+    SafetyDecision, TransitionAcknowledgement, TransitionAttempt, TransitionRule,
+    arbitrate_actuator_channel, evaluate_state_transition,
 };
 
 fn sha(character: char) -> String {
@@ -141,8 +141,7 @@ fn main() {
     );
     println!(
         "independent_safety_veto={:?},winner={:?}",
-        veto_report.disposition,
-        veto_report.winner_controller_id
+        veto_report.disposition, veto_report.winner_controller_id
     );
 
     let manifest = OperatingStateManifest {
@@ -204,8 +203,7 @@ fn main() {
     let transition = evaluate_state_transition(&manifest, &attempt);
     println!(
         "requalification_transition={:?},fallback={:?}",
-        transition.disposition,
-        transition.fallback_state_id
+        transition.disposition, transition.fallback_state_id
     );
     println!(
         "SCOPE: synthetic control arbitration/state-transition contract only; no hardware control, SIL certification, real-time determinism or physical safety claim"
