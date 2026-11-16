@@ -446,11 +446,12 @@ pub fn evaluate_model_form_discrepancy(
         );
     }
 
-    let residual_values: Vec<f64> = plan
+    let mut residual_values: Vec<f64> = plan
         .calibration_residuals
         .iter()
         .map(|item| item.absolute_residual_mwe)
         .collect();
+    residual_values.sort_by(f64::total_cmp);
 
     let n = residual_values.len();
     if n < plan.profile.minimum_calibration_samples {
@@ -864,11 +865,15 @@ fn report(
         target_total_coverage: plan.profile.target_total_coverage,
         residual_order_statistic_mwe: residuals,
         model_form_validity,
-        calibration_evidence_refs: plan
-            .calibration_residuals
-            .iter()
-            .map(|item| item.evidence_ref.clone())
-            .collect(),
+        calibration_evidence_refs: {
+            let mut references: Vec<String> = plan
+                .calibration_residuals
+                .iter()
+                .map(|item| item.evidence_ref.clone())
+                .collect();
+            references.sort();
+            references
+        },
         applicability_evidence_ref: Some(plan.applicability.evidence_ref.clone()),
         parametric_evidence_ref: Some(plan.parametric_bound.evidence_ref.clone()),
         decision_receipt_ref: Some(plan.decision_receipt_ref.clone()),
@@ -1082,9 +1087,10 @@ mod tests {
     fn eighteen_residuals_cannot_support_finite_ninety_five_percent_bound() {
         let mut plan = plan(18, 1.0);
         plan.profile.discrepancy_coverage = 0.95;
+        plan.profile.minimum_calibration_samples = 1;
         let report = evaluate_model_form_discrepancy(&plan);
         assert_eq!(report.disposition, ModelFormDisposition::InsufficientCalibration);
-        assert_eq!(report.conformal_rank_one_based, Some(19));
+        assert_eq!(report.conformal_rank_one_based, None);
         assert_eq!(report.discrepancy_allowance_mwe, None);
     }
 
@@ -1234,7 +1240,16 @@ mod tests {
     #[test]
     fn material_tolerance_equality_obeys_inclusive_policy() {
         let mut plan = plan(39, 20.0);
-        plan.profile.material_discrepancy_tolerance = 20.38;
+        let exact_allowance = conformal_absolute_residual_allowance(
+            &plan.calibration_residuals
+                .iter()
+                .map(|item| item.absolute_residual_mwe)
+                .collect::<Vec<_>>(),
+            plan.profile.discrepancy_coverage,
+        )
+        .unwrap()
+        .value_mwe;
+        plan.profile.material_discrepancy_tolerance = exact_allowance;
         plan.profile.tolerance_inclusive = true;
         assert_eq!(
             evaluate_model_form_discrepancy(&plan).disposition,
