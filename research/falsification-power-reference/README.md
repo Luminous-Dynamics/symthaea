@@ -114,7 +114,7 @@ This v0 requires all future d_t and sigma_t to be frozen before observations. It
 
 ## Paired Gaussian terminal-test method comparison
 
-The standalone binary gaussian_terminal_induction_calibration runs the fixed-design comparator:
+The standalone binary gaussian_terminal_induction_calibration runs the fixed-design comparator over a preregistered induced-test stopping-threshold grid of 0.75, 0.90 and 0.99:
 
     cargo run --locked --manifest-path research/falsification-power-reference/Cargo.toml --bin gaussian_terminal_induction_calibration
 
@@ -124,6 +124,6 @@ For the same generated outcome path it compares:
 - the Gaussian e-process Ville-boundary crossing rule;
 - naive repeated fixed-time z tests as an invalid optional-stopping control.
 
-It reports null/alternative rejection rates with Wilson intervals, mean stopping look, e-process crossing delay, the analytically computed terminal NP power and a terminal-equivalence mismatch count. The binary uses separate deterministic observation and randomizer streams; its PRNG is for simulation only.
+It reports null/alternative rejection rates with Wilson intervals for every threshold, early-stop frequency, mean stopping look, e-process crossing delay, the analytically computed terminal NP power and a terminal-equivalence mismatch count. The same observation paths are reused across all four methods; each threshold has a separate randomizer stream. The binary uses separate deterministic observation and randomizer streams; its PRNG is for simulation only.
 
 This campaign is restricted to one frozen simple Gaussian design. It is not a general adaptive-discovery benchmark or physical validation.
