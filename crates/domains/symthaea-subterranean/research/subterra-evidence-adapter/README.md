@@ -19,6 +19,7 @@ Fixtures in this package are copies of the cited synthetic examples for determin
 - Site evidence: typed DTO, semantic consistency checks and non-probabilistic `SiteBeliefInput` conversion.
 - Cave network: typed DTO, observed-topology components, evidence-state summary and directional demonstrated-route queries.
 - Non-uniform profile: typed DTO, explicit unknown intervals, measurement uncertainty preservation, coverage summary and observed-only length-weighted dimensions.
+- Science-return lifecycle: monotonic evidence events from proposal through admission, with failure/cancellation and store-and-forward branches; delivery and scientific admission are distinct.
 
 All three inputs retain schema-specific states and evidence references. The profile summary is a lightweight adapter view, not a replacement for Symtropy's morphometry reference kernel.
 
@@ -31,9 +32,10 @@ All three inputs retain schema-specific states and evidence references. The prof
 5. Candidate and geophysically supported edges are preserved as hypotheses and are not promoted into observed topology.
 6. Evidence references are opaque identifiers. The adapter does not authenticate, resolve, or dereference them.
 7. Profile means are calculated only over observed intervals. An unobserved interval is never treated as zero width/height or interpolated.
-8. The v0.1 observation `captured_at` string is retained but not independently checked as RFC 3339; JSON Schema format validation remains a separate gate.
-9. Planetary-protection and activity permissions are represented as declarations only. They are never converted into permission for a measurement, sample, biological activity or actuator.
-10. No Earth coordinate assumptions, geodetic transforms, SLAM, geomechanics or engineering qualification are implemented here.
+8. Science-return events distinguish proposed, executed, acquired, integrity-verified, persisted, store-and-forwarded, delivered and scientifically admitted states. Store-and-forward is not delivery.
+9. The v0.1 observation `captured_at` string is retained but not independently checked as RFC 3339; JSON Schema format validation remains a separate gate.
+10. Planetary-protection and activity permissions are represented as declarations only. They are never converted into permission for a measurement, sample, biological activity or actuator.
+11. No Earth coordinate assumptions, geodetic transforms, SLAM, geomechanics or engineering qualification are implemented here.
 
 ## Run locally
 
@@ -47,8 +49,9 @@ The package has its own Cargo workspace and does not join the production Symthae
 
 ## Validation boundary
 
-- Site, cave-network and non-uniform-profile adapters plus unit-test fixtures: AUTHORED.
+- Site, cave-network and non-uniform-profile adapters plus science-return lifecycle and unit-test fixtures: AUTHORED.
 - The profile adapter validates ordered contiguous coverage and computes observed-only geometry summaries; it does not yet propagate uncertainty through the summary statistics.
+- The science-return record validates event order and reference presence; it does not prove cryptographic authenticity, immutable storage, custody authority or transport delivery.
 - The adapter rejects malformed required fields and unknown fields, but does not replace full Draft 2020-12 schema validation or RFC 3339 format validation.
 - Rust source and unit-test fixtures: AUTHORED.
 - Compilation, formatting, tests and Clippy: NOT EXECUTED in the current authoring environment (no Rust toolchain available).
