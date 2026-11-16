@@ -218,3 +218,14 @@ dependency lock and fixture/source digests. This measures in-memory CPU query
 cost only; it does not establish durable-storage, distributed, throughput or
 physical-energy performance. No latency advantage is claimed until the latest
 exact-head run yields an artifact.
+
+
+## 12. Current external comparator snapshot
+
+The model-to-benchmark observations are pinned separately in
+`crates/domains/symthaea-capability-closure/fixtures/tsfm_comparator_snapshot_v0.1.json`
+and referenced by the real-irregular registry. The fixture keeps FEV-Bench
+win-rate snapshots, MASE skill, GIFT-Eval CRPS/MASE, BOOM telemetry CRPS and
+accuracy-energy study findings distinct. It preserves conflicting H2O public
+surfaces and identifies vendor claims versus leaderboard mirrors. It is a
+dated comparator manifest, not a set of reproduced scores.
