@@ -36,7 +36,15 @@
     "complete_when": "all_required_sources_watermark_at_least_interval_end_or_terminal",
     "no_progress": "incomplete",
     "late_breach": "contested",
-    "historical_query": "progress_and_late_arrival_only_visible_at_or_before_known_at"
+    "historical_query": "progress_and_late_arrival_only_visible_at_or_before_known_at",
+    "completeness_report_binds_progress_evidence": [
+      "progress_id",
+      "stream_generation",
+      "progress_sequence",
+      "recorded_at_us",
+      "policy_sha256",
+      "exclusive_watermark_us"
+    ]
   },
   "arrival": {
     "event_time_less_than_prior_watermark": "late_breach",
@@ -46,7 +54,16 @@
     "duplicate_event_arrival": "reject",
     "global_transaction_clock": "strictly_increasing_across_progress_and_arrival_transactions",
     "multiple_same_time_arrivals": "atomic_batch",
-    "raw_event_persistence": "bitemporal_event_ledger_owns_authoritative_event"
+    "raw_event_persistence": "bitemporal_event_ledger_owns_authoritative_event",
+    "no_prior_progress": "unqualified_not_on_time",
+    "late_breach_receipt_binds_progress_evidence": [
+      "progress_id",
+      "stream_generation",
+      "progress_sequence",
+      "recorded_at_us",
+      "policy_sha256",
+      "exclusive_watermark_us"
+    ]
   },
   "adversarial_scenarios": [
     {
@@ -132,6 +149,18 @@
       "name": "history_rebuild_and_digest",
       "expect": "exact_index_and_receipt_parity",
       "safety": "append_only_replay"
+    },
+    {
+      "id": "WM-015",
+      "name": "arrival_without_prior_progress",
+      "expect": "unqualified_no_prior_progress_not_on_time",
+      "safety": "lack_of_watermark_cannot_certify_timeliness"
+    },
+    {
+      "id": "WM-016",
+      "name": "progress_and_breach_evidence_binding",
+      "expect": "exact_progress_revision_and_policy_digest_returned",
+      "safety": "completeness_and_late_receipts_are_auditable"
     }
   ],
   "metrics": {
@@ -161,12 +190,13 @@
     "always_incomplete_policy_accepted": false
   },
   "validation_status": {
-    "rust_test_functions_authored": 17,
     "unit_tests_executed": false,
     "external_stream_replay_executed": false,
     "durable_persistence_executed": false,
     "source_authentication_executed": false,
     "benchmark_results_available": false,
-    "targets_are_results": false
+    "targets_are_results": false,
+    "watermark_test_functions_authored": 21,
+    "crate_test_functions_authored": 77
   }
 }
