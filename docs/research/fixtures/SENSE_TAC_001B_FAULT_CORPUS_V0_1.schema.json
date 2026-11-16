@@ -45,7 +45,13 @@
         "rounding",
         "fault_overrides",
         "truth_visibility",
-        "independence"
+        "independence",
+        "reference_temperature_c",
+        "drift_epoch_ms",
+        "default_channel_gain",
+        "default_channel_bias",
+        "drift_elapsed_time_basis",
+        "parameter_semantics"
       ],
       "properties": {
         "signal_unit": {
@@ -79,6 +85,28 @@
         },
         "independence": {
           "type": "string"
+        },
+        "reference_temperature_c": {
+          "type": "number"
+        },
+        "drift_epoch_ms": {
+          "type": "integer"
+        },
+        "default_channel_gain": {
+          "type": "number"
+        },
+        "default_channel_bias": {
+          "type": "number"
+        },
+        "drift_elapsed_time_basis": {
+          "type": "string"
+        },
+        "parameter_semantics": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "minProperties": 13
         }
       }
     },
