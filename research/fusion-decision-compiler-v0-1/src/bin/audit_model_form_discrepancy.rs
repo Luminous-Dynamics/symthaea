@@ -148,19 +148,16 @@ fn main() {
 
     let report = evaluate_model_form_discrepancy(&plan);
     println!("contract_version={}", report.contract_version);
-    println!("calibration_sample_count={}", report.calibration_sample_count);
+    println!(
+        "calibration_sample_count={}",
+        report.calibration_sample_count
+    );
     println!(
         "combined_coverage_floor={:.3}",
         report.combined_coverage_floor.unwrap_or(f64::NAN)
     );
-    println!(
-        "model_form_disposition={:?}",
-        report.disposition
-    );
-    println!(
-        "model_form_validity={:?}",
-        report.model_form_validity
-    );
+    println!("model_form_disposition={:?}", report.disposition);
+    println!("model_form_validity={:?}", report.model_form_validity);
     println!(
         "downstream_robust_receipt_emitted={}",
         report.to_net_export_receipt(&plan).is_some()
