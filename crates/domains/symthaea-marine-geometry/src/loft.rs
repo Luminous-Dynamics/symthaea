@@ -873,7 +873,7 @@ pub fn verify_loft_artifact_integrity(
         }
         if planar_stern {
             let stern_centre_index =
-                first_centre_index + if planar_bow { 1_u32 } else { 0_u32 };
+                first_centre_index + (if planar_bow { 1_u32 } else { 0_u32 });
             let expected = expected_cap_faces(false, stern_centre_index);
             let range = artifact.stern_end_cap_face_range;
             let end = range.first_face.saturating_add(range.face_count);
@@ -998,7 +998,8 @@ pub fn loft_waterplane_capped_hull(
         };
         vertex_count = total;
     }
-    let planar_cap_count = if bow_planar { 1_usize } else { 0_usize } + if stern_planar { 1_usize } else { 0_usize };
+    let planar_cap_count = (if bow_planar { 1_usize } else { 0_usize })
+        + (if stern_planar { 1_usize } else { 0_usize });
     let Some(vertex_count) = vertex_count
         .checked_add(planar_cap_count)
         .filter(|count| *count <= MAX_MESH_VERTICES)
