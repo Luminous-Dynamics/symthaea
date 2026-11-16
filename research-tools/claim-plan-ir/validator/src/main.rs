@@ -324,6 +324,72 @@ fn is_valid_json_pointer(pointer: &str) -> bool {
     true
 }
 
+fn canonical_https_dns_host(origin: &str) -> Result<&str, String> {
+    let authority = origin
+        .strip_prefix("https://")
+        .ok_or_else(|| "source origin must use HTTPS".to_owned())?;
+    if authority.is_empty()
+        || authority.contains('/')
+        || authority.contains('?')
+        || authority.contains('#')
+        || authority.contains('@')
+        || authority.contains('\\')
+        || authority.chars().any(char::is_whitespace)
+        || authority.contains('[')
+        || authority.contains(']')
+    {
+        return Err("source.request.origin must be a canonical HTTPS DNS origin".to_owned());
+    }
+
+    let (host, port) = match authority.split_once(':') {
+        Some((host, port)) => {
+            if port.is_empty()
+                || !port.bytes().all(|byte| byte.is_ascii_digit())
+                || port.starts_with('0')
+            {
+                return Err("HTTPS origin port must be canonical decimal without leading zeroes".to_owned());
+            }
+            let parsed = port
+                .parse::<u16>()
+                .map_err(|_| "HTTPS origin port must be in the range 1..=65535".to_owned())?;
+            if parsed == 443 {
+                return Err("canonical HTTPS origin must omit the default port 443".to_owned());
+            }
+            (host, Some(parsed))
+        }
+        None => (authority, None),
+    };
+    let _ = port;
+
+    if host.is_empty() || host.len() > 253 || !host.is_ascii() {
+        return Err("HTTPS origin host must be an ASCII DNS A-label of at most 253 bytes".to_owned());
+    }
+    if host.bytes().any(|byte| byte.is_ascii_uppercase()) || host.ends_with('.') {
+        return Err("HTTPS origin host must be lowercase and omit the trailing DNS dot".to_owned());
+    }
+    for label in host.split('.') {
+        if label.is_empty() || label.len() > 63 {
+            return Err("HTTPS origin contains an empty or overlong DNS label".to_owned());
+        }
+        let bytes = label.as_bytes();
+        if !bytes[0].is_ascii_lowercase() && !bytes[0].is_ascii_digit() {
+            return Err("DNS labels must begin with a lowercase alphanumeric character".to_owned());
+        }
+        if !bytes[bytes.len() - 1].is_ascii_lowercase()
+            && !bytes[bytes.len() - 1].is_ascii_digit()
+        {
+            return Err("DNS labels must end with a lowercase alphanumeric character".to_owned());
+        }
+        if !bytes
+            .iter()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || *byte == b'-')
+        {
+            return Err("DNS labels may contain only lowercase letters, digits and hyphens".to_owned());
+        }
+    }
+    Ok(host)
+}
+
 fn validate_semantics(value: &Value) -> Result<usize, String> {
     let fields = value
         .get("fields")
@@ -393,27 +459,29 @@ fn validate_semantics(value: &Value) -> Result<usize, String> {
         "origin",
         "source.request",
     )?;
-    let authority = origin
-        .strip_prefix("https://")
-        .ok_or_else(|| "source origin must use HTTPS".to_owned())?;
-    if authority.is_empty()
-        || authority.contains('/')
-        || authority.contains('?')
-        || authority.contains('#')
-        || authority.contains('@')
-        || authority.chars().any(char::is_whitespace)
+    let host = canonical_https_dns_host(origin)?;
+    let path_template = str_at(
+        value.pointer("/source/request").ok_or("source.request missing")?,
+        "path_template",
+        "source.request",
+    )?;
+    if !path_template.starts_with('/')
+        || path_template.starts_with("//")
+        || path_template.contains('?')
+        || path_template.contains('#')
+        || path_template.contains('\\')
+        || path_template.chars().any(char::is_control)
     {
-        return Err("source.request.origin must be an HTTPS origin, not a URL/path".to_owned());
+        return Err("source.request.path_template must be an origin-relative path without query, fragment or backslash".to_owned());
     }
-    let host = authority.split(':').next().unwrap_or_default();
     if value.pointer("/source/server/identity_kind").and_then(Value::as_str) == Some("dns_name") {
         let server_name = str_at(
             value.pointer("/source/server").ok_or("source.server missing")?,
             "identity_value",
             "source.server",
         )?;
-        if !server_name.eq_ignore_ascii_case(host) {
-            return Err("DNS server identity must match the HTTPS origin host".to_owned());
+        if server_name != host {
+            return Err("canonical DNS server identity must exactly match the HTTPS origin host".to_owned());
         }
     }
 
@@ -573,6 +641,8 @@ mod tests {
         include_str!("../../fixtures/negative/expiry_not_after_issued_at.json");
     const TRUST_SCOPE: &str =
         include_str!("../../fixtures/negative/trust_scope_overclaim.json");
+    const BAD_PORT: &str =
+        include_str!("../../fixtures/negative/https_origin_port_out_of_range.json");
 
     #[test]
     fn jcs_uses_utf16_code_unit_order_for_object_keys() {
@@ -590,6 +660,13 @@ mod tests {
         let (digest, count) = validate_plan(POSITIVE).expect("positive fixture should pass");
         assert_eq!(count, 3);
         assert_eq!(digest.len(), 64);
+    }
+
+    #[test]
+    fn https_origin_port_must_be_in_range() {
+        let error = validate_plan(BAD_PORT)
+            .expect_err("out-of-range HTTPS port must reject");
+        assert!(error.contains("port must be in the range"));
     }
 
     #[test]
