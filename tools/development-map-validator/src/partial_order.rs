@@ -1494,6 +1494,34 @@ mod tests {
     }
 
     #[test]
+    fn rejects_receipt_context_laundering_from_another_branch() {
+        let mut value = fixture_value();
+        value["candidate_view"]["receipts"][0]["context_digest"] =
+            json!("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+        let report = report_for(&value);
+        let conformant = trace(&report, "conformant-partial-order");
+        assert!(conformant.branch_receipt_contamination_ids.contains(&"receipt-build-a".to_owned()));
+        assert!(conformant.unsupported_current_claims.contains(&"branch-a:build-repro".to_owned()));
+        assert!(conformant.invalid_receipt_uses.iter().any(|issue| {
+            issue.receipt_id == "receipt-build-a"
+                && issue.reasons.iter().any(|reason| reason == "receipt_context_digest_does_not_match_origin_branch")
+        }));
+    }
+
+    #[test]
+    fn rejects_receipt_observed_before_its_source_event_was_available() {
+        let mut value = fixture_value();
+        value["candidate_view"]["receipts"][0]["observed_at"] = json!("2026-11-16T01:04:00Z");
+        let report = report_for(&value);
+        let conformant = trace(&report, "conformant-partial-order");
+        assert!(conformant.unsupported_current_claims.contains(&"branch-a:build-repro".to_owned()));
+        assert!(conformant.invalid_receipt_uses.iter().any(|issue| {
+            issue.receipt_id == "receipt-build-a"
+                && issue.reasons.iter().any(|reason| reason == "receipt_observed_before_source_event_available:branch-a-source")
+        }));
+    }
+
+    #[test]
     fn critical_join_claim_without_fresh_pass_is_unsupported() {
         let report = evaluate_partial_order_json(FIXTURE).expect("D6.10 fixture");
         let adversarial = trace(&report, "adversarial-linearization");
