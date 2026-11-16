@@ -1,0 +1,514 @@
+{
+  "bundle_id": "egddm-d6.13-whole-dag-v0.1",
+  "bundle_visibility": "evaluator_only_never_candidate_visible",
+  "candidate_view": {
+    "scenario_id": "d6.13-whole-dag-correlation-v0.1",
+    "observation_boundary_state": "complete",
+    "events": [
+      {
+        "event_id": "A",
+        "event_time": "2026-11-16T00:01:00Z",
+        "available_at": "2026-11-16T00:01:00Z"
+      },
+      {
+        "event_id": "B",
+        "event_time": "2026-11-16T00:02:00Z",
+        "available_at": "2026-11-16T00:02:00Z"
+      },
+      {
+        "event_id": "C",
+        "event_time": "2026-11-16T00:03:00Z",
+        "available_at": "2026-11-16T00:03:00Z"
+      },
+      {
+        "event_id": "E",
+        "event_time": "2026-11-16T00:04:00Z",
+        "available_at": "2026-11-16T00:04:00Z"
+      },
+      {
+        "event_id": "F",
+        "event_time": "2026-11-16T00:05:00Z",
+        "available_at": "2026-11-16T00:05:00Z"
+      },
+      {
+        "event_id": "Z",
+        "event_time": "2026-11-16T00:20:00Z",
+        "available_at": "2026-11-16T03:00:00Z"
+      }
+    ],
+    "trusted_happens_before_edges": [
+      [
+        "E",
+        "F"
+      ]
+    ],
+    "forbidden_ordered_pairs": [
+      [
+        "A",
+        "E"
+      ],
+      [
+        "A",
+        "F"
+      ],
+      [
+        "B",
+        "E"
+      ],
+      [
+        "B",
+        "F"
+      ],
+      [
+        "C",
+        "E"
+      ],
+      [
+        "C",
+        "F"
+      ],
+      [
+        "A",
+        "Z"
+      ],
+      [
+        "B",
+        "Z"
+      ],
+      [
+        "C",
+        "Z"
+      ],
+      [
+        "E",
+        "Z"
+      ],
+      [
+        "F",
+        "Z"
+      ]
+    ]
+  },
+  "gold_overlay": {
+    "adjudication_status": "synthetic_known_answer_not_independently_adjudicated",
+    "adjudicated_observation_boundary_state": "complete",
+    "admissible_worlds": [
+      {
+        "world_id": "world-forward",
+        "edges": [
+          [
+            "A",
+            "B"
+          ],
+          [
+            "B",
+            "C"
+          ],
+          [
+            "E",
+            "F"
+          ]
+        ]
+      },
+      {
+        "world_id": "world-reverse",
+        "edges": [
+          [
+            "C",
+            "B"
+          ],
+          [
+            "B",
+            "A"
+          ],
+          [
+            "E",
+            "F"
+          ]
+        ]
+      }
+    ]
+  },
+  "candidate_traces": [
+    {
+      "trace_id": "world-consistent-agent",
+      "observation_boundary_claim": "complete",
+      "relation_claims": [
+        {
+          "left_event_id": "A",
+          "right_event_id": "B",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": true
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "C",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": true
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "E",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "F",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "Z",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "C",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": true
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "E",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "F",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "Z",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "E",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "F",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "Z",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "F",
+          "claimed_relation": "before",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "Z",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "F",
+          "right_event_id": "Z",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        }
+      ]
+    },
+    {
+      "trace_id": "jointly-impossible-cycle",
+      "observation_boundary_claim": "complete",
+      "relation_claims": [
+        {
+          "left_event_id": "A",
+          "right_event_id": "B",
+          "claimed_relation": "before",
+          "decision_cutoff": "2026-11-16T02:00:00Z",
+          "evidence_event_ids": [
+            "Z"
+          ],
+          "critical": true
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "C",
+          "claimed_relation": "after",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": true
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "E",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "F",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "Z",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "C",
+          "claimed_relation": "before",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": true
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "E",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "F",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "Z",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "E",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "F",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "Z",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "F",
+          "claimed_relation": "before",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "Z",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "F",
+          "right_event_id": "Z",
+          "claimed_relation": "concurrent",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        }
+      ]
+    },
+    {
+      "trace_id": "always-abstain",
+      "observation_boundary_claim": "complete",
+      "relation_claims": [
+        {
+          "left_event_id": "A",
+          "right_event_id": "B",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "C",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "E",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "F",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "A",
+          "right_event_id": "Z",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "C",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "E",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "F",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "B",
+          "right_event_id": "Z",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "E",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "F",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "C",
+          "right_event_id": "Z",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "F",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "E",
+          "right_event_id": "Z",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        },
+        {
+          "left_event_id": "F",
+          "right_event_id": "Z",
+          "claimed_relation": "underdetermined",
+          "decision_cutoff": "2026-11-16T04:00:00Z",
+          "evidence_event_ids": [],
+          "critical": false
+        }
+      ]
+    }
+  ]
+}
