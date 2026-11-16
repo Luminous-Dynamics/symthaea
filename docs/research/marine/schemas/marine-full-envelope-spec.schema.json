@@ -1,0 +1,442 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/marine/schemas/marine-full-envelope-spec.schema.json",
+  "title": "Marine full external envelope specification",
+  "description": "Input contract for a full external hull envelope. It is distinct from the G2a/G2b keel-to-waterline displacement-volume profile.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "candidate_id",
+    "units",
+    "coordinate_frame",
+    "principal_dimensions",
+    "symmetry",
+    "end_conditions",
+    "design_waterline",
+    "stations",
+    "deck_surface",
+    "surface_inventory",
+    "boundary_semantics"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "candidate_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "units": {
+      "const": "m"
+    },
+    "coordinate_frame": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "axis_convention",
+        "handedness",
+        "origin_description"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "axis_convention": {
+          "const": "x-forward,y-starboard,z-down"
+        },
+        "handedness": {
+          "const": "right-handed"
+        },
+        "origin_description": {
+          "type": "string",
+          "minLength": 4
+        }
+      }
+    },
+    "principal_dimensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "length_m",
+        "maximum_beam_m",
+        "design_draft_m",
+        "design_freeboard_m"
+      ],
+      "properties": {
+        "length_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maximum_beam_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "design_draft_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "design_freeboard_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "symmetry": {
+      "enum": [
+        "SYMMETRIC_ABOUT_Y0",
+        "EXPLICIT_PORT_AND_STARBOARD"
+      ]
+    },
+    "end_conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bow",
+        "stern"
+      ],
+      "properties": {
+        "bow": {
+          "enum": [
+            "POINTED_STEM",
+            "TRANSOM"
+          ]
+        },
+        "stern": {
+          "enum": [
+            "POINTED_STEM",
+            "TRANSOM"
+          ]
+        }
+      }
+    },
+    "design_waterline": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "waterline_id",
+        "plane_z_m",
+        "station_intersections"
+      ],
+      "properties": {
+        "waterline_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plane_z_m": {
+          "const": 0
+        },
+        "station_intersections": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "station_id",
+              "starboard_point_id",
+              "port_point_id"
+            ],
+            "properties": {
+              "station_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "starboard_point_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "port_point_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "stations": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 512,
+      "items": {
+        "$ref": "#/$defs/station"
+      }
+    },
+    "deck_surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "surface_id",
+        "construction",
+        "sections"
+      ],
+      "properties": {
+        "surface_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "construction": {
+          "enum": [
+            "LOFTED_DECK_SECTIONS",
+            "PLANAR_DECK",
+            "UNSUPPORTED"
+          ]
+        },
+        "sections": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "station_id",
+              "points"
+            ],
+            "properties": {
+              "station_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "points": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 128,
+                "items": {
+                  "$ref": "#/$defs/deck_point"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "surface_inventory": {
+      "type": "array",
+      "minItems": 4,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "BOTTOM",
+          "TOPSIDES",
+          "DECK",
+          "BOW_STEM_CLOSURE",
+          "STERN_TRANSOM_CLOSURE",
+          "CHINE_BREAKLINES",
+          "KEEL_BREAKLINE"
+        ]
+      }
+    },
+    "boundary_semantics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "exterior_shell",
+        "openings"
+      ],
+      "properties": {
+        "exterior_shell": {
+          "enum": [
+            "CLOSED_SHELL",
+            "EXPLICIT_BOUNDARY_LOOPS"
+          ]
+        },
+        "openings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "opening_id",
+              "boundary_point_refs",
+              "status"
+            ],
+            "properties": {
+              "opening_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "boundary_point_refs": {
+                "type": "array",
+                "minItems": 3,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "status": {
+                "enum": [
+                  "SUPPORTED",
+                  "UNSUPPORTED_REQUIRES_REVIEW"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "external_components": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "component_id",
+          "component_type",
+          "source_digest_blake3",
+          "integration_semantics"
+        ],
+        "properties": {
+          "component_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "component_type": {
+            "enum": [
+              "RUDDER",
+              "PROPELLER",
+              "SHAFT",
+              "BILGE_KEEL",
+              "BOW_THRUSTER",
+              "SKeg",
+              "SUPERSTRUCTURE",
+              "BULWARK",
+              "OTHER"
+            ]
+          },
+          "source_digest_blake3": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "integration_semantics": {
+            "enum": [
+              "SEPARATE_ASSEMBLY",
+              "ATTACHED_BUT_SEPARATELY_MESHED",
+              "NOT_INCLUDED"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "profile_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point_id",
+        "y_m",
+        "z_m",
+        "role",
+        "region_to_next"
+      ],
+      "properties": {
+        "point_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "y_m": {
+          "type": "number"
+        },
+        "z_m": {
+          "type": "number"
+        },
+        "role": {
+          "enum": [
+            "KEEL",
+            "BILGE",
+            "CHINE",
+            "BOTTOM",
+            "WATERLINE",
+            "TOPSIDE",
+            "SHEER",
+            "DECK_EDGE",
+            "STEM",
+            "TRANSOM",
+            "OTHER"
+          ]
+        },
+        "region_to_next": {
+          "enum": [
+            "BOTTOM",
+            "TOPSIDES",
+            "DECK_EDGE_TRANSITION",
+            "STEM_CLOSURE",
+            "TRANSOM_CLOSURE",
+            "UNSUPPORTED"
+          ]
+        }
+      }
+    },
+    "deck_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "point_id",
+        "y_m",
+        "z_m",
+        "role"
+      ],
+      "properties": {
+        "point_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "y_m": {
+          "type": "number"
+        },
+        "z_m": {
+          "type": "number"
+        },
+        "role": {
+          "enum": [
+            "PORT_DECK_EDGE",
+            "DECK_CAMBER",
+            "DECK_CROWN",
+            "STARBOARD_DECK_EDGE",
+            "OTHER"
+          ]
+        }
+      }
+    },
+    "station": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "station_id",
+        "x_over_length",
+        "starboard_profile"
+      ],
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x_over_length": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "starboard_profile": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/profile_point"
+          }
+        },
+        "port_profile": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 128,
+          "items": {
+            "$ref": "#/$defs/profile_point"
+          }
+        }
+      }
+    }
+  }
+}
