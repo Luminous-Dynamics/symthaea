@@ -665,12 +665,95 @@ pub fn verify_loading_sweep_receipt(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::full_envelope::{
+        DeckPoint, DeckPointRole, DeckSection, FullEnvelopeStation, ProfilePoint,
+        ProfilePointRole, ProfileRegion, WaterlinePortSource, WaterlineStationIntersection,
+    };
 
     fn fixture_request() -> SectionalReferenceRequest {
         serde_json::from_str(include_str!(
             "../../../../docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json"
         ))
         .unwrap()
+    }
+
+    fn tapered_fixture_request() -> SectionalReferenceRequest {
+        serde_json::from_str(include_str!(
+            "../../../../docs/research/marine/fixtures/marine-full-envelope-tapered-loading-sweep-001.json"
+        ))
+        .unwrap()
+    }
+
+    fn tapered_request_with_station_count(station_count: usize) -> SectionalReferenceRequest {
+        let mut request = tapered_fixture_request();
+        if station_count == 2 {
+            return request;
+        }
+        let first = request.source_spec.stations[0].clone();
+        let last = request.source_spec.stations[1].clone();
+        let mut stations = Vec::with_capacity(station_count);
+        let mut deck_sections = Vec::with_capacity(station_count);
+        let mut intersections = Vec::with_capacity(station_count);
+
+        for index in 0..station_count {
+            let fraction = index as f64 / (station_count - 1) as f64;
+            let station_id = format!("REFINED-{index:03}");
+            let mut starboard_profile = first.starboard_profile.clone();
+            for (point_index, point) in starboard_profile.iter_mut().enumerate() {
+                let a = first.starboard_profile[point_index].y_m;
+                let b = last.starboard_profile[point_index].y_m;
+                point.y_m = a + fraction * (b - a);
+                point.point_id = format!("{station_id}-P{point_index:02}");
+            }
+            let waterline_point_id = starboard_profile
+                .iter()
+                .find(|point| point.role == ProfilePointRole::Waterline)
+                .unwrap()
+                .point_id
+                .clone();
+            let sheer = starboard_profile.last().unwrap();
+            let half_beam = sheer.y_m;
+            let station = FullEnvelopeStation {
+                station_id: station_id.clone(),
+                x_over_length: fraction,
+                starboard_profile,
+                port_profile: None,
+            };
+            deck_sections.push(DeckSection {
+                station_id: station_id.clone(),
+                points: vec![
+                    DeckPoint {
+                        point_id: format!("MIRROR:{}", sheer.point_id),
+                        y_m: -half_beam,
+                        z_m: -4.0,
+                        role: DeckPointRole::PortDeckEdge,
+                    },
+                    DeckPoint {
+                        point_id: format!("{station_id}-DECK-CROWN"),
+                        y_m: 0.0,
+                        z_m: -4.5,
+                        role: DeckPointRole::DeckCrown,
+                    },
+                    DeckPoint {
+                        point_id: sheer.point_id.clone(),
+                        y_m: half_beam,
+                        z_m: -4.0,
+                        role: DeckPointRole::StarboardDeckEdge,
+                    },
+                ],
+            });
+            intersections.push(WaterlineStationIntersection {
+                station_id: station_id.clone(),
+                starboard_point_id: waterline_point_id,
+                port_source: WaterlinePortSource::MirroredFromStarboard,
+                port_point_id: None,
+            });
+            stations.push(station);
+        }
+        request.source_spec.stations = stations;
+        request.source_spec.deck_surface.sections = deck_sections;
+        request.source_spec.design_waterline.station_intersections = intersections;
+        request
     }
 
     fn result_by_id<'a>(
@@ -705,6 +788,73 @@ mod tests {
         assert!((design.vertical_center_of_buoyancy_m - 3.0).abs() < 1.0e-9);
         assert!((light.vertical_center_of_buoyancy_m - 4.0).abs() < 1.0e-9);
         assert!((design.displaced_mass_tonnes - 12_300.0).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn linear_taper_fixture_matches_analytic_loading_curves() {
+        let receipt = evaluate_loading_sweep(&tapered_fixture_request()).unwrap();
+        let overload = result_by_id(&receipt, "TAPER-OVERLOAD-Z-NEG2");
+        let design = result_by_id(&receipt, "TAPER-DESIGN-Z0");
+        let light = result_by_id(&receipt, "TAPER-LIGHT-Z-POS2");
+        let expected_lcb = 500_000.0 / 9_000.0;
+
+        assert!((overload.displacement_volume_m3 - 12_000.0).abs() < 1.0e-9);
+        assert!((design.displacement_volume_m3 - 9_000.0).abs() < 1.0e-9);
+        assert!((light.displacement_volume_m3 - 6_000.0).abs() < 1.0e-9);
+        for result in [overload, design, light] {
+            assert!((result.waterplane_area_m2 - 1_500.0).abs() < 1.0e-9);
+            assert!((result.longitudinal_center_of_buoyancy_m - expected_lcb).abs() < 1.0e-9);
+            assert!((result.longitudinal_center_of_flotation_m - expected_lcb).abs() < 1.0e-9);
+            assert!(result.transverse_center_of_buoyancy_m.abs() < 1.0e-9);
+            assert!((result.tonnes_per_cm_immersion - 15.375).abs() < 1.0e-9);
+        }
+        assert!((overload.vertical_center_of_buoyancy_m - 2.0).abs() < 1.0e-9);
+        assert!((design.vertical_center_of_buoyancy_m - 3.0).abs() < 1.0e-9);
+        assert!((light.vertical_center_of_buoyancy_m - 4.0).abs() < 1.0e-9);
+        assert!((design.displaced_mass_tonnes - 9_225.0).abs() < 1.0e-9);
+    }
+
+    #[test]
+    fn linear_taper_loading_curve_is_invariant_to_station_refinement() {
+        let two = evaluate_loading_sweep(&tapered_request_with_station_count(2)).unwrap();
+        let three = evaluate_loading_sweep(&tapered_request_with_station_count(3)).unwrap();
+        let five = evaluate_loading_sweep(&tapered_request_with_station_count(5)).unwrap();
+        assert_ne!(two.source_spec_digest_blake3, five.source_spec_digest_blake3);
+
+        for condition_id in [
+            "TAPER-OVERLOAD-Z-NEG2",
+            "TAPER-DESIGN-Z0",
+            "TAPER-LIGHT-Z-POS2",
+        ] {
+            let a = result_by_id(&two, condition_id);
+            let b = result_by_id(&three, condition_id);
+            let c = result_by_id(&five, condition_id);
+            for (left, middle, right) in [
+                (
+                    a.displacement_volume_m3,
+                    b.displacement_volume_m3,
+                    c.displacement_volume_m3,
+                ),
+                (
+                    a.waterplane_area_m2,
+                    b.waterplane_area_m2,
+                    c.waterplane_area_m2,
+                ),
+                (
+                    a.longitudinal_center_of_buoyancy_m,
+                    b.longitudinal_center_of_buoyancy_m,
+                    c.longitudinal_center_of_buoyancy_m,
+                ),
+                (
+                    a.vertical_center_of_buoyancy_m,
+                    b.vertical_center_of_buoyancy_m,
+                    c.vertical_center_of_buoyancy_m,
+                ),
+            ] {
+                assert!((left - middle).abs() < 1.0e-9);
+                assert!((left - right).abs() < 1.0e-9);
+            }
+        }
     }
 
     #[test]
