@@ -47,20 +47,21 @@ fn build_ledger(
         i64::try_from(per_source_count).map_err(|_| "source event count exceeds i64".to_owned())?;
 
     let required_sources: Vec<_> = (1..=source_count).map(source_key).collect();
-    let progress = required_sources
-        .iter()
-        .enumerate()
-        .map(|(index, source)| SourceProgressRevision {
-            progress_id: index as u64 + 1,
-            source: *source,
-            stream_generation: 1,
-            progress_sequence: 1,
-            recorded_at_us: PROGRESS_RECORDED_AT_US,
-            policy_sha256: [0xA5; 32],
-            operation: SourceProgressOperation::Advance {
-                exclusive_event_time_us: per_source_count_i64 + 1,
-            },
-        });
+    let progress =
+        required_sources
+            .iter()
+            .enumerate()
+            .map(|(index, source)| SourceProgressRevision {
+                progress_id: index as u64 + 1,
+                source: *source,
+                stream_generation: 1,
+                progress_sequence: 1,
+                recorded_at_us: PROGRESS_RECORDED_AT_US,
+                policy_sha256: [0xA5; 32],
+                operation: SourceProgressOperation::Advance {
+                    exclusive_event_time_us: per_source_count_i64 + 1,
+                },
+            });
     let mut ledger = SourceWatermarkLedger::default();
     ledger
         .append_batch(progress)
@@ -74,8 +75,7 @@ fn build_ledger(
     for source in &required_sources {
         for local_index in 0..per_source_count {
             let arrival_bucket = local_index % arrival_batches.len();
-            let available_at_us =
-                FIRST_ARRIVAL_AT_US + (arrival_bucket as i64 * ARRIVAL_STEP_US);
+            let available_at_us = FIRST_ARRIVAL_AT_US + (arrival_bucket as i64 * ARRIVAL_STEP_US);
             let event = EventRecord {
                 event_id: next_event_id,
                 entity_id: source.entity_id,
@@ -99,8 +99,7 @@ fn build_ledger(
     }
 
     for (bucket, events) in arrival_batches.into_iter().enumerate() {
-        let recorded_at_us =
-            FIRST_ARRIVAL_AT_US + (bucket as i64 * ARRIVAL_STEP_US);
+        let recorded_at_us = FIRST_ARRIVAL_AT_US + (bucket as i64 * ARRIVAL_STEP_US);
         let classifications = ledger
             .record_event_arrival_batch(events, recorded_at_us)
             .map_err(|error| format!("record arrival bucket {bucket}: {error}"))?;
@@ -167,9 +166,8 @@ fn run_case(
     let mut verified_samples = Vec::with_capacity(VERIFIED_REPETITIONS);
     for _ in 0..VERIFIED_REPETITIONS {
         let started = Instant::now();
-        let report = black_box(
-            verified_query().map_err(|error| format!("verified query: {error}"))?,
-        );
+        let report =
+            black_box(verified_query().map_err(|error| format!("verified query: {error}"))?);
         black_box(report.verdict);
         verified_samples.push(started.elapsed());
     }
