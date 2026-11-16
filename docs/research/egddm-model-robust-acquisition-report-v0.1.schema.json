@@ -1,0 +1,294 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-model-robust-acquisition-report-v0.1.schema.json",
+  "title": "D6.16 model-robust acquisition report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "aggregation",
+    "model_count",
+    "measurement_count",
+    "action_count",
+    "trace_count",
+    "summary",
+    "traces",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "adjudication_status": {
+      "const": "synthetic_model_robust_known_answer_evaluator_only"
+    },
+    "aggregation": {
+      "const": "unweighted_worst_case_over_models"
+    },
+    "model_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "measurement_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "action_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "trace_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unsupported_action_trace_count",
+        "hard_gate_violation_trace_count",
+        "risk_policy_violation_trace_count",
+        "unnecessary_abstention_trace_count",
+        "budget_overrun_trace_count",
+        "future_evidence_leakage_events",
+        "unsupported_model_observation_events",
+        "zero_support_model_observation_events",
+        "risk_understatement_trace_count"
+      ],
+      "properties": {
+        "unsupported_action_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_gate_violation_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "risk_policy_violation_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unnecessary_abstention_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "budget_overrun_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "future_evidence_leakage_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unsupported_model_observation_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "zero_support_model_observation_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "risk_understatement_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "traces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "decision_kind",
+          "action_id",
+          "aggregation",
+          "worst_case_model_id",
+          "max_residual_risk_bps",
+          "model_count",
+          "supported_model_count",
+          "model_support_coverage_bps",
+          "minimum_model_risk_bps",
+          "worst_case_risk_bps",
+          "model_risk_spread_bps",
+          "acquisition_count",
+          "unique_measurement_count",
+          "redundant_measurement_count",
+          "unsupported_model_observation_events",
+          "zero_support_model_observation_events",
+          "future_evidence_leakage_count",
+          "not_yet_available_count",
+          "cost_estimate_undercoverage_count",
+          "total_cost_upper_micros",
+          "budget_micros",
+          "irreversible",
+          "hard_gate",
+          "all_models_supported",
+          "action_justified",
+          "unsupported_action",
+          "hard_gate_violation",
+          "risk_policy_violation",
+          "unnecessary_abstention",
+          "correctly_deferred",
+          "risk_understatement",
+          "budget_overrun",
+          "claimed_worst_case_risk_bps",
+          "acquisition_steps",
+          "model_results",
+          "final_history"
+        ],
+        "properties": {
+          "max_residual_risk_bps": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "model_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "supported_model_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "model_support_coverage_bps": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "minimum_model_risk_bps": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "worst_case_risk_bps": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "model_risk_spread_bps": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "acquisition_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unique_measurement_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "redundant_measurement_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsupported_model_observation_events": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "zero_support_model_observation_events": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "future_evidence_leakage_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "not_yet_available_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cost_estimate_undercoverage_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_cost_upper_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "budget_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "irreversible": {
+            "type": "boolean"
+          },
+          "hard_gate": {
+            "type": "boolean"
+          },
+          "all_models_supported": {
+            "type": "boolean"
+          },
+          "action_justified": {
+            "type": "boolean"
+          },
+          "unsupported_action": {
+            "type": "boolean"
+          },
+          "hard_gate_violation": {
+            "type": "boolean"
+          },
+          "risk_policy_violation": {
+            "type": "boolean"
+          },
+          "unnecessary_abstention": {
+            "type": "boolean"
+          },
+          "correctly_deferred": {
+            "type": "boolean"
+          },
+          "risk_understatement": {
+            "type": "boolean"
+          },
+          "budget_overrun": {
+            "type": "boolean"
+          },
+          "trace_id": {
+            "type": "string"
+          },
+          "decision_kind": {
+            "type": "string"
+          },
+          "action_id": {
+            "type": "string"
+          },
+          "aggregation": {
+            "type": "string"
+          },
+          "worst_case_model_id": {
+            "type": "string"
+          },
+          "claimed_worst_case_risk_bps": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "acquisition_steps": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "model_results": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "final_history": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
