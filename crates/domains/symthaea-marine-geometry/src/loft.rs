@@ -483,14 +483,14 @@ fn validate_section_family(artifact: &SectionFamilyArtifact) -> Result<usize, Ve
                 "first section must be at x=0",
             );
         }
-        if let Some(last) = artifact.sections.last() {
-            if !close_enough(last.x_m, artifact.length_m, coordinate_tolerance) {
-                violation(
-                    &mut violations,
-                    "last_station",
-                    "last section must be at x=length_m",
-                );
-            }
+        if let Some(last) = artifact.sections.last()
+            && !close_enough(last.x_m, artifact.length_m, coordinate_tolerance)
+        {
+            violation(
+                &mut violations,
+                "last_station",
+                "last section must be at x=length_m",
+            );
         }
     }
 
@@ -580,8 +580,13 @@ pub fn verify_loft_artifact_integrity(
         for range in ranges {
             match range.first_face.checked_add(range.face_count) {
                 Some(end) if end <= face_count => {
-                    for index in range.first_face..end {
-                        if covered[index] {
+                    for (index, is_covered) in covered
+                        .iter_mut()
+                        .enumerate()
+                        .take(end)
+                        .skip(range.first_face)
+                    {
+                        if *is_covered {
                             violation(
                                 &mut violations,
                                 "face_region_overlap",
@@ -589,7 +594,7 @@ pub fn verify_loft_artifact_integrity(
                             );
                             break;
                         }
-                        covered[index] = true;
+                        *is_covered = true;
                     }
                 }
                 _ => violation(
