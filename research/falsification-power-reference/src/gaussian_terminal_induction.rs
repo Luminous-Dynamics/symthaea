@@ -360,16 +360,17 @@ mod tests {
         let discrepancies = vec![0.22; HORIZON];
         let sigmas = vec![0.8; HORIZON];
         let test = GaussianTerminalInducedTest::new(0.05, discrepancies, sigmas).unwrap();
-        let mut state = 0xa5a5_1234_9876_fedc_u64;
+        let mut observation_state = 0xa5a5_1234_9876_fedc_u64;
+        let mut randomizer_state = 0x4f1b_bcdd_6a09_e667_u64;
         let mut rejections = 0_usize;
 
         for _ in 0..PATHS {
             let mut observations = Vec::with_capacity(HORIZON);
             let mut stopped = None;
             for look in 1..=HORIZON {
-                let y = 0.8 * deterministic_standard_normal(&mut state);
+                let y = 0.8 * deterministic_standard_normal(&mut observation_state);
                 observations.push(y);
-                let prefix = test.evaluate_prefix(&observations)?;
+                let prefix = test.evaluate_prefix(&observations).unwrap();
                 if prefix.conditional_rejection_probability >= 0.90 || look == HORIZON {
                     stopped = Some(prefix);
                     break;
@@ -377,10 +378,11 @@ mod tests {
             }
             let prefix = stopped.expect("the fixed terminal horizon always stops");
             let randomizer = {
-                // Independent stream derived from a separate state update,
-                // not from the observation residuals used by the test.
-                state = state.wrapping_add(0x6a09_e667_f3bc_c909);
-                let mut value = state;
+                // A separately seeded simulator stream supplies the
+                // independent terminal-test randomization draw.
+                randomizer_state =
+                    randomizer_state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+                let mut value = randomizer_state;
                 value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
                 value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
                 value ^= value >> 31;
