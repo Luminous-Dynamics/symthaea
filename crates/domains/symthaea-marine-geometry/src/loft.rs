@@ -636,6 +636,166 @@ pub fn verify_loft_artifact_integrity(
         );
     }
 
+    let bow_collapsed = artifact.longitudinal_end_conditions.bow
+        == LongitudinalEndCondition::CollapsedCentreline;
+    let stern_collapsed = artifact.longitudinal_end_conditions.stern
+        == LongitudinalEndCondition::CollapsedCentreline;
+    let point_count = artifact.section_point_count;
+    let station_count = artifact.station_count;
+    if point_count < 2 || station_count < 2
+        || (station_count == 2 && bow_collapsed && stern_collapsed)
+    {
+        violation(
+            &mut violations,
+            "end_semantics_station_budget",
+            "unsupported station/section counts for declared longitudinal end conditions",
+        );
+    } else {
+        let mut expected_vertices = 0_usize;
+        let mut vertex_layout_valid = true;
+        for station_index in 0..station_count {
+            let collapsed = (station_index == 0 && bow_collapsed)
+                || (station_index + 1 == station_count && stern_collapsed);
+            let station_vertices = point_count + if collapsed { 0 } else { point_count - 1 };
+            let Some(next) = expected_vertices.checked_add(station_vertices) else {
+                vertex_layout_valid = false;
+                break;
+            };
+            let end = next.min(artifact.candidate.geometry.vertices.len());
+            if next > artifact.candidate.geometry.vertices.len() {
+                vertex_layout_valid = false;
+                break;
+            }
+            let vertices = &artifact.candidate.geometry.vertices[expected_vertices..end];
+            let starboard = &vertices[..point_count];
+            if collapsed {
+                if starboard.iter().any(|point| point[1] != 0.0) {
+                    violation(
+                        &mut violations,
+                        "collapsed_end_geometry",
+                        format!(
+                            "collapsed endpoint station {station_index} has a non-zero transverse coordinate"
+                        ),
+                    );
+                    vertex_layout_valid = false;
+                }
+            } else {
+                let port = &vertices[point_count..];
+                for point_index in 1..point_count {
+                    let source = starboard[point_index];
+                    let mirrored = port[point_index - 1];
+                    if source[0] != mirrored[0]
+                        || source[1] != -mirrored[1]
+                        || source[2] != mirrored[2]
+                    {
+                        violation(
+                            &mut violations,
+                            "port_starboard_mirror",
+                            format!(
+                                "station {station_index} port sample {point_index} is not the exact mirror of its starboard sample"
+                            ),
+                        );
+                        vertex_layout_valid = false;
+                        break;
+                    }
+                }
+            }
+            expected_vertices = next;
+        }
+        let planar_cap_count = usize::from(!bow_collapsed) + usize::from(!stern_collapsed);
+        let expected_total_vertices = expected_vertices.checked_add(planar_cap_count);
+        if !vertex_layout_valid || expected_total_vertices != Some(artifact.candidate.geometry.vertices.len()) {
+            violation(
+                &mut violations,
+                "vertex_layout",
+                "mesh vertex layout does not match the versioned station/end-condition budget",
+            );
+        }
+        if expected_vertices > artifact.candidate.geometry.vertices.len() {
+            vertex_layout_valid = false;
+        }
+        if vertex_layout_valid {
+            let mut centre_offset = expected_vertices;
+            if !bow_collapsed {
+                let centre = artifact.candidate.geometry.vertices[centre_offset];
+                if (centre[0] - artifact.candidate.geometry.vertices[0][0]).abs()
+                    > GEOMETRY_TOLERANCE
+                    || centre[1].abs() > GEOMETRY_TOLERANCE
+                {
+                    violation(
+                        &mut violations,
+                        "bow_cap_centre",
+                        "planar bow cap centre must lie in the bow section plane and centreline",
+                    );
+                }
+                centre_offset += 1;
+            }
+            if !stern_collapsed {
+                let centre = artifact.candidate.geometry.vertices[centre_offset];
+                let last_station_base = (0..station_count - 1).fold(0_usize, |offset, station_index| {
+                    let collapsed = station_index == 0 && bow_collapsed;
+                    offset + point_count + if collapsed { 0 } else { point_count - 1 }
+                });
+                let stern_x = artifact.candidate.geometry.vertices[last_station_base][0];
+                if (centre[0] - stern_x).abs() > GEOMETRY_TOLERANCE
+                    || centre[1].abs() > GEOMETRY_TOLERANCE
+                {
+                    violation(
+                        &mut violations,
+                        "stern_cap_centre",
+                        "planar stern cap centre must lie in the stern section plane and centreline",
+                    );
+                }
+            }
+        }
+    }
+
+    let expected_side_faces = station_count
+        .checked_sub(1)
+        .and_then(|count| count.checked_mul(4))
+        .and_then(|count| count.checked_mul(point_count.saturating_sub(1)));
+    let expected_waterplane_faces = station_count
+        .checked_sub(1)
+        .and_then(|count| count.checked_mul(2))
+        .and_then(|count| count.checked_sub(usize::from(bow_collapsed)))
+        .and_then(|count| count.checked_sub(usize::from(stern_collapsed)));
+    let cap_faces_per_planar_end = point_count.checked_mul(2).and_then(|count| count.checked_sub(1));
+    let expected_bow_cap_faces = if bow_collapsed { Some(0) } else { cap_faces_per_planar_end };
+    let expected_stern_cap_faces = if stern_collapsed { Some(0) } else { cap_faces_per_planar_end };
+    if expected_side_faces != Some(artifact.side_face_range.face_count)
+        || expected_waterplane_faces != Some(artifact.waterplane_face_range.face_count)
+        || expected_bow_cap_faces != Some(artifact.bow_end_cap_face_range.face_count)
+        || expected_stern_cap_faces != Some(artifact.stern_end_cap_face_range.face_count)
+    {
+        violation(
+            &mut violations,
+            "end_face_budget",
+            "semantic face counts do not match the declared endpoint closure conditions",
+        );
+    }
+
+    let expected_bow_range_end = artifact
+        .bow_end_cap_face_range
+        .first_face
+        .checked_add(artifact.bow_end_cap_face_range.face_count);
+    let expected_stern_range_end = artifact
+        .stern_end_cap_face_range
+        .first_face
+        .checked_add(artifact.stern_end_cap_face_range.face_count);
+    if artifact.bow_end_cap_face_range.first_face != artifact.end_cap_face_range.first_face
+        || expected_bow_range_end != Some(artifact.stern_end_cap_face_range.first_face)
+        || expected_stern_range_end != end_cap_end
+        || artifact.end_cap_face_range.face_count
+            != artifact.bow_end_cap_face_range.face_count
+                + artifact.stern_end_cap_face_range.face_count
+    {
+        violation(
+            &mut violations,
+            "end_cap_range_semantics",
+            "bow/stern subranges must exactly partition the combined end-cap range",
+        );
+    }
+
     if violations.is_empty() {
         Ok(())
     } else {
