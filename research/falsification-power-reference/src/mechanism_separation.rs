@@ -605,16 +605,24 @@ mod tests {
     }
 
     #[test]
-    fn joint_schedule_can_separate_when_each_action_alone_cannot() {
+    fn joint_schedule_separates_multiple_classes_that_no_single_action_can_resolve() {
         let report = compute_identifiability_envelope(
-            vec![action("first", 0.5, 1.0, 1.0e-12), action("second", 0.5, 1.0, 1.0e-12)],
-            vec![mechanism("a", &[0.0, 0.0]), mechanism("b", &[1.0, 1.0])],
-            0.05, 0.80, 2,
+            vec![
+                action("first", 0.5, 1.0, 1.0e-12),
+                action("second", 0.5, 1.0, 1.0e-12),
+            ],
+            vec![
+                mechanism("a", &[0.0, 0.0]),
+                mechanism("b", &[1.0, 0.0]),
+                mechanism("c", &[1.0, 1.0]),
+            ],
+            0.05, 0.80, 4,
         ).unwrap();
         assert_eq!(report.disposition, SeparationDisposition::TargetAchievable);
-        assert_eq!(report.total_observations, 2);
-        assert_eq!(report.replications[0].replicates, 1);
-        assert_eq!(report.replications[1].replicates, 1);
+        assert_eq!(report.equivalence_class_count, 3);
+        assert_eq!(report.total_observations, 4);
+        assert_eq!(report.replications[0].replicates, 2);
+        assert_eq!(report.replications[1].replicates, 2);
     }
 
     #[test]
