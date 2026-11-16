@@ -1744,6 +1744,23 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn rehashed_wrong_side_face_is_rejected_by_shared_vertex_semantics() {
+        let mut loft = assert_admissible_end_conditions(
+            LongitudinalEndCondition::PlanarEndCap,
+            LongitudinalEndCondition::CollapsedCentreline,
+        );
+        let face_index = loft.side_face_range.first_face;
+        loft.candidate.geometry.faces[face_index][0] =
+            loft.candidate.geometry.faces[face_index][1];
+        rebind_loft_after_test_mutation(&mut loft);
+        let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|item| item.code == "side_closure_semantics"));
+    }
+
     #[test]
     fn rehashed_wrong_waterplane_triangle_is_rejected_by_closure_semantics() {
         let mut loft = assert_admissible_end_conditions(
