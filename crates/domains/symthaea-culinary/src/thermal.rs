@@ -80,8 +80,8 @@ impl std::fmt::Display for ThermalTrajectoryError {
 impl std::error::Error for ThermalTrajectoryError {}
 
 /// A trajectory of `(time_minutes, core_temperature_celsius)` points, assumed
-/// piecewise-linear in temperature between consecutive samples. Times must be
-/// non-decreasing.
+/// piecewise-linear in temperature between consecutive samples. The validated
+/// constructor requires finite samples and strictly increasing, non-negative times.
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ThermalTrajectory {
     pub points: Vec<(f64, f64)>,
