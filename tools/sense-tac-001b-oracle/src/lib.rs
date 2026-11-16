@@ -12,21 +12,17 @@
 
 use serde::de::{MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
 use std::fmt;
 
-pub const CORPUS_JSON: &str = include_str!(
-    "../../../docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.json"
-);
-pub const CORPUS_SCHEMA_JSON: &str = include_str!(
-    "../../../docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.schema.json"
-);
+pub const CORPUS_JSON: &str =
+    include_str!("../../../docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.json");
+pub const CORPUS_SCHEMA_JSON: &str =
+    include_str!("../../../docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.schema.json");
 
-pub const EXPECTED_CORPUS_BLOB_SHA1: &str =
-    "e9349751590c4a3a28f4be81a5a11f8170ef2212";
-pub const EXPECTED_SCHEMA_BLOB_SHA1: &str =
-    "7b531325c1c8f105879dd80e0ba6016555a4b645";
+pub const EXPECTED_CORPUS_BLOB_SHA1: &str = "e9349751590c4a3a28f4be81a5a11f8170ef2212";
+pub const EXPECTED_SCHEMA_BLOB_SHA1: &str = "7b531325c1c8f105879dd80e0ba6016555a4b645";
 
 const EXPECTED_SCHEMA_ID: &str =
     "https://luminousdynamics.io/schemas/sense-tac-001b-fault-corpus-v0.1.schema.json";
@@ -45,7 +41,11 @@ const EXPECTED_CASES: &[(&str, &str, &str)] = &[
     ("TAC-DEAD-007", "range_fault", "dead_zone"),
     ("TAC-QUANT-008", "quantization", "quantization"),
     ("TAC-DRIFT-009", "time_dependent_error", "linear_drift"),
-    ("TAC-TEMP-010", "environmental_error", "temperature_coefficient"),
+    (
+        "TAC-TEMP-010",
+        "environmental_error",
+        "temperature_coefficient",
+    ),
     ("TAC-HYST-011", "history_dependence", "hysteresis"),
     ("TAC-DROP-012", "missingness", "dropout"),
     ("TAC-STUCK-013", "missingness", "stuck_at"),
@@ -59,13 +59,33 @@ const EXPECTED_CASES: &[(&str, &str, &str)] = &[
     ("TAC-CONFLICT-021", "replay", "conflicting_duplicate"),
     ("TAC-ADC-COMMON-022", "common_mode", "shared_adc_offset"),
     ("TAC-REF-GAIN-023", "common_mode", "shared_reference_gain"),
-    ("TAC-ARTICLE-024", "calibration", "wrong_article_calibration"),
+    (
+        "TAC-ARTICLE-024",
+        "calibration",
+        "wrong_article_calibration",
+    ),
     ("TAC-STALE-025", "calibration", "firmware_generation_change"),
     ("TAC-REMOUNT-026", "installation", "remount_offset"),
-    ("TAC-CURVE-027", "applicability", "curvature_profile_mismatch"),
-    ("TAC-SELFTEST-028", "self_test", "self_test_misses_scale_drift"),
-    ("TAC-HDC-029", "representation_loss", "representation_threshold_loss"),
-    ("TAC-ALIAS-030", "representation_alias", "representation_alias"),
+    (
+        "TAC-CURVE-027",
+        "applicability",
+        "curvature_profile_mismatch",
+    ),
+    (
+        "TAC-SELFTEST-028",
+        "self_test",
+        "self_test_misses_scale_drift",
+    ),
+    (
+        "TAC-HDC-029",
+        "representation_loss",
+        "representation_threshold_loss",
+    ),
+    (
+        "TAC-ALIAS-030",
+        "representation_alias",
+        "representation_alias",
+    ),
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -207,35 +227,42 @@ fn schema_type_matches(value: &Value, expected_type: &Value) -> bool {
 
     match expected_type {
         Value::String(name) => matches_one(name),
-        Value::Array(names) => names
-            .iter()
-            .filter_map(Value::as_str)
-            .any(matches_one),
+        Value::Array(names) => names.iter().filter_map(Value::as_str).any(matches_one),
         _ => false,
     }
 }
 
 /// Small JSON Schema evaluator for the closed v0.1 schema vocabulary.
 /// Unsupported schema keywords fail closed instead of being ignored.
-fn validate_schema(
-    instance: &Value,
-    schema: &Value,
-    path: &str,
-    errors: &mut Vec<String>,
-) {
+fn validate_schema(instance: &Value, schema: &Value, path: &str, errors: &mut Vec<String>) {
     let Some(schema_object) = schema.as_object() else {
         errors.push(path_error(path, "schema node is not an object"));
         return;
     };
 
     const SUPPORTED: &[&str] = &[
-        "$schema", "$id", "title", "type", "additionalProperties", "required",
-        "properties", "items", "enum", "const", "minItems", "maxItems", "minLength",
-        "minProperties", "pattern",
+        "$schema",
+        "$id",
+        "title",
+        "type",
+        "additionalProperties",
+        "required",
+        "properties",
+        "items",
+        "enum",
+        "const",
+        "minItems",
+        "maxItems",
+        "minLength",
+        "minProperties",
+        "pattern",
     ];
     for keyword in schema_object.keys() {
         if !SUPPORTED.contains(&keyword.as_str()) {
-            errors.push(path_error(path, format!("unsupported schema keyword {keyword}")));
+            errors.push(path_error(
+                path,
+                format!("unsupported schema keyword {keyword}"),
+            ));
         }
     }
 
@@ -254,7 +281,10 @@ fn validate_schema(
     if let Some(expected_type) = schema_object.get("type")
         && !schema_type_matches(instance, expected_type)
     {
-        errors.push(path_error(path, format!("type mismatch; expected {expected_type}")));
+        errors.push(path_error(
+            path,
+            format!("type mismatch; expected {expected_type}"),
+        ));
         return;
     }
 
@@ -270,12 +300,13 @@ fn validate_schema(
         if let Some(minimum) = schema_object.get("minProperties").and_then(Value::as_u64)
             && object.len() < minimum as usize
         {
-            errors.push(path_error(path, format!("requires at least {minimum} properties")));
+            errors.push(path_error(
+                path,
+                format!("requires at least {minimum} properties"),
+            ));
         }
 
-        let properties = schema_object
-            .get("properties")
-            .and_then(Value::as_object);
+        let properties = schema_object.get("properties").and_then(Value::as_object);
 
         for (key, value) in object {
             if let Some(child_schema) = properties.and_then(|items| items.get(key)) {
@@ -295,7 +326,10 @@ fn validate_schema(
         if let Some(minimum) = schema_object.get("minItems").and_then(Value::as_u64)
             && array.len() < minimum as usize
         {
-            errors.push(path_error(path, format!("requires at least {minimum} items")));
+            errors.push(path_error(
+                path,
+                format!("requires at least {minimum} items"),
+            ));
         }
         if let Some(maximum) = schema_object.get("maxItems").and_then(Value::as_u64)
             && array.len() > maximum as usize
@@ -313,20 +347,22 @@ fn validate_schema(
         if let Some(minimum) = schema_object.get("minLength").and_then(Value::as_u64)
             && string.chars().count() < minimum as usize
         {
-            errors.push(path_error(path, format!("requires at least {minimum} characters")));
+            errors.push(path_error(
+                path,
+                format!("requires at least {minimum} characters"),
+            ));
         }
-        if schema_object.get("pattern").and_then(Value::as_str)
-            == Some("^TAC-[A-Z0-9-]+$")
-        {
+        if schema_object.get("pattern").and_then(Value::as_str) == Some("^TAC-[A-Z0-9-]+$") {
             let suffix = string.strip_prefix("TAC-").unwrap_or("");
             if suffix.is_empty()
-                || !suffix
-                    .chars()
-                    .all(|character| character.is_ascii_uppercase()
-                        || character.is_ascii_digit()
-                        || character == '-')
+                || !suffix.chars().all(|character| {
+                    character.is_ascii_uppercase() || character.is_ascii_digit() || character == '-'
+                })
             {
-                errors.push(path_error(path, "case identifier does not match TAC pattern"));
+                errors.push(path_error(
+                    path,
+                    "case identifier does not match TAC pattern",
+                ));
             }
         }
     }
@@ -379,66 +415,226 @@ fn require_near(
 ) -> Result<(), String> {
     match actual {
         Some(value) if nearly_equal(value, expected) => Ok(()),
-        _ => Err(path_error(case_id, format!("{field} does not match the deterministic model"))),
+        _ => Err(path_error(
+            case_id,
+            format!("{field} does not match the deterministic model"),
+        )),
     }
 }
 
-fn require_string(
-    value: &Value,
-    key: &str,
-    expected: &str,
-    path: &str,
-) -> Result<(), String> {
+fn require_string(value: &Value, key: &str, expected: &str, path: &str) -> Result<(), String> {
     let actual = string_member(value, key, path)?;
     if actual == expected {
         Ok(())
     } else {
-        Err(path_error(path, format!("{key}: expected {expected}, got {actual}")))
+        Err(path_error(
+            path,
+            format!("{key}: expected {expected}, got {actual}"),
+        ))
     }
 }
 
 fn expected_for_fault(kind: &str) -> Result<Value, String> {
-    let (evidence, flags, task, independence, representation): (
-        &str, &[&str], &str, &str, &str
-    ) = match kind {
-        "none" => ("eligible", &[], "usable", "one_physical_root", "raw_preserved"),
-        "bias" => ("limited", &["bias_suspect"], "degraded", "one_physical_root", "raw_preserved"),
-        "gain" => ("limited", &["gain_suspect"], "degraded", "one_physical_root", "raw_preserved"),
-        "normal_to_shear_crosstalk" | "shear_to_normal_crosstalk" =>
-            ("limited", &["cross_axis_coupling"], "degraded", "one_physical_root", "raw_preserved"),
-        "saturation" => ("reject", &["saturated"], "abstain", "one_physical_root", "raw_preserved"),
-        "dead_zone" => ("limited", &["dead_zone"], "degraded", "one_physical_root", "raw_preserved"),
-        "quantization" => ("limited", &["quantized"], "degraded", "one_physical_root", "raw_preserved"),
-        "linear_drift" => ("limited", &["drift_suspect"], "degraded", "one_physical_root", "raw_preserved"),
-        "temperature_coefficient" =>
-            ("limited", &["environmental_compensation_unresolved"], "degraded", "one_physical_root", "raw_preserved"),
-        "hysteresis" => ("limited", &["history_dependent"], "degraded", "one_physical_root", "raw_preserved"),
-        "dropout" => ("reject", &["missing"], "abstain", "one_physical_root", "raw_preserved"),
-        "stuck_at" => ("reject", &["stuck_at"], "abstain", "one_physical_root", "raw_preserved"),
-        "intermittent_open" => ("limited", &["intermittent_open"], "degraded", "one_physical_root", "raw_preserved"),
-        "channel_swap" => ("reject", &["channel_identity_mismatch"], "abstain", "one_physical_root", "raw_preserved"),
-        "unit_scale_mismatch" => ("reject", &["unit_mismatch"], "abstain", "one_physical_root", "raw_preserved"),
-        "clock_offset" => ("unknown", &["clock_offset"], "indeterminate", "one_physical_root", "raw_preserved"),
-        "readout_latency" => ("limited", &["readout_latency"], "degraded", "one_physical_root", "raw_preserved"),
-        "timestamp_jitter" => ("limited", &["timestamp_jitter"], "degraded", "one_physical_root", "raw_preserved"),
-        "exact_duplicate" => ("idempotent_duplicate", &["duplicate"], "usable_once_only", "one_physical_root", "raw_preserved"),
-        "conflicting_duplicate" => ("conflict", &["conflict"], "abstain", "one_physical_root", "raw_preserved"),
-        "shared_adc_offset" | "shared_reference_gain" =>
-            ("limited", &["common_mode"], "degraded", "shared_common_mode", "raw_preserved"),
-        "wrong_article_calibration" =>
-            ("reject", &["calibration_article_mismatch"], "abstain", "one_physical_root", "raw_preserved"),
-        "firmware_generation_change" =>
-            ("reject", &["stale_calibration"], "abstain", "one_physical_root", "raw_preserved"),
-        "remount_offset" => ("unknown", &["remount_mismatch"], "indeterminate", "one_physical_root", "raw_preserved"),
-        "curvature_profile_mismatch" => ("out_of_profile", &["out_of_profile"], "abstain", "one_physical_root", "raw_preserved"),
-        "self_test_misses_scale_drift" =>
-            ("limited", &["self_test_insufficient", "gain_suspect"], "degraded", "one_physical_root", "raw_preserved"),
-        "representation_threshold_loss" =>
-            ("eligible", &["representation_loss"], "abstain", "not_independent_descendant", "lossy"),
-        "representation_alias" =>
-            ("eligible", &["representation_alias"], "indeterminate", "not_independent_descendant", "alias"),
-        _ => return Err(format!("unsupported fault kind {kind}")),
-    };
+    let (evidence, flags, task, independence, representation): (&str, &[&str], &str, &str, &str) =
+        match kind {
+            "none" => (
+                "eligible",
+                &[],
+                "usable",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "bias" => (
+                "limited",
+                &["bias_suspect"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "gain" => (
+                "limited",
+                &["gain_suspect"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "normal_to_shear_crosstalk" | "shear_to_normal_crosstalk" => (
+                "limited",
+                &["cross_axis_coupling"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "saturation" => (
+                "reject",
+                &["saturated"],
+                "abstain",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "dead_zone" => (
+                "limited",
+                &["dead_zone"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "quantization" => (
+                "limited",
+                &["quantized"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "linear_drift" => (
+                "limited",
+                &["drift_suspect"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "temperature_coefficient" => (
+                "limited",
+                &["environmental_compensation_unresolved"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "hysteresis" => (
+                "limited",
+                &["history_dependent"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "dropout" => (
+                "reject",
+                &["missing"],
+                "abstain",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "stuck_at" => (
+                "reject",
+                &["stuck_at"],
+                "abstain",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "intermittent_open" => (
+                "limited",
+                &["intermittent_open"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "channel_swap" => (
+                "reject",
+                &["channel_identity_mismatch"],
+                "abstain",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "unit_scale_mismatch" => (
+                "reject",
+                &["unit_mismatch"],
+                "abstain",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "clock_offset" => (
+                "unknown",
+                &["clock_offset"],
+                "indeterminate",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "readout_latency" => (
+                "limited",
+                &["readout_latency"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "timestamp_jitter" => (
+                "limited",
+                &["timestamp_jitter"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "exact_duplicate" => (
+                "idempotent_duplicate",
+                &["duplicate"],
+                "usable_once_only",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "conflicting_duplicate" => (
+                "conflict",
+                &["conflict"],
+                "abstain",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "shared_adc_offset" | "shared_reference_gain" => (
+                "limited",
+                &["common_mode"],
+                "degraded",
+                "shared_common_mode",
+                "raw_preserved",
+            ),
+            "wrong_article_calibration" => (
+                "reject",
+                &["calibration_article_mismatch"],
+                "abstain",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "firmware_generation_change" => (
+                "reject",
+                &["stale_calibration"],
+                "abstain",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "remount_offset" => (
+                "unknown",
+                &["remount_mismatch"],
+                "indeterminate",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "curvature_profile_mismatch" => (
+                "out_of_profile",
+                &["out_of_profile"],
+                "abstain",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "self_test_misses_scale_drift" => (
+                "limited",
+                &["self_test_insufficient", "gain_suspect"],
+                "degraded",
+                "one_physical_root",
+                "raw_preserved",
+            ),
+            "representation_threshold_loss" => (
+                "eligible",
+                &["representation_loss"],
+                "abstain",
+                "not_independent_descendant",
+                "lossy",
+            ),
+            "representation_alias" => (
+                "eligible",
+                &["representation_alias"],
+                "indeterminate",
+                "not_independent_descendant",
+                "alias",
+            ),
+            _ => return Err(format!("unsupported fault kind {kind}")),
+        };
 
     Ok(json!({
         "evidence_disposition": evidence,
@@ -453,12 +649,19 @@ fn require_shared_roots(input: &Value, path: &str) -> Result<(), String> {
     let roots = member(input, "source_roots", path)?
         .as_array()
         .ok_or_else(|| path_error(path, "source_roots must be an array"))?;
-    let has_adc = roots.iter().any(|value| value.as_str() == Some("adc-shared"));
-    let has_reference = roots.iter().any(|value| value.as_str() == Some("ref-shared"));
+    let has_adc = roots
+        .iter()
+        .any(|value| value.as_str() == Some("adc-shared"));
+    let has_reference = roots
+        .iter()
+        .any(|value| value.as_str() == Some("ref-shared"));
     if has_adc && has_reference {
         Ok(())
     } else {
-        Err(path_error(path, "shared ADC/reference common-mode roots are not explicit"))
+        Err(path_error(
+            path,
+            "shared ADC/reference common-mode roots are not explicit",
+        ))
     }
 }
 
@@ -502,7 +705,12 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
         }
         "shear_to_normal_crosstalk" => {
             let p = parameter_number(fault, case_id)?;
-            require_near(normal, truth_normal + p * truth_shear, case_id, "normal_raw")?;
+            require_near(
+                normal,
+                truth_normal + p * truth_shear,
+                case_id,
+                "normal_raw",
+            )?;
             require_near(shear, truth_shear, case_id, "shear_raw")?;
         }
         "saturation" => {
@@ -512,7 +720,11 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
         }
         "dead_zone" => {
             let p = parameter_number(fault, case_id)?;
-            let expected = if truth_normal.abs() < p { 0.0 } else { truth_normal };
+            let expected = if truth_normal.abs() < p {
+                0.0
+            } else {
+                truth_normal
+            };
             require_near(normal, expected, case_id, "normal_raw")?;
             require_near(shear, truth_shear, case_id, "shear_raw")?;
         }
@@ -528,12 +740,22 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
         "linear_drift" => {
             let p = parameter_number(fault, case_id)?;
             let time_ms = number_member(input, "time_ms", case_id)?;
-            require_near(normal, truth_normal + p * (time_ms - drift_epoch), case_id, "normal_raw")?;
+            require_near(
+                normal,
+                truth_normal + p * (time_ms - drift_epoch),
+                case_id,
+                "normal_raw",
+            )?;
             require_near(shear, truth_shear, case_id, "shear_raw")?;
         }
         "temperature_coefficient" => {
             let p = parameter_number(fault, case_id)?;
-            require_near(normal, truth_normal + p * (truth_temperature - reference_temperature), case_id, "normal_raw")?;
+            require_near(
+                normal,
+                truth_normal + p * (truth_temperature - reference_temperature),
+                case_id,
+                "normal_raw",
+            )?;
             require_near(shear, truth_shear, case_id, "shear_raw")?;
         }
         "hysteresis" => {
@@ -545,21 +767,30 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
         "dropout" => {
             require_string(input, "sample_presence", "missing", case_id)?;
             if normal.is_some() || shear.is_some() {
-                return Err(path_error(case_id, "dropout must preserve missing values as null"));
+                return Err(path_error(
+                    case_id,
+                    "dropout must preserve missing values as null",
+                ));
             }
         }
         "stuck_at" => {
             let p = parameter_number(fault, case_id)?;
             require_near(normal, p, case_id, "normal_raw")?;
             if nearly_equal(p, truth_normal) {
-                return Err(path_error(case_id, "stuck-at value must differ from physical truth"));
+                return Err(path_error(
+                    case_id,
+                    "stuck-at value must differ from physical truth",
+                ));
             }
             require_near(shear, truth_shear, case_id, "shear_raw")?;
         }
         "intermittent_open" => {
             require_string(input, "sample_presence", "intermittent_open", case_id)?;
             if normal.is_some() {
-                return Err(path_error(case_id, "opened normal channel must remain null"));
+                return Err(path_error(
+                    case_id,
+                    "opened normal channel must remain null",
+                ));
             }
             require_near(shear, truth_shear, case_id, "shear_raw")?;
         }
@@ -571,7 +802,10 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
                 || order[0].as_str() != Some("shear")
                 || order[1].as_str() != Some("normal")
             {
-                return Err(path_error(case_id, "channel swap identity is not represented"));
+                return Err(path_error(
+                    case_id,
+                    "channel swap identity is not represented",
+                ));
             }
             require_near(normal, truth_shear, case_id, "normal_raw")?;
             require_near(shear, truth_normal, case_id, "shear_raw")?;
@@ -587,7 +821,10 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
             let device_time = number_member(input, "time_ms", case_id)?;
             let reference_time = number_member(truth, "reference_time_ms", case_id)?;
             if !nearly_equal(device_time - reference_time, p) {
-                return Err(path_error(case_id, "clock offset does not match independent reference"));
+                return Err(path_error(
+                    case_id,
+                    "clock offset does not match independent reference",
+                ));
             }
             require_near(normal, truth_normal, case_id, "normal_raw")?;
             require_near(shear, truth_shear, case_id, "shear_raw")?;
@@ -597,7 +834,10 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
             let source_time = number_member(input, "time_ms", case_id)?;
             let receipt_time = number_member(input, "receipt_time_ms", case_id)?;
             if !nearly_equal(receipt_time - source_time, p) {
-                return Err(path_error(case_id, "readout latency does not match source/receipt times"));
+                return Err(path_error(
+                    case_id,
+                    "readout latency does not match source/receipt times",
+                ));
             }
             require_near(normal, truth_normal, case_id, "normal_raw")?;
             require_near(shear, truth_shear, case_id, "shear_raw")?;
@@ -607,7 +847,10 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
             let device_time = number_member(input, "time_ms", case_id)?;
             let reference_time = number_member(truth, "reference_time_ms", case_id)?;
             if !nearly_equal(device_time - reference_time, p) {
-                return Err(path_error(case_id, "timestamp residual does not match reference"));
+                return Err(path_error(
+                    case_id,
+                    "timestamp residual does not match reference",
+                ));
             }
             require_near(normal, truth_normal, case_id, "normal_raw")?;
             require_near(shear, truth_shear, case_id, "shear_raw")?;
@@ -617,20 +860,29 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
             let current_sequence = number_member(input, "sequence", case_id)?;
             let previous_sequence = number_member(replay, "previous_sequence", case_id)?;
             if !nearly_equal(current_sequence, previous_sequence) {
-                return Err(path_error(case_id, "replay fixture must reuse the exact sequence"));
+                return Err(path_error(
+                    case_id,
+                    "replay fixture must reuse the exact sequence",
+                ));
             }
             let current_payload = string_member(input, "payload_identity", case_id)?;
             let previous_payload = string_member(replay, "previous_payload_identity", case_id)?;
             if kind == "exact_duplicate" {
                 if current_payload != previous_payload {
-                    return Err(path_error(case_id, "exact replay must preserve payload identity"));
+                    return Err(path_error(
+                        case_id,
+                        "exact replay must preserve payload identity",
+                    ));
                 }
                 require_string(replay, "expected_relation", "same_payload", case_id)?;
                 require_near(normal, truth_normal, case_id, "normal_raw")?;
                 require_near(shear, truth_shear, case_id, "shear_raw")?;
             } else {
                 if current_payload == previous_payload {
-                    return Err(path_error(case_id, "conflicting replay must change payload identity"));
+                    return Err(path_error(
+                        case_id,
+                        "conflicting replay must change payload identity",
+                    ));
                 }
                 require_string(replay, "expected_relation", "different_payload", case_id)?;
             }
@@ -653,8 +905,13 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
                 .as_str()
                 .ok_or_else(|| path_error(case_id, "expected calibration article label"))?;
             let calibration_ref = string_member(input, "calibration_ref", case_id)?;
-            if physical_article == calibration_article || !calibration_ref.contains(calibration_article) {
-                return Err(path_error(case_id, "calibration/article mismatch is not explicit"));
+            if physical_article == calibration_article
+                || !calibration_ref.contains(calibration_article)
+            {
+                return Err(path_error(
+                    case_id,
+                    "calibration/article mismatch is not explicit",
+                ));
             }
             require_near(normal, truth_normal, case_id, "normal_raw")?;
             require_near(shear, truth_shear, case_id, "shear_raw")?;
@@ -663,7 +920,10 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
             require_string(input, "firmware_generation", "fw-b", case_id)?;
             let calibration_ref = string_member(input, "calibration_ref", case_id)?;
             if !calibration_ref.contains("fw-a") {
-                return Err(path_error(case_id, "calibration does not identify the old firmware generation"));
+                return Err(path_error(
+                    case_id,
+                    "calibration does not identify the old firmware generation",
+                ));
             }
             require_near(normal, truth_normal, case_id, "normal_raw")?;
             require_near(shear, truth_shear, case_id, "shear_raw")?;
@@ -687,28 +947,41 @@ fn check_numeric_model(case: &Value, model: &Value) -> Result<(), String> {
         }
         "representation_threshold_loss" => {
             let p = parameter_number(fault, case_id)?;
-            let raw_normal = normal.ok_or_else(|| path_error(case_id, "raw normal observation missing"))?;
+            let raw_normal =
+                normal.ok_or_else(|| path_error(case_id, "raw normal observation missing"))?;
             let output = number_member(input, "representation_output", case_id)?;
             if raw_normal >= p || !nearly_equal(output, 0.0) {
-                return Err(path_error(case_id, "threshold-loss representation does not erase the declared cue"));
+                return Err(path_error(
+                    case_id,
+                    "threshold-loss representation does not erase the declared cue",
+                ));
             }
             if string_member(input, "representation_id", case_id)? == "raw" {
-                return Err(path_error(case_id, "lossy representation must retain a distinct identity"));
+                return Err(path_error(
+                    case_id,
+                    "lossy representation must retain a distinct identity",
+                ));
             }
         }
         "representation_alias" => {
             let comparison = member(input, "representation_comparison", case_id)?;
             let comparison_normal = number_member(comparison, "comparison_normal_raw", case_id)?;
             let comparison_shear = number_member(comparison, "comparison_shear_raw", case_id)?;
-            let comparison_representation = string_member(comparison, "comparison_representation_id", case_id)?;
+            let comparison_representation =
+                string_member(comparison, "comparison_representation_id", case_id)?;
             let representation = string_member(input, "representation_id", case_id)?;
-            let raw_normal = normal.ok_or_else(|| path_error(case_id, "primary raw normal missing"))?;
-            let raw_shear = shear.ok_or_else(|| path_error(case_id, "primary raw shear missing"))?;
+            let raw_normal =
+                normal.ok_or_else(|| path_error(case_id, "primary raw normal missing"))?;
+            let raw_shear =
+                shear.ok_or_else(|| path_error(case_id, "primary raw shear missing"))?;
             if nearly_equal(comparison_normal, raw_normal)
                 || !nearly_equal(comparison_shear, raw_shear)
                 || comparison_representation != representation
             {
-                return Err(path_error(case_id, "two evaluator-distinct traces do not alias to one representation"));
+                return Err(path_error(
+                    case_id,
+                    "two evaluator-distinct traces do not alias to one representation",
+                ));
             }
         }
         _ => return Err(path_error(case_id, "unhandled fault kind")),
@@ -728,18 +1001,35 @@ fn validate_model(model: &Value) -> Result<(), String> {
         || !nearly_equal(default_gain, 1.0)
         || !nearly_equal(default_bias, 0.0)
     {
-        return Err("model reference constants changed without a new fixture generation".to_owned());
+        return Err(
+            "model reference constants changed without a new fixture generation".to_owned(),
+        );
     }
-    require_string(model, "drift_elapsed_time_basis", "time_ms - drift_epoch_ms", "model")?;
+    require_string(
+        model,
+        "drift_elapsed_time_basis",
+        "time_ms - drift_epoch_ms",
+        "model",
+    )?;
 
     let parameter_semantics = member(model, "parameter_semantics", "model")?
         .as_object()
         .ok_or_else(|| "model.parameter_semantics must be an object".to_owned())?;
     for required in [
-        "bias", "gain", "normal_to_shear_crosstalk", "shear_to_normal_crosstalk",
-        "saturation", "dead_zone", "quantization", "linear_drift",
-        "temperature_coefficient", "hysteresis", "shared_adc_offset",
-        "shared_reference_gain", "clock_offset", "readout_latency",
+        "bias",
+        "gain",
+        "normal_to_shear_crosstalk",
+        "shear_to_normal_crosstalk",
+        "saturation",
+        "dead_zone",
+        "quantization",
+        "linear_drift",
+        "temperature_coefficient",
+        "hysteresis",
+        "shared_adc_offset",
+        "shared_reference_gain",
+        "clock_offset",
+        "readout_latency",
         "timestamp_jitter",
     ] {
         if !parameter_semantics.contains_key(required) {
@@ -764,7 +1054,10 @@ pub fn validate_document(document: &Value, schema: &Value) -> Result<ValidationR
     let mut schema_errors = Vec::new();
     validate_schema(document, schema, "$", &mut schema_errors);
     if !schema_errors.is_empty() {
-        return Err(format!("schema validation failed: {}", schema_errors.join("; ")));
+        return Err(format!(
+            "schema validation failed: {}",
+            schema_errors.join("; ")
+        ));
     }
 
     let model = member(document, "model", "corpus")?;
@@ -774,7 +1067,10 @@ pub fn validate_document(document: &Value, schema: &Value) -> Result<ValidationR
         .as_array()
         .ok_or_else(|| "corpus.cases must be an array".to_owned())?;
     if cases.len() != EXPECTED_CASE_COUNT || cases.len() != EXPECTED_CASES.len() {
-        return Err(format!("expected {EXPECTED_CASE_COUNT} fixtures, found {}", cases.len()));
+        return Err(format!(
+            "expected {EXPECTED_CASE_COUNT} fixtures, found {}",
+            cases.len()
+        ));
     }
 
     let mut identifiers = BTreeSet::new();
@@ -788,20 +1084,30 @@ pub fn validate_document(document: &Value, schema: &Value) -> Result<ValidationR
         let (expected_id, expected_family, expected_kind) = EXPECTED_CASES[index];
 
         if case_id != expected_id || family != expected_family || kind != expected_kind {
-            return Err(path_error(case_id, format!(
-                "fixture identity drift: expected ({expected_id}, {expected_family}, {expected_kind})"
-            )));
+            return Err(path_error(
+                case_id,
+                format!(
+                    "fixture identity drift: expected ({expected_id}, {expected_family}, {expected_kind})"
+                ),
+            ));
         }
         if !identifiers.insert(case_id.to_owned()) {
             return Err(path_error(case_id, "duplicate fixture identity"));
         }
 
         let derived_expected = expected_for_fault(kind)?;
-        let recorded_expected = member(member(case, "evaluator_only", case_id)?, "expected", case_id)?;
+        let recorded_expected = member(
+            member(case, "evaluator_only", case_id)?,
+            "expected",
+            case_id,
+        )?;
         if &derived_expected != recorded_expected {
-            return Err(path_error(case_id, format!(
-                "expected disposition drift: derived {derived_expected}, recorded {recorded_expected}"
-            )));
+            return Err(path_error(
+                case_id,
+                format!(
+                    "expected disposition drift: derived {derived_expected}, recorded {recorded_expected}"
+                ),
+            ));
         }
 
         check_numeric_model(case, model)?;
@@ -865,8 +1171,8 @@ mod tests {
     #[test]
     fn shared_reference_fault_cannot_be_promoted_to_independent_evidence() {
         let (mut document, schema) = tracked_values();
-        case_mut(&mut document, "TAC-REF-GAIN-023")["evaluator_only"]["expected"]
-            ["independence_disposition"] = json!("one_physical_root");
+        case_mut(&mut document, "TAC-REF-GAIN-023")["evaluator_only"]["expected"]["independence_disposition"] =
+            json!("one_physical_root");
         assert!(validate_document(&document, &schema).is_err());
     }
 
@@ -889,8 +1195,8 @@ mod tests {
     #[test]
     fn hdc_alias_fixture_requires_distinct_raw_traces_with_one_representation() {
         let (mut document, schema) = tracked_values();
-        case_mut(&mut document, "TAC-ALIAS-030")["candidate_input"]
-            ["representation_comparison"]["comparison_normal_raw"] = json!(0.31);
+        case_mut(&mut document, "TAC-ALIAS-030")["candidate_input"]["representation_comparison"]
+            ["comparison_normal_raw"] = json!(0.31);
         assert!(validate_document(&document, &schema).is_err());
     }
 
@@ -917,16 +1223,15 @@ mod tests {
     #[test]
     fn clock_offset_cannot_be_mistaken_for_readout_latency() {
         let (mut document, schema) = tracked_values();
-        case_mut(&mut document, "TAC-CLOCK-017")["candidate_input"]["time_ms"] =
-            json!(1249);
+        case_mut(&mut document, "TAC-CLOCK-017")["candidate_input"]["time_ms"] = json!(1249);
         assert!(validate_document(&document, &schema).is_err());
     }
 
     #[test]
     fn self_test_pass_does_not_clear_scale_drift() {
         let (mut document, schema) = tracked_values();
-        case_mut(&mut document, "TAC-SELFTEST-028")["evaluator_only"]["expected"]
-            ["qc_flags"] = json!(["self_test_insufficient"]);
+        case_mut(&mut document, "TAC-SELFTEST-028")["evaluator_only"]["expected"]["qc_flags"] =
+            json!(["self_test_insufficient"]);
         assert!(validate_document(&document, &schema).is_err());
     }
 
