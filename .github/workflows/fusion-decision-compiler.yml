@@ -55,3 +55,6 @@ jobs:
 
       - name: Run synthetic QENG and Pareto tradeoff audit
         run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_pareto_tradeoff
+
+      - name: Run synthetic decision-focused value-of-information
+        run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_decision_voi
