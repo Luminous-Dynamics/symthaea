@@ -1001,7 +1001,11 @@ mod tests {
         }
     }
 
-    fn point_permutations(group: &FiniteGroupV1, polygon_order: usize, dihedral: bool) -> Vec<Vec<usize>> {
+    fn point_permutations(
+        group: &FiniteGroupV1,
+        polygon_order: usize,
+        dihedral: bool,
+    ) -> Vec<Vec<usize>> {
         (0..group.multiplication.len())
             .map(|element| {
                 let rotation = if dihedral {
@@ -1145,12 +1149,8 @@ mod tests {
             let boundary = format!("boundary-orbit-{orbit_index}");
             let output = format!("output-orbit-{orbit_index}");
             for candidate in orbit {
-                candidate_semantics[*candidate] = semantics(
-                    orbit_cost,
-                    orbit.len() as i64,
-                    &boundary,
-                    &output,
-                );
+                candidate_semantics[*candidate] =
+                    semantics(orbit_cost, orbit.len() as i64, &boundary, &output);
             }
         }
         let candidate_ids = (0..candidate_count)
@@ -1171,7 +1171,10 @@ mod tests {
         let outcome =
             compile_quotient(&problem, &action, QualificationBudgetV1::default()).unwrap();
         let CompileOutcomeV1::Authorized(certificate) = outcome else {
-            panic!("group action must preserve orbit-assigned exact task semantics: {}", action.action_id);
+            panic!(
+                "group action must preserve orbit-assigned exact task semantics: {}",
+                action.action_id
+            );
         };
         let compiled: Vec<BTreeSet<usize>> = certificate
             .orbits
@@ -1241,8 +1244,16 @@ mod tests {
                 );
             }
         }
-        assert_eq!(quotient_best, exhaustive_best, "best objective for {}", action.action_id);
-        assert_eq!(lifted, exhaustive_solutions, "lifted optimum for {}", action.action_id);
+        assert_eq!(
+            quotient_best, exhaustive_best,
+            "best objective for {}",
+            action.action_id
+        );
+        assert_eq!(
+            lifted, exhaustive_solutions,
+            "lifted optimum for {}",
+            action.action_id
+        );
     }
 
     #[test]
@@ -1700,8 +1711,7 @@ mod tests {
             assert_exact_quotient_matches_oracle(dihedral_unordered_pairs);
             fixture_count += 1;
 
-            let dihedral_regular =
-                regular_action(dihedral.clone(), format!("D{n}-regular-action"));
+            let dihedral_regular = regular_action(dihedral.clone(), format!("D{n}-regular-action"));
             assert_exact_quotient_matches_oracle(dihedral_regular.clone());
             fixture_count += 1;
 
