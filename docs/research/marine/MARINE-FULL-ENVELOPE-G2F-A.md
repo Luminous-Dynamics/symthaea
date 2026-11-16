@@ -90,7 +90,8 @@ The fixture is an input contract test, not a produced mesh. Its exact prismatic 
 
 The JSON fixture set now includes:
 - `marine-full-envelope-box-001.json`: symmetric transom/transom reference hull;
-- `marine-full-envelope-asymmetric-001.json`: explicit port/starboard profiles with different transverse breadths and independently referenced waterline points.
+- `marine-full-envelope-asymmetric-001.json`: explicit port/starboard profiles with different transverse breadths and independently referenced waterline points;
+- `marine-full-envelope-pointed-bow-asymmetric-001.json`: explicit asymmetric midbody with a pointed bow whose port/starboard stem samples share exact IDs and coordinates.
 
 The pointed-stem + explicit port/starboard combination is covered by a Rust unit fixture. It requires both sides to share exact point identities and z coordinates along the collapsed stem, while permitting independent port/starboard geometry through the midbody. This distinction prevents the validator from treating asymmetric vessels as mirrored vessels or allowing a disconnected stem seam.
 
