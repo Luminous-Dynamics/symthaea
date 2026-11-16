@@ -85,30 +85,37 @@ jobs:
           report="$RUNNER_TEMP/gaussian-terminal-test-induction-calibration.json"
           cargo run --locked --manifest-path "$manifest" --bin gaussian_terminal_induction_calibration > "$report"
           jq -e '
-            .schema == "gaussian_terminal_test_induction_calibration_v0" and
+            .schema == "gaussian_terminal_test_induction_calibration_v1" and
             .nominal_alpha == 0.05 and
             .paths_per_scenario == 20000 and
             .maximum_looks == 80 and
+            .induced_stop_thresholds == [0.75, 0.90, 0.99] and
             (.scenarios | length) == 2 and
             all(.scenarios[];
               .paths == 20000 and
               .horizon == 80 and
               .terminal_induced_mismatches == 0 and
+              (.induced_stop_policies | length) == 3 and
               .terminal_np_rejection_rate >= 0 and .terminal_np_rejection_rate <= 1 and
-              .induced_randomized_rejection_rate >= 0 and .induced_randomized_rejection_rate <= 1 and
               .e_process_crossing_rate >= 0 and .e_process_crossing_rate <= 1 and
-              .naive_repeated_fixed_time_rate >= 0 and .naive_repeated_fixed_time_rate <= 1
+              .naive_repeated_fixed_time_rate >= 0 and .naive_repeated_fixed_time_rate <= 1 and
+              all(.induced_stop_policies[];
+                .randomized_rejection_rate >= 0 and .randomized_rejection_rate <= 1 and
+                .early_stop_rate >= 0 and .early_stop_rate <= 1
+              )
             ) and
-            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].terminal_np_rejection_rate) >= 0.04) and
-            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].terminal_np_rejection_rate) <= 0.06) and
-            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].induced_randomized_rejection_rate) >= 0.04) and
-            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].induced_randomized_rejection_rate) <= 0.06) and
-            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].e_process_crossing_rate) <= 0.06) and
-            ((.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0].naive_repeated_fixed_time_rate) > 0.10) and
-            ((
-              (.scenarios | map(select(.scenario == "fixed_gaussian_declared_alternative"))[0].terminal_np_rejection_rate) -
-              .analytic_terminal_np_power
-            ) | abs) < 0.015
+            (.scenarios | map(select(.scenario == "fixed_gaussian_simple_null"))[0]) as $null |
+            (.scenarios | map(select(.scenario == "fixed_gaussian_declared_alternative"))[0]) as $alt |
+            ($null.terminal_np_rejection_rate >= 0.04) and
+            ($null.terminal_np_rejection_rate <= 0.06) and
+            ($null.e_process_crossing_rate <= 0.06) and
+            ($null.naive_repeated_fixed_time_rate > 0.10) and
+            (all($null.induced_stop_policies[];
+              .randomized_rejection_rate >= 0.04 and .randomized_rejection_rate <= 0.06
+            )) and
+            (($alt.terminal_np_rejection_rate - .analytic_terminal_np_power) | abs) < 0.015 and
+            ($alt.induced_stop_policies[0].early_stop_rate >= $alt.induced_stop_policies[1].early_stop_rate) and
+            ($alt.induced_stop_policies[1].early_stop_rate >= $alt.induced_stop_policies[2].early_stop_rate)
           ' "$report"
           printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$report.source-sha"
           sha256sum "$report" | tee "$report.sha256"
