@@ -779,6 +779,25 @@ mod tests {
     }
 
     #[test]
+    fn candidate_cannot_move_the_evaluator_authoritative_cutoff() {
+        let mut candidate: Value = serde_json::from_str(CANDIDATE).unwrap();
+        let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+        candidate["decision_cutoff"] = json!("2026-11-16T10:10:00Z");
+        let error = evaluate_credal_risk_parts_json(&candidate.to_string(), &oracle.to_string()).unwrap_err();
+        assert!(error.contains("evaluator-authoritative cutoff"));
+    }
+
+    #[test]
+    fn candidate_cannot_change_option_availability() {
+        let candidate = serde_json::from_str::<Value>(CANDIDATE).unwrap();
+        let mut altered = candidate;
+        let mut oracle: Value = serde_json::from_str(ORACLE).unwrap();
+        altered["options"][0]["available_at"] = json!("2026-11-16T08:00:00Z");
+        let error = evaluate_credal_risk_parts_json(&altered.to_string(), &oracle.to_string()).unwrap_err();
+        assert!(error.contains("availability mismatch"));
+    }
+
+    #[test]
     fn candidate_cannot_weaken_authoritative_action_policy() {
         let mut candidate: Value = serde_json::from_str(CANDIDATE).unwrap();
         let oracle: Value = serde_json::from_str(ORACLE).unwrap();
