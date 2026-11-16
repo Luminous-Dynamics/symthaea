@@ -466,6 +466,43 @@ mod tests {
     }
 
     #[test]
+    fn changed_boundary_and_output_semantics_are_rejected_by_problem_digest() {
+        let (_problem, action, certificate, package) = authorized_fixture();
+        let mut changed_boundary = fixture().0;
+        changed_boundary.semantics[0].boundary_condition_id.push_str("-changed");
+        assert_eq!(
+            verify_bound_certificate(
+                &changed_boundary,
+                &action,
+                &certificate,
+                &package
+            ),
+            Err(ContentBindingErrorV1::ProblemDigestMismatch)
+        );
+
+        let mut changed_output = fixture().0;
+        changed_output.semantics[0].output_equivalence_id.push_str("-changed");
+        assert_eq!(
+            verify_bound_certificate(
+                &changed_output,
+                &action,
+                &certificate,
+                &package
+            ),
+            Err(ContentBindingErrorV1::ProblemDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn canonical_certificate_encoding_is_deterministic() {
+        let (_problem, _action, certificate, _package) = authorized_fixture();
+        let budget = ContentBindingBudgetV1::default();
+        let first = canonical_certificate_bytes_v1(&certificate, budget).unwrap();
+        let second = canonical_certificate_bytes_v1(&certificate, budget).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
     fn changed_objective_is_rejected_by_problem_digest() {
         let (_problem, action, certificate, package) = authorized_fixture();
         let mut changed = fixture().0;
