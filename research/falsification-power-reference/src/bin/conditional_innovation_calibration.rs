@@ -96,8 +96,7 @@ fn wilson_95(successes: u64, trials: u64) -> (f64, f64) {
     let z2 = WILSON_Z_95 * WILSON_Z_95;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let half = WILSON_Z_95 * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt())
-        / denominator;
+    let half = WILSON_Z_95 * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()) / denominator;
     ((center - half).max(0.0), (center + half).min(1.0))
 }
 
@@ -105,14 +104,10 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
     let mut counts = Counts::default();
 
     for path in 0..PATHS {
-        let seed = ROOT_SEED
-            ^ scenario.offset()
-            ^ path.wrapping_mul(0xd6e8_feb8_6659_fd93);
+        let seed = ROOT_SEED ^ scenario.offset() ^ path.wrapping_mul(0xd6e8_feb8_6659_fd93);
         let mut rng = SplitMix64::new(seed);
-        let mut conditional =
-            PredictableGaussianEProcess::new(SIGMA, ALPHA)?;
-        let mut zero_mean =
-            PredictableGaussianEProcess::new(SIGMA, ALPHA)?;
+        let mut conditional = PredictableGaussianEProcess::new(SIGMA, ALPHA)?;
+        let mut zero_mean = PredictableGaussianEProcess::new(SIGMA, ALPHA)?;
         let mut previous_observation = 0.0;
         let mut conditional_first_crossing = None;
         let mut zero_mean_first_crossing = None;
@@ -121,9 +116,7 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
             // This mean is a deterministic function of the previous public
             // observation. It is committed before the current noise is drawn.
             let null_conditional_mean = RHO * previous_observation;
-            let observed = null_conditional_mean
-                + scenario.shift()
-                + SIGMA * rng.standard_normal();
+            let observed = null_conditional_mean + scenario.shift() + SIGMA * rng.standard_normal();
 
             if conditional_first_crossing.is_none() {
                 let observation_id = format!("conditional-{path}-{look}");
@@ -135,11 +128,7 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
                     null_conditional_mean,
                     SIGMA,
                 )?;
-                let update = conditional.observe(
-                    &observation_id,
-                    &decision_digest,
-                    observed,
-                )?;
+                let update = conditional.observe(&observation_id, &decision_digest, observed)?;
                 if update.crossed_alpha_boundary {
                     conditional_first_crossing = Some(look);
                 }
@@ -154,11 +143,7 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
                     DISCREPANCY,
                     SIGMA,
                 )?;
-                let update = zero_mean.observe(
-                    &observation_id,
-                    &decision_digest,
-                    observed,
-                )?;
+                let update = zero_mean.observe(&observation_id, &decision_digest, observed)?;
                 if update.crossed_alpha_boundary {
                     zero_mean_first_crossing = Some(look);
                 }
@@ -186,28 +171,25 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
 }
 
 fn emit_scenario(scenario: Scenario, counts: &Counts) {
-    let (conditional_low, conditional_high) =
-        wilson_95(counts.conditional_crossings, PATHS);
-    let (zero_mean_low, zero_mean_high) =
-        wilson_95(counts.zero_mean_crossings, PATHS);
+    let (conditional_low, conditional_high) = wilson_95(counts.conditional_crossings, PATHS);
+    let (zero_mean_low, zero_mean_high) = wilson_95(counts.zero_mean_crossings, PATHS);
     let conditional_mean_look = if counts.conditional_crossers == 0 {
         0.0
     } else {
-        counts.conditional_crossing_looks as f64
-            / counts.conditional_crossers as f64
+        counts.conditional_crossing_looks as f64 / counts.conditional_crossers as f64
     };
     let zero_mean_mean_look = if counts.zero_mean_crossers == 0 {
         0.0
     } else {
-        counts.zero_mean_crossing_looks as f64
-            / counts.zero_mean_crossers as f64
+        counts.zero_mean_crossing_looks as f64 / counts.zero_mean_crossers as f64
     };
     let conditional_mean_observations = (counts.conditional_crossing_looks
-        + (PATHS - counts.conditional_crossers) * HORIZON) as f64
+        + (PATHS - counts.conditional_crossers) * HORIZON)
+        as f64
         / PATHS as f64;
-    let zero_mean_mean_observations = (counts.zero_mean_crossing_looks
-        + (PATHS - counts.zero_mean_crossers) * HORIZON) as f64
-        / PATHS as f64;
+    let zero_mean_mean_observations =
+        (counts.zero_mean_crossing_looks + (PATHS - counts.zero_mean_crossers) * HORIZON) as f64
+            / PATHS as f64;
 
     println!(
         concat!(
@@ -264,13 +246,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "\"claim\":\"synthetic conditional-Gaussian AR(1) calibration diagnostic only\",",
             "\"scenarios\":["
         ),
-        ROOT_SEED,
-        ALPHA,
-        PATHS,
-        HORIZON,
-        RHO,
-        SIGMA,
-        DISCREPANCY
+        ROOT_SEED, ALPHA, PATHS, HORIZON, RHO, SIGMA, DISCREPANCY
     );
     emit_scenario(Scenario::ConditionalNull, &null);
     println!(",");
