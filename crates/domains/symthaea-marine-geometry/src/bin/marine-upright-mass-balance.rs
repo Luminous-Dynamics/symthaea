@@ -114,9 +114,12 @@ fn run() -> Result<i32, String> {
 
     match solve_upright_mass_balance(&request) {
         Ok(receipt) => {
-            write_report(output, &CliReport::Solved {
-                receipt: Box::new(receipt),
-            })?;
+            write_report(
+                output,
+                &CliReport::Solved {
+                    receipt: Box::new(receipt),
+                },
+            )?;
             Ok(0)
         }
         Err(issues) => {
