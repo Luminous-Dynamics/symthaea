@@ -10,6 +10,7 @@ pub mod cross_solver_comparison;
 pub mod evidence_dependence;
 pub mod plant_service_gate;
 pub mod screening_funnel;
+pub mod validation_assessment;
 pub mod validation_domain;
 
 pub const COMPILER_VERSION: &str = "fusion-decision-compiler/0.1";
