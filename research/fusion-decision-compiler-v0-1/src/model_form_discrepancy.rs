@@ -227,6 +227,51 @@ pub struct ModelFormDiscrepancyPlan {
     pub decision_receipt_sha256: String,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ConformalAllowance {
+    pub rank_one_based: usize,
+    pub value_mwe: f64,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ConformalRankError {
+    EmptyResiduals,
+    InvalidCoverage,
+    NonFiniteResidual,
+    NegativeResidual,
+    RankUnavailable,
+}
+
+/// Exact finite-sample split-conformal absolute-residual order statistic:
+/// k = ceil((n + 1) * coverage). A rank above n is unavailable, never clamped.
+pub fn conformal_absolute_residual_allowance(
+    residuals_mwe: &[f64],
+    coverage: f64,
+) -> Result<ConformalAllowance, ConformalRankError> {
+    if residuals_mwe.is_empty() {
+        return Err(ConformalRankError::EmptyResiduals);
+    }
+    if !coverage.is_finite() || coverage <= 0.0 || coverage >= 1.0 {
+        return Err(ConformalRankError::InvalidCoverage);
+    }
+    if residuals_mwe.iter().any(|value| !value.is_finite()) {
+        return Err(ConformalRankError::NonFiniteResidual);
+    }
+    if residuals_mwe.iter().any(|value| *value < 0.0) {
+        return Err(ConformalRankError::NegativeResidual);
+    }
+    let mut sorted = residuals_mwe.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let rank = ((sorted.len() + 1) as f64 * coverage).ceil() as usize;
+    if rank == 0 || rank > sorted.len() {
+        return Err(ConformalRankError::RankUnavailable);
+    }
+    Ok(ConformalAllowance {
+        rank_one_based: rank,
+        value_mwe: sorted[rank - 1],
+    })
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModelFormDiscrepancyReport {
     pub contract_version: &'static str,
@@ -401,12 +446,11 @@ pub fn evaluate_model_form_discrepancy(
         );
     }
 
-    let mut residual_values: Vec<f64> = plan
+    let residual_values: Vec<f64> = plan
         .calibration_residuals
         .iter()
         .map(|item| item.absolute_residual_mwe)
         .collect();
-    residual_values.sort_by(f64::total_cmp);
 
     let n = residual_values.len();
     if n < plan.profile.minimum_calibration_samples {
@@ -425,25 +469,44 @@ pub fn evaluate_model_form_discrepancy(
             Some(residual_values),
         );
     }
-    let rank = ((n + 1) as f64 * plan.profile.discrepancy_coverage).ceil() as usize;
-    if rank == 0 || rank > n {
-        return report(
-            plan,
-            ModelFormDisposition::InsufficientCalibration,
-            vec![ModelFormDiagnostic::ConformalRankUnavailable],
-            Some(rank),
-            None,
-            Some(plan.parametric_bound.lower_bound_mwe),
-            None,
-            Some(coverage_floor(
-                plan.parametric_bound.one_sided_coverage,
-                plan.profile.discrepancy_coverage,
-            )),
-            Some(residual_values),
-        );
-    }
+    let conformal = match conformal_absolute_residual_allowance(
+        &residual_values,
+        plan.profile.discrepancy_coverage,
+    ) {
+        Ok(value) => value,
+        Err(ConformalRankError::RankUnavailable | ConformalRankError::EmptyResiduals) => {
+            return report(
+                plan,
+                ModelFormDisposition::InsufficientCalibration,
+                vec![ModelFormDiagnostic::ConformalRankUnavailable],
+                None,
+                None,
+                Some(plan.parametric_bound.lower_bound_mwe),
+                None,
+                Some(coverage_floor(
+                    plan.parametric_bound.one_sided_coverage,
+                    plan.profile.discrepancy_coverage,
+                )),
+                Some(residual_values),
+            );
+        }
+        Err(_) => {
+            return report(
+                plan,
+                ModelFormDisposition::NotEvaluable,
+                vec![ModelFormDiagnostic::NonFiniteResidual],
+                None,
+                None,
+                Some(plan.parametric_bound.lower_bound_mwe),
+                None,
+                None,
+                Some(residual_values),
+            );
+        }
+    };
 
-    let allowance = residual_values[rank - 1];
+    let rank = conformal.rank_one_based;
+    let allowance = conformal.value_mwe;
     let floor = coverage_floor(
         plan.parametric_bound.one_sided_coverage,
         plan.profile.discrepancy_coverage,
@@ -967,6 +1030,40 @@ mod tests {
     }
 
     #[test]
+    fn conformal_helper_uses_exact_finite_sample_order_statistic() {
+        let residuals: Vec<f64> = (1..=19).map(|value| value as f64).collect();
+        let allowance = conformal_absolute_residual_allowance(&residuals, 0.95).unwrap();
+        assert_eq!(allowance.rank_one_based, 19);
+        assert_eq!(allowance.value_mwe, 19.0);
+
+        let residuals: Vec<f64> = (1..=39).map(|value| value as f64).collect();
+        let allowance = conformal_absolute_residual_allowance(&residuals, 0.975).unwrap();
+        assert_eq!(allowance.rank_one_based, 39);
+        assert_eq!(allowance.value_mwe, 39.0);
+    }
+
+    #[test]
+    fn conformal_helper_refuses_eighteen_samples_for_ninety_five_percent() {
+        let residuals: Vec<f64> = (1..=18).map(|value| value as f64).collect();
+        assert_eq!(
+            conformal_absolute_residual_allowance(&residuals, 0.95),
+            Err(ConformalRankError::RankUnavailable)
+        );
+    }
+
+    #[test]
+    fn conformal_helper_rejects_non_finite_and_negative_residuals() {
+        assert_eq!(
+            conformal_absolute_residual_allowance(&[1.0, f64::NAN], 0.95),
+            Err(ConformalRankError::NonFiniteResidual)
+        );
+        assert_eq!(
+            conformal_absolute_residual_allowance(&[1.0, -0.1], 0.95),
+            Err(ConformalRankError::NegativeResidual)
+        );
+    }
+
+    #[test]
     fn nineteen_independent_residuals_at_ninety_five_percent_use_the_maximum() {
         let mut plan = plan(19, 1.0);
         plan.profile.discrepancy_coverage = 0.95;
@@ -1002,6 +1099,24 @@ mod tests {
     fn parametric_and_discrepancy_coverages_use_union_bound_not_product() {
         let report = evaluate_model_form_discrepancy(&plan(39, 1.0));
         assert_eq!(report.combined_coverage_floor, Some(0.95));
+    }
+
+    #[test]
+    fn minimum_calibration_count_is_enforced_even_when_rank_exists() {
+        let mut test_plan = plan(39, 1.0);
+        test_plan.profile.minimum_calibration_samples = 40;
+        let report = evaluate_model_form_discrepancy(&test_plan);
+        assert_eq!(report.disposition, ModelFormDisposition::InsufficientCalibration);
+        assert_eq!(report.conformal_rank_one_based, None);
+    }
+
+    #[test]
+    fn parametric_receipt_coverage_must_match_frozen_allocation() {
+        let mut test_plan = plan(39, 1.0);
+        test_plan.parametric_bound.one_sided_coverage = 0.95;
+        let report = evaluate_model_form_discrepancy(&test_plan);
+        assert_eq!(report.disposition, ModelFormDisposition::NotEvaluable);
+        assert!(report.diagnostics.contains(&ModelFormDiagnostic::ParametricCoverageMismatch));
     }
 
     #[test]
