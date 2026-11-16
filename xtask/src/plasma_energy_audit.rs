@@ -2441,7 +2441,12 @@ mod tests {
         let source = serde_json::json!({
             "programme": "TEST",
             "claim_ceiling": "SOURCE_ONLY",
-            "evidence_classes": ["PUBLISHED_LAB_EXPERIMENT"],
+            "evidence_classes": [
+                "PUBLISHED_LAB_EXPERIMENT",
+                "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+                "PUBLISHED_NUMERICAL_STUDY",
+                "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS"
+            ],
             "cases": [{
                 "case_id": "case-1",
                 "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
@@ -2571,7 +2576,26 @@ mod tests {
                     "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
                     "luminous_reproduction": false,
                     "source": {"url": "https://doi.org/10.1021/jacs.6c04148"},
-                    "observations": [{"metric":"ammonia_area_production_rate","value":7.7}]
+                    "observations": [{"metric":"ammonia_area_production_rate","value":7.7}],
+                    "state_transfer_evidence": {
+                        "physical_observations": [
+                            {"observation":"15N2 isotope labeling and plasma/electrolysis on-off controls","evidence_class":"PUBLISHED_EXPERIMENTAL_CONTROL"},
+                            {"observation":"in-situ Raman evidence of N-N-containing surface intermediates","evidence_class":"PUBLISHED_IN_SITU_SPECTROSCOPY"},
+                            {"observation":"NH3 area-normalized production rate and electrochemical Faradaic efficiency","evidence_class":"PUBLISHED_EXPERIMENTAL_PRODUCT_OBSERVATION"}
+                        ],
+                        "model_derived_estimates": [
+                            {"metric":"effective_N2_vibrational_state_temperature","value":4300.0,"evidence_class":"MODEL_DERIVED","interface_direct_measurement":false},
+                            {"metric":"N2_population_in_v4_to_v8","value":0.118,"evidence_class":"MODEL_DERIVED","interface_direct_measurement":false}
+                        ],
+                        "claim_policy": {
+                            "model_derived_population_must_not_be_relabelled_physical_measurement":true,
+                            "discharge_exit_population_must_not_be_substituted_for_interface_population":true,
+                            "raman_intermediate_signal_must_not_be_substituted_for_quantitative_state_flux":true,
+                            "isotope_attribution_is_not_equivalent_to_state_resolved_mechanism_proof":true,
+                            "faradaic_efficiency_is_not_equivalent_to_full_system_energy_efficiency":true
+                        },
+                        "not_established":["calibrated state-resolved N2(v) distribution measured at the catalyst interface"]
+                    }
                 }
             ],
             "derived_reference_checks": [{
@@ -2712,6 +2736,8 @@ mod tests {
     fn source_manifest_accepts_pulsed_plasma_methane_full_chain_target() {
         let mut source = minimal_benchmark_target_manifest("METHANE_PYROLYSIS_PULSED_HEATING");
         source["cases"][0]["case_id"] = serde_json::json!("CH4-PLASMA-PULSED-HEATING-REGEN-2026");
+        append_registered_source_case(&mut source, "CH4-PLASMA-PULSED-HEATING-REGEN-2026");
+        append_registered_source_case(&mut source, "METHANE-PYROLYSIS-HEATING-REVIEW-2026");
         source["benchmark_targets"][0]["comparator_case_ids"] = serde_json::json!([
             "CH4-PLASMA-PULSED-HEATING-REGEN-2026",
             "METHANE-PYROLYSIS-HEATING-REVIEW-2026"
@@ -2724,6 +2750,8 @@ mod tests {
     fn source_manifest_accepts_ammonia_dynamic_flex_target_with_matched_haber_bosch_baselines() {
         let mut source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY");
         source["cases"][0]["case_id"] = serde_json::json!("NH3-HB-ROBUST-LOAD-FLEX-2026");
+        append_registered_source_case(&mut source, "NH3-HB-FATIGUE-YEAR-SCHEDULING-2026");
+        append_registered_source_case(&mut source, "NH3-P2A-THREE-LEVEL-DISPATCH-2026");
         source["benchmark_targets"][0]["comparator_case_ids"] = serde_json::json!([
             "NH3-HB-ROBUST-LOAD-FLEX-2026",
             "NH3-HB-FATIGUE-YEAR-SCHEDULING-2026",
@@ -3040,6 +3068,23 @@ mod tests {
                 .to_string()
                 .contains("must preserve a no-credit baseline")
         );
+    }
+
+    fn append_registered_source_case(source: &mut Value, case_id: &str) {
+        let registered: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        )).unwrap();
+        let case = registered["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["case_id"] == case_id)
+            .unwrap_or_else(|| panic!("registered comparator case missing: {case_id}"))
+            .clone();
+        let cases = source["cases"].as_array_mut().unwrap();
+        if !cases.iter().any(|item| item["case_id"] == case_id) {
+            cases.push(case);
+        }
     }
 
     fn minimal_benchmark_target_manifest(lane: &str) -> Value {
