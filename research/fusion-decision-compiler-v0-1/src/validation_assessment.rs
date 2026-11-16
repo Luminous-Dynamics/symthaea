@@ -13,13 +13,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::ModelUse;
-use super::validation_domain::{
-    ValidationDomainError, ValidationPlan, validate_validation_domain,
-};
+use super::validation_domain::{ValidationPlan, validate_validation_domain};
 
 pub const VALIDATION_ASSESSMENT_VERSION: &str = "fusion-model-validation-assessment/0.1";
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ObservableValidationSpec {
     pub observable_id: String,
     pub unit_ref: String,
@@ -37,7 +35,7 @@ pub struct ObservableValidationSpec {
     pub maximum_mean_normalized_interval_width: f64,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ValidationAssessmentProfile {
     pub profile_id: String,
     pub profile_sha256: String,
@@ -964,7 +962,7 @@ mod tests {
             "test-stand-case",
             "test-stand-operating-point",
             &format!("test-stand-dataset-{index}"),
-            'f',
+            'z',
             &format!("test-stand-episode-{index}"),
         );
         let holdout_observation = observation(
@@ -1209,7 +1207,9 @@ mod tests {
         let mut source = campaign();
         for case in &mut source.cases {
             case.plan.blind_holdout.observation.facility_id = "one-facility".to_string();
-            case.plan.domain.allowed_facility_ids.push("one-facility".to_string());
+            if !case.plan.domain.allowed_facility_ids.contains(&"one-facility".to_string()) {
+                case.plan.domain.allowed_facility_ids.push("one-facility".to_string());
+            }
         }
         source.profile.minimum_distinct_facilities = 2;
         let report = assess_blind_holdout_campaign(&source).unwrap();
@@ -1222,9 +1222,9 @@ mod tests {
     #[test]
     fn point_coverage_and_measurement_interval_overlap_are_distinct() {
         let mut source = campaign();
-        source.cases[2].measurements[0].measurement_interval_lower = 99.0;
-        source.cases[2].measurements[0].measurement_interval_upper = 101.0;
-        source.cases[2].measurements[0].measured_value = 100.0;
+        source.cases[2].measurements[0].measurement_interval_lower = 100.0;
+        source.cases[2].measurements[0].measurement_interval_upper = 120.0;
+        source.cases[2].measurements[0].measured_value = 110.0;
         let report = assess_blind_holdout_campaign(&source).unwrap();
         let metric = &report.per_observable_metrics[0];
         assert!(metric.measurement_interval_overlap_coverage > metric.empirical_point_interval_coverage);
@@ -1277,6 +1277,3 @@ mod tests {
     }
 }
 
-function assert_is_sha256(value: &str) -> bool {
-    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
-}
