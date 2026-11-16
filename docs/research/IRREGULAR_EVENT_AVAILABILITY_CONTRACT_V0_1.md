@@ -244,7 +244,54 @@ build CPU query and audit cost only; it does not establish durable-WAL,
 distributed-stream, throughput or physical-energy performance. No latency
 advantage is claimed until the latest exact-head run yields an artifact.
 
-## 12. Current external comparator snapshot
+## 12. Clock-domain calibration and conservative time mapping
+
+A timestamp unit does not establish a shared clock. The event-time and
+watermark fields in this v0.1 ledger are scalar microseconds and therefore
+must already be expressed in one declared reference coordinate before they
+are compared. A source-local device timestamp must not be aggregated with
+another device's timestamp merely because both are measured in microseconds.
+
+The new `research/irregular-event-contract/src/clock.rs` module defines
+`ClockCalibrationV1`: source and reference domain IDs, source-time validity,
+anchor coordinates, a bounded offset interval, maximum absolute drift in
+parts per billion, calibration knowledge time, and a policy digest. Mapping
+returns a conservative time interval:
+
+[
+I_r(t_s) = [
+ t_a^r + \Delta + \delta^- - \lceil |\Delta|\rho / 10^9 \rceil,
+ t_a^r + \Delta + \delta^+ + \lceil |\Delta|\rho / 10^9 \rceil
+]
+]
+
+where `Delta = t_s - t_a^s`, `[delta-, delta+]` is the anchor offset
+uncertainty and `rho` is the maximum absolute drift in ppb. Arithmetic is
+checked and uncertainty is rounded outward. A calibration recorded after the
+requested knowledge-time cutoff, outside its validity range, or for a
+different source clock is rejected.
+
+For an exclusive source watermark, only the earliest possible mapped endpoint
+is safe for absence/completeness decisions. When combining sources, all mapped
+watermarks must share the same reference domain and the system takes the
+minimum earliest endpoint. An optimistic upper bound, midpoint, or uncalibrated
+raw clock value cannot close an interval.
+
+The mapped-time and conservative-watermark types have private fields to
+prevent fabricated result structs. Ten clock-specific tests cover offset
+uncertainty, drift growth and outward rounding, historical knowledge-time,
+validity expiry, domain mismatch, common-reference aggregation, empty source
+sets, invalid calibration and arithmetic overflow.
+
+**Integration boundary:** this module is not yet automatically wired into the
+v0.1 `SourceWatermarkLedger`. That ledger still expects callers to supply
+timestamps already normalized to one reference coordinate. The policy digest
+and content hash bind parameters but do not authenticate a calibration
+authority. A governed, append-only calibration registry, signed calibration
+receipts, key revocation/rotation and end-to-end clock provenance are future
+qualification steps. This contract does not claim physical clock truth.
+
+## 13. Current external comparator snapshot
 
 The model-to-benchmark observations are pinned separately in
 `crates/domains/symthaea-capability-closure/fixtures/tsfm_comparator_snapshot_v0.1.json`
