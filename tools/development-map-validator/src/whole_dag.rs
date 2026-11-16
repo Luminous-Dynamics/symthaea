@@ -458,10 +458,17 @@ fn parse_claims(
 fn world_satisfies_claims(
     world: &World,
     claims: &BTreeMap<(String, String), PairClaim>,
+    pair_truths: &BTreeMap<(String, String), PairTruth>,
 ) -> bool {
     claims.iter().all(|(pair, claim)| {
         if claim.claimed_relation == "underdetermined" || claim.claimed_relation == "compromised" {
             return true;
+        }
+        let Some(truth) = pair_truths.get(pair) else {
+            return false;
+        };
+        if claim.claimed_relation == "concurrent" && truth.expected_state != "concurrent" {
+            return false;
         }
         pair_relation(&pair.0, &pair.1, &world.closure) == claim.claimed_relation
     })
@@ -488,12 +495,10 @@ fn score_trace(
         let claim = claims
             .get(&(left.clone(), right.clone()))
             .ok_or_else(|| "candidate pair claim missing after coverage check".to_owned())?;
-        let individually_plausible = if claim.claimed_relation == "underdetermined"
-            || claim.claimed_relation == "compromised"
-        {
-            true
-        } else {
-            truth.possible_relations.contains(&claim.claimed_relation)
+        let individually_plausible = match claim.claimed_relation.as_str() {
+            "underdetermined" => truth.expected_state == "underdetermined",
+            "compromised" => truth.expected_state == "compromised",
+            relation => truth.possible_relations.contains(relation),
         };
         if individually_plausible {
             individually_plausible_claim_count += 1;
@@ -551,7 +556,7 @@ fn score_trace(
 
     let jointly_consistent_world_ids: Vec<String> = worlds
         .iter()
-        .filter(|world| world_satisfies_claims(world, &claims))
+        .filter(|world| world_satisfies_claims(world, &claims, pair_truths))
         .map(|world| world.world_id.clone())
         .collect();
     let pair_count = event_ids.len() * (event_ids.len() - 1) / 2;
@@ -758,6 +763,15 @@ mod tests {
             .expect("A/E pair");
         assert_eq!(pair.expected_state, "underdetermined");
         assert!(pair.correct);
+    }
+
+
+    #[test]
+    fn always_abstain_does_not_receive_identifiable_pair_credit() {
+        let report = evaluate_whole_dag_json(FIXTURE).expect("D6.13 fixture");
+        let always = trace(&report, "always-abstain");
+        assert_eq!(always.individually_plausible_claim_count, 3);
+        assert_eq!(always.unnecessary_abstention_count, 12);
     }
 
     #[test]
