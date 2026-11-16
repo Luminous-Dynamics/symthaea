@@ -248,6 +248,7 @@
           "enum": [
             "tlsn_opening_verify",
             "http_message_extract",
+            "http_body_extract",
             "http_transfer_decode",
             "http_content_decode",
             "utf8_validate",
