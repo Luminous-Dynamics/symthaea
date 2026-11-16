@@ -775,6 +775,7 @@ pub fn verify_loft_artifact_integrity(
             == Some(artifact.waterplane_face_range.first_face)
     {
         let faces = &artifact.candidate.geometry.faces;
+        let mut expected_side = Vec::<[u32; 3]>::new();
         let mut expected_waterplane = Vec::<[u32; 3]>::new();
         let port_vertex = |station_index: usize, point_index: usize| -> u32 {
             let base = station_bases[station_index];
@@ -790,8 +791,34 @@ pub fn verify_loft_artifact_integrity(
             (station_bases[station_index] + point_index) as u32
         };
         for interval in 0..station_count - 1 {
-            let left_collapsed = interval == 0 && bow_collapsed;
             let right_collapsed = interval + 1 == station_count - 1 && stern_collapsed;
+            for point_index in 0..point_count - 1 {
+                let a = starboard_vertex(interval, point_index);
+                let b = starboard_vertex(interval + 1, point_index);
+                let c = starboard_vertex(interval + 1, point_index + 1);
+                let d = starboard_vertex(interval, point_index + 1);
+                let port_a = port_vertex(interval, point_index);
+                let port_b = port_vertex(interval + 1, point_index);
+                let port_c = port_vertex(interval + 1, point_index + 1);
+                let port_d = port_vertex(interval, point_index + 1);
+                if right_collapsed {
+                    expected_side.extend([
+                        [a, b, d],
+                        [b, c, d],
+                        [port_a, port_d, port_b],
+                        [port_d, port_c, port_b],
+                    ]);
+                } else {
+                    expected_side.extend([
+                        [a, b, c],
+                        [a, c, d],
+                        [port_a, port_c, port_b],
+                        [port_a, port_d, port_c],
+                    ]);
+                }
+            }
+
+            let left_collapsed = interval == 0 && bow_collapsed;
             let port_here = port_vertex(interval, point_count - 1);
             let starboard_here = starboard_vertex(interval, point_count - 1);
             let starboard_next = starboard_vertex(interval + 1, point_count - 1);
@@ -822,6 +849,18 @@ pub fn verify_loft_artifact_integrity(
                 (true, true) => {}
             }
         }
+        let side_first = artifact.side_face_range.first_face;
+        let side_end = side_first.saturating_add(artifact.side_face_range.face_count);
+        if side_end <= faces.len()
+            && faces[side_first..side_end].iter().copied().ne(expected_side.iter().copied())
+        {
+            violation(
+                &mut violations,
+                "side_closure_semantics",
+                "side triangle indices do not match the declared shared-vertex endpoint and diagonal semantics",
+            );
+        }
+
         let first = artifact.waterplane_face_range.first_face;
         let end = first.saturating_add(artifact.waterplane_face_range.face_count);
         if end <= faces.len()
