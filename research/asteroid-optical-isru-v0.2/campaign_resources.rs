@@ -91,7 +91,10 @@ pub enum ResourceError {
     AllShadowPricesZero,
     ZeroWeightedCost(String),
     NoAffordableActions,
-    ActionExceedsRemainingBudget { action_id: String, resources: Vec<&'static str> },
+    ActionExceedsRemainingBudget {
+        action_id: String,
+        resources: Vec<&'static str>,
+    },
 }
 
 impl fmt::Display for ResourceError {
@@ -303,7 +306,6 @@ pub fn select_max_decision_value<'a>(
         .ok_or(ResourceError::NoAffordableActions)
 }
 
-
 /// Mutable campaign accounting for a sequence of admitted actions.
 /// Each apply is atomic: an over-budget action does not change spent or remaining.
 #[derive(Clone, Debug, PartialEq)]
@@ -357,7 +359,8 @@ impl CampaignLedger {
             source_energy_wh: self.spent.source_energy_wh + action.resources.source_energy_wh,
             feedstock_g: self.spent.feedstock_g + action.resources.feedstock_g,
             assay_cost: self.spent.assay_cost + action.resources.assay_cost,
-            maintenance_minutes: self.spent.maintenance_minutes + action.resources.maintenance_minutes,
+            maintenance_minutes: self.spent.maintenance_minutes
+                + action.resources.maintenance_minutes,
             consumables_g: self.spent.consumables_g + action.resources.consumables_g,
         };
         self.remaining = self.remaining.subtract(&action.resources);
@@ -410,10 +413,7 @@ impl ResourceShadowPrices {
         Ok(total)
     }
 
-    pub fn decision_value_density(
-        &self,
-        action: &CampaignAction,
-    ) -> Result<f64, ResourceError> {
+    pub fn decision_value_density(&self, action: &CampaignAction) -> Result<f64, ResourceError> {
         if action.basis != self.basis {
             return Err(ResourceError::BasisMismatch);
         }
@@ -436,7 +436,14 @@ mod tests {
         }
     }
 
-    fn vector(rig: f64, energy: f64, feedstock: f64, assay: f64, maintenance: f64, consumables: f64) -> ResourceVector {
+    fn vector(
+        rig: f64,
+        energy: f64,
+        feedstock: f64,
+        assay: f64,
+        maintenance: f64,
+        consumables: f64,
+    ) -> ResourceVector {
         ResourceVector {
             rig_hours: rig,
             source_energy_wh: energy,
@@ -481,7 +488,11 @@ mod tests {
     fn hard_budget_rejects_single_resource_overrun_before_ranking() {
         let candidates = vec![
             action("feasible", 1.0, vector(1.0, 100.0, 1.0, 10.0, 10.0, 1.0)),
-            action("too_much_energy", 100.0, vector(1.0, 1_001.0, 1.0, 10.0, 10.0, 1.0)),
+            action(
+                "too_much_energy",
+                100.0,
+                vector(1.0, 1_001.0, 1.0, 10.0, 10.0, 1.0),
+            ),
         ];
         let result = assess_budget(&candidates, &budget()).unwrap();
         assert!(result[0].affordable);
@@ -504,10 +515,16 @@ mod tests {
     fn high_value_but_unaffordable_action_is_never_selected() {
         let candidates = vec![
             action("affordable", 2.0, vector(1.0, 100.0, 1.0, 10.0, 10.0, 1.0)),
-            action("unaffordable", 200.0, vector(1.0, 1_001.0, 1.0, 10.0, 10.0, 1.0)),
+            action(
+                "unaffordable",
+                200.0,
+                vector(1.0, 1_001.0, 1.0, 10.0, 10.0, 1.0),
+            ),
         ];
         assert_eq!(
-            select_max_decision_value(&candidates, &budget()).unwrap().id,
+            select_max_decision_value(&candidates, &budget())
+                .unwrap()
+                .id,
             "affordable"
         );
     }
@@ -515,12 +532,23 @@ mod tests {
     #[test]
     fn pareto_frontier_preserves_incomparable_resource_tradeoffs() {
         let candidates = vec![
-            action("low_energy_more_time", 5.0, vector(8.0, 100.0, 5.0, 100.0, 20.0, 1.0)),
-            action("high_energy_less_time", 5.0, vector(2.0, 800.0, 5.0, 100.0, 20.0, 1.0)),
+            action(
+                "low_energy_more_time",
+                5.0,
+                vector(8.0, 100.0, 5.0, 100.0, 20.0, 1.0),
+            ),
+            action(
+                "high_energy_less_time",
+                5.0,
+                vector(2.0, 800.0, 5.0, 100.0, 20.0, 1.0),
+            ),
             action("dominated", 4.0, vector(9.0, 900.0, 6.0, 120.0, 30.0, 2.0)),
         ];
         let frontier = pareto_frontier(&candidates, &budget()).unwrap();
-        let ids: Vec<&str> = frontier.iter().map(|candidate| candidate.id.as_str()).collect();
+        let ids: Vec<&str> = frontier
+            .iter()
+            .map(|candidate| candidate.id.as_str())
+            .collect();
         assert_eq!(ids, vec!["low_energy_more_time", "high_energy_less_time"]);
     }
 
@@ -561,33 +589,49 @@ mod tests {
             source_energy_wh: 0.001,
             ..shadow_prices()
         };
-        assert!(energy_valued.decision_value_density(&b).unwrap()
-            > energy_valued.decision_value_density(&a).unwrap());
-        assert!(time_valued.decision_value_density(&a).unwrap()
-            > time_valued.decision_value_density(&b).unwrap());
+        assert!(
+            energy_valued.decision_value_density(&b).unwrap()
+                > energy_valued.decision_value_density(&a).unwrap()
+        );
+        assert!(
+            time_valued.decision_value_density(&a).unwrap()
+                > time_valued.decision_value_density(&b).unwrap()
+        );
     }
 
     #[test]
     fn energy_meter_boundary_mismatch_is_rejected() {
         let mut candidate = action("wrong_boundary", 1.0, vector(1.0, 10.0, 1.0, 1.0, 1.0, 1.0));
         candidate.basis.energy_meter_boundary = EnergyMeterBoundary::OpticalSourceOutput;
-        assert_eq!(assess_budget(&[candidate], &budget()), Err(ResourceError::BasisMismatch));
+        assert_eq!(
+            assess_budget(&[candidate], &budget()),
+            Err(ResourceError::BasisMismatch)
+        );
     }
 
     #[test]
     fn invalid_resource_and_shadow_price_values_are_rejected() {
         let bad = action("negative", 1.0, vector(-1.0, 1.0, 1.0, 1.0, 1.0, 1.0));
-        assert_eq!(assess_budget(&[bad], &budget()), Err(ResourceError::InvalidResource("rig_hours")));
+        assert_eq!(
+            assess_budget(&[bad], &budget()),
+            Err(ResourceError::InvalidResource("rig_hours"))
+        );
 
         let mut prices = shadow_prices();
         prices.source_energy_wh = f64::NAN;
-        assert_eq!(prices.validate(), Err(ResourceError::InvalidShadowPrice("source_energy_wh")));
+        assert_eq!(
+            prices.validate(),
+            Err(ResourceError::InvalidShadowPrice("source_energy_wh"))
+        );
     }
 
     #[test]
     fn zero_weighted_cost_and_all_zero_shadow_prices_are_rejected() {
         let free = action("free", 1.0, vector(0.0, 0.0, 0.0, 0.0, 0.0, 0.0));
-        assert_eq!(shadow_prices().decision_value_density(&free), Err(ResourceError::ZeroWeightedCost("free".to_string())));
+        assert_eq!(
+            shadow_prices().decision_value_density(&free),
+            Err(ResourceError::ZeroWeightedCost("free".to_string()))
+        );
 
         let mut prices = shadow_prices();
         prices.rig_hour = 0.0;
@@ -622,7 +666,14 @@ mod tests {
 
     #[test]
     fn no_affordable_action_is_an_explicit_result() {
-        let candidate = action("unaffordable", 10.0, vector(100.0, 10.0, 1.0, 1.0, 1.0, 1.0));
-        assert_eq!(select_max_decision_value(&[candidate], &budget()), Err(ResourceError::NoAffordableActions));
+        let candidate = action(
+            "unaffordable",
+            10.0,
+            vector(100.0, 10.0, 1.0, 1.0, 1.0, 1.0),
+        );
+        assert_eq!(
+            select_max_decision_value(&[candidate], &budget()),
+            Err(ResourceError::NoAffordableActions)
+        );
     }
 }
