@@ -396,7 +396,7 @@ mod tests {
             unit_ref: "MWe".to_string(),
             averaging_window_ref: "iter-run-steady-state-window-v1".to_string(),
             sign_convention_ref: "gross-and-load-positive-net-export-positive-v1".to_string(),
-            absolute_balance_tolerance_mw: 0.001,
+            absolute_balance_tolerance_mw: 0.000_001,
             required_net_export_reserve_mw: 0.0,
             reserve_threshold_inclusive: true,
         }
@@ -441,7 +441,13 @@ mod tests {
 
     #[test]
     fn d0fus_iter_reference_is_net_import_despite_positive_q_and_gross_power() {
-        let source = run(192.395, 144.149, 91.0951, 235.244, -42.84920863494321);
+        let source = run(
+            192.395,
+            144.14914,
+            91.09506863494322,
+            235.24420863494322,
+            -42.84920863494321,
+        );
         let report = evaluate_plant_power_balance(&profile(), &source);
         assert_eq!(report.disposition, PowerBalanceDisposition::NetImport);
         assert!(report.gross_electric_mw.unwrap() > 0.0);
