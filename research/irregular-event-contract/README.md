@@ -198,8 +198,9 @@ Event-time keys are permuted relative to four receipt-time batches. Each case
 compares 51 indexed queries with 15 `completeness_verified` queries that replay
 and validate the full history. CSV output includes source count, interval width,
 knowledge cutoff, event-time buckets visited, receipt candidates examined,
-matching breaches and indexed p50/p95/p99 and verified median/worst-observed latency. Exact equality of
-indexed and verified reports is required before timing. The benchmark is diagnostic, not a physical
+matching breaches and indexed p50/p95/p99 and verified median/worst-observed latency. The benchmark requires exact equality between the indexed report and the
+verified receipt's report, and checks that the receipt digest matches the
+ledger snapshot before timing. The benchmark is diagnostic, not a physical
 energy measurement; runner CPU model, toolchain, release profile and exact
 source/fixture hashes must accompany each artifact. The latest run has not
 completed; no latency advantage is asserted yet.
