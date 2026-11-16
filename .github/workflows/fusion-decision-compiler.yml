@@ -46,3 +46,6 @@ jobs:
 
       - name: Run synthetic matched-case cross-solver comparison
         run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin compare_solver_outputs
+
+      - name: Run D0FUS ITER net-electric service gate
+        run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin qualify_plant_service

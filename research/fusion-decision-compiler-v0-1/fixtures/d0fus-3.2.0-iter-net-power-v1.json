@@ -1,0 +1,59 @@
+{
+  "fixture_id": "d0fus-3.2.0-iter-net-power-reference-v1",
+  "evidence_class": "external_reference_model_output",
+  "source": {
+    "repository": "https://github.com/IRFM/D0FUS",
+    "tag": "v3.2.0",
+    "commit": "a682c3511dc189b2a4cdd6f4b8bc545d3cdb8924",
+    "deck_path": "D0FUS_INPUTS/1_run_ITER.txt",
+    "deck_git_blob_sha": "d8932a85adf05e2b1b72a52d5a04a20cb25943b8",
+    "deck_sha256": "15babfc79d7d9795afc83565ee926e332aa803816127922a25514174184feaa7"
+  },
+  "execution": {
+    "workflow_run_id": 43729456208,
+    "artifact_id": 14167288485,
+    "canonical_output_tuple_sha256": "59d59114ba7ecbcf873ea386c6f27495611b24464d02101acd68f3c79ca305e7",
+    "wheel_source_output_parity": "PASS",
+    "global_config_dataclass_field_count": 167,
+    "run_output_tuple_length": 165
+  },
+  "schema": {
+    "schema_id": "d0fus-3.2.0-iter-run-output-165-v1",
+    "schema_sha256": "a390b317a336f1ec683e3c2e2950cb7480c7d79bdac38d498258270266b2f774",
+    "tuple_indices": {
+      "P_elec_MWe": 25,
+      "P_e_gross_MWe": 153,
+      "P_recirc_var_MWe": 160,
+      "P_recirc_fix_MWe": 161,
+      "P_recirculated_MWe": 162
+    }
+  },
+  "service_boundary": {
+    "id": "plant-terminal-net-electric-v1",
+    "unit": "MWe",
+    "averaging_window": "iter-run-steady-state-window-v1",
+    "sign_convention": "gross-and-load-positive-net-export-positive"
+  },
+  "observables": {
+    "fusion_gain_Q_dimensionless": 9.959031439182866,
+    "thermal_power_MWth_reported": 549.700,
+    "gross_electric_power_MWe": 192.395,
+    "variable_recirculated_power_MWe": 144.14914,
+    "fixed_recirculated_power_MWe": 91.09506863494322,
+    "total_recirculated_power_MWe": 235.24420863494322,
+    "net_electric_power_MWe": -42.84920863494321,
+    "engineering_gain_QE_reported": 0.8178522273360723
+  },
+  "recomputed_balance": {
+    "absolute_balance_tolerance_mw": 0.000001,
+    "calculated_total_recirculated_mwe": 235.24420863494322,
+    "calculated_net_electric_mwe": -42.849208634943196,
+    "total_recirculated_residual_mw": 0.0,
+    "net_electric_residual_mw": -1.4210854715202004e-14
+  },
+  "qualification": {
+    "expected_disposition": "NetImport",
+    "reason": "D0FUS reports no net electricity over the year; COE is undefined for this reference case",
+    "claim_ceiling": "pinned ITER reference-deck model output and wheel/source output parity; not independent physical validation or commercial plant qualification"
+  }
+}
