@@ -128,3 +128,35 @@ The next G2f implementation stages remain distinct:
 4. **G2f-e:** exchange the external envelope and each derived displacement shell independently through AP242 and independent CAD-kernel re-import.
 
 No G2f-a validator result establishes self-intersection freedom, hull fairness, waterline quality, hydrostatic equilibrium, stability, strength, seakeeping, CFD, cavitation, DFM, class approval or seaworthiness.
+
+## Independent multi-waterline sectional reference
+
+The G2f-a2 increment adds `sectional_reference`, a second numerical path for checking displacement and waterplane properties from the full-envelope station profiles. It is deliberately independent of G2c's tetrahedral integration of a closed triangle mesh.
+
+The request contains one validated `source_spec` and an ordered list of `loading_conditions`. Each condition supplies:
+- a unique condition ID;
+- a horizontal waterplane elevation in the same vessel frame (z-down; negative elevations are above the design waterplane and imply deeper immersion);
+- explicit water density in kg/m³.
+
+For each station, the implementation constructs its transverse section from the actual starboard and port profiles (or derives port by reflection only when the spec says symmetric), clips the polygon to the submerged half-plane, calculates section area/centroid and measures the waterline breadth. It then integrates sectional area and breadth along the vessel length with piecewise-linear trapezoidal integration. First longitudinal moments use the exact integral for a piecewise-linear sectional curve. Kahan compensated summation is used for the accumulated integrals.
+
+Run the analytical sweep fixture:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-sectional-hydrostatics-reference -- docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json --output /tmp/marine-sectional-reference.json
+
+Exit codes: 0 = evaluated; 1 = typed source/loading/integration rejection; 2 = CLI/I/O/JSON parse failure. The emitted receipt includes source-spec and per-condition BLAKE3 digests. The verifier recomputes the exact request rather than trusting a caller-supplied output.
+
+### Synthetic known answers
+
+For the 100 m × 20 m prismatic fixture, density 1,025 kg/m³, and upright horizontal planes:
+- z = -2 m: 16,000 m³ displacement, 2,000 m² waterplane, VCB = 2 m;
+- z = 0 m: 12,000 m³ displacement, 2,000 m² waterplane, VCB = 3 m;
+- z = +2 m: 8,000 m³ displacement, 2,000 m² waterplane, VCB = 4 m.
+
+All three have LCB = LCF = 50 m, TCB = 0, and TPC = 20.5 t/cm. The values are analytic reference results for this prismatic synthetic hull, not real-vessel predictions.
+
+The method uses the source's station spacing and a piecewise-linear longitudinal assumption. The result is an independent numerical reference and screening curve; it is not exact for arbitrary longitudinal curvature between sparse stations. Compare the z=0 result against G2c polyhedral hydrostatics only for matching geometry, waterplane, density, frame and scope. A disagreement is a diagnostic requiring investigation, not permission to average the two results.
+
+### Supported and unsupported scope
+
+G2f-a2 supports upright horizontal waterplanes intersecting the station profiles between keel and sheer. It explicitly rejects planes above the sheer rather than inventing deck/flooding geometry. It does not implement trim, heel, hydrostatic equilibrium, free-surface corrections, GZ curves, intact/damage stability criteria, appendage volume, slamming, seakeeping, resistance, propulsion or CFD. It does not generate a loading-specific displacement mesh. Those remain separate geometry, hydrostatics and validation increments.
