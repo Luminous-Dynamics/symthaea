@@ -65,6 +65,38 @@ The initial 15 authored tests cover matched outputs, descriptive-only and covari
 
 The graph helper returns the changed nodes and their full transitive downstream closure. Cycles are tolerated and traversal is deterministic. This is a structural impact calculation, not automatic revocation of an external certificate or authority decision.
 
+
+## Plant-service net-electric power-balance gate
+
+The `plant_service_gate` module consumes five power observables from one exact solver run and one declared grid boundary: gross generation, variable recirculation, fixed recirculation, total recirculation and reported net output. It independently verifies:
+
+```text
+total_recirculated = variable_recirculated + fixed_recirculated
+net_electric = gross_electric - variable_recirculated - fixed_recirculated
+```
+
+The D0FUS 3.2.0 ITER adapter freezes the 165-value tuple layout from upstream commit `a682c3511dc189b2a4cdd6f4b8bc545d3cdb8924`: P_elec index 25, P_e_gross 153, P_recirc_var 160, P_recirc_fix 161 and P_recirculated 162. The runtime `GlobalConfig` contains 167 fields. The source-pinned external replay is recorded in [PR #12314](https://github.com/Luminous-Dynamics/symthaea/pull/12314): PyPI wheel and source-checkout output tuples match; module-byte differences remain disclosed.
+
+The full-precision ITER reference fixture gives gross 192.395 MWe, variable recirculation 144.14914 MWe, fixed recirculation 91.09506863494322 MWe, total recirculation 235.24420863494322 MWe and net output -42.84920863494321 MWe. Residuals for both identities are within 1e-6 MW. This is a model reference case, not a commercial plant; its positive plasma gain and gross electric output do not override negative net electricity.
+
+The gate has 19 authored Rust tests for arithmetic identity, boundary/unit/time/sign/schema binding, missing/duplicate/non-finite terms and reserve-threshold behavior. The `qualify_plant_service` runner requires the D0FUS fixture to remain `NetImport`.
+
+## Event-based availability and signed lifecycle energy
+
+The `lifecycle_service_ledger` module consumes a frozen integer-second horizon, source-linked planned/unplanned outage events and a complete signed net-power state schedule. It verifies exact interval coverage, event boundaries, independently derived active-event sets and service-state labels. Planned-only, unplanned-only and concurrent full-outage intervals are reported separately; concurrent time is counted once. Negative standby and outage power becomes grid-import MWh, not zero.
+
+The module has 20 authored tests, including overlap union, planned/forced concurrency, half-open intervals, gap/overlap refusal, derated events, input-order determinism, missing evidence and signed energy reconciliation. The 24-hour executable example is synthetic and is not an availability prediction.
+
+## Resource-constrained remote-maintenance choreography
+
+The `maintenance_choreography` module schedules a frozen task DAG against declared renewable resources: robots, ports, casks, hot-cell bays, crews and metrology. It uses a deterministic serial schedule generation scheme, validates precedence and resource capacity independently, reports serial baseline, critical path and speedup, and emits task intervals as lifecycle events. A bounded exact oracle enumerates feasible serial-generation orders for instances up to nine tasks so small-instance optimality gaps can be measured; the heuristic makes no global-optimality claim for larger problems.
+
+Each task now also requires a source-bound access certificate carrying the exact candidate revision, geometry digest, task-definition reference/digest, robot/tool model digests and clearance/tolerance profile. Missing, stale, blocked or unknown access certificates refuse a feasible schedule. Analytic fixtures, simulation, mockup, independent verification and physical qualification are distinct evidence levels. Synthetic access evidence only qualifies synthetic contract fixtures.
+
+The scheduler has 22 authored Rust tests covering precedence, shared/exclusive resource capacity, parallelism, cycles, exact-oracle limits, independent validation, stale/missing access evidence, geometry/task binding, blocked/unknown access and evidence-class promotion. The runner uses a synthetic two-sector maintenance graph; no physical robot, access port or remote-handling procedure has been validated.
+
+The industry challenge is substantial: the EU DEMO AIM-TU paper derives a JET 80%-availability scenario requiring minor interventions to fall from 108 days to about 12 days (roughly 89% reduction). This is a published scenario requirement, not an achieved plant maintenance result. The paper identifies task speed and parallelisation as major levers. FECOMP's scheduler is an accounting/optimization contract; Symtropy issue [#5506](https://github.com/Luminous-Dynamics/symtropy/issues/5506) owns geometric clearance and robot reachability certificates.
+
 ## Run locally
 
 From this directory:
