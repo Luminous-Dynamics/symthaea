@@ -259,12 +259,12 @@ impl LiveSelectionPacket {
             }
         }
 
-        if let Some(submitted_id) = &self.submitted_candidate_id {
-            if !candidate_ids.contains(submitted_id.as_str()) {
-                return Err(ScilawsSelectionError::SubmittedCandidateMissing(
-                    submitted_id.clone(),
-                ));
-            }
+        if let Some(submitted_id) = &self.submitted_candidate_id
+            && !candidate_ids.contains(submitted_id.as_str())
+        {
+            return Err(ScilawsSelectionError::SubmittedCandidateMissing(
+                submitted_id.clone(),
+            ));
         }
         Ok(())
     }
@@ -866,8 +866,8 @@ mod tests {
         }
     }
 
-    fn evaluator_candidate(
-        id: &str,
+    struct EvaluatorCandidateFixture<'a> {
+        id: &'a str,
         model_digest: char,
         s_n: Option<f64>,
         s_v: Option<f64>,
@@ -875,16 +875,18 @@ mod tests {
         anti_hacking_pass: bool,
         status: EvaluatorCandidateStatus,
         evidence_digest: char,
-    ) -> RealEvaluatorCandidate {
+    }
+
+    fn evaluator_candidate(input: EvaluatorCandidateFixture<'_>) -> RealEvaluatorCandidate {
         RealEvaluatorCandidate {
-            candidate_id: id.to_owned(),
-            model_sha256: digest(model_digest),
-            evaluation_evidence_sha256: digest(evidence_digest),
-            status,
-            s_n,
-            s_v,
-            contract_valid,
-            anti_hacking_pass,
+            candidate_id: input.id.to_owned(),
+            model_sha256: digest(input.model_digest),
+            evaluation_evidence_sha256: digest(input.evidence_digest),
+            status: input.status,
+            s_n: input.s_n,
+            s_v: input.s_v,
+            contract_valid: input.contract_valid,
+            anti_hacking_pass: input.anti_hacking_pass,
         }
     }
 
@@ -939,36 +941,36 @@ mod tests {
             Some("submitted"),
         );
         let evaluator = evaluator_pool(vec![
-            evaluator_candidate(
-                "submitted",
-                'a',
-                Some(0.70),
-                Some(0.80),
-                true,
-                true,
-                EvaluatorCandidateStatus::Complete,
-                '1',
-            ),
-            evaluator_candidate(
-                "dominator",
-                'b',
-                Some(0.78),
-                Some(0.82),
-                true,
-                true,
-                EvaluatorCandidateStatus::Complete,
-                '2',
-            ),
-            evaluator_candidate(
-                "tradeoff",
-                'c',
-                Some(0.90),
-                Some(0.50),
-                true,
-                true,
-                EvaluatorCandidateStatus::Complete,
-                '3',
-            ),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "submitted",
+                model_digest: 'a',
+                s_n: Some(0.70),
+                s_v: Some(0.80),
+                contract_valid: true,
+                anti_hacking_pass: true,
+                status: EvaluatorCandidateStatus::Complete,
+                evidence_digest: '1',
+            }),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "dominator",
+                model_digest: 'b',
+                s_n: Some(0.78),
+                s_v: Some(0.82),
+                contract_valid: true,
+                anti_hacking_pass: true,
+                status: EvaluatorCandidateStatus::Complete,
+                evidence_digest: '2',
+            }),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "tradeoff",
+                model_digest: 'c',
+                s_n: Some(0.90),
+                s_v: Some(0.50),
+                contract_valid: true,
+                anti_hacking_pass: true,
+                status: EvaluatorCandidateStatus::Complete,
+                evidence_digest: '3',
+            }),
         ]);
 
         let audit = audit_real_candidate_selection(&live, &evaluator).unwrap();
@@ -1000,26 +1002,26 @@ mod tests {
             Some("fit"),
         );
         let evaluator = evaluator_pool(vec![
-            evaluator_candidate(
-                "fit",
-                'a',
-                Some(0.95),
-                Some(0.55),
-                true,
-                true,
-                EvaluatorCandidateStatus::Complete,
-                '1',
-            ),
-            evaluator_candidate(
-                "valid",
-                'b',
-                Some(0.75),
-                Some(0.92),
-                true,
-                true,
-                EvaluatorCandidateStatus::Complete,
-                '2',
-            ),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "fit",
+                model_digest: 'a',
+                s_n: Some(0.95),
+                s_v: Some(0.55),
+                contract_valid: true,
+                anti_hacking_pass: true,
+                status: EvaluatorCandidateStatus::Complete,
+                evidence_digest: '1',
+            }),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "valid",
+                model_digest: 'b',
+                s_n: Some(0.75),
+                s_v: Some(0.92),
+                contract_valid: true,
+                anti_hacking_pass: true,
+                status: EvaluatorCandidateStatus::Complete,
+                evidence_digest: '2',
+            }),
         ]);
 
         let audit = audit_real_candidate_selection(&live, &evaluator).unwrap();
@@ -1041,26 +1043,26 @@ mod tests {
             Some("hacked"),
         );
         let evaluator = evaluator_pool(vec![
-            evaluator_candidate(
-                "hacked",
-                'a',
-                Some(0.99),
-                Some(0.02),
-                true,
-                false,
-                EvaluatorCandidateStatus::Complete,
-                '1',
-            ),
-            evaluator_candidate(
-                "valid",
-                'b',
-                Some(0.70),
-                Some(0.91),
-                true,
-                true,
-                EvaluatorCandidateStatus::Complete,
-                '2',
-            ),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "hacked",
+                model_digest: 'a',
+                s_n: Some(0.99),
+                s_v: Some(0.02),
+                contract_valid: true,
+                anti_hacking_pass: false,
+                status: EvaluatorCandidateStatus::Complete,
+                evidence_digest: '1',
+            }),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "valid",
+                model_digest: 'b',
+                s_n: Some(0.70),
+                s_v: Some(0.91),
+                contract_valid: true,
+                anti_hacking_pass: true,
+                status: EvaluatorCandidateStatus::Complete,
+                evidence_digest: '2',
+            }),
         ]);
 
         let audit = audit_real_candidate_selection(&live, &evaluator).unwrap();
@@ -1082,36 +1084,36 @@ mod tests {
             Some("complete"),
         );
         let evaluator = evaluator_pool(vec![
-            evaluator_candidate(
-                "complete",
-                'a',
-                Some(0.8),
-                Some(0.8),
-                true,
-                true,
-                EvaluatorCandidateStatus::Complete,
-                '1',
-            ),
-            evaluator_candidate(
-                "failed",
-                'b',
-                None,
-                None,
-                false,
-                false,
-                EvaluatorCandidateStatus::Failed,
-                '2',
-            ),
-            evaluator_candidate(
-                "unknown",
-                'c',
-                None,
-                None,
-                false,
-                false,
-                EvaluatorCandidateStatus::NotEvaluable,
-                '3',
-            ),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "complete",
+                model_digest: 'a',
+                s_n: Some(0.8),
+                s_v: Some(0.8),
+                contract_valid: true,
+                anti_hacking_pass: true,
+                status: EvaluatorCandidateStatus::Complete,
+                evidence_digest: '1',
+            }),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "failed",
+                model_digest: 'b',
+                s_n: None,
+                s_v: None,
+                contract_valid: false,
+                anti_hacking_pass: false,
+                status: EvaluatorCandidateStatus::Failed,
+                evidence_digest: '2',
+            }),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "unknown",
+                model_digest: 'c',
+                s_n: None,
+                s_v: None,
+                contract_valid: false,
+                anti_hacking_pass: false,
+                status: EvaluatorCandidateStatus::NotEvaluable,
+                evidence_digest: '3',
+            }),
         ]);
 
         let audit = audit_real_candidate_selection(&live, &evaluator).unwrap();
@@ -1127,16 +1129,16 @@ mod tests {
 
     #[test]
     fn missing_evaluator_metric_is_not_imputed_as_zero() {
-        let pool = evaluator_pool(vec![evaluator_candidate(
-            "a",
-            'a',
-            Some(0.8),
-            None,
-            true,
-            true,
-            EvaluatorCandidateStatus::Complete,
-            '1',
-        )]);
+        let pool = evaluator_pool(vec![evaluator_candidate(EvaluatorCandidateFixture {
+            id: "a",
+            model_digest: 'a',
+            s_n: Some(0.8),
+            s_v: None,
+            contract_valid: true,
+            anti_hacking_pass: true,
+            status: EvaluatorCandidateStatus::Complete,
+            evidence_digest: '1',
+        })]);
         assert!(matches!(
             pool.validate(),
             Err(ScilawsSelectionError::IncompleteMetrics { .. })
@@ -1146,16 +1148,16 @@ mod tests {
     #[test]
     fn no_admissible_candidate_can_end_in_explicit_abstention() {
         let live = live_packet(vec![live_candidate("invalid", 'a', 0.2)], None);
-        let evaluator = evaluator_pool(vec![evaluator_candidate(
-            "invalid",
-            'a',
-            Some(0.9),
-            Some(0.1),
-            false,
-            false,
-            EvaluatorCandidateStatus::Complete,
-            '1',
-        )]);
+        let evaluator = evaluator_pool(vec![evaluator_candidate(EvaluatorCandidateFixture {
+            id: "invalid",
+            model_digest: 'a',
+            s_n: Some(0.9),
+            s_v: Some(0.1),
+            contract_valid: false,
+            anti_hacking_pass: false,
+            status: EvaluatorCandidateStatus::Complete,
+            evidence_digest: '1',
+        })]);
 
         let audit = audit_real_candidate_selection(&live, &evaluator).unwrap();
         assert_eq!(audit.infeasible_count, 1);
@@ -1184,16 +1186,16 @@ mod tests {
     #[test]
     fn mismatched_task_manifests_fail_closed() {
         let live = live_packet(vec![live_candidate("a", 'a', 0.1)], Some("a"));
-        let mut evaluator = evaluator_pool(vec![evaluator_candidate(
-            "a",
-            'a',
-            Some(0.8),
-            Some(0.8),
-            true,
-            true,
-            EvaluatorCandidateStatus::Complete,
-            '1',
-        )]);
+        let mut evaluator = evaluator_pool(vec![evaluator_candidate(EvaluatorCandidateFixture {
+            id: "a",
+            model_digest: 'a',
+            s_n: Some(0.8),
+            s_v: Some(0.8),
+            contract_valid: true,
+            anti_hacking_pass: true,
+            status: EvaluatorCandidateStatus::Complete,
+            evidence_digest: '1',
+        })]);
         evaluator.task_manifest_sha256 = digest('e');
         assert_eq!(
             audit_real_candidate_selection(&live, &evaluator).err(),
@@ -1208,26 +1210,26 @@ mod tests {
             Some("a"),
         );
         let evaluator = evaluator_pool(vec![
-            evaluator_candidate(
-                "a",
-                'a',
-                Some(0.8),
-                Some(0.9),
-                true,
-                true,
-                EvaluatorCandidateStatus::Complete,
-                '1',
-            ),
-            evaluator_candidate(
-                "b",
-                'b',
-                Some(0.9),
-                Some(0.7),
-                true,
-                true,
-                EvaluatorCandidateStatus::Complete,
-                '2',
-            ),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "a",
+                model_digest: 'a',
+                s_n: Some(0.8),
+                s_v: Some(0.9),
+                contract_valid: true,
+                anti_hacking_pass: true,
+                status: EvaluatorCandidateStatus::Complete,
+                evidence_digest: '1',
+            }),
+            evaluator_candidate(EvaluatorCandidateFixture {
+                id: "b",
+                model_digest: 'b',
+                s_n: Some(0.9),
+                s_v: Some(0.7),
+                contract_valid: true,
+                anti_hacking_pass: true,
+                status: EvaluatorCandidateStatus::Complete,
+                evidence_digest: '2',
+            }),
         ]);
         let live_json = serde_json::to_string(&live).unwrap();
         let evaluator_json = serde_json::to_string(&evaluator).unwrap();
@@ -1261,16 +1263,16 @@ mod tests {
             vec![live_candidate("a", 'a', 0.1), live_candidate("b", 'b', 0.2)],
             Some("a"),
         );
-        let evaluator = evaluator_pool(vec![evaluator_candidate(
-            "a",
-            'a',
-            Some(0.8),
-            Some(0.8),
-            true,
-            true,
-            EvaluatorCandidateStatus::Complete,
-            '1',
-        )]);
+        let evaluator = evaluator_pool(vec![evaluator_candidate(EvaluatorCandidateFixture {
+            id: "a",
+            model_digest: 'a',
+            s_n: Some(0.8),
+            s_v: Some(0.8),
+            contract_valid: true,
+            anti_hacking_pass: true,
+            status: EvaluatorCandidateStatus::Complete,
+            evidence_digest: '1',
+        })]);
         assert_eq!(
             audit_real_candidate_selection(&live, &evaluator).err(),
             Some(ScilawsSelectionError::LiveCandidateMissingEvaluatorRecord(
