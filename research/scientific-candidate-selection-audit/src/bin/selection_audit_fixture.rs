@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             candidate(
                 "candidate-a",
                 "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-                0.78,
+                0.91,
             ),
             candidate(
                 "candidate-b",
