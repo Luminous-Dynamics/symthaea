@@ -1461,7 +1461,10 @@ mod tests {
             assert_ne!(starboard.y_m.abs(), port.y_m.abs());
         }
         let report = validate_full_envelope_spec(&spec);
-        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert_eq!(
+            report.disposition,
+            FullEnvelopeDisposition::ValidInputContract
+        );
         assert!(report.issues.is_empty());
     }
 
@@ -1584,7 +1587,8 @@ mod tests {
             if intersection.station_id == bow_station_id {
                 intersection.port_point_id = Some(intersection.starboard_point_id.clone());
             } else {
-                intersection.port_point_id = Some(format!("PORT-{}", intersection.starboard_point_id));
+                intersection.port_point_id =
+                    Some(format!("PORT-{}", intersection.starboard_point_id));
             }
         }
 
@@ -1594,7 +1598,13 @@ mod tests {
             z_m: -4.0,
             role: DeckPointRole::DeckCrown,
         }];
-        let stern_port_sheer = spec.stations[1].port_profile.as_ref().unwrap().last().unwrap().clone();
+        let stern_port_sheer = spec.stations[1]
+            .port_profile
+            .as_ref()
+            .unwrap()
+            .last()
+            .unwrap()
+            .clone();
         let stern_deck_port = spec.deck_surface.sections[1].points.first_mut().unwrap();
         stern_deck_port.point_id = stern_port_sheer.point_id;
         stern_deck_port.y_m = stern_port_sheer.y_m;
