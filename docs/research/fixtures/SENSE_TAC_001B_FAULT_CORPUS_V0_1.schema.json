@@ -1,0 +1,498 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/sense-tac-001b-fault-corpus-v0.1.schema.json",
+  "title": "SENSE-TAC-001B synthetic tactile fault corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "corpus_id",
+    "version",
+    "status",
+    "claim_ceiling",
+    "model",
+    "cases"
+  ],
+  "properties": {
+    "schema_id": {
+      "type": "string",
+      "const": "https://luminousdynamics.io/schemas/sense-tac-001b-fault-corpus-v0.1.schema.json"
+    },
+    "corpus_id": {
+      "type": "string",
+      "const": "SENSE-TAC-001B-FAULT-CORPUS"
+    },
+    "version": {
+      "type": "string",
+      "const": "0.1.0"
+    },
+    "status": {
+      "type": "string",
+      "const": "synthetic_reference_only"
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 20
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signal_unit",
+        "normal_equation",
+        "shear_equation",
+        "order",
+        "rounding",
+        "fault_overrides",
+        "truth_visibility",
+        "independence",
+        "reference_temperature_c",
+        "drift_epoch_ms",
+        "default_channel_gain",
+        "default_channel_bias",
+        "drift_elapsed_time_basis",
+        "parameter_semantics"
+      ],
+      "properties": {
+        "signal_unit": {
+          "type": "string"
+        },
+        "normal_equation": {
+          "type": "string"
+        },
+        "shear_equation": {
+          "type": "string"
+        },
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 5
+        },
+        "rounding": {
+          "type": "string"
+        },
+        "fault_overrides": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1
+        },
+        "truth_visibility": {
+          "type": "string"
+        },
+        "independence": {
+          "type": "string"
+        },
+        "reference_temperature_c": {
+          "type": "number"
+        },
+        "drift_epoch_ms": {
+          "type": "integer"
+        },
+        "default_channel_gain": {
+          "type": "number"
+        },
+        "default_channel_bias": {
+          "type": "number"
+        },
+        "drift_elapsed_time_basis": {
+          "type": "string"
+        },
+        "parameter_semantics": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "minProperties": 13
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "family",
+          "candidate_input",
+          "evaluator_only"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^TAC-[A-Z0-9-]+$"
+          },
+          "family": {
+            "type": "string",
+            "enum": [
+              "nominal",
+              "static_error",
+              "cross_axis",
+              "range_fault",
+              "quantization",
+              "time_dependent_error",
+              "environmental_error",
+              "history_dependence",
+              "missingness",
+              "identity",
+              "units",
+              "timing",
+              "replay",
+              "common_mode",
+              "calibration",
+              "installation",
+              "applicability",
+              "self_test",
+              "representation_loss",
+              "representation_alias"
+            ]
+          },
+          "candidate_input": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "normal_raw",
+              "shear_raw",
+              "sample_presence",
+              "sequence",
+              "time_ms",
+              "receipt_time_ms",
+              "channel_order",
+              "source_roots",
+              "payload_identity",
+              "reported_unit",
+              "calibration_ref",
+              "installation_ref",
+              "firmware_generation",
+              "representation_id"
+            ],
+            "properties": {
+              "normal_raw": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "shear_raw": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "sample_presence": {
+                "type": "string",
+                "enum": [
+                  "present",
+                  "missing",
+                  "intermittent_open"
+                ]
+              },
+              "sequence": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "time_ms": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "receipt_time_ms": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "channel_order": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              },
+              "source_roots": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "minItems": 1
+              },
+              "payload_identity": {
+                "type": "string"
+              },
+              "reported_unit": {
+                "type": "string"
+              },
+              "calibration_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "installation_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "firmware_generation": {
+                "type": "string"
+              },
+              "representation_id": {
+                "type": "string"
+              },
+              "self_test": {
+                "type": "string"
+              },
+              "representation_output": {
+                "type": "number"
+              },
+              "replay_context": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "previous_sequence",
+                  "previous_payload_identity",
+                  "expected_relation"
+                ],
+                "properties": {
+                  "previous_sequence": {
+                    "type": "integer"
+                  },
+                  "previous_payload_identity": {
+                    "type": "string"
+                  },
+                  "expected_relation": {
+                    "type": "string",
+                    "enum": [
+                      "same_payload",
+                      "different_payload"
+                    ]
+                  }
+                }
+              },
+              "representation_comparison": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "comparison_trace_ref",
+                  "comparison_normal_raw",
+                  "comparison_shear_raw",
+                  "comparison_representation_id"
+                ],
+                "properties": {
+                  "comparison_trace_ref": {
+                    "type": "string"
+                  },
+                  "comparison_normal_raw": {
+                    "type": "number"
+                  },
+                  "comparison_shear_raw": {
+                    "type": "number"
+                  },
+                  "comparison_representation_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "evaluator_only": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "physical_truth",
+              "fault",
+              "expected"
+            ],
+            "properties": {
+              "physical_truth": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "normal",
+                  "shear",
+                  "temperature_c",
+                  "event"
+                ],
+                "properties": {
+                  "normal": {
+                    "type": "number"
+                  },
+                  "shear": {
+                    "type": "number"
+                  },
+                  "temperature_c": {
+                    "type": "number"
+                  },
+                  "event": {
+                    "type": "string"
+                  },
+                  "reference_time_ms": {
+                    "type": "integer"
+                  },
+                  "physical_article": {
+                    "type": "string"
+                  },
+                  "mount_profile": {
+                    "type": "string"
+                  }
+                }
+              },
+              "fault": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "parameter",
+                  "description"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "bias",
+                      "gain",
+                      "normal_to_shear_crosstalk",
+                      "shear_to_normal_crosstalk",
+                      "saturation",
+                      "dead_zone",
+                      "quantization",
+                      "linear_drift",
+                      "temperature_coefficient",
+                      "hysteresis",
+                      "dropout",
+                      "stuck_at",
+                      "intermittent_open",
+                      "channel_swap",
+                      "unit_scale_mismatch",
+                      "clock_offset",
+                      "readout_latency",
+                      "timestamp_jitter",
+                      "exact_duplicate",
+                      "conflicting_duplicate",
+                      "shared_adc_offset",
+                      "shared_reference_gain",
+                      "wrong_article_calibration",
+                      "firmware_generation_change",
+                      "remount_offset",
+                      "curvature_profile_mismatch",
+                      "self_test_misses_scale_drift",
+                      "representation_threshold_loss",
+                      "representation_alias"
+                    ]
+                  },
+                  "parameter": {
+                    "type": [
+                      "number",
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              },
+              "expected": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "evidence_disposition",
+                  "qc_flags",
+                  "task_disposition",
+                  "independence_disposition",
+                  "representation_disposition"
+                ],
+                "properties": {
+                  "evidence_disposition": {
+                    "type": "string",
+                    "enum": [
+                      "eligible",
+                      "limited",
+                      "reject",
+                      "unknown",
+                      "idempotent_duplicate",
+                      "conflict",
+                      "out_of_profile"
+                    ]
+                  },
+                  "qc_flags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "bias_suspect",
+                        "gain_suspect",
+                        "cross_axis_coupling",
+                        "saturated",
+                        "dead_zone",
+                        "quantized",
+                        "drift_suspect",
+                        "environmental_compensation_unresolved",
+                        "history_dependent",
+                        "missing",
+                        "stuck_at",
+                        "intermittent_open",
+                        "channel_identity_mismatch",
+                        "unit_mismatch",
+                        "clock_offset",
+                        "readout_latency",
+                        "timestamp_jitter",
+                        "duplicate",
+                        "conflict",
+                        "common_mode",
+                        "calibration_article_mismatch",
+                        "stale_calibration",
+                        "remount_mismatch",
+                        "out_of_profile",
+                        "self_test_insufficient",
+                        "representation_loss",
+                        "representation_alias"
+                      ]
+                    }
+                  },
+                  "task_disposition": {
+                    "type": "string",
+                    "enum": [
+                      "usable",
+                      "usable_once_only",
+                      "degraded",
+                      "abstain",
+                      "indeterminate"
+                    ]
+                  },
+                  "independence_disposition": {
+                    "type": "string",
+                    "enum": [
+                      "one_physical_root",
+                      "shared_common_mode",
+                      "not_independent_descendant"
+                    ]
+                  },
+                  "representation_disposition": {
+                    "type": "string",
+                    "enum": [
+                      "raw_preserved",
+                      "lossy",
+                      "alias"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "maxItems": 30
+    }
+  }
+}
