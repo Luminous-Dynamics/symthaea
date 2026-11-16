@@ -1603,6 +1603,9 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert_eq!(report.disposition, ModelDiscrepancyDisposition::MaterialDiscrepancy);
+        assert_eq!(
+            report.disposition,
+            ModelDiscrepancyDisposition::MaterialDiscrepancy
+        );
     }
 }
