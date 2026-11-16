@@ -2,6 +2,7 @@
 
 **Date:** 2026-11-16  
 **Owner:** Symthaea #12442  
+**Exact-head qualification:** passed on 37449e8314ceb892482935ea99e98dc3bf631fab; Rust 1.96.0, 32/32 tests, rustfmt and strict Clippy, focused workflow run #48  
 **Composes with:** #12375, #12402, PR #12405; Symtropy #3784/#3973
 
 ## 1. Objective
@@ -103,7 +104,16 @@ The focused workflow asserts for this frozen generator:
 - misspecified zero-mean null crossing >10%;
 - correct conditional alternative detection >50%.
 
-These are deliberately separated smoke gates. They are calibration evidence for one fixed simulator/seed schedule, not a theorem or cross-family error-rate proof.
+Exact run #48 (https://github.com/Luminous-Dynamics/symthaea/actions/runs/43825085862) passed all gates. The observed 20,000-path results were:
+
+| Scenario | Correct conditional monitor | Zero-mean misspecified control |
+|---|---:|---:|
+| AR(1) null crossing | 3.035% (Wilson 95% 2.806–3.282%) | 42.590% (41.906–43.277%) |
+| AR(1) conditional alternative crossing | 72.855% (72.234–73.467%) | 98.665% (98.496–98.815%) |
+
+The correct monitor used a mean 98.57 observations on null paths (only 3.04% crossed) and 65.06 observations on alternative paths. The zero-mean negative control is invalid under this AR(1) null; its high crossing rate illustrates why a misspecified conditional baseline must not be treated as valid evidence. The exact source SHA was 37449e8314ceb892482935ea99e98dc3bf631fab. Artifact archive SHA-256: 511f56571a69cceaa35c995315e2abec191968957f1a64b3e04f1613166e6bd5; report JSON SHA-256: 91ab9f3a87a37379ba87f9d79fab4fc2fe291f57b1dc0ec64dc292a37571b8f9.
+
+These are deliberately separated smoke gates and one calibration dataset. They are evidence only for the fixed simulator/seed schedule, not a theorem or cross-family error-rate proof.
 
 ## 6. Composition and claim boundary
 
