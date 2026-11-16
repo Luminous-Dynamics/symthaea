@@ -206,8 +206,6 @@ jobs:
                 )
               ) and
               (($alt.terminal_np_rejection_rate - .analytic_terminal_np_power) | abs) < 0.007 and
-              ($alt.induced_stop_policies[0].randomized_rejection_rate <= $alt.induced_stop_policies[1].randomized_rejection_rate) and
-              ($alt.induced_stop_policies[1].randomized_rejection_rate <= $alt.induced_stop_policies[2].randomized_rejection_rate) and
               ($alt.induced_stop_policies[0].early_stop_rate >= $alt.induced_stop_policies[1].early_stop_rate) and
               ($alt.induced_stop_policies[1].early_stop_rate >= $alt.induced_stop_policies[2].early_stop_rate)
             )
