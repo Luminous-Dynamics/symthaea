@@ -144,3 +144,17 @@ Recent work makes the competitive boundary more specific:
 4. **Report richer outcomes.** Alongside resolve rate, report retained functionality, active-requirement conformance, evidence support, graph-level consistency, justified abstention, evaluator integrity, cost and recovery latency. A safe-performance Pareto frontier is more informative than one aggregate rank.
 
 These papers are complementary baselines, not evidence that EGDDM currently outperforms them. Matched trials remain necessary.
+## Industry update — interruption, takeover and context compaction (2026-11-16)
+
+Three recent benchmark lines make interruption and cross-agent transfer a concrete adjacent dimension:
+
+- [Handoff Debt](https://arxiv.org/abs/2606.02875) studies 75 source tasks, 181 interruption points and 724 takeover runs per successor model. It reports 20–59% fewer median agent events and 42–63% fewer cumulative prompt tokens for context-bearing handoffs versus repository-only takeover, with solved-rate effects smaller and model-dependent.
+- [HSC-Bench](https://arxiv.org/abs/2610.36523) reports 1,039 takeover tasks across six receiving models, separating recovery of repository evidence from continuation of inherited conversation, tool and file-work state.
+- [ContinuityBench](https://openreview.net/pdf?id=3N3BzvoLbG) applies controlled interruptions to existing agent benchmarks. It reports average success falling from 41.7% to 28.0% after interruption; structured-summary handoff outperforms summary-plus-full-action-history in 11 of 18 settings. More context is not necessarily better.
+- [CompactionBench](https://www.microsoft.com/en-us/research/wp-content/uploads/2026/10/CompactionBench_preprint.pdf) analyzes 13.5 million GitHub Copilot sessions. The preprint reports that 7.8% of sessions invoke context compaction but account for 44.2% of total token use; compaction also reduces prefix-cache reuse.
+
+### D6.14 differentiation
+
+EGDDM D6.14 is tracked separately in [Issue #12470](https://github.com/Luminous-Dynamics/symthaea/issues/12470). Its target is not just successful task takeover. It tests whether the receiver inherits valid evidence, current authority, active obligations and unresolved side effects; rejects stale evidence; reconciles unknown non-idempotent operations before retry; and can verify artifact references without the sender's private transcript. This complements Handoff Debt, HSC-Bench and ContinuityBench rather than claiming to replace them.
+
+The design objective is minimum sufficient, provenance-bearing state that preserves commitments and evidence while limiting rediscovery, over-steering, disclosure and serving cost.
