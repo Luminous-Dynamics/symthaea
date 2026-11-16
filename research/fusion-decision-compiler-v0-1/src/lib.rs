@@ -10,6 +10,7 @@ pub mod cross_solver_comparison;
 pub mod evidence_dependence;
 pub mod plant_service_gate;
 pub mod remote_maintenance_compiler;
+pub mod remote_handling_benchmark;
 pub mod screening_funnel;
 pub mod validation_domain;
 

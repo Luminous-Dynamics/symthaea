@@ -52,3 +52,6 @@ jobs:
 
       - name: Run synthetic design-for-remote-maintenance procedure
         run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_remote_maintenance
+
+      - name: Run synthetic repeatable remote-handling benchmark
+        run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_remote_handling_benchmark
