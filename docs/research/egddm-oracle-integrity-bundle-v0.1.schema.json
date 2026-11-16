@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-oracle-integrity-bundle-v0.1.schema.json",
+  "title": "EGDDM D6.12 oracle-integrity bundle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundle_id",
+    "bundle_visibility",
+    "candidate_view",
+    "gold_overlay",
+    "candidate_traces"
+  ],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_visibility": {
+      "const": "evaluator_only_never_candidate_visible"
+    },
+    "candidate_view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "oracle_runs"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "oracle_runs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "case_id",
+              "control_role",
+              "candidate_input_digest",
+              "post_candidate_state_digest",
+              "pre_grade_state_digest",
+              "post_grade_state_digest",
+              "replay_state_digest",
+              "verifier_outcome",
+              "repeat_verifier_outcome",
+              "cache_hit",
+              "cache_input_digest",
+              "observed_surfaces"
+            ],
+            "properties": {
+              "case_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "control_role": {
+                "enum": [
+                  "positive",
+                  "negative",
+                  "sham",
+                  "fault_injection"
+                ]
+              },
+              "candidate_input_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "post_candidate_state_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "pre_grade_state_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "post_grade_state_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "replay_state_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "verifier_outcome": {
+                "enum": [
+                  "pass",
+                  "fail"
+                ]
+              },
+              "repeat_verifier_outcome": {
+                "enum": [
+                  "pass",
+                  "fail"
+                ]
+              },
+              "cache_hit": {
+                "type": "boolean"
+              },
+              "cache_input_digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "observed_surfaces": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "gold_overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adjudication_status",
+        "case_truths"
+      ],
+      "properties": {
+        "adjudication_status": {
+          "const": "synthetic_known_answer_not_independently_adjudicated"
+        },
+        "case_truths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "case_id",
+              "expected_semantic_outcome",
+              "expected_post_candidate_state_digest",
+              "required_observer_surfaces",
+              "expected_fault_classes"
+            ],
+            "properties": {
+              "case_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "expected_semantic_outcome": {
+                "enum": [
+                  "pass",
+                  "fail"
+                ]
+              },
+              "expected_post_candidate_state_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "required_observer_surfaces": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "expected_fault_classes": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "candidate_state_drift",
+                    "state_mutation",
+                    "replay_disagreement",
+                    "cache_mismatch",
+                    "nondeterminism",
+                    "observer_coverage_gap",
+                    "false_positive",
+                    "false_negative"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "candidate_traces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "case_claims"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "case_claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "case_id",
+                "claimed_semantic_outcome",
+                "detected_fault_classes",
+                "claimed_integrity_state"
+              ],
+              "properties": {
+                "case_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "claimed_semantic_outcome": {
+                  "enum": [
+                    "pass",
+                    "fail",
+                    "unknown"
+                  ]
+                },
+                "detected_fault_classes": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "enum": [
+                      "candidate_state_drift",
+                      "state_mutation",
+                      "replay_disagreement",
+                      "cache_mismatch",
+                      "nondeterminism",
+                      "observer_coverage_gap",
+                      "false_positive",
+                      "false_negative"
+                    ]
+                  }
+                },
+                "claimed_integrity_state": {
+                  "enum": [
+                    "valid",
+                    "invalid",
+                    "unknown"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,779 @@
+{
+  "scenario_id": "d6.12-state-mutating-oracle-two-sided-v0.1",
+  "adjudication_status": "synthetic_known_answer_not_independently_adjudicated",
+  "oracle_case_count": 10,
+  "traces": [
+    {
+      "trace_id": "always-reject",
+      "cases": [
+        {
+          "case_id": "candidate-state-drift",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": false,
+          "false_accept": false,
+          "false_reject": true,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "candidate_state_drift"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "candidate_state_drift"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "empty-patch",
+          "control_role": "negative",
+          "expected_semantic_outcome": "fail",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "fail",
+          "actual_fault_classes": [],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "valid",
+          "integrity_claim_correct": false,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": true
+        },
+        {
+          "case_id": "mutating-oracle",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": false,
+          "false_accept": false,
+          "false_reject": true,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "state_mutation"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "state_mutation"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "nondeterministic",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": false,
+          "false_accept": false,
+          "false_reject": true,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "nondeterminism"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "nondeterminism"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "observer-gap",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": false,
+          "false_accept": false,
+          "false_reject": true,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "observer_coverage_gap"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "observer_coverage_gap"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "replay-disagreement",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": false,
+          "false_accept": false,
+          "false_reject": true,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "replay_disagreement"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "replay_disagreement"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "sham-grade",
+          "control_role": "sham",
+          "expected_semantic_outcome": "fail",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "fail",
+          "actual_fault_classes": [],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "valid",
+          "integrity_claim_correct": false,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": true
+        },
+        {
+          "case_id": "stale-cache",
+          "control_role": "negative",
+          "expected_semantic_outcome": "fail",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "cache_mismatch",
+            "false_positive"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "cache_mismatch",
+            "false_positive"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "valid-alternative",
+          "control_role": "positive",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": false,
+          "false_accept": false,
+          "false_reject": true,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "fail",
+          "actual_fault_classes": [
+            "false_negative"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "false_negative"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "valid-reference",
+          "control_role": "positive",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": false,
+          "false_accept": false,
+          "false_reject": true,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "valid",
+          "integrity_claim_correct": false,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": true
+        }
+      ],
+      "case_count": 10,
+      "positive_control_count": 2,
+      "negative_control_count": 2,
+      "sham_control_count": 1,
+      "fault_injection_case_count": 5,
+      "false_accept_count": 0,
+      "false_reject_count": 7,
+      "unnecessary_abstention_count": 0,
+      "total_fault_instances": 8,
+      "detected_fault_instances": 0,
+      "missed_fault_instances": 8,
+      "false_alarm_fault_instances": 0,
+      "false_integrity_valid_assertions": 0,
+      "false_integrity_invalid_assertions": 3,
+      "state_mutation_case_count": 1,
+      "replay_disagreement_case_count": 1,
+      "cache_mismatch_case_count": 1,
+      "nondeterminism_case_count": 1,
+      "observer_coverage_gap_case_count": 1,
+      "verifier_false_positive_case_count": 1,
+      "verifier_false_negative_case_count": 1,
+      "candidate_state_drift_case_count": 1
+    },
+    {
+      "trace_id": "independent-auditor",
+      "cases": [
+        {
+          "case_id": "candidate-state-drift",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "candidate_state_drift"
+          ],
+          "detected_fault_classes": [
+            "candidate_state_drift"
+          ],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "empty-patch",
+          "control_role": "negative",
+          "expected_semantic_outcome": "fail",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "fail",
+          "actual_fault_classes": [],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "valid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "mutating-oracle",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "state_mutation"
+          ],
+          "detected_fault_classes": [
+            "state_mutation"
+          ],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "nondeterministic",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "nondeterminism"
+          ],
+          "detected_fault_classes": [
+            "nondeterminism"
+          ],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "observer-gap",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "observer_coverage_gap"
+          ],
+          "detected_fault_classes": [
+            "observer_coverage_gap"
+          ],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "replay-disagreement",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "replay_disagreement"
+          ],
+          "detected_fault_classes": [
+            "replay_disagreement"
+          ],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "sham-grade",
+          "control_role": "sham",
+          "expected_semantic_outcome": "fail",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "fail",
+          "actual_fault_classes": [],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "valid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "stale-cache",
+          "control_role": "negative",
+          "expected_semantic_outcome": "fail",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "cache_mismatch",
+            "false_positive"
+          ],
+          "detected_fault_classes": [
+            "cache_mismatch",
+            "false_positive"
+          ],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "valid-alternative",
+          "control_role": "positive",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "fail",
+          "actual_fault_classes": [
+            "false_negative"
+          ],
+          "detected_fault_classes": [
+            "false_negative"
+          ],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "invalid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "valid-reference",
+          "control_role": "positive",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "valid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        }
+      ],
+      "case_count": 10,
+      "positive_control_count": 2,
+      "negative_control_count": 2,
+      "sham_control_count": 1,
+      "fault_injection_case_count": 5,
+      "false_accept_count": 0,
+      "false_reject_count": 0,
+      "unnecessary_abstention_count": 0,
+      "total_fault_instances": 8,
+      "detected_fault_instances": 8,
+      "missed_fault_instances": 0,
+      "false_alarm_fault_instances": 0,
+      "false_integrity_valid_assertions": 0,
+      "false_integrity_invalid_assertions": 0,
+      "state_mutation_case_count": 1,
+      "replay_disagreement_case_count": 1,
+      "cache_mismatch_case_count": 1,
+      "nondeterminism_case_count": 1,
+      "observer_coverage_gap_case_count": 1,
+      "verifier_false_positive_case_count": 1,
+      "verifier_false_negative_case_count": 1,
+      "candidate_state_drift_case_count": 1
+    },
+    {
+      "trace_id": "native-verifier-only",
+      "cases": [
+        {
+          "case_id": "candidate-state-drift",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "candidate_state_drift"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "candidate_state_drift"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": false,
+          "false_integrity_valid_assertion": true,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "empty-patch",
+          "control_role": "negative",
+          "expected_semantic_outcome": "fail",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "fail",
+          "actual_fault_classes": [],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "valid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "mutating-oracle",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "state_mutation"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "state_mutation"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": false,
+          "false_integrity_valid_assertion": true,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "nondeterministic",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "nondeterminism"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "nondeterminism"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": false,
+          "false_integrity_valid_assertion": true,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "observer-gap",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "observer_coverage_gap"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "observer_coverage_gap"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": false,
+          "false_integrity_valid_assertion": true,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "replay-disagreement",
+          "control_role": "fault_injection",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "replay_disagreement"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "replay_disagreement"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": false,
+          "false_integrity_valid_assertion": true,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "sham-grade",
+          "control_role": "sham",
+          "expected_semantic_outcome": "fail",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "fail",
+          "actual_fault_classes": [],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "valid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "stale-cache",
+          "control_role": "negative",
+          "expected_semantic_outcome": "fail",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": false,
+          "false_accept": true,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [
+            "cache_mismatch",
+            "false_positive"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "cache_mismatch",
+            "false_positive"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": false,
+          "false_integrity_valid_assertion": true,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "valid-alternative",
+          "control_role": "positive",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "fail",
+          "outcome_correct": false,
+          "false_accept": false,
+          "false_reject": true,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "fail",
+          "actual_fault_classes": [
+            "false_negative"
+          ],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [
+            "false_negative"
+          ],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "invalid",
+          "integrity_claim_correct": false,
+          "false_integrity_valid_assertion": true,
+          "false_integrity_invalid_assertion": false
+        },
+        {
+          "case_id": "valid-reference",
+          "control_role": "positive",
+          "expected_semantic_outcome": "pass",
+          "claimed_semantic_outcome": "pass",
+          "outcome_correct": true,
+          "false_accept": false,
+          "false_reject": false,
+          "unnecessary_abstention": false,
+          "native_verifier_outcome": "pass",
+          "actual_fault_classes": [],
+          "detected_fault_classes": [],
+          "missed_fault_classes": [],
+          "false_alarm_fault_classes": [],
+          "claimed_integrity_state": "valid",
+          "expected_integrity_state": "valid",
+          "integrity_claim_correct": true,
+          "false_integrity_valid_assertion": false,
+          "false_integrity_invalid_assertion": false
+        }
+      ],
+      "case_count": 10,
+      "positive_control_count": 2,
+      "negative_control_count": 2,
+      "sham_control_count": 1,
+      "fault_injection_case_count": 5,
+      "false_accept_count": 1,
+      "false_reject_count": 1,
+      "unnecessary_abstention_count": 0,
+      "total_fault_instances": 8,
+      "detected_fault_instances": 0,
+      "missed_fault_instances": 8,
+      "false_alarm_fault_instances": 0,
+      "false_integrity_valid_assertions": 7,
+      "false_integrity_invalid_assertions": 0,
+      "state_mutation_case_count": 1,
+      "replay_disagreement_case_count": 1,
+      "cache_mismatch_case_count": 1,
+      "nondeterminism_case_count": 1,
+      "observer_coverage_gap_case_count": 1,
+      "verifier_false_positive_case_count": 1,
+      "verifier_false_negative_case_count": 1,
+      "candidate_state_drift_case_count": 1
+    }
+  ],
+  "claim_ceiling": "Synthetic known-answer evaluation of declared oracle observations, state digests, replay records, cache identities, repeat outcomes and observer coverage. Does not authenticate telemetry, prove OS-level isolation, independently implement arbitrary benchmark semantics, or establish universal benchmark integrity."
+}

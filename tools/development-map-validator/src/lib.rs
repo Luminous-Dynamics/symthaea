@@ -15,6 +15,7 @@ pub mod multi_shift_sequence;
 pub mod exploit_migration;
 pub mod partial_order;
 pub mod identifiability;
+pub mod oracle_integrity;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
