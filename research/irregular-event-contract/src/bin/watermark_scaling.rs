@@ -7,7 +7,7 @@ use symthaea_irregular_event_contract::{
 };
 
 const INDEXED_REPETITIONS: usize = 51;
-const VERIFIED_REPETITIONS: usize = 7;
+const VERIFIED_REPETITIONS: usize = 15;
 const EVENT_COUNTS: [usize; 3] = [4_096, 16_384, 65_536];
 const SOURCE_COUNTS: [usize; 3] = [1, 4, 16];
 const INTERVAL_WIDTHS: [usize; 3] = [1, 16, 256];
@@ -180,11 +180,13 @@ fn run_case(
     let indexed_p95 = percentile_micros(&mut indexed_for_percentiles, 0.95);
     let indexed_p99 = percentile_micros(&mut indexed_for_percentiles, 0.99);
     let verified_p50 = percentile_micros(&mut verified_for_percentiles, 0.50);
-    let verified_p95 = percentile_micros(&mut verified_for_percentiles, 0.95);
-    let verified_p99 = percentile_micros(&mut verified_for_percentiles, 0.99);
+    let verified_max = verified_for_percentiles
+        .last()
+        .map(|duration| duration.as_secs_f64() * 1_000_000.0)
+        .unwrap_or_default();
 
     println!(
-        "{event_count},{source_count},{interval_width},{known_at_us},{INDEXED_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_p95:.3},{verified_p99:.3}",
+        "{event_count},{source_count},{interval_width},{known_at_us},{INDEXED_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_max:.3}",
         warm.late_breach_index_buckets_examined,
         warm.late_breach_candidates_examined,
         warm.late_breaches.len()
@@ -194,7 +196,7 @@ fn run_case(
 
 fn main() {
     println!(
-        "events,sources,interval_width_us,known_at_us,indexed_samples,verified_samples,index_buckets,receipt_candidates,matching_breaches,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_p95_us,verified_p99_us"
+        "events,sources,interval_width_us,known_at_us,indexed_samples,verified_samples,index_buckets,receipt_candidates,matching_breaches,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_max_us"
     );
     for event_count in EVENT_COUNTS {
         for source_count in SOURCE_COUNTS {
