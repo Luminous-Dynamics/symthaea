@@ -1968,8 +1968,8 @@ mod tests {
         let plasma_summary = audit_source_value(&plasma, "plasma-source-cases").unwrap();
         let hts_summary = audit_source_value(&hts, "hts-source-cases").unwrap();
 
-        assert_eq!(plasma_summary.case_count, 41);
-        assert_eq!(plasma_summary.negative_control_count, 64);
+        assert_eq!(plasma_summary.case_count, 42);
+        assert_eq!(plasma_summary.negative_control_count, 68);
         assert_eq!(plasma_summary.benchmark_target_count, 6);
         let plasma_case_ids: BTreeSet<_> = plasma
             .get("cases")
