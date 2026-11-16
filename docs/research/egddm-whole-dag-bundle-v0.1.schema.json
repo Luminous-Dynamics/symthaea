@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-whole-dag-bundle-v0.1.schema.json",
+  "title": "EGDDM D6.13 whole-DAG bundle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundle_id",
+    "bundle_visibility",
+    "candidate_view",
+    "gold_overlay",
+    "candidate_traces"
+  ],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_visibility": {
+      "const": "evaluator_only_never_candidate_visible"
+    },
+    "candidate_view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "observation_boundary_state",
+        "events",
+        "trusted_happens_before_edges",
+        "forbidden_ordered_pairs"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "observation_boundary_state": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "unknown",
+            "compromised"
+          ]
+        },
+        "events": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "event_id",
+              "event_time",
+              "available_at"
+            ],
+            "properties": {
+              "event_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "event_time": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "available_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "trusted_happens_before_edges": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pair"
+          }
+        },
+        "forbidden_ordered_pairs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pair"
+          }
+        }
+      }
+    },
+    "gold_overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adjudication_status",
+        "adjudicated_observation_boundary_state",
+        "admissible_worlds"
+      ],
+      "properties": {
+        "adjudication_status": {
+          "const": "synthetic_known_answer_not_independently_adjudicated"
+        },
+        "adjudicated_observation_boundary_state": {
+          "enum": [
+            "complete",
+            "incomplete",
+            "unknown",
+            "compromised"
+          ]
+        },
+        "admissible_worlds": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "world_id",
+              "edges"
+            ],
+            "properties": {
+              "world_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "edges": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/pair"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "candidate_traces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "observation_boundary_claim",
+          "relation_claims"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "observation_boundary_claim": {
+            "enum": [
+              "complete",
+              "incomplete",
+              "unknown",
+              "compromised"
+            ]
+          },
+          "relation_claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "left_event_id",
+                "right_event_id",
+                "claimed_relation",
+                "decision_cutoff",
+                "evidence_event_ids",
+                "critical"
+              ],
+              "properties": {
+                "left_event_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "right_event_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "claimed_relation": {
+                  "enum": [
+                    "before",
+                    "after",
+                    "concurrent",
+                    "underdetermined",
+                    "compromised"
+                  ]
+                },
+                "decision_cutoff": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "evidence_event_ids": {
+                  "type": "array",
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "critical": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "pair": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}
