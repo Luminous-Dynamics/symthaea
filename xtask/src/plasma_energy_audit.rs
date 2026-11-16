@@ -1361,6 +1361,130 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     );
                 }
             }
+            "CO2_DBD_MODEL_GENERALIZATION" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    close_f64(
+                        required_f64(metrics, "baseline_best_publication_grouped_cv_r2", &format!("{display_name}: {target_id}"))?,
+                        0.791
+                    ),
+                    "{display_name}: CO2 DBD target {target_id} must preserve the source grouped-CV baseline"
+                );
+                for (key, floor) in [
+                    ("target_mean_leave_one_publication_out_r2_min", 0.80),
+                    ("nominal_prediction_interval_coverage_min", 0.90),
+                    ("minimum_applicability_domain_coverage_fraction", 0.80),
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value >= floor && value <= 1.0),
+                        "{display_name}: CO2 DBD target {target_id} has invalid or weak threshold {key}"
+                    );
+                }
+                ensure!(
+                    metrics.get("sealed_prospective_reactor_holdout_required").and_then(Value::as_bool)
+                        == Some(true),
+                    "{display_name}: CO2 DBD target {target_id} must require a sealed prospective reactor holdout"
+                );
+                for key in [
+                    "source_paper_grouped_splits_required",
+                    "leave_one_publication_out_required",
+                    "leave_one_reactor_configuration_out_required",
+                    "random_row_split_cannot_support_transfer_claim",
+                    "prediction_interval_calibration_reported",
+                    "worst_group_error_and_abstention_reported",
+                    "no_extrapolation_claim_without_sealed_external_measurements",
+                    "only_measured_physical_descriptors_may_be_used",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: CO2 DBD target {target_id} is missing grouped-generalization guard {key}"
+                    );
+                }
+                ensure!(
+                    comparators.iter().any(|value| value.as_str() == Some("CO2-DBD-ML-358-DATASET-2026")),
+                    "{display_name}: CO2 DBD target {target_id} must reference the 358-point source corpus"
+                );
+            }
+            "CO2_WARM_PLASMA_RWGS" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics.get("distinct_operating_points_required").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: RWGS target {target_id} must preserve distinct H2-rich and stoichiometric points"
+                );
+                ensure!(
+                    metrics.get("unresolved_source_energy_cost_discrepancy_blocks_ranking").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: RWGS target {target_id} must block ranking while source discrepancy is unresolved"
+                );
+                for (key, expected) in [
+                    ("stoichiometric_co2_conversion_min_fraction", 0.68),
+                    ("stoichiometric_specific_energy_cost_max_kj_per_mol_co", 277.0),
+                    ("h2_rich_co2_conversion_min_fraction", 0.93),
+                    ("h2_rich_co_selectivity_min_fraction", 1.0),
+                ] {
+                    ensure!(
+                        close_f64(required_f64(metrics, key, &format!("{display_name}: {target_id}"))?, expected),
+                        "{display_name}: RWGS target {target_id} must preserve source-pinned comparator {key}"
+                    );
+                }
+                for key in [
+                    "full_grid_to_accepted_co_and_syngas_energy_boundary_required",
+                    "h2_co2_feed_ratio_bound_to_each_point",
+                    "product_purity_pressure_and_h2_co_contract_required",
+                    "source_264_vs_277_kj_per_mol_discrepancy_resolved_before_point_ranking",
+                    "carbon_and_oxygen_balances_closed_independently",
+                    "matched_thermocatalytic_rwgs_baseline_required",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: RWGS target {target_id} is missing source/product gate {key}"
+                    );
+                }
+                ensure!(
+                    comparators.iter().any(|value| value.as_str() == Some("CO2-RWGS-GLIDING-ARC-2026")),
+                    "{display_name}: RWGS target {target_id} must reference the gliding-arc source case"
+                );
+            }
+            "CO2_CYCLIC_CARBON_UTILIZATION" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                for (key, floor) in [
+                    ("completed_reaction_gasification_cycles_min", 100.0),
+                    ("carbon_inventory_closure_min_fraction", 0.95),
+                    ("useful_syngas_productivity_retention_after_cycles_min_fraction", 0.90),
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value >= floor && value <= 1.0_f64.max(floor)),
+                        "{display_name}: cyclic carbon target {target_id} has insufficient or invalid threshold {key}"
+                    );
+                }
+                for key in [
+                    "all_cycles_and_failed_starts_in_denominator",
+                    "continuous_and_discontinuous_modes_separate",
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: cyclic carbon target {target_id} is missing required cycle-denominator gate {key}"
+                    );
+                }
+                for key in [
+                    "grid_side_energy_includes_plasma_power_conversion_and_all_auxiliaries",
+                    "deposited_carbon_and_gasified_carbon_inventories_tracked_separately",
+                    "carbon_co_o2_and_residual_streams_species_resolved",
+                    "no_unqualified_carbon_or_oxygen_coproduct_credit",
+                    "cycle_durability_must_be_physical_not_simulated",
+                    "matched_syngas_composition_and_product_contract_required",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: cyclic carbon target {target_id} is missing plant/cycle guard {key}"
+                    );
+                }
+                ensure!(
+                    comparators.iter().any(|value| value.as_str() == Some("CO2-CYCLIC-REFORMING-GASIFICATION-2026")),
+                    "{display_name}: cyclic carbon target {target_id} must reference the published cycle experiment"
+                );
+            }
             "PLASMA_POWER_TO_X_BIOGAS_REFORMING" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
                 ensure!(
@@ -3841,6 +3965,60 @@ mod tests {
                 "required_improvement_vs_integrated_reference_fraction": 0.10,
                 "all_thresholds_must_hold_at_same_operating_point": true
             })
+        } else if lane == "CO2_DBD_MODEL_GENERALIZATION" {
+            serde_json::json!({
+                "baseline_best_publication_grouped_cv_r2": 0.791,
+                "target_mean_leave_one_publication_out_r2_min": 0.80,
+                "nominal_prediction_interval_coverage_min": 0.90,
+                "minimum_applicability_domain_coverage_fraction": 0.80,
+                "sealed_prospective_reactor_holdout_required": true
+            })
+        } else if lane == "CO2_WARM_PLASMA_RWGS" {
+            serde_json::json!({
+                "stoichiometric_co2_conversion_min_fraction": 0.68,
+                "stoichiometric_specific_energy_cost_max_kj_per_mol_co": 277.0,
+                "h2_rich_co2_conversion_min_fraction": 0.93,
+                "h2_rich_co_selectivity_min_fraction": 1.0,
+                "distinct_operating_points_required": true,
+                "unresolved_source_energy_cost_discrepancy_blocks_ranking": true
+            })
+        } else if lane == "CO2_CYCLIC_CARBON_UTILIZATION" {
+            serde_json::json!({
+                "completed_reaction_gasification_cycles_min": 100.0,
+                "carbon_inventory_closure_min_fraction": 0.95,
+                "useful_syngas_productivity_retention_after_cycles_min_fraction": 0.90,
+                "all_cycles_and_failed_starts_in_denominator": true,
+                "continuous_and_discontinuous_modes_separate": true
+            })
+        } else if lane == "CO2_DBD_MODEL_GENERALIZATION" {
+            serde_json::json!({
+                "source_paper_grouped_splits_required": true,
+                "leave_one_publication_out_required": true,
+                "leave_one_reactor_configuration_out_required": true,
+                "random_row_split_cannot_support_transfer_claim": true,
+                "prediction_interval_calibration_reported": true,
+                "worst_group_error_and_abstention_reported": true,
+                "no_extrapolation_claim_without_sealed_external_measurements": true,
+                "only_measured_physical_descriptors_may_be_used": true
+            })
+        } else if lane == "CO2_WARM_PLASMA_RWGS" {
+            serde_json::json!({
+                "full_grid_to_accepted_co_and_syngas_energy_boundary_required": true,
+                "h2_co2_feed_ratio_bound_to_each_point": true,
+                "product_purity_pressure_and_h2_co_contract_required": true,
+                "source_264_vs_277_kj_per_mol_discrepancy_resolved_before_point_ranking": true,
+                "carbon_and_oxygen_balances_closed_independently": true,
+                "matched_thermocatalytic_rwgs_baseline_required": true
+            })
+        } else if lane == "CO2_CYCLIC_CARBON_UTILIZATION" {
+            serde_json::json!({
+                "grid_side_energy_includes_plasma_power_conversion_and_all_auxiliaries": true,
+                "deposited_carbon_and_gasified_carbon_inventories_tracked_separately": true,
+                "carbon_co_o2_and_residual_streams_species_resolved": true,
+                "no_unqualified_carbon_or_oxygen_coproduct_credit": true,
+                "cycle_durability_must_be_physical_not_simulated": true,
+                "matched_syngas_composition_and_product_contract_required": true
+            })
         } else if lane == "METHANE_PYROLYSIS_PULSED_HEATING" {
             serde_json::json!({
                 "methane_conversion_min_fraction": 0.90,
@@ -3967,6 +4145,12 @@ mod tests {
                 "unqualified_coproduct_credit_forbidden": true
             })
         };
+        let comparator_case_id = match lane {
+            "CO2_DBD_MODEL_GENERALIZATION" => "CO2-DBD-ML-358-DATASET-2026",
+            "CO2_WARM_PLASMA_RWGS" => "CO2-RWGS-GLIDING-ARC-2026",
+            "CO2_CYCLIC_CARBON_UTILIZATION" => "CO2-CYCLIC-REFORMING-GASIFICATION-2026",
+            _ => "case-1"
+        };
         serde_json::json!({
             "programme": "PLASMA-ENERGY-001",
             "claim_ceiling": "SOURCE_REGISTER_ONLY",
@@ -3992,7 +4176,7 @@ mod tests {
                 "target_id": "target-1",
                 "lane": lane,
                 "status": "RESEARCH_TARGET_NOT_RESULT",
-                "comparator_case_ids": ["case-1"],
+                "comparator_case_ids": [comparator_case_id],
                 "metric_thresholds": metrics,
                 "claim_guards": guards,
                 "credit_policies": ["NO_CREDIT", "ALLOCATION", "AVOIDED_PRODUCT_CREDIT"]
@@ -4123,6 +4307,73 @@ mod tests {
             serde_json::json!(false);
         let error = audit_source_value(&source, "ammonia-thermal-target.json").unwrap_err();
         assert!(error.to_string().contains("one operating point"));
+    }
+
+
+    #[test]
+    fn source_manifest_accepts_co2_dbd_grouped_generalization_target() {
+        let source = minimal_benchmark_target_manifest("CO2_DBD_MODEL_GENERALIZATION");
+        let summary = audit_source_value(&source, "co2-dbd-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_co2_dbd_target_without_publication_grouping() {
+        let mut source = minimal_benchmark_target_manifest("CO2_DBD_MODEL_GENERALIZATION");
+        source["benchmark_targets"][0]["claim_guards"]["source_paper_grouped_splits_required"] =
+            serde_json::json!(false);
+        let error = audit_source_value(&source, "co2-dbd-target.json").unwrap_err();
+        assert!(error.to_string().contains("source_paper_grouped_splits_required"));
+    }
+
+    #[test]
+    fn source_manifest_accepts_rwgs_point_separation_and_energy_discrepancy_gate() {
+        let source = minimal_benchmark_target_manifest("CO2_WARM_PLASMA_RWGS");
+        let summary = audit_source_value(&source, "rwgs-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_rwgs_target_without_distinct_operating_points() {
+        let mut source = minimal_benchmark_target_manifest("CO2_WARM_PLASMA_RWGS");
+        source["benchmark_targets"][0]["metric_thresholds"]["distinct_operating_points_required"] =
+            serde_json::json!(false);
+        let error = audit_source_value(&source, "rwgs-target.json").unwrap_err();
+        assert!(error.to_string().contains("distinct H2-rich and stoichiometric points"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_rwgs_target_without_discrepancy_resolution_gate() {
+        let mut source = minimal_benchmark_target_manifest("CO2_WARM_PLASMA_RWGS");
+        source["benchmark_targets"][0]["claim_guards"]["source_264_vs_277_kj_per_mol_discrepancy_resolved_before_point_ranking"] =
+            serde_json::json!(false);
+        let error = audit_source_value(&source, "rwgs-target.json").unwrap_err();
+        assert!(error.to_string().contains("source_264_vs_277"));
+    }
+
+    #[test]
+    fn source_manifest_accepts_cyclic_carbon_durability_target() {
+        let source = minimal_benchmark_target_manifest("CO2_CYCLIC_CARBON_UTILIZATION");
+        let summary = audit_source_value(&source, "co2-crg-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_cyclic_carbon_target_with_fewer_than_100_cycles() {
+        let mut source = minimal_benchmark_target_manifest("CO2_CYCLIC_CARBON_UTILIZATION");
+        source["benchmark_targets"][0]["metric_thresholds"]["completed_reaction_gasification_cycles_min"] =
+            serde_json::json!(50);
+        let error = audit_source_value(&source, "co2-crg-target.json").unwrap_err();
+        assert!(error.to_string().contains("completed_reaction_gasification_cycles_min"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_cyclic_carbon_target_without_grid_energy_boundary() {
+        let mut source = minimal_benchmark_target_manifest("CO2_CYCLIC_CARBON_UTILIZATION");
+        source["benchmark_targets"][0]["claim_guards"]["grid_side_energy_includes_plasma_power_conversion_and_all_auxiliaries"] =
+            serde_json::json!(false);
+        let error = audit_source_value(&source, "co2-crg-target.json").unwrap_err();
+        assert!(error.to_string().contains("grid_side_energy_includes"));
     }
 
     #[test]
