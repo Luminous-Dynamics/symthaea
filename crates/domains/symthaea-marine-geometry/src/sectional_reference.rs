@@ -927,7 +927,9 @@ mod tests {
         for station in &mut request.source_spec.stations {
             let mut port = station.starboard_profile.clone();
             for point in &mut port {
-                point.point_id = format!("PORT-{}", point.point_id);
+                if point.role != ProfilePointRole::Keel {
+                    point.point_id = format!("PORT-{}", point.point_id);
+                }
                 point.y_m = -point.y_m * 0.9;
             }
             station.port_profile = Some(port);
