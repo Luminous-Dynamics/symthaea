@@ -39,7 +39,7 @@ pub enum ScilawsSelectionError {
     EmptyCandidatePool,
     EmptyCandidateId,
     DuplicateCandidateId(String),
-    DuplicateSemanticCandidate(String),
+    InvalidAssumptionCheckId { candidate_id: String },
     InvalidDigest { field: String },
     InvalidDevelopmentRmse { candidate_id: String },
     InvalidComplexity { candidate_id: String },
@@ -68,8 +68,8 @@ impl fmt::Display for ScilawsSelectionError {
             Self::EmptyCandidatePool => write!(f, "candidate pool must not be empty"),
             Self::EmptyCandidateId => write!(f, "candidate ID must not be empty"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate ID: {id}"),
-            Self::DuplicateSemanticCandidate(digest) => {
-                write!(f, "duplicate canonical model digest: {digest}")
+            Self::InvalidAssumptionCheckId { candidate_id } => {
+                write!(f, "assumption check IDs must be non-empty and unique for candidate {candidate_id}")
             }
             Self::InvalidDigest { field } => {
                 write!(f, "{field} must be a lowercase 64-character SHA-256 digest")
@@ -162,7 +162,6 @@ impl LiveSelectionPacket {
         }
 
         let mut candidate_ids = BTreeSet::new();
-        let mut model_digests = BTreeSet::new();
         for candidate in &self.candidates {
             if candidate.candidate_id.trim().is_empty() {
                 return Err(ScilawsSelectionError::EmptyCandidateId);
@@ -183,11 +182,6 @@ impl LiveSelectionPacket {
                     candidate.candidate_id
                 ),
             )?;
-            if !model_digests.insert(candidate.model_sha256.as_str()) {
-                return Err(ScilawsSelectionError::DuplicateSemanticCandidate(
-                    candidate.model_sha256.clone(),
-                ));
-            }
             if !candidate.development_rmse.is_finite() || candidate.development_rmse < 0.0 {
                 return Err(ScilawsSelectionError::InvalidDevelopmentRmse {
                     candidate_id: candidate.candidate_id.clone(),
@@ -201,7 +195,7 @@ impl LiveSelectionPacket {
             let mut checks = BTreeSet::new();
             for check_id in &candidate.declared_assumption_check_ids {
                 if check_id.trim().is_empty() || !checks.insert(check_id.as_str()) {
-                    return Err(ScilawsSelectionError::InvalidComplexity {
+                    return Err(ScilawsSelectionError::InvalidAssumptionCheckId {
                         candidate_id: candidate.candidate_id.clone(),
                     });
                 }
@@ -216,6 +210,28 @@ impl LiveSelectionPacket {
             }
         }
         Ok(())
+    }
+
+    /// Returns semantic-duplicate groups without dropping attempts. Equality is
+    /// by the caller-supplied canonical ScientificModel digest, never by raw
+    /// source text or candidate ID.
+    pub fn semantic_duplicate_groups(&self) -> Vec<Vec<String>> {
+        let mut groups = BTreeMap::<&str, Vec<String>>::new();
+        for candidate in &self.candidates {
+            groups
+                .entry(candidate.model_sha256.as_str())
+                .or_default()
+                .push(candidate.candidate_id.clone());
+        }
+        let mut duplicates = groups
+            .into_values()
+            .filter(|ids| ids.len() > 1)
+            .collect::<Vec<_>>();
+        for ids in &mut duplicates {
+            ids.sort();
+        }
+        duplicates.sort();
+        duplicates
     }
 }
 
@@ -321,11 +337,27 @@ pub enum SubmittedCandidateDisposition {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct EvaluatorAttemptAudit {
+    pub candidate_id: String,
+    pub status: EvaluatorCandidateStatus,
+    pub s_n: Option<f64>,
+    pub s_v: Option<f64>,
+    pub contract_valid: bool,
+    pub anti_hacking_pass: bool,
+    pub evaluation_evidence_sha256: String,
+    pub dominated_by: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ScilawsRealSelectionAudit {
     pub schema: String,
     pub version: String,
     pub campaign_id: String,
+    pub live_packet_sha256: String,
     pub attempt_count: usize,
+    pub semantic_duplicate_groups: Vec<Vec<String>>,
+    pub attempt_results: Vec<EvaluatorAttemptAudit>,
     pub complete_count: usize,
     pub failed_count: usize,
     pub not_evaluable_count: usize,
@@ -345,7 +377,10 @@ struct AuditReceiptPayload<'a> {
     schema: &'a str,
     version: &'a str,
     campaign_id: &'a str,
+    live_packet_sha256: &'a str,
     attempt_count: usize,
+    semantic_duplicate_groups: &'a [Vec<String>],
+    attempt_results: &'a [EvaluatorAttemptAudit],
     complete_count: usize,
     failed_count: usize,
     not_evaluable_count: usize,
@@ -482,6 +517,31 @@ pub fn audit_real_candidate_selection(
         })
         .unwrap_or_else(|| (0, Vec::new()));
 
+    let semantic_duplicate_groups = live.semantic_duplicate_groups();
+    let attempt_results = evaluator
+        .candidates
+        .iter()
+        .map(|candidate| {
+            let dominated_by = pareto_summary.as_ref().and_then(|summary| {
+                summary
+                    .candidate_results
+                    .iter()
+                    .find(|row| row.candidate_id == candidate.candidate_id)
+                    .and_then(|row| row.dominated_by.clone())
+            });
+            EvaluatorAttemptAudit {
+                candidate_id: candidate.candidate_id.clone(),
+                status: candidate.status,
+                s_n: candidate.s_n,
+                s_v: candidate.s_v,
+                contract_valid: candidate.contract_valid,
+                anti_hacking_pass: candidate.anti_hacking_pass,
+                evaluation_evidence_sha256: candidate.evaluation_evidence_sha256.clone(),
+                dominated_by,
+            }
+        })
+        .collect::<Vec<_>>();
+
     let submitted_disposition = match live.submitted_candidate_id.as_deref() {
         None => SubmittedCandidateDisposition::Abstained,
         Some(submitted_id) => {
@@ -524,6 +584,9 @@ pub fn audit_real_candidate_selection(
     let schema = AUDIT_SCHEMA.to_owned();
     let version = AUDIT_VERSION.to_owned();
     let attempt_count = evaluator.candidates.len();
+    let live_bytes = serde_json::to_vec(live)
+        .map_err(|error| ScilawsSelectionError::Serialization(error.to_string()))?;
+    let live_packet_sha256 = sha256_hex(&live_bytes);
     let pareto_receipt_sha256 = pareto_summary
         .as_ref()
         .map(|summary| summary.receipt_sha256.as_str());
@@ -531,7 +594,10 @@ pub fn audit_real_candidate_selection(
         schema: &schema,
         version: &version,
         campaign_id: &evaluator.campaign_id,
+        live_packet_sha256: &live_packet_sha256,
         attempt_count,
+        semantic_duplicate_groups: &semantic_duplicate_groups,
+        attempt_results: &attempt_results,
         complete_count,
         failed_count,
         not_evaluable_count,
@@ -550,7 +616,10 @@ pub fn audit_real_candidate_selection(
         schema,
         version,
         campaign_id: evaluator.campaign_id.clone(),
+        live_packet_sha256,
         attempt_count,
+        semantic_duplicate_groups,
+        attempt_results,
         complete_count,
         failed_count,
         not_evaluable_count,
@@ -712,7 +781,7 @@ mod tests {
                 dominator_candidate_id: "dominator".to_owned()
             }
         );
-        assert!(audit.audit_sha256.len() == 64);
+        assert_eq!(audit.audit_sha256.len(), 64);
     }
 
     #[test]
@@ -825,24 +894,39 @@ mod tests {
     }
 
     #[test]
-    fn duplicate_semantic_candidates_fail_closed() {
+    fn duplicate_semantic_candidates_are_retained_and_flagged() {
         let live = live_packet(
             vec![live_candidate("first", 'a', 0.1), live_candidate("second", 'a', 0.2)],
             Some("first"),
         );
-        assert!(matches!(
-            live.validate(),
-            Err(ScilawsSelectionError::DuplicateSemanticCandidate(_))
-        ));
+        live.validate().unwrap();
+        assert_eq!(
+            live.semantic_duplicate_groups(),
+            vec![vec!["first".to_owned(), "second".to_owned()]]
+        );
     }
 
     #[test]
     fn live_and_evaluator_candidate_sets_must_match_exactly() {
-        let live = live_packet(vec![live_candidate("a", 'a', 0.1)], Some("a"));
-        let evaluator = evaluator_pool(vec![]);
+        let live = live_packet(
+            vec![live_candidate("a", 'a', 0.1), live_candidate("b", 'b', 0.2)],
+            Some("a"),
+        );
+        let evaluator = evaluator_pool(vec![evaluator_candidate(
+            "a",
+            'a',
+            Some(0.8),
+            Some(0.8),
+            true,
+            true,
+            EvaluatorCandidateStatus::Complete,
+            '1',
+        )]);
         assert_eq!(
             audit_real_candidate_selection(&live, &evaluator).err(),
-            Some(ScilawsSelectionError::EmptyCandidatePool)
+            Some(ScilawsSelectionError::LiveCandidateMissingEvaluatorRecord(
+                "b".to_owned()
+            ))
         );
     }
 }
