@@ -130,8 +130,9 @@ fn run_case(event_count: usize) -> Result<(), String> {
     let verified_p99 = percentile_micros(&mut verified_for_percentiles, 0.99);
 
     println!(
-        "{event_count},{INDEXED_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_p95:.3},{verified_p99:.3}",
+        "{event_count},{INDEXED_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_p95:.3},{verified_p99:.3}",
         warm.late_breach_candidates_examined,
+        warm.late_breach_index_buckets_examined,
         warm.late_breaches.len()
     );
     Ok(())
@@ -139,7 +140,7 @@ fn run_case(event_count: usize) -> Result<(), String> {
 
 fn main() {
     println!(
-        "events,indexed_samples,verified_samples,index_candidates,matching_breaches,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_p95_us,verified_p99_us"
+        "events,indexed_samples,verified_samples,index_candidates,index_buckets,matching_breaches,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_p95_us,verified_p99_us"
     );
     for event_count in EVENT_COUNTS {
         if let Err(error) = run_case(event_count) {
