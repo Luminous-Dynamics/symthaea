@@ -38,7 +38,10 @@ impl fmt::Display for GaussianInductionError {
             ),
             Self::InvalidAlpha => write!(f, "alpha must be finite and in (1e-12, 1 - 1e-12)"),
             Self::InvalidSigma { index } => {
-                write!(f, "sigma at design index {index} must be finite and positive")
+                write!(
+                    f,
+                    "sigma at design index {index} must be finite and positive"
+                )
             }
             Self::NonFiniteDiscrepancy { index } => {
                 write!(f, "discrepancy at design index {index} must be finite")
@@ -53,8 +56,13 @@ impl fmt::Display for GaussianInductionError {
                 f,
                 "fixed design has zero information and no non-randomized terminal NP test"
             ),
-            Self::NumericalOverflow => write!(f, "Gaussian design information or log likelihood overflowed"),
-            Self::InvalidUniformDraw => write!(f, "randomization draw must be finite and in [0, 1)"),
+            Self::NumericalOverflow => write!(
+                f,
+                "Gaussian design information or log likelihood overflowed"
+            ),
+            Self::InvalidUniformDraw => {
+                write!(f, "randomization draw must be finite and in [0, 1)")
+            }
         }
     }
 }
@@ -291,8 +299,7 @@ mod tests {
 
     #[test]
     fn empty_prefix_test_value_equals_nominal_alpha() {
-        let test =
-            GaussianTerminalInducedTest::new(0.05, vec![0.24; 3], vec![0.15; 3]).unwrap();
+        let test = GaussianTerminalInducedTest::new(0.05, vec![0.24; 3], vec![0.15; 3]).unwrap();
         let prefix = test.evaluate_prefix(&[]).unwrap();
         assert!((prefix.conditional_rejection_probability - 0.05).abs() < 2.0e-7);
         assert_eq!(prefix.observations, 0);
@@ -301,8 +308,7 @@ mod tests {
 
     #[test]
     fn terminal_prefix_matches_the_fixed_n_p_test_exactly() {
-        let test =
-            GaussianTerminalInducedTest::new(0.05, vec![0.24; 3], vec![0.15; 3]).unwrap();
+        let test = GaussianTerminalInducedTest::new(0.05, vec![0.24; 3], vec![0.15; 3]).unwrap();
         let above = test.evaluate_prefix(&[0.2, 0.2, 0.2]).unwrap();
         let below = test.evaluate_prefix(&[-0.2, -0.2, -0.2]).unwrap();
         assert_eq!(
@@ -325,23 +331,20 @@ mod tests {
 
     #[test]
     fn terminal_power_matches_the_known_direction_gaussian_reference() {
-        let test =
-            GaussianTerminalInducedTest::new(0.05, vec![0.24; 3], vec![0.15; 3]).unwrap();
+        let test = GaussianTerminalInducedTest::new(0.05, vec![0.24; 3], vec![0.15; 3]).unwrap();
         let power = super::super::known_direction_power(&[0.24; 3], 0.15, 0.05).unwrap();
         assert!((test.terminal_power() - power.power).abs() < 2.0e-7);
     }
 
     #[test]
     fn terminal_power_matches_external_normal_reference_value() {
-        let test =
-            GaussianTerminalInducedTest::new(0.05, vec![0.24; 3], vec![0.15; 3]).unwrap();
+        let test = GaussianTerminalInducedTest::new(0.05, vec![0.24; 3], vec![0.15; 3]).unwrap();
         assert!((test.terminal_power() - 0.870_007_728_878_440_5).abs() < 2.0e-7);
     }
 
     #[test]
     fn fixed_design_conditional_values_satisfy_a_prefix_martingale_check() {
-        let test =
-            GaussianTerminalInducedTest::new(0.05, vec![0.2; 3], vec![0.5; 3]).unwrap();
+        let test = GaussianTerminalInducedTest::new(0.05, vec![0.2; 3], vec![0.5; 3]).unwrap();
         let prefix = test.evaluate_prefix(&[0.15]).unwrap();
         let mut state = 0x1234_5678_9abc_def0_u64;
         let mut total = 0.0;
@@ -387,8 +390,7 @@ mod tests {
             let randomizer = {
                 // A separately seeded simulator stream supplies the
                 // independent terminal-test randomization draw.
-                randomizer_state =
-                    randomizer_state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+                randomizer_state = randomizer_state.wrapping_add(0x9e37_79b9_7f4a_7c15);
                 let mut value = randomizer_state;
                 value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
                 value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
