@@ -2518,7 +2518,7 @@ fn validate_nh3_integrated_source_case(
                     && close_f64(required_f64(low_energy, "voltage_v", &context)?, 0.076)
                     && close_f64(required_f64(low_energy, "specific_energy_kwh_per_kg_h2", &context)?, 2.03)
                     && close_f64(required_f64(low_energy, "maximum_electrical_output_mw_per_cm2", &context)?, 5.9),
-                "{context}: low-energy/power-output MEA mode must preserve its separate 0.10 A/cm2 / 76 mV operating point"
+                "{context}: low-energy MEA mode (power-output mode) must preserve its separate 0.10 A/cm2 / 76 mV operating point"
             );
             ensure!(
                 case.get("system_boundary").and_then(|value| value.get("full_balance_of_plant_energy")).and_then(Value::as_bool) == Some(false),
