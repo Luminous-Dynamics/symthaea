@@ -24,7 +24,7 @@ The live selector and evaluator audit have different information privileges.
 The Rust API enforces this at the object-graph boundary:
 - CandidateSelectionPolicy::select accepts only &SelectorPacket.
 - SelectorPacket has no evaluator metric or hidden-truth field.
-- SelectionTrace binds task ID, frozen candidate-pool digest, policy ID, consumed evidence IDs, selected candidate/abstention and all-in selector cost.
+- SelectionTrace binds task ID, frozen candidate-pool digest, policy ID, consumed evidence IDs, selected candidate/abstention and selector-only cost.
 - A task-declared cost-unit ID and hard scalar cap are bound to the trace; cost above the cap or a unit mismatch fails closed. This is one task-native meter, not a conversion of heterogeneous resource vectors into a weighted sum. Wall time, CPU/GPU time, peak memory, energy, tokens and tool calls remain distinct resource dimensions under the existing multi-resource allocator (#9338).
 - audit_submission accepts evaluator outcomes only after the trace is frozen.
 - The trace is rejected if it references evidence not in the packet's permitted evidence manifest.
