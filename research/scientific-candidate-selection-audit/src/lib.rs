@@ -1064,7 +1064,12 @@ mod tests {
             &self,
             packet: &SelectorPacket,
         ) -> Result<SelectionObservation, SelectionAuditError> {
-            assert!(packet.candidates.iter().any(|c| c.candidate_id == self.selected));
+            assert!(
+                packet
+                    .candidates
+                    .iter()
+                    .any(|c| c.candidate_id == self.selected)
+            );
             Ok(SelectionObservation {
                 decision: SelectionDecision::Select {
                     candidate_id: self.selected.clone(),
@@ -1307,7 +1312,10 @@ mod tests {
             ))
         );
         let unknown = vec![real_outcome(
-            "outside-pool", 70.0, 80.0, EvaluatorAdmissibility::Qualified,
+            "outside-pool",
+            70.0,
+            80.0,
+            EvaluatorAdmissibility::Qualified,
         )];
         assert_eq!(
             audit_submission(&packet, &frozen, &unknown),
