@@ -5,7 +5,7 @@
 //! It does not establish physical reachability, collision freedom, activated
 //! handling, dose/contamination performance or mockup repair time.
 
-use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const DFRM_COMPILER_VERSION: &str = "fusion-dfrm-compiler/0.1";
 
@@ -101,6 +101,8 @@ pub struct ReplaceableAssembly {
 pub struct ServiceInterface {
     pub interface_id: String,
     pub mate_interface_id: String,
+    /// True only for the connector physically mounted on the replaceable assembly.
+    pub is_assembly_side: bool,
     pub family: InterfaceFamily,
     pub compatibility_key: String,
     pub access_side_ref: String,
@@ -506,7 +508,8 @@ fn validate_plan(plan: &RemoteMaintenancePlan) -> Vec<DfrmDiagnostic> {
             Some(mate)
                 if mate.mate_interface_id != interface.interface_id
                     || mate.family != interface.family
-                    || mate.compatibility_key != interface.compatibility_key =>
+                    || mate.compatibility_key != interface.compatibility_key
+                    || mate.is_assembly_side == interface.is_assembly_side =>
             {
                 diagnostics.push(DfrmDiagnostic::IncompatibleInterfaceMate);
             }
@@ -632,12 +635,6 @@ fn validate_plan(plan: &RemoteMaintenancePlan) -> Vec<DfrmDiagnostic> {
             }
         }
 
-        for predecessor in &operation.predecessor_ids {
-            if !operations.contains_key(predecessor.as_str()) {
-                // The full operation index is built in a second pass below;
-                // record only after all IDs are known.
-            }
-        }
     }
 
     let operation_ids: BTreeSet<&str> = operations.keys().copied().collect();
@@ -666,7 +663,7 @@ fn validate_plan(plan: &RemoteMaintenancePlan) -> Vec<DfrmDiagnostic> {
         &ancestors,
         &mut diagnostics,
     );
-    validate_action_ordering(plan, &operations, &ancestors, &mut diagnostics);
+    validate_action_ordering(plan, &ancestors, &mut diagnostics);
     validate_schedules(plan, &mut diagnostics);
 
     diagnostics
@@ -685,7 +682,7 @@ fn validate_interface_bindings(
             diagnostics.push(DfrmDiagnostic::DuplicateInterfaceBinding);
         }
     }
-    for interface in &plan.interfaces {
+    for interface in plan.interfaces.iter().filter(|item| item.is_assembly_side) {
         let Some(binding) = binding_map.get(interface.interface_id.as_str()) else {
             diagnostics.push(DfrmDiagnostic::MissingInterfaceBinding);
             continue;
@@ -800,7 +797,10 @@ fn validate_interface_bindings(
         }
     }
     for binding in &plan.interface_bindings {
-        if !interfaces.contains_key(binding.interface_id.as_str()) {
+        if !interfaces
+            .get(binding.interface_id.as_str())
+            .is_some_and(|interface| interface.is_assembly_side)
+        {
             diagnostics.push(DfrmDiagnostic::UnknownBindingInterface);
         }
     }
@@ -808,7 +808,6 @@ fn validate_interface_bindings(
 
 fn validate_action_ordering(
     plan: &RemoteMaintenancePlan,
-    operations: &BTreeMap<&str, &MaintenanceOperation>,
     ancestors: &BTreeMap<String, BTreeSet<String>>,
     diagnostics: &mut Vec<DfrmDiagnostic>,
 ) {
@@ -1002,17 +1001,20 @@ fn validate_action_ordering(
         diagnostics.push(DfrmDiagnostic::MissingAction(MaintenanceAction::RestartSystem));
     }
 
-    // A restart must be terminal within the maintenance procedure.
+    // Restart is terminal: every other declared operation must be its ancestor.
     for restart in &restarts {
         for operation in plan.operations.iter().filter(|operation| {
             operation.operation_id != restart.operation_id
-                && operation.predecessor_ids.iter().any(|id| id == &restart.operation_id)
+                && operation.action != MaintenanceAction::Other
         }) {
-            let _ = operation;
-            diagnostics.push(DfrmDiagnostic::RestartBeforeRequalification);
+            require_all(
+                restart,
+                &[operation],
+                DfrmDiagnostic::RestartBeforeRequalification,
+                diagnostics,
+            );
         }
     }
-    let _ = operations;
 }
 
 fn validate_schedules(plan: &RemoteMaintenancePlan, diagnostics: &mut Vec<DfrmDiagnostic>) {
@@ -1201,12 +1203,14 @@ mod tests {
     fn interface(
         id: &str,
         mate: &str,
+        is_assembly_side: bool,
         family: InterfaceFamily,
         compatibility_key: &str,
     ) -> ServiceInterface {
         ServiceInterface {
             interface_id: id.to_string(),
             mate_interface_id: mate.to_string(),
+            is_assembly_side,
             family,
             compatibility_key: compatibility_key.to_string(),
             access_side_ref: format!("access-{id}"),
@@ -1262,10 +1266,34 @@ mod tests {
                 isolation_plan_ref: "coolant-tritium-isolation-plan-v1".to_string(),
             },
             interfaces: vec![
-                interface("coolant-a", "coolant-b", InterfaceFamily::Coolant, "DN200-PN40"),
-                interface("coolant-b", "coolant-a", InterfaceFamily::Coolant, "DN200-PN40"),
-                interface("power-a", "power-b", InterfaceFamily::Electrical, "HV-remote-plug"),
-                interface("power-b", "power-a", InterfaceFamily::Electrical, "HV-remote-plug"),
+                interface(
+                    "coolant-a",
+                    "coolant-b",
+                    true,
+                    InterfaceFamily::Coolant,
+                    "DN200-PN40",
+                ),
+                interface(
+                    "coolant-b",
+                    "coolant-a",
+                    false,
+                    InterfaceFamily::Coolant,
+                    "DN200-PN40",
+                ),
+                interface(
+                    "power-a",
+                    "power-b",
+                    true,
+                    InterfaceFamily::Electrical,
+                    "HV-remote-plug",
+                ),
+                interface(
+                    "power-b",
+                    "power-a",
+                    false,
+                    InterfaceFamily::Electrical,
+                    "HV-remote-plug",
+                ),
             ],
             interface_bindings: vec![
                 InterfaceProcedureBinding {
@@ -1313,6 +1341,22 @@ mod tests {
             report.claim_ceiling,
             "declared maintenance-procedure completeness only"
         );
+    }
+
+    #[test]
+    fn plant_side_mating_connector_does_not_require_duplicate_procedure_binding() {
+        let mut plan = base_plan();
+        plan.interface_bindings.push(InterfaceProcedureBinding {
+            interface_id: "coolant-b".to_string(),
+            isolation_operation_id: "isolate".to_string(),
+            prove_safe_operation_id: "safe".to_string(),
+            preparation_operation_id: Some("prep-coolant".to_string()),
+            disconnect_operation_id: "disconnect-coolant".to_string(),
+            reconnect_operation_id: "reconnect-coolant".to_string(),
+            integrity_test_operation_id: "test-coolant".to_string(),
+        });
+        let report = compile_remote_maintenance_plan(&plan);
+        assert!(report.diagnostics.contains(&DfrmDiagnostic::UnknownBindingInterface));
     }
 
     #[test]
