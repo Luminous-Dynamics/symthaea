@@ -28,9 +28,7 @@ fn assert_valid_fixture(name: &str) {
     assert_eq!(report["disposition"], "valid-input-contract");
     assert_eq!(report["issues"], serde_json::json!([]));
     assert_eq!(
-        report["source_spec_digest_blake3"]
-            .as_str()
-            .map(str::len),
+        report["source_spec_digest_blake3"].as_str().map(str::len),
         Some(64)
     );
 }
