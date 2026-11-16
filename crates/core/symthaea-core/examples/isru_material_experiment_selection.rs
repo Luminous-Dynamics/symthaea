@@ -274,7 +274,7 @@ fn by_id(pool: &[Experiment], id: u8) -> Option<Experiment> {
 fn fixed_schedule(policy: Policy, pool: &[Experiment], seed: &mut u64) -> Vec<Experiment> {
     let ids: &[u8] = match policy {
         // Three flux levels crossed with two morphology strata.
-        Policy::FixedCanonical => &[7, 9, 13, 15, 19, 1],
+        Policy::FixedCanonical => &[3, 5, 9, 11, 15, 17],
         // Irradiance changes while morphology is held at the central index.
         Policy::OneFactorAtATime => &[7, 4, 10, 13, 16, 19],
         // A deterministic spread over both axes.
@@ -518,6 +518,34 @@ mod tests {
                 assert_eq!(unique.len(), result.selected_ids.len());
             }
         }
+    }
+
+    #[test]
+    fn factorial_fixed_design_can_false_confidently_misclassify_ood_world() {
+        let result = run_trial(
+            Policy::FixedCanonical,
+            SyntheticWorld::OutOfDomainShift,
+        );
+        assert_eq!(
+            result.decision,
+            Decision::Identified(Hypothesis::LowFluxPeak)
+        );
+        assert!(!is_correct(SyntheticWorld::OutOfDomainShift, &result));
+    }
+
+    #[test]
+    fn active_selector_correctly_abstains_where_fixed_design_false_commits() {
+        let fixed = run_trial(
+            Policy::FixedCanonical,
+            SyntheticWorld::OutOfDomainShift,
+        );
+        let active = run_trial(
+            Policy::SymthaeaPredictionDisagreement,
+            SyntheticWorld::OutOfDomainShift,
+        );
+        assert!(!is_correct(SyntheticWorld::OutOfDomainShift, &fixed));
+        assert!(is_correct(SyntheticWorld::OutOfDomainShift, &active));
+        assert_eq!(active.decision, Decision::OutOfDomain);
     }
 
     #[test]
