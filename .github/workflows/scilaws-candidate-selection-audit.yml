@@ -1,0 +1,42 @@
+name: SciLaws Candidate Selection Audit
+
+on:
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-architecture-engineering/src/scilaws_candidate_selection.rs"
+      - "crates/domains/symthaea-architecture-engineering/src/pareto_objectives.rs"
+      - "crates/domains/symthaea-architecture-engineering/src/lib.rs"
+      - "crates/domains/symthaea-architecture-engineering/Cargo.toml"
+      - ".github/workflows/scilaws-candidate-selection-audit.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scilaws-candidate-selection-audit-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Format, focused tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact pull-request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-architecture-engineering/Cargo.toml -- --check
+
+      - name: Run SciLaws candidate-audit tests
+        run: cargo test --locked --manifest-path crates/domains/symthaea-architecture-engineering/Cargo.toml --lib scilaws_candidate_selection
+
+      - name: Run strict Clippy
+        run: cargo clippy --locked --manifest-path crates/domains/symthaea-architecture-engineering/Cargo.toml --all-targets -- -D warnings
