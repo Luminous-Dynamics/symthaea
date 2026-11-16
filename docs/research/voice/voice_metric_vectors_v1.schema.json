@@ -1,0 +1,448 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_metric_vectors_v1.schema.json",
+  "title": "Synthetic speech metric regression vectors",
+  "description": "Structural schema for synthetic-only WER, PIER, SETER and SPER regression vectors. Cross-field alignment and equation checks must be performed by the fixture verifier.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "classification",
+    "purpose",
+    "metric_contract",
+    "alignment_policy",
+    "vectors",
+    "aggregate_vectors"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "classification": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "purpose": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metric_contract": {
+      "type": "object",
+      "required": [
+        "tokenization",
+        "wer",
+        "pier",
+        "seter",
+        "sper",
+        "language_error"
+      ]
+    },
+    "alignment_policy": {
+      "type": "object",
+      "required": [
+        "source",
+        "operations",
+        "insertion_source_position",
+        "trailing_pier_insertion_rule",
+        "tie_break",
+        "compatibility_note"
+      ]
+    },
+    "vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "reference_tokens",
+          "hypothesis_tokens",
+          "language_tags",
+          "poi_tags",
+          "expected_alignment",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9][A-Z0-9-]+$"
+          },
+          "reference_tokens": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "hypothesis_tokens": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "language_tags": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "poi_tags": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "boolean"
+            }
+          },
+          "expected_alignment": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "required": [
+                    "op",
+                    "reference_index"
+                  ],
+                  "properties": {
+                    "op": {
+                      "enum": [
+                        "MATCH",
+                        "SUBSTITUTE",
+                        "DELETE"
+                      ]
+                    },
+                    "reference_index": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "required": [
+                    "op",
+                    "source_position"
+                  ],
+                  "properties": {
+                    "op": {
+                      "const": "INSERT"
+                    },
+                    "source_position": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "expected": {
+            "type": "object",
+            "required": [
+              "wer",
+              "pier",
+              "switch"
+            ],
+            "properties": {
+              "wer": {
+                "type": "object",
+                "required": [
+                  "substitutions",
+                  "deletions",
+                  "insertions",
+                  "numerator",
+                  "denominator",
+                  "fraction"
+                ],
+                "properties": {
+                  "substitutions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "deletions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "insertions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "fraction": {
+                    "type": "number",
+                    "minimum": 0
+                  }
+                }
+              },
+              "pier": {
+                "type": "object",
+                "required": [
+                  "estimable",
+                  "poi_reference_tokens",
+                  "hits",
+                  "substitutions",
+                  "deletions",
+                  "insertions",
+                  "numerator",
+                  "denominator",
+                  "percent"
+                ],
+                "properties": {
+                  "estimable": {
+                    "type": "boolean"
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "poi_reference_tokens": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "hits": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "substitutions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "deletions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "insertions": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "numerator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "denominator": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "percent": {
+                    "type": [
+                      "number",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "switch": {
+                "type": "object",
+                "required": [
+                  "entry_positions",
+                  "seter",
+                  "sper",
+                  "per_language"
+                ],
+                "properties": {
+                  "entry_positions": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer",
+                      "minimum": 1
+                    }
+                  },
+                  "seter": {
+                    "$ref": "#/$defs/maskedRate"
+                  },
+                  "sper": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "radius",
+                        "selected_tokens",
+                        "errors",
+                        "fraction"
+                      ],
+                      "properties": {
+                        "radius": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "selected_tokens": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "errors": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "fraction": {
+                          "type": [
+                            "number",
+                            "null"
+                          ],
+                          "minimum": 0
+                        },
+                        "non_estimable_reason": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "per_language": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "language",
+                        "selected_tokens",
+                        "errors",
+                        "fraction"
+                      ],
+                      "properties": {
+                        "language": {
+                          "type": "string"
+                        },
+                        "selected_tokens": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "errors": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "fraction": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "aggregate_vectors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "metric",
+          "utterances",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^A[0-9]+-"
+          },
+          "metric": {
+            "enum": [
+              "PIER",
+              "SETER_SPER"
+            ]
+          },
+          "window_radii": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "utterances": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": [
+                "reference_tokens",
+                "hypothesis_tokens"
+              ],
+              "properties": {
+                "reference_tokens": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "hypothesis_tokens": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "poi_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "boolean"
+                  }
+                },
+                "language_tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "expected": {
+            "type": "object",
+            "minProperties": 1
+          },
+          "explanation": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "$defs": {
+    "maskedRate": {
+      "type": "object",
+      "required": [
+        "selected_tokens",
+        "errors",
+        "fraction"
+      ],
+      "properties": {
+        "selected_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fraction": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "non_estimable_reason": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

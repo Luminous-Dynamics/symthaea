@@ -1,0 +1,1174 @@
+{
+  "schema_version": "0.1.0",
+  "program_id": "luminous.voice.african_historical_speech.2026q4",
+  "evidence_state": "RESEARCH_DRAFT",
+  "governance": {
+    "governor_issue": 5352,
+    "admission_issue": 10942,
+    "external_comparison_issue": 10970,
+    "south_africa_programme_issue": 10913,
+    "statement": "This manifest defines benchmark lanes and data-admission requirements. It does not authorize data ingestion, training, publication of examples, or capability promotion."
+  },
+  "scoring_policy": {
+    "preserve_original_audio": true,
+    "preserve_original_reference_text": true,
+    "normalization_must_be_versioned": true,
+    "never_strip_diacritics_implicitly": true,
+    "report_per_language_and_worst_qualified_group": true,
+    "paired_clustered_uncertainty": true,
+    "unsupported_no_access_or_policy_blocked_is_not_zero_error": true,
+    "no_single_composite_score": true
+  },
+  "tracks": [
+    {
+      "id": "sa_monolingual_asr",
+      "name": "South African monolingual speech recognition",
+      "task": "ASR",
+      "parent_issue": 10913,
+      "admission_issue": 10942,
+      "metrics": [
+        "strict_WER",
+        "strict_CER",
+        "versioned_normalized_WER_CER",
+        "PER_if_expert_labels_exist",
+        "critical_entity_exactness",
+        "number_unit_date_negation_exactness",
+        "RTFx"
+      ],
+      "split_units": [
+        "speaker",
+        "session",
+        "source_collection",
+        "source_program",
+        "domain"
+      ],
+      "candidate_sources": [
+        {
+          "id": "afrivox_v1",
+          "status": "REVIEW_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/intronhealth/afrivox",
+          "note": "Current card reports 64.26h / 18 languages / CC BY-NC-SA 4.0 / gated access; pin immutable revision and rights."
+        },
+        {
+          "id": "afrivox_v2",
+          "status": "EVALUATION_ONLY_REVIEW_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/intronhealth/afrivox-v2",
+          "note": "Current card reports 24 languages / 10 domains and evaluation-only intended use; aggregates multiple sources; do not train."
+        },
+        {
+          "id": "nchlt_auxiliary",
+          "status": "SOURCE_LEVEL_ADMISSION_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/dsfsi-anv/multilingual-nchlt-dataset"
+        },
+        {
+          "id": "lwazi",
+          "status": "SOURCE_LEVEL_ADMISSION_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/dsfsi/lwazi-asr-corpus-compressed"
+        }
+      ]
+    },
+    {
+      "id": "african_natural_code_switch",
+      "name": "Natural African code-switching",
+      "task": "CODE_SWITCH_ASR",
+      "parent_issue": 10999,
+      "scorer_issue": 11056,
+      "implementation_pr": 11058,
+      "metrics": [
+        "strict_WER",
+        "strict_CER",
+        "PIER",
+        "embedded_span_deletion_rate",
+        "switch_boundary_precision_recall_f1",
+        "inter_word_switch_accuracy",
+        "intra_word_switch_accuracy_when_annotated",
+        "SETER",
+        "SPER_at_1",
+        "SPER_at_3",
+        "per_language_masked_error_rate",
+        "switch_direction_error_rate",
+        "diacritic_sensitive_WER",
+        "diacritic_insensitive_WER",
+        "blank_output_rate",
+        "truncation_rate",
+        "degenerate_repetition_rate",
+        "length_expansion_rate",
+        "prompt_leakage_rate",
+        "pooled_micro_PIER",
+        "utterance_macro_PIER",
+        "pooled_micro_SETER",
+        "utterance_macro_SETER",
+        "pooled_micro_SPER",
+        "utterance_macro_SPER",
+        "switch_transition_direction_precision_recall_f1"
+      ],
+      "complexity_axes": [
+        "CMI",
+        "switch_count",
+        "switch_density_per_second",
+        "switch_density_per_token",
+        "embedded_span_length",
+        "matrix_language",
+        "acoustic_domain"
+      ],
+      "candidate_sources": [
+        {
+          "id": "afriswitch",
+          "status": "TEST_ONLY_SOURCE_AND_ACCESS_REVIEW_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/intronhealth/AfriSwitch",
+          "paper_url": "https://arxiv.org/abs/2608.26434",
+          "note": "Current HF README revision c247482 reports 54.41h / 16,602 / 73,486 / 14 configurations / one test split / CC BY-NC-SA 4.0. Current page exposes direct downloads and independent catalogue reports open access, differing from an earlier gated-status observation. Paper reports 61.36h / 18,861 / 78,333 / 16 varieties / CC BY 4.0. Preserve both snapshots; recheck current access and exact rights. Not a training set because only test split is released."
+        },
+        {
+          "id": "sa_soap_opera_five_language",
+          "status": "RESEARCH_ONLY_SOURCE_TERMS_REQUIRED",
+          "url": "https://hdl.handle.net/20.500.12185/545"
+        },
+        {
+          "id": "africode_switch_english_yoruba",
+          "status": "METADATA_AND_RIGHTS_REVIEW_REQUIRED",
+          "paper_url": "https://arxiv.org/abs/2609.11786",
+          "note": "The 2026 switch-aware study audits 8,181 audio-available rows / 9.54h from 9,966 AfriCodeSwitch validation metadata rows and uses a deterministic 2,000-utterance manifest. Its exact artifact, manifest, license, speaker split and permission must be pinned before use; no download or ingestion is authorized."
+        },
+        {
+          "id": "yecs_yoruba_english",
+          "status": "ACCESS_REQUEST_AND_NOODL_BENEFIT_SHARING_REVIEW",
+          "url": "https://mozilladatacollective.com/datasets/cmo09pqp300gbnx07xcl42los",
+          "note": "~120h / 99,930 validated audio-text pairs / 140 Nigerian bilingual speakers; word-level language tags; tone/sub-dot marked Yoruba; 16 domains. NOODL-1.0: commercial entities headquartered in developed/high-income nations require a benefit-sharing agreement; speaker identification and individual voice cloning prohibited; test audio-only with labels held by steward; access request. Potential training/validation only after exact terms, access, purpose and #10942 admission."
+        },
+        {
+          "id": "switchboard_tier_b",
+          "status": "SMALL_NONCOMMERCIAL_EVALUATION_ONLY_SOURCE_REVIEW",
+          "card_url": "https://huggingface.co/datasets/mosesdaudu/switchboard-tierb-codeswitch",
+          "note": "87 consented utterances / 8 speakers / 8.75min across four African-language-English pairs; word tags and gold intent/slot labels; CC BY-NC-SA 4.0. Card says too small to train or rank systems; read speech, headset-only, Hausa n=9 effectively one speaker; one flagged accidental real-person-name collision requires exclusion or source-owner re-record. Use as smoke test/qualitative slot probe only."
+        },
+        {
+          "id": "vocal_money",
+          "status": "NONCOMMERCIAL_REPRODUCTION_SUBSET_SOURCE_LINEAGE_REVIEW",
+          "card_url": "https://huggingface.co/datasets/Kimyayd/vocal-money-codeswitch-asr-benchmark",
+          "note": "210 Yoruba-English clips with references and outputs from five systems; CC BY-NC-SA 4.0; source rows identify AfriSwitch. Use for scorer/output reproduction only, not as an independent test cohort."
+        }
+      ],
+      "required_outputs": [
+        "output_quality_flags"
+      ],
+      "implementation_issue": 11056,
+      "switch_metrics_issue": 11075,
+      "corpus_aggregation_issue": 11103,
+      "metric_vectors_issue": 11082,
+      "direction_issue": 11106
+    },
+    {
+      "id": "speech_grounded_semantics",
+      "name": "Audio-grounded semantic extraction and spoken QA",
+      "task": "SPEECH_SEMANTIC_UNDERSTANDING",
+      "issue": 11057,
+      "parent_issues": [
+        10913,
+        9661,
+        10970
+      ],
+      "metrics": [
+        "slot_precision_recall_f1",
+        "entity_exactness",
+        "number_unit_exactness",
+        "negation_exactness",
+        "role_and_temporal_relation_accuracy",
+        "audio_evidence_span_overlap",
+        "unsupported_answer_rate",
+        "abstention_precision_recall",
+        "calibration",
+        "native_reviewer_correction_time",
+        "blank_output_rate",
+        "truncation_rate",
+        "degenerate_repetition_rate",
+        "unsupported_prompt_echo_rate"
+      ],
+      "required_outputs": [
+        "typed_slots",
+        "source_audio_spans",
+        "transcript_spans_when_available",
+        "uncertainty",
+        "unsupported_or_unknown_state",
+        "output_quality_flags"
+      ],
+      "system_arms": [
+        "ASR_then_Broca",
+        "speech_native_model",
+        "hybrid_audio_transcript_semantic",
+        "SAMA_style_semantic_anchor",
+        "acoustic_veto_hybrid",
+        "modular_ASR_Broca"
+      ],
+      "candidate_sources": [
+        {
+          "id": "afrivox_v2_entity_number_subsets",
+          "status": "EVALUATION_ONLY_REVIEW_REQUIRED",
+          "card_url": "https://huggingface.co/datasets/intronhealth/afrivox-v2",
+          "note": "Entity/number flags are strata, not complete semantic gold; independently adjudicated audio-grounded references required."
+        },
+        {
+          "id": "switchboard_tier_b_intent_slots",
+          "status": "SMALL_QUALITATIVE_SMOKE_TEST_ONLY",
+          "card_url": "https://huggingface.co/datasets/mosesdaudu/switchboard-tierb-codeswitch",
+          "note": "Includes gold intent/slot labels and per-token language tags for 87 consented clips. Too small to rank systems and has documented speaker/device/read-speech limitations; one flagged accidental real-person-name collision needs source-owner resolution."
+        }
+      ],
+      "semantic_anchor_issue": 11104
+    },
+    {
+      "id": "namibian_click_phonetics",
+      "name": "Namibian click-language acoustic and phonetic perception",
+      "task": "PHONETIC_CONTRAST_RECOGNITION",
+      "issue": 11038,
+      "parent_issues": [
+        10913,
+        10942,
+        10976,
+        11020
+      ],
+      "language_profiles": [
+        "Ju|'hoan",
+        "Khoekhoegowab_variety_scoped",
+        "≠Akhoe_Hai//om"
+      ],
+      "metrics": [
+        "click_place_accuracy",
+        "click_accompaniment_accuracy",
+        "phonation_contrast_accuracy",
+        "tone_contrast_accuracy",
+        "minimal_pair_accuracy",
+        "per_feature_confusion_matrix",
+        "calibration",
+        "unknown_class_recall"
+      ],
+      "candidate_sources": [
+        {
+          "id": "dobes_akhoe_haiom",
+          "status": "METADATA_ONLY_SOURCE_AUDIT",
+          "url": "https://dobes.mpi.nl/projects/akhoe/"
+        },
+        {
+          "id": "ela_juhoan",
+          "status": "METADATA_ONLY_SOURCE_AUDIT",
+          "url": "https://www.language-archives.org/item.php/oai:soas.ac.uk:MPI1031468"
+        },
+        {
+          "id": "dammann_khoekhoegowab_archive",
+          "status": "METADATA_ONLY_SOURCE_AUDIT",
+          "url": "https://researchspace.bathspa.ac.uk/14159/"
+        },
+        {
+          "id": "afrispeech_african_speech_ipa",
+          "status": "METADATA_ONLY_G2P_PROVENANCE_AUDIT_NOT_CLICK_GOLD",
+          "card_url": "https://huggingface.co/datasets/AfriSpeech/african-speech-ipa",
+          "note": "Current card describes 141 language configurations with 70 native, 13 equivalent and 58 donor rule mappings; Damara is explicitly excluded because click-letter orthography is unsupported. Rule-based IPA reflects orthography, not actual pronunciation. Do not treat donor mappings as expert acoustic gold or infer click coverage for Namibian languages."
+        }
+      ],
+      "exclusions": [
+        "Do_not_call_archival_20th_century_audio_ancient_speech",
+        "N_uu_is_separate_South_African_Kalahari_cohort_not_current_Namibia_denominator"
+      ]
+    },
+    {
+      "id": "egyptian_historical_phonology",
+      "name": "Evidence-qualified Egyptian phonology and pronunciation",
+      "task": "HISTORICAL_PHONOLOGY_RECONSTRUCTION",
+      "issue": 11039,
+      "parent_issues": [
+        9694,
+        9661,
+        5352
+      ],
+      "profiles": [
+        "Old_Egyptian",
+        "Middle_Egyptian",
+        "Late_Egyptian",
+        "Demotic",
+        "Coptic_dialect_scoped"
+      ],
+      "evidence_classes": [
+        "direct_modern_audio",
+        "orthographic_attestation",
+        "named_transliteration_convention",
+        "comparative_evidence",
+        "attributed_scholarly_reconstruction",
+        "conventional_Egyptological_reading",
+        "synthetic_realization"
+      ],
+      "metrics": [
+        "sign_layout_accuracy",
+        "transliteration_accuracy",
+        "lexical_morphological_accuracy",
+        "evidence_traceability",
+        "expert_agreement",
+        "uncertainty_calibration",
+        "unsupported_phonetic_insertion_rate",
+        "period_dialect_leakage"
+      ],
+      "candidate_sources": [
+        {
+          "id": "thesaurus_linguae_aegyptiae",
+          "status": "METADATA_AND_TERMS_REVIEW",
+          "url": "https://tla.digital/home?lang=en"
+        },
+        {
+          "id": "coptic_scriptorium",
+          "status": "PER_DOCUMENT_LICENSE_REVIEW",
+          "url": "https://github.com/CopticScriptorium/corpora"
+        }
+      ],
+      "forbidden_inferences": [
+        "synthetic_audio_is_historical_recording",
+        "conventional_reading_is_proven_historic_pronunciation",
+        "Coptic_is_direct_acoustic_ground_truth_for_middle_egyptian"
+      ]
+    },
+    {
+      "id": "streaming_dialogue",
+      "name": "Streaming multilingual dialogue",
+      "task": "STREAMING_SPEECH_INTERACTION",
+      "parent_issues": [
+        10788,
+        10873,
+        10913
+      ],
+      "metrics": [
+        "first_partial_latency_p50_p95_p99",
+        "stable_partial_latency_p50_p95_p99",
+        "final_latency_p50_p95_p99",
+        "revision_churn",
+        "timestamp_tolerance",
+        "audio_gap_detection",
+        "interruption_recovery",
+        "selective_risk",
+        "clarification_burden",
+        "false_action_execution"
+      ],
+      "required_controls": [
+        "identical_pcm",
+        "identical_chunk_schedule",
+        "known_gap_injection",
+        "overlap_and_interruption"
+      ]
+    },
+    {
+      "id": "data_efficiency",
+      "name": "Active data selection and low-resource adaptation",
+      "task": "DATA_EFFICIENCY",
+      "issue": 9661,
+      "candidate_labelled_hour_budgets": [
+        1,
+        5,
+        10,
+        20,
+        50,
+        100,
+        150,
+        300,
+        400
+      ],
+      "selection_arms": [
+        "random",
+        "language_domain_diversity",
+        "uncertainty",
+        "expected_value_of_information"
+      ],
+      "metrics": [
+        "WER_CER_PIER_learning_curve",
+        "semantic_slot_exactness",
+        "annotation_minutes",
+        "cost_per_error_reduction",
+        "performance_per_labelled_hour",
+        "worst_group_quality",
+        "prior_language_retention"
+      ],
+      "note": "Only execute budgets supported by admitted data. Paza's published saturation/efficiency observations are hypotheses to test, not universal thresholds. Include 150/300/400-hour arms when admitted language data supports them, reflecting Paza's published scaling range; this is a test grid, not a universal saturation claim.",
+      "candidate_sources": [
+        {
+          "id": "yecs_yoruba_english",
+          "status": "ACCESS_REQUEST_AND_NOODL_BENEFIT_SHARING_REVIEW",
+          "url": "https://mozilladatacollective.com/datasets/cmo09pqp300gbnx07xcl42los",
+          "note": "Potential admitted Yoruba-English low-resource adaptation source (~120h / 99,930 pairs). NOODL-1.0 restrictions and benefit-sharing apply; public test is audio-only and steward labels are held back. Use train/validation only after rights and governance admission; do not claim the hidden test can be scored locally."
+        }
+      ]
+    },
+    {
+      "id": "phonetic_supervision_provenance",
+      "name": "Phonetic supervision provenance and G2P tier audit",
+      "task": "PHONETIC_SUPERVISION_PROVENANCE",
+      "issue": 11077,
+      "parent_issues": [
+        11038,
+        10942,
+        10976,
+        11020,
+        10913
+      ],
+      "metrics": [
+        "native_rule_mapping_coverage",
+        "donor_rule_proportion",
+        "expert_phonological_agreement",
+        "acoustic_phone_label_agreement",
+        "click_contrast_preservation",
+        "tone_diacritic_preservation",
+        "unsupported_feature_rate",
+        "source_and_rule_lineage_completeness"
+      ],
+      "candidate_sources": [
+        {
+          "id": "afrispeech_african_speech_ipa",
+          "status": "METADATA_ONLY_G2P_PROVENANCE_AUDIT",
+          "card_url": "https://huggingface.co/datasets/AfriSpeech/african-speech-ipa",
+          "note": "Current card says 141 configs: 70 native, 13 equivalent-code, 58 donor; Damara excluded due unsupported click-letter orthography. It warns rule-based IPA reflects orthography, not speaker pronunciation, and donor character coverage does not prove phonological correctness."
+        }
+      ],
+      "required_outputs": [
+        "rule_mapping_tier",
+        "rule_set_version",
+        "character_coverage",
+        "orthography_version",
+        "phonetic_label_authority",
+        "acoustic_reference_status",
+        "source_lineage"
+      ],
+      "exclusions": [
+        "donor_G2P_is_not_native_gold",
+        "orthography_derived_IPA_is_not_acoustic_ground_truth",
+        "dataset_language_count_is_not_capability_qualification"
+      ]
+    },
+    {
+      "id": "depth_aware_adaptation",
+      "name": "Depth-aware multilingual speech adaptation and retention",
+      "task": "LOW_RESOURCE_ADAPTATION",
+      "issue": 11076,
+      "parent_issues": [
+        9607,
+        9661,
+        10913,
+        10942,
+        10970,
+        5352
+      ],
+      "adaptation_arms": [
+        "frozen_multilingual_baseline",
+        "full_finetuning",
+        "uniform_LoRA",
+        "DAMA_depth_aware",
+        "HDC_language_conditioned_projection",
+        "hybrid_depth_adapter_HDC",
+        "PUMA_Universal_Language_Projection"
+      ],
+      "metrics": [
+        "target_WER_CER_PIER",
+        "SETER_SPER_when_applicable",
+        "trainable_parameter_count",
+        "training_FLOPs",
+        "optimizer_memory",
+        "peak_memory",
+        "training_time",
+        "inference_latency",
+        "prior_language_retention",
+        "worst_language_regression",
+        "calibration",
+        "performance_per_labelled_hour"
+      ],
+      "candidate_labelled_hour_budgets": [
+        1,
+        5,
+        10,
+        20,
+        50,
+        100
+      ],
+      "note": "DAMA (Findings ACL 2026) reports depth-aware adaptation, 80% fewer trainable parameters and 29% error reduction in its own setting. Reproduce on matched South African data/compute; published gains are not assumed to transfer. Add PUMA's Universal Language Projection as a mandatory matched-compute comparator against HDC-conditioned projection; paper gains are not assumed to transfer. Paper: https://aclanthology.org/2026.findings-acl.17/."
+    },
+    {
+      "id": "metric_vector_conformance",
+      "name": "Cross-implementation metric vector conformance",
+      "task": "SCORER_REPRODUCIBILITY",
+      "issue": 11082,
+      "metrics": [
+        "WER_count_exactness",
+        "PIER_count_exactness",
+        "SETER_count_exactness",
+        "SPER_count_exactness_by_radius",
+        "micro_macro_aggregation_exactness",
+        "non_estimable_state_exactness",
+        "alignment_policy_conformance",
+        "micro_macro_weighting_consistency",
+        "fixture_schema_conformance",
+        "boundary_precision_recall_f1_exactness",
+        "boundary_empty_set_non_estimable_exactness",
+        "direction_transition_tuple_exactness"
+      ],
+      "required_outputs": [
+        "metric_vector_id",
+        "implementation_revision",
+        "exact_counts",
+        "denominators",
+        "non_estimable_reason",
+        "normalization_revision",
+        "alignment_policy_revision"
+      ],
+      "candidate_sources": [
+        {
+          "id": "voice_metric_vectors_v1",
+          "status": "SYNTHETIC_ONLY_NO_LANGUAGE_EVIDENCE",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_metric_vectors_v1.json",
+          "note": "Ten hand-computed synthetic vectors for WER, PIER, SETER, SPER@k and per-language masked error; schema at voice_metric_vectors_v1.schema.json. Current custom formula/alignment audit passes; this is not Rust execution or cross-implementation differential qualification."
+        },
+        {
+          "id": "voice_metric_vectors_v1_schema",
+          "status": "SYNTHETIC_ONLY_SCHEMA",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_metric_vectors_v1.schema.json"
+        },
+        {
+          "id": "switch_boundary_golden_v0_1",
+          "status": "SYNTHETIC_ONLY_NO_LANGUAGE_EVIDENCE",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/switch_boundary_golden_v0.1.json",
+          "note": "Six synthetic reference/predicted language-tag sequences for exact switch-boundary TP/FP/FN/precision/recall/F1. Independent formula audit recomputes all six cases successfully. This is not language identification evaluation or model output."
+        },
+        {
+          "id": "switch_transition_direction_golden_v0_1",
+          "status": "SYNTHETIC_ONLY_NO_LANGUAGE_EVIDENCE",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/switch_transition_direction_golden_v0.1.json",
+          "note": "Nine synthetic reference/predicted tag sequences for exact boundary position + source-language + destination-language tuple matching. Separate from position-only boundary F1."
+        },
+        {
+          "id": "switch_transition_direction_golden_v0_1_schema",
+          "status": "SYNTHETIC_ONLY_SCHEMA",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/switch_transition_direction_golden_v0.1.schema.json"
+        }
+      ],
+      "note": "All scorer implementations should consume identical frozen vectors. Validate metric counts and denominators separately from floating-point presentation; real-corpus results require additional independent evidence."
+    },
+    {
+      "id": "experiment_receipt_conformance",
+      "name": "Reproducible benchmark experiment receipts",
+      "task": "EVIDENCE_AND_REPRODUCIBILITY",
+      "issue": 11107,
+      "metrics": [
+        "receipt_field_completeness",
+        "immutable_model_dataset_scorer_revision_consistency",
+        "language_oracle_mode_disclosure",
+        "split_leakage_audit_completeness",
+        "raw_count_denominator_completeness",
+        "paired_clustered_uncertainty_completeness",
+        "compute_cost_latency_measurement_completeness",
+        "artifact_hash_completeness"
+      ],
+      "required_outputs": [
+        "receipt_id",
+        "evidence_state",
+        "dataset_revision_and_file_manifest",
+        "source_admission_status",
+        "model_revision_and_checkpoint_digest",
+        "language_input_mode",
+        "preprocessing_and_decoder_revision",
+        "scorer_and_normalization_revision",
+        "split_disjointness_audit",
+        "raw_metric_counts_and_denominators",
+        "micro_macro_aggregation_definition",
+        "clustered_confidence_intervals",
+        "hardware_latency_memory_energy_cost",
+        "negative_control_results",
+        "prediction_log_and_output_hashes"
+      ],
+      "candidate_sources": [
+        {
+          "id": "voice_experiment_receipt_v1_schema",
+          "status": "SCHEMA_CONTRACT",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_experiment_receipt_v1.schema.json"
+        },
+        {
+          "id": "voice_experiment_receipt_design_example_v1",
+          "status": "SYNTHETIC_DESIGN_ONLY",
+          "url": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/voice_experiment_receipt_design_example_v1.json",
+          "note": "Synthetic example only; no audio, model, benchmark execution or claim."
+        }
+      ],
+      "note": "A leaderboard result without immutable inputs, model/decode/scorer revisions, data admission, split integrity, denominators, clustered uncertainty and efficiency measures is not reproducible evidence. Schema validity is not proof that the recorded facts are true."
+    },
+    {
+      "id": "acoustic_hypothesis_selection",
+      "name": "Closed-set acoustic transcript hypothesis selection",
+      "task": "ASR_HYPOTHESIS_SELECTION",
+      "issue": 11119,
+      "implementation_issue": 11120,
+      "implementation_pr": 11121,
+      "parent_issues": [
+        10873,
+        10970,
+        10999,
+        11057,
+        9661,
+        11082,
+        11107,
+        5352
+      ],
+      "candidate_sources": [
+        {
+          "id": "micl_low_resource_asr",
+          "status": "PAPER_COMPARATOR_REPRODUCTION_REQUIRED",
+          "paper_url": "https://aclanthology.org/2026.findings-acl.1239/",
+          "note": "Findings ACL 2026 evaluates Phi-4 and Qwen3-Omni on three endangered languages; reports multimodal in-context learning, cross-lingual transfer and acoustic-hypothesis selection. No transfer claim to African language cohorts without matched replication."
+        },
+        {
+          "id": "sama_asr_semantic_anchor",
+          "status": "SEPARATE_ARCHITECTURAL_COMPARATOR",
+          "paper_url": "https://aclanthology.org/2026.emnlp-main.1380/",
+          "note": "SAMA-ASR conditions decoding with translation-derived semantic embeddings plus acoustic anchor. This is not candidate selection; compare separately with acoustic-veto controls under #11104."
+        }
+      ],
+      "system_arms": [
+        "acoustic_single_best",
+        "acoustic_nbest_score",
+        "acoustic_lm_fusion",
+        "independent_recognizer_consensus",
+        "text_only_micl_candidate_selector",
+        "audio_only_micl_candidate_selector",
+        "audio_text_micl_candidate_selector",
+        "cross_lingual_micl_candidate_selector",
+        "risk_controlled_selector_with_abstention",
+        "sama_semantic_anchor_separate_arm",
+        "oracle_best_candidate_upper_bound"
+      ],
+      "metrics": [
+        "candidate_selection_top1_accuracy",
+        "candidate_oracle_regret",
+        "oracle_gap",
+        "candidate_coverage",
+        "false_accept_when_no_candidate_correct",
+        "abstention_precision_recall",
+        "selection_calibration",
+        "strict_WER",
+        "strict_CER",
+        "PIER",
+        "SETER",
+        "SPER_at_1",
+        "SPER_at_3",
+        "critical_entity_number_unit_negation_exactness",
+        "candidate_id_integrity",
+        "selected_transcript_exact_copy_rate",
+        "free_form_rewrite_rate",
+        "demonstration_retrieval_leakage_rate",
+        "total_system_latency_p50_p95_p99",
+        "cost_per_correctly_selected_utterance"
+      ],
+      "required_outputs": [
+        "immutable_candidate_set_manifest",
+        "candidate_provenance_and_source_frame_spans",
+        "selector_prompt_and_model_revision",
+        "demonstration_manifest_and_retrieval_policy",
+        "candidate_id_or_typed_abstention",
+        "exact_selected_candidate_copy",
+        "selection_experiment_receipt"
+      ],
+      "selection_modes": [
+        "acoustic_best",
+        "n_best_score",
+        "consensus",
+        "text_only_micl",
+        "audio_only_micl",
+        "audio_text_micl",
+        "cross_lingual_micl",
+        "risk_controlled"
+      ],
+      "controls": [
+        "closed_set_selector_cannot_return_replacement_transcript",
+        "no_correct_candidate_false_accept_control",
+        "context_predicts_wrong_word_audio_clear_control",
+        "candidate_pool_coverage_oracle_gap",
+        "demonstration_source_and_speaker_leakage_audit",
+        "target_language_label_and_demo_leakage_audit",
+        "matched_total_system_compute_and_latency",
+        "abstention_on_empty_or_invalid_candidate_pool"
+      ],
+      "prospective_gates": [
+        "candidate_id_integrity_100_percent",
+        "selected_transcript_exact_copy_100_percent",
+        "closed_set_free_form_rewrite_rate_zero",
+        "source_frame_and_model_lineage_completeness_100_percent",
+        "no_candidate_correct_false_accept_zero_on_frozen_controls",
+        "MICL_gain_reported_against_same_candidate_pool_at_matched_total_compute",
+        "candidate_oracle_regret_at_least_20_percent_relative_reduction_vs_strongest_matched_non_micl_baseline",
+        "report_coverage_and_abstention_with_error"
+      ],
+      "note": "Candidate selection is not transcript correction. Oracle best-in-pool is an upper bound only. MICL published results are not assumed to transfer to African speech."
+    },
+    {
+      "id": "african_phonological_feature_evaluation",
+      "name": "Language-profiled phonological feature and tone-aware ASR evaluation",
+      "task": "PHONOLOGICAL_FEATURE_ASR_EVALUATION",
+      "issue": 11137,
+      "implementation_pr": 11139,
+      "parent_issues": [
+        10913,
+        10999,
+        11077,
+        11038,
+        11082,
+        11107,
+        5352
+      ],
+      "candidate_sources": [
+        {
+          "id": "africanlp_2026_fer_ter",
+          "status": "PAPER_FORMULA_REFERENCE_FEATURE_INVENTORY_NOT_UNIVERSAL",
+          "paper_url": "https://aclanthology.org/2026.africanlp-main.14/",
+          "note": "Chen, Adeleke & Downey (AfricaNLP 2026) introduce NA-masked FER and tone-only TER with sparse {-1,0,+1} vectors and Needleman-Wunsch alignment. Their 24-dim inventory is designed for Edoid/Yoruboid phonology; do not apply it to other languages without a native-authorized profile."
+        }
+      ],
+      "metrics": [
+        "strict_WER",
+        "strict_CER",
+        "PER_when_validated_phone_reference_exists",
+        "FER",
+        "TER_when_tone_profiled",
+        "per_feature_error_rate",
+        "per_tone_error_rate",
+        "unscorable_feature_pair_count",
+        "profile_specific_non_estimability",
+        "native_expert_agreement",
+        "per_feature_dimension_error_rate",
+        "per_feature_active_pair_count",
+        "per_feature_mismatch_count"
+      ],
+      "required_outputs": [
+        "feature_profile_id",
+        "feature_profile_revision",
+        "feature_dimension_definitions",
+        "tone_dimension_indices",
+        "G2P_or_annotation_authority",
+        "source_lineage",
+        "alignment_gap_penalty",
+        "alignment_tie_policy",
+        "FER_raw_numerator_and_reference_denominator",
+        "TER_raw_numerator_and_reference_denominator",
+        "non_estimable_reasons",
+        "phonological_feature_golden_vector_manifest",
+        "phonological_feature_profile_manifest",
+        "phonological_feature_profile_review_status",
+        "feature_dimension_order_and_applicability",
+        "per_feature_dimension_diagnostics_in_profile_order",
+        "non_estimable_feature_dimension_flags",
+        "feature_dimension_diagnostics_manifest_sha256"
+      ],
+      "system_arms": [
+        "strict_orthographic_WER_CER_baseline",
+        "IPA_PER_with_expert_phonetics",
+        "NA_masked_FER",
+        "tone_only_TER",
+        "feature_conditioned_multilingual_encoder_if_present"
+      ],
+      "required_controls": [
+        "zero_zero_feature_dimensions_are_NA",
+        "non_tonal_profile_TER_not_applicable",
+        "unknown_G2P_rule_not_treated_as_gold",
+        "feature_width_and_schema_reject_mismatch",
+        "native_profile_revision_pinned",
+        "alignment_and_gap_policy_pinned"
+      ],
+      "prospective_gates": [
+        "feature_profile_native_authority_verified",
+        "100_percent_frozen_synthetic_formula_conformance",
+        "no_cross_language_inventory_reuse_without_authorization",
+        "non_estimable_feature_cells_not_reported_as_zero"
+      ],
+      "profile_issue": 11144,
+      "profile_schema_path": "docs/research/voice/phonological_feature_profile_v1.schema.json",
+      "profile_example_path": "docs/research/voice/phonological_feature_profile_synthetic_example_v1.json"
+    },
+    {
+      "id": "acoustic_faithfulness_and_hallucination",
+      "name": "Acoustic faithfulness under text, context and prompt conflict",
+      "task": "AUDIO_GROUNDING_AND_HALLUCINATION_DIAGNOSTICS",
+      "issue": 11138,
+      "parent_issues": [
+        11104,
+        11057,
+        10890,
+        10873,
+        11119,
+        10970,
+        5352
+      ],
+      "candidate_sources": [
+        {
+          "id": "deaf_acoustic_faithfulness",
+          "status": "PUBLIC_BENCHMARK_COMPARATOR_REVIEW_REQUIRED",
+          "paper_url": "https://aclanthology.org/2026.findings-aacl.165/",
+          "url": "https://github.com/kikixiong/DEAF",
+          "note": "Over 2,700 conflict stimuli covering emotional prosody, background sounds and speaker identity, with staged semantic-context and misleading-prompt conflicts. Evaluate the official protocol; do not assume all tasks or speaker attributes are appropriate for this speech program."
+        },
+        {
+          "id": "hallu_audio",
+          "status": "PUBLIC_BENCHMARK_COMPARATOR_REVIEW_REQUIRED",
+          "paper_url": "https://aclanthology.org/2026.acl-long.1797/",
+          "note": "Over 5,000 human-verified audio QA pairs spanning speech, environmental sound and music; reports hallucination, yes/no bias, error types and refusal. Use speech-relevant subsets and pin exact rights/version."
+        },
+        {
+          "id": "speechllm_attention_hallucination",
+          "status": "RESEARCH_BASELINE_REPRODUCTION_REQUIRED",
+          "paper_url": "https://aclanthology.org/2026.findings-acl.2147/",
+          "note": "Uses AudioRatio, AudioConsistency, AudioEntropy and TextEntropy attention-derived features with lightweight classifiers. Model-dependent and task-specific; requires attention access and should not be treated as universal confidence."
+        },
+        {
+          "id": "paraspeechrag_speech_semantic_robustness",
+          "status": "ADJACENT_PAPER_COMPARATOR_TASK_TRANSFER_NOT_ESTABLISHED",
+          "paper_url": "https://aclanthology.org/2026.emnlp-main.2581/",
+          "note": "ParaSpeechRAG (EMNLP 2026) studies semantic stability under speaker, emotion/prosody, noise, speaking-rate and codec perturbations. It is a speech-retrieval robustness comparator, not an ASR benchmark reproduction. Treat speaker identity as nuisance for transcript semantics but as task evidence for diarization/speaker attribution."
+        }
+      ],
+      "metrics": [
+        "audio_supported_answer_accuracy",
+        "acoustic_evidence_adherence",
+        "context_induced_override_rate",
+        "prompt_induced_override_rate",
+        "unsupported_claim_rate",
+        "hallucination_rate",
+        "yes_no_bias",
+        "abstention_precision_recall",
+        "audio_evidence_span_localization",
+        "counterfactual_audio_sensitivity",
+        "prompt_invariance",
+        "audio_adherence",
+        "context_override_rate",
+        "prompt_override_rate",
+        "unanswerable_false_answer_rate",
+        "appropriate_abstention_rate",
+        "answerable_abstention_rate",
+        "evidence_span_coverage",
+        "claim_id_precision",
+        "claim_id_recall",
+        "reference_claim_evidence_coverage",
+        "citation_sample_precision",
+        "reference_sample_recall",
+        "claim_conditioned_sample_iou",
+        "unsupported_predicted_claim_rate",
+        "unsupported_citation_sample_rate"
+      ],
+      "system_arms": [
+        "asr_to_evidence_aware_semantic_pipeline",
+        "speech_native_audio_language_model",
+        "MICL_closed_set_candidate_selection",
+        "SAMA_semantic_anchor_with_acoustic_veto",
+        "hybrid_audio_transcript_evidence_ledger"
+      ],
+      "required_outputs": [
+        "source_audio_hash",
+        "counterfactual_pair_manifest",
+        "acoustic_property_changed",
+        "prompt_and_context_revision",
+        "claim_level_evidence_spans",
+        "evidence_status",
+        "abstention_or_refusal_reason",
+        "model_output_hash",
+        "scorer_revision",
+        "claim_label_ontology_revision",
+        "conflict_axis_annotation_revision",
+        "trial_manifest_sha256",
+        "exact_metric_numerators_and_denominators",
+        "sample_rate_hz",
+        "audio_sample_count",
+        "evidence_interval_coordinate_system_half_open_samples",
+        "citation_evaluation_audio_sha256",
+        "reference_support_interval_manifest_sha256",
+        "evidence_span_scorer_revision",
+        "claim_to_evidence_overlap_counts",
+        "evaluation_audio_sha256"
+      ],
+      "required_controls": [
+        "context_predicts_wrong_word_audio_unambiguous",
+        "misleading_prompt_conflicts_with_audio",
+        "number_unit_negation_role_counterfactuals",
+        "silence_or_unanswerable_audio",
+        "mixed_audio_source_ambiguity",
+        "text_only_negative_control",
+        "correct_claim_wrong_interval",
+        "correct_claim_no_citation",
+        "wrong_claim_correct_interval",
+        "overbroad_citation_interval",
+        "overlapping_citations_union_not_double_counted",
+        "citation_from_wrong_audio_digest"
+      ],
+      "prospective_gates": [
+        "zero_context_only_substitution_on_unambiguous_controls",
+        "zero_supported_as_fact_answers_without_audio_evidence",
+        "100_percent_factual_slots_evidence_linked_or_unknown",
+        "separate_context_override_and_prompt_override_rates",
+        "privacy_and_consent_review_for_real_speakers",
+        "frozen_acoustic_faithfulness_vectors_match_exact_numerators_and_denominators",
+        "unanswerable_false_answer_and_override_denominators_remain_separate",
+        "zero_cross_audio_citations_accepted",
+        "zero_out_of_bounds_evidence_intervals_accepted",
+        "overlapping_intervals_union_before_sample_rate_calculation",
+        "claim_correctness_and_evidence_localization_reported_separately",
+        "zero_denominators_reported_non_estimable_not_zero_success"
+      ],
+      "implementation_issue": 11138,
+      "implementation_pr": 11146,
+      "evidence_span_implementation_issue": 11218,
+      "evidence_span_implementation_pr": 11220,
+      "note": "Binary evidence_span_present is retained only as a coarse trial-level coverage diagnostic. Confirmatory localization uses the exact evaluation-audio SHA-256 and half-open sample coordinate system from #11218/#11220; the cohort derivation manifest separately maps any transformed evaluation waveform back to its original source. Claim correctness and citation quality remain separate; the scorer does not prove model-internal reliance."
+    },
+    {
+      "id": "paired_causal_counterfactual_evaluation",
+      "name": "Paired counterfactual nuisance invariance and acoustic evidence sensitivity",
+      "task": "PAIRED_AUDIO_CAUSAL_GROUNDING",
+      "issue": 11156,
+      "parent_issues": [
+        11138,
+        11140,
+        11119,
+        11104,
+        10871,
+        11057,
+        5352
+      ],
+      "implementation_pr": 11157,
+      "candidate_sources": [
+        {
+          "id": "aha_counterfactual_hard_negatives",
+          "status": "PAPER_COMPARATOR_TASK_TRANSFER_NOT_ESTABLISHED",
+          "paper_url": "https://aclanthology.org/2026.findings-acl.1464/",
+          "note": "AHA identifies event omission, false event identity, temporal relation error and quantitative temporal error; uses counterfactual hard negatives and a separate human-verified evaluation set. Its reported Qwen2.5-Omni gains are author-reported for its evaluated audio reasoning tasks, not African speech or Symthaea."
+        },
+        {
+          "id": "deaf_paired_conflicts",
+          "status": "PUBLIC_BENCHMARK_COMPARATOR_REVIEW_REQUIRED",
+          "paper_url": "https://aclanthology.org/2026.findings-aacl.165/",
+          "note": "DEAF varies textual influence over acoustic conflicts. The paired scorer extends this idea with explicit text-nuisance invariance and waveform-relevant sensitivity; do not treat this as an official DEAF reproduction."
+        },
+        {
+          "id": "paraspeechrag_acoustic_nuisance_robustness",
+          "status": "ADJACENT_PAPER_COMPARATOR_TASK_TRANSFER_NOT_ESTABLISHED",
+          "paper_url": "https://aclanthology.org/2026.emnlp-main.2581/",
+          "note": "ParaSpeechRAG (EMNLP 2026) studies semantic stability under speaker, emotion/prosody, noise, speaking-rate and codec perturbations. It is a speech-retrieval robustness comparator, not an ASR benchmark reproduction. Treat speaker identity as nuisance for transcript semantics but as task evidence for diarization/speaker attribution."
+        }
+      ],
+      "metrics": [
+        "text_nuisance_response_invariance",
+        "text_nuisance_joint_correct_rate",
+        "text_nuisance_joint_abstention_rate",
+        "audio_relevant_counterfactual_sensitivity",
+        "audio_relevant_false_invariance_rate",
+        "audio_relevant_joint_abstention_rate",
+        "audio_nuisance_semantic_stability",
+        "audio_nuisance_joint_correct_rate",
+        "audio_nuisance_differential_abstention_rate",
+        "pair_coverage",
+        "text_nuisance_joint_answer_coverage",
+        "text_joint_correct_given_answered",
+        "audio_relevant_joint_answer_coverage",
+        "audio_relevant_joint_sensitivity_given_answered",
+        "audio_nuisance_joint_claim_coverage",
+        "audio_nuisance_joint_correct_given_answered",
+        "task_relative_false_sensitivity_rate",
+        "task_relative_conditional_field_stability"
+      ],
+      "system_arms": [
+        "trial_level_acoustic_faithfulness_only",
+        "paired_counterfactual_outcome_scorer",
+        "ASR_to_Broca",
+        "speech_native_audio_language_model",
+        "MICL_closed_set_candidate_selector",
+        "SAMA_semantic_anchor_with_acoustic_veto",
+        "hybrid_source_audio_evidence_ledger"
+      ],
+      "required_outputs": [
+        "pair_manifest_sha256",
+        "intervention_manifest_sha256",
+        "trial_manifest_sha256",
+        "condition_manifest_hashes",
+        "scorer_revision",
+        "pair_type_counts",
+        "exact_pair_metric_numerators_and_denominators",
+        "pair_split_revision",
+        "preference_training_pair_manifest_sha256",
+        "held_out_evaluation_pair_manifest_sha256",
+        "training_evaluation_disjointness_audit_sha256",
+        "training_evaluation_overlap_count",
+        "training_evaluation_disjointness_status",
+        "text_nuisance_joint_answer_coverage_numerator_denominator",
+        "text_joint_correct_given_answered_numerator_denominator",
+        "audio_relevant_joint_answer_coverage_numerator_denominator",
+        "audio_relevant_joint_sensitivity_given_answered_numerator_denominator",
+        "audio_nuisance_joint_claim_coverage_numerator_denominator",
+        "audio_nuisance_joint_correct_given_answered_numerator_denominator",
+        "target_task_id",
+        "target_task_ontology_revision",
+        "acoustic_dimension_id",
+        "task_relative_expected_relation",
+        "expected_unchanged_output_fields",
+        "expected_changed_output_fields",
+        "task_relative_adjudication_manifest_sha256"
+      ],
+      "required_controls": [
+        "same_audio_same_truth_text_context_changed",
+        "audio_changed_truth_changed_non_audio_conditions_fixed",
+        "audio_nuisance_changed_truth_fixed",
+        "same_wrong_answer_is_not_joint_correct",
+        "both_abstain_is_not_evidence_sensitivity",
+        "differential_abstention_under_acoustic_nuisance",
+        "pair_id_trial_reuse_and_manifest_digest_rejection",
+        "speaker_identity_task_role_declared_per_target_task",
+        "speaker_change_invariant_for_transcription_but_sensitive_for_diarization",
+        "speaking_rate_invariant_for_word_sequence_but_sensitive_for_word_timing",
+        "prosody_invariant_for_lexical_content_but_sensitive_for_emotion_or_pragmatic_intent"
+      ],
+      "prospective_gates": [
+        "100_percent_frozen_pair_relation_validation",
+        "zero_invalid_pair_relation_acceptance",
+        "100_percent_deterministic_synthetic_pair_outcomes",
+        "text_invariance_reported_with_joint_correctness_and_joint_abstention",
+        "audio_sensitivity_requires_both_outputs_match_distinct_truths",
+        "acoustic_nuisance_stability_conditioned_on_joint_answer_coverage",
+        "preference_training_pairs_disjoint_from_held_out_evaluation_pairs",
+        "zero_preference_training_to_held_out_evaluation_pair_overlap_audited_by_manifest",
+        "clean_admitted_text_nuisance_joint_correct_rate_at_least_95_percent_with_pair_answer_coverage_at_least_95_percent",
+        "audio_relevant_joint_counterfactual_sensitivity_at_least_95_percent",
+        "audio_relevant_false_invariance_at_most_1_percent_among_pairs_with_two_claims",
+        "audio_nuisance_semantic_stability_at_least_95_percent_with_joint_claim_coverage_at_least_90_percent",
+        "speaker_session_source_clustered_paired_confidence_intervals_and_worst_group_reporting"
+      ],
+      "profile_requirements": [
+        "PAIR_MANIFEST_SHA256",
+        "INTERVENTION_SPEC_SHA256",
+        "CONDITION_MANIFEST_SCHEMA",
+        "CLAIM_ONTOLOGY_REVISION",
+        "SOURCE_LINEAGE_REVISION"
+      ],
+      "implementation_branch": "feat/voice-counterfactual-pair-scorer-v0.1",
+      "note": "undefined Task-relative extension: acoustic dimensions are not globally nuisance/relevant. Each confirmatory pair must pin target task, ontology revision, acoustic dimension and expected invariant/sensitive/conditional relation; see #11200. These task-relative semantics are a research contract, not yet implemented by the v0.1 pair scorer."
+    }
+  ],
+  "promotion_gates": [
+    "exact_source_revision_and_file_digest",
+    "source_level_license_consent_and_permitted_purpose",
+    "speaker_source_and_derivative_leakage_audit",
+    "frozen_scoring_and_normalization_revision",
+    "qualified_native_or_expert_reference_and_disagreement",
+    "paired_clustered_confidence_intervals",
+    "exact_head_executed_build_test_and_benchmark_receipts",
+    "no_capability_promotion_from_skipped_ci_or_synthetic_fixtures",
+    "phonetic_supervision_tier_verified",
+    "native_acoustic_label_distinguished_from_rule_derived_phones",
+    "depth_adapter_retention_noninferiority_on_prior_languages",
+    "closed_set_candidate_selection_integrity_verified",
+    "selector_demonstration_manifest_and_leakage_audit_complete",
+    "phonological_feature_profile_authority_and_applicability_verified",
+    "acoustic_faithfulness_counterfactual_suite_passed_on_synthetic_controls",
+    "acoustic_faithfulness_unanswerable_and_override_denominators_separately_validated",
+    "paired_counterfactual_invariance_and_audio_sensitivity_qualified_separately"
+  ],
+  "test_vector_sets": [
+    {
+      "id": "switch_metrics_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_FORMULA_CHECKED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/switch_metric_golden_v0.1.json",
+      "schema_path": "docs/research/voice/switch_metric_golden_v0.1.schema.json",
+      "cases": 10,
+      "linked_issue": 11082,
+      "metrics": [
+        "WER",
+        "PIER",
+        "SETER",
+        "SPER_at_k"
+      ],
+      "note": "Token-level synthetic vectors; expected values are formula-checked using the declared deterministic Levenshtein tie-break, but no Rust test, RapidFuzz differential or real-data result is claimed."
+    },
+    {
+      "id": "switch_boundary_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_FORMULA_CHECKED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/switch_boundary_golden_v0.1.json",
+      "schema_path": "docs/research/voice/switch_boundary_golden_v0.1.schema.json",
+      "cases": 6,
+      "linked_issue": 11086,
+      "metrics": [
+        "boundary_precision",
+        "boundary_recall",
+        "boundary_f1"
+      ],
+      "note": "Six synthetic token-aligned language-tag cases with exact-position boundary matching; no tolerance and no audio evidence."
+    },
+    {
+      "id": "phonological_feature_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_INDEPENDENT_FORMULA_AUDITED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/phonological_feature_golden_v0.1.json",
+      "schema_path": "docs/research/voice/phonological_feature_golden_v0.1.schema.json",
+      "cases": 10,
+      "linked_issue": 11137,
+      "linked_pr": 11139,
+      "metrics": [
+        "FER",
+        "TER",
+        "NA_masked_feature_cost",
+        "alignment_gap_cost",
+        "per_feature_active_pair_count",
+        "per_feature_mismatch_count",
+        "per_feature_error_rate"
+      ],
+      "note": "Ten synthetic generic feature-profile vectors. A separate JavaScript implementation recomputed FER/TER, NA-aware alignment, and all 40 per-dimension diagnostic rows with no mismatches. This is arithmetic fixture validation only; no Rust tests or external-reference differential have been executed."
+    },
+    {
+      "id": "acoustic_faithfulness_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_INDEPENDENT_FORMULA_AUDITED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/acoustic_faithfulness_golden_v0.1.json",
+      "schema_path": "docs/research/voice/acoustic_faithfulness_golden_v0.1.schema.json",
+      "cases": 10,
+      "linked_issue": 11140,
+      "linked_pr": 11146,
+      "metrics": [
+        "audio_adherence",
+        "context_override_rate",
+        "prompt_override_rate",
+        "unsupported_claim_rate",
+        "unanswerable_false_answer_rate",
+        "appropriate_abstention_rate",
+        "evidence_span_coverage"
+      ],
+      "note": "Ten synthetic trial groups. Independent JavaScript recomputation of every numerator, denominator and rate matches all expected values; this is formula audit only, not Rust execution or DEAF/HalluAudio reproduction."
+    },
+    {
+      "id": "acoustic_counterfactual_pair_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_INDEPENDENT_FORMULA_AUDITED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/acoustic_counterfactual_pair_golden_v0.1.json",
+      "schema_path": "docs/research/voice/acoustic_counterfactual_pair_golden_v0.1.schema.json",
+      "cases": 8,
+      "linked_issue": 11156,
+      "linked_pr": 11157,
+      "metrics": [
+        "text_nuisance_response_invariance",
+        "text_nuisance_joint_correct",
+        "audio_counterfactual_sensitivity",
+        "audio_false_invariance",
+        "audio_nuisance_semantic_stability",
+        "differential_abstention"
+      ],
+      "note": "Eight synthetic pair-level vectors. Independent JS recomputation of all defined pair numerators/denominators/rates matched after correcting the one-pair denominator for false invariance. No Rust execution or real-audio evaluation."
+    },
+    {
+      "id": "evidence_span_golden_v0_1",
+      "status": "SYNTHETIC_ONLY_INDEPENDENT_FORMULA_AUDITED_NOT_RUST_EXECUTED",
+      "path": "docs/research/voice/evidence_span_golden_v0.1.json",
+      "schema_path": "docs/research/voice/evidence_span_golden_v0.1.schema.json",
+      "cases": 9,
+      "linked_issue": 11218,
+      "linked_pr": 11220,
+      "metrics": [
+        "claim_id_precision",
+        "claim_id_recall",
+        "reference_claim_evidence_coverage",
+        "citation_sample_precision",
+        "reference_sample_recall",
+        "claim_conditioned_sample_iou",
+        "unsupported_predicted_claim_rate",
+        "unsupported_citation_sample_rate"
+      ],
+      "note": "Nine synthetic cases plus three rejected controls. A separately written JS recomputation matched all declared counts, denominators and rates. This checks arithmetic/fixture consistency only; Rust tests, JSON Schema meta-validation, audio or model execution are not claimed."
+    }
+  ]
+}

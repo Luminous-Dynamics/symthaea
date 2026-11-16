@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/voice/switch_boundary_golden_v0.1.schema.json",
+  "title": "Switch Boundary F1 Golden Vectors",
+  "description": "Synthetic-only token-aligned tag sequences for exact language-switch boundary precision, recall and F1.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "evidence_state",
+    "description",
+    "token_indexing",
+    "boundary_definition",
+    "matching_policy",
+    "metric_definitions",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "evidence_state": {
+      "const": "SYNTHETIC_ONLY"
+    },
+    "description": {
+      "type": "string"
+    },
+    "token_indexing": {
+      "const": "zero_based"
+    },
+    "boundary_definition": {
+      "type": "string"
+    },
+    "matching_policy": {
+      "type": "string"
+    },
+    "metric_definitions": {
+      "type": "object",
+      "minProperties": 1
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "reference_tags",
+          "predicted_tags",
+          "expected"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "reference_tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "predicted_tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected": {
+            "type": "object",
+            "required": [
+              "reference_positions",
+              "predicted_positions",
+              "true_positives",
+              "false_positives",
+              "false_negatives",
+              "precision",
+              "recall",
+              "f1"
+            ],
+            "properties": {
+              "reference_positions": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "predicted_positions": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "true_positives": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "false_positives": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "false_negatives": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "precision": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "recall": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "f1": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

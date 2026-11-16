@@ -1,0 +1,130 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "synthetic-phonological-profile",
+  "profile_revision": "v1",
+  "profile_status": "SYNTHETIC_ONLY",
+  "language_scope": {
+    "language_tag": "und-x-synthetic",
+    "language_name": "Synthetic feature fixture",
+    "variety_name": "Not a natural language",
+    "country_or_region": null,
+    "scope_note": "Artificial labels used only to test profile structure and FER/TER arithmetic.",
+    "exclusions": [
+      "No real language coverage",
+      "No phonological claims",
+      "No G2P or acoustic ground truth"
+    ]
+  },
+  "orthography_scope": {
+    "orthography_name": "synthetic-symbols",
+    "orthography_revision": "v1",
+    "normalization_policy": "Exact identifiers only; no normalization.",
+    "source_mapping_policy": "No grapheme-to-phoneme mapping exists in this fixture."
+  },
+  "dimensions": [
+    {
+      "dimension_index": 0,
+      "dimension_id": "segment_feature_a",
+      "name": "Segment feature A",
+      "definition": "Synthetic binary feature for scorer fixtures.",
+      "category": "SEGMENTAL",
+      "applicability": "APPLICABLE",
+      "value_semantics": {
+        "negative_one": "Synthetic absence",
+        "zero": "NOT_APPLICABLE_ONLY",
+        "positive_one": "Synthetic presence"
+      },
+      "source_reference": null,
+      "expert_review_ref": null
+    },
+    {
+      "dimension_index": 1,
+      "dimension_id": "segment_feature_b",
+      "name": "Segment feature B",
+      "definition": "Synthetic binary feature for scorer fixtures.",
+      "category": "SEGMENTAL",
+      "applicability": "APPLICABLE",
+      "value_semantics": {
+        "negative_one": "Synthetic absence",
+        "zero": "NOT_APPLICABLE_ONLY",
+        "positive_one": "Synthetic presence"
+      },
+      "source_reference": null,
+      "expert_review_ref": null
+    },
+    {
+      "dimension_index": 2,
+      "dimension_id": "tone_feature",
+      "name": "Tone feature",
+      "definition": "Synthetic tone marker used only to exercise the TER dimension selector.",
+      "category": "TONE",
+      "applicability": "APPLICABLE",
+      "value_semantics": {
+        "negative_one": "Synthetic low",
+        "zero": "NOT_APPLICABLE_ONLY",
+        "positive_one": "Synthetic high"
+      },
+      "source_reference": null,
+      "expert_review_ref": null
+    },
+    {
+      "dimension_index": 3,
+      "dimension_id": "click_feature",
+      "name": "Click feature",
+      "definition": "Synthetic click-related placeholder; not a real click classification.",
+      "category": "CLICK",
+      "applicability": "UNREVIEWED",
+      "value_semantics": {
+        "negative_one": "Synthetic absent",
+        "zero": "NOT_APPLICABLE_ONLY",
+        "positive_one": "Synthetic present"
+      },
+      "source_reference": null,
+      "expert_review_ref": null
+    }
+  ],
+  "tone_dimension_ids": [
+    "tone_feature"
+  ],
+  "value_semantics": {
+    "encoding": {
+      "negative_one": -1,
+      "zero": 0,
+      "positive_one": 1
+    },
+    "unknown_annotation": "MUST_REMAIN_UNRESOLVED_NOT_ZERO",
+    "missing_annotation": "MISSING_NOT_ZERO",
+    "zero": "NOT_APPLICABLE_ONLY"
+  },
+  "annotation_authority": "SYNTHETIC_FEATURE_LABELS_ONLY",
+  "annotation_protocol": {
+    "protocol_id": "synthetic-vector-fixture",
+    "protocol_revision": "v1",
+    "segment_definition": "One synthetic feature vector per unit.",
+    "adjudication_policy": "Expected values are manually authored for arithmetic controls only.",
+    "annotator_training_ref": null,
+    "inter_annotator_agreement": null
+  },
+  "reference_revision": "synthetic-v1",
+  "source_lineage": [
+    {
+      "source_id": "synthetic-fixture",
+      "revision": "v1",
+      "role": "synthetic-only source",
+      "digest": null
+    }
+  ],
+  "rights_and_purpose": {
+    "permission_status": "SYNTHETIC_ONLY",
+    "permitted_purpose": "Schema and scorer testing only.",
+    "source_rights_ref": null,
+    "redistribution_policy": "Synthetic fixture may be redistributed with the source repository."
+  },
+  "reviewers": [],
+  "limitations": [
+    "This is not an actual language inventory.",
+    "The feature labels and tone mapping are artificial.",
+    "No real language may be marked QUALIFIED by copying this example.",
+    "Unknown and missing annotations are not encoded as zero."
+  ]
+}

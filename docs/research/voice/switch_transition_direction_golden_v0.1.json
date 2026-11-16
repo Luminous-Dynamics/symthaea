@@ -1,0 +1,318 @@
+{
+  "schema_version": "0.1.0",
+  "classification": "SYNTHETIC_ONLY",
+  "purpose": "Exact switch-transition tuple conformance vectors. These fixtures test position plus source/destination language labels; they are not audio data or language-identification evidence.",
+  "matching_policy": "A directional true positive requires exact equality of zero-based boundary position, from_language and to_language. Wrong direction at the correct position is one FP plus one FN.",
+  "cases": [
+    {
+      "id": "D01-exact-transitions",
+      "reference_tags": [
+        "en",
+        "zu",
+        "zu",
+        "en"
+      ],
+      "predicted_tags": [
+        "en",
+        "zu",
+        "zu",
+        "en"
+      ],
+      "expected": {
+        "reference_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "zu"
+          },
+          {
+            "position": 3,
+            "from_language": "zu",
+            "to_language": "en"
+          }
+        ],
+        "predicted_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "zu"
+          },
+          {
+            "position": 3,
+            "from_language": "zu",
+            "to_language": "en"
+          }
+        ],
+        "true_positives": 2,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      }
+    },
+    {
+      "id": "D02-reversed-direction-same-position",
+      "reference_tags": [
+        "en",
+        "zu"
+      ],
+      "predicted_tags": [
+        "zu",
+        "en"
+      ],
+      "expected": {
+        "reference_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "zu"
+          }
+        ],
+        "predicted_transitions": [
+          {
+            "position": 1,
+            "from_language": "zu",
+            "to_language": "en"
+          }
+        ],
+        "true_positives": 0,
+        "false_positives": 1,
+        "false_negatives": 1,
+        "precision": 0,
+        "recall": 0,
+        "f1": 0
+      }
+    },
+    {
+      "id": "D03-wrong-destination",
+      "reference_tags": [
+        "en",
+        "zu"
+      ],
+      "predicted_tags": [
+        "en",
+        "af"
+      ],
+      "expected": {
+        "reference_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "zu"
+          }
+        ],
+        "predicted_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "af"
+          }
+        ],
+        "true_positives": 0,
+        "false_positives": 1,
+        "false_negatives": 1,
+        "precision": 0,
+        "recall": 0,
+        "f1": 0
+      }
+    },
+    {
+      "id": "D04-wrong-source",
+      "reference_tags": [
+        "en",
+        "zu"
+      ],
+      "predicted_tags": [
+        "af",
+        "zu"
+      ],
+      "expected": {
+        "reference_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "zu"
+          }
+        ],
+        "predicted_transitions": [
+          {
+            "position": 1,
+            "from_language": "af",
+            "to_language": "zu"
+          }
+        ],
+        "true_positives": 0,
+        "false_positives": 1,
+        "false_negatives": 1,
+        "precision": 0,
+        "recall": 0,
+        "f1": 0
+      }
+    },
+    {
+      "id": "D05-correct-direction-wrong-position",
+      "reference_tags": [
+        "en",
+        "en",
+        "zu"
+      ],
+      "predicted_tags": [
+        "en",
+        "zu",
+        "zu"
+      ],
+      "expected": {
+        "reference_transitions": [
+          {
+            "position": 2,
+            "from_language": "en",
+            "to_language": "zu"
+          }
+        ],
+        "predicted_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "zu"
+          }
+        ],
+        "true_positives": 0,
+        "false_positives": 1,
+        "false_negatives": 1,
+        "precision": 0,
+        "recall": 0,
+        "f1": 0
+      }
+    },
+    {
+      "id": "D06-multiple-pairs-with-one-correct",
+      "reference_tags": [
+        "en",
+        "zu",
+        "zu",
+        "af"
+      ],
+      "predicted_tags": [
+        "en",
+        "zu",
+        "en",
+        "af"
+      ],
+      "expected": {
+        "reference_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "zu"
+          },
+          {
+            "position": 3,
+            "from_language": "zu",
+            "to_language": "af"
+          }
+        ],
+        "predicted_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "zu"
+          },
+          {
+            "position": 2,
+            "from_language": "zu",
+            "to_language": "en"
+          },
+          {
+            "position": 3,
+            "from_language": "en",
+            "to_language": "af"
+          }
+        ],
+        "true_positives": 1,
+        "false_positives": 2,
+        "false_negatives": 1,
+        "precision": 0.3333333333333333,
+        "recall": 0.5,
+        "f1": 0.4
+      }
+    },
+    {
+      "id": "D07-no-transitions",
+      "reference_tags": [
+        "en",
+        "en",
+        "en"
+      ],
+      "predicted_tags": [
+        "zu",
+        "zu",
+        "zu"
+      ],
+      "expected": {
+        "reference_transitions": [],
+        "predicted_transitions": [],
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "precision": null,
+        "recall": null,
+        "f1": null
+      }
+    },
+    {
+      "id": "D08-no-predicted-transition",
+      "reference_tags": [
+        "en",
+        "zu"
+      ],
+      "predicted_tags": [
+        "en",
+        "en"
+      ],
+      "expected": {
+        "reference_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "zu"
+          }
+        ],
+        "predicted_transitions": [],
+        "true_positives": 0,
+        "false_positives": 0,
+        "false_negatives": 1,
+        "precision": null,
+        "recall": 0,
+        "f1": 0
+      }
+    },
+    {
+      "id": "D09-predicted-only-transition",
+      "reference_tags": [
+        "en",
+        "en"
+      ],
+      "predicted_tags": [
+        "en",
+        "zu"
+      ],
+      "expected": {
+        "reference_transitions": [],
+        "predicted_transitions": [
+          {
+            "position": 1,
+            "from_language": "en",
+            "to_language": "zu"
+          }
+        ],
+        "true_positives": 0,
+        "false_positives": 1,
+        "false_negatives": 0,
+        "precision": 0,
+        "recall": null,
+        "f1": 0
+      }
+    }
+  ]
+}

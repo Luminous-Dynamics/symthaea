@@ -1,0 +1,1289 @@
+{
+  "schema_version": "0.1.0",
+  "classification": "SYNTHETIC_ONLY",
+  "purpose": "Cross-implementation regression vectors for WER, PIER, SETER, SPER@k and per-language masked error. These examples are not speech data and provide no language capability evidence.",
+  "metric_contract": {
+    "tokenization": "Already-tokenized exact strings; no implicit normalization, transliteration, case-folding or diacritic stripping.",
+    "wer": {
+      "unit": "fraction",
+      "numerator": "substitutions + deletions + insertions",
+      "denominator": "reference token count"
+    },
+    "pier": {
+      "unit": "percent",
+      "numerator": "POI substitutions + POI deletions + POI-attributed insertions",
+      "denominator": "POI hits + POI substitutions + POI deletions"
+    },
+    "seter": {
+      "unit": "fraction",
+      "numerator": "substitutions + deletions at switch-entry reference positions",
+      "denominator": "number of switch-entry reference positions"
+    },
+    "sper": {
+      "unit": "fraction",
+      "numerator": "substitutions + deletions in the union of reference-token windows around all switch entries",
+      "denominator": "number of unique reference positions in that union"
+    },
+    "language_error": {
+      "unit": "fraction",
+      "numerator": "substitutions + deletions in the language-tagged reference group",
+      "denominator": "reference tokens carrying that language tag"
+    }
+  },
+  "alignment_policy": {
+    "source": "symthaea_stt::eval::levenshtein_align",
+    "operations": [
+      "MATCH",
+      "SUBSTITUTE",
+      "DELETE",
+      "INSERT"
+    ],
+    "insertion_source_position": "Number of reference tokens consumed before the insertion; zero-based boundary index.",
+    "trailing_pier_insertion_rule": "If the final reference token is a POI, insertions at source_position == reference_length are attributed to the POI set.",
+    "tie_break": "Deterministic implementation-specific backtracking. These vectors avoid ambiguous optimal-alignment ties; tie cases require separate differential fixtures.",
+    "compatibility_note": "PIER all-POI references are estimable in the Rust contract; zero-POI references are explicitly non-estimable. This differs from the current reference Python helper's skip behavior for all-POI or no-POI utterances."
+  },
+  "vectors": [
+    {
+      "id": "V01-perfect-mixed",
+      "reference_tokens": [
+        "we",
+        "vula",
+        "today"
+      ],
+      "hypothesis_tokens": [
+        "we",
+        "vula",
+        "today"
+      ],
+      "language_tags": [
+        "en",
+        "zu",
+        "en"
+      ],
+      "poi_tags": [
+        false,
+        true,
+        false
+      ],
+      "expected_alignment": [
+        {
+          "op": "MATCH",
+          "reference_index": 0
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 1
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 2
+        }
+      ],
+      "expected": {
+        "wer": {
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 0,
+          "denominator": 3,
+          "fraction": 0
+        },
+        "pier": {
+          "estimable": true,
+          "poi_reference_tokens": 1,
+          "hits": 1,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 0,
+          "denominator": 1,
+          "percent": 0
+        },
+        "switch": {
+          "entry_positions": [
+            1,
+            2
+          ],
+          "seter": {
+            "selected_tokens": 2,
+            "errors": 0,
+            "fraction": 0
+          },
+          "sper": [
+            {
+              "radius": 0,
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "radius": 1,
+              "selected_tokens": 3,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "radius": 3,
+              "selected_tokens": 3,
+              "errors": 0,
+              "fraction": 0
+            }
+          ],
+          "per_language": [
+            {
+              "language": "en",
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "language": "zu",
+              "selected_tokens": 1,
+              "errors": 0,
+              "fraction": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "V02-embedded-deletion",
+      "reference_tokens": [
+        "we",
+        "vula",
+        "amanzi",
+        "today"
+      ],
+      "hypothesis_tokens": [
+        "we",
+        "amanzi",
+        "today"
+      ],
+      "language_tags": [
+        "en",
+        "zu",
+        "zu",
+        "en"
+      ],
+      "poi_tags": [
+        false,
+        true,
+        true,
+        false
+      ],
+      "expected_alignment": [
+        {
+          "op": "MATCH",
+          "reference_index": 0
+        },
+        {
+          "op": "DELETE",
+          "reference_index": 1
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 2
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 3
+        }
+      ],
+      "expected": {
+        "wer": {
+          "substitutions": 0,
+          "deletions": 1,
+          "insertions": 0,
+          "numerator": 1,
+          "denominator": 4,
+          "fraction": 0.25
+        },
+        "pier": {
+          "estimable": true,
+          "poi_reference_tokens": 2,
+          "hits": 1,
+          "substitutions": 0,
+          "deletions": 1,
+          "insertions": 0,
+          "numerator": 1,
+          "denominator": 2,
+          "percent": 50
+        },
+        "switch": {
+          "entry_positions": [
+            1,
+            3
+          ],
+          "seter": {
+            "selected_tokens": 2,
+            "errors": 1,
+            "fraction": 0.5
+          },
+          "sper": [
+            {
+              "radius": 0,
+              "selected_tokens": 2,
+              "errors": 1,
+              "fraction": 0.5
+            },
+            {
+              "radius": 1,
+              "selected_tokens": 4,
+              "errors": 1,
+              "fraction": 0.25
+            },
+            {
+              "radius": 3,
+              "selected_tokens": 4,
+              "errors": 1,
+              "fraction": 0.25
+            }
+          ],
+          "per_language": [
+            {
+              "language": "en",
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "language": "zu",
+              "selected_tokens": 2,
+              "errors": 1,
+              "fraction": 0.5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "V03-embedded-substitution",
+      "reference_tokens": [
+        "we",
+        "hello",
+        "friend"
+      ],
+      "hypothesis_tokens": [
+        "we",
+        "hullo",
+        "friend"
+      ],
+      "language_tags": [
+        "zu",
+        "en",
+        "zu"
+      ],
+      "poi_tags": [
+        false,
+        true,
+        false
+      ],
+      "expected_alignment": [
+        {
+          "op": "MATCH",
+          "reference_index": 0
+        },
+        {
+          "op": "SUBSTITUTE",
+          "reference_index": 1
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 2
+        }
+      ],
+      "expected": {
+        "wer": {
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 1,
+          "denominator": 3,
+          "fraction": 0.3333333333333333
+        },
+        "pier": {
+          "estimable": true,
+          "poi_reference_tokens": 1,
+          "hits": 0,
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 1,
+          "denominator": 1,
+          "percent": 100
+        },
+        "switch": {
+          "entry_positions": [
+            1,
+            2
+          ],
+          "seter": {
+            "selected_tokens": 2,
+            "errors": 1,
+            "fraction": 0.5
+          },
+          "sper": [
+            {
+              "radius": 0,
+              "selected_tokens": 2,
+              "errors": 1,
+              "fraction": 0.5
+            },
+            {
+              "radius": 1,
+              "selected_tokens": 3,
+              "errors": 1,
+              "fraction": 0.3333333333333333
+            },
+            {
+              "radius": 3,
+              "selected_tokens": 3,
+              "errors": 1,
+              "fraction": 0.3333333333333333
+            }
+          ],
+          "per_language": [
+            {
+              "language": "zu",
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "language": "en",
+              "selected_tokens": 1,
+              "errors": 1,
+              "fraction": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "V04-insertion-at-poi-boundary",
+      "reference_tokens": [
+        "we",
+        "hello",
+        "friend"
+      ],
+      "hypothesis_tokens": [
+        "we",
+        "extra",
+        "hello",
+        "friend"
+      ],
+      "language_tags": [
+        "zu",
+        "en",
+        "zu"
+      ],
+      "poi_tags": [
+        false,
+        true,
+        false
+      ],
+      "expected_alignment": [
+        {
+          "op": "MATCH",
+          "reference_index": 0
+        },
+        {
+          "op": "INSERT",
+          "source_position": 1
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 1
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 2
+        }
+      ],
+      "expected": {
+        "wer": {
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 1,
+          "numerator": 1,
+          "denominator": 3,
+          "fraction": 0.3333333333333333
+        },
+        "pier": {
+          "estimable": true,
+          "poi_reference_tokens": 1,
+          "hits": 1,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 1,
+          "numerator": 1,
+          "denominator": 1,
+          "percent": 100
+        },
+        "switch": {
+          "entry_positions": [
+            1,
+            2
+          ],
+          "seter": {
+            "selected_tokens": 2,
+            "errors": 0,
+            "fraction": 0
+          },
+          "sper": [
+            {
+              "radius": 0,
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "radius": 1,
+              "selected_tokens": 3,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "radius": 3,
+              "selected_tokens": 3,
+              "errors": 0,
+              "fraction": 0
+            }
+          ],
+          "per_language": [
+            {
+              "language": "zu",
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "language": "en",
+              "selected_tokens": 1,
+              "errors": 0,
+              "fraction": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "V05-insertion-outside-poi",
+      "reference_tokens": [
+        "we",
+        "hello",
+        "friend"
+      ],
+      "hypothesis_tokens": [
+        "extra",
+        "we",
+        "hello",
+        "friend"
+      ],
+      "language_tags": [
+        "zu",
+        "en",
+        "zu"
+      ],
+      "poi_tags": [
+        false,
+        true,
+        false
+      ],
+      "expected_alignment": [
+        {
+          "op": "INSERT",
+          "source_position": 0
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 0
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 1
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 2
+        }
+      ],
+      "expected": {
+        "wer": {
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 1,
+          "numerator": 1,
+          "denominator": 3,
+          "fraction": 0.3333333333333333
+        },
+        "pier": {
+          "estimable": true,
+          "poi_reference_tokens": 1,
+          "hits": 1,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 0,
+          "denominator": 1,
+          "percent": 0
+        },
+        "switch": {
+          "entry_positions": [
+            1,
+            2
+          ],
+          "seter": {
+            "selected_tokens": 2,
+            "errors": 0,
+            "fraction": 0
+          },
+          "sper": [
+            {
+              "radius": 0,
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "radius": 1,
+              "selected_tokens": 3,
+              "errors": 0,
+              "fraction": 0
+            }
+          ],
+          "per_language": [
+            {
+              "language": "zu",
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "language": "en",
+              "selected_tokens": 1,
+              "errors": 0,
+              "fraction": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "V06-trailing-insertion-after-final-poi",
+      "reference_tokens": [
+        "we",
+        "hello"
+      ],
+      "hypothesis_tokens": [
+        "we",
+        "hello",
+        "tail"
+      ],
+      "language_tags": [
+        "zu",
+        "en"
+      ],
+      "poi_tags": [
+        false,
+        true
+      ],
+      "expected_alignment": [
+        {
+          "op": "MATCH",
+          "reference_index": 0
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 1
+        },
+        {
+          "op": "INSERT",
+          "source_position": 2
+        }
+      ],
+      "expected": {
+        "wer": {
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 1,
+          "numerator": 1,
+          "denominator": 2,
+          "fraction": 0.5
+        },
+        "pier": {
+          "estimable": true,
+          "poi_reference_tokens": 1,
+          "hits": 1,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 1,
+          "numerator": 1,
+          "denominator": 1,
+          "percent": 100
+        },
+        "switch": {
+          "entry_positions": [
+            1
+          ],
+          "seter": {
+            "selected_tokens": 1,
+            "errors": 0,
+            "fraction": 0
+          },
+          "sper": [
+            {
+              "radius": 0,
+              "selected_tokens": 1,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "radius": 1,
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            }
+          ],
+          "per_language": [
+            {
+              "language": "zu",
+              "selected_tokens": 1,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "language": "en",
+              "selected_tokens": 1,
+              "errors": 0,
+              "fraction": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "V07-all-poi-no-switch",
+      "reference_tokens": [
+        "hola",
+        "amigo"
+      ],
+      "hypothesis_tokens": [
+        "hola",
+        "amiga"
+      ],
+      "language_tags": [
+        "es",
+        "es"
+      ],
+      "poi_tags": [
+        true,
+        true
+      ],
+      "expected_alignment": [
+        {
+          "op": "MATCH",
+          "reference_index": 0
+        },
+        {
+          "op": "SUBSTITUTE",
+          "reference_index": 1
+        }
+      ],
+      "expected": {
+        "wer": {
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 1,
+          "denominator": 2,
+          "fraction": 0.5
+        },
+        "pier": {
+          "estimable": true,
+          "poi_reference_tokens": 2,
+          "hits": 1,
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 1,
+          "denominator": 2,
+          "percent": 50
+        },
+        "switch": {
+          "entry_positions": [],
+          "seter": {
+            "selected_tokens": 0,
+            "errors": 0,
+            "fraction": null,
+            "non_estimable_reason": "no_switch_entries"
+          },
+          "sper": [
+            {
+              "radius": 0,
+              "selected_tokens": 0,
+              "errors": 0,
+              "fraction": null,
+              "non_estimable_reason": "no_switch_entries"
+            },
+            {
+              "radius": 1,
+              "selected_tokens": 0,
+              "errors": 0,
+              "fraction": null,
+              "non_estimable_reason": "no_switch_entries"
+            }
+          ],
+          "per_language": [
+            {
+              "language": "es",
+              "selected_tokens": 2,
+              "errors": 1,
+              "fraction": 0.5
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "V08-no-poi-but-switches",
+      "reference_tokens": [
+        "we",
+        "hello"
+      ],
+      "hypothesis_tokens": [
+        "we",
+        "hello"
+      ],
+      "language_tags": [
+        "zu",
+        "en"
+      ],
+      "poi_tags": [
+        false,
+        false
+      ],
+      "expected_alignment": [
+        {
+          "op": "MATCH",
+          "reference_index": 0
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 1
+        }
+      ],
+      "expected": {
+        "wer": {
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 0,
+          "denominator": 2,
+          "fraction": 0
+        },
+        "pier": {
+          "estimable": false,
+          "reason": "no_points_of_interest",
+          "poi_reference_tokens": 0,
+          "hits": 0,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 0,
+          "denominator": 0,
+          "percent": null
+        },
+        "switch": {
+          "entry_positions": [
+            1
+          ],
+          "seter": {
+            "selected_tokens": 1,
+            "errors": 0,
+            "fraction": 0
+          },
+          "sper": [
+            {
+              "radius": 0,
+              "selected_tokens": 1,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "radius": 1,
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            }
+          ],
+          "per_language": [
+            {
+              "language": "zu",
+              "selected_tokens": 1,
+              "errors": 0,
+              "fraction": 0
+            },
+            {
+              "language": "en",
+              "selected_tokens": 1,
+              "errors": 0,
+              "fraction": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "V09-overlapping-switch-windows",
+      "reference_tokens": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+      ],
+      "hypothesis_tokens": [
+        "a",
+        "b",
+        "x",
+        "d",
+        "e"
+      ],
+      "language_tags": [
+        "en",
+        "zu",
+        "en",
+        "zu",
+        "en"
+      ],
+      "poi_tags": [
+        false,
+        true,
+        true,
+        true,
+        true
+      ],
+      "expected_alignment": [
+        {
+          "op": "MATCH",
+          "reference_index": 0
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 1
+        },
+        {
+          "op": "SUBSTITUTE",
+          "reference_index": 2
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 3
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 4
+        }
+      ],
+      "expected": {
+        "wer": {
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 1,
+          "denominator": 5,
+          "fraction": 0.2
+        },
+        "pier": {
+          "estimable": true,
+          "poi_reference_tokens": 4,
+          "hits": 3,
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 1,
+          "denominator": 4,
+          "percent": 25
+        },
+        "switch": {
+          "entry_positions": [
+            1,
+            2,
+            3,
+            4
+          ],
+          "seter": {
+            "selected_tokens": 4,
+            "errors": 1,
+            "fraction": 0.25
+          },
+          "sper": [
+            {
+              "radius": 0,
+              "selected_tokens": 4,
+              "errors": 1,
+              "fraction": 0.25
+            },
+            {
+              "radius": 1,
+              "selected_tokens": 5,
+              "errors": 1,
+              "fraction": 0.2
+            },
+            {
+              "radius": 3,
+              "selected_tokens": 5,
+              "errors": 1,
+              "fraction": 0.2
+            }
+          ],
+          "per_language": [
+            {
+              "language": "en",
+              "selected_tokens": 3,
+              "errors": 1,
+              "fraction": 0.3333333333333333
+            },
+            {
+              "language": "zu",
+              "selected_tokens": 2,
+              "errors": 0,
+              "fraction": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "V10-no-switch-but-pier-estimable",
+      "reference_tokens": [
+        "a",
+        "b",
+        "c"
+      ],
+      "hypothesis_tokens": [
+        "a",
+        "b",
+        "c"
+      ],
+      "language_tags": [
+        "zu",
+        "zu",
+        "zu"
+      ],
+      "poi_tags": [
+        false,
+        true,
+        false
+      ],
+      "expected_alignment": [
+        {
+          "op": "MATCH",
+          "reference_index": 0
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 1
+        },
+        {
+          "op": "MATCH",
+          "reference_index": 2
+        }
+      ],
+      "expected": {
+        "wer": {
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 0,
+          "denominator": 3,
+          "fraction": 0
+        },
+        "pier": {
+          "estimable": true,
+          "poi_reference_tokens": 1,
+          "hits": 1,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "numerator": 0,
+          "denominator": 1,
+          "percent": 0
+        },
+        "switch": {
+          "entry_positions": [],
+          "seter": {
+            "selected_tokens": 0,
+            "errors": 0,
+            "fraction": null,
+            "non_estimable_reason": "no_switch_entries"
+          },
+          "sper": [
+            {
+              "radius": 0,
+              "selected_tokens": 0,
+              "errors": 0,
+              "fraction": null,
+              "non_estimable_reason": "no_switch_entries"
+            },
+            {
+              "radius": 3,
+              "selected_tokens": 0,
+              "errors": 0,
+              "fraction": null,
+              "non_estimable_reason": "no_switch_entries"
+            }
+          ],
+          "per_language": [
+            {
+              "language": "zu",
+              "selected_tokens": 3,
+              "errors": 0,
+              "fraction": 0
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "aggregate_vectors": [
+    {
+      "id": "A01-pier-micro-macro-divergence",
+      "metric": "PIER",
+      "utterances": [
+        {
+          "reference_tokens": [
+            "a",
+            "poi1"
+          ],
+          "hypothesis_tokens": [
+            "a",
+            "wrong"
+          ],
+          "poi_tags": [
+            false,
+            true
+          ]
+        },
+        {
+          "reference_tokens": [
+            "b",
+            "poi2",
+            "poi3"
+          ],
+          "hypothesis_tokens": [
+            "b",
+            "poi2",
+            "poi3"
+          ],
+          "poi_tags": [
+            false,
+            true,
+            true
+          ]
+        }
+      ],
+      "expected": {
+        "utterances": 2,
+        "estimable_utterances": 2,
+        "non_estimable_utterances": 0,
+        "corpus_reference_tokens": 5,
+        "corpus_hypothesis_tokens": 5,
+        "totals": {
+          "hits": 2,
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 0,
+          "poi_denominator": 3,
+          "pier_numerator": 1
+        },
+        "micro_pier_percent": 33.333333333333336,
+        "macro_pier_percent": 50
+      },
+      "explanation": "Utterance PIER values are 100% and 0%. Pooled/micro PIER is 1/3 = 33.333...%; macro PIER is (100+0)/2 = 50%."
+    },
+    {
+      "id": "A02-switch-micro-macro-with-no-switch-utterance",
+      "metric": "SETER_SPER",
+      "window_radii": [
+        0,
+        1
+      ],
+      "utterances": [
+        {
+          "reference_tokens": [
+            "a",
+            "b"
+          ],
+          "hypothesis_tokens": [
+            "a",
+            "wrong"
+          ],
+          "language_tags": [
+            "en",
+            "zu"
+          ]
+        },
+        {
+          "reference_tokens": [
+            "c",
+            "d",
+            "e",
+            "f"
+          ],
+          "hypothesis_tokens": [
+            "c",
+            "d",
+            "e",
+            "f"
+          ],
+          "language_tags": [
+            "en",
+            "zu",
+            "en",
+            "zu"
+          ]
+        },
+        {
+          "reference_tokens": [
+            "g",
+            "h"
+          ],
+          "hypothesis_tokens": [
+            "g",
+            "h"
+          ],
+          "language_tags": [
+            "af",
+            "af"
+          ]
+        }
+      ],
+      "expected": {
+        "utterances": 3,
+        "switch_utterances": 2,
+        "no_switch_utterances": 1,
+        "corpus_reference_tokens": 8,
+        "corpus_hypothesis_tokens": 8,
+        "totals": {
+          "substitutions": 1,
+          "deletions": 0,
+          "insertions": 0
+        },
+        "wer": 0.125,
+        "seter": {
+          "micro": {
+            "selected_tokens": 4,
+            "errors": 1,
+            "fraction": 0.25
+          },
+          "macro": {
+            "estimable_utterances": 2,
+            "mean_fraction": 0.5
+          }
+        },
+        "sper": [
+          {
+            "radius": 0,
+            "micro": {
+              "selected_tokens": 4,
+              "errors": 1,
+              "fraction": 0.25
+            },
+            "macro": {
+              "estimable_utterances": 2,
+              "mean_fraction": 0.5
+            }
+          },
+          {
+            "radius": 1,
+            "micro": {
+              "selected_tokens": 6,
+              "errors": 1,
+              "fraction": 0.16666666666666666
+            },
+            "macro": {
+              "estimable_utterances": 2,
+              "mean_fraction": 0.25
+            }
+          }
+        ],
+        "per_language": [
+          {
+            "language": "en",
+            "selected_tokens": 3,
+            "errors": 0,
+            "fraction": 0
+          },
+          {
+            "language": "zu",
+            "selected_tokens": 3,
+            "errors": 1,
+            "fraction": 0.3333333333333333
+          },
+          {
+            "language": "af",
+            "selected_tokens": 2,
+            "errors": 0,
+            "fraction": 0
+          }
+        ]
+      },
+      "explanation": "The no-switch utterance is counted but excluded from switch-metric macro means. Windows are unioned within each utterance; they never cross utterance boundaries."
+    },
+    {
+      "id": "A03-pier-non-estimable-utterance-kept-in-corpus-token-total",
+      "metric": "PIER",
+      "utterances": [
+        {
+          "reference_tokens": [
+            "m",
+            "poi"
+          ],
+          "hypothesis_tokens": [
+            "m",
+            "poi"
+          ],
+          "poi_tags": [
+            false,
+            true
+          ]
+        },
+        {
+          "reference_tokens": [
+            "x",
+            "y"
+          ],
+          "hypothesis_tokens": [
+            "x",
+            "y"
+          ],
+          "poi_tags": [
+            false,
+            false
+          ]
+        }
+      ],
+      "expected": {
+        "utterances": 2,
+        "estimable_utterances": 1,
+        "non_estimable_utterances": 1,
+        "corpus_reference_tokens": 4,
+        "corpus_hypothesis_tokens": 4,
+        "totals": {
+          "hits": 1,
+          "substitutions": 0,
+          "deletions": 0,
+          "insertions": 0,
+          "poi_denominator": 1,
+          "pier_numerator": 0
+        },
+        "micro_pier_percent": 0,
+        "macro_pier_percent": 0
+      },
+      "explanation": "The second utterance is not a zero-error PIER observation. It is explicitly non-estimable, excluded from PIER means, but its reference/hypothesis token counts remain in corpus totals."
+    }
+  ]
+}

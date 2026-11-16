@@ -1,0 +1,261 @@
+{
+  "schema_version": "1.0.0",
+  "receipt_id": "design-only-voice-fixture-2026-11-08-v1",
+  "evidence_state": "DESIGN_ONLY",
+  "synthetic_only": true,
+  "created_at": "2026-11-08T09:45:00Z",
+  "supersedes_receipt_id": null,
+  "original_receipt_id": null,
+  "benchmark": {
+    "track_id": "metric_vector_conformance",
+    "manifest_revision": "docs/voice/voice_benchmark_matrix_2026q4.json@design",
+    "manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "task": "synthetic_metric_receipt_contract_example",
+    "evaluation_protocol_revision": "voice_metric_vectors_v1"
+  },
+  "source_admission": {
+    "status": "SYNTHETIC_ONLY",
+    "governance_issue": 11107,
+    "purpose": "Schema example only; no real audio or corpus use.",
+    "permission_evidence_refs": [],
+    "sources": [
+      {
+        "dataset_id": "voice_metric_vectors_v1",
+        "revision": "synthetic-example",
+        "config": "all",
+        "split": "synthetic-fixtures",
+        "status": "SYNTHETIC_ONLY",
+        "file_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "source_genealogy_ref": null,
+        "permitted_purpose_ref": "synthetic-fixture-scoring-only",
+        "speaker_identity_prohibited": true
+      }
+    ]
+  },
+  "inputs": {
+    "utterance_count": 0,
+    "audio_duration_seconds": 0,
+    "input_manifest_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "excluded_count": 0,
+    "failed_count": 0,
+    "split_units": [],
+    "split_disjointness_audit": null,
+    "leakage_audit": {
+      "status": "NOT_APPLICABLE",
+      "details_ref": "No speech/audio samples are present.",
+      "duplicate_scan_revision": null
+    }
+  },
+  "code": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "commit_sha": "0000000000000000000000000000000000000000",
+    "dirty_tree": false,
+    "pipeline_config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "container_or_environment_digest": null,
+    "dependency_lock_sha256": null
+  },
+  "model": {
+    "provider": "NONE",
+    "model_id": "NO_MODEL_SYNTHETIC_FIXTURE_ONLY",
+    "model_revision": "NOT_APPLICABLE",
+    "checkpoint_sha256": null,
+    "tokenizer_revision": "pretokenized-fixture-v1",
+    "architecture": "no-model-formula-audit",
+    "parameter_count": null,
+    "adapter_revision": null,
+    "adapter_sha256": null,
+    "trainable_parameter_count": null,
+    "quantization": null,
+    "precision": "integer-count-and-double-formula-audit",
+    "language_support_claim": []
+  },
+  "inference": {
+    "language_input_mode": "NOT_APPLICABLE",
+    "language_id_system": null,
+    "preprocessing_revision": "none-pretokenized-fixtures",
+    "sample_rate_hz": 16000,
+    "channel_policy": "no-audio",
+    "resampling_policy": "not-applicable",
+    "decoder_config_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "prompt_sha256": null,
+    "chunk_schedule": {
+      "chunk_ms": null,
+      "overlap_ms": null,
+      "endpointing": "not-applicable",
+      "vad_revision": null
+    },
+    "streaming": false,
+    "provider_api_date": null,
+    "provider_region": null,
+    "retention_policy_snapshot_ref": null,
+    "price_basis_ref": null
+  },
+  "evaluation": {
+    "scorer_revision": "independent-formula-audit-not-rust-execution",
+    "normalization_revision": "none-exact-token-fixtures",
+    "tokenization_revision": "pretokenized-fixture-v1",
+    "alignment_policy_revision": "declared-per-vector-alignment-v1",
+    "reference_revision": "voice_metric_vectors_v1",
+    "annotation_adjudication_ref": null,
+    "annotator_agreement": null,
+    "metrics": [
+      {
+        "name": "WER",
+        "unit": "fraction",
+        "numerator": 0,
+        "denominator": 0,
+        "value": null,
+        "estimable": false,
+        "non_estimable_reason": "No audio/model inference; DESIGN_ONLY receipt example.",
+        "aggregation": "NOT_APPLICABLE",
+        "group_key": null
+      }
+    ],
+    "non_estimable": [
+      {
+        "metric": "WER",
+        "count": 0,
+        "reason": "No model outputs or evaluated speech records exist in this design-only example."
+      }
+    ],
+    "per_group_metrics_ref": null
+  },
+  "statistics": {
+    "cluster_unit": "NOT_ESTIMATED",
+    "method": "No inferential statistics; schema example only.",
+    "seed": null,
+    "replicates": 0,
+    "confidence_level": null,
+    "multiplicity_policy": "not-applicable",
+    "paired_comparison": false,
+    "comparison_receipt_ids": []
+  },
+  "efficiency": {
+    "execution_mode": "SYNTHETIC_ONLY",
+    "hardware": {
+      "accelerator": null,
+      "driver": null,
+      "cpu": null,
+      "memory_bytes": null
+    },
+    "measurement_method": "No model inference or hardware benchmark executed.",
+    "latency_ms": {
+      "p50": null,
+      "p95": null,
+      "p99": null
+    },
+    "rtfx": null,
+    "peak_ram_bytes": null,
+    "peak_vram_bytes": null,
+    "energy_joules": null,
+    "cost": null,
+    "currency": null
+  },
+  "controls": {
+    "baseline_receipt_ids": [],
+    "ablations": [],
+    "negative_controls": [
+      {
+        "id": "no_audio_no_model",
+        "expected": "no model performance claim",
+        "observed": null,
+        "status": "NOT_RUN"
+      }
+    ],
+    "calibration_status": "NOT_APPLICABLE",
+    "selective_risk_coverage_ref": null,
+    "claim_limits": [
+      "Synthetic schema example only.",
+      "Does not represent an executed ASR benchmark.",
+      "Does not validate dataset rights or speaker consent.",
+      "Does not establish language capability or SOTA."
+    ]
+  },
+  "artifacts": {
+    "prediction_manifest_sha256": null,
+    "logs_sha256": null,
+    "scorer_output_sha256": null,
+    "artifact_refs": []
+  },
+  "candidate_selection": {
+    "mode": "NOT_USED",
+    "candidate_set_manifest_sha256": null,
+    "candidate_count": 0,
+    "candidate_generator_manifest_sha256": null,
+    "selector_provider": null,
+    "selector_model_id": null,
+    "selector_model_revision": null,
+    "selector_checkpoint_sha256": null,
+    "selector_prompt_sha256": null,
+    "demonstrations_manifest_sha256": null,
+    "demonstration_count": 0,
+    "demonstration_selection_policy": "NOT_APPLICABLE",
+    "target_language_demonstration_count": 0,
+    "target_language_supervised_training_used": false,
+    "decision_type": "NOT_APPLICABLE",
+    "selected_candidate_id": null,
+    "abstention_reason": null,
+    "rewrite_allowed": false,
+    "rewrite_count": 0,
+    "candidate_id_integrity_check": "NOT_APPLICABLE",
+    "selected_transcript_exact_copy_check": "NOT_APPLICABLE",
+    "source_interval_start_frame": null,
+    "source_interval_end_frame": null,
+    "target_language_supervised_training_hours": 0,
+    "selector_output_sha256": null
+  },
+  "phonological_evaluation": {
+    "mode": "NOT_USED",
+    "feature_profile_id": null,
+    "feature_profile_revision": null,
+    "feature_profile_manifest_sha256": null,
+    "feature_dimension_count": null,
+    "tone_dimensions": [],
+    "phonetic_reference_revision": null,
+    "g2p_authority": "NOT_APPLICABLE",
+    "g2p_rule_set_revision": null,
+    "alignment_algorithm": "NOT_APPLICABLE",
+    "alignment_gap_penalty": null,
+    "alignment_tie_policy": null,
+    "unscorable_segment_count": 0,
+    "feature_profile_schema_version": null,
+    "feature_profile_status": "NOT_APPLICABLE",
+    "feature_dimension_diagnostics_sha256": null
+  },
+  "acoustic_faithfulness": {
+    "mode": "NOT_USED",
+    "stimulus_manifest_sha256": null,
+    "base_audio_manifest_sha256": null,
+    "condition_count": 0,
+    "prompt_revision_sha256": null,
+    "context_revision_sha256": null,
+    "changed_dimensions": [],
+    "audio_access_mode": "NOT_APPLICABLE",
+    "ground_truth_revision": null,
+    "evidence_annotation_revision": null,
+    "output_manifest_sha256": null,
+    "privacy_review_ref": null,
+    "trial_manifest_sha256": null,
+    "scorer_revision": null,
+    "claim_label_ontology_revision": null,
+    "conflict_axis_annotation_revision": null
+  },
+  "counterfactual_pairs": {
+    "mode": "NOT_USED",
+    "pair_manifest_sha256": null,
+    "intervention_manifest_sha256": null,
+    "trial_manifest_sha256": null,
+    "scorer_revision": null,
+    "condition_manifest_schema_version": null,
+    "changed_dimension_annotation_revision": null,
+    "pair_count": 0,
+    "pair_kinds": [],
+    "pair_split_revision": null,
+    "source_lineage_manifest_sha256": null,
+    "preference_training_pair_manifest_sha256": null,
+    "held_out_evaluation_pair_manifest_sha256": null,
+    "training_evaluation_disjointness_audit_sha256": null,
+    "training_evaluation_overlap_count": 0,
+    "training_evaluation_disjointness_status": "NOT_APPLICABLE"
+  }
+}
