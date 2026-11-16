@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use crate::CoordinateFrame;
 
 
-const SECTION_SCHEMA_VERSION: u32 = 1;
+const SECTION_SCHEMA_VERSION: u32 = 2;
 const ENDPOINT_TOLERANCE: f64 = 1.0e-12;
 const MAX_STATIONS: usize = 512;
 const MAX_CONTROL_POINTS_PER_STATION: usize = 128;
@@ -98,6 +98,8 @@ pub struct SectionFamilyArtifact {
     pub candidate_id: String,
     pub source_spec_digest_blake3: String,
     pub sampled_sections_digest_blake3: String,
+    #[serde(default)]
+    pub section_family_manifest_digest_blake3: String,
     pub length_m: f64,
     pub beam_m: f64,
     pub draft_m: f64,
@@ -106,6 +108,208 @@ pub struct SectionFamilyArtifact {
     #[serde(default)]
     pub longitudinal_end_conditions: LongitudinalEndConditions,
     pub sections: Vec<SampledSection>,
+}
+
+#[derive(Serialize)]
+struct SectionFamilyManifestIdentity<'a> {
+    artifact_schema_version: u32,
+    candidate_id: &'a str,
+    source_spec_digest_blake3: &'a str,
+    sampled_sections_digest_blake3: &'a str,
+    length_m: f64,
+    beam_m: f64,
+    draft_m: f64,
+    units: &'a str,
+    coordinate_frame: &'a CoordinateFrame,
+    longitudinal_end_conditions: LongitudinalEndConditions,
+    station_count: usize,
+}
+
+fn compute_section_family_manifest_digest(
+    artifact: &SectionFamilyArtifact,
+) -> Result<String, serde_json::Error> {
+    let identity = SectionFamilyManifestIdentity {
+        artifact_schema_version: artifact.artifact_schema_version,
+        candidate_id: &artifact.candidate_id,
+        source_spec_digest_blake3: &artifact.source_spec_digest_blake3,
+        sampled_sections_digest_blake3: &artifact.sampled_sections_digest_blake3,
+        length_m: artifact.length_m,
+        beam_m: artifact.beam_m,
+        draft_m: artifact.draft_m,
+        units: &artifact.units,
+        coordinate_frame: &artifact.coordinate_frame,
+        longitudinal_end_conditions: artifact.longitudinal_end_conditions,
+        station_count: artifact.sections.len(),
+    };
+    Ok(blake3::hash(&serde_json::to_vec(&identity)?).to_hex().to_string())
+}
+
+/// Verify section coordinates and all semantic metadata against their digests.
+/// This is an integrity check, not proof that the source dimensions are correct.
+pub fn verify_section_family_artifact_integrity(
+    artifact: &SectionFamilyArtifact,
+) -> Result<(), Vec<SectionViolation>> {
+    let mut errors = Vec::new();
+    if artifact.artifact_schema_version != 2 {
+        violation(
+            &mut errors,
+            "artifact_schema_version",
+            "section-family artifact schema v2 is required",
+        );
+    }
+    if artifact.candidate_id.trim().is_empty() {
+        violation(&mut errors, "candidate_id", "candidate ID must not be empty");
+    }
+    if artifact.units != "m"
+        || !finite_positive(artifact.length_m)
+        || !finite_positive(artifact.beam_m)
+        || !finite_positive(artifact.draft_m)
+    {
+        violation(
+            &mut errors,
+            "dimensions_or_units",
+            "section-family dimensions must be finite, positive and expressed in metres",
+        );
+    }
+    if artifact.source_spec_digest_blake3.len() != 64
+        || !artifact.source_spec_digest_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
+    {
+        violation(
+            &mut errors,
+            "source_spec_digest",
+            "source specification digest must be 64 hexadecimal characters",
+        );
+    }
+    match compute_sampled_sections_digest(&artifact.sections) {
+        Ok(actual) if actual.eq_ignore_ascii_case(&artifact.sampled_sections_digest_blake3) => {}
+        Ok(_) => violation(
+            &mut errors,
+            "sampled_sections_digest",
+            "sample coordinates do not match the declared sampled-sections digest",
+        ),
+        Err(error) => violation(
+            &mut errors,
+            "sampled_sections_digest",
+            format!("sample coordinates cannot be serialized: {error}"),
+        ),
+    }
+    let frame = &artifact.coordinate_frame;
+    if frame.id.trim().is_empty()
+        || frame.handedness != "right-handed"
+        || !frame.axis_convention.contains("x-forward")
+        || !frame.axis_convention.contains("y-starboard")
+        || !frame.axis_convention.contains("z-down")
+    {
+        violation(
+            &mut errors,
+            "coordinate_frame",
+            "section-family artifact requires explicit right-handed x-forward/y-starboard/z-down coordinates",
+        );
+    }
+    if artifact.sections.len() < 2 || artifact.sections.len() > MAX_STATIONS {
+        violation(
+            &mut errors,
+            "station_count",
+            format!("section-family station count must be within 2..={MAX_STATIONS}"),
+        );
+    } else {
+        for (index, section) in artifact.sections.iter().enumerate() {
+            if section.station_index != index
+                || !section.x_m.is_finite()
+                || section.x_m < 0.0
+                || section.x_m > artifact.length_m
+                || section.keel_to_sheer_m.len() < 2
+            {
+                violation(
+                    &mut errors,
+                    "station_identity_or_coordinates",
+                    format!("station {index} has invalid identity, x coordinate or sample count"),
+                );
+                continue;
+            }
+            if index > 0 && section.x_m <= artifact.sections[index - 1].x_m {
+                violation(
+                    &mut errors,
+                    "station_order",
+                    format!("station {index} is not strictly after its predecessor"),
+                );
+            }
+            let endpoint = if index == 0 {
+                Some(artifact.longitudinal_end_conditions.bow)
+            } else if index + 1 == artifact.sections.len() {
+                Some(artifact.longitudinal_end_conditions.stern)
+            } else {
+                None
+            };
+            let final_point = section.keel_to_sheer_m.last().copied().unwrap_or([0.0; 3]);
+            match endpoint {
+                Some(LongitudinalEndCondition::CollapsedCentreline)
+                    if section.keel_to_sheer_m.iter().any(|point| point[1] != 0.0)
+                        || final_point[1] != 0.0 =>
+                {
+                    violation(
+                        &mut errors,
+                        "collapsed_end_geometry",
+                        format!("collapsed endpoint station {index} must have every transverse sample exactly on y=0"),
+                    );
+                }
+                Some(LongitudinalEndCondition::PlanarEndCap)
+                    if final_point[1] <= 0.0 =>
+                {
+                    violation(
+                        &mut errors,
+                        "planar_end_geometry",
+                        format!("planar endpoint station {index} must have positive waterline half-breadth"),
+                    );
+                }
+                None if final_point[1] <= 0.0 => {
+                    violation(
+                        &mut errors,
+                        "interior_end_geometry",
+                        format!("interior station {index} must have positive waterline half-breadth"),
+                    );
+                }
+                _ => {}
+            }
+        }
+        if artifact.sections.len() == 2
+            && artifact.longitudinal_end_conditions.bow
+                == LongitudinalEndCondition::CollapsedCentreline
+            && artifact.longitudinal_end_conditions.stern
+                == LongitudinalEndCondition::CollapsedCentreline
+        {
+            violation(
+                &mut errors,
+                "adjacent_collapsed_ends",
+                "two collapsed endpoints require at least one positive-breadth interior station",
+            );
+        }
+        if let (Some(first), Some(last)) = (artifact.sections.first(), artifact.sections.last()) {
+            if !close_enough(first.x_m, 0.0) || !close_enough(last.x_m, artifact.length_m) {
+                violation(
+                    &mut errors,
+                    "station_extent",
+                    "section-family stations must span x=0 through the declared vessel length",
+                );
+            }
+        }
+    }
+
+    match compute_section_family_manifest_digest(artifact) {
+        Ok(actual) if actual.eq_ignore_ascii_case(&artifact.section_family_manifest_digest_blake3) => {}
+        Ok(_) => violation(
+            &mut errors,
+            "section_family_manifest_digest",
+            "section-family semantic metadata does not match its manifest digest",
+        ),
+        Err(error) => violation(
+            &mut errors,
+            "section_family_manifest_digest",
+            format!("section-family metadata cannot be serialized: {error}"),
+        ),
+    }
+
+    if errors.is_empty() { Ok(()) } else { Err(errors) }
 }
 
 fn violation(violations: &mut Vec<SectionViolation>, code: &str, detail: impl Into<String>) {
@@ -530,11 +734,12 @@ pub fn generate_section_artifact(
             }]
         })?;
 
-    Ok(SectionFamilyArtifact {
-        artifact_schema_version: 1,
+    let mut artifact = SectionFamilyArtifact {
+        artifact_schema_version: 2,
         candidate_id: spec.candidate_id.clone(),
         source_spec_digest_blake3,
         sampled_sections_digest_blake3,
+        section_family_manifest_digest_blake3: String::new(),
         length_m: spec.length_m,
         beam_m: spec.beam_m,
         draft_m: spec.draft_m,
@@ -542,7 +747,15 @@ pub fn generate_section_artifact(
         coordinate_frame: spec.coordinate_frame.clone(),
         longitudinal_end_conditions: spec.longitudinal_end_conditions,
         sections,
-    })
+    };
+    artifact.section_family_manifest_digest_blake3 =
+        compute_section_family_manifest_digest(&artifact).map_err(|error| {
+            vec![SectionViolation {
+                code: "section_family_manifest_digest".into(),
+                detail: format!("could not serialize section-family identity: {error}"),
+            }]
+        })?;
+    Ok(artifact)
 }
 
 #[cfg(test)]
