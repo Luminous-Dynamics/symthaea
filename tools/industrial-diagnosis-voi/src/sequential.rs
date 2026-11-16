@@ -46,6 +46,7 @@ pub struct AdaptivePolicy {
     pub expected_terminal_decision_loss: f64,
     pub expected_measurement_cost: f64,
     pub expected_total_loss: f64,
+    pub worst_case_branch_total_loss: f64,
     pub improvement_over_no_test: f64,
 }
 
@@ -176,7 +177,7 @@ fn evaluate_first_branch(
                     .map(|decision| decision.decision_id),
                 terminal_expected_decision_loss: terminal_loss,
                 second_measurement_cost: second_cost,
-                branch_expected_total_loss: terminal_loss + second_cost,
+                branch_expected_total_loss: first_measurement.cost_units + terminal_loss + second_cost,
             }
         }
         None => AdaptiveBranch {
@@ -188,7 +189,7 @@ fn evaluate_first_branch(
             second_negative_decision_id: None,
             terminal_expected_decision_loss: current_decision.expected_loss,
             second_measurement_cost: 0.0,
-            branch_expected_total_loss: current_decision.expected_loss,
+            branch_expected_total_loss: first_measurement.cost_units + current_decision.expected_loss,
         },
     };
 
@@ -264,6 +265,7 @@ pub fn evaluate_depth_two(
     let mut best_policy: Option<AdaptivePolicy> = None;
     let mut second_measurements_evaluated = 0usize;
     let mut nonzero_branches = 0usize;
+    let mut first_measurements_enumerated = 0usize;
     let prior: Vec<f64> = case.hypotheses.iter().map(|hypothesis| hypothesis.prior).collect();
 
     for (first_measurement, first_evaluation) in
@@ -281,6 +283,7 @@ pub fn evaluate_depth_two(
         let Some(likelihoods) = first_measurement.positive_likelihoods.as_ref() else {
             continue;
         };
+        first_measurements_enumerated += 1;
         let probability_positive = first_evaluation
             .probability_positive
             .expect("eligible measurement has an outcome probability");
@@ -340,6 +343,11 @@ pub fn evaluate_depth_two(
             continue;
         }
 
+        let worst_case_branch_total_loss = branches
+            .iter()
+            .map(|branch| branch.branch_expected_total_loss)
+            .max_by(f64::total_cmp)
+            .unwrap_or(expected_total_loss);
         let candidate = AdaptivePolicy {
             first_measurement_id: first_measurement.id,
             first_measurement_cost: first_cost,
@@ -347,6 +355,7 @@ pub fn evaluate_depth_two(
             expected_terminal_decision_loss: expected_terminal_loss,
             expected_measurement_cost,
             expected_total_loss,
+            worst_case_branch_total_loss,
             improvement_over_no_test: improvement,
         };
 
@@ -374,7 +383,7 @@ pub fn evaluate_depth_two(
         greedy_one_step_measurement_id: greedy_id,
         greedy_one_step_total_loss: greedy_total_loss,
         adaptive_depth_two: best_policy,
-        first_measurements_enumerated: measurements.len(),
+        first_measurements_enumerated,
         nonzero_first_outcome_branches: nonzero_branches,
         second_measurements_evaluated,
     })
