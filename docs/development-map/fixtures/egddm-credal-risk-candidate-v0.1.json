@@ -1,0 +1,195 @@
+{
+  "scenario_id": "d6.16-credal-risk-bounded-priors-v0.1",
+  "decision_cutoff": "2026-11-16T10:00:00Z",
+  "actions": [
+    {
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0
+    },
+    {
+      "action_id": "bounded-probe",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 1200
+    },
+    {
+      "action_id": "bounded-probe-wide",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 3500
+    },
+    {
+      "action_id": "inspect-readonly",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 0
+    }
+  ],
+  "hypothesis_bounds": [
+    {
+      "hypothesis_id": "safe",
+      "lower_probability_bps": 5000,
+      "upper_probability_bps": 7000,
+      "nominal_probability_bps": 6000
+    },
+    {
+      "hypothesis_id": "hazard-a",
+      "lower_probability_bps": 500,
+      "upper_probability_bps": 2500,
+      "nominal_probability_bps": 1500
+    },
+    {
+      "hypothesis_id": "hazard-b",
+      "lower_probability_bps": 500,
+      "upper_probability_bps": 2500,
+      "nominal_probability_bps": 1500
+    },
+    {
+      "hypothesis_id": "hazard-ab",
+      "lower_probability_bps": 500,
+      "upper_probability_bps": 3000,
+      "nominal_probability_bps": 1000
+    }
+  ],
+  "options": [
+    {
+      "option_id": "cheap-signal",
+      "available_at": "2026-11-16T09:00:00Z"
+    },
+    {
+      "option_id": "gate-a",
+      "available_at": "2026-11-16T09:00:00Z"
+    },
+    {
+      "option_id": "gate-b",
+      "available_at": "2026-11-16T09:00:00Z"
+    },
+    {
+      "option_id": "audit",
+      "available_at": "2026-11-16T09:00:00Z"
+    }
+  ],
+  "traces": [
+    {
+      "trace_id": "nominal-only-probe",
+      "acquisitions": [],
+      "decision": {
+        "kind": "act",
+        "action_id": "bounded-probe",
+        "claimed_residual_risk_bps": 1000
+      }
+    },
+    {
+      "trace_id": "robust-probe-after-cheap-signal",
+      "acquisitions": [
+        {
+          "option_id": "cheap-signal",
+          "observed_value": "clear",
+          "at": "2026-11-16T09:40:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "bounded-probe",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "single-gate-not-enough-release",
+      "acquisitions": [
+        {
+          "option_id": "gate-a",
+          "observed_value": "pass",
+          "at": "2026-11-16T09:40:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "two-gates-release",
+      "acquisitions": [
+        {
+          "option_id": "gate-a",
+          "observed_value": "pass",
+          "at": "2026-11-16T09:40:00Z"
+        },
+        {
+          "option_id": "gate-b",
+          "observed_value": "pass",
+          "at": "2026-11-16T09:44:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "always-act-release",
+      "acquisitions": [],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "always-abstain-readonly",
+      "acquisitions": [],
+      "decision": {
+        "kind": "defer",
+        "action_id": "inspect-readonly",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "false-observation-retained",
+      "acquisitions": [
+        {
+          "option_id": "gate-a",
+          "observed_value": "forged-pass",
+          "at": "2026-11-16T09:40:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "bounded-probe",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "bounded-action-wide-envelope",
+      "acquisitions": [],
+      "decision": {
+        "kind": "act",
+        "action_id": "bounded-probe-wide",
+        "claimed_residual_risk_bps": 3000
+      }
+    },
+    {
+      "trace_id": "risk-underreport",
+      "acquisitions": [],
+      "decision": {
+        "kind": "act",
+        "action_id": "bounded-probe",
+        "claimed_residual_risk_bps": 500
+      }
+    },
+    {
+      "trace_id": "defer-release",
+      "acquisitions": [],
+      "decision": {
+        "kind": "defer",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 5000
+      }
+    }
+  ]
+}

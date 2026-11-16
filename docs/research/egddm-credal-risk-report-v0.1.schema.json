@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-credal-risk-report-v0.1.schema.json",
+  "title": "EGDDM D6.16 robust risk report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "hypothesis_count",
+    "action_count",
+    "option_count",
+    "trace_count",
+    "summary",
+    "traces",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "adjudication_status": {
+      "const": "synthetic_known_answer_credal_evaluation_only"
+    },
+    "hypothesis_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "action_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "option_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "trace_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unsupported_action_trace_count",
+        "actual_unsafe_action_trace_count",
+        "hard_gate_violation_trace_count",
+        "nominal_false_safe_trace_count",
+        "unnecessary_abstention_trace_count",
+        "correctly_deferred_trace_count",
+        "future_evidence_leakage_events",
+        "false_observation_events",
+        "total_prior_optimism_gap_bps"
+      ],
+      "properties": {
+        "unsupported_action_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "actual_unsafe_action_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "hard_gate_violation_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nominal_false_safe_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unnecessary_abstention_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "correctly_deferred_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "future_evidence_leakage_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "false_observation_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_prior_optimism_gap_bps": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "trace_id",
+          "decision_kind",
+          "action_id",
+          "nominal_posterior_risk_bps",
+          "worst_case_posterior_risk_bps",
+          "prior_optimism_gap_bps",
+          "robust_action_justified",
+          "unsupported_action"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "decision_kind": {
+            "enum": [
+              "act",
+              "defer"
+            ]
+          },
+          "action_id": {
+            "type": "string"
+          },
+          "nominal_posterior_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "worst_case_posterior_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "prior_optimism_gap_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "robust_action_justified": {
+            "type": "boolean"
+          },
+          "unsupported_action": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
