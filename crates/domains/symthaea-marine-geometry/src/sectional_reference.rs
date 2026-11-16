@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 use crate::full_envelope::{
-    FullEnvelopeDisposition, FullEnvelopeSpec, HullEndCondition, ProfilePoint, SymmetryPolicy,
+    FullEnvelopeDisposition, FullEnvelopeSpec, ProfilePoint, SymmetryPolicy,
     compute_full_envelope_spec_digest, validate_full_envelope_spec,
 };
 
@@ -668,7 +668,7 @@ mod tests {
 
     fn fixture_request() -> SectionalReferenceRequest {
         serde_json::from_str(include_str!(
-            "../docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json"
+            "../../../../docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json"
         ))
         .unwrap()
     }
