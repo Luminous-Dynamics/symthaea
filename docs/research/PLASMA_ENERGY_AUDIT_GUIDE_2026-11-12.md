@@ -421,3 +421,15 @@ Review of the full 2026 Green Chemistry article clarifies that the DBD hybrid en
 - prospective validation R2 = 0.92 on 10 new points within the explored domain.
 
 The paper reports 358 points in the abstract/methods and 357 in its conclusion. The discrepancy is left unresolved until the SI row table is independently reconciled. The new benchmark targets mean five-fold grouped R2 >=0.55 and worst-fold R2 >=0.15, a separate LOPO mean R2 >=0.45, 90% interval coverage >=90%, at least 80% applicability coverage and >=20 independent prospective reactor observations. The source result is not promoted to cross-reactor or cross-regime validation.
+
+
+## 9.23 Ammonia cracking dynamic service-response source and target
+
+The offline audit corpus includes:
+- `NH3-CRACK-MW-RESONATOR-DYNAMIC-2026`: QWCCR, 200 W / 1 bar / 1 SLPM pure NH3 steady-state source point; 1.31 ms 160→180 W and 1.10 ms 180→160 W ACR/diagnostic responses; 40.95% steady ACR and 11.71 g/kWh steady H2 energy yield. The source record explicitly says accepted H2 product response was not measured.
+- `NH3-CRACK-WAVEGUIDE-MWPJ-2026`: separate high-power waveguide / Ar-balance MWPJ comparator, with approximately 47.5% critical NH3 inlet fraction vs 2.32% Surfatron and approximately sevenfold relative efficiency claim. The validator does not transfer this result to the QWCCR.
+- `NH3-CRACK-DYNAMIC-DELIVERY-RESPONSE-001`: research target for end-to-end accepted H2 service response, with direct product flow/purity measurement and full grid-side energy.
+
+The audit validates source step direction, pressure, power pair, response time and measurand layer. It refuses an ACR/optical diagnostic response promoted into accepted H2 product response. The benchmark target separately requires sample-train delay, independently measured H2 flow/purity, held-out OES proxy domains, storage/compression accounting and transient product-quality gates.
+
+The corpus contains 55 source cases / 101 negative controls / 7 derived arithmetic checks / 13 research benchmark targets. All target status fields remain `RESEARCH_TARGET_NOT_RESULT`; no Luminous measurement is claimed.
