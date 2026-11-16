@@ -37,20 +37,20 @@ impl SourceKey {
 pub enum SourceProgressOperation {
     /// No on-time event with event_time_us < exclusive_event_time_us is
     /// expected under the named source policy.
-    Advance {
-        exclusive_event_time_us: i64,
-    },
+    Advance { exclusive_event_time_us: i64 },
     /// The source has ended. No further events of any event time are expected.
-    EndOfStream {
-        final_exclusive_event_time_us: i64,
-    },
+    EndOfStream { final_exclusive_event_time_us: i64 },
 }
 
 impl SourceProgressOperation {
     fn exclusive_bound(self) -> i64 {
         match self {
-            Self::Advance { exclusive_event_time_us } => exclusive_event_time_us,
-            Self::EndOfStream { final_exclusive_event_time_us } => final_exclusive_event_time_us,
+            Self::Advance {
+                exclusive_event_time_us,
+            } => exclusive_event_time_us,
+            Self::EndOfStream {
+                final_exclusive_event_time_us,
+            } => final_exclusive_event_time_us,
         }
     }
 
@@ -171,7 +171,9 @@ pub enum WatermarkError {
     ZeroStreamGeneration,
     ZeroProgressSequence,
     ZeroPolicyDigest,
-    DuplicateProgressId { progress_id: u64 },
+    DuplicateProgressId {
+        progress_id: u64,
+    },
     EmptyBatch,
     BatchTimestampMismatch,
     NonIncreasingTransactionTime {
@@ -219,29 +221,73 @@ pub enum WatermarkError {
 impl fmt::Display for WatermarkError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::ZeroSourceIdentity => write!(f, "watermark source entity/modality/source IDs must be nonzero"),
+            Self::ZeroSourceIdentity => write!(
+                f,
+                "watermark source entity/modality/source IDs must be nonzero"
+            ),
             Self::ZeroProgressId => write!(f, "source progress ID must be nonzero"),
             Self::ZeroStreamGeneration => write!(f, "source stream generation must be nonzero"),
             Self::ZeroProgressSequence => write!(f, "source progress sequence must be nonzero"),
             Self::ZeroPolicyDigest => write!(f, "source progress policy digest must be nonzero"),
-            Self::DuplicateProgressId { progress_id } => write!(f, "duplicate source progress ID {progress_id}"),
+            Self::DuplicateProgressId { progress_id } => {
+                write!(f, "duplicate source progress ID {progress_id}")
+            }
             Self::EmptyBatch => write!(f, "source progress transaction batch must not be empty"),
-            Self::BatchTimestampMismatch => write!(f, "all source progress records in a transaction must share recorded_at_us"),
-            Self::NonIncreasingTransactionTime { previous, actual } => write!(f, "source progress transaction time {actual} must be later than previous commit {previous}"),
-            Self::UnknownSourceGeneration { source } => write!(f, "source {:?} has no prior generation", source),
-            Self::StreamGenerationMismatch { expected, actual } => write!(f, "expected source stream generation {expected}, received {actual}"),
-            Self::PolicyChangedWithinGeneration { stream_generation } => write!(f, "source progress policy changed without advancing stream generation {stream_generation}"),
-            Self::ProgressSequenceMismatch { expected, actual } => write!(f, "expected progress sequence {expected}, received {actual}"),
-            Self::WatermarkRegression { previous, actual } => write!(f, "exclusive source watermark regressed from {previous} to {actual}"),
-            Self::SourceAlreadyEnded { source } => write!(f, "source {:?} already declared end-of-stream", source),
-            Self::DuplicateRequiredSource { source } => write!(f, "required source {:?} appears more than once", source),
+            Self::BatchTimestampMismatch => write!(
+                f,
+                "all source progress records in a transaction must share recorded_at_us"
+            ),
+            Self::NonIncreasingTransactionTime { previous, actual } => write!(
+                f,
+                "source progress transaction time {actual} must be later than previous commit {previous}"
+            ),
+            Self::UnknownSourceGeneration { source } => {
+                write!(f, "source {:?} has no prior generation", source)
+            }
+            Self::StreamGenerationMismatch { expected, actual } => write!(
+                f,
+                "expected source stream generation {expected}, received {actual}"
+            ),
+            Self::PolicyChangedWithinGeneration { stream_generation } => write!(
+                f,
+                "source progress policy changed without advancing stream generation {stream_generation}"
+            ),
+            Self::ProgressSequenceMismatch { expected, actual } => write!(
+                f,
+                "expected progress sequence {expected}, received {actual}"
+            ),
+            Self::WatermarkRegression { previous, actual } => write!(
+                f,
+                "exclusive source watermark regressed from {previous} to {actual}"
+            ),
+            Self::SourceAlreadyEnded { source } => {
+                write!(f, "source {:?} already declared end-of-stream", source)
+            }
+            Self::DuplicateRequiredSource { source } => {
+                write!(f, "required source {:?} appears more than once", source)
+            }
             Self::NoRequiredSources => write!(f, "completeness requires at least one source"),
-            Self::InvalidCompletenessInterval => write!(f, "completeness interval must be non-empty and half-open"),
+            Self::InvalidCompletenessInterval => {
+                write!(f, "completeness interval must be non-empty and half-open")
+            }
             Self::InvalidEventRecord => write!(f, "event record failed its event contract"),
-            Self::EventUnavailableAtReceipt { available_at_us, recorded_at_us } => write!(f, "event availability {available_at_us} is after arrival receipt time {recorded_at_us}"),
-            Self::DuplicateEventArrival { event_id } => write!(f, "event {event_id} already has an arrival receipt"),
-            Self::ArithmeticOverflow => write!(f, "watermark counter or digest length arithmetic overflowed"),
-            Self::InvalidHistory => write!(f, "source watermark history or indexes are inconsistent"),
+            Self::EventUnavailableAtReceipt {
+                available_at_us,
+                recorded_at_us,
+            } => write!(
+                f,
+                "event availability {available_at_us} is after arrival receipt time {recorded_at_us}"
+            ),
+            Self::DuplicateEventArrival { event_id } => {
+                write!(f, "event {event_id} already has an arrival receipt")
+            }
+            Self::ArithmeticOverflow => write!(
+                f,
+                "watermark counter or digest length arithmetic overflowed"
+            ),
+            Self::InvalidHistory => {
+                write!(f, "source watermark history or indexes are inconsistent")
+            }
         }
     }
 }
@@ -306,7 +352,10 @@ impl SourceWatermarkLedger {
             return Err(WatermarkError::EmptyBatch);
         }
         let transaction_time = incoming[0].recorded_at_us;
-        if incoming.iter().any(|revision| revision.recorded_at_us != transaction_time) {
+        if incoming
+            .iter()
+            .any(|revision| revision.recorded_at_us != transaction_time)
+        {
             return Err(WatermarkError::BatchTimestampMismatch);
         }
         if let Some(previous) = self.last_transaction_time_us {
@@ -327,10 +376,7 @@ impl SourceWatermarkLedger {
         Ok(())
     }
 
-    fn append_unchecked(
-        &mut self,
-        revision: SourceProgressRevision,
-    ) -> Result<(), WatermarkError> {
+    fn append_unchecked(&mut self, revision: SourceProgressRevision) -> Result<(), WatermarkError> {
         revision.source.validate()?;
         if revision.progress_id == 0 {
             return Err(WatermarkError::ZeroProgressId);
@@ -350,7 +396,9 @@ impl SourceWatermarkLedger {
             });
         }
 
-        let prior_index = self.revisions_by_source.get(&revision.source)
+        let prior_index = self
+            .revisions_by_source
+            .get(&revision.source)
             .and_then(|chain| chain.last().copied());
         match prior_index {
             None => {
@@ -387,7 +435,9 @@ impl SourceWatermarkLedger {
                             stream_generation: revision.stream_generation,
                         });
                     }
-                    let expected = previous.progress_sequence.checked_add(1)
+                    let expected = previous
+                        .progress_sequence
+                        .checked_add(1)
                         .ok_or(WatermarkError::ArithmeticOverflow)?;
                     if revision.progress_sequence != expected {
                         return Err(WatermarkError::ProgressSequenceMismatch {
@@ -396,7 +446,9 @@ impl SourceWatermarkLedger {
                         });
                     }
                 } else {
-                    let expected = previous.stream_generation.checked_add(1)
+                    let expected = previous
+                        .stream_generation
+                        .checked_add(1)
                         .ok_or(WatermarkError::ArithmeticOverflow)?;
                     if revision.stream_generation != expected {
                         return Err(WatermarkError::StreamGenerationMismatch {
@@ -417,7 +469,10 @@ impl SourceWatermarkLedger {
         let index = self.revisions.len();
         self.revisions.push(revision);
         self.revision_by_id.insert(revision.progress_id, index);
-        self.revisions_by_source.entry(revision.source).or_default().push(index);
+        self.revisions_by_source
+            .entry(revision.source)
+            .or_default()
+            .push(index);
         Ok(())
     }
 
@@ -436,7 +491,9 @@ impl SourceWatermarkLedger {
                 recorded < knowledge_time_us
             }
         });
-        count.checked_sub(1).map(|position| &self.revisions[chain[position]])
+        count
+            .checked_sub(1)
+            .map(|position| &self.revisions[chain[position]])
     }
 
     /// Assess whether every required source has closed the half-open
@@ -498,9 +555,16 @@ impl SourceWatermarkLedger {
         for source in &unique {
             let start = (*source, interval_start_us);
             let end = (*source, interval_end_exclusive_us);
-            for indices in self.late_breaches_by_source_event_time.range(start..end).map(|(_, indices)| indices) {
+            for indices in self
+                .late_breaches_by_source_event_time
+                .range(start..end)
+                .map(|(_, indices)| indices)
+            {
                 for index in indices {
-                    let breach = self.late_breaches.get(*index).ok_or(WatermarkError::InvalidHistory)?;
+                    let breach = self
+                        .late_breaches
+                        .get(*index)
+                        .ok_or(WatermarkError::InvalidHistory)?;
                     if breach.recorded_at_us <= known_at_us {
                         late_breaches.push(*breach);
                     }
@@ -587,7 +651,9 @@ impl SourceWatermarkLedger {
         }
         let mut unique = BTreeSet::new();
         for event in &incoming {
-            event.validate().map_err(|_| WatermarkError::InvalidEventRecord)?;
+            event
+                .validate()
+                .map_err(|_| WatermarkError::InvalidEventRecord)?;
             if event.available_at_us > recorded_at_us {
                 return Err(WatermarkError::EventUnavailableAtReceipt {
                     available_at_us: event.available_at_us,
@@ -627,11 +693,13 @@ impl SourceWatermarkLedger {
                 let evidence = SourceProgressEvidence::from(*progress);
                 match progress.operation {
                     SourceProgressOperation::EndOfStream { .. } => {
-                        EventArrivalClassification::Late(LateEventKind::AfterEndOfStream { evidence })
+                        EventArrivalClassification::Late(LateEventKind::AfterEndOfStream {
+                            evidence,
+                        })
                     }
-                    SourceProgressOperation::Advance { exclusive_event_time_us }
-                        if event.event_time_us < exclusive_event_time_us =>
-                    {
+                    SourceProgressOperation::Advance {
+                        exclusive_event_time_us,
+                    } if event.event_time_us < exclusive_event_time_us => {
                         EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark {
                             progress: evidence,
                         })
@@ -666,9 +734,8 @@ impl SourceWatermarkLedger {
         // Rebuild one global knowledge-time sequence from the two append-only
         // record families. A timestamp can contain progress OR event arrivals,
         // but not both; this avoids ambiguous ordering within one transaction.
-        let mut timeline: Vec<(i64, u8, usize)> = Vec::with_capacity(
-            self.revisions.len() + self.event_arrivals.len()
-        );
+        let mut timeline: Vec<(i64, u8, usize)> =
+            Vec::with_capacity(self.revisions.len() + self.event_arrivals.len());
         for (index, revision) in self.revisions.iter().enumerate() {
             timeline.push((revision.recorded_at_us, 0, index));
         }
@@ -690,15 +757,18 @@ impl SourceWatermarkLedger {
                 end += 1;
             }
             if kind == 0 {
-                let batch: Vec<_> = timeline[offset..end].iter()
+                let batch: Vec<_> = timeline[offset..end]
+                    .iter()
                     .map(|(_, _, index)| self.revisions[*index])
                     .collect();
                 rebuilt.append_batch(batch)?;
             } else {
-                let batch: Vec<_> = timeline[offset..end].iter()
+                let batch: Vec<_> = timeline[offset..end]
+                    .iter()
                     .map(|(_, _, index)| self.event_arrivals[*index].event)
                     .collect();
-                let expected: Vec<_> = timeline[offset..end].iter()
+                let expected: Vec<_> = timeline[offset..end]
+                    .iter()
                     .map(|(_, _, index)| self.event_arrivals[*index].classification)
                     .collect();
                 let actual = rebuilt.record_event_arrival_batch(batch, recorded_at)?;
@@ -727,11 +797,15 @@ impl SourceWatermarkLedger {
             hasher.update(revision.recorded_at_us.to_le_bytes());
             hasher.update(revision.policy_sha256);
             match revision.operation {
-                SourceProgressOperation::Advance { exclusive_event_time_us } => {
+                SourceProgressOperation::Advance {
+                    exclusive_event_time_us,
+                } => {
                     hasher.update([1]);
                     hasher.update(exclusive_event_time_us.to_le_bytes());
                 }
-                SourceProgressOperation::EndOfStream { final_exclusive_event_time_us } => {
+                SourceProgressOperation::EndOfStream {
+                    final_exclusive_event_time_us,
+                } => {
                     hasher.update([2]);
                     hasher.update(final_exclusive_event_time_us.to_le_bytes());
                 }
@@ -744,7 +818,9 @@ impl SourceWatermarkLedger {
             match receipt.classification {
                 EventArrivalClassification::NoPriorProgress => hasher.update([0]),
                 EventArrivalClassification::OnTime => hasher.update([1]),
-                EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark { progress }) => {
+                EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark {
+                    progress,
+                }) => {
                     hasher.update([2]);
                     hash_progress_evidence(&mut hasher, progress);
                 }
@@ -763,7 +839,11 @@ mod tests {
     use super::*;
 
     fn source(modality_id: u32) -> SourceKey {
-        SourceKey { entity_id: 1, modality_id, source_id: u64::from(modality_id) }
+        SourceKey {
+            entity_id: 1,
+            modality_id,
+            source_id: u64::from(modality_id),
+        }
     }
 
     fn progress(
@@ -794,7 +874,12 @@ mod tests {
         }
     }
 
-    fn event(event_id: u64, modality_id: u32, event_time_us: i64, available_at_us: i64) -> EventRecord {
+    fn event(
+        event_id: u64,
+        modality_id: u32,
+        event_time_us: i64,
+        available_at_us: i64,
+    ) -> EventRecord {
         EventRecord {
             event_id,
             entity_id: 1,
@@ -804,7 +889,10 @@ mod tests {
             available_at_us,
             source_sequence: event_id,
             unit_code: 1,
-            measurement: Measurement::Observed { scaled_value: 1, decimal_scale: 0 },
+            measurement: Measurement::Observed {
+                scaled_value: 1,
+                decimal_scale: 0,
+            },
             source_sha256: [event_id as u8; 32],
         }
     }
@@ -861,23 +949,34 @@ mod tests {
                 progress: SourceProgressEvidence::from(revision),
             })
         );
-        assert_eq!(ledger.late_breaches()[0].kind, match classification {
-            EventArrivalClassification::Late(kind) => kind,
-            _ => unreachable!(),
-        });
+        assert_eq!(
+            ledger.late_breaches()[0].kind,
+            match classification {
+                EventArrivalClassification::Late(kind) => kind,
+                _ => unreachable!(),
+            }
+        );
     }
 
     #[test]
     fn indexed_completeness_matches_full_history_audit() {
         let mut ledger = SourceWatermarkLedger::default();
-        ledger.append_batch([
-            progress(1, 1, 1, 1, 10, 100, false),
-            progress(2, 2, 1, 1, 10, 120, false),
-        ]).unwrap();
-        ledger.record_event_arrival(event(1, 1, 50, 20), 20).unwrap();
+        ledger
+            .append_batch([
+                progress(1, 1, 1, 1, 10, 100, false),
+                progress(2, 2, 1, 1, 10, 120, false),
+            ])
+            .unwrap();
+        ledger
+            .record_event_arrival(event(1, 1, 50, 20), 20)
+            .unwrap();
 
-        let indexed = ledger.completeness(1, &[source(1), source(2)], 0, 100, 20).unwrap();
-        let audited = ledger.completeness_verified(1, &[source(1), source(2)], 0, 100, 20).unwrap();
+        let indexed = ledger
+            .completeness(1, &[source(1), source(2)], 0, 100, 20)
+            .unwrap();
+        let audited = ledger
+            .completeness_verified(1, &[source(1), source(2)], 0, 100, 20)
+            .unwrap();
         assert_eq!(indexed, audited);
         assert_eq!(indexed.verdict, CompletenessVerdict::Contested);
     }
@@ -889,10 +988,16 @@ mod tests {
             progress(1, 1, 1, 1, 10, 100, false),
             progress(2, 2, 1, 1, 10, 100, false),
         ]).unwrap();
-        ledger.record_event_arrival(event(1, 2, 50, 20), 20).unwrap();
-        ledger.record_event_arrival(event(2, 1, 200, 30), 30).unwrap();
+        ledger
+            .record_event_arrival(event(1, 2, 50, 20), 20)
+            .unwrap();
+        ledger
+            .record_event_arrival(event(2, 1, 200, 30), 30)
+            .unwrap();
 
-        let report = ledger.completeness(1, &[source(1)], 0, 100, 30).unwrap();
+        let report = ledger
+            .completeness(1, &[source(1)], 0, 100, 30)
+            .unwrap();
         assert_eq!(report.verdict, CompletenessVerdict::Complete);
         assert!(report.late_breaches.is_empty());
         assert_eq!(
@@ -913,11 +1018,15 @@ mod tests {
     #[test]
     fn interval_is_bounded_by_least_advanced_required_source() {
         let mut ledger = SourceWatermarkLedger::default();
-        ledger.append_batch([
-            progress(1, 1, 1, 1, 10, 120, false),
-            progress(2, 2, 1, 1, 10, 80, false),
-        ]).unwrap();
-        let report = ledger.completeness(1, &[source(1), source(2)], 0, 100, 10).unwrap();
+        ledger
+            .append_batch([
+                progress(1, 1, 1, 1, 10, 120, false),
+                progress(2, 2, 1, 1, 10, 80, false),
+            ])
+            .unwrap();
+        let report = ledger
+            .completeness(1, &[source(1), source(2)], 0, 100, 10)
+            .unwrap();
         assert_eq!(report.verdict, CompletenessVerdict::Incomplete);
         assert_eq!(report.blocked_sources, vec![source(2)]);
     }
@@ -939,8 +1048,20 @@ mod tests {
         let mut ledger = SourceWatermarkLedger::default();
         ledger.append(progress(1, 1, 1, 1, 10, 50, false)).unwrap();
         ledger.append(progress(2, 1, 1, 2, 30, 100, false)).unwrap();
-        assert_eq!(ledger.completeness(1, &[source(1)], 0, 100, 20).unwrap().verdict, CompletenessVerdict::Incomplete);
-        assert_eq!(ledger.completeness(1, &[source(1)], 0, 100, 30).unwrap().verdict, CompletenessVerdict::Complete);
+        assert_eq!(
+            ledger
+                .completeness(1, &[source(1)], 0, 100, 20)
+                .unwrap()
+                .verdict,
+            CompletenessVerdict::Incomplete
+        );
+        assert_eq!(
+            ledger
+                .completeness(1, &[source(1)], 0, 100, 30)
+                .unwrap()
+                .verdict,
+            CompletenessVerdict::Complete
+        );
     }
 
     #[test]
@@ -950,9 +1071,11 @@ mod tests {
         let event = event(1, 1, 50, 20);
         assert_eq!(
             ledger.record_event_arrival(event, 20),
-            Ok(EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark {
-                progress: SourceProgressEvidence::from(progress(1, 1, 1, 1, 10, 100, false)),
-            }))
+            Ok(EventArrivalClassification::Late(
+                LateEventKind::BelowExclusiveWatermark {
+                    progress: SourceProgressEvidence::from(progress(1, 1, 1, 1, 10, 100, false)),
+                }
+            ))
         );
         let report = ledger.completeness(1, &[source(1)], 0, 100, 20).unwrap();
         assert_eq!(report.verdict, CompletenessVerdict::Contested);
@@ -974,11 +1097,16 @@ mod tests {
     fn terminal_source_closes_future_intervals_without_inventing_a_watermark() {
         let mut ledger = SourceWatermarkLedger::default();
         ledger.append(progress(1, 1, 1, 1, 10, 50, true)).unwrap();
-        let report = ledger.completeness(1, &[source(1)], 1_000, 2_000, 10).unwrap();
+        let report = ledger
+            .completeness(1, &[source(1)], 1_000, 2_000, 10)
+            .unwrap();
         assert_eq!(report.verdict, CompletenessVerdict::Complete);
-        assert_eq!(report.sources[0].status, SourceCompleteness::Complete {
-            evidence: SourceProgressEvidence::from(progress(1, 1, 1, 1, 10, 50, true)),
-        });
+        assert_eq!(
+            report.sources[0].status,
+            SourceCompleteness::Complete {
+                evidence: SourceProgressEvidence::from(progress(1, 1, 1, 1, 10, 50, true)),
+            }
+        );
     }
 
     #[test]
@@ -988,7 +1116,10 @@ mod tests {
         let before = ledger.state_sha256();
         assert_eq!(
             ledger.append(progress(2, 1, 1, 2, 20, 90, false)),
-            Err(WatermarkError::WatermarkRegression { previous: 100, actual: 90 })
+            Err(WatermarkError::WatermarkRegression {
+                previous: 100,
+                actual: 90
+            })
         );
         assert_eq!(ledger.state_sha256(), before);
     }
@@ -1013,7 +1144,9 @@ mod tests {
         changed.policy_sha256 = [8; 32];
         assert_eq!(
             ledger.append(changed),
-            Err(WatermarkError::PolicyChangedWithinGeneration { stream_generation: 1 })
+            Err(WatermarkError::PolicyChangedWithinGeneration {
+                stream_generation: 1
+            })
         );
         let mut new_generation = progress(3, 1, 2, 1, 21, 120, false);
         new_generation.policy_sha256 = [8; 32];
@@ -1026,7 +1159,10 @@ mod tests {
         let mut ledger = SourceWatermarkLedger::default();
         let mut invalid = progress(1, 1, 1, 1, 10, 100, false);
         invalid.policy_sha256 = [0; 32];
-        assert_eq!(ledger.append(invalid), Err(WatermarkError::ZeroPolicyDigest));
+        assert_eq!(
+            ledger.append(invalid),
+            Err(WatermarkError::ZeroPolicyDigest)
+        );
         ledger.append(progress(1, 1, 1, 1, 10, 100, true)).unwrap();
         assert_eq!(
             ledger.append(progress(2, 1, 1, 2, 20, 120, false)),
@@ -1043,7 +1179,10 @@ mod tests {
                 progress(1, 1, 1, 1, 10, 100, false),
                 progress(2, 2, 1, 2, 10, 100, false),
             ]),
-            Err(WatermarkError::ProgressSequenceMismatch { expected: 1, actual: 2 })
+            Err(WatermarkError::ProgressSequenceMismatch {
+                expected: 1,
+                actual: 2
+            })
         );
         assert!(ledger.revisions().is_empty());
         assert_eq!(ledger.state_sha256(), before);
@@ -1070,9 +1209,23 @@ mod tests {
     fn historical_completeness_is_not_rewritten_by_late_arrival() {
         let mut ledger = SourceWatermarkLedger::default();
         ledger.append(progress(1, 1, 1, 1, 10, 100, false)).unwrap();
-        ledger.record_event_arrival(event(1, 1, 50, 20), 20).unwrap();
-        assert_eq!(ledger.completeness(1, &[source(1)], 0, 100, 19).unwrap().verdict, CompletenessVerdict::Complete);
-        assert_eq!(ledger.completeness(1, &[source(1)], 0, 100, 20).unwrap().verdict, CompletenessVerdict::Contested);
+        ledger
+            .record_event_arrival(event(1, 1, 50, 20), 20)
+            .unwrap();
+        assert_eq!(
+            ledger
+                .completeness(1, &[source(1)], 0, 100, 19)
+                .unwrap()
+                .verdict,
+            CompletenessVerdict::Complete
+        );
+        assert_eq!(
+            ledger
+                .completeness(1, &[source(1)], 0, 100, 20)
+                .unwrap()
+                .verdict,
+            CompletenessVerdict::Contested
+        );
     }
 
     #[test]
@@ -1086,7 +1239,10 @@ mod tests {
         let before = ledger.state_sha256();
         assert_eq!(
             ledger.append(progress(1, 1, 1, 1, 10, 100, false)),
-            Err(WatermarkError::NonIncreasingTransactionTime { previous: 20, actual: 10 })
+            Err(WatermarkError::NonIncreasingTransactionTime {
+                previous: 20,
+                actual: 10
+            })
         );
         assert_eq!(ledger.state_sha256(), before);
         assert_eq!(ledger.verify_consistency(), Ok(()));
@@ -1095,10 +1251,9 @@ mod tests {
     #[test]
     fn multiple_event_arrivals_share_one_atomic_knowledge_time_transaction() {
         let mut ledger = SourceWatermarkLedger::default();
-        let results = ledger.record_event_arrival_batch(
-            [event(1, 1, 10, 20), event(2, 1, 15, 20)],
-            20,
-        ).unwrap();
+        let results = ledger
+            .record_event_arrival_batch([event(1, 1, 10, 20), event(2, 1, 15, 20)], 20)
+            .unwrap();
         assert_eq!(
             results,
             vec![
