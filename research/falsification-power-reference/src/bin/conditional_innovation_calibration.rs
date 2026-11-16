@@ -116,34 +116,43 @@ fn run_scenario(scenario: Scenario) -> Result<Counts, Box<dyn Error>> {
             // This mean is a deterministic function of the previous public
             // observation. It is committed before the current noise is drawn.
             let null_conditional_mean = RHO * previous_observation;
-            let observed = null_conditional_mean + scenario.shift() + SIGMA * rng.standard_normal();
+            let conditional_id = format!("conditional-{path}-{look}");
+            let zero_mean_id = format!("zero-mean-{path}-{look}");
+            let conditional_digest = format!("conditional-decision-{path}-{look}");
+            let zero_mean_digest = format!("zero-mean-decision-{path}-{look}");
 
+            // Commit the candidate null and the misspecified negative control
+            // before drawing the current observation.
             if conditional_first_crossing.is_none() {
-                let observation_id = format!("conditional-{path}-{look}");
-                let decision_digest = format!("conditional-decision-{path}-{look}");
                 conditional.commit_prediction_with_conditional_gaussian(
-                    &observation_id,
-                    &decision_digest,
+                    &conditional_id,
+                    &conditional_digest,
                     DISCREPANCY,
                     null_conditional_mean,
                     SIGMA,
                 )?;
-                let update = conditional.observe(&observation_id, &decision_digest, observed)?;
+            }
+            if zero_mean_first_crossing.is_none() {
+                zero_mean.commit_prediction_with_sigma(
+                    &zero_mean_id,
+                    &zero_mean_digest,
+                    DISCREPANCY,
+                    SIGMA,
+                )?;
+            }
+
+            let observed =
+                null_conditional_mean + scenario.shift() + SIGMA * rng.standard_normal();
+
+            if conditional_first_crossing.is_none() {
+                let update = conditional.observe(&conditional_id, &conditional_digest, observed)?;
                 if update.crossed_alpha_boundary {
                     conditional_first_crossing = Some(look);
                 }
             }
 
             if zero_mean_first_crossing.is_none() {
-                let observation_id = format!("zero-mean-{path}-{look}");
-                let decision_digest = format!("zero-mean-decision-{path}-{look}");
-                zero_mean.commit_prediction_with_sigma(
-                    &observation_id,
-                    &decision_digest,
-                    DISCREPANCY,
-                    SIGMA,
-                )?;
-                let update = zero_mean.observe(&observation_id, &decision_digest, observed)?;
+                let update = zero_mean.observe(&zero_mean_id, &zero_mean_digest, observed)?;
                 if update.crossed_alpha_boundary {
                     zero_mean_first_crossing = Some(look);
                 }
