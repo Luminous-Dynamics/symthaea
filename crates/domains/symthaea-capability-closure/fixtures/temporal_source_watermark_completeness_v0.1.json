@@ -256,7 +256,7 @@
       65536
     ],
     "indexed_query_repetitions": 51,
-    "verified_query_repetitions": 7,
+    "verified_query_repetitions": 15,
     "interval_width_us": 16,
     "event_time_order": "deterministic_permutation_relative_to_arrival_order",
     "outputs": [
@@ -267,7 +267,8 @@
       "indexed_receipt_candidates_examined",
       "matching_breaches",
       "indexed_p50_p95_p99_us",
-      "verified_p50_p95_p99_us"
+      "verified_p50_us",
+      "verified_max_us"
     ],
     "known_answer": "indexed_and_verified_reports_must_match_for_every_workload_before_timing",
     "correctness_gate": "indexed_and_verified_reports_equal_before_timing",
@@ -296,6 +297,7 @@
       5000000
     ],
     "availability_time": "equal_to_each_event_arrival_transaction_and_after_generated_event_time",
-    "event_time": "zero_based_per_source_permuted_microsecond_values_below_declared_watermark"
+    "event_time": "zero_based_per_source_permuted_microsecond_values_below_declared_watermark",
+    "statistical_note": "51 indexed samples support nearest-rank p50/p95/p99; 15 full-audit samples report median and observed maximum only, not p95/p99"
   }
 }
