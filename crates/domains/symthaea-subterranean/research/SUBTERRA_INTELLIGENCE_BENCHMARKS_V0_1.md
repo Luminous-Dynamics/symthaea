@@ -317,4 +317,4 @@ This is particularly important for physical world models: recent 2026 work notes
 
 ### Evidence boundary
 
-The calibration crate's 14 unit tests are AUTHORED, not executed. Its Dirichlet-smoothed empirical frequencies are not a general Bayesian sensor model and are not evidence of planetary transfer. Qualitative Candidate, Supported or DirectlyObserved site claim states must never be converted directly into probability values. Only independently adjudicated site/action observation cases with provenance are eligible for calibration.
+The calibration crate's 19 unit tests are AUTHORED, not executed. Five cover guarded EVSI conversion, including under-supported-cell rejection, hypothesis-order consistency and preservation of external gate denial. Its Dirichlet-smoothed empirical frequencies are not a general Bayesian sensor model and are not evidence of planetary transfer. Qualitative Candidate, Supported or DirectlyObserved site claim states must never be converted directly into probability values. Only independently adjudicated site/action observation cases with provenance are eligible for calibration.
