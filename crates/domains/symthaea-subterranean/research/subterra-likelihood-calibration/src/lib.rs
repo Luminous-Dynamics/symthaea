@@ -371,6 +371,13 @@ impl CalibrationDataset {
         if table.cells.len() != expected_cells {
             return Err(CalibrationError::InvalidLikelihoodTable);
         }
+        let expected_table = self.fit_likelihoods(
+            table.dirichlet_alpha,
+            table.minimum_training_sites,
+        )?;
+        if expected_table.cells != table.cells {
+            return Err(CalibrationError::InvalidLikelihoodTable);
+        }
         let mut seen_cells = BTreeSet::new();
         for cell in &table.cells {
             let Some(action) = self.actions.iter().find(|a| a.action_id == cell.action_id) else {
@@ -735,6 +742,24 @@ mod tests {
         assert_eq!(report.scored_cases, 2);
         assert_eq!(report.unscored_cases, 1);
         assert!((report.coverage_fraction - (2.0 / 3.0)).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn altered_likelihood_table_is_rejected_before_holdout_scoring() {
+        let data = dataset();
+        let mut table = data.fit_likelihoods(0.5, 2).unwrap();
+        table
+            .cells
+            .iter_mut()
+            .find(|cell| cell.action_id == "gpr" && cell.hypothesis_id == "tunnel")
+            .unwrap()
+            .probabilities
+            .as_mut()
+            .unwrap()[0] = 0.99;
+        assert_eq!(
+            data.score_holdout(&table, DataSplit::Evaluation),
+            Err(CalibrationError::InvalidLikelihoodTable)
+        );
     }
 
     #[test]
