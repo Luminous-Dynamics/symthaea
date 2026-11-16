@@ -854,29 +854,29 @@ fn score_causal_order(
     let ordered_nodes: Vec<&String> = nodes.iter().collect();
     for (index, left) in ordered_nodes.iter().enumerate() {
         for right in ordered_nodes.iter().skip(index + 1) {
-            let gold_lr = gold_closure.contains(&((*left).clone(), (*right).clone()));
-            let gold_rl = gold_closure.contains(&((*right).clone(), (*left).clone()));
-            let candidate_lr = candidate_closure.contains(&((*left).clone(), (*right).clone()));
-            let candidate_rl = candidate_closure.contains(&((*right).clone(), (*left).clone()));
+            let gold_lr = gold_closure.contains(&(left.to_string(), right.to_string()));
+            let gold_rl = gold_closure.contains(&(right.to_string(), left.to_string()));
+            let candidate_lr = candidate_closure.contains(&(left.to_string(), right.to_string()));
+            let candidate_rl = candidate_closure.contains(&(right.to_string(), left.to_string()));
 
             if gold_lr {
                 if candidate_lr {
-                    correct.insert(((*left).clone(), (*right).clone()));
+                    correct.insert((left.to_string(), right.to_string()));
                 } else if candidate_rl {
-                    wrong_direction.insert(((*left).clone(), (*right).clone()));
+                    wrong_direction.insert((left.to_string(), right.to_string()));
                 } else {
-                    missing.insert(((*left).clone(), (*right).clone()));
+                    missing.insert((left.to_string(), right.to_string()));
                 }
             } else if gold_rl {
                 if candidate_rl {
-                    correct.insert(((*right).clone(), (*left).clone()));
+                    correct.insert((right.to_string(), left.to_string()));
                 } else if candidate_lr {
-                    wrong_direction.insert(((*left).clone(), (*right).clone()));
+                    wrong_direction.insert((left.to_string(), right.to_string()));
                 } else {
-                    missing.insert(((*right).clone(), (*left).clone()));
+                    missing.insert((right.to_string(), left.to_string()));
                 }
             } else if candidate_lr || candidate_rl {
-                false_serialization.insert(((*left).clone(), (*right).clone()));
+                false_serialization.insert((left.to_string(), right.to_string()));
             }
         }
     }
