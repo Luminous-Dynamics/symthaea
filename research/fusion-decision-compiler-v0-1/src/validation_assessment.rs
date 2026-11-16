@@ -48,6 +48,9 @@ pub struct ValidationAssessmentProfile {
     pub minimum_holdout_count: usize,
     pub minimum_distinct_facilities: usize,
     pub minimum_distinct_operating_points: usize,
+    /// Categorical slices frozen before the holdout is unsealed.
+    pub slice_dimensions: Vec<ValidationSliceDimension>,
+    pub minimum_per_slice_count: usize,
     pub observables: Vec<ObservableValidationSpec>,
 }
 
@@ -129,6 +132,9 @@ pub enum ValidationAssessmentErrorKind {
     ZeroMinimumFacilityCount,
     ZeroMinimumOperatingPointCount,
     EmptyObservableSet,
+    EmptySliceDimensions,
+    DuplicateSliceDimension,
+    ZeroMinimumPerSliceCount,
     DuplicateObservableSpec,
     InvalidObservableIdentity,
     InvalidObservableUnit,
@@ -209,6 +215,8 @@ pub struct PerCaseValidationResult {
     pub facility_id: String,
     pub case_id: String,
     pub operating_point_id: String,
+    pub regime_id: String,
+    pub geometry_sha256: String,
     pub model_run_id: String,
     pub observable_id: String,
     pub measured_value: f64,
@@ -250,6 +258,68 @@ pub struct PerObservableValidationMetrics {
     pub meets_declared_acceptance: bool,
 }
 
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum ValidationSliceDimension {
+    Facility,
+    Case,
+    OperatingPoint,
+    Regime,
+    Geometry,
+}
+
+impl ValidationSliceDimension {
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Facility => "facility",
+            Self::Case => "case",
+            Self::OperatingPoint => "operating-point",
+            Self::Regime => "regime",
+            Self::Geometry => "geometry",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct ValidationSliceKey {
+    pub dimension: ValidationSliceDimension,
+    pub value: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ValidationSliceDisposition {
+    MeetsDeclaredAcceptance,
+    OutsideDeclaredAcceptance,
+    InsufficientSliceEvidence,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum WorstSliceCriterion {
+    NormalizedRmse,
+    AbsoluteNormalizedBias,
+    MaximumNormalizedAbsoluteError,
+    EmpiricalPointIntervalCoverage,
+    MeanNormalizedIntervalWidth,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PerSliceValidationMetrics {
+    pub key: ValidationSliceKey,
+    pub observable_id: String,
+    pub sample_count: usize,
+    pub metrics: PerObservableValidationMetrics,
+    pub disposition: ValidationSliceDisposition,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct WorstSliceFinding {
+    pub observable_id: String,
+    pub criterion: WorstSliceCriterion,
+    pub extreme_value: f64,
+    /// All exact ties, sorted by dimension then categorical value.
+    pub slice_keys: Vec<ValidationSliceKey>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidationAssessmentReport {
     pub contract_version: &'static str,
@@ -267,6 +337,9 @@ pub struct ValidationAssessmentReport {
     pub calibration_episode_count: usize,
     pub admitted_holdout_record_ids: Vec<String>,
     pub per_observable_metrics: Vec<PerObservableValidationMetrics>,
+    pub slice_disposition: ValidationSliceDisposition,
+    pub per_slice_metrics: Vec<PerSliceValidationMetrics>,
+    pub worst_slice_findings: Vec<WorstSliceFinding>,
     pub per_case_results: Vec<PerCaseValidationResult>,
     pub unseal_receipt_refs: Vec<String>,
     pub model_run_receipt_refs: Vec<String>,
@@ -571,12 +644,73 @@ pub fn assess_blind_holdout_campaign(
     }
 
     metrics.sort_by(|left, right| left.observable_id.cmp(&right.observable_id));
+
+    // Build categorical slice groups only along dimensions frozen in the profile.
+    // Every member retains its original per-case/model/measurement evidence.
+    let mut slice_groups: BTreeMap<ValidationSliceKey, Vec<&PerCaseValidationResult>> =
+        BTreeMap::new();
+    for result in &case_results {
+        for dimension in &campaign.profile.slice_dimensions {
+            let key = ValidationSliceKey {
+                dimension: *dimension,
+                value: slice_value(result, *dimension).to_string(),
+            };
+            slice_groups.entry(key).or_default().push(result);
+        }
+    }
+
+    let mut per_slice_metrics = Vec::new();
+    let mut any_slice_failed = false;
+    let mut any_slice_insufficient = false;
+    for (key, slice_results) in slice_groups {
+        for spec in &campaign.profile.observables {
+            let selected: Vec<&PerCaseValidationResult> = slice_results
+                .iter()
+                .copied()
+                .filter(|result| result.observable_id == spec.observable_id)
+                .collect();
+            if selected.is_empty() {
+                continue;
+            }
+            let metrics_for_slice = compute_observable_metrics(spec, &selected);
+            let disposition = if selected.len() < campaign.profile.minimum_per_slice_count {
+                ValidationSliceDisposition::InsufficientSliceEvidence
+            } else if !metrics_for_slice.meets_declared_acceptance {
+                ValidationSliceDisposition::OutsideDeclaredAcceptance
+            } else {
+                ValidationSliceDisposition::MeetsDeclaredAcceptance
+            };
+            any_slice_failed |=
+                disposition == ValidationSliceDisposition::OutsideDeclaredAcceptance;
+            any_slice_insufficient |=
+                disposition == ValidationSliceDisposition::InsufficientSliceEvidence;
+            per_slice_metrics.push(PerSliceValidationMetrics {
+                key: key.clone(),
+                observable_id: spec.observable_id.clone(),
+                sample_count: selected.len(),
+                metrics: metrics_for_slice,
+                disposition,
+            });
+        }
+    }
+    per_slice_metrics.sort_by(|left, right| {
+        (&left.observable_id, &left.key).cmp(&(&right.observable_id, &right.key))
+    });
+    let worst_slice_findings = build_worst_slice_findings(&per_slice_metrics);
+    let slice_disposition = if any_slice_failed {
+        ValidationSliceDisposition::OutsideDeclaredAcceptance
+    } else if any_slice_insufficient {
+        ValidationSliceDisposition::InsufficientSliceEvidence
+    } else {
+        ValidationSliceDisposition::MeetsDeclaredAcceptance
+    };
+
     let insufficient = campaign.cases.len() < campaign.profile.minimum_holdout_count
         || facility_ids.len() < campaign.profile.minimum_distinct_facilities
         || operating_point_ids.len() < campaign.profile.minimum_distinct_operating_points;
-    let disposition = if any_metric_failed {
+    let disposition = if any_metric_failed || any_slice_failed {
         PredictiveAssessmentDisposition::OutsideDeclaredAcceptance
-    } else if insufficient {
+    } else if insufficient || any_slice_insufficient {
         PredictiveAssessmentDisposition::InsufficientHoldoutEvidence
     } else {
         PredictiveAssessmentDisposition::WithinDeclaredAcceptance
@@ -611,6 +745,9 @@ pub fn assess_blind_holdout_campaign(
             .sum(),
         admitted_holdout_record_ids,
         per_observable_metrics: metrics,
+        slice_disposition,
+        per_slice_metrics,
+        worst_slice_findings,
         per_case_results: case_results,
         unseal_receipt_refs: unseal_refs.into_iter().collect(),
         model_run_receipt_refs: run_receipt_refs.into_iter().collect(),
@@ -618,6 +755,150 @@ pub fn assess_blind_holdout_campaign(
         prediction_evidence_refs: prediction_refs.into_iter().collect(),
         claim_ceiling: "predictive performance on finite admitted blind holdouts only",
     })
+}
+
+
+fn slice_value(
+    result: &PerCaseValidationResult,
+    dimension: ValidationSliceDimension,
+) -> &str {
+    match dimension {
+        ValidationSliceDimension::Facility => &result.facility_id,
+        ValidationSliceDimension::Case => &result.case_id,
+        ValidationSliceDimension::OperatingPoint => &result.operating_point_id,
+        ValidationSliceDimension::Regime => &result.regime_id,
+        ValidationSliceDimension::Geometry => &result.geometry_sha256,
+    }
+}
+
+fn compute_observable_metrics(
+    spec: &ObservableValidationSpec,
+    selected: &[&PerCaseValidationResult],
+) -> PerObservableValidationMetrics {
+    let count = selected.len();
+    let n = count as f64;
+    let signed_sum: f64 = selected.iter().map(|result| result.signed_error).sum();
+    let absolute_sum: f64 = selected.iter().map(|result| result.absolute_error).sum();
+    let squared_sum: f64 = selected
+        .iter()
+        .map(|result| result.signed_error * result.signed_error)
+        .sum();
+    let normalized_width_sum: f64 = selected
+        .iter()
+        .map(|result| {
+            (result.prediction_interval_upper - result.prediction_interval_lower)
+                / spec.normalization_scale
+        })
+        .sum();
+    let point_coverage_count = selected
+        .iter()
+        .filter(|result| result.point_inside_prediction_interval)
+        .count();
+    let overlap_count = selected
+        .iter()
+        .filter(|result| result.measurement_interval_overlaps_prediction_interval)
+        .count();
+    let normalized_bias = (signed_sum / n) / spec.normalization_scale;
+    let normalized_rmse = (squared_sum / n).sqrt() / spec.normalization_scale;
+    let point_coverage = point_coverage_count as f64 / n;
+    let interval_width = normalized_width_sum / n;
+    let maximum_error = selected
+        .iter()
+        .map(|result| result.normalized_absolute_error)
+        .fold(0.0_f64, f64::max);
+    let meets = point_coverage >= spec.minimum_empirical_point_coverage
+        && normalized_rmse <= spec.maximum_normalized_rmse
+        && normalized_bias.abs() <= spec.maximum_absolute_normalized_bias
+        && interval_width <= spec.maximum_mean_normalized_interval_width;
+
+    PerObservableValidationMetrics {
+        observable_id: spec.observable_id.clone(),
+        unit_ref: spec.unit_ref.clone(),
+        service_boundary_ref: spec.service_boundary_ref.clone(),
+        averaging_window_ref: spec.averaging_window_ref.clone(),
+        nominal_interval_coverage: spec.nominal_interval_coverage,
+        interval_method_ref: spec.interval_method_ref.clone(),
+        interval_assumption_ref: spec.interval_assumption_ref.clone(),
+        sample_count: count,
+        mean_signed_error: signed_sum / n,
+        mean_absolute_error: absolute_sum / n,
+        root_mean_square_error: (squared_sum / n).sqrt(),
+        normalized_bias,
+        normalized_rmse,
+        maximum_absolute_normalized_error: maximum_error,
+        empirical_point_interval_coverage: point_coverage,
+        measurement_interval_overlap_coverage: overlap_count as f64 / n,
+        mean_normalized_prediction_interval_width: interval_width,
+        meets_declared_acceptance: meets,
+    }
+}
+
+fn build_worst_slice_findings(
+    slices: &[PerSliceValidationMetrics],
+) -> Vec<WorstSliceFinding> {
+    let mut findings = Vec::new();
+    let observable_ids: BTreeSet<&str> =
+        slices.iter().map(|slice| slice.observable_id.as_str()).collect();
+    let criteria = [
+        WorstSliceCriterion::NormalizedRmse,
+        WorstSliceCriterion::AbsoluteNormalizedBias,
+        WorstSliceCriterion::MaximumNormalizedAbsoluteError,
+        WorstSliceCriterion::EmpiricalPointIntervalCoverage,
+        WorstSliceCriterion::MeanNormalizedIntervalWidth,
+    ];
+
+    for observable_id in observable_ids {
+        for criterion in criteria {
+            let selected: Vec<&PerSliceValidationMetrics> = slices
+                .iter()
+                .filter(|slice| slice.observable_id == observable_id)
+                .collect();
+            if selected.is_empty() {
+                continue;
+            }
+            let value_for = |slice: &PerSliceValidationMetrics| match criterion {
+                WorstSliceCriterion::NormalizedRmse => slice.metrics.normalized_rmse,
+                WorstSliceCriterion::AbsoluteNormalizedBias => slice.metrics.normalized_bias.abs(),
+                WorstSliceCriterion::MaximumNormalizedAbsoluteError => {
+                    slice.metrics.maximum_absolute_normalized_error
+                }
+                WorstSliceCriterion::EmpiricalPointIntervalCoverage => {
+                    slice.metrics.empirical_point_interval_coverage
+                }
+                WorstSliceCriterion::MeanNormalizedIntervalWidth => {
+                    slice.metrics.mean_normalized_prediction_interval_width
+                }
+            };
+            let minimize = criterion == WorstSliceCriterion::EmpiricalPointIntervalCoverage;
+            let extreme_value = selected
+                .iter()
+                .map(|slice| value_for(slice))
+                .reduce(|current, next| {
+                    if minimize {
+                        current.min(next)
+                    } else {
+                        current.max(next)
+                    }
+                })
+                .unwrap_or(0.0);
+            let mut slice_keys: Vec<ValidationSliceKey> = selected
+                .iter()
+                .filter(|slice| value_for(slice) == extreme_value)
+                .map(|slice| slice.key.clone())
+                .collect();
+            slice_keys.sort();
+            findings.push(WorstSliceFinding {
+                observable_id: observable_id.to_string(),
+                criterion,
+                extreme_value,
+                slice_keys,
+            });
+        }
+    }
+    findings.sort_by(|left, right| {
+        (&left.observable_id, left.criterion).cmp(&(&right.observable_id, right.criterion))
+    });
+    findings
 }
 
 fn validate_profile(profile: &ValidationAssessmentProfile) -> Vec<ValidationAssessmentError> {
@@ -1154,6 +1435,8 @@ fn validate_case_observables(
                 facility_id: observation.facility_id.clone(),
                 case_id: observation.case_id.clone(),
                 operating_point_id: observation.operating_point_id.clone(),
+                regime_id: observation.regime_id.clone(),
+                geometry_sha256: observation.geometry_sha256.clone(),
                 model_run_id: case.model_run.run_id.clone(),
                 observable_id: spec.observable_id.clone(),
                 measured_value: measured.measured_value,
@@ -1223,6 +1506,11 @@ mod tests {
             minimum_holdout_count: 3,
             minimum_distinct_facilities: 2,
             minimum_distinct_operating_points: 3,
+            slice_dimensions: vec![
+                ValidationSliceDimension::Facility,
+                ValidationSliceDimension::OperatingPoint,
+            ],
+            minimum_per_slice_count: 1,
             observables: vec![ObservableValidationSpec {
                 observable_id: "net-heat-flux".to_string(),
                 unit_ref: "MW/m2".to_string(),
@@ -1662,6 +1950,109 @@ mod tests {
         assert_eq!(report.measurement_evidence_refs.len(), 3);
         assert_eq!(report.model_run_receipt_refs.len(), 3);
         assert_eq!(report.unseal_receipt_refs.len(), 3);
+    }
+
+
+    #[test]
+    fn pooled_campaign_cannot_hide_a_failing_facility_slice() {
+        let mut source = campaign();
+
+        // Facility A has one severe positive residual. The other two cases are
+        // exact, so pooled normalized RMSE and bias remain within their limits.
+        source.cases[0].predictions[0].predicted_value = 125.0;
+        source.cases[0].predictions[0].prediction_interval_lower = 100.0;
+        source.cases[0].predictions[0].prediction_interval_upper = 125.0;
+        source.cases[1].predictions[0].predicted_value = 120.0;
+        source.cases[2].predictions[0].predicted_value = 80.0;
+        source.cases[2].predictions[0].prediction_interval_lower = 75.0;
+        source.cases[2].predictions[0].prediction_interval_upper = 85.0;
+
+        let report = assess_blind_holdout_campaign(&source).unwrap();
+        assert!(report.per_observable_metrics[0].meets_declared_acceptance);
+        assert_eq!(
+            report.slice_disposition,
+            ValidationSliceDisposition::OutsideDeclaredAcceptance
+        );
+        assert_eq!(
+            report.disposition,
+            PredictiveAssessmentDisposition::OutsideDeclaredAcceptance
+        );
+        let facility_a = report
+            .per_slice_metrics
+            .iter()
+            .find(|slice| {
+                slice.observable_id == "net-heat-flux"
+                    && slice.key.dimension == ValidationSliceDimension::Facility
+                    && slice.key.value == "facility-a"
+            })
+            .unwrap();
+        assert_eq!(
+            facility_a.disposition,
+            ValidationSliceDisposition::OutsideDeclaredAcceptance
+        );
+        assert!(!facility_a.metrics.meets_declared_acceptance);
+    }
+
+    #[test]
+    fn worst_slice_finding_identifies_the_largest_normalized_error_slice() {
+        let mut source = campaign();
+        source.cases[0].predictions[0].predicted_value = 125.0;
+        source.cases[0].predictions[0].prediction_interval_lower = 100.0;
+        source.cases[0].predictions[0].prediction_interval_upper = 125.0;
+        source.cases[1].predictions[0].predicted_value = 120.0;
+        source.cases[2].predictions[0].predicted_value = 80.0;
+        source.cases[2].predictions[0].prediction_interval_lower = 75.0;
+        source.cases[2].predictions[0].prediction_interval_upper = 85.0;
+
+        let report = assess_blind_holdout_campaign(&source).unwrap();
+        let worst = report
+            .worst_slice_findings
+            .iter()
+            .find(|finding| {
+                finding.observable_id == "net-heat-flux"
+                    && finding.criterion == WorstSliceCriterion::NormalizedRmse
+                    && finding.slice_keys.contains(&ValidationSliceKey {
+                        dimension: ValidationSliceDimension::Facility,
+                        value: "facility-a".to_string(),
+                    })
+            })
+            .unwrap();
+        assert!((worst.extreme_value - 0.25).abs() < 1e-12);
+    }
+
+    #[test]
+    fn underfilled_predeclared_slices_are_not_dropped_or_pooled_away() {
+        let mut source = campaign();
+        source.profile.minimum_per_slice_count = 2;
+        let report = assess_blind_holdout_campaign(&source).unwrap();
+        assert_eq!(
+            report.slice_disposition,
+            ValidationSliceDisposition::InsufficientSliceEvidence
+        );
+        assert_eq!(
+            report.disposition,
+            PredictiveAssessmentDisposition::InsufficientHoldoutEvidence
+        );
+        assert!(report.per_slice_metrics.iter().any(|slice| {
+            slice.disposition == ValidationSliceDisposition::InsufficientSliceEvidence
+        }));
+    }
+
+    #[test]
+    fn duplicate_or_empty_predeclared_slice_dimensions_are_refused() {
+        let mut source = campaign();
+        source.profile.slice_dimensions.push(ValidationSliceDimension::Facility);
+        let errors = assess_blind_holdout_campaign(&source).unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.kind == ValidationAssessmentErrorKind::DuplicateSliceDimension
+        }));
+
+        let mut source = campaign();
+        source.profile.slice_dimensions.clear();
+        let errors = assess_blind_holdout_campaign(&source).unwrap_err();
+        assert!(errors.iter().any(|error| {
+            error.kind == ValidationAssessmentErrorKind::EmptySliceDimensions
+        }));
     }
 
     #[test]

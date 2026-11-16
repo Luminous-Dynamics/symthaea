@@ -175,6 +175,11 @@ fn main() {
             minimum_holdout_count: 3,
             minimum_distinct_facilities: 2,
             minimum_distinct_operating_points: 3,
+            slice_dimensions: vec![
+                ValidationSliceDimension::Facility,
+                ValidationSliceDimension::OperatingPoint,
+            ],
+            minimum_per_slice_count: 1,
             observables: vec![ObservableValidationSpec {
                 observable_id: "net-heat-flux".to_string(),
                 unit_ref: "MW/m2".to_string(),
@@ -207,6 +212,31 @@ fn main() {
         report.distinct_operating_point_count
     );
     println!("disposition={:?}", report.disposition);
+    println!("slice_disposition={:?}", report.slice_disposition);
+    println!("slice_count={}", report.per_slice_metrics.len());
+
+    for slice in &report.per_slice_metrics {
+        println!(
+            "slice={}:{},observable={},n={},normalized_rmse={:.6},point_coverage={:.6},interval_width={:.6},disposition={:?}",
+            slice.key.dimension.id(),
+            slice.key.value,
+            slice.observable_id,
+            slice.sample_count,
+            slice.metrics.normalized_rmse,
+            slice.metrics.empirical_point_interval_coverage,
+            slice.metrics.mean_normalized_prediction_interval_width,
+            slice.disposition
+        );
+    }
+    for finding in &report.worst_slice_findings {
+        println!(
+            "worst_slice={}::{:?},value={:.6},keys={:?}",
+            finding.observable_id,
+            finding.criterion,
+            finding.extreme_value,
+            finding.slice_keys
+        );
+    }
 
     for metric in &report.per_observable_metrics {
         println!("observable={}", metric.observable_id);

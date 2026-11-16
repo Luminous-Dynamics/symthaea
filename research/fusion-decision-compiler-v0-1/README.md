@@ -84,13 +84,31 @@ The assessment profile freezes quantity ID, unit, service boundary, averaging wi
 
 A report only means the finite campaign met the declared profile. Empirical point coverage is descriptive; the module does not attach a confidence interval, assume independent samples, fit a model or calibrate prediction bands. Measurement-interval overlap is not substituted for point coverage. Wide intervals are penalized through the mean normalized width ceiling.
 
-The module has 23 authored tests covering known-answer metric calculations, split leakage, stale model and output identity, reused receipts, incomplete observables, unit/boundary/time-window mismatch, malformed intervals, artifact provenance, sample-diversity gates, point versus measurement-interval coverage, order-invariant output and out-of-domain refusal. The synthetic runner uses three holdout cases across two facilities and three operating points; all values and the expected acceptance profile are synthetic.
+The module has 27 authored tests covering known-answer metric calculations, split leakage, stale model and output identity, reused receipts, incomplete observables, unit/boundary/time-window mismatch, malformed intervals, artifact provenance, sample-diversity gates, point versus measurement-interval coverage, order-invariant output, out-of-domain refusal, pooled-masking adversaries and predeclared slice integrity. The synthetic runner uses three holdout cases across two facilities and three operating points; all values and the expected acceptance profile are synthetic.
 
 ### External validation benchmark alignment
 
 The DOE's June 2026 roadmap calls for an end-to-end plant-model workflow against experimental data with quantified uncertainty, independent reproducibility, an enforced validity domain and holdout validation at a different operating point/case/facility while maintaining uncertainty bounds. It also calls for model comparisons against coupled experiments. This module adds the predictive-metric side of that requirement while keeping specialist experiment, metrology and physics-model ownership external.
 
 A July 2026 *Fusion Science and Technology* article on integral nuclear-data benchmarking emphasizes measured integral responses representative of the materials/radiation/temperature conditions and rigorous benchmark models with experimental uncertainties. A 2021 multiscale fusion VVUQ study explores distribution-similarity validation; this implementation uses transparent point errors and interval metrics as a reproducible v0.1 baseline, not as a claim to supersede specialist validation methods.
+
+
+
+## Facility and operating-point worst-slice validation
+
+The next layer keeps the pooled campaign metrics but also reports metrics across categorical slice dimensions frozen in the assessment profile before holdout unsealing. V0.1 supports facility, case ID, operating point, regime and geometry identity. It does not invent bins after observing residuals.
+
+For every predeclared dimension/value and observable, the report includes sample count, bias, MAE, RMSE, normalized bias/RMSE, max normalized error, point interval coverage, measurement interval overlap and normalized interval width. Underfilled groups remain visible with `InsufficientSliceEvidence`; they are never silently dropped or pooled away.
+
+The campaign now reports a separate slice disposition. A sufficiently sampled slice that fails any declared observable threshold makes the overall assessment `OutsideDeclaredAcceptance`, even when the pooled metrics pass. An underfilled slice makes it `InsufficientHoldoutEvidence`. A deterministic worst-slice register identifies the worst facility/case/operating-point/regime/geometry for normalized RMSE, absolute normalized bias, maximum normalized residual, point coverage and interval width; exact ties are returned in sorted order.
+
+Four additional authored tests demonstrate:
+- a synthetic pooled campaign that meets aggregate thresholds but fails one facility slice;
+- deterministic worst-slice identification;
+- insufficient per-slice sample count remaining explicit;
+- duplicate/empty slice dimensions being rejected.
+
+The runner emits each facility and operating-point slice and its worst-slice findings. These remain synthetic software-contract examples, not independent statistical or physical validation.
 
 
 ## Run locally
