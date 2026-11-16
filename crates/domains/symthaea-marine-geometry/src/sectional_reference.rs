@@ -1292,7 +1292,6 @@ mod tests {
         assert!(errors.iter().any(|issue| issue.code == "iteration_limit"));
     }
 
-
     #[test]
     fn upright_mass_balance_receipt_binds_numerical_stopping_configuration() {
         let mut first_request = box_mass_balance_request(12_300.0);
