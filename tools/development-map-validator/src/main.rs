@@ -10,6 +10,7 @@ use development_map_validator::{
     selective_revalidation::score_selective_revalidation_oracle_json,
     multi_shift_sequence::score_multi_shift_sequence_json,
     exploit_migration::evaluate_exploit_migration_json,
+    partial_order::evaluate_partial_order_json,
     validate_document_json,
 };
 
@@ -27,6 +28,7 @@ fn usage() {
     eprintln!("  development-map-validator revalidation-oracle <scenario.json>");
     eprintln!("  development-map-validator multi-shift-sequence <bundle.json>");
     eprintln!("  development-map-validator exploit-migration <bundle.json>");
+    eprintln!("  development-map-validator partial-order <bundle.json>");
     eprintln!();
     eprintln!("Validates EGDDM snapshots/federation/planning/retrieval fixtures, or");
     eprintln!("projects source files, composes a Git tree snapshot, or replays a pinned epistemic temporal ledger.");
@@ -423,6 +425,36 @@ fn evaluate_exploit_migration_file(args: &[String]) -> i32 {
     }
 }
 
+
+fn evaluate_partial_order_file(args: &[String]) -> i32 {
+    if args.len() != 2 {
+        usage();
+        return 2;
+    }
+    let path = &args[1];
+    let input = match read_input(path, "D6.10-IO-001") {
+        Ok(input) => input,
+        Err(code) => return code,
+    };
+    match evaluate_partial_order_json(&input) {
+        Err(error) => {
+            eprintln!("ERROR D6.10-PARTIAL-ORDER-001 {path}: {error}");
+            1
+        }
+        Ok(report) => match serde_json::to_string_pretty(&report) {
+            Ok(output) => {
+                println!("{output}");
+                println!("NOTE evaluator-only partial-order report; timestamps do not establish causality and this output must not be exposed to candidate agents");
+                0
+            }
+            Err(error) => {
+                eprintln!("ERROR D6.10-PARTIAL-ORDER-JSON-001 {path}: {error}");
+                2
+            }
+        },
+    }
+}
+
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
     if args.is_empty() || args[0] == "--help" || args[0] == "-h" {
@@ -445,6 +477,7 @@ fn main() {
         "revalidation-oracle" => score_selective_revalidation_oracle_file(&args),
         "multi-shift-sequence" => score_multi_shift_sequence_file(&args),
         "exploit-migration" => evaluate_exploit_migration_file(&args),
+        "partial-order" => evaluate_partial_order_file(&args),
         _ if args.len() == 1 => validate_document(&args[0]),
         _ => {
             usage();
