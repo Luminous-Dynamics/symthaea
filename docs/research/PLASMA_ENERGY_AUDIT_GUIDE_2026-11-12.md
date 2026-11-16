@@ -408,3 +408,16 @@ The Rust source auditor now validates each source case's operating-point identit
 - ammonia synthesis route energy values borrowed across RGA-NORR, RGA-LNT, direct DBD and green-HB comparator rows.
 
 The latest corpus snapshot is **53 source cases / 98 negative controls / 7 derived checks / 12 benchmark targets**. The focused audit must pass exact-head format, unit tests, strict Clippy and frozen corpus validation before this becomes a software claim.
+
+
+## 9.22 DBD CO2 model baseline correction and audit gates — 2026-11-16
+
+Review of the full 2026 Green Chemistry article clarifies that the DBD hybrid ensemble's reported **0.791 is the best fold**, not the cross-validation mean. The correct publication-grouped five-fold results are:
+- hybrid mean R2 = 0.441;
+- best fold R2 = 0.791;
+- worst fold R2 = 0.024;
+- strongest individual learner (XGBoost) mean R2 = 0.362;
+- hybrid mean MAE = 3.463 percentage points and RMSE = 4.544 percentage points;
+- prospective validation R2 = 0.92 on 10 new points within the explored domain.
+
+The paper reports 358 points in the abstract/methods and 357 in its conclusion. The discrepancy is left unresolved until the SI row table is independently reconciled. The new benchmark targets mean five-fold grouped R2 >=0.55 and worst-fold R2 >=0.15, a separate LOPO mean R2 >=0.45, 90% interval coverage >=90%, at least 80% applicability coverage and >=20 independent prospective reactor observations. The source result is not promoted to cross-reactor or cross-regime validation.
