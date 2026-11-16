@@ -870,6 +870,15 @@ pub fn solve_upright_mass_balance(
     .map_err(|issue| vec![issue])?;
 
     if lower_result.displaced_mass_tonnes + request.mass_tolerance_tonnes
+        < upper_result.displaced_mass_tonnes
+    {
+        return Err(vec![SectionalReferenceIssue {
+            code: "non_monotone_displacement".into(),
+            detail: "shallower waterplane must not displace less mass than the deeper waterplane"
+                .into(),
+        }]);
+    }
+    if lower_result.displaced_mass_tonnes + request.mass_tolerance_tonnes
         < request.target_mass_tonnes
         || upper_result.displaced_mass_tonnes - request.mass_tolerance_tonnes
             > request.target_mass_tonnes
@@ -1195,6 +1204,14 @@ mod tests {
     }
 
 
+
+    fn mass_balance_fixture_request() -> UprightMassBalanceRequest {
+        serde_json::from_str(include_str!(
+            "../../../../docs/research/marine/fixtures/marine-upright-mass-balance-box-001.json"
+        ))
+        .unwrap()
+    }
+
     fn box_mass_balance_request(target_mass_tonnes: f64) -> UprightMassBalanceRequest {
         let source_spec = fixture_request().source_spec;
         UprightMassBalanceRequest {
@@ -1209,6 +1226,17 @@ mod tests {
             plane_tolerance_m: 1.0e-10,
             maximum_iterations: 64,
         }
+    }
+
+
+    #[test]
+    fn upright_mass_balance_json_fixture_solves_and_binds_the_exact_source() {
+        let request = mass_balance_fixture_request();
+        let receipt = solve_upright_mass_balance(&request).unwrap();
+        assert_eq!(receipt.source_spec_digest_blake3, compute_full_envelope_spec_digest(&request.source_spec).unwrap());
+        assert!((receipt.equilibrium.waterplane_z_m).abs() < 1.0e-12);
+        assert!((receipt.equilibrium.displaced_mass_tonnes - 12_300.0).abs() < 1.0e-8);
+        verify_upright_mass_balance_receipt(&request, &receipt).unwrap();
     }
 
     #[test]
