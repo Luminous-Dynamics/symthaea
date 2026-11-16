@@ -153,6 +153,8 @@ pub struct ControllerAuthority {
 pub struct ActuatorChannelProfile {
     pub channel_id: String,
     pub unit: String,
+    pub authority_manifest_ref: String,
+    pub authority_manifest_sha256: String,
     pub minimum_value: f64,
     pub maximum_value: f64,
     pub maximum_slew_per_second: f64,
@@ -201,17 +203,37 @@ pub struct ProposalRejection {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ProposalEvidenceBinding {
+    pub proposal_id: String,
+    pub controller_id: String,
+    pub controller_revision: String,
+    pub observation_timestamp_ns: u64,
+    pub valid_until_ns: u64,
+    pub observation_sha256: String,
+    pub model_state_sha256: String,
+    pub proposal_evidence_ref: String,
+    pub evidence_class: ControlEvidenceClass,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct ArbitrationReport {
     pub contract_version: &'static str,
     pub cycle_id: String,
     pub channel_id: String,
+    pub unit: String,
+    pub authority_manifest_ref: String,
+    pub authority_manifest_sha256: String,
+    pub timing_evidence: ControlTimingEvidence,
     pub disposition: ControlDecisionDisposition,
     pub winner_proposal_id: Option<String>,
     pub winner_controller_id: Option<String>,
     pub selected_command_value: Option<f64>,
     pub rejected_proposals: Vec<ProposalRejection>,
     pub considered_proposal_ids: Vec<String>,
+    pub proposal_evidence_bindings: Vec<ProposalEvidenceBinding>,
     pub safety_authority_id: Option<String>,
+    pub safety_evidence_ref: Option<String>,
+    pub safety_evidence_sha256: Option<String>,
     pub timing_evidence_ref: String,
     pub diagnostics: Vec<ControlDiagnostic>,
     pub evidence_classes: Vec<ControlEvidenceClass>,
@@ -258,6 +280,8 @@ pub fn arbitrate_actuator_channel(
                 selected_command_value: None,
                 rejected_proposals: rejections,
                 safety_authority_id: None,
+                safety_evidence_ref: None,
+                safety_evidence_sha256: None,
                 diagnostics,
             },
             proposals,
@@ -302,6 +326,8 @@ pub fn arbitrate_actuator_channel(
                     })
                     .collect(),
                 safety_authority_id: Some(safety.authority_id.clone()),
+                safety_evidence_ref: Some(safety.evidence_ref.clone()),
+                safety_evidence_sha256: Some(safety.evidence_sha256.clone()),
                 diagnostics,
             },
             proposals,
@@ -589,6 +615,8 @@ struct ArbitrationOutcome {
     selected_command_value: Option<f64>,
     rejected_proposals: Vec<ProposalRejection>,
     safety_authority_id: Option<String>,
+    safety_evidence_ref: Option<String>,
+    safety_evidence_sha256: Option<String>,
     diagnostics: Vec<ControlDiagnostic>,
 }
 
@@ -614,13 +642,33 @@ fn arbitration_report(
         contract_version: AUTHORITY_TO_RECOVERY_VERSION,
         cycle_id: timing.cycle_id.clone(),
         channel_id: channel.channel_id.clone(),
+        unit: channel.unit.clone(),
+        authority_manifest_ref: channel.authority_manifest_ref.clone(),
+        authority_manifest_sha256: channel.authority_manifest_sha256.clone(),
+        timing_evidence: timing.clone(),
         disposition: outcome.disposition,
         winner_proposal_id: outcome.winner_proposal_id,
         winner_controller_id: outcome.winner_controller_id,
         selected_command_value: outcome.selected_command_value,
         rejected_proposals: outcome.rejected_proposals,
         considered_proposal_ids,
+        proposal_evidence_bindings: proposals
+            .iter()
+            .map(|proposal| ProposalEvidenceBinding {
+                proposal_id: proposal.proposal_id.clone(),
+                controller_id: proposal.controller_id.clone(),
+                controller_revision: proposal.controller_revision.clone(),
+                observation_timestamp_ns: proposal.observation_timestamp_ns,
+                valid_until_ns: proposal.valid_until_ns,
+                observation_sha256: proposal.observation_sha256.clone(),
+                model_state_sha256: proposal.model_state_sha256.clone(),
+                proposal_evidence_ref: proposal.proposal_evidence_ref.clone(),
+                evidence_class: proposal.evidence_class,
+            })
+            .collect(),
         safety_authority_id: outcome.safety_authority_id,
+        safety_evidence_ref: outcome.safety_evidence_ref,
+        safety_evidence_sha256: outcome.safety_evidence_sha256,
         timing_evidence_ref: timing.timing_evidence_ref.clone(),
         diagnostics: outcome.diagnostics,
         evidence_classes,
@@ -682,6 +730,9 @@ pub struct TransitionAttempt {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StateTransitionReport {
     pub contract_version: &'static str,
+    pub manifest_id: String,
+    pub manifest_sha256: String,
+    pub clock_domain: String,
     pub transition_id: String,
     pub from_state_id: String,
     pub to_state_id: String,
@@ -689,6 +740,7 @@ pub struct StateTransitionReport {
     pub fallback_state_id: Option<String>,
     pub diagnostics: Vec<ControlDiagnostic>,
     pub guard_evidence_refs: Vec<String>,
+    pub guard_evidence: Vec<GuardEvidence>,
     pub transition_evidence_ref: String,
     pub claim_ceiling: &'static str,
 }
@@ -878,7 +930,7 @@ pub fn evaluate_state_transition(
 }
 
 fn transition_report(
-    _manifest: &OperatingStateManifest,
+    manifest: &OperatingStateManifest,
     attempt: &TransitionAttempt,
     rule: Option<&TransitionRule>,
     disposition: ControlDecisionDisposition,
@@ -886,6 +938,9 @@ fn transition_report(
 ) -> StateTransitionReport {
     StateTransitionReport {
         contract_version: AUTHORITY_TO_RECOVERY_VERSION,
+        manifest_id: manifest.manifest_id.clone(),
+        manifest_sha256: manifest.manifest_sha256.clone(),
+        clock_domain: manifest.clock_domain.clone(),
         transition_id: attempt.transition_id.clone(),
         from_state_id: attempt.from_state_id.clone(),
         to_state_id: attempt.to_state_id.clone(),
@@ -897,6 +952,7 @@ fn transition_report(
             .iter()
             .map(|guard| guard.evidence_ref.clone())
             .collect(),
+        guard_evidence: attempt.guards.clone(),
         transition_evidence_ref: attempt.transition_evidence_ref.clone(),
         claim_ceiling: "declared state-transition and recovery contract only",
     }
@@ -1019,6 +1075,25 @@ mod tests {
             Some(&self::safety(safety)),
             time,
         )
+    }
+
+    #[test]
+    fn arbitration_receipt_preserves_authority_timing_and_proposal_evidence() {
+        let proposals = vec![proposal("p1", "deterministic-mpc", "mpc-r4", 40.0)];
+        let report = arbitrate(
+            &proposals,
+            SafetyDecision::Permit,
+            &timing(),
+            &channel().tie_break_controller_order,
+        );
+        assert_eq!(report.proposal_evidence_bindings.len(), 1);
+        assert_eq!(
+            report.proposal_evidence_bindings[0].observation_sha256,
+            proposals[0].observation_sha256
+        );
+        assert_eq!(report.safety_evidence_ref.as_deref(), Some("safety-plc-receipt"));
+        assert_eq!(report.timing_evidence.cycle_id, "cycle-42");
+        assert!(!report.authority_manifest_sha256.is_empty());
     }
 
     #[test]
