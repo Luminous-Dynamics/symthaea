@@ -1,0 +1,226 @@
+{
+  "scenario_id": "d6.16-model-robust-acquisition-v0.1",
+  "decision_cutoff": "2026-11-16T10:00:00Z",
+  "budget_micros": 1000,
+  "actions": [
+    {
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0
+    },
+    {
+      "action_id": "bounded-probe",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 3500
+    },
+    {
+      "action_id": "inspect",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 10000
+    }
+  ],
+  "measurements": [
+    {
+      "measurement_id": "primary-sensor",
+      "available_at": "2026-11-16T09:00:00Z",
+      "estimated_cost_upper_micros": 90
+    },
+    {
+      "measurement_id": "mirror-dashboard",
+      "available_at": "2026-11-16T09:00:00Z",
+      "estimated_cost_upper_micros": 50
+    },
+    {
+      "measurement_id": "independent-reference",
+      "available_at": "2026-11-16T09:00:00Z",
+      "estimated_cost_upper_micros": 350
+    },
+    {
+      "measurement_id": "noisy-measurement",
+      "available_at": "2026-11-16T09:00:00Z",
+      "estimated_cost_upper_micros": 180
+    },
+    {
+      "measurement_id": "uncalibrated-check",
+      "available_at": "2026-11-16T09:00:00Z",
+      "estimated_cost_upper_micros": 80
+    },
+    {
+      "measurement_id": "impossible-check",
+      "available_at": "2026-11-16T09:00:00Z",
+      "estimated_cost_upper_micros": 50
+    }
+  ],
+  "traces": [
+    {
+      "trace_id": "model-average-trap",
+      "acquisitions": [],
+      "decision": {
+        "kind": "act",
+        "action_id": "bounded-probe",
+        "claimed_worst_case_risk_bps": 3000
+      }
+    },
+    {
+      "trace_id": "primary-only-release",
+      "acquisitions": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:40:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_worst_case_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "shared-dashboard-release",
+      "acquisitions": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:30:00Z"
+        },
+        {
+          "measurement_id": "mirror-dashboard",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:32:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_worst_case_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "independent-reference-release",
+      "acquisitions": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:20:00Z"
+        },
+        {
+          "measurement_id": "independent-reference",
+          "outcome_id": "clear",
+          "mode": "cold",
+          "at": "2026-11-16T09:22:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_worst_case_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "noisy-bounded-probe",
+      "acquisitions": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:10:00Z"
+        },
+        {
+          "measurement_id": "noisy-measurement",
+          "outcome_id": "clear",
+          "mode": "cold",
+          "at": "2026-11-16T09:12:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "bounded-probe",
+        "claimed_worst_case_risk_bps": 2000
+      }
+    },
+    {
+      "trace_id": "partial-model-support",
+      "acquisitions": [
+        {
+          "measurement_id": "uncalibrated-check",
+          "outcome_id": "discordant",
+          "mode": "cold",
+          "at": "2026-11-16T09:05:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_worst_case_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "out-of-model-observation",
+      "acquisitions": [
+        {
+          "measurement_id": "impossible-check",
+          "outcome_id": "unexpected",
+          "mode": "cold",
+          "at": "2026-11-16T09:05:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_worst_case_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "always-abstain-positive-control",
+      "acquisitions": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:00:00Z"
+        },
+        {
+          "measurement_id": "independent-reference",
+          "outcome_id": "clear",
+          "mode": "cold",
+          "at": "2026-11-16T09:02:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "defer",
+        "action_id": "release",
+        "claimed_worst_case_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "future-reference",
+      "acquisitions": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:00:00Z"
+        },
+        {
+          "measurement_id": "independent-reference",
+          "outcome_id": "clear",
+          "mode": "cold",
+          "at": "2026-11-16T10:01:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_worst_case_risk_bps": 0
+      }
+    }
+  ]
+}

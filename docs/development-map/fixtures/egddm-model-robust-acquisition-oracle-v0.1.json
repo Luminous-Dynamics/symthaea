@@ -1,0 +1,690 @@
+{
+  "decision_cutoff": "2026-11-16T10:00:00Z",
+  "budget_micros": 1000,
+  "actions": [
+    {
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0
+    },
+    {
+      "action_id": "bounded-probe",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 3500
+    },
+    {
+      "action_id": "inspect",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 10000
+    }
+  ],
+  "measurements": [
+    {
+      "measurement_id": "primary-sensor",
+      "available_at": "2026-11-16T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          90,
+          100,
+          110
+        ],
+        "warm": [
+          20,
+          30,
+          35
+        ],
+        "retry": [
+          45,
+          50,
+          55
+        ]
+      }
+    },
+    {
+      "measurement_id": "mirror-dashboard",
+      "available_at": "2026-11-16T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          40,
+          50,
+          60
+        ],
+        "warm": [
+          10,
+          15,
+          20
+        ],
+        "retry": [
+          20,
+          25,
+          30
+        ]
+      }
+    },
+    {
+      "measurement_id": "independent-reference",
+      "available_at": "2026-11-16T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          350,
+          400,
+          450
+        ],
+        "warm": [
+          80,
+          90,
+          100
+        ],
+        "retry": [
+          130,
+          140,
+          150
+        ]
+      }
+    },
+    {
+      "measurement_id": "noisy-measurement",
+      "available_at": "2026-11-16T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          180,
+          200,
+          220
+        ],
+        "warm": [
+          35,
+          40,
+          45
+        ],
+        "retry": [
+          70,
+          75,
+          80
+        ]
+      }
+    },
+    {
+      "measurement_id": "uncalibrated-check",
+      "available_at": "2026-11-16T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          80,
+          100,
+          120
+        ],
+        "warm": [
+          15,
+          20,
+          25
+        ],
+        "retry": [
+          30,
+          35,
+          40
+        ]
+      }
+    },
+    {
+      "measurement_id": "impossible-check",
+      "available_at": "2026-11-16T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          50,
+          60,
+          70
+        ],
+        "warm": [
+          10,
+          12,
+          15
+        ],
+        "retry": [
+          20,
+          22,
+          25
+        ]
+      }
+    }
+  ],
+  "models": [
+    {
+      "model_id": "nominal",
+      "states": [
+        {
+          "state_id": "safe",
+          "prior_bps": 8000,
+          "safe_actions": [
+            "release",
+            "bounded-probe",
+            "inspect"
+          ]
+        },
+        {
+          "state_id": "hazard",
+          "prior_bps": 1500,
+          "safe_actions": [
+            "inspect"
+          ]
+        },
+        {
+          "state_id": "critical",
+          "prior_bps": 500,
+          "safe_actions": [
+            "inspect"
+          ]
+        }
+      ],
+      "likelihoods": [
+        {
+          "history": [],
+          "measurement_id": "primary-sensor",
+          "outcomes": [
+            {
+              "outcome_id": "pass",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 9500
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 6000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 2000
+                }
+              ]
+            },
+            {
+              "outcome_id": "fail",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 500
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 4000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 8000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "history": [
+            {
+              "measurement_id": "primary-sensor",
+              "outcome_id": "pass"
+            }
+          ],
+          "measurement_id": "mirror-dashboard",
+          "outcomes": [
+            {
+              "outcome_id": "pass",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 10000
+                }
+              ]
+            },
+            {
+              "outcome_id": "drift",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 0
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 0
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "history": [
+            {
+              "measurement_id": "primary-sensor",
+              "outcome_id": "pass"
+            }
+          ],
+          "measurement_id": "independent-reference",
+          "outcomes": [
+            {
+              "outcome_id": "clear",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 0
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 0
+                }
+              ]
+            },
+            {
+              "outcome_id": "alarm",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 0
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 10000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "history": [
+            {
+              "measurement_id": "primary-sensor",
+              "outcome_id": "pass"
+            }
+          ],
+          "measurement_id": "noisy-measurement",
+          "outcomes": [
+            {
+              "outcome_id": "clear",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 9000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 5000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 2500
+                }
+              ]
+            },
+            {
+              "outcome_id": "alarm",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 1000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 5000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 7500
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "history": [],
+          "measurement_id": "uncalibrated-check",
+          "outcomes": [
+            {
+              "outcome_id": "clear",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 10000
+                }
+              ]
+            },
+            {
+              "outcome_id": "discordant",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 0
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 0
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "history": [],
+          "measurement_id": "impossible-check",
+          "outcomes": [
+            {
+              "outcome_id": "normal",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 10000
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "model_id": "stress",
+      "states": [
+        {
+          "state_id": "safe",
+          "prior_bps": 6000,
+          "safe_actions": [
+            "release",
+            "bounded-probe",
+            "inspect"
+          ]
+        },
+        {
+          "state_id": "hazard",
+          "prior_bps": 3000,
+          "safe_actions": [
+            "inspect"
+          ]
+        },
+        {
+          "state_id": "critical",
+          "prior_bps": 1000,
+          "safe_actions": [
+            "inspect"
+          ]
+        }
+      ],
+      "likelihoods": [
+        {
+          "history": [],
+          "measurement_id": "primary-sensor",
+          "outcomes": [
+            {
+              "outcome_id": "pass",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 9000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 7000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 4000
+                }
+              ]
+            },
+            {
+              "outcome_id": "fail",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 1000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 3000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 6000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "history": [
+            {
+              "measurement_id": "primary-sensor",
+              "outcome_id": "pass"
+            }
+          ],
+          "measurement_id": "mirror-dashboard",
+          "outcomes": [
+            {
+              "outcome_id": "pass",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 10000
+                }
+              ]
+            },
+            {
+              "outcome_id": "drift",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 0
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 0
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 0
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "history": [
+            {
+              "measurement_id": "primary-sensor",
+              "outcome_id": "pass"
+            }
+          ],
+          "measurement_id": "independent-reference",
+          "outcomes": [
+            {
+              "outcome_id": "clear",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 0
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 0
+                }
+              ]
+            },
+            {
+              "outcome_id": "alarm",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 0
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 10000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "history": [
+            {
+              "measurement_id": "primary-sensor",
+              "outcome_id": "pass"
+            }
+          ],
+          "measurement_id": "noisy-measurement",
+          "outcomes": [
+            {
+              "outcome_id": "clear",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 8500
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 5500
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 3000
+                }
+              ]
+            },
+            {
+              "outcome_id": "alarm",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 1500
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 4500
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 7000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "history": [],
+          "measurement_id": "uncalibrated-check",
+          "outcomes": [
+            {
+              "outcome_id": "clear",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 9000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 6000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 2000
+                }
+              ]
+            },
+            {
+              "outcome_id": "discordant",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 1000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 4000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 8000
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "history": [],
+          "measurement_id": "impossible-check",
+          "outcomes": [
+            {
+              "outcome_id": "normal",
+              "state_likelihoods": [
+                {
+                  "state_id": "safe",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "hazard",
+                  "probability_bps": 10000
+                },
+                {
+                  "state_id": "critical",
+                  "probability_bps": 10000
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

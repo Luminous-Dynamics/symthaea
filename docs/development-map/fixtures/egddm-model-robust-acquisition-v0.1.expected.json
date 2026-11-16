@@ -1,0 +1,868 @@
+{
+  "scenario_id": "d6.16-model-robust-acquisition-v0.1",
+  "adjudication_status": "synthetic_model_robust_known_answer_evaluator_only",
+  "aggregation": "unweighted_worst_case_over_models",
+  "model_count": 2,
+  "measurement_count": 6,
+  "action_count": 3,
+  "trace_count": 9,
+  "summary": {
+    "unsupported_action_trace_count": 6,
+    "hard_gate_violation_trace_count": 5,
+    "risk_policy_violation_trace_count": 1,
+    "unnecessary_abstention_trace_count": 1,
+    "budget_overrun_trace_count": 0,
+    "future_evidence_leakage_events": 1,
+    "unsupported_model_observation_events": 2,
+    "zero_support_model_observation_events": 1,
+    "risk_understatement_trace_count": 7
+  },
+  "traces": [
+    {
+      "trace_id": "model-average-trap",
+      "decision_kind": "act",
+      "action_id": "bounded-probe",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 3500,
+      "aggregation": "unweighted_worst_case_over_models",
+      "model_count": 2,
+      "supported_model_count": 2,
+      "model_support_coverage_bps": 10000,
+      "all_models_supported": true,
+      "worst_case_model_id": "stress",
+      "minimum_model_risk_bps": 2000,
+      "worst_case_risk_bps": 4000,
+      "model_risk_spread_bps": 2000,
+      "action_justified": false,
+      "unsupported_action": true,
+      "hard_gate_violation": false,
+      "risk_policy_violation": true,
+      "unnecessary_abstention": false,
+      "correctly_deferred": false,
+      "claimed_worst_case_risk_bps": 3000,
+      "risk_understatement": true,
+      "acquisition_count": 0,
+      "unique_measurement_count": 0,
+      "redundant_measurement_count": 0,
+      "unsupported_model_observation_events": 0,
+      "zero_support_model_observation_events": 0,
+      "future_evidence_leakage_count": 0,
+      "not_yet_available_count": 0,
+      "cost_estimate_undercoverage_count": 0,
+      "total_cost_upper_micros": 0,
+      "budget_micros": 1000,
+      "budget_overrun": false,
+      "acquisition_steps": [],
+      "model_results": [
+        {
+          "model_id": "nominal",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 20,
+          "unsafe_weight_mass": 4,
+          "risk_bps": 2000,
+          "state_weight_masses": {
+            "safe": 16,
+            "hazard": 3,
+            "critical": 1
+          }
+        },
+        {
+          "model_id": "stress",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 10,
+          "unsafe_weight_mass": 4,
+          "risk_bps": 4000,
+          "state_weight_masses": {
+            "safe": 6,
+            "hazard": 3,
+            "critical": 1
+          }
+        }
+      ],
+      "final_history": []
+    },
+    {
+      "trace_id": "primary-only-release",
+      "decision_kind": "act",
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0,
+      "aggregation": "unweighted_worst_case_over_models",
+      "model_count": 2,
+      "supported_model_count": 2,
+      "model_support_coverage_bps": 10000,
+      "all_models_supported": true,
+      "worst_case_model_id": "stress",
+      "minimum_model_risk_bps": 1163,
+      "worst_case_risk_bps": 3165,
+      "model_risk_spread_bps": 2002,
+      "action_justified": false,
+      "unsupported_action": true,
+      "hard_gate_violation": true,
+      "risk_policy_violation": false,
+      "unnecessary_abstention": false,
+      "correctly_deferred": false,
+      "claimed_worst_case_risk_bps": 0,
+      "risk_understatement": true,
+      "acquisition_count": 1,
+      "unique_measurement_count": 1,
+      "redundant_measurement_count": 0,
+      "unsupported_model_observation_events": 0,
+      "zero_support_model_observation_events": 0,
+      "future_evidence_leakage_count": 0,
+      "not_yet_available_count": 0,
+      "cost_estimate_undercoverage_count": 1,
+      "total_cost_upper_micros": 110,
+      "budget_micros": 1000,
+      "budget_overrun": false,
+      "acquisition_steps": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "cost_upper_micros": 110,
+          "candidate_estimate_upper_micros": 90,
+          "estimate_undercovered": true,
+          "history_depth": 1,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 3165,
+          "disposition": "applied"
+        }
+      ],
+      "model_results": [
+        {
+          "model_id": "nominal",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 86,
+          "unsafe_weight_mass": 10,
+          "risk_bps": 1163,
+          "state_weight_masses": {
+            "safe": 76,
+            "hazard": 9,
+            "critical": 1
+          }
+        },
+        {
+          "model_id": "stress",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 79,
+          "unsafe_weight_mass": 25,
+          "risk_bps": 3165,
+          "state_weight_masses": {
+            "safe": 54,
+            "hazard": 21,
+            "critical": 4
+          }
+        }
+      ],
+      "final_history": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass"
+        }
+      ]
+    },
+    {
+      "trace_id": "shared-dashboard-release",
+      "decision_kind": "act",
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0,
+      "aggregation": "unweighted_worst_case_over_models",
+      "model_count": 2,
+      "supported_model_count": 2,
+      "model_support_coverage_bps": 10000,
+      "all_models_supported": true,
+      "worst_case_model_id": "stress",
+      "minimum_model_risk_bps": 1163,
+      "worst_case_risk_bps": 3165,
+      "model_risk_spread_bps": 2002,
+      "action_justified": false,
+      "unsupported_action": true,
+      "hard_gate_violation": true,
+      "risk_policy_violation": false,
+      "unnecessary_abstention": false,
+      "correctly_deferred": false,
+      "claimed_worst_case_risk_bps": 0,
+      "risk_understatement": true,
+      "acquisition_count": 2,
+      "unique_measurement_count": 2,
+      "redundant_measurement_count": 1,
+      "unsupported_model_observation_events": 0,
+      "zero_support_model_observation_events": 0,
+      "future_evidence_leakage_count": 0,
+      "not_yet_available_count": 0,
+      "cost_estimate_undercoverage_count": 2,
+      "total_cost_upper_micros": 170,
+      "budget_micros": 1000,
+      "budget_overrun": false,
+      "acquisition_steps": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "cost_upper_micros": 110,
+          "candidate_estimate_upper_micros": 90,
+          "estimate_undercovered": true,
+          "history_depth": 1,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 3165,
+          "disposition": "applied"
+        },
+        {
+          "measurement_id": "mirror-dashboard",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "cost_upper_micros": 60,
+          "candidate_estimate_upper_micros": 50,
+          "estimate_undercovered": true,
+          "history_depth": 2,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 3165,
+          "disposition": "applied"
+        }
+      ],
+      "model_results": [
+        {
+          "model_id": "nominal",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 86,
+          "unsafe_weight_mass": 10,
+          "risk_bps": 1163,
+          "state_weight_masses": {
+            "safe": 76,
+            "hazard": 9,
+            "critical": 1
+          }
+        },
+        {
+          "model_id": "stress",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 79,
+          "unsafe_weight_mass": 25,
+          "risk_bps": 3165,
+          "state_weight_masses": {
+            "safe": 54,
+            "hazard": 21,
+            "critical": 4
+          }
+        }
+      ],
+      "final_history": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass"
+        },
+        {
+          "measurement_id": "mirror-dashboard",
+          "outcome_id": "pass"
+        }
+      ]
+    },
+    {
+      "trace_id": "independent-reference-release",
+      "decision_kind": "act",
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0,
+      "aggregation": "unweighted_worst_case_over_models",
+      "model_count": 2,
+      "supported_model_count": 2,
+      "model_support_coverage_bps": 10000,
+      "all_models_supported": true,
+      "worst_case_model_id": "nominal",
+      "minimum_model_risk_bps": 0,
+      "worst_case_risk_bps": 0,
+      "model_risk_spread_bps": 0,
+      "action_justified": true,
+      "unsupported_action": false,
+      "hard_gate_violation": false,
+      "risk_policy_violation": false,
+      "unnecessary_abstention": false,
+      "correctly_deferred": false,
+      "claimed_worst_case_risk_bps": 0,
+      "risk_understatement": false,
+      "acquisition_count": 2,
+      "unique_measurement_count": 2,
+      "redundant_measurement_count": 0,
+      "unsupported_model_observation_events": 0,
+      "zero_support_model_observation_events": 0,
+      "future_evidence_leakage_count": 0,
+      "not_yet_available_count": 0,
+      "cost_estimate_undercoverage_count": 2,
+      "total_cost_upper_micros": 560,
+      "budget_micros": 1000,
+      "budget_overrun": false,
+      "acquisition_steps": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "cost_upper_micros": 110,
+          "candidate_estimate_upper_micros": 90,
+          "estimate_undercovered": true,
+          "history_depth": 1,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 3165,
+          "disposition": "applied"
+        },
+        {
+          "measurement_id": "independent-reference",
+          "outcome_id": "clear",
+          "mode": "cold",
+          "cost_upper_micros": 450,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true,
+          "history_depth": 2,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 0,
+          "disposition": "applied"
+        }
+      ],
+      "model_results": [
+        {
+          "model_id": "nominal",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 1,
+          "unsafe_weight_mass": 0,
+          "risk_bps": 0,
+          "state_weight_masses": {
+            "safe": 1,
+            "hazard": 0,
+            "critical": 0
+          }
+        },
+        {
+          "model_id": "stress",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 1,
+          "unsafe_weight_mass": 0,
+          "risk_bps": 0,
+          "state_weight_masses": {
+            "safe": 1,
+            "hazard": 0,
+            "critical": 0
+          }
+        }
+      ],
+      "final_history": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass"
+        },
+        {
+          "measurement_id": "independent-reference",
+          "outcome_id": "clear"
+        }
+      ]
+    },
+    {
+      "trace_id": "noisy-bounded-probe",
+      "decision_kind": "act",
+      "action_id": "bounded-probe",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 3500,
+      "aggregation": "unweighted_worst_case_over_models",
+      "model_count": 2,
+      "supported_model_count": 2,
+      "model_support_coverage_bps": 10000,
+      "all_models_supported": true,
+      "worst_case_model_id": "stress",
+      "minimum_model_risk_bps": 650,
+      "worst_case_risk_bps": 2174,
+      "model_risk_spread_bps": 1524,
+      "action_justified": true,
+      "unsupported_action": false,
+      "hard_gate_violation": false,
+      "risk_policy_violation": false,
+      "unnecessary_abstention": false,
+      "correctly_deferred": false,
+      "claimed_worst_case_risk_bps": 2000,
+      "risk_understatement": true,
+      "acquisition_count": 2,
+      "unique_measurement_count": 2,
+      "redundant_measurement_count": 0,
+      "unsupported_model_observation_events": 0,
+      "zero_support_model_observation_events": 0,
+      "future_evidence_leakage_count": 0,
+      "not_yet_available_count": 0,
+      "cost_estimate_undercoverage_count": 2,
+      "total_cost_upper_micros": 330,
+      "budget_micros": 1000,
+      "budget_overrun": false,
+      "acquisition_steps": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "cost_upper_micros": 110,
+          "candidate_estimate_upper_micros": 90,
+          "estimate_undercovered": true,
+          "history_depth": 1,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 3165,
+          "disposition": "applied"
+        },
+        {
+          "measurement_id": "noisy-measurement",
+          "outcome_id": "clear",
+          "mode": "cold",
+          "cost_upper_micros": 220,
+          "candidate_estimate_upper_micros": 180,
+          "estimate_undercovered": true,
+          "history_depth": 2,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 2174,
+          "disposition": "applied"
+        }
+      ],
+      "model_results": [
+        {
+          "model_id": "nominal",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 1463,
+          "unsafe_weight_mass": 95,
+          "risk_bps": 650,
+          "state_weight_masses": {
+            "safe": 1368,
+            "hazard": 90,
+            "critical": 5
+          }
+        },
+        {
+          "model_id": "stress",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 391,
+          "unsafe_weight_mass": 85,
+          "risk_bps": 2174,
+          "state_weight_masses": {
+            "safe": 306,
+            "hazard": 77,
+            "critical": 8
+          }
+        }
+      ],
+      "final_history": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass"
+        },
+        {
+          "measurement_id": "noisy-measurement",
+          "outcome_id": "clear"
+        }
+      ]
+    },
+    {
+      "trace_id": "partial-model-support",
+      "decision_kind": "act",
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0,
+      "aggregation": "unweighted_worst_case_over_models",
+      "model_count": 2,
+      "supported_model_count": 1,
+      "model_support_coverage_bps": 5000,
+      "all_models_supported": false,
+      "worst_case_model_id": "nominal",
+      "minimum_model_risk_bps": 7693,
+      "worst_case_risk_bps": 10000,
+      "model_risk_spread_bps": 2307,
+      "action_justified": false,
+      "unsupported_action": true,
+      "hard_gate_violation": true,
+      "risk_policy_violation": false,
+      "unnecessary_abstention": false,
+      "correctly_deferred": false,
+      "claimed_worst_case_risk_bps": 0,
+      "risk_understatement": true,
+      "acquisition_count": 1,
+      "unique_measurement_count": 1,
+      "redundant_measurement_count": 0,
+      "unsupported_model_observation_events": 1,
+      "zero_support_model_observation_events": 0,
+      "future_evidence_leakage_count": 0,
+      "not_yet_available_count": 0,
+      "cost_estimate_undercoverage_count": 1,
+      "total_cost_upper_micros": 120,
+      "budget_micros": 1000,
+      "budget_overrun": false,
+      "acquisition_steps": [
+        {
+          "measurement_id": "uncalibrated-check",
+          "outcome_id": "discordant",
+          "mode": "cold",
+          "cost_upper_micros": 120,
+          "candidate_estimate_upper_micros": 80,
+          "estimate_undercovered": true,
+          "history_depth": 1,
+          "newly_unsupported_model_ids": [
+            "nominal"
+          ],
+          "supported_models_after": 1,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 10000,
+          "disposition": "applied"
+        }
+      ],
+      "model_results": [
+        {
+          "model_id": "nominal",
+          "supported": false,
+          "unsupported_reason": "zero_conditioning_mass",
+          "posterior_weight_mass": 0,
+          "unsafe_weight_mass": 0,
+          "risk_bps": 10000,
+          "state_weight_masses": {
+            "safe": 16,
+            "hazard": 3,
+            "critical": 1
+          }
+        },
+        {
+          "model_id": "stress",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 13,
+          "unsafe_weight_mass": 10,
+          "risk_bps": 7693,
+          "state_weight_masses": {
+            "safe": 3,
+            "hazard": 6,
+            "critical": 4
+          }
+        }
+      ],
+      "final_history": [
+        {
+          "measurement_id": "uncalibrated-check",
+          "outcome_id": "discordant"
+        }
+      ]
+    },
+    {
+      "trace_id": "out-of-model-observation",
+      "decision_kind": "act",
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0,
+      "aggregation": "unweighted_worst_case_over_models",
+      "model_count": 2,
+      "supported_model_count": 0,
+      "model_support_coverage_bps": 0,
+      "all_models_supported": false,
+      "worst_case_model_id": "nominal",
+      "minimum_model_risk_bps": 10000,
+      "worst_case_risk_bps": 10000,
+      "model_risk_spread_bps": 0,
+      "action_justified": false,
+      "unsupported_action": true,
+      "hard_gate_violation": true,
+      "risk_policy_violation": false,
+      "unnecessary_abstention": false,
+      "correctly_deferred": false,
+      "claimed_worst_case_risk_bps": 0,
+      "risk_understatement": true,
+      "acquisition_count": 1,
+      "unique_measurement_count": 1,
+      "redundant_measurement_count": 0,
+      "unsupported_model_observation_events": 1,
+      "zero_support_model_observation_events": 1,
+      "future_evidence_leakage_count": 0,
+      "not_yet_available_count": 0,
+      "cost_estimate_undercoverage_count": 1,
+      "total_cost_upper_micros": 70,
+      "budget_micros": 1000,
+      "budget_overrun": false,
+      "acquisition_steps": [
+        {
+          "measurement_id": "impossible-check",
+          "outcome_id": "unexpected",
+          "mode": "cold",
+          "cost_upper_micros": 70,
+          "candidate_estimate_upper_micros": 50,
+          "estimate_undercovered": true,
+          "history_depth": 1,
+          "newly_unsupported_model_ids": [
+            "nominal",
+            "stress"
+          ],
+          "supported_models_after": 0,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 10000,
+          "disposition": "applied"
+        }
+      ],
+      "model_results": [
+        {
+          "model_id": "nominal",
+          "supported": false,
+          "unsupported_reason": "outcome_not_in_model:unexpected",
+          "posterior_weight_mass": 0,
+          "unsafe_weight_mass": 0,
+          "risk_bps": 10000,
+          "state_weight_masses": {
+            "safe": 16,
+            "hazard": 3,
+            "critical": 1
+          }
+        },
+        {
+          "model_id": "stress",
+          "supported": false,
+          "unsupported_reason": "outcome_not_in_model:unexpected",
+          "posterior_weight_mass": 0,
+          "unsafe_weight_mass": 0,
+          "risk_bps": 10000,
+          "state_weight_masses": {
+            "safe": 6,
+            "hazard": 3,
+            "critical": 1
+          }
+        }
+      ],
+      "final_history": [
+        {
+          "measurement_id": "impossible-check",
+          "outcome_id": "unexpected"
+        }
+      ]
+    },
+    {
+      "trace_id": "always-abstain-positive-control",
+      "decision_kind": "defer",
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0,
+      "aggregation": "unweighted_worst_case_over_models",
+      "model_count": 2,
+      "supported_model_count": 2,
+      "model_support_coverage_bps": 10000,
+      "all_models_supported": true,
+      "worst_case_model_id": "nominal",
+      "minimum_model_risk_bps": 0,
+      "worst_case_risk_bps": 0,
+      "model_risk_spread_bps": 0,
+      "action_justified": true,
+      "unsupported_action": false,
+      "hard_gate_violation": false,
+      "risk_policy_violation": false,
+      "unnecessary_abstention": true,
+      "correctly_deferred": false,
+      "claimed_worst_case_risk_bps": 0,
+      "risk_understatement": false,
+      "acquisition_count": 2,
+      "unique_measurement_count": 2,
+      "redundant_measurement_count": 0,
+      "unsupported_model_observation_events": 0,
+      "zero_support_model_observation_events": 0,
+      "future_evidence_leakage_count": 0,
+      "not_yet_available_count": 0,
+      "cost_estimate_undercoverage_count": 2,
+      "total_cost_upper_micros": 560,
+      "budget_micros": 1000,
+      "budget_overrun": false,
+      "acquisition_steps": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "cost_upper_micros": 110,
+          "candidate_estimate_upper_micros": 90,
+          "estimate_undercovered": true,
+          "history_depth": 1,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 3165,
+          "disposition": "applied"
+        },
+        {
+          "measurement_id": "independent-reference",
+          "outcome_id": "clear",
+          "mode": "cold",
+          "cost_upper_micros": 450,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true,
+          "history_depth": 2,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 0,
+          "disposition": "applied"
+        }
+      ],
+      "model_results": [
+        {
+          "model_id": "nominal",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 1,
+          "unsafe_weight_mass": 0,
+          "risk_bps": 0,
+          "state_weight_masses": {
+            "safe": 1,
+            "hazard": 0,
+            "critical": 0
+          }
+        },
+        {
+          "model_id": "stress",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 1,
+          "unsafe_weight_mass": 0,
+          "risk_bps": 0,
+          "state_weight_masses": {
+            "safe": 1,
+            "hazard": 0,
+            "critical": 0
+          }
+        }
+      ],
+      "final_history": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass"
+        },
+        {
+          "measurement_id": "independent-reference",
+          "outcome_id": "clear"
+        }
+      ]
+    },
+    {
+      "trace_id": "future-reference",
+      "decision_kind": "act",
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0,
+      "aggregation": "unweighted_worst_case_over_models",
+      "model_count": 2,
+      "supported_model_count": 2,
+      "model_support_coverage_bps": 10000,
+      "all_models_supported": true,
+      "worst_case_model_id": "stress",
+      "minimum_model_risk_bps": 1163,
+      "worst_case_risk_bps": 3165,
+      "model_risk_spread_bps": 2002,
+      "action_justified": false,
+      "unsupported_action": true,
+      "hard_gate_violation": true,
+      "risk_policy_violation": false,
+      "unnecessary_abstention": false,
+      "correctly_deferred": false,
+      "claimed_worst_case_risk_bps": 0,
+      "risk_understatement": true,
+      "acquisition_count": 2,
+      "unique_measurement_count": 2,
+      "redundant_measurement_count": 0,
+      "unsupported_model_observation_events": 0,
+      "zero_support_model_observation_events": 0,
+      "future_evidence_leakage_count": 1,
+      "not_yet_available_count": 0,
+      "cost_estimate_undercoverage_count": 2,
+      "total_cost_upper_micros": 560,
+      "budget_micros": 1000,
+      "budget_overrun": false,
+      "acquisition_steps": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass",
+          "mode": "cold",
+          "cost_upper_micros": 110,
+          "candidate_estimate_upper_micros": 90,
+          "estimate_undercovered": true,
+          "history_depth": 1,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": 3165,
+          "disposition": "applied"
+        },
+        {
+          "measurement_id": "independent-reference",
+          "outcome_id": "clear",
+          "mode": "cold",
+          "cost_upper_micros": 450,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true,
+          "history_depth": 1,
+          "newly_unsupported_model_ids": [],
+          "supported_models_after": 2,
+          "model_count": 2,
+          "worst_case_risk_bps_after": null,
+          "disposition": "future_evidence_rejected"
+        }
+      ],
+      "model_results": [
+        {
+          "model_id": "nominal",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 86,
+          "unsafe_weight_mass": 10,
+          "risk_bps": 1163,
+          "state_weight_masses": {
+            "safe": 76,
+            "hazard": 9,
+            "critical": 1
+          }
+        },
+        {
+          "model_id": "stress",
+          "supported": true,
+          "unsupported_reason": null,
+          "posterior_weight_mass": 79,
+          "unsafe_weight_mass": 25,
+          "risk_bps": 3165,
+          "state_weight_masses": {
+            "safe": 54,
+            "hazard": 21,
+            "critical": 4
+          }
+        }
+      ],
+      "final_history": [
+        {
+          "measurement_id": "primary-sensor",
+          "outcome_id": "pass"
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Synthetic finite model-family evaluator. It assumes supplied model membership, priors, likelihoods, safety labels and cost samples. It does not establish that the true world is in the family, calibrate real sensor likelihoods, prove physical independence, authorize operations, or solve unrestricted adaptive POMDPs."
+}
