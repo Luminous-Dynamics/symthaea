@@ -99,55 +99,61 @@ These are comparison anchors, not an assertion that vendor claims have been inde
 
 ## 5. Reference fixture and evidence design
 
-The fixture is a separate measurement instrument and must itself have an inspectable calibration and uncertainty chain.
+### Physical phantom ownership
 
-### Required capabilities
+The physical tactile calibration phantom and its reference-instrument architecture already have a canonical owner: **Symtropy #4753 — PHRI-TAC-PHANTOM-001**. This Symthaea campaign must consume that phantom rather than define a second one.
 
-- repeatable normal loading/unloading across a declared range;
-- tangential/shear loading while controlling or measuring normal loading;
-- repeatable contact-position grid and indenter geometry;
-- independently measured fixture displacement/velocity and slip reference;
-- flat mounting and one explicitly declared curved/remount profile if the selected candidate claims it;
-- temperature/environment observation only where relevant and instrumented;
-- safe, non-destructive saturation/range-boundary and channel-fault injection;
-- synchronization sufficient to estimate end-to-end event timing.
+The benchmark's first integration task is an applicability audit against the exact #4753 article and evidence package:
 
-### Reference channels
+- phantom article/revision, surface material and geometry;
+- indenter identity and measured as-built geometry;
+- independently calibrated six-axis force/torque reference and calibration chain;
+- surface registration/position reference;
+- replaceable tile/article identity, calibration and firmware profile;
+- normal/tangential load, contact migration, creep, slip and cycle conditions;
+- reference uncertainty, timebase and sample lineage;
+- accepted and rejected conditions / declared measurement envelope.
 
-Use appropriately calibrated reference force-proving equipment for axial force. ISO 376:2011 is a current method for calibration/classification of force-proving instruments used in static verification of uniaxial testing machines; it is **not automatically a complete multi-axis tactile calibration method**. The exact shear/torque/displacement/slip references require a separately reviewed method and uncertainty budget.
+If any T1/T2 requirement is not supported by the exact phantom version—for example, an independently timestamped incipient-slip reference—the campaign must record "REFERENCE_CAPABILITY_NOT_ESTABLISHED" and add a scoped extension to #4753 or an owning Symtropy child. The candidate tactile sensor must never supply its own evaluator labels.
 
-Standard anchor: ISO 376:2011 current status confirmed 2026-08-14: https://www.iso.org/standard/44661.html.
+### Task-to-reference mapping
 
-Reference independence is proposition-specific. The candidate sensor must not label its own force, slip, or contact position for the test that scores it. Shared load-cell references, fixtures, clocks, ADC rails and calibration roots must be recorded and assessed through ENG-EVID-INDEP #4918.
+| Benchmark question | Independent reference needed | Claim ceiling |
+|---|---|---|
+| T1 contact localization | Measured phantom geometry + calibrated registration/position reference | Contact location under the exact surface, indenter, mount and registration profile |
+| Normal-force characterization | Independently calibrated normal-force/wrench channel | Normal-force result inside its calibrated range and uncertainty |
+| Shear characterization | Independent tangential wrench component under an applicable calibrated method | Shear result only where the reference and method cover it |
+| T2 incipient slip | Independent displacement/motion/time evidence for the contact interface, synchronized to the force reference | Slip event timing only where the independent event definition and clock uncertainty are qualified |
+| Contact area / center of pressure | Reference geometry and independent registration; any pressure comparator must itself have an independent calibration | Geometric/pressure-derived outputs only within the declared method and uncertainty |
+| Drift / hysteresis / cycling | Repeated reference observations over declared load histories and cycle counts | Drift/hysteresis for the tested article and profile, not population reliability |
 
-A commanded stage position is not measured force. A fixture motor command is not slip truth. A video annotation is not automatically a calibrated displacement reference.
+A commanded stage position is not measured force. A force peak alone is not necessarily a slip label. A video annotation is not automatically a calibrated displacement reference. The method and the reference channel must match the exact measurand.
 
-### Calibration chain
+### Standards and measurement uncertainty
 
-For every reference and candidate channel, bind exact instrument/article/channel identity, calibration record and source digest, covered measurand/unit/range/method, calibration conditions and uncertainty, installation/fixture geometry, firmware/readout profile, timing identity, and sample lineage. The verifier must resolve applicability; a producer-declared calibrated flag is insufficient.
+ISO 376:2011 remains current after confirmation on 2026-08-14. It specifies calibration/classification of force-proving instruments for static verification of **uniaxial** testing machines. It is a potential reference path for an applicable axial-force proving instrument, not an automatically sufficient method for multi-axis tactile calibration, spatial pressure mapping, torque, or dynamic incipient slip. Those channels require an explicitly reviewed method and uncertainty budget.  
+Standard: https://www.iso.org/standard/44661.html
 
-### Existing owner integration (do not duplicate)
+The result, not merely the instrument or certificate, must have a documented unbroken traceability chain with uncertainty contributions. A calibrated reference instrument does not automatically make every subsequent measurement traceable or fit for a declared purpose.  
+NIST policy: https://www.nist.gov/metrology/metrological-traceability
 
-The Symthaea tactile campaign is a co-design / task-comparison consumer. It must reuse the physical metrology and test-cell owners:
+For uncertainty computations, bind to **Mycelix #6048** and the applicable current JCGM/BIPM guidance: GUM linearization, the 2026 amendment addressing nonlinearity in measurement models, Monte Carlo distribution propagation (JCGM 101), multiple output quantities/covariance (JCGM 102), conformity assessment/guard bands (JCGM 106), and measurement-model development (GUM-6). Choose the propagation method from the measurement model and input distributions; do not assume unrecorded covariance is zero.  
+Official catalogue: https://www.bipm.org/en/committees/jc/jcgm/publications/
 
-- **Symtropy #4753 — PHRI-TAC-PHANTOM-001:** owns the traceable non-human tactile calibration phantom, independently calibrated six-axis force/torque reference, surface geometry/registration, replaceable tactile tiles, normal/tangential loading, creep/slip, temperature/cycle testing, and phantom-specific uncertainty/acceptance. This document does not define a second phantom design. Any T1/T2 fixture instantiation must bind the exact #4753 article, reference, surface, fixture and test revisions.
-- **Symtropy #4754 — PHRI-QUAL-BENCH-001:** owns the matched physical-interaction / tactile-coupling comparative benchmark and its system scorecards. This campaign contributes sensor-specific co-design arms and must not duplicate the pHRI controller/passivity or human-agency benchmark.
-- **Symtropy #4790 — PHRI-CONTACT-EXPOSURE-001:** owns spatially resolved non-human phantom contact pressure/deformation/exposure envelopes. This campaign may consume those measurements where relevant; it does not infer human injury, comfort, consent or safety thresholds.
-- **Symtropy #4531 and #5335:** own the unoccupied room-scale service test cell and WaterLoop physical demonstrator, respectively. A future water-quality/flow instrument is a separate application projection, not part of the tactile phantom.
-- **Mycelix #6034 — MYC-BUILD-METROLOGY-002:** owns instrument/channel/capability, calibration, installation and sample-level evidence records. Use its canonical record types; do not make this document a second instrument passport.
-- **Mycelix #6047:** owns digital calibration-certificate interoperability/verification. Preserve certificate source bytes, signature verification, trust policy, accreditation scope and applicability as distinct results; do not invent a second certificate format.
-- **Mycelix #6048 — MYC-BUILD-UQ-001:** owns measurement-equation, covariance/common-cause and nonlinear/Monte-Carlo uncertainty computation. This benchmark binds its exact uncertainty-model receipt rather than implementing an uncertainty engine here.
-- **Mycelix #6054 / #6065:** own stream identity/timebase/replay and measurement-condition applicability. Exact sample epoch, sequence, condition values and condition-profile digest must survive all adapters.
+### Cross-project owner integration (no duplicate ontologies)
+
+- **Symtropy #4753 — PHRI-TAC-PHANTOM-001:** owns the non-human tactile calibration phantom, physical fixture/reference geometry, reference instrument setup and phantom measurement campaign.
+- **Symtropy #4754 — PHRI-QUAL-BENCH-001:** owns the matched physical-interaction/tactile-coupling comparative benchmark and its scorecards. This Symthaea campaign contributes sensor co-design arms and must not duplicate pHRI controller/passivity or human-agency benchmark semantics.
+- **Symtropy #4790 — PHRI-CONTACT-EXPOSURE-001:** owns phantom material-stack/contact-exposure characterization. Its non-human pressure/deformation results do not establish human injury, comfort, consent or safety thresholds.
+- **Symtropy #4531 / #5335:** own the unoccupied room-scale service test cell and WaterLoop physical demonstrator. A water-quality/flow instrument is a later, separate sensor application.
+- **Mycelix #6034 — MYC-BUILD-METROLOGY-002:** owns instrument/channel capability, calibration, installation and sample-level evidence records. Use its canonical records rather than creating another instrument passport.
+- **Mycelix #6047:** owns digital calibration-certificate interoperability/verification. Keep source bytes, signature result, signer trust, accreditation scope and calibration applicability distinct.
+- **Mycelix #6048 — MYC-BUILD-UQ-001:** owns measurement-equation, covariance/common-cause and nonlinear/Monte-Carlo uncertainty computation. Bind its exact method/receipt rather than implementing an uncertainty engine here.
+- **Mycelix #6054 / #6065:** own stream identity/timebase/replay and measurement-condition applicability. Exact sample epoch, sequence, condition values and condition-profile digest must survive every adapter.
 - **Symthaea FIELD/SE-OBS/SE-SEM and #4918:** remain the semantic and evidence-dependence authorities. Do not add local quantity, unit, observation, calibration or common-mode ontologies.
 - **Sol-Atlas #633 / #700:** consume owner-native spatial and service-outcome projections. They do not recalculate sensor calibration or reinterpret source sample time.
 
-If an owner contract is not yet implemented or not on the exact consuming branch, preserve the required evidence as an unresolved reference and do not imply the integration is executable.
-
-### Measurement-uncertainty reference
-
-Use the current JCGM/BIPM uncertainty guidance as the method anchor: GUM linearization, the 2026 amendment addressing nonlinearity in measurement models, Monte Carlo distribution propagation (JCGM 101), multiple output quantities/covariance (JCGM 102), conformity assessment/guard bands (JCGM 106), and measurement-model development (GUM-6). Choose the propagation method from the model and input distributions; do not use Monte Carlo merely as decoration or assume unrecorded covariance is zero.
-
-Official catalogue: https://www.bipm.org/en/committees/jc/jcgm/publications/
+If an owner contract is not implemented or is absent from the exact consuming branch, preserve the dependency as unresolved. Do not imply cross-repository integration is executable merely because the contract is documented.
 
 ## 6. Comparison and causal attribution
 
