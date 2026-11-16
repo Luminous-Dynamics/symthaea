@@ -85,7 +85,10 @@ pub fn generate(id: FixtureId, samples: usize, seed: u64) -> Result<Vec<Sample>,
         return Err(FixtureError::ZeroSamples);
     }
     if samples > MAX_SAMPLES {
-        return Err(FixtureError::TooManySamples { requested: samples, maximum: MAX_SAMPLES });
+        return Err(FixtureError::TooManySamples {
+            requested: samples,
+            maximum: MAX_SAMPLES,
+        });
     }
 
     let mut output = Vec::with_capacity(samples);
@@ -100,9 +103,15 @@ pub fn generate(id: FixtureId, samples: usize, seed: u64) -> Result<Vec<Sample>,
                 }
             }
         }
-        FixtureId::LogisticFixed => generate_logistic(2.5, 0.2, id.burn_in(), samples, &mut output)?,
-        FixtureId::LogisticPeriod2 => generate_logistic(3.2, 0.2, id.burn_in(), samples, &mut output)?,
-        FixtureId::LogisticChaotic => generate_logistic(4.0, 0.123_456_789, id.burn_in(), samples, &mut output)?,
+        FixtureId::LogisticFixed => {
+            generate_logistic(2.5, 0.2, id.burn_in(), samples, &mut output)?
+        }
+        FixtureId::LogisticPeriod2 => {
+            generate_logistic(3.2, 0.2, id.burn_in(), samples, &mut output)?
+        }
+        FixtureId::LogisticChaotic => {
+            generate_logistic(4.0, 0.123_456_789, id.burn_in(), samples, &mut output)?
+        }
         FixtureId::Henon => {
             let (a, b) = (1.4_f64, 0.3_f64);
             let (mut x, mut y) = (0.0_f64, 0.0_f64);
@@ -122,7 +131,13 @@ pub fn generate(id: FixtureId, samples: usize, seed: u64) -> Result<Vec<Sample>,
                 let n = (step + 1) as f64;
                 let phase_a = n * 2.0_f64.sqrt();
                 let phase_b = n * 3.0_f64.sqrt();
-                push(&mut output, step, phase_a.cos(), phase_a.sin(), phase_b.cos())?;
+                push(
+                    &mut output,
+                    step,
+                    phase_a.cos(),
+                    phase_a.sin(),
+                    phase_b.cos(),
+                )?;
             }
         }
         FixtureId::Ar1ColoredNoise => {
@@ -145,7 +160,13 @@ pub fn generate(id: FixtureId, samples: usize, seed: u64) -> Result<Vec<Sample>,
             for step in 0..total {
                 state = lorenz_rk4(state, sigma, rho, beta, dt);
                 if step >= id.burn_in() {
-                    push(&mut output, step - id.burn_in(), state[0], state[1], state[2])?;
+                    push(
+                        &mut output,
+                        step - id.burn_in(),
+                        state[0],
+                        state[1],
+                        state[2],
+                    )?;
                 }
             }
         }
@@ -186,7 +207,11 @@ fn lorenz_derivative(s: [f64; 3], sigma: f64, rho: f64, beta: f64) -> [f64; 3] {
 }
 
 fn add_scaled(a: [f64; 3], b: [f64; 3], scale: f64) -> [f64; 3] {
-    [a[0] + scale * b[0], a[1] + scale * b[1], a[2] + scale * b[2]]
+    [
+        a[0] + scale * b[0],
+        a[1] + scale * b[1],
+        a[2] + scale * b[2],
+    ]
 }
 
 fn lorenz_rk4(s: [f64; 3], sigma: f64, rho: f64, beta: f64, dt: f64) -> [f64; 3] {
@@ -203,10 +228,14 @@ fn lorenz_rk4(s: [f64; 3], sigma: f64, rho: f64, beta: f64, dt: f64) -> [f64; 3]
 
 /// Seeded normal noise generator. Deterministic within the generator's
 /// integer-arithmetic contract; it is not a CSPRNG.
-struct SplitMix64 { state: u64 }
+struct SplitMix64 {
+    state: u64,
+}
 
 impl SplitMix64 {
-    fn new(seed: u64) -> Self { Self { state: seed } }
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
 
     fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(0x9e37_79b9_7f4a_7c15);
@@ -252,7 +281,10 @@ mod tests {
     use super::*;
 
     fn near(a: f64, b: f64, tol: f64) {
-        assert!((a - b).abs() <= tol, "a={a:.12e}, b={b:.12e}, tol={tol:.3e}");
+        assert!(
+            (a - b).abs() <= tol,
+            "a={a:.12e}, b={b:.12e}, tol={tol:.3e}"
+        );
     }
 
     #[test]
@@ -260,7 +292,11 @@ mod tests {
         for id in FixtureId::ALL {
             let samples = generate(id, 128, 2026).unwrap();
             assert_eq!(samples.len(), 128, "{}", id.as_str());
-            assert!(samples.iter().all(|s| s.x.is_finite() && s.y.is_finite() && s.z.is_finite()));
+            assert!(
+                samples
+                    .iter()
+                    .all(|s| s.x.is_finite() && s.y.is_finite() && s.z.is_finite())
+            );
         }
     }
 
@@ -308,12 +344,19 @@ mod tests {
     #[test]
     fn lorenz_trajectory_is_finite_and_bounded_for_frozen_fixture() {
         let samples = generate(FixtureId::Lorenz63, 256, 0).unwrap();
-        assert!(samples.iter().all(|s| s.x.abs() < 100.0 && s.y.abs() < 100.0 && s.z.abs() < 100.0));
+        assert!(
+            samples
+                .iter()
+                .all(|s| s.x.abs() < 100.0 && s.y.abs() < 100.0 && s.z.abs() < 100.0)
+        );
     }
 
     #[test]
     fn sample_budget_is_enforced() {
-        assert_eq!(generate(FixtureId::StableLinear, 0, 0), Err(FixtureError::ZeroSamples));
+        assert_eq!(
+            generate(FixtureId::StableLinear, 0, 0),
+            Err(FixtureError::ZeroSamples)
+        );
         assert!(matches!(
             generate(FixtureId::StableLinear, MAX_SAMPLES + 1, 0),
             Err(FixtureError::TooManySamples { .. })
