@@ -136,20 +136,8 @@ fn main() {
         std::process::exit(1);
     }
 
-    let strict_dominator = candidate(
-        "dominant",
-        13_000.0,
-        7_000.0,
-        0.97,
-        250.0,
-        150.0,
-        0.6,
-        10.0,
-    );
-    let frontier = extract_pareto_front(
-        &profile,
-        &[higher_qeng, higher_service, strict_dominator],
-    );
+    let strict_dominator = candidate("dominant", 13_000.0, 7_000.0, 0.97, 250.0, 150.0, 0.6, 10.0);
+    let frontier = extract_pareto_front(&profile, &[higher_qeng, higher_service, strict_dominator]);
     println!("pareto_front={:?}", frontier.frontier_candidate_ids);
     println!(
         "non_dominated_statuses={}",
