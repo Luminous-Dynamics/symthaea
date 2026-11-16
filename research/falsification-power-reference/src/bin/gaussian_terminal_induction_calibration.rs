@@ -299,7 +299,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "\"nominal_alpha\":{:.8},",
             "\"paths_per_scenario\":{},",
             "\"maximum_looks\":{},",
-            "\"induced_stop_thresholds\":[{:.4},{:.4},{:.4}],"
+            "\"induced_stop_thresholds\":[{:.4},{:.4},{:.4}],",
             "\"design_information\":{:.8},",
             "\"analytic_terminal_np_power\":{:.8},",
             "\"claim\":\"paired synthetic calibration diagnostic for a frozen simple Gaussian design only\",",
