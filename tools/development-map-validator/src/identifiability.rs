@@ -222,6 +222,7 @@ fn parse_events(candidate: &Value) -> Result<BTreeMap<String, Event>, String> {
         return Err("candidate_view.events must not be empty".to_owned());
     }
     let mut output = BTreeMap::new();
+    let mut producer_sequences = BTreeSet::new();
     for (index, value) in values.iter().enumerate() {
         let label = format!("candidate_view.events[{index}]");
         allowed_keys(
@@ -237,6 +238,11 @@ fn parse_events(candidate: &Value) -> Result<BTreeMap<String, Event>, String> {
             .ok_or_else(|| format!("{label}.sequence_number must be an unsigned integer"))?;
         let _event_time = parse_time(value, "event_time", &label)?;
         let available_at = parse_time(value, "available_at", &label)?;
+        if !producer_sequences.insert((producer_id.clone(), sequence_number)) {
+            return Err(format!(
+                "producer {producer_id:?} repeats sequence number {sequence_number}"
+            ));
+        }
         if output
             .insert(
                 id.clone(),
@@ -431,6 +437,7 @@ fn parse_pair_truths(
     gold: &Value,
     pair_tasks: &BTreeMap<String, PairTask>,
     events: &BTreeMap<String, Event>,
+    boundaries: &BTreeMap<String, Boundary>,
     boundary_truths: &BTreeMap<String, String>,
 ) -> Result<BTreeMap<String, PairTruth>, String> {
     let values = gold
@@ -481,7 +488,9 @@ fn parse_pair_truths(
             .get(&task.right_event_id)
             .ok_or_else(|| format!("pair {pair_id:?} references missing right event"))?;
         if left_event.producer_id == right_event.producer_id
-            && boundary_truths.get(&left_event.producer_id).is_some_and(|state| state != "compromised")
+            && boundaries
+                .get(&left_event.producer_id)
+                .is_some_and(|boundary| boundary.signature_status == "valid")
             && left_event.sequence_number != right_event.sequence_number
         {
             let sequence_relation = if left_event.sequence_number < right_event.sequence_number {
@@ -523,6 +532,17 @@ fn expected_pair_state(
     truth: &PairTruth,
     boundary_truths: &BTreeMap<String, String>,
 ) -> String {
+    // An independently established relation remains usable even if a separate
+    // relevant observer is compromised. The admissible-history intersection
+    // decides relation identifiability; boundary integrity is scored separately.
+    if truth.admissible_relations.len() == 1 {
+        return truth
+            .admissible_relations
+            .iter()
+            .next()
+            .cloned()
+            .unwrap_or_else(|| "underdetermined".to_owned());
+    }
     if task
         .relevant_producers
         .iter()
@@ -530,15 +550,7 @@ fn expected_pair_state(
     {
         return "compromised".to_owned();
     }
-    if truth.admissible_relations.len() != 1 {
-        return "underdetermined".to_owned();
-    }
-    truth
-        .admissible_relations
-        .iter()
-        .next()
-        .cloned()
-        .unwrap_or_else(|| "underdetermined".to_owned())
+    "underdetermined".to_owned()
 }
 
 fn score_trace(
@@ -759,6 +771,23 @@ pub fn evaluate_identifiability_json(input: &str) -> Result<IdentifiabilityRepor
     let scenario_id = required_str(candidate, "scenario_id", "candidate_view")?.to_owned();
     let events = parse_events(candidate)?;
     let boundaries = parse_boundaries(candidate)?;
+    for (event_id, event) in &events {
+        let boundary = boundaries
+            .get(&event.producer_id)
+            .ok_or_else(|| format!("event {event_id:?} has no observation boundary"))?;
+        if !boundary.observed_sequence_numbers.contains(&event.sequence_number) {
+            return Err(format!(
+                "event {event_id:?} sequence number is not present in its producer's observed coverage"
+            ));
+        }
+        if !boundary.expected_sequence_numbers.is_empty()
+            && !boundary.expected_sequence_numbers.contains(&event.sequence_number)
+        {
+            return Err(format!(
+                "event {event_id:?} sequence number is outside its producer's expected coverage"
+            ));
+        }
+    }
     let pair_tasks = parse_pair_tasks(candidate, &events, &boundaries)?;
 
     let gold = bundle
@@ -770,7 +799,7 @@ pub fn evaluate_identifiability_json(input: &str) -> Result<IdentifiabilityRepor
         return Err(format!("unsupported D6.11 v0.1 adjudication status {adjudication_status:?}"));
     }
     let boundary_truths = parse_boundary_truths(gold, &boundaries)?;
-    let pair_truths = parse_pair_truths(gold, &pair_tasks, &events, &boundary_truths)?;
+    let pair_truths = parse_pair_truths(gold, &pair_tasks, &events, &boundaries, &boundary_truths)?;
 
     let traces = bundle
         .get("candidate_traces")
@@ -931,6 +960,45 @@ mod tests {
             json!([1, 2, 99]);
         let error = evaluate_identifiability_json(&value.to_string()).unwrap_err();
         assert!(error.contains("outside the expected coverage range"));
+    }
+
+    #[test]
+    fn preserves_identifiable_relation_with_independent_evidence_despite_compromised_observer() {
+        let mut value = fixture_value();
+        value["gold_overlay"]["pair_truths"][4]["admissible_relations"] = json!(["before"]);
+        value["candidate_traces"][0]["pair_claims"][4]["claimed_relation"] = json!("before");
+        let report = report_for(&value);
+        let calibrated = trace(&report, "calibrated-agent");
+        let result = calibrated.pair_outcomes.iter()
+            .find(|item| item.pair_id == "compromised-stream")
+            .expect("compromised pair");
+        assert_eq!(result.expected_state, "before");
+        assert!(result.correct);
+        assert_eq!(calibrated.missed_compromise_count, 0);
+        assert_eq!(
+            calibrated.boundary_outcomes.iter()
+                .find(|item| item.producer_id == "stream-comp")
+                .expect("boundary")
+                .expected_state,
+            "compromised"
+        );
+    }
+
+    #[test]
+    fn rejects_duplicate_producer_sequence_numbers() {
+        let mut value = fixture_value();
+        let duplicate = value["candidate_view"]["events"][0].clone();
+        value["candidate_view"]["events"].as_array_mut().expect("events").push(duplicate);
+        let error = evaluate_identifiability_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("repeats sequence number"));
+    }
+
+    #[test]
+    fn rejects_event_not_present_in_observed_sequence_manifest() {
+        let mut value = fixture_value();
+        value["candidate_view"]["events"][0]["sequence_number"] = json!(99);
+        let error = evaluate_identifiability_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("not present in its producer's observed coverage"));
     }
 
     #[test]
