@@ -954,8 +954,16 @@ mod tests {
         request.attitude.waterplane_offset_m = -1.0;
         request.attitude.pitch_rad = 0.02;
         let receipt = evaluate_static_attitude(&request).unwrap();
-        assert!((receipt.displacement_volume_m3 - 12_000.0).abs() < 1.0e-7);
-        assert!((receipt.center_of_buoyancy_body_m.x_m - 47.222_222_222_222_22).abs() < 1.0e-8);
+        assert!(
+            (receipt.displacement_volume_m3 - 12_000.0).abs() < 1.0e-7,
+            "unexpected displaced volume: {:.12}",
+            receipt.displacement_volume_m3
+        );
+        assert!(
+            (receipt.center_of_buoyancy_body_m.x_m - 47.222_222_222_222_22).abs() < 1.0e-8,
+            "unexpected LCB: {:.12}",
+            receipt.center_of_buoyancy_body_m.x_m
+        );
         assert!(receipt.center_of_buoyancy_body_m.y_m.abs() < 1.0e-8);
     }
 
@@ -971,8 +979,9 @@ mod tests {
     #[test]
     fn moment_residual_vanishes_when_cg_is_on_the_buoyancy_gravity_line() {
         let mut request = box_request();
-        request.attitude.pitch_rad = 0.08;
-        request.attitude.roll_rad = -0.05;
+        request.attitude.waterplane_offset_m = -1.0;
+        request.attitude.pitch_rad = 0.02;
+        request.attitude.roll_rad = -0.01;
         let first = evaluate_static_attitude(&request).unwrap();
         let gravity = first.body_gravity_direction;
         let displacement = 2.0;
