@@ -3043,7 +3043,9 @@
           "frequency",
           "pulse width",
           "small oxygen addition"
-        ]
+        ],
+        "peak_metrics_pairing_status": "UNPAIRED_DIFFERENT_OPERATING_CONDITIONS",
+        "peak_metrics_must_not_be_combined": true
       },
       "observations": [
         {
@@ -3092,7 +3094,8 @@
         "Diluents alter chemistry, ionization and flow; the Ar/He/N2/O2 findings must not be transferred to other plasma regimes without matched evidence.",
         "No Luminous reproduction or independent validation has occurred."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "technology_family": "PLASMA"
     },
     {
       "case_id": "NH3-THERMAL-HEAT-INTEGRATED-PLANT-TEA-2026",
@@ -3142,7 +3145,8 @@
         "Heat recovery is a modeled plant result and must not be credited to a plasma candidate without measured useful heat duty.",
         "No Luminous reproduction has occurred."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "technology_family": "NON_PLASMA_THERMAL_CATALYTIC"
     },
     {
       "case_id": "BIOGAS-REFORMING-THERMOCHEMICAL-HARMONIZED-TEA-2026",
@@ -3286,7 +3290,8 @@
         "The 10,000 draws use independent assumptions as described by the paper; a future paired cross-route analysis must define correlated exogenous scenarios rather than infer that the source's samples are paired.",
         "No Luminous reproduction has occurred."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "technology_family": "NON_PLASMA_THERMOCHEMICAL"
     },
     {
       "case_id": "METHANE-PYROLYSIS-SHOCK-WAVE-REFERENCE-2026",
@@ -3329,7 +3334,8 @@
         "Hydrogen selectivity is not supplied for this cost/conversion-prioritized point in the source summary.",
         "The shock-wave point and the microwave selectivity-prioritized point are separate Pareto points."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "technology_family": "NON_PLASMA_SHOCK_WAVE"
     },
     {
       "case_id": "METHANE-PYROLYSIS-MICROWAVE-REFERENCE-2026",
@@ -3378,7 +3384,8 @@
         "The point is separate from the shock-wave cost/conversion point and must not be cross-paired with its 92% conversion or USD 0.70/kg cost.",
         "Reconcile the review's functional unit, cost basis, selectivity and boundary before direct ranking."
       ],
-      "luminous_reproduction": false
+      "luminous_reproduction": false,
+      "technology_family": "NON_PLASMA_MICROWAVE_HEATING"
     }
   ],
   "negative_controls": [
@@ -4411,32 +4418,62 @@
         {
           "group_id": "NH3-CRACKING",
           "product_service": "accepted H2 at a frozen purity, pressure and delivery service contract",
-          "candidate_case_ids": [
-            "NH3-CRACK-MW-ATM-MECHANISM-2026",
-            "NH3-PLASMA-DILUENTS-NSP-2026",
-            "NH3-THERMAL-HEAT-INTEGRATED-PLANT-TEA-2026",
-            "NH3-CRACK-TEA-LBNL-2023"
+          "common_service_status": "NOT_YET_MATCHED",
+          "candidate_routes": [
+            {
+              "case_id": "NH3-CRACK-MW-ATM-MECHANISM-2026",
+              "technology_class": "PLASMA"
+            },
+            {
+              "case_id": "NH3-PLASMA-DILUENTS-NSP-2026",
+              "technology_class": "PLASMA"
+            },
+            {
+              "case_id": "NH3-THERMAL-HEAT-INTEGRATED-PLANT-TEA-2026",
+              "technology_class": "NON_PLASMA_THERMAL_CATALYTIC"
+            },
+            {
+              "case_id": "NH3-CRACK-TEA-LBNL-2023",
+              "technology_class": "NON_PLASMA_SYSTEM_TEA"
+            }
           ],
-          "source_point_policy": "all operating points separate; source abstract/conclusion mismatch blocks the disputed throughput point"
+          "source_point_policy": "all operating points remain separate; the microwave abstract/conclusion throughput discrepancy blocks the disputed point"
         },
         {
           "group_id": "METHANE-PYROLYSIS",
           "product_service": "accepted H2 and carbon coproduct under a frozen quality and credit contract",
-          "candidate_case_ids": [
-            "METHANE-PYROLYSIS-ARC-PLASMA-TEA-2026",
-            "METHANE-PYROLYSIS-SHOCK-WAVE-REFERENCE-2026",
-            "METHANE-PYROLYSIS-MICROWAVE-REFERENCE-2026"
+          "common_service_status": "NOT_YET_MATCHED",
+          "candidate_routes": [
+            {
+              "case_id": "METHANE-PYROLYSIS-ARC-PLASMA-TEA-2026",
+              "technology_class": "PLASMA"
+            },
+            {
+              "case_id": "METHANE-PYROLYSIS-SHOCK-WAVE-REFERENCE-2026",
+              "technology_class": "NON_PLASMA_SHOCK_WAVE"
+            },
+            {
+              "case_id": "METHANE-PYROLYSIS-MICROWAVE-REFERENCE-2026",
+              "technology_class": "NON_PLASMA_MICROWAVE_HEATING"
+            }
           ],
-          "source_point_policy": "shock-wave cost/conversion and microwave selectivity Pareto references remain distinct; no-credit case is mandatory"
+          "source_point_policy": "shock-wave cost/conversion and microwave selectivity points remain separate; no-credit case mandatory"
         },
         {
           "group_id": "BIOGAS-TO-HYDROGEN",
-          "product_service": "99.9% H2 at the same gate-to-gate or fully expanded delivered-product boundary",
-          "candidate_case_ids": [
-            "PLASMA-POWERT0X-BIOGAS-REFORMING-TEA-2026",
-            "BIOGAS-REFORMING-THERMOCHEMICAL-HARMONIZED-TEA-2026"
+          "product_service": "accepted hydrogen at matched purity, delivery and system boundary",
+          "common_service_status": "NOT_YET_MATCHED",
+          "candidate_routes": [
+            {
+              "case_id": "PLASMA-POWERT0X-BIOGAS-REFORMING-TEA-2026",
+              "technology_class": "PLASMA"
+            },
+            {
+              "case_id": "BIOGAS-REFORMING-THERMOCHEMICAL-HARMONIZED-TEA-2026",
+              "technology_class": "NON_PLASMA_THERMOCHEMICAL"
+            }
           ],
-          "source_point_policy": "EUR/t syngas and USD/kg H2 are NOT_COMPARABLE until product, currency, year and system boundaries are normalized"
+          "source_point_policy": "EUR/t syngas and USD/kg H2 are not comparable until product, currency and system boundaries are harmonized"
         }
       ],
       "baseline_algorithms": [
