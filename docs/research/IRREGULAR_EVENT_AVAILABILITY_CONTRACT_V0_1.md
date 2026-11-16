@@ -222,18 +222,27 @@ are preregistered targets, not benchmark results.
 
 The standalone executable
 `research/irregular-event-contract/src/bin/watermark_scaling.rs` constructs
-fixed, deterministic source-watermark ledgers containing 1k, 10k and 100k
-late-arrival receipts. Each generated history permutes event-time order relative
-to availability/arrival order. It queries a 16-unit half-open interval and
-compares 101 indexed reads with 15 full-history verified reads. It records
-indexed p50/p95/p99 latency, verified median/worst-observed latency, event-time buckets visited and receipt entries examined, and
-checks exact report parity plus the expected 16 matching breaches before timing.
-The hosted workflow retains the CSV output with the exact commit, toolchain,
-dependency lock and fixture/source digests. This measures in-memory CPU query
-cost only; it does not establish durable-storage, distributed, throughput or
-physical-energy performance. No latency advantage is claimed until the latest
-exact-head run yields an artifact.
+deterministic ledgers at 4,096, 16,384 and 65,536 event records. It varies
+required-source counts 1/4/16, half-open interval widths 1/16/256 microseconds,
+late-event densities 0/100/5,000/10,000 basis points (0%, 1%, 50%, 100%), and
+two historical knowledge cutoffs, for 216 workload configurations. Event-time
+keys are permuted relative to four receipt-time batches.
 
+Each workload first requires exact equality between the fast indexed report and
+the report inside a distinct, non-forgeable `VerifiedCompletenessReport`.
+The verified receipt binds the full-history replay to the ledger SHA-256 and
+progress/arrival/breach counts; this is in-memory ledger consistency, not source
+authentication. It additionally requires the receipt digest to match the
+current ledger snapshot before timing. Each case records 51 indexed query
+samples (nearest-rank p50/p95/p99) and 15 verified replay samples (median and
+observed maximum), plus event-time index buckets visited, receipt candidates
+examined and matching breaches.
+
+The hosted workflow retains CSV output with the exact commit, Rust toolchain,
+dependency lock, and fixture/source digests. This measures in-memory release
+build CPU query and audit cost only; it does not establish durable-WAL,
+distributed-stream, throughput or physical-energy performance. No latency
+advantage is claimed until the latest exact-head run yields an artifact.
 
 ## 12. Current external comparator snapshot
 
