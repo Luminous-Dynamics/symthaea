@@ -1368,6 +1368,10 @@ mod tests {
         let conformant = trace(&report, "conformant-partial-order");
         assert!(conformant.causal_order.false_serialization_pairs.is_empty());
         assert!(conformant.causal_order.missing_order_pairs.is_empty());
+        assert!(!conformant.causal_order.correctly_ordered_pairs.iter().any(|pair| {
+            (pair[0] == "branch-a-source" && pair[1] == "branch-b-docs")
+                || (pair[0] == "branch-b-docs" && pair[1] == "branch-a-source")
+        }));
     }
 
     #[test]
