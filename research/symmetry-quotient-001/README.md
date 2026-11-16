@@ -2,7 +2,7 @@
 
 This crate is the first executable slice of [SYMM-QUOTIENT-001](https://github.com/Luminous-Dynamics/symthaea/issues/11616).
 
-It starts with finite, exactly enumerable domains: C2 and C3 actions, plus a non-abelian D4 action on ordered pairs of square vertices. These make the unquotiented search small enough to enumerate independently and compare against exhaustive orbit oracles.
+It starts with finite, exactly enumerable domains: C2 and C3 fixtures, a non-abelian D4 action on ordered pairs of square vertices, and a deterministic 110-fixture corpus spanning cyclic C_n and dihedral D_n groups for 3 <= n <= 12. The corpus covers vertex, ordered-pair, ordered-triple, unordered-pair, regular, and disjoint-union actions, each checked against an exhaustive orbit oracle.
 
 ## Authority boundary
 
@@ -36,4 +36,4 @@ This version does not use a cryptographic digest. The verifier receives the exac
 
 This is not a general-purpose group-discovery engine. It does not cover continuous Lie groups, approximate actions, infinite domains, non-finite objectives, transformed output spaces, or physical step-map equivariance. It must abstain when its exact finite contract is incomplete or its resource budget is exceeded.
 
-The D4 benchmark also compares an actual objective search against exhaustive enumeration: a 16-candidate ordered-pair problem has three verified orbits, the optimum found by evaluating one representative per orbit matches the exhaustive optimum, and lifting reconstructs all four original minimizers. This yields 16/3 = 5.33× fewer objective evaluations on this exact finite fixture; it is candidate-work reduction, not a wall-clock speedup claim. The tests independently enumerate candidate orbits, mutate the group table/action/task/certificate witnesses, and verify the optimum and full solution lift.
+The D4 benchmark compares an actual objective search against exhaustive enumeration: a 16-candidate ordered-pair problem has three verified orbits, the optimum found by evaluating one representative per orbit matches the exhaustive optimum, and lifting reconstructs all four original minimizers. This yields 16/3 = 5.33× fewer objective evaluations on this exact finite fixture; it is candidate-work reduction, not a wall-clock speedup claim. The 110-case generated corpus assigns exact task semantics per exhaustive orbit, independently checks every quotient partition, replays each certificate, and compares the full optimum and lifted solution set against exhaustive search. Separate negative controls mutate group axioms, action laws, task semantics, and certificate witnesses.
