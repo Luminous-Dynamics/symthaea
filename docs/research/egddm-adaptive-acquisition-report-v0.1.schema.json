@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EGDDM D6.16 adaptive acquisition report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "world_count",
+    "option_count",
+    "action_count",
+    "candidate_policy_count",
+    "exact_oracle",
+    "policies",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "adjudication_status": {
+      "const": "synthetic_finite_pomdp_known_answer"
+    },
+    "world_count": {
+      "type": "integer"
+    },
+    "option_count": {
+      "type": "integer"
+    },
+    "action_count": {
+      "type": "integer"
+    },
+    "candidate_policy_count": {
+      "type": "integer"
+    },
+    "exact_oracle": {
+      "type": "object",
+      "required": [
+        "expected_total_cost_micros",
+        "expected_acquisition_cost_micros",
+        "expected_defer_penalty_micros",
+        "expected_acquisition_count",
+        "max_acquisitions_on_path",
+        "memoized_belief_states",
+        "policy"
+      ],
+      "properties": {
+        "expected_total_cost_micros": {
+          "type": "number"
+        },
+        "expected_acquisition_cost_micros": {
+          "type": "number"
+        },
+        "expected_defer_penalty_micros": {
+          "type": "number"
+        },
+        "expected_acquisition_count": {
+          "type": "number"
+        },
+        "max_acquisitions_on_path": {
+          "type": "integer"
+        },
+        "memoized_belief_states": {
+          "type": "integer"
+        },
+        "policy": {
+          "type": "object"
+        }
+      }
+    },
+    "policies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "policy_id",
+          "expected_total_cost_micros",
+          "expected_acquisition_cost_micros",
+          "expected_defer_penalty_micros",
+          "expected_acquisition_count",
+          "max_acquisitions_on_path",
+          "leaf_count",
+          "unsupported_action_probability_bps",
+          "hard_gate_violation_probability_bps",
+          "risk_envelope_violation_probability_bps",
+          "actual_unsafe_action_probability_bps",
+          "unnecessary_defer_probability_bps",
+          "safe_policy_cost_regret_micros"
+        ],
+        "properties": {
+          "policy_id": {
+            "type": "string"
+          },
+          "expected_total_cost_micros": {
+            "type": "number"
+          },
+          "expected_acquisition_cost_micros": {
+            "type": "number"
+          },
+          "expected_defer_penalty_micros": {
+            "type": "number"
+          },
+          "expected_acquisition_count": {
+            "type": "number"
+          },
+          "max_acquisitions_on_path": {
+            "type": "integer"
+          },
+          "leaf_count": {
+            "type": "integer"
+          },
+          "unsupported_action_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "hard_gate_violation_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "risk_envelope_violation_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "actual_unsafe_action_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "unnecessary_defer_probability_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "safe_policy_cost_regret_micros": {
+            "type": [
+              "number",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

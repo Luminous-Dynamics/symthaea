@@ -1,0 +1,473 @@
+{
+  "candidate_view": {
+    "scenario_id": "d6.16-adaptive-risk-pomdp-v0.1",
+    "trusted_contract": {
+      "decision_cutoff": "2026-11-16T10:00:00Z",
+      "budget_micros": 2500,
+      "defer_penalty_micros": 10000,
+      "max_acquisitions": 4,
+      "actions": [
+        {
+          "action_id": "release",
+          "hard_gate": true,
+          "irreversible": true,
+          "max_residual_risk_bps": 0
+        },
+        {
+          "action_id": "repair-a",
+          "hard_gate": true,
+          "irreversible": true,
+          "max_residual_risk_bps": 0
+        },
+        {
+          "action_id": "repair-b",
+          "hard_gate": true,
+          "irreversible": true,
+          "max_residual_risk_bps": 0
+        }
+      ],
+      "options": [
+        {
+          "option_id": "screen",
+          "available_at": "2026-11-16T08:00:00Z"
+        },
+        {
+          "option_id": "verify-release",
+          "available_at": "2026-11-16T08:00:00Z"
+        },
+        {
+          "option_id": "classify",
+          "available_at": "2026-11-16T08:00:00Z"
+        },
+        {
+          "option_id": "redundant-audit",
+          "available_at": "2026-11-16T08:00:00Z"
+        }
+      ]
+    },
+    "policies": [
+      {
+        "policy_id": "adaptive-verify-then-classify",
+        "root_node_id": "root",
+        "nodes": [
+          {
+            "node_id": "root",
+            "kind": "acquire",
+            "option_id": "verify-release",
+            "at": "2026-11-16T09:01:00Z",
+            "outcome_edges": {
+              "pass": "release",
+              "fail": "classify-hazards"
+            }
+          },
+          {
+            "node_id": "release",
+            "kind": "act",
+            "action_id": "release"
+          },
+          {
+            "node_id": "classify-hazards",
+            "kind": "acquire",
+            "option_id": "classify",
+            "at": "2026-11-16T09:02:00Z",
+            "outcome_edges": {
+              "A": "repair-a",
+              "B": "repair-b"
+            }
+          },
+          {
+            "node_id": "repair-a",
+            "kind": "act",
+            "action_id": "repair-a"
+          },
+          {
+            "node_id": "repair-b",
+            "kind": "act",
+            "action_id": "repair-b"
+          }
+        ]
+      },
+      {
+        "policy_id": "fixed-classifier",
+        "root_node_id": "root",
+        "nodes": [
+          {
+            "node_id": "root",
+            "kind": "acquire",
+            "option_id": "classify",
+            "at": "2026-11-16T09:01:00Z",
+            "outcome_edges": {
+              "none": "release",
+              "A": "repair-a",
+              "B": "repair-b"
+            }
+          },
+          {
+            "node_id": "release",
+            "kind": "act",
+            "action_id": "release"
+          },
+          {
+            "node_id": "repair-a",
+            "kind": "act",
+            "action_id": "repair-a"
+          },
+          {
+            "node_id": "repair-b",
+            "kind": "act",
+            "action_id": "repair-b"
+          }
+        ]
+      },
+      {
+        "policy_id": "greedy-screen-only",
+        "root_node_id": "root",
+        "nodes": [
+          {
+            "node_id": "root",
+            "kind": "acquire",
+            "option_id": "screen",
+            "at": "2026-11-16T09:01:00Z",
+            "outcome_edges": {
+              "green": "release",
+              "amber": "defer"
+            }
+          },
+          {
+            "node_id": "release",
+            "kind": "act",
+            "action_id": "release"
+          },
+          {
+            "node_id": "defer",
+            "kind": "defer",
+            "reason_code": "screen_not_decisive"
+          }
+        ]
+      },
+      {
+        "policy_id": "always-act",
+        "root_node_id": "root",
+        "nodes": [
+          {
+            "node_id": "root",
+            "kind": "act",
+            "action_id": "release"
+          }
+        ]
+      },
+      {
+        "policy_id": "always-defer",
+        "root_node_id": "root",
+        "nodes": [
+          {
+            "node_id": "root",
+            "kind": "defer",
+            "reason_code": "always_stop"
+          }
+        ]
+      },
+      {
+        "policy_id": "full-static-acquisition",
+        "root_node_id": "root",
+        "nodes": [
+          {
+            "node_id": "root",
+            "kind": "acquire",
+            "option_id": "screen",
+            "at": "2026-11-16T09:01:00Z",
+            "outcome_edges": {
+              "green": "verify-green",
+              "amber": "verify-amber"
+            }
+          },
+          {
+            "node_id": "verify-green",
+            "kind": "acquire",
+            "option_id": "verify-release",
+            "at": "2026-11-16T09:02:00Z",
+            "outcome_edges": {
+              "pass": "classify-gpass",
+              "fail": "classify-gfail"
+            }
+          },
+          {
+            "node_id": "verify-amber",
+            "kind": "acquire",
+            "option_id": "verify-release",
+            "at": "2026-11-16T09:02:00Z",
+            "outcome_edges": {
+              "pass": "classify-apass",
+              "fail": "classify-afail"
+            }
+          },
+          {
+            "node_id": "classify-gpass",
+            "kind": "acquire",
+            "option_id": "classify",
+            "at": "2026-11-16T09:03:00Z",
+            "outcome_edges": {
+              "none": "release-a"
+            }
+          },
+          {
+            "node_id": "classify-gfail",
+            "kind": "acquire",
+            "option_id": "classify",
+            "at": "2026-11-16T09:03:00Z",
+            "outcome_edges": {
+              "A": "repair-a1",
+              "B": "repair-b1"
+            }
+          },
+          {
+            "node_id": "classify-apass",
+            "kind": "acquire",
+            "option_id": "classify",
+            "at": "2026-11-16T09:03:00Z",
+            "outcome_edges": {
+              "none": "release-b"
+            }
+          },
+          {
+            "node_id": "classify-afail",
+            "kind": "acquire",
+            "option_id": "classify",
+            "at": "2026-11-16T09:03:00Z",
+            "outcome_edges": {
+              "A": "repair-a2",
+              "B": "repair-b2"
+            }
+          },
+          {
+            "node_id": "release-a",
+            "kind": "act",
+            "action_id": "release"
+          },
+          {
+            "node_id": "repair-a1",
+            "kind": "act",
+            "action_id": "repair-a"
+          },
+          {
+            "node_id": "repair-b1",
+            "kind": "act",
+            "action_id": "repair-b"
+          },
+          {
+            "node_id": "release-b",
+            "kind": "act",
+            "action_id": "release"
+          },
+          {
+            "node_id": "repair-a2",
+            "kind": "act",
+            "action_id": "repair-a"
+          },
+          {
+            "node_id": "repair-b2",
+            "kind": "act",
+            "action_id": "repair-b"
+          }
+        ]
+      }
+    ]
+  },
+  "oracle": {
+    "trusted_contract": {
+      "decision_cutoff": "2026-11-16T10:00:00Z",
+      "budget_micros": 2500,
+      "defer_penalty_micros": 10000,
+      "max_acquisitions": 4,
+      "actions": [
+        {
+          "action_id": "release",
+          "hard_gate": true,
+          "irreversible": true,
+          "max_residual_risk_bps": 0
+        },
+        {
+          "action_id": "repair-a",
+          "hard_gate": true,
+          "irreversible": true,
+          "max_residual_risk_bps": 0
+        },
+        {
+          "action_id": "repair-b",
+          "hard_gate": true,
+          "irreversible": true,
+          "max_residual_risk_bps": 0
+        }
+      ],
+      "options": [
+        {
+          "option_id": "screen",
+          "available_at": "2026-11-16T08:00:00Z"
+        },
+        {
+          "option_id": "verify-release",
+          "available_at": "2026-11-16T08:00:00Z"
+        },
+        {
+          "option_id": "classify",
+          "available_at": "2026-11-16T08:00:00Z"
+        },
+        {
+          "option_id": "redundant-audit",
+          "available_at": "2026-11-16T08:00:00Z"
+        }
+      ]
+    },
+    "worlds": [
+      {
+        "world_id": "safe",
+        "prior_probability_bps": 6000,
+        "safe_actions": [
+          "release"
+        ]
+      },
+      {
+        "world_id": "hazard-a",
+        "prior_probability_bps": 2000,
+        "safe_actions": [
+          "repair-a"
+        ]
+      },
+      {
+        "world_id": "hazard-b",
+        "prior_probability_bps": 2000,
+        "safe_actions": [
+          "repair-b"
+        ]
+      }
+    ],
+    "observation_models": [
+      {
+        "option_id": "screen",
+        "cost_samples_micros": {
+          "cold": [
+            250,
+            280,
+            300
+          ]
+        },
+        "by_world": [
+          {
+            "world_id": "safe",
+            "outcomes": {
+              "green": 9000,
+              "amber": 1000
+            }
+          },
+          {
+            "world_id": "hazard-a",
+            "outcomes": {
+              "green": 1000,
+              "amber": 9000
+            }
+          },
+          {
+            "world_id": "hazard-b",
+            "outcomes": {
+              "green": 1000,
+              "amber": 9000
+            }
+          }
+        ]
+      },
+      {
+        "option_id": "verify-release",
+        "cost_samples_micros": {
+          "cold": [
+            450,
+            480,
+            500
+          ]
+        },
+        "by_world": [
+          {
+            "world_id": "safe",
+            "outcomes": {
+              "pass": 10000,
+              "fail": 0
+            }
+          },
+          {
+            "world_id": "hazard-a",
+            "outcomes": {
+              "pass": 0,
+              "fail": 10000
+            }
+          },
+          {
+            "world_id": "hazard-b",
+            "outcomes": {
+              "pass": 0,
+              "fail": 10000
+            }
+          }
+        ]
+      },
+      {
+        "option_id": "classify",
+        "cost_samples_micros": {
+          "cold": [
+            1300,
+            1400,
+            1500
+          ]
+        },
+        "by_world": [
+          {
+            "world_id": "safe",
+            "outcomes": {
+              "none": 10000
+            }
+          },
+          {
+            "world_id": "hazard-a",
+            "outcomes": {
+              "A": 10000
+            }
+          },
+          {
+            "world_id": "hazard-b",
+            "outcomes": {
+              "B": 10000
+            }
+          }
+        ]
+      },
+      {
+        "option_id": "redundant-audit",
+        "cost_samples_micros": {
+          "cold": [
+            180,
+            190,
+            200
+          ]
+        },
+        "by_world": [
+          {
+            "world_id": "safe",
+            "outcomes": {
+              "ok": 10000
+            }
+          },
+          {
+            "world_id": "hazard-a",
+            "outcomes": {
+              "ok": 10000
+            }
+          },
+          {
+            "world_id": "hazard-b",
+            "outcomes": {
+              "ok": 10000
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

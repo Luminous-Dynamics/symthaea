@@ -1,0 +1,133 @@
+{
+  "scenario_id": "d6.16-adaptive-risk-pomdp-v0.1",
+  "adjudication_status": "synthetic_finite_pomdp_known_answer",
+  "world_count": 3,
+  "option_count": 4,
+  "action_count": 3,
+  "candidate_policy_count": 6,
+  "exact_oracle": {
+    "expected_total_cost_micros": 1100,
+    "expected_acquisition_cost_micros": 1100,
+    "expected_defer_penalty_micros": 0,
+    "expected_acquisition_count": 1.4,
+    "max_acquisitions_on_path": 2,
+    "memoized_belief_states": 34,
+    "policy": {
+      "kind": "acquire",
+      "option_id": "verify-release",
+      "outcome_policies": {
+        "fail": {
+          "kind": "acquire",
+          "option_id": "classify",
+          "outcome_policies": {
+            "A": {
+              "kind": "act",
+              "action_id": "repair-a"
+            },
+            "B": {
+              "kind": "act",
+              "action_id": "repair-b"
+            }
+          }
+        },
+        "pass": {
+          "kind": "act",
+          "action_id": "release"
+        }
+      }
+    }
+  },
+  "policies": [
+    {
+      "policy_id": "adaptive-verify-then-classify",
+      "expected_total_cost_micros": 1100,
+      "expected_acquisition_cost_micros": 1100,
+      "expected_defer_penalty_micros": 0,
+      "expected_acquisition_count": 1.4,
+      "max_acquisitions_on_path": 2,
+      "leaf_count": 3,
+      "unsupported_action_probability_bps": 0,
+      "hard_gate_violation_probability_bps": 0,
+      "risk_envelope_violation_probability_bps": 0,
+      "actual_unsafe_action_probability_bps": 0,
+      "unnecessary_defer_probability_bps": 0,
+      "safe_policy_cost_regret_micros": 0
+    },
+    {
+      "policy_id": "fixed-classifier",
+      "expected_total_cost_micros": 1500,
+      "expected_acquisition_cost_micros": 1500,
+      "expected_defer_penalty_micros": 0,
+      "expected_acquisition_count": 1,
+      "max_acquisitions_on_path": 1,
+      "leaf_count": 3,
+      "unsupported_action_probability_bps": 0,
+      "hard_gate_violation_probability_bps": 0,
+      "risk_envelope_violation_probability_bps": 0,
+      "actual_unsafe_action_probability_bps": 0,
+      "unnecessary_defer_probability_bps": 0,
+      "safe_policy_cost_regret_micros": 400
+    },
+    {
+      "policy_id": "greedy-screen-only",
+      "expected_total_cost_micros": 4500,
+      "expected_acquisition_cost_micros": 300,
+      "expected_defer_penalty_micros": 4200,
+      "expected_acquisition_count": 1,
+      "max_acquisitions_on_path": 1,
+      "leaf_count": 2,
+      "unsupported_action_probability_bps": 5800,
+      "hard_gate_violation_probability_bps": 5800,
+      "risk_envelope_violation_probability_bps": 0,
+      "actual_unsafe_action_probability_bps": 400,
+      "unnecessary_defer_probability_bps": 0,
+      "safe_policy_cost_regret_micros": null
+    },
+    {
+      "policy_id": "always-act",
+      "expected_total_cost_micros": 0,
+      "expected_acquisition_cost_micros": 0,
+      "expected_defer_penalty_micros": 0,
+      "expected_acquisition_count": 0,
+      "max_acquisitions_on_path": 0,
+      "leaf_count": 1,
+      "unsupported_action_probability_bps": 10000,
+      "hard_gate_violation_probability_bps": 10000,
+      "risk_envelope_violation_probability_bps": 0,
+      "actual_unsafe_action_probability_bps": 4000,
+      "unnecessary_defer_probability_bps": 0,
+      "safe_policy_cost_regret_micros": null
+    },
+    {
+      "policy_id": "always-defer",
+      "expected_total_cost_micros": 10000,
+      "expected_acquisition_cost_micros": 0,
+      "expected_defer_penalty_micros": 10000,
+      "expected_acquisition_count": 0,
+      "max_acquisitions_on_path": 0,
+      "leaf_count": 1,
+      "unsupported_action_probability_bps": 0,
+      "hard_gate_violation_probability_bps": 0,
+      "risk_envelope_violation_probability_bps": 0,
+      "actual_unsafe_action_probability_bps": 0,
+      "unnecessary_defer_probability_bps": 0,
+      "safe_policy_cost_regret_micros": 8900
+    },
+    {
+      "policy_id": "full-static-acquisition",
+      "expected_total_cost_micros": 2300,
+      "expected_acquisition_cost_micros": 2300,
+      "expected_defer_penalty_micros": 0,
+      "expected_acquisition_count": 3,
+      "max_acquisitions_on_path": 3,
+      "leaf_count": 6,
+      "unsupported_action_probability_bps": 0,
+      "hard_gate_violation_probability_bps": 0,
+      "risk_envelope_violation_probability_bps": 0,
+      "actual_unsafe_action_probability_bps": 0,
+      "unnecessary_defer_probability_bps": 0,
+      "safe_policy_cost_regret_micros": 1200
+    }
+  ],
+  "claim_ceiling": "Exact dynamic-programming oracle over a bounded finite POMDP with evaluator-supplied world priors, conditional observation likelihoods, action-safety labels and p95 query costs. Does not prove real-world probability calibration, general-POMDP optimality outside this finite model, production authority, safe autonomy, or external benchmark superiority."
+}
