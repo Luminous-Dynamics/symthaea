@@ -4,6 +4,8 @@ A standalone Rust adapter for the exact Subterra v0.1 site-evidence and cave-net
 
 ## Source contracts
 
+Pinned provenance manifest: `upstream-schema-manifest-v0.1.json`. It binds the upstream schema IDs, versions, Git blob object IDs and copied synthetic fixture object IDs. Git blob IDs are repository provenance identifiers, not signatures or independent authenticity proofs.
+
 - Symtropy site schema: `research/geobio-foundry/SUBTERRA_SITE_EVIDENCE_SCHEMA_v0.1.json`, blob SHA `970b48703a8147cd3047cce05c5fc0631d1f03d9`.
 - Symtropy network schema: `research/geobio-foundry/SUBTERRA_NETWORK_SCHEMA_v0.1.json`, blob SHA `bfe797f741d930ffcde2ce9d33a21c75396f46c0`.
 - Symtropy profile schema: `research/geobio-foundry/SUBTERRA_PROFILE_SCHEMA_v0.1.json`, blob SHA `87d77b208f20227797ff59fd1f6d4c01bbb1c72c`.
@@ -16,7 +18,7 @@ Fixtures in this package are copies of the cited synthetic examples for determin
 
 ## Supported records
 
-- Site evidence: typed DTO, semantic consistency checks and non-probabilistic `SiteBeliefInput` conversion.
+- Site evidence: typed DTO, semantic consistency checks and non-probabilistic `SiteBeliefInput` conversion; source schema version is retained.
 - Cave network: typed DTO, observed-topology components, evidence-state summary and directional demonstrated-route queries.
 - Non-uniform profile: typed DTO, explicit unknown intervals, measurement uncertainty preservation, coverage summary and observed-only length-weighted dimensions.
 - Science-return lifecycle: monotonic evidence events from proposal through admission, with failure/cancellation and store-and-forward branches; delivery and scientific admission are distinct.
@@ -52,6 +54,7 @@ The package has its own Cargo workspace and does not join the production Symthae
 - Site, cave-network and non-uniform-profile adapters plus science-return lifecycle and unit-test fixtures: AUTHORED.
 - The profile adapter validates ordered contiguous coverage and computes observed-only geometry summaries; it does not yet propagate uncertainty through the summary statistics.
 - The science-return record validates event order and reference presence; it does not prove cryptographic authenticity, immutable storage, custody authority or transport delivery.
+- The upstream manifest pins source Git objects but does not fetch or authenticate upstream content at runtime.
 - The adapter rejects malformed required fields and unknown fields, but does not replace full Draft 2020-12 schema validation or RFC 3339 format validation.
 - Rust source and unit-test fixtures: AUTHORED.
 - Compilation, formatting, tests and Clippy: NOT EXECUTED in the current authoring environment (no Rust toolchain available).
