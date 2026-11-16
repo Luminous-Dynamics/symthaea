@@ -40,7 +40,7 @@ This crate has its own Cargo workspace and does not join or alter the production
 ## Evidence state
 
 - Source and 10 unit-test cases: AUTHORED.
-- Mathematical policy-tree sanity check: independently recalculated in a separate executable reference script; not a Rust execution.
+- Mathematical policy-tree sanity check: independently recalculated with a separate arithmetic model; not a Rust execution.
 - Rust formatting, compile, tests and Clippy: NOT EXECUTED in the current authoring environment (no cargo/rustc present).
 - CI: NOT CHECKED; any skipped job is not a pass.
 - Robot-in-the-loop, terrestrial analogue, flight or planetary validation: NOT PERFORMED.
