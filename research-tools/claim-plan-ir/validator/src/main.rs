@@ -643,6 +643,10 @@ mod tests {
         include_str!("../../fixtures/negative/trust_scope_overclaim.json");
     const BAD_PORT: &str =
         include_str!("../../fixtures/negative/https_origin_port_out_of_range.json");
+    const DEFAULT_PORT: &str =
+        include_str!("../../fixtures/negative/https_origin_explicit_default_port.json");
+    const SERVER_MISMATCH: &str =
+        include_str!("../../fixtures/negative/dns_server_identity_mismatch.json");
 
     #[test]
     fn jcs_uses_utf16_code_unit_order_for_object_keys() {
@@ -660,6 +664,20 @@ mod tests {
         let (digest, count) = validate_plan(POSITIVE).expect("positive fixture should pass");
         assert_eq!(count, 3);
         assert_eq!(digest.len(), 64);
+    }
+
+    #[test]
+    fn canonical_https_origin_omits_default_port_443() {
+        let error = validate_plan(DEFAULT_PORT)
+            .expect_err("explicit default port 443 must reject");
+        assert!(error.contains("omit the default port 443"));
+    }
+
+    #[test]
+    fn dns_server_identity_must_match_origin_host() {
+        let error = validate_plan(SERVER_MISMATCH)
+            .expect_err("DNS server identity mismatch must reject");
+        assert!(error.contains("must exactly match the HTTPS origin host"));
     }
 
     #[test]
