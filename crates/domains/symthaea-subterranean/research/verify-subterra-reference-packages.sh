@@ -21,6 +21,7 @@ CRATES=(
   "subterra-voi-kernel"
   "subterra-survival-planner"
   "subterra-robust-voi"
+  "subterra-likelihood-calibration"
   "subterra-evidence-adapter"
 )
 
@@ -53,5 +54,5 @@ for crate in "\${CRATES[@]}"; do
   cargo clippy --manifest-path "$ROOT/$BASE/$crate/Cargo.toml" --all-targets -- -D warnings
 done
 
-printf '\nPASS: four standalone Subterra packages passed formatting, tests and strict Clippy.\n'
+printf '\nPASS: five standalone Subterra packages passed formatting, tests and strict Clippy.\n'
 printf 'This does not establish physical, analogue, flight or planetary qualification.\n'
