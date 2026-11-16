@@ -7,10 +7,12 @@ fn fixture_path(name: &str) -> PathBuf {
 }
 
 fn run_cli(args: &[&str]) -> std::process::Output {
-    Command::new(env!("CARGO_BIN_EXE_marine-sectional-hydrostatics-reference"))
-        .args(args)
-        .output()
-        .expect("sectional reference CLI must launch")
+    Command::new(env!(
+        "CARGO_BIN_EXE_marine-sectional-hydrostatics-reference"
+    ))
+    .args(args)
+    .output()
+    .expect("sectional reference CLI must launch")
 }
 
 fn run_cli_with_request(name: &str, request: &serde_json::Value) -> std::process::Output {
@@ -48,9 +50,7 @@ fn cli_evaluates_box_loading_sweep_and_emits_digest_bound_receipt() {
     let receipt = &report["receipt"];
     assert_eq!(receipt["algorithm"], "sectional-area-trapezoid-v1");
     assert_eq!(
-        receipt["source_spec_digest_blake3"]
-            .as_str()
-            .map(str::len),
+        receipt["source_spec_digest_blake3"].as_str().map(str::len),
         Some(64)
     );
     assert_eq!(receipt["results"].as_array().map(Vec::len), Some(3));
@@ -66,7 +66,10 @@ fn cli_evaluates_box_loading_sweep_and_emits_digest_bound_receipt() {
         design["result_digest_blake3"].as_str().map(str::len),
         Some(64)
     );
-    assert_eq!(receipt["sweep_digest_blake3"].as_str().map(str::len), Some(64));
+    assert_eq!(
+        receipt["sweep_digest_blake3"].as_str().map(str::len),
+        Some(64)
+    );
 }
 
 #[test]
@@ -89,7 +92,9 @@ fn cli_evaluates_tapered_loading_sweep_and_off_midship_centres() {
     assert!((design["displacement_volume_m3"].as_f64().unwrap() - 9_000.0).abs() < 1.0e-9);
     assert!((design["waterplane_area_m2"].as_f64().unwrap() - 1_500.0).abs() < 1.0e-9);
     assert!(
-        (design["longitudinal_center_of_buoyancy_m"].as_f64().unwrap()
+        (design["longitudinal_center_of_buoyancy_m"]
+            .as_f64()
+            .unwrap()
             - 500_000.0 / 9_000.0)
             .abs()
             < 1.0e-9
