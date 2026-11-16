@@ -18,7 +18,7 @@ The reference auditor receives one row per raw/derived evidence record with:
 
 - stable case ID;
 - physical site ID;
-- physical acquisition-lineage ID;
+- one or more physical acquisition-lineage IDs;
 - fixed split assignment;
 - zero or more declared shared-cause groups.
 
@@ -35,7 +35,7 @@ It additionally joins rows sharing one or more declared groups:
 
 The grouping graph uses transitive closure. If A and B share an environmental episode, and B and C share a processing run, A/B/C form one dependency component and must remain in a single split.
 
-Multiple derived rows from one physical acquisition are allowed and retained. They do not increase the number of dependency components. This is more expressive than rejecting every repeated acquisition ID, while still preventing derived products from masquerading as independent acquisitions.
+Multiple derived rows from one or more physical acquisitions are allowed and retained. Every contributing acquisition ID joins the derived record to its source components, so fused products cannot hide shared physical inputs. This is more expressive than rejecting every repeated acquisition ID, while still preventing derived products from masquerading as independent acquisitions.
 
 ## 3. Split semantics
 
@@ -109,6 +109,6 @@ Standalone package:
 - Transitive dependency components.
 - Fail-closed split-crossing checks.
 - Exact component/group counts and maximum component size.
-- 24 authored tests, including 9 paired cluster-bootstrap cases.
+- 28 authored tests, including 10 paired cluster-bootstrap cases and 3 multi-acquisition lineage cases.
 
 The package is AUTHORED, not compiled or executed in the current environment. It does not estimate correlations, calculate effective sample size, bootstrap uncertainty, detect undeclared causes, authenticate IDs, or integrate with the likelihood fitter. Those are follow-on work, not implied capabilities.

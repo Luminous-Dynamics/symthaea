@@ -62,9 +62,10 @@ pub struct SharedCauseGroup {
 pub struct LineageCase {
     pub case_id: String,
     pub site_id: String,
-    /// Several derived records may legitimately share one physical acquisition.
-    /// They are retained as separate rows but joined into one dependency group.
-    pub acquisition_lineage_id: String,
+    /// All physical acquisitions contributing to this raw or derived record.
+    /// A fused map/product may name multiple acquisition lineages; each joins
+    /// the record to every contributing dependency component.
+    pub acquisition_lineage_ids: Vec<String>,
     pub split: DataSplit,
     /// Caller-declared shared causes that must not cross split boundaries.
     pub shared_causes: Vec<SharedCauseGroup>,
@@ -229,7 +230,6 @@ impl LineageDataset {
             for (value, field) in [
                 (case.case_id.as_str(), "case_id"),
                 (case.site_id.as_str(), "site_id"),
-                (case.acquisition_lineage_id.as_str(), "acquisition_lineage_id"),
             ] {
                 if !nonempty(value) {
                     return Err(AuditError::EmptyField {
@@ -243,7 +243,6 @@ impl LineageDataset {
                 return Err(AuditError::DuplicateCaseId(case.case_id.clone()));
             }
             unique_sites.insert(case.site_id.as_str());
-            unique_acquisitions.insert(case.acquisition_lineage_id.as_str());
 
             match site_splits.get(&case.site_id) {
                 Some(first_split) if *first_split != case.split => {
@@ -259,15 +258,33 @@ impl LineageDataset {
                 }
             }
 
-            let mut case_groups = BTreeSet::new();
-            let mut keys = vec![
-                GroupKey::new(DependencyKind::Site, &case.site_id),
-                GroupKey::new(
+            if case.acquisition_lineage_ids.is_empty() {
+                return Err(AuditError::EmptyAcquisitionLineageSet {
+                    case_id: case.case_id.clone(),
+                });
+            }
+            let mut case_acquisitions = BTreeSet::new();
+            let mut keys = vec![GroupKey::new(DependencyKind::Site, &case.site_id)];
+            for acquisition_lineage_id in &case.acquisition_lineage_ids {
+                if !nonempty(acquisition_lineage_id) {
+                    return Err(AuditError::EmptyField {
+                        case_id: case.case_id.clone(),
+                        field: "acquisition_lineage_id",
+                    });
+                }
+                if !case_acquisitions.insert(acquisition_lineage_id.as_str()) {
+                    return Err(AuditError::DuplicateAcquisitionLineage(
+                        acquisition_lineage_id.clone(),
+                    ));
+                }
+                unique_acquisitions.insert(acquisition_lineage_id.as_str());
+                keys.push(GroupKey::new(
                     DependencyKind::PhysicalAcquisition,
-                    &case.acquisition_lineage_id,
-                ),
-            ];
+                    acquisition_lineage_id,
+                ));
+            }
 
+            let mut case_groups = BTreeSet::new();
             for shared_cause in &case.shared_causes {
                 if !nonempty(&shared_cause.group_id) {
                     return Err(AuditError::EmptyField {
@@ -621,7 +638,7 @@ mod tests {
         LineageCase {
             case_id: case_id.into(),
             site_id: site_id.into(),
-            acquisition_lineage_id: acquisition_id.into(),
+            acquisition_lineage_ids: vec![acquisition_id.into()],
             split,
             shared_causes: Vec::new(),
         }
@@ -992,6 +1009,52 @@ mod tests {
         assert_eq!(
             paired_cluster_bootstrap(&[], bootstrap_config()),
             Err(BootstrapError::EmptyClusterScores)
+        );
+    }
+
+    #[test]
+    fn fused_product_joins_every_contributing_physical_acquisition() {
+        let a = case("raw-a", "site-a", "acq-a", DataSplit::Training);
+        let b = case("raw-b", "site-b", "acq-b", DataSplit::Training);
+        let mut fused = case("fused", "regional-product", "placeholder", DataSplit::Training);
+        fused.acquisition_lineage_ids = vec!["acq-a".into(), "acq-b".into()];
+        let report = dataset(vec![a, b, fused]).audit().unwrap();
+        assert_eq!(report.unique_acquisitions, 2);
+        assert_eq!(report.dependency_component_count, 1);
+        assert_eq!(report.largest_component_case_count, 3);
+    }
+
+    #[test]
+    fn empty_or_duplicate_acquisition_lineages_are_rejected() {
+        let mut data = dataset(vec![case("a", "site-a", "acq-a", DataSplit::Training)]);
+        data.cases[0].acquisition_lineage_ids.clear();
+        assert_eq!(
+            data.audit(),
+            Err(AuditError::EmptyAcquisitionLineageSet {
+                case_id: "a".into()
+            })
+        );
+
+        data.cases[0].acquisition_lineage_ids = vec!["acq-a".into(), "acq-a".into()];
+        assert_eq!(
+            data.audit(),
+            Err(AuditError::DuplicateAcquisitionLineage("acq-a".into()))
+        );
+    }
+
+    #[test]
+    fn fused_product_cannot_smuggle_a_shared_acquisition_across_splits() {
+        let mut fused = case("fused", "site-a", "acq-a", DataSplit::Training);
+        fused.acquisition_lineage_ids.push("acq-b".into());
+        let b = case("raw-b", "site-b", "acq-b", DataSplit::Evaluation);
+        assert_eq!(
+            dataset(vec![fused, b]).audit(),
+            Err(AuditError::DependencyGroupCrossesSplits {
+                kind: DependencyKind::PhysicalAcquisition,
+                group_id: "acq-b".into(),
+                first_split: DataSplit::Training,
+                conflicting_split: DataSplit::Evaluation,
+            })
         );
     }
 
