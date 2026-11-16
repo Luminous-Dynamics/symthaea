@@ -331,14 +331,23 @@ fn close_enough(left: f64, right: f64) -> bool {
 pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionViolation>> {
     let mut violations = Vec::new();
 
-    if spec.schema_version != SECTION_SCHEMA_VERSION {
+    if !(1..=SECTION_SCHEMA_VERSION).contains(&spec.schema_version) {
         violation(
             &mut violations,
             "schema_version",
             format!(
-                "section schema {} is unsupported; expected {}",
+                "section schema {} is unsupported; supported versions are 1..={}",
                 spec.schema_version, SECTION_SCHEMA_VERSION
             ),
+        );
+    }
+    if spec.schema_version == 1
+        && spec.longitudinal_end_conditions != LongitudinalEndConditions::default()
+    {
+        violation(
+            &mut violations,
+            "end_conditions_require_schema_v2",
+            "non-planar longitudinal end conditions require section specification schema version 2",
         );
     }
 
