@@ -1932,6 +1932,39 @@ mod tests {
         assert!(report.issues.is_empty());
     }
 
+
+    #[test]
+    fn pointed_deck_endpoint_must_share_terminal_sheer_identity() {
+        let mut spec = box_fixture();
+        spec.end_conditions.bow = HullEndCondition::PointedStem;
+        for point in &mut spec.stations[0].starboard_profile {
+            point.y_m = 0.0;
+        }
+        spec.deck_surface.sections[0].points = vec![DeckPoint {
+            point_id: "DECK-POINT-WITH-WRONG-IDENTITY".into(),
+            y_m: 0.0,
+            z_m: -4.0,
+            role: DeckPointRole::DeckCrown,
+        }];
+        assert_rejected(&spec, "pointed_deck_endpoint");
+    }
+
+    #[test]
+    fn pointed_deck_endpoint_must_match_terminal_sheer_coordinates() {
+        let mut spec = box_fixture();
+        spec.end_conditions.bow = HullEndCondition::PointedStem;
+        for point in &mut spec.stations[0].starboard_profile {
+            point.y_m = 0.0;
+        }
+        spec.deck_surface.sections[0].points = vec![DeckPoint {
+            point_id: "BOW-SHEER-S".into(),
+            y_m: 0.0,
+            z_m: -4.125,
+            role: DeckPointRole::DeckCrown,
+        }];
+        assert_rejected(&spec, "pointed_deck_endpoint");
+    }
+
     #[test]
     fn opening_boundary_point_references_must_resolve() {
         let mut spec = box_fixture();
