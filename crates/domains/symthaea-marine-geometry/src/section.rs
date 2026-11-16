@@ -935,7 +935,7 @@ mod tests {
     }
 
     #[test]
-    fn section_family_manifest_binds_longitudinal_end_conditions) {
+    fn section_family_manifest_binds_longitudinal_end_conditions() {
         let mut artifact = generate_section_artifact(&valid_spec()).unwrap();
         verify_section_family_artifact_integrity(&artifact).unwrap();
         artifact.longitudinal_end_conditions.bow = LongitudinalEndCondition::CollapsedCentreline;
@@ -952,11 +952,15 @@ mod tests {
         let mut artifact = generate_section_artifact(&valid_spec()).unwrap();
         artifact.beam_m += 0.1;
         let errors = verify_section_family_artifact_integrity(&artifact).unwrap_err();
-        assert!(errors.iter().any(|item| item.code == "section_family_manifest_digest"));
+        assert!(
+            errors
+                .iter()
+                .any(|item| item.code == "section_family_manifest_digest")
+        );
     }
 
     #[test]
-    fn collapsed_endpoint_semantics_are_checked_even_after_manifest_rebinding) {
+    fn collapsed_endpoint_semantics_are_checked_even_after_manifest_rebinding() {
         let mut spec = valid_spec();
         spec.schema_version = 2;
         spec.longitudinal_end_conditions.bow = LongitudinalEndCondition::CollapsedCentreline;
@@ -988,8 +992,7 @@ mod tests {
     #[test]
     fn non_planar_end_conditions_require_spec_schema_v2() {
         let mut spec = valid_spec();
-        spec.longitudinal_end_conditions.bow =
-            LongitudinalEndCondition::CollapsedCentreline;
+        spec.longitudinal_end_conditions.bow = LongitudinalEndCondition::CollapsedCentreline;
         spec.stations[0].half_breadth_fraction = 0.0;
         assert!(
             validate_section_spec(&spec)
@@ -1000,7 +1003,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_v1_json_without_end_condition_field_defaults_to_planar) {
+    fn legacy_v1_json_without_end_condition_field_defaults_to_planar() {
         let spec = valid_spec();
         let mut legacy = serde_json::to_value(&spec).unwrap();
         legacy
