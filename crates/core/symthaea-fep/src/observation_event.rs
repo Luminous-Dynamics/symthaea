@@ -147,18 +147,39 @@ pub struct ObservationEventV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ObservationEventError {
     EmptyDimensions,
-    DimensionCountMismatch { expected: usize, actual: usize },
-    EmptyIdentifier { field: &'static str },
-    DuplicateVariableId { index: usize },
-    NonFiniteObservedValue { index: usize },
-    InvalidPrecision { index: usize },
-    PrecisionForMissingDimension { index: usize },
-    MissingnessForObservedDimension { index: usize },
+    DimensionCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    EmptyIdentifier {
+        field: &'static str,
+    },
+    DuplicateVariableId {
+        index: usize,
+    },
+    NonFiniteObservedValue {
+        index: usize,
+    },
+    InvalidPrecision {
+        index: usize,
+    },
+    PrecisionForMissingDimension {
+        index: usize,
+    },
+    MissingnessForObservedDimension {
+        index: usize,
+    },
     ArrivalBeforeCapture,
     InvalidFallbackPrecision,
-    NonFinitePrediction { index: usize },
-    MissingPredictionForObservedDimension { index: usize },
-    PredictionCoordinateMismatch { index: usize },
+    NonFinitePrediction {
+        index: usize,
+    },
+    MissingPredictionForObservedDimension {
+        index: usize,
+    },
+    PredictionCoordinateMismatch {
+        index: usize,
+    },
     NonFiniteLikelihood,
     NoiseModelNotDiagonalIndependent,
     EmptyLikelihoodMatrix,
@@ -167,9 +188,16 @@ pub enum ObservationEventError {
         expected: usize,
         actual: usize,
     },
-    NonFiniteLikelihoodCoefficient { row: usize, column: usize },
-    NonFiniteWeightedResidual { index: usize },
-    NonFiniteBeliefGradient { row: usize },
+    NonFiniteLikelihoodCoefficient {
+        row: usize,
+        column: usize,
+    },
+    NonFiniteWeightedResidual {
+        index: usize,
+    },
+    NonFiniteBeliefGradient {
+        row: usize,
+    },
 }
 
 impl std::fmt::Display for ObservationEventError {
@@ -229,9 +257,7 @@ impl ObservationEventV1 {
             .zip(predicted.dimensions.iter())
             .enumerate()
         {
-            if observed.variable_id != prediction.variable_id
-                || observed.unit != prediction.unit
-            {
+            if observed.variable_id != prediction.variable_id || observed.unit != prediction.unit {
                 return Err(ObservationEventError::PredictionCoordinateMismatch { index });
             }
         }
@@ -353,11 +379,9 @@ impl ObservationEventV1 {
             .enumerate()
             .map(|(index, dimension)| match dimension.value {
                 Some(value) => {
-                    let prediction = predicted.dimensions[index]
-                        .value
-                        .ok_or(ObservationEventError::MissingPredictionForObservedDimension {
-                            index,
-                        })?;
+                    let prediction = predicted.dimensions[index].value.ok_or(
+                        ObservationEventError::MissingPredictionForObservedDimension { index },
+                    )?;
                     if !prediction.is_finite() {
                         return Err(ObservationEventError::NonFinitePrediction { index });
                     }
@@ -618,13 +642,21 @@ mod tests {
     fn missing_dimension_is_excluded_not_imputed_or_scored() {
         let observation = event(vec![
             dimension("temperature", Some(0.5), Some(4.0), None),
-            dimension("pressure", None, None, Some(MissingnessReason::SensorUnavailable)),
+            dimension(
+                "pressure",
+                None,
+                None,
+                Some(MissingnessReason::SensorUnavailable),
+            ),
         ]);
 
         // A non-finite prediction in the absent dimension is intentionally
         // ignored: it cannot contribute a residual or likelihood term.
         let residuals = observation
-            .masked_residuals(&prediction(&[("temperature", Some(0.25)), ("pressure", None)]))
+            .masked_residuals(&prediction(&[
+                ("temperature", Some(0.25)),
+                ("pressure", None),
+            ]))
             .expect("missing dimension is not read");
         assert_eq!(residuals[0], Some(-0.25));
         assert_eq!(residuals[1], None);
@@ -643,7 +675,12 @@ mod tests {
     #[test]
     fn all_missing_event_has_no_observation_likelihood() {
         let observation = event(vec![
-            dimension("temperature", None, None, Some(MissingnessReason::NotSampled)),
+            dimension(
+                "temperature",
+                None,
+                None,
+                Some(MissingnessReason::NotSampled),
+            ),
             dimension("pressure", None, None, None),
         ]);
         let likelihood = observation
@@ -726,8 +763,7 @@ mod tests {
             Err(ObservationEventError::InvalidPrecision { index: 0 })
         );
 
-        let precision_for_missing =
-            event(vec![dimension("temperature", None, Some(1.0), None)]);
+        let precision_for_missing = event(vec![dimension("temperature", None, Some(1.0), None)]);
         assert_eq!(
             precision_for_missing.validate(1),
             Err(ObservationEventError::PrecisionForMissingDimension { index: 0 })
@@ -947,10 +983,7 @@ mod tests {
         );
         assert_eq!(
             observation.masked_belief_gradient(&predicted, &[vec![f64::NAN]], 1.0),
-            Err(ObservationEventError::NonFiniteLikelihoodCoefficient {
-                row: 0,
-                column: 0,
-            })
+            Err(ObservationEventError::NonFiniteLikelihoodCoefficient { row: 0, column: 0 })
         );
     }
 
@@ -964,21 +997,25 @@ mod tests {
             Err(ObservationEventError::EmptyLikelihoodMatrix)
         );
 
-        let extreme_precision =
-            event(vec![dimension("temperature", Some(10.5), Some(1.0e308), None)]);
+        let extreme_precision = event(vec![dimension(
+            "temperature",
+            Some(10.5),
+            Some(1.0e308),
+            None,
+        )]);
         assert_eq!(
             extreme_precision.masked_belief_gradient(&predicted, &[vec![1.0]], 1.0),
             Err(ObservationEventError::NonFiniteWeightedResidual { index: 0 })
         );
 
-        let extreme_coefficient =
-            event(vec![dimension("temperature", Some(0.5), Some(1.0e10), None)]);
+        let extreme_coefficient = event(vec![dimension(
+            "temperature",
+            Some(0.5),
+            Some(1.0e10),
+            None,
+        )]);
         assert_eq!(
-            extreme_coefficient.masked_belief_gradient(
-                &predicted,
-                &[vec![1.0e308]],
-                1.0,
-            ),
+            extreme_coefficient.masked_belief_gradient(&predicted, &[vec![1.0e308]], 1.0,),
             Err(ObservationEventError::NonFiniteBeliefGradient { row: 0 })
         );
     }
