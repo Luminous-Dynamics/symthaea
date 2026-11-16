@@ -1646,9 +1646,9 @@ mod tests {
         plan.tasks[0].access_certificate.evidence_class = LifecycleEvidenceClass::Synthetic;
         let errors = generate_maintenance_schedule(&plan).unwrap_err();
         assert!(
-            errors
-                .iter()
-                .any(|error| error.diagnostic == ScheduleDiagnostic::InsufficientAccessEvidenceClass)
+            errors.iter().any(
+                |error| error.diagnostic == ScheduleDiagnostic::InsufficientAccessEvidenceClass
+            )
         );
 
         plan.tasks[0].access_certificate.evidence_class = LifecycleEvidenceClass::Modelled;
