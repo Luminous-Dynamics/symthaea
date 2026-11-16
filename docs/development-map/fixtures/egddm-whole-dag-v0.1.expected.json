@@ -392,7 +392,7 @@
         }
       ],
       "pair_count": 15,
-      "individually_plausible_claim_count": 15,
+      "individually_plausible_claim_count": 3,
       "jointly_consistent_world_ids": [
         "world-forward",
         "world-reverse"
