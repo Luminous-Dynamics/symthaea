@@ -46,8 +46,14 @@ jobs:
       - name: Check fixture formatting
         run: rustfmt --edition 2024 --check crates/core/symthaea-fep/tests/observation_process_equivalence.rs
 
-      - name: Run exact paired-world controls
-        run: cargo test --locked -p symthaea-fep --test observation_process_equivalence -- --nocapture
+      - name: Compile and run standalone paired-world controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --edition=2024 --test \
+            crates/core/symthaea-fep/tests/observation_process_equivalence.rs \
+            -o /tmp/observation-process-equivalence-tests
+          /tmp/observation-process-equivalence-tests --nocapture
 
       - name: Record exact source identity
         run: |
