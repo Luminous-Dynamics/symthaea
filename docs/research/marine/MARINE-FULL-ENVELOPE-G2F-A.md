@@ -696,3 +696,105 @@ Primary sources:
 - GAN/VAE-PCT study: https://www.mdpi.com/2077-1312/14/18/1707
 - Raster2Hull IEEE Access paper: https://xplorestaging.ieee.org/document/11630600
 - Raster2Hull source/data named by the authors: https://github.com/dinceruur/raster2Hull
+
+
+## 16. G2f-a2: multi-waterplane curves and upright mass-balance receipts
+
+The full-envelope source can now be evaluated at a bounded ordered set of upright horizontal waterplanes without rebuilding the source representation. The implementation is in `src/sectional_reference.rs`, with two separate algorithms:
+
+- `sectional-area-trapezoid-v1`: clips each station's closed transverse profile to the submerged half-plane, computes section area/centroid and waterline breadth, then integrates those piecewise-linear longitudinal curves using compensated summation.
+- `upright-mass-balance-bisection-v2`: solves a caller-supplied total mass at explicit water density by safeguarded bracketed bisection over z-down waterplane elevation.
+
+Commands:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-sectional-hydrostatics-reference -- docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json --output /tmp/marine-sectionals.json
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-sectional-hydrostatics-reference -- docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json --verify /tmp/marine-sectionals.json
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-upright-mass-balance -- docs/research/marine/fixtures/marine-upright-mass-balance-box-001.json --output /tmp/marine-mass-balance.json
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-upright-mass-balance -- docs/research/marine/fixtures/marine-upright-mass-balance-box-001.json --verify /tmp/marine-mass-balance.json
+
+The independent verifier recomputes from the exact input request. Mutating a result and recomputing its BLAKE3 receipt digest does not make the changed result valid.
+
+### Known-answer corpus
+
+**Prismatic box hull:** 100 m length, 20 m beam, 6 m design draft, 4 m freeboard, 1,025 kg/m³ explicit density.
+
+| Waterplane z (m, z-down) | Displacement (m³) | Waterplane area (m²) | VCB (m, z-down) |
+|---:|---:|---:|---:|
+| -2 | 16,000 | 2,000 | 2 |
+| 0 | 12,000 | 2,000 | 3 |
+| +2 | 8,000 | 2,000 | 4 |
+
+All have LCB = LCF = 50 m, TCB = 0 and TPC = 20.5 t/cm. For increasing immersion (decreasing z), the finite-difference displacement derivative equals the 2,000 m² waterplane area in this exact prismatic fixture.
+
+**Nonuniform, linearly tapered hull:** 100 m length, three stations at x/L = 0, 0.4 and 1.0, half-breadths 5, 7 and 10 m respectively, constant 6 m draft.
+
+- Displacement: 9,000 m³.
+- Waterplane area: 1,500 m².
+- LCB = LCF = 55.5555555556 m.
+- VCB = 3 m, TCB = 0.
+- Mass at 1,025 kg/m³: 9,225 t.
+- TPC: 15.375 t/cm.
+
+This fixture tests nonuniform station spacing and longitudinal first moments; a constant-area rectangular prism would not expose a misplaced LCB/LCF integration.
+
+**Convergence and invariance controls:** the current tests include a linear station-refinement invariant, a quadratic-breadth second-order convergence test for displacement and waterplane area, density-scaling invariance, explicit asymmetric-port use, above-sheer waterplane refusal, receipt rebinding resistance and upright mass-balance solver stopping/iteration controls.
+
+### Upright mass-balance stop condition correction
+
+The bisection algorithm previously checked the bracket width before incorporating the current midpoint into the bracket. With a small maximum iteration budget this could return iteration-limit failure even though the newly narrowed bracket had already met the caller's plane tolerance. The branch now:
+1. evaluates the midpoint;
+2. checks the mass residual;
+3. updates the appropriate shallow/deep bracket endpoint;
+4. checks the **refined** bracket width; and
+5. stops with `WaterplaneBracketWithinTolerance` when that refined bracket meets tolerance.
+
+A regression case forces the bracket-width stop in two iterations and verifies that the reported equilibrium remains inside the final bracket. A bracket-width stop does not imply the mass residual also met its separate tolerance; both are recorded and must be assessed distinctly.
+
+### G2f claim ceiling
+
+This reference is independent of the G2c polyhedral integration method but is not a generated displacement mesh or a production hydrostatics package. It assumes piecewise-linear longitudinal interpolation of section area, waterline breadth and sectional first moments. Errors for strongly curved longitudinal variation must be characterized through station-refinement and independent 3D mesh comparisons. Upright sinkage does not solve trim/heel, KG, free surfaces, GZ, stability criteria or flooding.
+
+The next static-attitude work is tracked separately in [MARINE-STATIC-ATTITUDE-EQUILIBRIUM-001 #12498](https://github.com/Luminous-Dynamics/symthaea/issues/12498). It specifies three coupled unknowns (waterplane offset, pitch and roll) with a gravity-aligned force/moment residual; it must not be confused with dynamic WAPS/leeway manoeuvring or with a stability approval.
+
+## 17. Updated competitive comparison
+
+The current market baseline is already strong and should be described precisely:
+
+| System / research | Demonstrated capability | What we should do differently |
+|---|---|---|
+| NAPA | Approved hydrostatic/compartment models, stability/loading workflows and operational data bridging | Bind as-built/configuration revision, load-case provenance and downstream verification continuously; do not claim an onboard stability replacement |
+| Maxsurf Stability | Equilibrium hydrostatics, free/fixed trim, tank/compartment and intact/damage stability workflows | Provide open evidence receipts and independent reconstruction/comparison; do not claim stability parity until benchmarked against the same criteria |
+| Siemens STAR-CCM+ | Transient free-surface VOF, dynamic fluid-body interaction and up to 6-DOF vessel motion | Interoperate with specialist CFD and compare per observable under ITTC V&V; do not claim a home-grown model is more accurate |
+| SHIPFLOW | Specialist multi-fidelity resistance, propulsion, seakeeping and manoeuvring CFD | Optimize cost to independently validated mission improvement; do not attempt to recreate the full solver suite |
+| GAN / VAE-PCT (2026) | 8,000 processed CAD hulls, five quality/diversity metrics, B-spline pull-back/fairing and early calm-water resistance statistics on two single-type datasets | Reproduce at matched data/compute, then add engineering coefficient bias, loading curves, evidence-chain and held-out validation scorecards |
+| Representation-aware latent diffusion (2026) | Shared latent encoding across point clouds, waterline sections and buttock curves | Preserve the same multi-representation consistency while making feasibility, identity and independent verification first-class |
+| Raster2Hull (2026) | 5,000 synthetic drawing/point-cloud pairs for GA/lines-plan reconstruction | Benchmark real degraded archives separately; require uncertainty and abstention because synthetic point-cloud fit does not establish watertight CAD |
+
+Primary references:
+- NAPA loading/stability and digital-twin data bridge: https://www.napa.fi/a-digital-twins-best-foundation-is-meaningful-use-of-data/
+- Siemens STAR-CCM+ hull-performance workflow: https://static.sw.cdn.siemens.com/siemens-disw-assets/public/4b92hDfRCo5ND51UfBtk7p/en-US/Siemens-SW-Simcenter-STAR-CCM%2B-Hull-Performance-Workflow-Fact-Sheet_tcm27-80626.pdf
+- SHIPFLOW capabilities: https://shipflow.se/
+- GAN/VAE-PCT comparison: https://www.mdpi.com/2077-1312/14/18/1707
+- Representation-aware generative modeling: https://www.mdpi.com/2077-1312/14/7/642
+- Raster2Hull: https://xplorestaging.ieee.org/document/11630600
+- ITTC 2024 CFD benchmark database, 7.5-03-02-02 Rev.03: https://ittc.info/media/11956/75-03-02-02.pdf
+- ITTC 2024 CFD uncertainty examples, 7.5-03-02-01 Rev.02: https://www.ittc.info/media/11954/75-03-02-01.pdf
+
+### Falsifiable differentiation targets
+
+Do not compare headline scores from unrelated papers. Reproduce the appropriate baselines with frozen corpora, parent-hull-family-held-out splits, normalization, test conditions and compute/evaluation budgets.
+
+Our research target is to demonstrate all of the following together:
+- 100% of admitted full-envelope region and boundary accounting is reconciled;
+- 0 silent geometry repair, frame/unit inference or hidden conversion;
+- multi-waterplane displacement curves converge under station refinement with documented order and per-observable residuals;
+- sectional and polyhedral methods compare within predeclared combined numerical uncertainty on matched geometry;
+- independent CAD round-trip retains geometry, persistent identity and validation properties;
+- resistance/propulsion/seakeeping outputs are only marked validated when comparison error is within independently estimated combined validation uncertainty for that exact observable/condition;
+- held-out model predictions are calibrated by hull family and operating regime, with false-feasible and rank-reversal rates reported;
+- final system wins on independently confirmed Pareto improvement per fixed specialist-evaluation budget and lifecycle engineering cost, not raw number of generated candidates.
+
+These remain research targets, not achieved performance.
