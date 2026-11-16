@@ -52,3 +52,6 @@ jobs:
 
       - name: Run synthetic lifecycle availability and energy ledger
         run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_lifecycle_service
+
+      - name: Run resource-constrained maintenance choreography
+        run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_maintenance_choreography
