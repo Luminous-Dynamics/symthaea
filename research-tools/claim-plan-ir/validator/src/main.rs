@@ -362,7 +362,10 @@ fn canonical_https_dns_host(origin: &str) -> Result<&str, String> {
     let _ = port;
 
     if host.is_empty() || host.len() > 253 || !host.is_ascii() {
-        return Err("HTTPS origin host must be an ASCII DNS A-label of at most 253 bytes".to_owned());
+        return Err("HTTPS origin host must be a lowercase ASCII DNS name of at most 253 bytes".to_owned());
+    }
+    if host.parse::<std::net::Ipv4Addr>().is_ok() {
+        return Err("IPv4 address literals are outside the v1 HTTPS origin profile".to_owned());
     }
     if host.bytes().any(|byte| byte.is_ascii_uppercase()) || host.ends_with('.') {
         return Err("HTTPS origin host must be lowercase and omit the trailing DNS dot".to_owned());
@@ -370,6 +373,9 @@ fn canonical_https_dns_host(origin: &str) -> Result<&str, String> {
     for label in host.split('.') {
         if label.is_empty() || label.len() > 63 {
             return Err("HTTPS origin contains an empty or overlong DNS label".to_owned());
+        }
+        if label.starts_with("xn--") {
+            return Err("IDN A-labels are outside the v1 HTTPS origin profile".to_owned());
         }
         let bytes = label.as_bytes();
         if !bytes[0].is_ascii_lowercase() && !bytes[0].is_ascii_digit() {
@@ -647,6 +653,8 @@ mod tests {
         include_str!("../../fixtures/negative/https_origin_explicit_default_port.json");
     const SERVER_MISMATCH: &str =
         include_str!("../../fixtures/negative/dns_server_identity_mismatch.json");
+    const IPV4_ORIGIN: &str =
+        include_str!("../../fixtures/negative/ipv4_origin_literal.json");
 
     #[test]
     fn jcs_uses_utf16_code_unit_order_for_object_keys() {
@@ -664,6 +672,13 @@ mod tests {
         let (digest, count) = validate_plan(POSITIVE).expect("positive fixture should pass");
         assert_eq!(count, 3);
         assert_eq!(digest.len(), 64);
+    }
+
+    #[test]
+    fn ipv4_origin_literal_is_not_admitted_in_v1() {
+        let error = validate_plan(IPV4_ORIGIN)
+            .expect_err("IPv4 literal origin must reject");
+        assert!(error.contains("IPv4 address literals are outside the v1"));
     }
 
     #[test]
