@@ -4148,7 +4148,8 @@
         "prediction_interval_calibration_reported": true,
         "worst_group_error_and_abstention_reported": true,
         "no_extrapolation_claim_without_sealed_external_measurements": true,
-        "only_measured_physical_descriptors_may_be_used": true
+        "only_measured_physical_descriptors_may_be_used": true,
+        "source_data_row_count_discrepancy_resolved_before_exact_reproduction_claim": true
       },
       "rationale": "The published hybrid DBD model reports mean publication-grouped five-fold R2=0.441, best fold 0.791, worst fold 0.024, and prospective R2=0.92 on 10 new points within the explored domain. The Luminous challenge is to reproduce the exact 27-paper split, then target mean grouped R2>=0.55 and worst-fold R2>=0.15 with calibrated intervals and applicability reporting. The LOPO target is reported separately and is not directly equated with the five-fold score. A sealed prospective reactor holdout must include at least 20 independent points. The source's 358 abstract/methods versus 357 conclusion row-count discrepancy must be resolved against SI before any exact reproduction claim."
     },
