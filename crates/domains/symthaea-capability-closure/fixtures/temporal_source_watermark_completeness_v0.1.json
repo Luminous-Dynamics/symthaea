@@ -175,6 +175,12 @@
       "name": "late_breach_index_source_and_interval_filter",
       "expect": "unrelated_source_and_out_of_interval_breaches_do_not_contest",
       "safety": "no_cross_source_or_boundary_contamination"
+    },
+    {
+      "id": "WM-019",
+      "name": "seeded_multi_source_indexed_vs_audited_differential",
+      "expect": "identical_reports_for_180_source_interval_and_knowledge_time_queries",
+      "safety": "secondary_index_matches_full_history_oracle_under_mixed_source_arrivals"
     }
   ],
   "metrics": {
@@ -198,7 +204,8 @@
       "completeness_query_latency_p95_us",
       "completeness_query_latency_p99_us",
       "late_breach_index_candidates_visited",
-      "full_history_audit_rebuild_latency_us"
+      "full_history_audit_rebuild_latency_us",
+      "indexed_vs_audited_report_mismatch_count"
     ]
   },
   "qualification_targets": {
@@ -215,7 +222,7 @@
     "source_authentication_executed": false,
     "benchmark_results_available": false,
     "targets_are_results": false,
-    "watermark_test_functions_authored": 23,
-    "crate_test_functions_authored": 79
+    "watermark_test_functions_authored": 24,
+    "crate_test_functions_authored": 80
   }
 }
