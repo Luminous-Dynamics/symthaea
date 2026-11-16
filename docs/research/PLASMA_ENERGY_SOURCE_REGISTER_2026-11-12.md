@@ -984,3 +984,37 @@ The machine-readable register adds:
 - Cyclic carbon utilization: 100 physical cycles, >=95% uncertainty-aware carbon inventory closure and >=90% accepted syngas productivity retention, with all grid-side auxiliaries and every failed cycle counted.
 
 The register now contains **47 source cases, 92 negative controls, 6 derived checks and 12 benchmark targets**. All Luminous reproduction flags remain false.
+
+## 9.23 Ammonia cracking dynamic service response — 2026-11-16
+
+The new source lane distinguishes a fast plasma/diagnostic response from accepted hydrogen service.
+
+### Quarter-wave coaxial microwave resonator
+
+Zhang et al., *Dynamic response of a microwave resonant plasma system for hydrogen production via ammonia cracking*, Chemical Engineering Journal 543 (1 September 2026), DOI https://doi.org/10.1016/j.cej.2026.178329.
+
+At 200 W, 1 bar absolute and 1 SLPM pure NH3, the study reports 40.95% ammonia cracking ratio and 11.71 g H2/kWh. For its atmospheric-pressure power-step tests it reports 1.31 ms for 160→180 W and 1.10 ms for 180→160 W. The paper also reports R2 > 0.99 correlation between optical emission features and ACR in the specified calibration setup.
+
+The response time is a source-specific ACR/diagnostic response, not a measured purified-H2 mass-flow, compressor, storage or customer-delivery response. The optical correlation is not assumed to transfer to other pressure, feed, flow, reactor geometry or device condition.
+
+### High-power waveguide microwave plasma jet
+
+Zhang and Cha, *Enhanced ammonia cracking using high-power waveguide-based microwave plasma jets*, Proceedings of the Combustion Institute 42 (2026), DOI https://doi.org/10.1016/j.proci.2026.106307.
+
+The source reports critical inlet NH3 fraction up to approximately 47.5% versus approximately 2.32% for a Surfatron-based comparison and an approximately sevenfold relative H2-production-efficiency increase. This is a distinct Ar-balance-gas, waveguide/flow configuration. It is not pooled with the pure-NH3 coaxial resonator's dynamic-response numbers.
+
+### Source discrepancy retained
+
+The September 2026 atmospheric microwave ammonia paper (DOI 10.1016/j.ijhydene.2026.156912) has an abstract/conclusion mismatch: its abstract associates >99% conversion, 45 g/kWh and 242 kJ/mol with 150 g/h, while its conclusion separately associates 150 g/h with 92.4% conversion, 50 g/kWh and 217 kJ/mol. The register preserves the three separately described source points and marks the 150 g/h pairing discrepancy unresolved pending the article's figure/table/supplementary reconciliation. It must not be used as a single combined Pareto point.
+
+### Dynamic-service paradigm shift
+
+The benchmark records distinct times for:
+
+`power command → delivered power → plasma/ACR state → diagnostic proxy → measured gas species/flow → purified H2 → compressed/stored H2 → accepted customer delivery`
+
+It requires direct product-side H2 flow and purity measurement, sample-train/analyser delay characterization, separate up/down step reporting, held-out pressure/device proxy tests, full grid-to-accepted-H2 energy, and accounting for compression/storage/failed starts/off-spec output.
+
+Proposed target (not achieved): ≤1 s 90% settling at a declared accepted-H2 delivery boundary, ≤5% flow overshoot, and ≤5% increase in grid-to-accepted-H2 specific energy during a frozen transient profile. The 1.31 ms / 1.10 ms source diagnostic figures are reproduction points only and cannot satisfy the product-service target.
+
+Dedicated issue: [AMMONIA-CRACK-DYNAMIC-SERVICE-001 #12488](https://github.com/Luminous-Dynamics/symthaea/issues/12488).
