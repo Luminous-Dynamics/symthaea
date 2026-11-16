@@ -305,6 +305,8 @@ fn run_seed(
     let mut null = RejectionCounts::default();
     let mut alternative = RejectionCounts::default();
     let mut null_moments = SufficientMoments::default();
+    let mut conditional_ar1_null: Option<RejectionCounts> = None;
+    let mut conditional_ar1_alternative: Option<RejectionCounts> = None;
     let regime_salt = (NoiseRegime::ALL
         .iter()
         .position(|candidate| *candidate == regime)
@@ -388,10 +390,11 @@ fn run_seed(
 fn run_regime(
     regime: NoiseRegime,
     test: &GaussianTerminalInducedTest,
+    conditional_ar1_test: &GaussianTerminalInducedTest,
 ) -> Result<RegimeResult, Box<dyn Error>> {
     let mut seeds = Vec::with_capacity(ROOT_SEEDS.len());
     for root_seed in ROOT_SEEDS {
-        seeds.push(run_seed(regime, root_seed, test)?);
+        seeds.push(run_seed(regime, root_seed, test, conditional_ar1_test)?);
     }
     Ok(RegimeResult { regime, seeds })
 }
@@ -408,6 +411,27 @@ fn aggregate_counts(results: &[SeedResult], alternative: bool) -> RejectionCount
         pooled.rejections += counts.rejections;
     }
     pooled
+}
+
+fn aggregate_conditional_ar1(
+    results: &[SeedResult],
+    alternative: bool,
+) -> Option<RejectionCounts> {
+    let mut pooled = RejectionCounts::default();
+    let mut found = false;
+    for result in results {
+        let counts = if alternative {
+            result.conditional_ar1_alternative
+        } else {
+            result.conditional_ar1_null
+        };
+        if let Some(counts) = counts {
+            found = true;
+            pooled.paths += counts.paths;
+            pooled.rejections += counts.rejections;
+        }
+    }
+    found.then_some(pooled)
 }
 
 fn aggregate_moments(results: &[SeedResult]) -> SufficientMoments {
@@ -446,13 +470,38 @@ fn counts_json(counts: RejectionCounts) -> String {
     )
 }
 
+fn optional_pair_json(
+    null: Option<RejectionCounts>,
+    alternative: Option<RejectionCounts>,
+) -> String {
+    match (null, alternative) {
+        (Some(null), Some(alternative)) => format!(
+            concat!(
+                "{{",
+                "\"null\":{},",
+                "\"alternative\":{}",
+                "}}"
+            ),
+            counts_json(null),
+            counts_json(alternative)
+        ),
+        (None, None) => "null".to_owned(),
+        _ => "null".to_owned(),
+    }
+}
+
 fn seed_json(result: &SeedResult) -> String {
+    let conditional = optional_pair_json(
+        result.conditional_ar1_null,
+        result.conditional_ar1_alternative,
+    );
     format!(
         concat!(
             "{{",
             "\"root_seed\":\"0x{:016x}\",",
             "\"null\":{},",
             "\"alternative\":{},",
+            "\"conditional_known_rho_ar1\":{},",
             "\"null_mean\":{:.8},",
             "\"null_variance\":{:.8},",
             "\"null_lag_one_correlation\":{:.8}",
@@ -461,23 +510,35 @@ fn seed_json(result: &SeedResult) -> String {
         result.root_seed,
         counts_json(result.null),
         counts_json(result.alternative),
+        conditional,
         result.null_moments.mean(),
         result.null_moments.variance(),
         result.null_moments.lag_one_correlation()
     )
 }
 
-fn regime_json(result: &RegimeResult, analytic_power: f64) -> String {
+fn regime_json(
+    result: &RegimeResult,
+    analytic_power: f64,
+    conditional_ar1_analytic_power: f64,
+) -> String {
     let null = aggregate_counts(&result.seeds, false);
     let alternative = aggregate_counts(&result.seeds, true);
     let moments = aggregate_moments(&result.seeds);
+    let conditional_null = aggregate_conditional_ar1(&result.seeds, false);
+    let conditional_alternative = aggregate_conditional_ar1(&result.seeds, true);
+    let conditional = optional_pair_json(conditional_null, conditional_alternative);
     let per_seed = result
         .seeds
         .iter()
         .map(seed_json)
         .collect::<Vec<_>>()
         .join(",");
-    let null_rate = null.rate();
+    let conditional_status = if conditional_null.is_some() && conditional_alternative.is_some() {
+        "IN_CONTRACT_KNOWN_RHO_AR1"
+    } else {
+        "NOT_APPLICABLE"
+    };
     format!(
         concat!(
             "{{",
@@ -488,6 +549,10 @@ fn regime_json(result: &RegimeResult, analytic_power: f64) -> String {
             "\"null\":{},",
             "\"alternative\":{},",
             "\"analytic_iid_terminal_power\":{:.8},",
+            "\"known_rho_ar1_analytic_conditional_power\":{:.8},",
+            "\"conditional_known_rho_ar1_status\":\"{}\",",
+            "\"conditional_known_rho_ar1\":{},",
+            "\"conditional_known_rho_ar1_analytic_power\":{:.8},",
             "\"null_false_alarm_excess_over_alpha\":{:.8},",
             "\"pooled_null_mean\":{:.8},",
             "\"pooled_null_variance\":{:.8},",
@@ -502,7 +567,10 @@ fn regime_json(result: &RegimeResult, analytic_power: f64) -> String {
         counts_json(null),
         counts_json(alternative),
         analytic_power,
-        null_rate - ALPHA,
+        conditional_status,
+        conditional,
+        conditional_ar1_analytic_power,
+        null.rate() - ALPHA,
         moments.mean(),
         moments.variance(),
         moments.lag_one_correlation(),
@@ -513,6 +581,22 @@ fn regime_json(result: &RegimeResult, analytic_power: f64) -> String {
 fn main() -> Result<(), Box<dyn Error>> {
     let test =
         GaussianTerminalInducedTest::new(ALPHA, vec![DISCREPANCY; HORIZON], vec![SIGMA; HORIZON])?;
+    let mut conditional_discrepancies = Vec::with_capacity(HORIZON);
+    let mut conditional_sigmas = Vec::with_capacity(HORIZON);
+    for look in 0..HORIZON {
+        if look == 0 {
+            conditional_discrepancies.push(DISCREPANCY);
+            conditional_sigmas.push(SIGMA);
+        } else {
+            conditional_discrepancies.push((1.0 - AR1_RHO) * DISCREPANCY);
+            conditional_sigmas.push(SIGMA * (1.0 - AR1_RHO * AR1_RHO).sqrt());
+        }
+    }
+    let conditional_ar1_test = GaussianTerminalInducedTest::new(
+        ALPHA,
+        conditional_discrepancies,
+        conditional_sigmas,
+    )?;
     let unique_seeds = ROOT_SEEDS
         .iter()
         .copied()
@@ -523,11 +607,17 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut regimes = Vec::with_capacity(NoiseRegime::ALL.len());
     for regime in NoiseRegime::ALL {
-        regimes.push(run_regime(regime, &test)?);
+        regimes.push(run_regime(regime, &test, &conditional_ar1_test)?);
     }
     let regime_rows = regimes
         .iter()
-        .map(|result| regime_json(result, test.terminal_power()))
+        .map(|result| {
+            regime_json(
+                result,
+                test.terminal_power(),
+                conditional_ar1_test.terminal_power(),
+            )
+        })
         .collect::<Vec<_>>()
         .join(",");
     let roots = ROOT_SEEDS
@@ -539,7 +629,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!(
         concat!(
             "{{",
-            "\"schema\":\"gaussian_assumption_stress_v0\",",
+            "\"schema\":\"gaussian_assumption_stress_v1\",",
             "\"prng\":\"SplitMix64_BoxMuller_v1\",",
             "\"root_seed_count\":{},",
             "\"root_seeds\":[{}],",
@@ -550,7 +640,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             "\"discrepancy\":{:.8},",
             "\"design_sigma\":{:.8},",
             "\"analytic_iid_terminal_power\":{:.8},",
-            "\"claim\":\"fixed terminal iid-Gaussian assumption-stress map only; out-of-contract cells do not inherit its theorem\",",
+            "\"claim\":\"fixed terminal IID-Gaussian test assumption-stress map plus separate known-rho AR1 conditional-innovation comparator; no blind noise identification\",",
             "\"regimes\":[{}]",
             "}}"
         ),
@@ -563,6 +653,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         DISCREPANCY,
         SIGMA,
         test.terminal_power(),
+        conditional_ar1_test.terminal_power(),
         regime_rows
     );
     Ok(())
