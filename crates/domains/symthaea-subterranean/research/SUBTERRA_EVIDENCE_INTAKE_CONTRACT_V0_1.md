@@ -151,10 +151,10 @@ Contents:
 - science-return lifecycle validator and site/observation linkage;
 - a separate site-disjoint likelihood-calibration reference crate for Training-only empirical likelihood estimates, Calibration/Evaluation proper scoring and a guarded conversion into EVSI inputs;
 - copied synthetic site, network and profile fixtures;
-- 21 site/network tests, 6 profile tests and 26 science-return tests (53 adapter cases total); 19 site-disjoint likelihood-calibration tests and 47 dependence-auditor tests in their separate packages.
+- 21 site/network tests, 6 profile tests and 39 science-return tests (66 adapter cases total); 19 site-disjoint likelihood-calibration tests and 47 dependence-auditor tests in their separate packages.
 - Pinned upstream schema/fixture manifest and explicit local verification script for the six nested Cargo packages.
 
-Across the complete current Symthaea Subterra PR, the six standalone packages have 150 authored Rust unit tests (10 EVSI + 11 survival + 10 robust EVSI + 21 site/network + 6 profile + 26 science-return + 19 likelihood calibration + 47 dependence audit). This is a source count only; none has been compiled or executed in the current environment.
+Across the complete current Symthaea Subterra PR, the six standalone packages have 163 authored Rust unit tests (10 EVSI + 11 survival + 10 robust EVSI + 21 site/network + 6 profile + 39 science-return + 19 likelihood calibration + 47 dependence audit). This is a source count only; none has been compiled or executed in the current environment.
 
 ### Verification status
 
@@ -193,7 +193,7 @@ The reference accepts only fixed-width UTC timestamps in `YYYY-MM-DDTHH:MM:SSZ` 
 
 ### Signed payload attestation
 
-The research adapter supports detached Ed25519 v1 attestations over a domain-separated envelope containing site ID, observation ID, the acquired event's event ID, actor ID, timestamp, clock ID and uncertainty, the payload SHA-256 and byte length, and the signing key ID. Verification uses strict Ed25519 signature checks.
+The research adapter supports detached Ed25519 v1 attestations over a domain-separated envelope containing site ID, observation ID, the acquired event's event ID and sequence, actor ID, source evidence reference, timestamp, clock ID and uncertainty, the payload SHA-256 and byte length, and the signing key ID. Verification uses strict Ed25519 signature checks.
 
 The caller supplies the expected trusted actor ID, expected key ID and corresponding public key bytes from an independently governed key registry. A key ID or public key included only in the record is not trusted. The verifier first checks actual payload bytes, then confirms the external actor/key binding and verifies the signature over the canonical envelope. Unknown algorithm identifiers, malformed keys/signatures, mismatched actor/key IDs, modified payload bytes and cross-site/observation replay are rejected.
 

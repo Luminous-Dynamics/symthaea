@@ -351,7 +351,9 @@ fn payload_attestation_message(
     append_len_prefixed(&mut message, observation_id.as_bytes());
     append_len_prefixed(&mut message, key_id.as_bytes());
     append_len_prefixed(&mut message, acquired_event.event_id.as_bytes());
+    message.extend_from_slice(&acquired_event.sequence.to_be_bytes());
     append_len_prefixed(&mut message, acquired_event.actor_id.as_bytes());
+    append_len_prefixed(&mut message, acquired_event.evidence_ref.as_bytes());
     append_len_prefixed(&mut message, acquired_event.recorded_at.as_bytes());
     append_len_prefixed(&mut message, acquired_event.clock_id.as_bytes());
     message.extend_from_slice(&acquired_event.clock_uncertainty_ms.to_be_bytes());
@@ -1228,6 +1230,17 @@ mod tests {
     fn acquired_event_identity_is_signed() {
         let (mut record, public_key) = signed_record_and_public_key();
         record.events[2].event_id = "acquired-substituted".into();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abc",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &public_key
+            ),
+            Err(vec![ScienceReturnIssue::PayloadAttestationSignatureInvalid])
+        );
+        record.events[2].event_id = "acquired".into();
+        record.events[2].evidence_ref = "substituted-evidence-ref".into();
         assert_eq!(
             record.verify_signed_payload_bytes(
                 b"abc",
