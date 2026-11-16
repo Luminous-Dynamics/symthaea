@@ -354,7 +354,13 @@
     "tls_session_or_proof": "not_run",
     "standards_adjudication": {
       "status": "corrected_to_RFC9557",
-      "note": "Z and legacy -00:00 share unknown-local-offset semantics; +00:00 denotes UTC as preferred reference point. All denote the same UTC instant when the time fields are the same."
+      "note": "Z and legacy -00:00 share known-UTC/unknown-local-offset semantics. +00:00 means UTC is the preferred reference point. These forms still identify the same instant when their date/time fields match."
+    },
+    "js_oracle": {
+      "status": "authored_not_executed_on_exact_branch",
+      "path": "research-tools/claim-plan-ir/conformance/cpir_js_oracle.mjs",
+      "runtime_target": "Node.js 22.x",
+      "claim_ceiling": "restricted CPIR integer-only JSON parser and JCS subset; not full RFC 8785, Rust agreement or production qualification"
     }
   }
 }
