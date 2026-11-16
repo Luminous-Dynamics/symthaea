@@ -44,7 +44,9 @@
       "recorded_at_us",
       "policy_sha256",
       "exclusive_watermark_us"
-    ]
+    ],
+    "hot_path": "source_progress_chain_plus_source_event_time_late_breach_index",
+    "audit_path": "completeness_verified_rebuilds_and_checks_full_append_only_history"
   },
   "arrival": {
     "event_time_less_than_prior_watermark": "late_breach",
@@ -161,6 +163,18 @@
       "name": "progress_and_breach_evidence_binding",
       "expect": "exact_progress_revision_and_policy_digest_returned",
       "safety": "completeness_and_late_receipts_are_auditable"
+    },
+    {
+      "id": "WM-017",
+      "name": "indexed_query_matches_full_history_audit",
+      "expect": "exact_completeness_report_parity",
+      "safety": "fast_path_does_not_weaken_integrity"
+    },
+    {
+      "id": "WM-018",
+      "name": "late_breach_index_source_and_interval_filter",
+      "expect": "unrelated_source_and_out_of_interval_breaches_do_not_contest",
+      "safety": "no_cross_source_or_boundary_contamination"
     }
   ],
   "metrics": {
@@ -179,7 +193,12 @@
       "per_source_watermark_skew_us",
       "required_source_blocked_fraction",
       "late_arrival_detection_latency_us",
-      "unknown_until_complete_fraction"
+      "unknown_until_complete_fraction",
+      "completeness_query_latency_p50_us",
+      "completeness_query_latency_p95_us",
+      "completeness_query_latency_p99_us",
+      "late_breach_index_candidates_visited",
+      "full_history_audit_rebuild_latency_us"
     ]
   },
   "qualification_targets": {
@@ -196,7 +215,7 @@
     "source_authentication_executed": false,
     "benchmark_results_available": false,
     "targets_are_results": false,
-    "watermark_test_functions_authored": 21,
-    "crate_test_functions_authored": 77
+    "watermark_test_functions_authored": 23,
+    "crate_test_functions_authored": 79
   }
 }
