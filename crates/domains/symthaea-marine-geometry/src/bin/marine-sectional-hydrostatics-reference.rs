@@ -2,14 +2,16 @@ use std::{env, fs, path::PathBuf, process};
 
 use serde::Serialize;
 use symthaea_marine_geometry::sectional_reference::{
-    SectionalReferenceIssue, SectionalReferenceRequest, evaluate_loading_sweep,
+    LoadingSweepReceipt, SectionalReferenceIssue, SectionalReferenceRequest,
+    evaluate_loading_sweep, verify_loading_sweep_receipt,
 };
 
 const USAGE: &str = concat!(
-    "Usage: marine-sectional-hydrostatics-reference <loading-sweep-request.json> [--output <receipt.json>]\n",
+    "Usage: marine-sectional-hydrostatics-reference <loading-sweep-request.json> [--output <report.json>] [--verify <receipt.json>]\n",
     "Computes an independent piecewise-linear sectional-area reference for upright horizontal waterplanes.\n",
     "This does not generate displacement meshes or approve vessel stability.\n",
-    "Exit codes: 0 = sweep evaluated; 1 = typed validation/integration rejection; 2 = CLI, I/O, or JSON parse failure."
+    "Use --verify to independently recompute a supplied receipt against the exact request.\n",
+    "Exit codes: 0 = evaluated or verified; 1 = typed validation/integration/integrity rejection; 2 = CLI, I/O, or JSON parse failure."
 );
 
 #[derive(Serialize)]
@@ -20,6 +22,11 @@ enum CliReport {
     },
     Rejected {
         issues: Vec<SectionalReferenceIssue>,
+    },
+    Verified {
+        receipt_schema_version: u32,
+        sweep_digest_blake3: String,
+        result_count: usize,
     },
 }
 
@@ -39,6 +46,7 @@ fn run() -> Result<i32, String> {
     let mut args = env::args().skip(1);
     let mut input: Option<PathBuf> = None;
     let mut output: Option<PathBuf> = None;
+    let mut verify: Option<PathBuf> = None;
 
     while let Some(argument) = args.next() {
         match argument.as_str() {
@@ -47,6 +55,12 @@ fn run() -> Result<i32, String> {
                     .next()
                     .ok_or_else(|| "--output requires a path".to_string())?;
                 output = Some(PathBuf::from(path));
+            }
+            "--verify" => {
+                let path = args
+                    .next()
+                    .ok_or_else(|| "--verify requires a receipt path".to_string())?;
+                verify = Some(PathBuf::from(path));
             }
             "-h" | "--help" => {
                 println!("{USAGE}");
@@ -68,6 +82,30 @@ fn run() -> Result<i32, String> {
         fs::read(&input).map_err(|error| format!("cannot read {}: {error}", input.display()))?;
     let request: SectionalReferenceRequest = serde_json::from_slice(&bytes)
         .map_err(|error| format!("invalid loading-sweep request: {error}"))?;
+
+    if let Some(receipt_path) = verify {
+        let receipt_bytes = fs::read(&receipt_path)
+            .map_err(|error| format!("cannot read {}: {error}", receipt_path.display()))?;
+        let receipt: LoadingSweepReceipt = serde_json::from_slice(&receipt_bytes)
+            .map_err(|error| format!("invalid sectional reference receipt: {error}"))?;
+        return match verify_loading_sweep_receipt(&request, &receipt) {
+            Ok(()) => {
+                write_report(
+                    output,
+                    &CliReport::Verified {
+                        receipt_schema_version: receipt.receipt_schema_version,
+                        sweep_digest_blake3: receipt.sweep_digest_blake3,
+                        result_count: receipt.results.len(),
+                    },
+                )?;
+                Ok(0)
+            }
+            Err(issues) => {
+                write_report(output, &CliReport::Rejected { issues })?;
+                Ok(1)
+            }
+        };
+    }
 
     match evaluate_loading_sweep(&request) {
         Ok(receipt) => {
