@@ -1,0 +1,57 @@
+name: Observation Process Equivalence Contract
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/observation-process-equivalence.yml"
+      - "crates/core/symthaea-fep/tests/observation_process_equivalence.rs"
+      - "docs/research/OBSERVATION_PROCESS_EQUIVALENCE_BENCHMARK_2026-11-16.md"
+  push:
+    branches: [research/observation-process-equivalence-fixtures-v1]
+    paths:
+      - ".github/workflows/observation-process-equivalence.yml"
+      - "crates/core/symthaea-fep/tests/observation_process_equivalence.rs"
+      - "docs/research/OBSERVATION_PROCESS_EQUIVALENCE_BENCHMARK_2026-11-16.md"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: observation-process-equivalence-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  exact-fixture:
+    name: Validate paired-world observation controls
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Check fixture formatting
+        run: rustfmt --edition 2024 --check crates/core/symthaea-fep/tests/observation_process_equivalence.rs
+
+      - name: Run exact paired-world controls
+        run: cargo test --locked -p symthaea-fep --test observation_process_equivalence -- --nocapture
+
+      - name: Record exact source identity
+        run: |
+          set -euo pipefail
+          echo "source_sha=$(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+          echo "fixture_sha256=$(sha256sum crates/core/symthaea-fep/tests/observation_process_equivalence.rs | cut -d ' ' -f 1)" >> "$GITHUB_STEP_SUMMARY"
+          echo "protocol_sha256=$(sha256sum docs/research/OBSERVATION_PROCESS_EQUIVALENCE_BENCHMARK_2026-11-16.md | cut -d ' ' -f 1)" >> "$GITHUB_STEP_SUMMARY"
