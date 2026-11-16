@@ -669,8 +669,10 @@ pub fn verify_loft_artifact_integrity(
         );
     } else {
         let mut expected_vertices = 0_usize;
+        let mut station_bases = Vec::with_capacity(station_count);
         let mut vertex_layout_valid = true;
         for station_index in 0..station_count {
+            station_bases.push(expected_vertices);
             let collapsed = (station_index == 0 && bow_collapsed)
                 || (station_index + 1 == station_count && stern_collapsed);
             let station_vertices = point_count + if collapsed { 0 } else { point_count - 1 };
@@ -763,6 +765,126 @@ pub fn verify_loft_artifact_integrity(
                         "planar stern cap centre must lie in the stern section plane and centreline",
                     );
                 }
+            }
+        }
+    }
+
+    if station_bases.len() == station_count
+        && artifact.side_face_range.first_face
+            .checked_add(artifact.side_face_range.face_count)
+            == Some(artifact.waterplane_face_range.first_face)
+    {
+        let faces = &artifact.candidate.geometry.faces;
+        let mut expected_waterplane = Vec::<[u32; 3]>::new();
+        let port_vertex = |station_index: usize, point_index: usize| -> u32 {
+            let base = station_bases[station_index];
+            let collapsed = (station_index == 0 && bow_collapsed)
+                || (station_index + 1 == station_count && stern_collapsed);
+            if point_index == 0 || collapsed {
+                (base + point_index) as u32
+            } else {
+                (base + point_count + point_index - 1) as u32
+            }
+        };
+        let starboard_vertex = |station_index: usize, point_index: usize| -> u32 {
+            (station_bases[station_index] + point_index) as u32
+        };
+        for interval in 0..station_count - 1 {
+            let left_collapsed = interval == 0 && bow_collapsed;
+            let right_collapsed = interval + 1 == station_count - 1 && stern_collapsed;
+            let port_here = port_vertex(interval, point_count - 1);
+            let starboard_here = starboard_vertex(interval, point_count - 1);
+            let starboard_next = starboard_vertex(interval + 1, point_count - 1);
+            let port_next = port_vertex(interval + 1, point_count - 1);
+            match (left_collapsed, right_collapsed) {
+                (true, false) => expected_waterplane.push([
+                    port_here,
+                    starboard_next,
+                    port_next,
+                ]),
+                (false, true) => expected_waterplane.push([
+                    port_here,
+                    starboard_here,
+                    starboard_next,
+                ]),
+                (false, false) => {
+                    expected_waterplane.push([
+                        port_here,
+                        starboard_here,
+                        starboard_next,
+                    ]);
+                    expected_waterplane.push([
+                        port_here,
+                        starboard_next,
+                        port_next,
+                    ]);
+                }
+                (true, true) => {}
+            }
+        }
+        let first = artifact.waterplane_face_range.first_face;
+        let end = first.saturating_add(artifact.waterplane_face_range.face_count);
+        if end <= faces.len()
+            && faces[first..end].iter().copied().ne(expected_waterplane.iter().copied())
+        {
+            violation(
+                &mut violations,
+                "waterplane_closure_semantics",
+                "waterplane triangle indices do not match the declared collapsed/planar endpoint semantics",
+            );
+        }
+
+        let expected_cap_faces = |is_bow: bool, centre_index: u32| -> Vec<[u32; 3]> {
+            let station_index = if is_bow { 0 } else { station_count - 1 };
+            let mut ring = (0..point_count)
+                .map(|point_index| starboard_vertex(station_index, point_index))
+                .collect::<Vec<_>>();
+            for point_index in (1..point_count).rev() {
+                ring.push(port_vertex(station_index, point_index));
+            }
+            let mut cap_faces = Vec::with_capacity(ring.len());
+            for index in 0..ring.len() {
+                let next = (index + 1) % ring.len();
+                if is_bow {
+                    cap_faces.push([centre_index, ring[index], ring[next]]);
+                } else {
+                    cap_faces.push([centre_index, ring[next], ring[index]]);
+                }
+            }
+            cap_faces
+        };
+
+        let planar_bow = !bow_collapsed;
+        let planar_stern = !stern_collapsed;
+        let first_centre_index = expected_vertices as u32;
+        if planar_bow {
+            let expected = expected_cap_faces(true, first_centre_index);
+            let range = artifact.bow_end_cap_face_range;
+            let end = range.first_face.saturating_add(range.face_count);
+            if end <= faces.len()
+                && faces[range.first_face..end].iter().copied().ne(expected.iter().copied())
+            {
+                violation(
+                    &mut violations,
+                    "bow_cap_topology",
+                    "bow end-cap triangles do not match the declared planar bow ring and centre",
+                );
+            }
+        }
+        if planar_stern {
+            let stern_centre_index =
+                first_centre_index + u32::from(planar_bow);
+            let expected = expected_cap_faces(false, stern_centre_index);
+            let range = artifact.stern_end_cap_face_range;
+            let end = range.first_face.saturating_add(range.face_count);
+            if end <= faces.len()
+                && faces[range.first_face..end].iter().copied().ne(expected.iter().copied())
+            {
+                violation(
+                    &mut violations,
+                    "stern_cap_topology",
+                    "stern end-cap triangles do not match the declared planar stern ring and centre",
+                );
             }
         }
     }
