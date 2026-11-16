@@ -694,7 +694,7 @@ impl SourceWatermarkLedger {
                 match progress.operation {
                     SourceProgressOperation::EndOfStream { .. } => {
                         EventArrivalClassification::Late(LateEventKind::AfterEndOfStream {
-                            evidence,
+                            progress: evidence,
                         })
                     }
                     SourceProgressOperation::Advance {
@@ -837,6 +837,7 @@ impl SourceWatermarkLedger {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Measurement;
 
     fn source(modality_id: u32) -> SourceKey {
         SourceKey {
