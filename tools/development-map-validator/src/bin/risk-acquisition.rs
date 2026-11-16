@@ -428,8 +428,8 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    const FIXTURE:&str=include_str!("../../../docs/development-map/fixtures/egddm-risk-acquisition-v0.1.json");
-    const EXPECTED:&str=include_str!("../../../docs/development-map/fixtures/egddm-risk-acquisition-v0.1.expected.json");
+    const FIXTURE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-risk-acquisition-v0.1.json");
+    const EXPECTED:&str=include_str!("../../../../docs/development-map/fixtures/egddm-risk-acquisition-v0.1.expected.json");
     fn report()->Value { evaluate_risk_acquisition_json(FIXTURE).expect("D6.15 fixture evaluates") }
     fn trace(value:&Value,id:&str)->Value {
         value["traces"].as_array().unwrap().iter().find(|item|item["trace_id"]==id)
