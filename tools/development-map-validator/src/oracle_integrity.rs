@@ -648,7 +648,7 @@ mod tests {
     fn preserves_positive_and_negative_controls_against_always_reject() {
         let report = evaluate_oracle_integrity_json(FIXTURE).expect("D6.12 fixture");
         let always = trace(&report, "always-reject");
-        assert_eq!(always.false_reject_count, 5);
+        assert_eq!(always.false_reject_count, 7);
         assert_eq!(always.false_accept_count, 0);
     }
 
@@ -682,6 +682,39 @@ mod tests {
         let report = evaluate_oracle_integrity_json(FIXTURE).expect("D6.12 fixture");
         let auditor = trace(&report, "independent-auditor");
         assert_eq!(auditor.observer_coverage_gap_case_count, 1);
+    }
+
+    #[test]
+    fn auditor_detects_every_registered_fault_instance() {
+        let report = evaluate_oracle_integrity_json(FIXTURE).expect("D6.12 fixture");
+        let auditor = trace(&report, "independent-auditor");
+        assert_eq!(auditor.total_fault_instances, 8);
+        assert_eq!(auditor.detected_fault_instances, 8);
+        assert_eq!(auditor.missed_fault_instances, 0);
+        assert_eq!(auditor.false_alarm_fault_instances, 0);
+        assert_eq!(auditor.false_integrity_valid_assertions, 0);
+        assert_eq!(auditor.false_integrity_invalid_assertions, 0);
+    }
+
+    #[test]
+    fn native_verifier_only_baseline_misses_faults_and_both_sides_of_accuracy() {
+        let report = evaluate_oracle_integrity_json(FIXTURE).expect("D6.12 fixture");
+        let native = trace(&report, "native-verifier-only");
+        assert_eq!(native.false_accept_count, 1);
+        assert_eq!(native.false_reject_count, 1);
+        assert_eq!(native.missed_fault_instances, 8);
+        assert_eq!(native.false_integrity_valid_assertions, 7);
+    }
+
+    #[test]
+    fn detects_candidate_state_drift_before_grading() {
+        let report = evaluate_oracle_integrity_json(FIXTURE).expect("D6.12 fixture");
+        let auditor = trace(&report, "independent-auditor");
+        assert_eq!(auditor.candidate_state_drift_case_count, 1);
+        assert!(auditor.cases.iter().any(|case| {
+            case.case_id == "candidate-state-drift"
+                && case.actual_fault_classes.contains(&"candidate_state_drift".to_owned())
+        }));
     }
 
     #[test]
