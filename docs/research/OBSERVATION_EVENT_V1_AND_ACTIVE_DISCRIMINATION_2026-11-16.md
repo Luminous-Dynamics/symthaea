@@ -60,6 +60,22 @@ Use posterior predictive checks and held-out residual structure to decide whethe
 
 The next query should be chosen for its expected impact on a decision, not just for entropy reduction in an abstract latent state.
 
+For a hypothesis set \(H\), current evidence \(D\), and candidate query/action \(a\), distinguish two values:
+
+\[
+\operatorname{EIG}(a)=H(H\mid D)-\mathbb{E}_{o\sim p(o\mid D,a)}[H(H\mid D,o,a)]
+\]
+
+and decision-focused expected value of sample information:
+
+\[
+\operatorname{EVSI}(a)=\min_d\mathbb{E}[L(d,H)\mid D]-\mathbb{E}_{o}\left[\min_d\mathbb{E}[L(d,H)\mid D,o,a]\right].
+\]
+
+EIG rewards uncertainty reduction even when the unresolved model distinction cannot alter the decision. EVSI rewards only expected reduction in decision loss. Select among actions using EVSI and a declared resource/cost contract; retain a Pareto set over sensing energy, wakeups, compute, communication, latency and risk when there is no justified application-specific scalar utility. An exact small-instance oracle should enumerate the action/outcome tree and give a lower bound on observations or decision regret for the evaluator.
+
+The key adversarial fixture is a pair of **observationally equivalent worlds**: two different physical/measurement mechanisms produce the same history under the current passive sampling policy. A candidate must request an informative sensor, time or intervention before it can separate them. Include a negative-control pair in which the observation patterns differ but the physical decision is identical; this detects policies that chase mask entropy without decision value.
+
 Compare within #9817's policy harness:
 - random or periodic observation;
 - uncertainty sampling;
