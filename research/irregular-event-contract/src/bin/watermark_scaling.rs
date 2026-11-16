@@ -149,10 +149,13 @@ fn run_case(
     // verifier must return byte-for-byte equal reports for this workload.
     let warm = query().map_err(|error| format!("warm indexed query: {error}"))?;
     let verified = verified_query().map_err(|error| format!("warm verified query: {error}"))?;
-    if warm != verified {
+    if warm != *verified.report() {
         return Err(format!(
             "indexed and verified reports differ: events={event_count}, sources={source_count}, width={interval_width}, known_at={known_at_us}"
         ));
+    }
+    if verified.ledger_sha256() != ledger.state_sha256() {
+        return Err("verified report digest does not bind the current ledger snapshot".to_owned());
     }
 
     let mut indexed_samples = Vec::with_capacity(INDEXED_REPETITIONS);
