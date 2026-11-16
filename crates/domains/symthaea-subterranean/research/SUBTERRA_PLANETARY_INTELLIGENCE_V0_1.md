@@ -223,6 +223,8 @@ For measurement action `a`, observation outcome `o`, hypothesis `h`, decision `d
 
 `EVSI(a) = R_before - R_after(a)`
 
+The likelihood table must come from independently adjudicated site/action observations, with whole-site Training/Calibration/Evaluation splits and acquisition-lineage de-duplication. Qualitative claim states such as Candidate or DirectlyObserved are never converted directly into arbitrary probabilities. The new subterra-likelihood-calibration reference estimates categorical likelihoods on Training data with explicit Dirichlet smoothing, reports Brier/NLL on Calibration/Evaluation sites, and refuses to emit unsupported cells. A guarded converter builds EVSI input only when every cell is supported and the caller separately supplies priors, decision losses, resource costs and external gate results. This is empirical likelihood estimation, not proof of calibration under planetary shift.
+
 A separately declared utility model prices energy, time, data and exposure. Hard safety, authorization, preservation and out-of-domain gates are not soft penalties and cannot be traded against EVSI. The planner only ranks a measurement proposal after those external gates have passed. It does not issue a robot command.
 
 The `unknown` hypothesis prevents a closed-world classifier from forcing every site into a known geological class. It must have a nonzero prior in benchmark cases unless a preregistered case explicitly tests a closed-set mathematical control.
@@ -234,11 +236,15 @@ The `unknown` hypothesis prevents a closed-world classifier from forcing every s
 | P0 | Measurement-selection reference | Standalone Rust EVSI kernel, deterministic tie-breaks, explicit unknown class, adversarial tests | Source authored; compilation and test execution still required |
 | P1 | Site-belief schema adapter | Convert Subterra site-evidence and network records into Symthaea typed hypotheses without promoting evidence | Positive and negative cross-field fixtures |
 | P1 | Evidence lineage bridge | Consume domain-awareness / sensor-trust evidence with exact source IDs and freshness | Replayed, stale, duplicate and correlated-source rejection |
+| P1 | Site-disjoint likelihood calibration | Estimate outcome likelihoods from independently adjudicated Training sites; score Calibration/Evaluation sites; keep unsupported cells unknown | Whole-site split isolation, acquisition-lineage uniqueness, Brier/NLL, coverage and held-out calibration report |
+| P1 | Calibrated-likelihood to EVSI adapter | Build planner inputs from supported likelihood cells and separately supplied priors/losses/costs/gates | Reject insufficient cells, hypothesis-order drift and missing/denied action policies |
 | P1 | Observation task proposal | Convert selected measurement to a bounded survey work proposal, not a motor command | Existing logistics, retreat and safety layers remain mandatory |
 | P2 | FEP comparison | Compare EVSI proposal with expected-free-energy policy rollouts; report disagreements | Matched baseline, calibration and ablation |
 | P2 | Blind site transfer | Leave-site-out and leave-geology-class-out evaluation | Frozen train/calibration/evaluation split by site |
 | P3 | Multi-agent science planning | Allocate measurements across heterogeneous agents under bandwidth and resource limits | Faulted communication, relay loss, robot-loss and evidence-return tests |
 | P3 | Cross-body domain envelopes | Moon/Mars/Venus first; icy worlds and small bodies kept as separate environment families | No Earth-to-body physics promotion without independent qualification |
+
+The new likelihood calibration package is a small reference estimator only. It does not yet implement hierarchical sensor models, temporal drift, conformal uncertainty, source authentication, clustered bootstrap intervals or planner-induced online adaptation. Those remain later work.
 
 ## 8. First terrestrial and orbital data programme
 
@@ -307,3 +313,7 @@ No planetary mission, flight readiness, autonomous subterranean safety, geotechn
 6. Carrer, L., Diana, E. & Bruzzone, L. (2026), *Radar-based observation of a lava tube on Venus*. https://www.nature.com/articles/s41467-026-68643-6
 7. Sharma et al. (2026), *A potential cave candidate in the Elysium Mons region of Mars*. https://www.nature.com/articles/s44453-026-00039-8
 8. *Robotic lava tube mapping and multimodal data collection using quadruped and LiDAR* (2026), Frontiers in Robotics and AI. https://doi.org/10.3389/frobt.2026.1855443
+9. *A Survey on World Models for Physical AI: From Interaction to Real-World Deployment* (2026). https://doi.org/10.1007/s44163-026-02122-1
+10. Li et al. (2026), *Active Visual Perception: Opportunities and Challenges*, Sensors 26(20), 6544. https://doi.org/10.3390/s26206544
+11. *A Sensor-Centric Survey of Autonomous Driving: Integrating Measurement Physics, Uncertainty Modeling, and Safety-Critical Multi-Sensor Fusion* (2026). https://doi.org/10.3390/s26123801
+12. *Potential caves on Mars: From orbital evidence to subsurface exploration* (2026). https://www.sciencedirect.com/science/article/pii/S2950616626000410
