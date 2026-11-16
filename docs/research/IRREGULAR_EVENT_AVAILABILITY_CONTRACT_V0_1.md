@@ -170,12 +170,19 @@ boundary. Terminal/end-of-stream is stronger than a finite watermark and
 closes intervals beyond its final event-time bound.
 
 The normal completeness query uses the ordered source-progress chain and a
-secondary index keyed by source identity and event time to inspect only late
-breaches that could affect the requested half-open interval. It does not replay
-the full append-only history on every query. The completeness_verified method
-is the explicit audit path: it rebuilds progress and arrival indexes from the
-history, checks digest/replay parity, then returns the same completeness report.
-The fast and audited paths are tested for exact report equality.
+secondary index keyed by source identity, event time and receipt/knowledge time
+to inspect only late breaches that could affect the requested half-open
+interval. It does not replay the full append-only history on every query.
+`completeness_verified` is the explicit audit path: it rebuilds progress and
+arrival indexes from the history, verifies replay/digest equality, and returns
+a distinct `VerifiedCompletenessReport` with private fields, the exact ledger
+SHA-256, and progress/arrival/breach counts. Its `.report()` contains the same
+completeness result as the fast path. The fast and audited paths are tested for
+exact report equality. The type distinction prevents a caller from passing an
+index-only `CompletenessReport` where replay verification is required. It
+certifies only the integrity of this in-memory ledger history and derived
+indexes; it is not source authentication or proof that a source's progress
+claim is truthful.
 
 The breach index is nested by source identity and event time, with a
 receipt/knowledge-time sub-index inside every event-time bucket. Historical
