@@ -49,6 +49,30 @@ Development target: 12 deterministic plans. Validity pilot: 8 uncertainty famili
 
 D6.15 overlaps rather than claims an empty field. RigorBench measures planning, verification coverage, recovery, abstention and atomic transitions. The 2026 abstention-competence proposal covers specification, verification and authority gaps. Recent evaluation reviews identify cost, reproducibility and safety omissions; long-horizon software-engineering work stresses retained obligations and accumulated project state. D6.15's narrower differentiator is the combined protocol: sequential acquisition over admissible worlds, action-specific risk envelopes, independently sampled costs, temporal evidence admissibility and a per-case minimum-sufficient lower bound. It must be directly compared with these related benchmarks, not represented as their replacement.
 
+
+- A September 2026 systematic agent-evaluation survey maps 259 primary studies and a hand-verified matrix of 17 prominent benchmarks. It identifies a structural trilemma across contamination, nondeterminism and execution cost: none of the 17 reports evidence that all three are jointly controlled, and none supplies a complete standardized run-cost record. This is a concrete evaluation-infrastructure gap, but D6.15 v0.1 does **not** close it yet: the current fixture's cost samples are synthetic. The next real-cost adapter must publish pinned runner/toolchain/command/input identity, cold/warm/retry raw measurements, reviewer cost, cache state, provenance, contamination controls and deterministic replay receipts. See [Nageshwaran et al., 15 September 2026](https://link.springer.com/article/10.1007/s10462-026-11678-4).
+
+
+## Proposed competitive targets (not current results)
+
+Lock these only after the 144-decision pilot, independent adjudication and a pre-registered power analysis:
+
+| Axis | Research target | Comparison rule |
+|---|---|---|
+| Critical safety | Zero hard-gate violations in the 400-episode registered suite; publish the one-sided 95% upper confidence bound, including cluster-aware sensitivity | No score/cost compensation for a critical violation |
+| Positive-control utility | At least 95% justified action coverage on fully evidenced safe controls; separately report reversible bounded-risk controls | Always-abstain must fail; compare at equal safety gates |
+| Evidence cost | At least 20% lower median total verification cost than full revalidation, and at least 10% lower than the strongest measured adaptive baseline | Same tasks, runner, toolchain, budget and success criteria; include retries and reviewer effort |
+| Tail efficiency | At least 10% lower p95 end-to-end cost without increasing critical risk or delaying urgent safe actions | Report confidence intervals and full distributions, not only means |
+| Cost calibration | 90% predictive cost intervals achieve 85–95% empirical coverage on held-out cold/warm/retry measurements | Recalibrate after runner, toolchain or workload drift |
+| Evidence correctness | 100% known-answer controls; zero future-evidence, false-observation acceptance, missing critical obligations or unreconciled unknown-side-effect retry | Hidden gold worlds; independent replay and oracle adjudication |
+| Risk calibration | Target expected calibration error ≤0.05 only after world weights are externally adjudicated and enough examples populate each risk bin | Also report reliability diagrams, Brier score and subgroup intervals |
+
+These are ambitious research targets, not established SOTA scores or claims that the prototype currently achieves them. A zero observed failure count is not proof of zero risk; confidence bounds and task-family clustering must remain visible.
+
+
+
+- A September 2026 systematic agent-evaluation survey maps 259 primary studies and a hand-verified matrix of 17 prominent benchmarks. It identifies a structural trilemma across contamination, nondeterminism and execution cost: none of the 17 reports evidence that all three are jointly controlled, and none supplies a complete standardized run-cost record. This is a concrete evaluation-infrastructure gap, but D6.15 v0.1 does **not** close it yet: the current fixture's cost samples are synthetic. The next real-cost adapter must publish pinned runner/toolchain/command/input identity, cold/warm/retry raw measurements, reviewer cost, cache state, provenance, contamination controls and deterministic replay receipts. See [Nageshwaran et al., 15 September 2026](https://link.springer.com/article/10.1007/s10462-026-11678-4).
+
 ## Baselines
 
 Full revalidation; trust/no revalidation; static dependency closure; count-only D6.6; independently costed D6.7; cheapest-first; information-gain-first; expected-value/cost-aware planner; D6.11 pairwise uncertainty; D6.13 whole-DAG worlds; always-act; always-abstain; expert/operator; and the fixed-outcome minimum-sufficient subset oracle.
