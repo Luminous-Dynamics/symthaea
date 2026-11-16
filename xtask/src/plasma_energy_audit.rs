@@ -762,11 +762,16 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         if case_id == "CH4-PLASMA-PULSED-HEATING-REGEN-2026" {
             validate_ch4_pph_operating_points(case, display_name)?;
         }
+        if case_id == "CH4-PLASMA-THERMAL-APPJ-2026" {
+            validate_ch4_thermal_appj_case(case, display_name)?;
+        }
         if case_id == "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026" {
             validate_nh3_n2_vibrational_transfer_case(case, display_name)?;
         }
         let lane = case.get("lane").and_then(Value::as_str);
-        if lane == Some("METHANE_PYROLYSIS") {
+        if lane == Some("METHANE_PYROLYSIS")
+            || lane == Some("METHANE_PLASMA_THERMAL_APPJ")
+        {
             let coproduct = case
                 .get("coproduct_accounting")
                 .with_context(|| {
@@ -1551,6 +1556,134 @@ fn validate_ch4_pph_operating_points(case: &Value, display_name: &str) -> Result
             .and_then(Value::as_bool)
             == Some(false),
         "{context}: carbon product qualification and offtake must remain unvalidated"
+    );
+    Ok(())
+}
+
+
+fn validate_ch4_thermal_appj_case(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: hybrid APPJ methane source-claim audit");
+    ensure!(
+        case.get("evidence_class").and_then(Value::as_str) == Some("PUBLISHED_LAB_EXPERIMENT"),
+        "{context}: APPJ source must remain a published laboratory experiment"
+    );
+    ensure!(
+        case.get("luminous_reproduction").and_then(Value::as_bool) == Some(false),
+        "{context}: APPJ source cannot be promoted to Luminous reproduction"
+    );
+    ensure!(
+        case.get("source").and_then(|source| source.get("doi")).and_then(Value::as_str)
+            == Some("10.1016/j.ijhydene.2026.158179"),
+        "{context}: APPJ source DOI identity does not match the registered article"
+    );
+
+    let configuration = case.get("configuration")
+        .with_context(|| format!("{context}: configuration is missing"))?;
+    ensure!(
+        configuration.get("reactor").and_then(Value::as_str)
+            == Some("thermally assisted atmospheric-pressure plasma jet (APPJ)"),
+        "{context}: reactor identity must remain a thermally assisted APPJ"
+    );
+    let configs = configuration.get("configurations_compared")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: compared configurations are missing"))?;
+    for required in [
+        "single-electrode APPJ with plasma outside the heated zone",
+        "single-electrode APPJ with plasma directly inside the heated zone",
+        "double-electrode APPJ configuration",
+    ] {
+        ensure!(
+            configs.iter().any(|value| value.as_str() == Some(required)),
+            "{context}: missing source configuration {required}"
+        );
+    }
+
+    let claims = case.get("reported_claims")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: source reported_claims are missing"))?;
+    let conversion = claims.iter().find(|claim| {
+        claim.get("claim_id").and_then(Value::as_str)
+            == Some("PLASMA-IN-THERMAL-ZONE-CONVERSION-RELATIVE-GAIN")
+    }).with_context(|| format!("{context}: relative conversion claim is missing"))?;
+    ensure!(
+        close_f64(required_f64(conversion, "value_lower_bound", &context)?, 5.0)
+            && conversion.get("unit").and_then(Value::as_str) == Some("fold"),
+        "{context}: source conversion result must remain a >5-fold relative gain"
+    );
+    ensure!(
+        conversion.get("absolute_conversion_fraction").is_some_and(Value::is_null),
+        "{context}: relative conversion gain cannot be promoted to absolute methane conversion"
+    );
+    ensure!(
+        conversion.get("comparator_pair_definition_status").and_then(Value::as_str)
+            == Some("RECONSTRUCT_FROM_FULL_ARTICLE_AND_SUPPLEMENT"),
+        "{context}: exact comparator pair must remain a source-reconstruction requirement"
+    );
+
+    let deposition = claims.iter().find(|claim| {
+        claim.get("claim_id").and_then(Value::as_str) == Some("LOWEST-CARBON-DEPOSITION-APPJ")
+    }).with_context(|| format!("{context}: carbon-deposition claim is missing"))?;
+    ensure!(
+        close_f64(required_f64(deposition, "value_approx", &context)?, 0.36),
+        "{context}: approximately 36% source carbon-deposition result must be preserved"
+    );
+    ensure!(
+        deposition.get("denominator_definition_status").and_then(Value::as_str)
+            == Some("RECONSTRUCT_FROM_FULL_ARTICLE_AND_SUPPLEMENT"),
+        "{context}: carbon-deposition denominator must remain unresolved pending source reconstruction"
+    );
+    ensure!(
+        deposition.get("captured_product_mass").is_some_and(Value::is_null)
+            && deposition.get("feed_carbon_recovery_fraction").is_some_and(Value::is_null),
+        "{context}: carbon deposition cannot be promoted to captured or recovered carbon yield"
+    );
+
+    let morphology = claims.iter().find(|claim| {
+        claim.get("claim_id").and_then(Value::as_str) == Some("TURBOSTRATIC-CARBON-STRUCTURE")
+    }).with_context(|| format!("{context}: carbon morphology claim is missing"))?;
+    ensure!(
+        morphology.get("value").and_then(Value::as_str)
+            == Some("turbostratic nanostructural features")
+            && morphology.get("product_grade_qualification_status").and_then(Value::as_str)
+                == Some("NOT_VALIDATED"),
+        "{context}: carbon structure must not be promoted to qualified product grade"
+    );
+
+    let slate = case.get("product_slate")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: multi-product slate is missing"))?;
+    let h2 = slate.iter().find(|product| {
+        product.get("species_or_material").and_then(Value::as_str) == Some("H2")
+    }).with_context(|| format!("{context}: H2 product stream is missing"))?;
+    ensure!(
+        h2.get("quantitative_rate").is_some_and(Value::is_null)
+            && h2.get("purity_fraction").is_some_and(Value::is_null)
+            && h2.get("pressure").is_some_and(Value::is_null)
+            && h2.get("accepted_product_status").and_then(Value::as_str) == Some("NOT_QUANTIFIED"),
+        "{context}: H2 rate, purity and pressure must remain unquantified"
+    );
+    let c2c3 = slate.iter().find(|product| {
+        product.get("species_or_material").and_then(Value::as_str) == Some("C2-C3 hydrocarbons")
+    }).with_context(|| format!("{context}: C2-C3 product stream is missing"))?;
+    ensure!(
+        c2c3.get("species_resolved_yields").is_some_and(Value::is_null)
+            && c2c3.get("accepted_product_status").and_then(Value::as_str) == Some("NOT_QUANTIFIED"),
+        "{context}: C2-C3 species-resolved yields must remain unquantified"
+    );
+    let carbon = slate.iter().find(|product| {
+        product.get("species_or_material").and_then(Value::as_str) == Some("solid carbon")
+    }).with_context(|| format!("{context}: solid carbon stream is missing"))?;
+    ensure!(
+        carbon.get("captured_mass").is_some_and(Value::is_null)
+            && carbon.get("grade").is_some_and(Value::is_null)
+            && carbon.get("accepted_product_status").and_then(Value::as_str) == Some("NOT_QUALIFIED"),
+        "{context}: solid carbon deposition/morphology is not captured qualified product"
+    );
+
+    ensure!(
+        case.get("comparison_status").and_then(Value::as_str)
+            == Some("SOURCE_SPECIFIC_RELATIVE_CONFIGURATION_RESULT_NOT_FULL_CHAIN_COMPARABLE"),
+        "{context}: APPJ result must remain non-comparable until full boundaries are reconstructed"
     );
     Ok(())
 }
@@ -2693,6 +2826,82 @@ mod tests {
         })
     }
 
+
+    fn hybrid_appj_source_manifest() -> Value {
+        let registered: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        )).unwrap();
+        let case = registered["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["case_id"] == "CH4-PLASMA-THERMAL-APPJ-2026")
+            .unwrap()
+            .clone();
+        serde_json::json!({
+            "programme": "PLASMA-ENERGY-001",
+            "claim_ceiling": "SOURCE_REGISTER_ONLY",
+            "evidence_classes": [
+                "PUBLISHED_LAB_EXPERIMENT",
+                "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+                "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+                "PUBLISHED_NUMERICAL_STUDY",
+                "MANUFACTURER_REPORTED_OPERATIONAL_CLAIM",
+                "MANUFACTURER_PRODUCT_CLAIM",
+                "GOVERNMENT_RESEARCH_FACILITY_DESCRIPTION",
+                "GOVERNMENT_ROADMAP"
+            ],
+            "cases": [case],
+            "negative_controls": [{
+                "control_id": "NC-APPJ",
+                "expected_disposition": "BLOCKED"
+            }]
+        })
+    }
+
+    #[test]
+    fn source_manifest_accepts_hybrid_appj_relative_claims_without_absolute_performance_invention() {
+        let source = hybrid_appj_source_manifest();
+        let summary = audit_source_value(&source, "hybrid-appj.json").unwrap();
+        assert_eq!(summary.case_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_relative_appj_gain_promoted_to_absolute_conversion() {
+        let mut source = hybrid_appj_source_manifest();
+        source["cases"][0]["reported_claims"][0]["absolute_conversion_fraction"] =
+            serde_json::json!(0.95);
+        let error = audit_source_value(&source, "hybrid-appj.json").unwrap_err();
+        assert!(error.to_string().contains("cannot be promoted to absolute methane conversion"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_carbon_deposition_promoted_to_feed_carbon_recovery() {
+        let mut source = hybrid_appj_source_manifest();
+        source["cases"][0]["reported_claims"][1]["feed_carbon_recovery_fraction"] =
+            serde_json::json!(0.36);
+        let error = audit_source_value(&source, "hybrid-appj.json").unwrap_err();
+        assert!(error.to_string().contains("cannot be promoted to captured or recovered carbon yield"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_appj_carbon_as_qualified_coproduct() {
+        let mut source = hybrid_appj_source_manifest();
+        source["cases"][0]["coproduct_accounting"]["carbon_product_qualification_status"] =
+            serde_json::json!("VALIDATED");
+        let error = audit_source_value(&source, "hybrid-appj.json").unwrap_err();
+        assert!(error.to_string().contains("must not promote carbon-product grade"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_appj_h2_rate_inferred_without_product_measurement() {
+        let mut source = hybrid_appj_source_manifest();
+        source["cases"][0]["product_slate"][0]["quantitative_rate"] =
+            serde_json::json!(100.0);
+        let error = audit_source_value(&source, "hybrid-appj.json").unwrap_err();
+        assert!(error.to_string().contains("H2 rate, purity and pressure must remain unquantified"));
+    }
+
     #[test]
     fn source_manifest_accepts_pulsed_plasma_methane_points_and_regeneration_evidence() {
         let source: Value = serde_json::from_str(include_str!(
@@ -3278,7 +3487,16 @@ mod tests {
         serde_json::json!({
             "programme": "PLASMA-ENERGY-001",
             "claim_ceiling": "SOURCE_REGISTER_ONLY",
-            "evidence_classes": ["PUBLISHED_LAB_EXPERIMENT"],
+            "evidence_classes": [
+                "PUBLISHED_LAB_EXPERIMENT",
+                "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+                "PUBLISHED_REVIEW_OR_DATA_SYNTHESIS",
+                "PUBLISHED_NUMERICAL_STUDY",
+                "MANUFACTURER_REPORTED_OPERATIONAL_CLAIM",
+                "MANUFACTURER_PRODUCT_CLAIM",
+                "GOVERNMENT_RESEARCH_FACILITY_DESCRIPTION",
+                "GOVERNMENT_ROADMAP"
+            ],
             "cases": [
                 {
                     "case_id": "case-1",
