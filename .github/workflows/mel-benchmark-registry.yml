@@ -32,7 +32,7 @@ jobs:
           test "$actual" = "$expected"
           echo "MEL_BENCHMARK_REGISTRY_REVISION=$actual" >> "$GITHUB_ENV"
       - name: Install pinned Rust
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@1.100.0
         with:
           components: rustfmt
       - name: Stage standalone registry crate outside root workspace
@@ -48,13 +48,13 @@ jobs:
           echo "MEL_BENCHMARK_REGISTRY_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
           echo "MEL_BENCHMARK_REGISTRY_DIR=$staged" >> "$GITHUB_ENV"
       - name: Format isolated registry crate
-        run: cargo +1.96.0 fmt --check --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
+        run: cargo +1.100.0 fmt --check --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
       - name: Resolve and lock standalone dependencies
-        run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
+        run: cargo +1.100.0 generate-lockfile --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
       - name: Test exact benchmark registry module
-        run: cargo +1.96.0 test --locked --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
+        run: cargo +1.100.0 test --locked --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
       - name: Validate the committed synthetic profile
-        run: cargo +1.96.0 run --locked --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST" --example profile_check
+        run: cargo +1.100.0 run --locked --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST" --example profile_check
       - name: Record exact source and lock identities
         shell: bash
         run: |
