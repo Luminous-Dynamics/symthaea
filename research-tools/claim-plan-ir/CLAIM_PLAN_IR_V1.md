@@ -109,7 +109,7 @@ The semantic preflight maps the selected source mode to its minimum witness and 
 
 A TEE can improve operator-integrity assurance while changing the confidentiality claim: if credentials and decrypted responses enter the enclave, plaintext is visible to enclave code and privacy depends on attestation, TCB and vendor assumptions. This is not equivalent to a cryptographic design in which plaintext remains on the holder's device and the witness sees only ciphertext. The profile must not call these guarantees identical.
 
-The `plaintext_visibility_profile` is an owner-qualified profile reference, not a caller-authored `private=true` assertion. The schema and preflight also constrain v1 HTTPS origins to lowercase ASCII DNS A-labels, omit default port 443, require numeric ports 1..=65535, and require a canonical DNS server identity to exactly match the origin host. IPv6 literals and internationalized U-labels are out of scope for v1; callers must use an approved A-label profile. It records which principals can observe authentication secrets, decrypted response bytes, session key material, selected disclosure and telemetry. The `collusion_assumptions_profile` separately records which principals may collude and what the proof remains sound/private against. A generic "zero knowledge" label is not a substitute.
+The `plaintext_visibility_profile` is an owner-qualified profile reference, not a caller-authored `private=true` assertion. The schema and preflight also constrain v1 HTTPS origins to lowercase ASCII LDH DNS names (IDNs/IP literals excluded), omit default port 443, require numeric ports 1..=65535, and require a canonical DNS server identity to exactly match the origin host. IPv6 literals and internationalized U-labels are out of scope for v1; callers must use an approved A-label profile. It records which principals can observe authentication secrets, decrypted response bytes, session key material, selected disclosure and telemetry. The `collusion_assumptions_profile` separately records which principals may collude and what the proof remains sound/private against. A generic "zero knowledge" label is not a substitute.
 
 Source-specific reading:
 - TLSNotary describes zkTLS as designated-verifier: a witness must participate during the TLS session; portable downstream verification relies on a notary/attestor signature. https://tlsnotary.org/blog/2026/06/17/public-verifiability/
@@ -348,6 +348,7 @@ The standalone fixture directory now contains:
 - HTTPS origin port outside 1..=65535;
 - explicit default HTTPS port 443;
 - DNS server identity mismatch with the canonical origin host;
+- IPv4 address literal used as HTTPS origin;
 - a machine-readable manifest describing the expected rejection stage.
 
 The fixtures are structural/semantic test inputs only. They contain zero digests and synthetic profile IDs, so they do not represent a valid cryptographic trust profile, issued credential, source session, or proof. The duplicate-member fixture must be rejected by the raw JSON admission parser before a normal JSON object is formed.
@@ -360,12 +361,12 @@ An isolated, research-only Rust workspace now exists at `research-tools/claim-pl
 2. custom duplicate-aware deserialization (reject decoded duplicate keys before ordinary object construction);
 3. integer/floating-point admission before JCS;
 4. JSON Schema 2020-12 validation with format assertions enabled;
-5. cross-field semantic checks for multi-field binding, unique pointers and IDs, RFC 6901 `~0`/`~1` escape validity, typed predicate references, freshness, status maturity, canonical lowercase DNS A-label HTTPS origin/port/server continuity, path-template shape and source-mode/witness/verification-scope/commitment consistency;
+5. cross-field semantic checks for multi-field binding, unique pointers and IDs, RFC 6901 `~0`/`~1` escape validity, typed predicate references, freshness, status maturity, canonical lowercase ASCII LDH DNS origin/port/server continuity (no IPv4/IPv6 literals or IDNs), path-template shape and source-mode/witness/verification-scope/commitment consistency;
 6. RFC 8785 serialization and domain-separated SHA-256 plan digest.
 
 Direct crate versions are pinned in `Cargo.toml`: `jsonschema 0.61.2`, `serde_json_canonicalizer 0.4.1`, `serde_json 1.0.151`, `serde 1.0.229`, `sha2 0.10.9` and `hex 0.4.3`. JSON Schema format assertion is explicitly enabled. Canonicalization follows the duplicate-aware parser because canonicalization cannot repair ambiguous duplicate-key input after an ordinary map parser has discarded a duplicate.
 
-The Rust source contains 17 authored unit tests for the three-field positive fixture, duplicate keys, unsafe integers, status maturity, origin paths, missing anti-rollback, unknown field references, freshness type mismatch, unused fields, floating-point inputs, invalid RFC 6901 pointer escapes, RFC 8785 UTF-16 object-key ordering, nonpositive request lifetime, source-mode/trust-scope consistency, HTTPS port range, explicit default-port rejection and DNS server/origin identity matching. **The crate has not been compiled or tested**: rustc/Cargo are absent in the authoring environment. A Cargo.lock is also not present, so the transitive dependency closure is not frozen. Authored tests remain unrun.
+The Rust source contains 18 authored unit tests for the three-field positive fixture, duplicate keys, unsafe integers, status maturity, origin paths, missing anti-rollback, unknown field references, freshness type mismatch, unused fields, floating-point inputs, invalid RFC 6901 pointer escapes, RFC 8785 UTF-16 object-key ordering, nonpositive request lifetime, source-mode/trust-scope consistency, HTTPS port range, explicit default-port rejection and DNS server/origin identity matching. **The crate has not been compiled or tested**: rustc/Cargo are absent in the authoring environment. A Cargo.lock is also not present, so the transitive dependency closure is not frozen. Authored tests remain unrun.
 
 ## 11. Implementation sequence
 
