@@ -78,5 +78,55 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Run AR(1) conditional-innovation calibration
+        run: |
+          set -euo pipefail
+          manifest="research/falsification-power-reference/Cargo.toml"
+          report="$RUNNER_TEMP/conditional-innovation-calibration.json"
+          cargo run --locked --manifest-path "$manifest" --bin conditional_innovation_calibration > "$report"
+          jq -e '
+            (.scenarios | map(select(.scenario == "ar1_predictable_conditional_null"))[0]) as $null
+            | (.scenarios | map(select(.scenario == "ar1_predictable_conditional_alternative"))[0]) as $alt
+            | (
+              .schema == "gaussian_conditional_innovation_calibration_v0" and
+              .nominal_alpha == 0.05 and
+              .paths_per_scenario == 20000 and
+              .maximum_looks == 100 and
+              .ar1_rho == 0.65 and
+              .sigma == 0.8 and
+              .discrepancy == 0.22 and
+              (.scenarios | length) == 2 and
+              all(.scenarios[];
+                .paths == 20000 and
+                .horizon == 100 and
+                .conditional_innovation_rate >= 0 and
+                .conditional_innovation_rate <= 1 and
+                .conditional_innovation_wilson95[0] <= .conditional_innovation_rate and
+                .conditional_innovation_rate <= .conditional_innovation_wilson95[1] and
+                .zero_mean_misspecified_rate >= 0 and
+                .zero_mean_misspecified_rate <= 1 and
+                .zero_mean_misspecified_wilson95[0] <= .zero_mean_misspecified_rate and
+                .zero_mean_misspecified_rate <= .zero_mean_misspecified_wilson95[1]
+              ) and
+              ($null.conditional_innovation_rate <= 0.06) and
+              ($null.zero_mean_misspecified_rate > 0.10) and
+              ($alt.conditional_innovation_rate > 0.50)
+            )
+          ' "$report"
+          printf '%s\n' "${{ github.event.pull_request.head.sha || github.sha }}" > "$report.source-sha"
+          sha256sum "$report" | tee "$report.sha256"
+          cat "$report"
+
+      - name: Upload conditional-innovation calibration receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: gaussian-conditional-innovation-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            ${{ runner.temp }}/conditional-innovation-calibration.json
+            ${{ runner.temp }}/conditional-innovation-calibration.json.sha256
+            ${{ runner.temp }}/conditional-innovation-calibration.json.source-sha
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Run strict Clippy
         run: cargo clippy --locked --manifest-path research/falsification-power-reference/Cargo.toml --all-targets -- -D warnings
