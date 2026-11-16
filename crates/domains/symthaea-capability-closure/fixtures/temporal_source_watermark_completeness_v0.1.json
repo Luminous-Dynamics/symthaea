@@ -46,7 +46,13 @@
       "exclusive_watermark_us"
     ],
     "hot_path": "source_progress_chain_plus_source_event_time_late_breach_index",
-    "audit_path": "completeness_verified_rebuilds_and_checks_full_append_only_history"
+    "audit_path": "completeness_verified_rebuilds_and_checks_full_append_only_history",
+    "breach_index_key": [
+      "source_identity",
+      "event_time_us",
+      "recorded_at_us"
+    ],
+    "known_at_behavior": "future_receipts_excluded_by_ordered_index_range_before_candidate_visit"
   },
   "arrival": {
     "event_time_less_than_prior_watermark": "late_breach",
@@ -187,6 +193,12 @@
       "name": "indexed_vs_verified_query_scaling",
       "expect": "known_answer_and_exact_report_parity_at_1k_10k_100k_arrivals",
       "safety": "query_latency_gain_never_substitutes_for_full_replay_audit"
+    },
+    {
+      "id": "WM-021",
+      "name": "historical_query_prunes_future_breach_receipts",
+      "expect": "zero_one_and_three_visible_candidates_at_successive_knowledge_cutoffs",
+      "safety": "index_range_lookup_does_not_visit_future_known_evidence"
     }
   ],
   "metrics": {
@@ -213,7 +225,8 @@
       "full_history_audit_rebuild_latency_us",
       "indexed_vs_audited_report_mismatch_count",
       "indexed_query_p50_p95_p99_us",
-      "verified_query_p50_p95_p99_us"
+      "verified_query_p50_p95_p99_us",
+      "future_known_breach_candidates_pruned"
     ]
   },
   "qualification_targets": {
@@ -230,8 +243,8 @@
     "source_authentication_executed": false,
     "benchmark_results_available": false,
     "targets_are_results": false,
-    "watermark_test_functions_authored": 24,
-    "crate_test_functions_authored": 80,
+    "watermark_test_functions_authored": 25,
+    "crate_test_functions_authored": 81,
     "benchmark_protocol_authored": true
   },
   "benchmark_protocol": {
