@@ -1,0 +1,131 @@
+{
+  "actual_hypothesis_id": "safe",
+  "decision_cutoff": "2026-11-16T10:00:00Z",
+  "actions": [
+    {
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0
+    },
+    {
+      "action_id": "bounded-probe",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 1200
+    },
+    {
+      "action_id": "bounded-probe-wide",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 3500
+    },
+    {
+      "action_id": "inspect-readonly",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 0
+    }
+  ],
+  "hypothesis_bounds": [
+    {
+      "hypothesis_id": "safe",
+      "lower_probability_bps": 5000,
+      "upper_probability_bps": 7000,
+      "nominal_probability_bps": 6000
+    },
+    {
+      "hypothesis_id": "hazard-a",
+      "lower_probability_bps": 500,
+      "upper_probability_bps": 2500,
+      "nominal_probability_bps": 1500
+    },
+    {
+      "hypothesis_id": "hazard-b",
+      "lower_probability_bps": 500,
+      "upper_probability_bps": 2500,
+      "nominal_probability_bps": 1500
+    },
+    {
+      "hypothesis_id": "hazard-ab",
+      "lower_probability_bps": 500,
+      "upper_probability_bps": 3000,
+      "nominal_probability_bps": 1000
+    }
+  ],
+  "hypotheses": [
+    {
+      "hypothesis_id": "safe",
+      "safe_actions": [
+        "release",
+        "bounded-probe",
+        "bounded-probe-wide",
+        "inspect-readonly"
+      ],
+      "observations": {
+        "cheap-signal": "clear",
+        "gate-a": "pass",
+        "gate-b": "pass",
+        "audit": "green"
+      }
+    },
+    {
+      "hypothesis_id": "hazard-a",
+      "safe_actions": [
+        "bounded-probe",
+        "bounded-probe-wide",
+        "inspect-readonly"
+      ],
+      "observations": {
+        "cheap-signal": "clear",
+        "gate-a": "pass",
+        "gate-b": "fail",
+        "audit": "green"
+      }
+    },
+    {
+      "hypothesis_id": "hazard-b",
+      "safe_actions": [
+        "bounded-probe",
+        "bounded-probe-wide",
+        "inspect-readonly"
+      ],
+      "observations": {
+        "cheap-signal": "clear",
+        "gate-a": "fail",
+        "gate-b": "pass",
+        "audit": "green"
+      }
+    },
+    {
+      "hypothesis_id": "hazard-ab",
+      "safe_actions": [
+        "inspect-readonly"
+      ],
+      "observations": {
+        "cheap-signal": "warning",
+        "gate-a": "fail",
+        "gate-b": "fail",
+        "audit": "green"
+      }
+    }
+  ],
+  "options": [
+    {
+      "option_id": "cheap-signal",
+      "available_at": "2026-11-16T09:00:00Z"
+    },
+    {
+      "option_id": "gate-a",
+      "available_at": "2026-11-16T09:00:00Z"
+    },
+    {
+      "option_id": "gate-b",
+      "available_at": "2026-11-16T09:00:00Z"
+    },
+    {
+      "option_id": "audit",
+      "available_at": "2026-11-16T09:00:00Z"
+    }
+  ]
+}
