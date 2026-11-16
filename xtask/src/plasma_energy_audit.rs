@@ -1447,14 +1447,22 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
             }
             "CO2_CYCLIC_CARBON_UTILIZATION" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
+                let cycles = required_f64(
+                    metrics,
+                    "completed_reaction_gasification_cycles_min",
+                    &format!("{display_name}: {target_id}"),
+                )?;
+                ensure!(
+                    cycles >= 100.0,
+                    "{display_name}: cyclic carbon target {target_id} must require at least 100 complete cycles"
+                );
                 for (key, floor) in [
-                    ("completed_reaction_gasification_cycles_min", 100.0),
                     ("carbon_inventory_closure_min_fraction", 0.95),
                     ("useful_syngas_productivity_retention_after_cycles_min_fraction", 0.90),
                 ] {
                     ensure!(
                         metrics.get(key).and_then(Value::as_f64)
-                            .is_some_and(|value| value.is_finite() && value >= floor && value <= 1.0_f64.max(floor)),
+                            .is_some_and(|value| value.is_finite() && value >= floor && value <= 1.0),
                         "{display_name}: cyclic carbon target {target_id} has insufficient or invalid threshold {key}"
                     );
                 }
@@ -3990,35 +3998,6 @@ mod tests {
                 "all_cycles_and_failed_starts_in_denominator": true,
                 "continuous_and_discontinuous_modes_separate": true
             })
-        } else if lane == "CO2_DBD_MODEL_GENERALIZATION" {
-            serde_json::json!({
-                "source_paper_grouped_splits_required": true,
-                "leave_one_publication_out_required": true,
-                "leave_one_reactor_configuration_out_required": true,
-                "random_row_split_cannot_support_transfer_claim": true,
-                "prediction_interval_calibration_reported": true,
-                "worst_group_error_and_abstention_reported": true,
-                "no_extrapolation_claim_without_sealed_external_measurements": true,
-                "only_measured_physical_descriptors_may_be_used": true
-            })
-        } else if lane == "CO2_WARM_PLASMA_RWGS" {
-            serde_json::json!({
-                "full_grid_to_accepted_co_and_syngas_energy_boundary_required": true,
-                "h2_co2_feed_ratio_bound_to_each_point": true,
-                "product_purity_pressure_and_h2_co_contract_required": true,
-                "source_264_vs_277_kj_per_mol_discrepancy_resolved_before_point_ranking": true,
-                "carbon_and_oxygen_balances_closed_independently": true,
-                "matched_thermocatalytic_rwgs_baseline_required": true
-            })
-        } else if lane == "CO2_CYCLIC_CARBON_UTILIZATION" {
-            serde_json::json!({
-                "grid_side_energy_includes_plasma_power_conversion_and_all_auxiliaries": true,
-                "deposited_carbon_and_gasified_carbon_inventories_tracked_separately": true,
-                "carbon_co_o2_and_residual_streams_species_resolved": true,
-                "no_unqualified_carbon_or_oxygen_coproduct_credit": true,
-                "cycle_durability_must_be_physical_not_simulated": true,
-                "matched_syngas_composition_and_product_contract_required": true
-            })
         } else if lane == "METHANE_PYROLYSIS_PULSED_HEATING" {
             serde_json::json!({
                 "methane_conversion_min_fraction": 0.90,
@@ -4136,6 +4115,35 @@ mod tests {
                 "duty_cycle_and_steady_state_duration_matched": true,
                 "comparison_must_report_measurement_uncertainty_and_grouped_repeats": true
             })
+        } else if lane == "CO2_DBD_MODEL_GENERALIZATION" {
+            serde_json::json!({
+                "source_paper_grouped_splits_required": true,
+                "leave_one_publication_out_required": true,
+                "leave_one_reactor_configuration_out_required": true,
+                "random_row_split_cannot_support_transfer_claim": true,
+                "prediction_interval_calibration_reported": true,
+                "worst_group_error_and_abstention_reported": true,
+                "no_extrapolation_claim_without_sealed_external_measurements": true,
+                "only_measured_physical_descriptors_may_be_used": true
+            })
+        } else if lane == "CO2_WARM_PLASMA_RWGS" {
+            serde_json::json!({
+                "full_grid_to_accepted_co_and_syngas_energy_boundary_required": true,
+                "h2_co2_feed_ratio_bound_to_each_point": true,
+                "product_purity_pressure_and_h2_co_contract_required": true,
+                "source_264_vs_277_kj_per_mol_discrepancy_resolved_before_point_ranking": true,
+                "carbon_and_oxygen_balances_closed_independently": true,
+                "matched_thermocatalytic_rwgs_baseline_required": true
+            })
+        } else if lane == "CO2_CYCLIC_CARBON_UTILIZATION" {
+            serde_json::json!({
+                "grid_side_energy_includes_plasma_power_conversion_and_all_auxiliaries": true,
+                "deposited_carbon_and_gasified_carbon_inventories_tracked_separately": true,
+                "carbon_co_o2_and_residual_streams_species_resolved": true,
+                "no_unqualified_carbon_or_oxygen_coproduct_credit": true,
+                "cycle_durability_must_be_physical_not_simulated": true,
+                "matched_syngas_composition_and_product_contract_required": true
+            })
         } else {
             serde_json::json!({
                 "matched_syngas_composition_and_quality_required": true,
@@ -4166,7 +4174,7 @@ mod tests {
             ],
             "cases": [
                 {
-                    "case_id": "case-1",
+                    "case_id": comparator_case_id,
                     "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
                     "luminous_reproduction": false,
                     "source": {"url": "https://example.org/source"}
