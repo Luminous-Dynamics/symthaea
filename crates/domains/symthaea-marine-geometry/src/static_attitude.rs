@@ -12,7 +12,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::full_envelope::{
-    FullEnvelopeDisposition, FullEnvelopeSpec, ProfilePoint, SymmetryPolicy,
+    FullEnvelopeDisposition, FullEnvelopeSpec, SymmetryPolicy,
     compute_full_envelope_spec_digest, validate_full_envelope_spec,
 };
 
@@ -934,6 +934,30 @@ mod tests {
         assert!((gravity.z - 0.2_f64.cos() * 0.1_f64.cos()).abs() < 1.0e-12);
         let norm = (gravity.x.powi(2) + gravity.y.powi(2) + gravity.z.powi(2)).sqrt();
         assert!((norm - 1.0).abs() < 1.0e-12);
+    }
+
+
+    #[test]
+    fn pure_roll_clipping_matches_the_analytic_prismatic_section() {
+        let mut request = box_request();
+        request.attitude.roll_rad = 0.1;
+        let receipt = evaluate_static_attitude(&request).unwrap();
+        let expected_tcb = (2000.0 / 3.0) * 0.1_f64.tan() / 120.0;
+        let expected_vcb = 3.0 - (1000.0 / 360.0) * 0.1_f64.tan().powi(2);
+        assert!((receipt.displacement_volume_m3 - 12_000.0).abs() < 1.0e-7);
+        assert!((receipt.center_of_buoyancy_body_m.y_m - expected_tcb).abs() < 1.0e-8);
+        assert!((receipt.center_of_buoyancy_body_m.z_m - expected_vcb).abs() < 1.0e-8);
+    }
+
+    #[test]
+    fn pure_pitch_clipping_reproduces_the_linear_prismatic_displacement() {
+        let mut request = box_request();
+        request.attitude.waterplane_offset_m = -1.0;
+        request.attitude.pitch_rad = 0.02;
+        let receipt = evaluate_static_attitude(&request).unwrap();
+        assert!((receipt.displacement_volume_m3 - 12_000.0).abs() < 1.0e-7);
+        assert!((receipt.center_of_buoyancy_body_m.x_m - 47.222_222_222_222_22).abs() < 1.0e-8);
+        assert!(receipt.center_of_buoyancy_body_m.y_m.abs() < 1.0e-8);
     }
 
     #[test]
