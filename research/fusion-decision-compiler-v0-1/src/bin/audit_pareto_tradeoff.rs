@@ -1,7 +1,7 @@
 use fusion_decision_compiler_contract::pareto_tradeoff::{
     CandidateEligibility, CandidateObjectiveVector, DominanceRelation, ObjectiveComparisonProfile,
-    ParetoFrontStatus, ScalarPreference, ScalarTradeoffDisposition, SourcedScalar, compare_pair,
-    extract_pareto_front,
+    ObjectiveTolerance, ParetoFrontStatus, ScalarPreference, ScalarTradeoffDisposition,
+    SourcedScalar, compare_pair, extract_pareto_front,
 };
 
 fn sha(character: char) -> String {
@@ -24,6 +24,16 @@ fn profile() -> ObjectiveComparisonProfile {
         cost_basis_ref: "synthetic-usd-2026-real-discount-6pct-v1".to_string(),
         ebi_normalization_ref: "synthetic-qeng-ebi-normalization-v1".to_string(),
         uncertainty_basis_ref: "synthetic-net-export-95pct-interval-v1".to_string(),
+        objective_tolerances: [
+            ObjectiveTolerance { absolute: 0.01, relative: 1e-9 },
+            ObjectiveTolerance { absolute: 0.01, relative: 1e-9 },
+            ObjectiveTolerance { absolute: 1e-6, relative: 0.0 },
+            ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
+            ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
+            ObjectiveTolerance { absolute: 1e-9, relative: 1e-9 },
+            ObjectiveTolerance { absolute: 1e-4, relative: 1e-9 },
+        ],
+        q_eng_tolerance: ObjectiveTolerance { absolute: 1e-9, relative: 1e-9 },
     }
 }
 
