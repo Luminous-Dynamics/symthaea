@@ -111,17 +111,6 @@ impl ResourceCost {
         }
     }
 
-    fn plus(self, other: Self) -> Result<Self, PlanningError> {
-        let sum = Self {
-            energy_j: self.energy_j + other.energy_j,
-            duration_s: self.duration_s + other.duration_s,
-            data_bytes: self.data_bytes + other.data_bytes,
-            exposure_units: self.exposure_units + other.exposure_units,
-        };
-        sum.validate()?;
-        Ok(sum)
-    }
-
     fn weighted(self, prices: CostPrices) -> Result<f64, PlanningError> {
         let value = self.energy_j * prices.energy_per_j
             + self.duration_s * prices.time_per_s
