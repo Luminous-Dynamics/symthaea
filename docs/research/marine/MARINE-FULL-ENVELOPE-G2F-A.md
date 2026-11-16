@@ -349,3 +349,54 @@ Analytical results:
 TCB is zero by symmetry. Design-waterplane displaced mass is 9,225 tonnes.
 
 A second unit test refines this same linear taper from 2 to 3 to 5 longitudinal stations. Because section area and waterline breadth are linear in x for this controlled fixture, the piecewise-linear integration should preserve displacement, waterplane area, LCB and VCB within a frozen 1e-9 absolute test tolerance. The source-spec digest must differ after refinement even though the physical numeric answers remain the same. This is a test of deterministic identity and integration invariance for a known linear case; it is not evidence that arbitrary curved hulls have converged. For curved/nonlinear stations, perform systematic refinement studies and report the change in each observable instead of assuming linear interpolation is exact.
+
+
+## 14. Published generative-hull baseline: quantitative CAD recovery and shape-distribution targets
+
+A useful current baseline is the September 2026 GAN versus VAE-PCT hull-generation comparison (JMSE 14(18), 1707). It reports 7,795 barge-type and 8,498 containership training CAD hulls, then evaluates 8,000 generated CAD outputs per generator and hull category. The pipeline pulls discrete generator outputs back to continuous B-spline surfaces by fairing section curves and lofting the results. This is already a meaningful CAD-to-CAD generative baseline; simply producing point clouds or lofted surfaces is not a sufficient novelty claim.
+
+The paper evaluates five complementary metrics: Noise Score (NS), Diversity Score (DS), Jensen–Shannon Divergence (JSD), Minimum Matching Distance (MMD) and Coverage (COV). It reports the following pull-back failures:
+
+| Hull family | GAN failures | VAE-PCT failures |
+| --- | ---: | ---: |
+| Barge-type | 441 / 8,000 (5.5%) | 126 / 8,000 (1.6%) |
+| Containership | 361 / 8,000 (4.5%) | 194 / 8,000 (2.4%) |
+
+The trade-offs matter: VAE-PCT generally produces less noisy geometries and performs better on the more complex containership set, while GAN generally achieves greater coverage of the training design space. These results should be reproduced on the published definitions and matched splits, not compressed into a universal winner label.
+
+The paper also finds systematic underestimation of midship-area coefficient C_M, with upward bias in derived prismatic coefficient C_P and vertical centre of buoyancy ratio VCB/T. This is an important warning: a generator can reproduce overall point-cloud distributions yet distort naval-architectural quantities that affect design decisions.
+
+### Our targets against that baseline (research targets, not achievements)
+
+- **CAD pull-back success ≥99%** on each predeclared held-out hull family, improving on the reported 94.5–98.4% success range in the four baseline cases.
+- **No silent repair:** every fairing, healing, resampling or coordinate change is separately reported and digest-bound. Report source-to-CAD deviations before and after any explicitly permitted operation.
+- **No geometry-only victory:** add errors in displacement, C_M, C_P, C_WP, LCB, LCF, VCB/T, waterplane area and wetted surface, not just point-cloud similarity.
+- Report NS, DS, JSD, MMD and COV using the paper's definitions and normalization; add 1-NNA as a supplementary metric, noting that the 2026 paper lists it as a future extension rather than a reported baseline result.
+- Use parent-hull-family holdouts and hull-class holdouts. Do not randomly split nearly identical geometry variants across train and test.
+- Add robustness cases for unusual stems, transoms, asymmetry, deck camber, sparse stations, reconstruction holes, high curvature and geometry outside the training distribution.
+- Report 95% confidence intervals, compute budget, generation count, pull-back failure denominator, invalid/unsupported rate and cost per independently validated candidate.
+
+The target is not merely to reduce failure below 1%; it is to reduce failure while preserving or improving the baseline's diversity and design-space coverage, and while preventing geometric bias from becoming a false hydrostatic or hydrodynamic claim.
+
+## 15. The multimodal-generation novelty boundary
+
+Representation-aware generative ship design is already present in the 2026 literature: a conditional multimodal autoencoder learns a shared latent representation of surface point clouds, waterline sections and buttock curves, then a conditional latent diffusion model generates representations from principal dimensions and form coefficients.
+
+Consequently, we should not claim that combining point clouds, sections and buttock curves is itself the paradigm shift. The differentiator must be what happens *after* the proposal:
+- persistent identities and cross-representation consistency;
+- full external envelope and loading-state separation;
+- explicit source and reconstruction uncertainty;
+- CAD/STEP semantic preservation with downstream traceability;
+- independent hydrostatic and hydrodynamic verification;
+- experiment selection by decision impact;
+- robust mission-level Pareto decisions with hard safety gates.
+
+This is a more demanding comparison than matching a training distribution. It asks whether a candidate remains an identifiable, physically coherent and decision-useful engineering object through the whole design-to-evidence lifecycle.
+
+## 16. G2f-a3 — shared keel identity in asymmetric section profiles
+
+For explicitly asymmetric port/starboard sections, the keel is a common centreline vertex. Both profiles must share its point identity and coincident y=0/z coordinates. Other non-pointed profile points remain separately identified. At a pointed bow or stern, all corresponding terminal profile points share identity and collapse to y=0.
+
+This distinction is now enforced by the typed validator and tested against split keel identity and mismatched keel elevation. It matters for later G2f-b shell construction: the independent reference must not close a polygon by connecting two nominally different keel vertices whose z coordinates differ.
+
+Latest focused evidence is recorded in issue #12434 and PR #12438; it remains focused crate verification, not full workspace CI or physical qualification.
