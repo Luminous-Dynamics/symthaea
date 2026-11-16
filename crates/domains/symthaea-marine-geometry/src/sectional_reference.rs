@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 
 use crate::full_envelope::{
-    FullEnvelopeDisposition, FullEnvelopeSpec, HullEndCondition, ProfilePoint,
-    SymmetryPolicy, compute_full_envelope_spec_digest, validate_full_envelope_spec,
+    FullEnvelopeDisposition, FullEnvelopeSpec, HullEndCondition, ProfilePoint, SymmetryPolicy,
+    compute_full_envelope_spec_digest, validate_full_envelope_spec,
 };
 
 pub const SECTIONAL_REFERENCE_SCHEMA_VERSION: u32 = 1;
@@ -250,7 +250,11 @@ fn section_profile_polygon(
     }));
     match symmetry {
         SymmetryPolicy::SymmetricAboutY0 => {
-            for point in starboard.iter().rev().take(starboard.len().saturating_sub(1)) {
+            for point in starboard
+                .iter()
+                .rev()
+                .take(starboard.len().saturating_sub(1))
+            {
                 polygon.push(Point2 {
                     y: -point.y_m,
                     z: point.z_m,
@@ -259,7 +263,11 @@ fn section_profile_polygon(
         }
         SymmetryPolicy::ExplicitPortAndStarboard => {
             if let Some(port_profile) = port {
-                for point in port_profile.iter().rev().take(port_profile.len().saturating_sub(1)) {
+                for point in port_profile
+                    .iter()
+                    .rev()
+                    .take(port_profile.len().saturating_sub(1))
+                {
                     polygon.push(Point2 {
                         y: point.y_m,
                         z: point.z_m,
@@ -309,7 +317,11 @@ fn station_sample(
 ) -> Result<SectionSample, SectionalReferenceIssue> {
     let station = &spec.stations[station_index];
     let keel_z = station.starboard_profile[0].z_m;
-    let sheer_z = station.starboard_profile.last().map(|point| point.z_m).unwrap_or(0.0);
+    let sheer_z = station
+        .starboard_profile
+        .last()
+        .map(|point| point.z_m)
+        .unwrap_or(0.0);
     if plane_z_m < sheer_z - GEOMETRY_TOLERANCE_M || plane_z_m >= keel_z - GEOMETRY_TOLERANCE_M {
         return Err(SectionalReferenceIssue {
             code: "waterplane_outside_supported_section".into(),
@@ -329,33 +341,31 @@ fn station_sample(
     let clipped = clip_submerged_polygon(&polygon, plane_z_m);
     let properties = polygon_properties(&clipped);
 
-    let starboard_bounds =
-        profile_waterline_bounds(&station.starboard_profile, plane_z_m).ok_or_else(|| {
-            SectionalReferenceIssue {
-                code: "starboard_waterline_intersection".into(),
-                detail: format!(
-                    "condition waterplane does not intersect station {} starboard profile",
-                    station.station_id
-                ),
-            }
+    let starboard_bounds = profile_waterline_bounds(&station.starboard_profile, plane_z_m)
+        .ok_or_else(|| SectionalReferenceIssue {
+            code: "starboard_waterline_intersection".into(),
+            detail: format!(
+                "condition waterplane does not intersect station {} starboard profile",
+                station.station_id
+            ),
         })?;
     let port_bounds = match spec.symmetry {
         SymmetryPolicy::SymmetricAboutY0 => (-starboard_bounds.1, -starboard_bounds.0),
         SymmetryPolicy::ExplicitPortAndStarboard => {
-            let profile = station.port_profile.as_deref().ok_or_else(|| {
-                SectionalReferenceIssue {
-                    code: "explicit_port_profile_missing".into(),
-                    detail: format!("station {} has no port profile", station.station_id),
-                }
-            })?;
-            profile_waterline_bounds(profile, plane_z_m).ok_or_else(|| {
-                SectionalReferenceIssue {
-                    code: "port_waterline_intersection".into(),
-                    detail: format!(
-                        "condition waterplane does not intersect station {} port profile",
-                        station.station_id
-                    ),
-                }
+            let profile =
+                station
+                    .port_profile
+                    .as_deref()
+                    .ok_or_else(|| SectionalReferenceIssue {
+                        code: "explicit_port_profile_missing".into(),
+                        detail: format!("station {} has no port profile", station.station_id),
+                    })?;
+            profile_waterline_bounds(profile, plane_z_m).ok_or_else(|| SectionalReferenceIssue {
+                code: "port_waterline_intersection".into(),
+                detail: format!(
+                    "condition waterplane does not intersect station {} port profile",
+                    station.station_id
+                ),
             })?
         }
     };
@@ -367,7 +377,10 @@ fn station_sample(
     if !area_m2.is_finite() || !waterline_breadth.is_finite() {
         return Err(SectionalReferenceIssue {
             code: "non_finite_sectional_property".into(),
-            detail: format!("station {} produced a non-finite clipped section", station.station_id),
+            detail: format!(
+                "station {} produced a non-finite clipped section",
+                station.station_id
+            ),
         });
     }
 
@@ -405,8 +418,7 @@ fn integrate_linear_first_moment(
         let f0 = value(&pair[0]);
         let f1 = value(&pair[1]);
         let delta = f1 - f0;
-        let segment =
-            dx * (x0 * (f0 + 0.5 * delta) + dx * (0.5 * f0 + delta / 3.0));
+        let segment = dx * (x0 * (f0 + 0.5 * delta) + dx * (0.5 * f0 + delta / 3.0));
         kahan_add(&mut sum, &mut correction, segment);
     }
     sum
@@ -428,7 +440,9 @@ fn result_digest(result: &SectionalHydrostaticResult) -> Result<String, serde_js
         vertical_center_of_buoyancy_m: result.vertical_center_of_buoyancy_m,
         longitudinal_center_of_flotation_m: result.longitudinal_center_of_flotation_m,
     };
-    Ok(blake3::hash(&serde_json::to_vec(&identity)?).to_hex().to_string())
+    Ok(blake3::hash(&serde_json::to_vec(&identity)?)
+        .to_hex()
+        .to_string())
 }
 
 fn evaluate_one(
@@ -470,14 +484,11 @@ fn evaluate_one(
     let displacement_volume = integrate_linear_curve(&samples, |sample| sample.area_m2);
     let waterplane_area = integrate_linear_curve(&samples, |sample| sample.waterline_breadth_m);
     let lcb_moment = integrate_linear_first_moment(&samples, |sample| sample.area_m2);
-    let lcf_moment =
-        integrate_linear_first_moment(&samples, |sample| sample.waterline_breadth_m);
-    let transverse_moment = integrate_linear_curve(&samples, |sample| {
-        sample.area_m2 * sample.centroid_y_m
-    });
-    let vertical_moment = integrate_linear_curve(&samples, |sample| {
-        sample.area_m2 * sample.centroid_z_m
-    });
+    let lcf_moment = integrate_linear_first_moment(&samples, |sample| sample.waterline_breadth_m);
+    let transverse_moment =
+        integrate_linear_curve(&samples, |sample| sample.area_m2 * sample.centroid_y_m);
+    let vertical_moment =
+        integrate_linear_curve(&samples, |sample| sample.area_m2 * sample.centroid_z_m);
 
     if !displacement_volume.is_finite()
         || displacement_volume <= 0.0
@@ -486,7 +497,8 @@ fn evaluate_one(
     {
         return Err(SectionalReferenceIssue {
             code: "non_positive_integral".into(),
-            detail: "loading condition produced non-positive displacement or waterplane area".into(),
+            detail: "loading condition produced non-positive displacement or waterplane area"
+                .into(),
         });
     }
 
@@ -524,7 +536,9 @@ pub fn compute_loading_sweep_digest(
         source_spec_digest_blake3: &receipt.source_spec_digest_blake3,
         results: &receipt.results,
     };
-    Ok(blake3::hash(&serde_json::to_vec(&identity)?).to_hex().to_string())
+    Ok(blake3::hash(&serde_json::to_vec(&identity)?)
+        .to_hex()
+        .to_string())
 }
 
 /// Evaluate multiple upright horizontal waterplanes from one validated full
@@ -625,13 +639,12 @@ pub fn evaluate_loading_sweep(
         results,
         sweep_digest_blake3: String::new(),
     };
-    receipt.sweep_digest_blake3 =
-        compute_loading_sweep_digest(&receipt).map_err(|error| {
-            vec![SectionalReferenceIssue {
-                code: "sweep_digest".into(),
-                detail: format!("could not serialize loading sweep identity: {error}"),
-            }]
-        })?;
+    receipt.sweep_digest_blake3 = compute_loading_sweep_digest(&receipt).map_err(|error| {
+        vec![SectionalReferenceIssue {
+            code: "sweep_digest".into(),
+            detail: format!("could not serialize loading sweep identity: {error}"),
+        }]
+    })?;
     Ok(receipt)
 }
 
@@ -711,7 +724,11 @@ mod tests {
         let mut request = fixture_request();
         request.loading_conditions.swap(0, 2);
         let errors = evaluate_loading_sweep(&request).unwrap_err();
-        assert!(errors.iter().any(|issue| issue.code == "loading_condition_order"));
+        assert!(
+            errors
+                .iter()
+                .any(|issue| issue.code == "loading_condition_order")
+        );
     }
 
     #[test]
@@ -729,18 +746,23 @@ mod tests {
         request.loading_conditions[1].waterplane_z_m = 0.0;
         request.loading_conditions[2].waterplane_z_m = 2.0;
         let errors = evaluate_loading_sweep(&request).unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|issue| issue.code == "waterplane_outside_supported_section"));
+        assert!(
+            errors
+                .iter()
+                .any(|issue| issue.code == "waterplane_outside_supported_section")
+        );
     }
-
 
     #[test]
     fn invalid_source_geometry_is_rejected_without_indexing_missing_stations() {
         let mut request = fixture_request();
         request.source_spec.stations.clear();
         let errors = evaluate_loading_sweep(&request).unwrap_err();
-        assert!(errors.iter().any(|issue| issue.code == "source_spec_rejected"));
+        assert!(
+            errors
+                .iter()
+                .any(|issue| issue.code == "source_spec_rejected")
+        );
     }
 
     #[test]
@@ -758,8 +780,7 @@ mod tests {
         for intersection in &mut request.source_spec.design_waterline.station_intersections {
             intersection.port_source =
                 crate::full_envelope::WaterlinePortSource::ExplicitPortProfile;
-            intersection.port_point_id =
-                Some(format!("PORT-{}", intersection.starboard_point_id));
+            intersection.port_point_id = Some(format!("PORT-{}", intersection.starboard_point_id));
         }
         for (station, deck_section) in request
             .source_spec
@@ -780,11 +801,13 @@ mod tests {
     #[test]
     fn duplicate_loading_condition_ids_are_rejected() {
         let mut request = fixture_request();
-        request.loading_conditions[2].condition_id = request.loading_conditions[1]
-            .condition_id
-            .clone();
+        request.loading_conditions[2].condition_id =
+            request.loading_conditions[1].condition_id.clone();
         let errors = evaluate_loading_sweep(&request).unwrap_err();
-        assert!(errors.iter().any(|issue| issue.code == "loading_condition_identity"));
+        assert!(
+            errors
+                .iter()
+                .any(|issue| issue.code == "loading_condition_identity")
+        );
     }
-
 }
