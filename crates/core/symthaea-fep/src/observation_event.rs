@@ -168,6 +168,7 @@ pub enum ObservationEventError {
         actual: usize,
     },
     NonFiniteLikelihoodCoefficient { row: usize, column: usize },
+    NonFiniteWeightedResidual { index: usize },
     NonFiniteBeliefGradient { row: usize },
 }
 
@@ -449,7 +450,7 @@ impl ObservationEventV1 {
             let precision = dimension.precision.unwrap_or(fallback_precision);
             let weighted_residual = precision * (value - prediction);
             if !weighted_residual.is_finite() {
-                return Err(ObservationEventError::NonFiniteBeliefGradient { row: index });
+                return Err(ObservationEventError::NonFiniteWeightedResidual { index });
             }
             weighted_residuals[index] = Some(weighted_residual);
         }
