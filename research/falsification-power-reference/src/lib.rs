@@ -10,6 +10,7 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::fmt;
 
+pub mod gaussian_terminal_induction;
 pub mod sequential;
 
 /// Errors for invalid designs and power-envelope declarations.
