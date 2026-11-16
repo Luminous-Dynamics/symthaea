@@ -77,6 +77,7 @@ cargo run --manifest-path Cargo.toml --bin verify_validation_domain_corpus
 cargo run --manifest-path Cargo.toml --bin compare_solver_outputs
 cargo run --manifest-path Cargo.toml --bin qualify_plant_service
 cargo run --manifest-path Cargo.toml --bin audit_robust_net_export
+cargo run --manifest-path Cargo.toml --bin audit_model_form_discrepancy
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
