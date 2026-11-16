@@ -511,6 +511,30 @@ mod tests {
         assert_eq!(irrelevant["residual_risk_bps"],4000);
         assert_eq!(irrelevant["unsupported_action"],true);
     }
+    #[test] fn candidate_cannot_weaken_evaluator_authoritative_action_policy() {
+        let mut value:Value=serde_json::from_str(FIXTURE).unwrap();
+        value["candidate_view"]["actions"][0]["irreversible"]=json!(false);
+        value["candidate_view"]["actions"][0]["hard_gate"]=json!(false);
+        value["candidate_view"]["actions"][0]["max_residual_risk_bps"]=json!(10000);
+        let error=evaluate_risk_acquisition_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("evaluator-authoritative action policies"));
+    }
+    #[test] fn candidate_cannot_move_cutoff_or_inflate_budget() {
+        let mut cutoff:Value=serde_json::from_str(FIXTURE).unwrap();
+        cutoff["candidate_view"]["decision_cutoff"]=json!("2026-11-16T10:10:00Z");
+        let cutoff_error=evaluate_risk_acquisition_json(&cutoff.to_string()).unwrap_err();
+        assert!(cutoff_error.contains("evaluator-authoritative cutoff"));
+        let mut budget:Value=serde_json::from_str(FIXTURE).unwrap();
+        budget["candidate_view"]["budget_micros"]=json!(999999);
+        let budget_error=evaluate_risk_acquisition_json(&budget.to_string()).unwrap_err();
+        assert!(budget_error.contains("evaluator-authoritative budget"));
+    }
+    #[test] fn sequential_acquisition_timestamps_must_be_nondecreasing() {
+        let mut value:Value=serde_json::from_str(FIXTURE).unwrap();
+        value["candidate_view"]["traces"][0]["acquisitions"][1]["at"]=json!("2026-11-16T09:40:00Z");
+        let error=evaluate_risk_acquisition_json(&value.to_string()).unwrap_err();
+        assert!(error.contains("must be nondecreasing"));
+    }
     #[test] fn hard_gate_cannot_be_softened_by_nonzero_risk_allowance() {
         let mut value:Value=serde_json::from_str(FIXTURE).unwrap();value["candidate_view"]["actions"][0]["max_residual_risk_bps"]=json!(1);
         let error=evaluate_risk_acquisition_json(&value.to_string()).unwrap_err();assert!(error.contains("hard-gated actions must have zero"));
