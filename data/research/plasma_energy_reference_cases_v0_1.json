@@ -2832,6 +2832,374 @@
         "realized_revenue_evidence": false,
         "no_credit_baseline_required": true
       }
+    },
+    {
+      "case_id": "NH3-PLASMA-SYNTHESIS-ROUTES-TEA-2026",
+      "lane": "AMMONIA_SYNTHESIS_COMPETITIVENESS",
+      "evidence_class": "PUBLISHED_TECHNO_ECONOMIC_ANALYSIS",
+      "source": {
+        "title": "Beyond Haber-Bosch: Plasma-driven electrification as the next frontier in ammonia synthesis directly from air and water?",
+        "authors": [
+          "Sayeh Yasmani Masouleh",
+          "Rafael Andres Albuja Del Valle",
+          "Yury Gorbanev",
+          "Annemie Bogaerts",
+          "Tomoaki Kawasaki",
+          "Akihito Tezuka",
+          "Anchan Kayamori",
+          "Yoshiyuki Iso",
+          "Andrea Monforti Ferrario",
+          "Patrice Perreault"
+        ],
+        "publisher": "Chemical Engineering Research and Design",
+        "volume": 234,
+        "pages": "407-423",
+        "publication_date": "2026-10",
+        "doi": "10.1016/j.cherd.2026.09.031",
+        "url": "https://doi.org/10.1016/j.cherd.2026.09.031"
+      },
+      "configuration": {
+        "model": "Aspen Plus V12.1 process models with MATLAB sub-models",
+        "nominal_plant_capacity_tonne_nh3_per_day": 1,
+        "accepted_product_purity_weight_fraction": 0.98,
+        "feedstocks": [
+          "air",
+          "water"
+        ],
+        "alternatives": [
+          "RGA plasma NOx + lean NOx trap catalytic reduction",
+          "RGA plasma NOx + electrochemical NOx reduction (NORR)",
+          "direct N2-H2 DBD plasma-catalytic synthesis"
+        ],
+        "evidence_boundary": "modeled process-level mass and energy balances; not a physical plant demonstration"
+      },
+      "operating_points": [
+        {
+          "operating_point_id": "NH3-SYN-RGA-NORR-2026",
+          "route": "RGA_NORR",
+          "specific_energy_kWh_per_kg_nh3": 84,
+          "plasma_share_of_total_energy_fraction": 0.68,
+          "qualifier": "lowest modeled total energy among the three alternatives; 1 tonne/day model"
+        },
+        {
+          "operating_point_id": "NH3-SYN-RGA-LNT-2026",
+          "route": "RGA_LNT",
+          "specific_energy_kWh_per_kg_nh3": 154,
+          "qualifier": "modeled alternative; sensitive to LNT selectivity and hydrogen utilization"
+        },
+        {
+          "operating_point_id": "NH3-SYN-DIRECT-DBD-2026",
+          "route": "DIRECT_DBD",
+          "specific_energy_kWh_per_kg_nh3": 435,
+          "qualifier": "modeled direct N2-H2 plasma-catalytic alternative"
+        }
+      ],
+      "observations": [
+        {
+          "metric": "green_haber_bosch_small_scale_reference_specific_energy",
+          "value": 11.5,
+          "unit": "kWh/kg_NH3",
+          "qualifier": "source-selected comparator for small-scale green Haber-Bosch"
+        },
+        {
+          "metric": "modeled_levelized_cost_ammonia_min",
+          "value": 18000,
+          "unit": "USD/tonne_NH3",
+          "qualifier": "reported across modeled plasma alternatives/scenarios; not a market price"
+        },
+        {
+          "metric": "modeled_levelized_cost_ammonia_max",
+          "value": 98000,
+          "unit": "USD/tonne_NH3",
+          "qualifier": "reported across modeled plasma alternatives/scenarios; not a market price"
+        }
+      ],
+      "source_conclusion": "The process-level model compares RGA-LNT, RGA-NORR and direct DBD plasma-catalytic routes at 1 tonne/day and 98 wt% NH3. RGA-NORR has the lowest modeled energy requirement at 84 kWh/kg NH3, with plasma generation contributing 68%; RGA-LNT requires 154 kWh/kg, and direct DBD 435 kWh/kg. These remain well above the source-selected small-scale green Haber-Bosch reference of about 11.5 kWh/kg. The modeled LCOA range is USD 18,000-98,000 per tonne NH3, with electricity price and energy consumption as the main cost drivers.",
+      "comparison_status": "PUBLISHED_PROCESS_TECHNO_ECONOMIC_MODEL_NOT_PHYSICAL_DEMONSTRATION",
+      "blockers": [
+        "All three routes are modeled; none is a Luminous physical reproduction or commissioned plant.",
+        "RGA-NORR, RGA-LNT and direct DBD are separate process configurations and must not be collapsed into one performance point.",
+        "The 84 kWh/kg RGA-NORR result is not at parity with the 11.5 kWh/kg small-scale green Haber-Bosch reference.",
+        "The modelled plant gate, electricity, air separation, feed conditioning, water treatment, gas separation, recycle and product isolation boundaries must be reconstructed before matched ranking.",
+        "LCOA is scenario-dependent and must preserve electricity price, utilization, scale and product specification."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "CO2-DBD-ML-358-DATASET-2026",
+      "lane": "CO2_DBD_MODEL_GENERALIZATION",
+      "evidence_class": "PUBLISHED_NUMERICAL_STUDY",
+      "source": {
+        "title": "Machine learning to predict plasma-based CO2 conversion in dielectric barrier discharge reactors",
+        "authors": [
+          "Jiayin Li",
+          "Xinpei Lu",
+          "Pranav Arun",
+          "Jing Xu",
+          "Fausto Gallucci",
+          "Sirui Li",
+          "Annemie Bogaerts"
+        ],
+        "publisher": "Green Chemistry",
+        "volume": 28,
+        "pages": "9804-9821",
+        "publication_date": "2026-05-14",
+        "doi": "10.1039/D6GC01077F",
+        "url": "https://doi.org/10.1039/D6GC01077F"
+      },
+      "dataset": {
+        "data_point_count": 358,
+        "literature_year_start": 2010,
+        "literature_year_end": 2025,
+        "reactor_scope": "coaxial dielectric-barrier discharge CO2-splitting reactors with source-reported common descriptors",
+        "feature_count": 6,
+        "features": [
+          "discharge power",
+          "frequency",
+          "gas flow rate",
+          "discharge gap",
+          "dielectric constant",
+          "discharge length"
+        ],
+        "split_protocol": "publication-wise grouped five-fold cross-validation",
+        "models": [
+          "physics-informed neural network",
+          "random forest",
+          "extreme gradient boosting",
+          "hybrid ensemble"
+        ]
+      },
+      "observations": [
+        {
+          "metric": "best_fold_grouped_cross_validation_r2",
+          "value": 0.791,
+          "unit": "R2",
+          "qualifier": "best-fold result reported under publication-grouped five-fold CV; not a universal cross-reactor score"
+        },
+        {
+          "metric": "prospective_unseen_data_r2",
+          "value": 0.92,
+          "unit": "R2",
+          "qualifier": "source-reported prospective validation within the explored data domain"
+        },
+        {
+          "metric": "flow_rate_and_power_feature_importance_min",
+          "value": 0.61,
+          "unit": "fraction",
+          "qualifier": "lower end of the reported combined SHAP contribution range"
+        },
+        {
+          "metric": "flow_rate_and_power_feature_importance_max",
+          "value": 0.71,
+          "unit": "fraction",
+          "qualifier": "upper end of the reported combined SHAP contribution range"
+        }
+      ],
+      "source_conclusion": "The study assembles 358 literature data points and trains a PINN/RF/XGBoost hybrid ensemble. It reports a best-fold R2 of 0.791 under publication-wise grouped five-fold validation and R2=0.92 on prospective unseen data within the explored domain. Flow rate and power dominate reported feature importance. This is a DBD-specific data/model result, not evidence of universal plasma-reactor transfer.",
+      "comparison_status": "PUBLISHED_GROUPED_DATA_MODEL_WITH_DOMAIN_LIMITED_PROSPECTIVE_VALIDATION",
+      "blockers": [
+        "Best-fold R2 is not the same as mean grouped-fold performance or a lower confidence bound.",
+        "Prospective validation is within the explored domain; it does not establish cross-reactor, cross-pressure, cross-chemistry or cross-regime transfer.",
+        "The underlying 358-row corpus, source labels, preprocessing and feature provenance must be pinned before independent reproduction.",
+        "The six common descriptors omit potentially important physical descriptors such as reduced electric field, electron density and discharge morphology when those are not available in the source literature.",
+        "No source model prediction may be promoted to a physical CO2 conversion measurement."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "CO2-RWGS-GLIDING-ARC-2026",
+      "lane": "CO2_WARM_PLASMA_RWGS",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Energy-efficient reverse water gas shift reaction in a gliding arc plasmatron",
+        "authors": [
+          "Seunghwan Bang",
+          "Rania Djettene",
+          "Bart D. Vandegehuchte",
+          "Annemie Bogaerts"
+        ],
+        "publisher": "Chemical Engineering Journal",
+        "publication_year": 2026,
+        "volume": 547,
+        "article_number": "181398",
+        "doi": "10.1016/j.cej.2026.181398",
+        "url": "https://doi.org/10.1016/j.cej.2026.181398"
+      },
+      "configuration": {
+        "reactor": "gliding arc plasmatron",
+        "reaction": "CO2 + H2 -> CO + H2O",
+        "discharge_power_w_range": [
+          600,
+          1200
+        ],
+        "total_flow_slpm_range": [
+          7,
+          20
+        ],
+        "specific_energy_input_kj_per_litre_range": [
+          2.3,
+          6.4
+        ],
+        "source_reports_catalyst_free_operation": true
+      },
+      "operating_points": [
+        {
+          "operating_point_id": "RWGS-H2-RICH-2026",
+          "h2_to_co2_feed_ratio": 4,
+          "co2_conversion_fraction": 0.93,
+          "co_selectivity_fraction": 1,
+          "qualifier": "high-conversion H2-rich condition; do not attach stoichiometric minimum-energy metric"
+        },
+        {
+          "operating_point_id": "RWGS-STOICHIOMETRIC-2026",
+          "h2_to_co2_feed_ratio": 1,
+          "co2_conversion_fraction": 0.68,
+          "co_selectivity_fraction": 1,
+          "specific_energy_cost_kj_per_mol_co": 277,
+          "specific_energy_input_kj_per_litre": 2.3,
+          "qualifier": "stoichiometric condition near reported thermodynamic equilibrium; abstract reports minimum energy cost 277 kJ/mol CO"
+        }
+      ],
+      "observations": [
+        {
+          "metric": "maximum_co2_conversion",
+          "value": 0.93,
+          "unit": "fraction",
+          "qualifier": "reported under H2:CO2=4"
+        },
+        {
+          "metric": "co_selectivity",
+          "value": 1,
+          "unit": "fraction",
+          "qualifier": "reported across the studied operating conditions"
+        },
+        {
+          "metric": "stoichiometric_co2_conversion",
+          "value": 0.68,
+          "unit": "fraction",
+          "qualifier": "H2:CO2=1; near thermodynamic equilibrium around 2000 K"
+        },
+        {
+          "metric": "minimum_specific_energy_cost",
+          "value": 277,
+          "unit": "kJ/mol_CO",
+          "qualifier": "abstract value at SEI 2.3 kJ/L; not a grid-to-accepted-syngas plant metric"
+        }
+      ],
+      "source_text_discrepancies": [
+        {
+          "field": "minimum_specific_energy_cost_kj_per_mol_co",
+          "source_locations": [
+            "article highlights",
+            "article abstract"
+          ],
+          "reported_values": [
+            264,
+            277
+          ],
+          "resolution": "UNRESOLVED; preserve abstract value 277 as the current source-attributed operating-point value and block exact point-estimate ranking until the paper table/figure is checked"
+        }
+      ],
+      "source_conclusion": "The gliding-arc plasmatron study reports maximum CO2 conversion of approximately 93% at H2:CO2=4 with 100% CO selectivity. At stoichiometric H2:CO2=1, conversion is approximately 68%, near the calculated thermodynamic equilibrium. The abstract reports a minimum energy cost of 277 kJ/mol CO at 2.3 kJ/L SEI. The article highlights also report 264 kJ/mol CO; this discrepancy is unresolved. Reactor/discharge metrics are not a complete grid-to-accepted-syngas plant boundary.",
+      "comparison_status": "SOURCE_SPECIFIC_OPERATING_POINTS_WITH_UNRESOLVED_ENERGY_COST_DISCREPANCY",
+      "blockers": [
+        "Do not combine 93% H2-rich conversion with 277 kJ/mol CO from the separate stoichiometric point.",
+        "Do not silently resolve the 264 versus 277 kJ/mol CO discrepancy.",
+        "The reported energy cost requires exact power-measurement boundary reconstruction and is not assumed to be grid-to-product energy.",
+        "Accepted syngas purity, pressure, downstream acceptance and complete balance-of-plant loads are not established by this source summary."
+      ],
+      "luminous_reproduction": false
+    },
+    {
+      "case_id": "CO2-CYCLIC-REFORMING-GASIFICATION-2026",
+      "lane": "CO2_CYCLIC_CARBON_UTILIZATION",
+      "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+      "source": {
+        "title": "Plasma-based cyclic reforming-gasification for improved CO2 conversion with CH4 pyrolysis and dry reforming of CH4",
+        "authors": [
+          "Colin O'Modhrain",
+          "Annemie Bogaerts"
+        ],
+        "publisher": "Journal of CO2 Utilization",
+        "volume": 112,
+        "article_number": "103570",
+        "publication_date": "2026-10",
+        "doi": "10.1016/j.jcou.2026.103570",
+        "url": "https://doi.org/10.1016/j.jcou.2026.103570"
+      },
+      "configuration": {
+        "reactor": "gliding arc plasmatron with a CO2-plasma high-temperature effluent coupled to a fixed bed containing deposited carbon",
+        "phases": [
+          "carbon formation by dry reforming of methane or methane pyrolysis",
+          "oxidation/gasification of deposited carbon by CO2-plasma effluent"
+        ],
+        "operation_modes": [
+          "discontinuous",
+          "continuous"
+        ],
+        "energy_basis": "plasma-deposited power, not full wall-plug/grid input"
+      },
+      "operating_points": [
+        {
+          "operating_point_id": "CRG-DISCONTINUOUS-DRM-2026",
+          "route": "dry reforming of methane",
+          "h2_to_co_ratio": 1.7,
+          "qualifier": "source reports tuneable syngas from DRM and subsequent carbon oxidation; do not merge with continuous pyrolysis"
+        },
+        {
+          "operating_point_id": "CRG-CONTINUOUS-CH4-PYROLYSIS-2026",
+          "route": "methane pyrolysis",
+          "methane_conversion_fraction": 0.6,
+          "main_products": [
+            "solid carbon",
+            "hydrogen"
+          ],
+          "maximum_oxygen_concentration_after_three_passes_vol_percent": 0.5,
+          "qualifier": "continuous mode; subsequent oxidation passes increase CO and decrease O2"
+        }
+      ],
+      "observations": [
+        {
+          "metric": "reported_overall_conversion_highlight",
+          "value": 0.78,
+          "unit": "fraction",
+          "qualifier": "article highlight; exact point/definition must be recovered from the paper before using as a matched metric"
+        },
+        {
+          "metric": "reported_energy_cost_highlight",
+          "value": 0.16,
+          "unit": "MJ/mol_reactant",
+          "qualifier": "article highlight; source uses plasma-deposited power"
+        },
+        {
+          "metric": "reported_specific_energy_per_tonne_syngas_highlight",
+          "value": 13.9,
+          "unit": "kWh/tonne_syngas",
+          "qualifier": "article highlight; do not interpret as grid-side plant energy"
+        },
+        {
+          "metric": "continuous_methane_conversion",
+          "value": 0.6,
+          "unit": "fraction",
+          "qualifier": "continuous methane-pyrolysis mode"
+        },
+        {
+          "metric": "maximum_oxygen_after_three_passes",
+          "value": 0.5,
+          "unit": "vol_percent",
+          "qualifier": "maximum reported O2 concentration after three carbon-oxidation passes"
+        }
+      ],
+      "source_conclusion": "The study alternates methane-derived solid carbon formation and CO2-plasma-effluent gasification. It demonstrates discontinuous DRM and continuous methane-pyrolysis variants, with distinct product and operating outcomes. The reported energy values are calculated using plasma-deposited power, not complete grid-side input. The carbon reuse concept is experimentally explored but is not yet a fully closed industrial carbon loop or qualified syngas product chain.",
+      "comparison_status": "PUBLISHED_CYCLIC_EXPERIMENT_WITH_PLASMA_DEPOSITED_POWER_BOUNDARY",
+      "blockers": [
+        "Keep discontinuous DRM and continuous methane-pyrolysis modes separate.",
+        "The 78% / 0.16 MJ/mol / 13.9 kWh per tonne syngas highlight requires exact point and denominator reconstruction from the article before use.",
+        "Plasma-deposited power is not grid-side energy; no system-level efficiency claim is admitted.",
+        "A maximum O2 concentration of 0.5 vol% after three passes is not a qualified oxygen product or evidence of complete carbon oxidation.",
+        "No complete carbon inventory, long-cycle durability or accepted syngas customer contract is established by this source summary."
+      ],
+      "luminous_reproduction": false
     }
   ],
   "negative_controls": [
@@ -3274,6 +3642,56 @@
       "control_id": "NC-042",
       "condition": "Borrow the pulsed-heating paper's pure-CH4 27 kWh/kg H2 metric or diluted-feed 95% conversion into the APPJ source record.",
       "expected_disposition": "REJECT_CROSS_SOURCE_OPERATING_POINT_BORROWING"
+    },
+    {
+      "control_id": "NC-CO2-ML-001",
+      "condition": "Treat the published DBD hybrid model's best-fold R2=0.791 or in-domain prospective R2=0.92 as cross-reactor or cross-regime validation without a sealed external holdout.",
+      "expected_disposition": "REJECT_TRANSFER_SCOPE_MISMATCH"
+    },
+    {
+      "control_id": "NC-CO2-ML-002",
+      "condition": "Randomly split individual literature rows from the same paper/reactor into train and test and claim publication-independent generalization.",
+      "expected_disposition": "REJECT_GROUP_LEAKAGE"
+    },
+    {
+      "control_id": "NC-2-RWGS-001",
+      "condition": "Combine the H2:CO2=4 / ~93% conversion point with the H2:CO2=1 / 277 kJ/mol CO stoichiometric energy point as one operating result.",
+      "expected_disposition": "REJECT_OPERATING_POINT_MIX"
+    },
+    {
+      "control_id": "NC-2-RWGS-002",
+      "condition": "Silently replace the paper's 277 kJ/mol CO abstract value with the 264 kJ/mol CO highlight value or average them without reviewing the exact table/figure.",
+      "expected_disposition": "BLOCKED_SOURCE_DISCREPANCY"
+    },
+    {
+      "control_id": "NC-2-RWGS-003",
+      "condition": "Treat the RWGS discharge or plasma energy metric as full grid-to-accepted-CO or grid-to-syngas energy without auxiliary and power-conversion accounting.",
+      "expected_disposition": "BLOCKED_INCOMPLETE_ENERGY_BOUNDARY"
+    },
+    {
+      "control_id": "NC-CRG-001",
+      "condition": "Combine discontinuous DRM and continuous methane-pyrolysis cycles into a single performance point.",
+      "expected_disposition": "REJECT_MODE_MISMATCH"
+    },
+    {
+      "control_id": "NC-CRG-002",
+      "condition": "Treat plasma-deposited-power energy as wall-plug/grid-side specific energy.",
+      "expected_disposition": "REJECT_POWER_BOUNDARY_MISMATCH"
+    },
+    {
+      "control_id": "NC-CRG-003",
+      "condition": "Treat maximum 0.5 vol% O2 after three gasification passes as an accepted oxygen product or a closed carbon inventory.",
+      "expected_disposition": "REJECT_PRODUCT_AND_BALANCE_MISMATCH"
+    },
+    {
+      "control_id": "NC-NH3-PLASMA-TEA-001",
+      "condition": "Claim parity with green Haber-Bosch from the 84 kWh/kg NH3 RGA-NORR model without reconciling the 11.5 kWh/kg reference and complete plant boundaries.",
+      "expected_disposition": "REJECT_COMPETITIVENESS_CLAIM"
+    },
+    {
+      "control_id": "NC-NH3-PLASMA-TEA-002",
+      "condition": "Mix the 84 kWh/kg RGA-NORR, 154 kWh/kg RGA-LNT and 435 kWh/kg direct-DBD alternative as if they were one route or operating point.",
+      "expected_disposition": "REJECT_ROUTE_MIX"
     }
   ],
   "derived_reference_checks": [
@@ -3392,6 +3810,27 @@
       },
       "interpretation": "This is arithmetic over two different published source metrics, not a matched performance comparison. The gas-liquid tandem paper reports 1,161 kWh/kg NH3 (~0.861 g/kWh), while a separate 2026 integrated SOEC-HB plant model reports 8.14 kWh/kg NH3 (~122.85 g/kWh), a nominal 142.6x source-metric gap. Their boundaries and product contracts must be reconstructed before claiming a head-to-head gap. Separately, the JACS 2026 area rate of 7.7 nmol/s/cm2 corresponds to approximately 0.1133 kg NH3/m2/day, implying roughly 8,826 m2 active area per tonne/day at that rate. This geometric extrapolation is arithmetic only, not a scalability prediction; it omits packing, current distribution, mass transfer, degradation and balance-of-plant.",
       "comparison_status": "NOT_COMPARABLE_BOUNDARIES_UNRESOLVED"
+    },
+    {
+      "check_id": "NH3-PLASMA-SYNTHESIS-RECIPROCAL-YIELD-2026",
+      "source_case_id": "NH3-PLASMA-SYNTHESIS-ROUTES-TEA-2026",
+      "reference_case_id": "NH3-IEA-HB-ASU-2026",
+      "evidence_class": "DERIVED_ARITHMETIC_FROM_PUBLISHED_PROCESS_ENERGY",
+      "luminous_measurement": false,
+      "inputs": {
+        "rga_norr_specific_energy_kWh_per_kg_NH3": 84,
+        "rga_lnt_specific_energy_kWh_per_kg_NH3": 154,
+        "direct_dbd_specific_energy_kWh_per_kg_NH3": 435,
+        "small_scale_green_hb_reference_kWh_per_kg_NH3": 11.5
+      },
+      "derivation": {
+        "rga_norr_energy_yield_g_NH3_per_kWh": 11.904761904761905,
+        "rga_lnt_energy_yield_g_NH3_per_kWh": 6.4935064935064934,
+        "direct_dbd_energy_yield_g_NH3_per_kWh": 2.2988505747126435,
+        "green_hb_energy_yield_g_NH3_per_kWh": 86.95652173913044,
+        "rga_norr_energy_multiple_vs_green_hb": 7.304347826086956
+      },
+      "interpretation": "Reciprocal arithmetic only. The three plasma routes and the small-scale green-HB reference remain source-specific modeled process metrics; no superiority or matched-boundary conclusion follows without reconstructing plant boundaries. Luminous has not reproduced or measured any of these values."
     }
   ],
   "benchmark_targets": [
@@ -3634,6 +4073,83 @@
         "no_flexibility_superiority_claim_without_same_trace_replay": true
       },
       "rationale": "The 2026 flexible Haber-Bosch model reports 10–120% load and 3%/min ramp; a separate year-long fatigue/scheduling model reports 10–100% load at 3%/min, and a three-level dispatch study reports >80% lower modeled reactor cycling. The plasma challenge must therefore match plant-level service across the same renewable profiles and fatigue boundaries before claiming flexibility advantage."
+    },
+    {
+      "target_id": "CO2-DBD-MODEL-GENERALIZATION-001",
+      "lane": "CO2_DBD_MODEL_GENERALIZATION",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "CO2-DBD-ML-358-DATASET-2026"
+      ],
+      "metric_thresholds": {
+        "baseline_best_publication_grouped_cv_r2": 0.791,
+        "target_mean_leave_one_publication_out_r2_min": 0.8,
+        "nominal_prediction_interval_coverage_min": 0.9,
+        "minimum_applicability_domain_coverage_fraction": 0.8,
+        "sealed_prospective_reactor_holdout_required": true
+      },
+      "claim_guards": {
+        "source_paper_grouped_splits_required": true,
+        "leave_one_publication_out_required": true,
+        "leave_one_reactor_configuration_out_required": true,
+        "random_row_split_cannot_support_transfer_claim": true,
+        "prediction_interval_calibration_reported": true,
+        "worst_group_error_and_abstention_reported": true,
+        "no_extrapolation_claim_without_sealed_external_measurements": true,
+        "only_measured_physical_descriptors_may_be_used": true
+      },
+      "rationale": "The 2026 DBD study reports 358 data points, best-fold grouped-CV R2=0.791 and prospective in-domain R2=0.92. The Luminous target is a source-held-out mean R2 >=0.80 with calibrated uncertainty and at least 80% declared applicability coverage. The prospective .92 number is not a cross-reactor baseline."
+    },
+    {
+      "target_id": "CO2-RWGS-ACCEPTED-SYNGAS-PARETO-001",
+      "lane": "CO2_WARM_PLASMA_RWGS",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "CO2-RWGS-GLIDING-ARC-2026",
+        "CO2-DBD-HUMIDIFIED-SYNGAS-EXPERIMENT-2026"
+      ],
+      "metric_thresholds": {
+        "stoichiometric_co2_conversion_min_fraction": 0.68,
+        "stoichiometric_specific_energy_cost_max_kj_per_mol_co": 277,
+        "h2_rich_co2_conversion_min_fraction": 0.93,
+        "h2_rich_co_selectivity_min_fraction": 1,
+        "distinct_operating_points_required": true,
+        "unresolved_source_energy_cost_discrepancy_blocks_ranking": true
+      },
+      "claim_guards": {
+        "full_grid_to_accepted_co_and_syngas_energy_boundary_required": true,
+        "h2_co2_feed_ratio_bound_to_each_point": true,
+        "product_purity_pressure_and_h2_co_contract_required": true,
+        "source_264_vs_277_kj_per_mol_discrepancy_resolved_before_point_ranking": true,
+        "carbon_and_oxygen_balances_closed_independently": true,
+        "matched_thermocatalytic_rwgs_baseline_required": true
+      },
+      "rationale": "The target preserves the reported stoichiometric energy point separately from the H2-rich high-conversion point. A candidate must improve the accepted syngas Pareto frontier under a complete grid-side energy and product boundary; the source's 264/277 value discrepancy is a blocker until resolved."
+    },
+    {
+      "target_id": "CO2-CYCLIC-CARBON-REUSE-DURABILITY-001",
+      "lane": "CO2_CYCLIC_CARBON_UTILIZATION",
+      "status": "RESEARCH_TARGET_NOT_RESULT",
+      "comparator_case_ids": [
+        "CO2-CYCLIC-REFORMING-GASIFICATION-2026",
+        "METHANE-PYROLYSIS-HEATING-REVIEW-2026"
+      ],
+      "metric_thresholds": {
+        "completed_reaction_gasification_cycles_min": 100,
+        "carbon_inventory_closure_min_fraction": 0.95,
+        "useful_syngas_productivity_retention_after_cycles_min_fraction": 0.9,
+        "all_cycles_and_failed_starts_in_denominator": true,
+        "continuous_and_discontinuous_modes_separate": true
+      },
+      "claim_guards": {
+        "grid_side_energy_includes_plasma_power_conversion_and_all_auxiliaries": true,
+        "deposited_carbon_and_gasified_carbon_inventories_tracked_separately": true,
+        "carbon_co_o2_and_residual_streams_species_resolved": true,
+        "no_unqualified_carbon_or_oxygen_coproduct_credit": true,
+        "cycle_durability_must_be_physical_not_simulated": true,
+        "matched_syngas_composition_and_product_contract_required": true
+      },
+      "rationale": "The 2026 cyclic CRG paper demonstrates carbon formation/gasification but uses plasma-deposited power, has distinct modes, and reports only about 0.5 vol% maximum O2 after three passes. This target tests real carbon closure, durability and retained useful syngas over 100 cycles with full grid-side energy accounting."
     }
   ]
 }
