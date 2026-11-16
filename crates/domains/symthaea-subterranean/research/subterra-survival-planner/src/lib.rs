@@ -16,6 +16,9 @@ use std::collections::BTreeSet;
 const PROBABILITY_TOLERANCE: f64 = 1.0e-9;
 const COMPARISON_TOLERANCE: f64 = 1.0e-10;
 const UNKNOWN_HYPOTHESIS_ID: &str = "unknown";
+const MAX_HORIZON_STEPS: usize = 16;
+const MAX_ACTIONS: usize = 32;
+const MAX_OUTCOMES_PER_ACTION: usize = 16;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Hypothesis {
@@ -504,11 +507,16 @@ fn validate_problem(
         return Err(PlanningError::NoMissionDecisions);
     }
     if config.horizon_steps == 0
+        || config.horizon_steps > MAX_HORIZON_STEPS
         || config.maximum_search_nodes == 0
         || config.maximum_actions == 0
+        || config.maximum_actions > MAX_ACTIONS
         || config.maximum_outcomes_per_action == 0
+        || config.maximum_outcomes_per_action > MAX_OUTCOMES_PER_ACTION
     {
-        return Err(PlanningError::InvalidPlannerLimit("all planner limits must be positive"));
+        return Err(PlanningError::InvalidPlannerLimit(
+            "planner limits are outside the supported bounded envelope",
+        ));
     }
     if problem.actions.len() > config.maximum_actions {
         return Err(PlanningError::InvalidPlannerLimit("maximum action count exceeded"));
