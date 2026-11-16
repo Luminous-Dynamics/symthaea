@@ -2830,7 +2830,7 @@ mod tests {
         let mut case = frozen_case("CO2-DBD-ML-358-DATASET-2026");
         case["comparison_status"] = serde_json::json!("CROSS_REACTOR_VALIDATED");
         let error = validate_co2_dbd_ml_case(&case, "co2-dbd.json").unwrap_err();
-        assert!(error.to_string().contains("domain-limited"));
+        assert!(error.to_string().contains("claim ceiling"));
     }
 
     #[test]
@@ -4466,7 +4466,7 @@ mod tests {
         source["benchmark_targets"][0]["metric_thresholds"]["completed_reaction_gasification_cycles_min"] =
             serde_json::json!(50);
         let error = audit_source_value(&source, "co2-crg-target.json").unwrap_err();
-        assert!(error.to_string().contains("completed_reaction_gasification_cycles_min"));
+        assert!(error.to_string().contains("at least 100 complete cycles"));
     }
 
     #[test]
