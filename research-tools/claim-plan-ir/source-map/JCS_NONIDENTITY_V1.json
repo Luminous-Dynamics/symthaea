@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "profile_id": "luminous.cpir.source-map.v1",
+  "vector_id": "jcs-nonidentity-node-origin-001",
+  "source_file": "fixtures/jcs_nonidentity_source_001.raw.json",
+  "source_sha256": "70d8af48dec853013316c7f1c88d0f6e1b89f3035842b2f26d328b16a83ca22e",
+  "source_byte_length": 22,
+  "canonical_file": "fixtures/jcs_nonidentity_canonical_001.raw.json",
+  "canonical_sha256": "4731f8b2b0b833d05c665d5dba3e2e436917ba05656a89099398146ec9cdf892",
+  "canonical_byte_length": 21,
+  "node_map_file": "fixtures/jcs_nonidentity_node_origin_map_001.json",
+  "node_map_sha256": "e0d71f0ccc50d289c1c22b100fcb924ebcfe00c4a0c2b643e7e6fd09cd35b12e",
+  "json_pointer": "/name",
+  "source_coordinate_space": "json_source_utf8_bytes",
+  "source_start": 8,
+  "source_end": 11,
+  "canonical_coordinate_space": "jcs_canonical_json_bytes",
+  "canonical_start": 17,
+  "canonical_end": 20,
+  "expected_raw_token": "\"A\"",
+  "raw_token_sha256": "798640599597df7a8daa32b1132f07850a68b5e71bd295650399a38074f52804",
+  "expected_canonical_json": "{\"age\":30,\"name\":\"A\"}",
+  "negative_controls": [
+    "wrong_source_span",
+    "wrong_canonical_span",
+    "wrong_pointer",
+    "wrong_source_digest",
+    "wrong_canonical_digest",
+    "wrong_raw_token_digest",
+    "ambiguous_node_origin",
+    "wrong_node_identity"
+  ]
+}
