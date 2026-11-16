@@ -549,10 +549,7 @@ fn score_trace(
         if unsupported_compromise_claim {
             unsupported_compromise_claim_count += 1;
         }
-        let critical_unsupported = claim.critical
-            && ["before", "after", "concurrent", "compromised"]
-                .contains(&claim.claimed_relation.as_str())
-            && !correct;
+        let critical_unsupported = claim.critical && !correct;
         if critical_unsupported {
             critical_unsupported_claim_count += 1;
         }
@@ -950,6 +947,23 @@ mod tests {
         }).expect("A/B pair");
         assert!(pair.unsupported_compromise_claim);
         assert_eq!(scored.unsupported_compromise_claim_count, 1);
+    }
+
+    #[test]
+    fn critical_abstention_on_an_entailed_relation_is_a_critical_failure() {
+        let mut value = fixture_value();
+        let t = value["candidate_traces"].as_array_mut().expect("traces")
+            .iter_mut().find(|trace| trace["trace_id"] == "world-consistent-agent")
+            .expect("trace");
+        let claim = t["relation_claims"].as_array_mut().expect("claims")
+            .iter_mut().find(|claim| claim["left_event_id"] == "E" && claim["right_event_id"] == "F")
+            .expect("E/F claim");
+        claim["claimed_relation"] = json!("underdetermined");
+        claim["critical"] = json!(true);
+        let report = report_for(&value);
+        let scored = trace(&report, "world-consistent-agent");
+        assert_eq!(scored.unnecessary_abstention_count, 1);
+        assert_eq!(scored.critical_unsupported_claim_count, 1);
     }
 
     #[test]
