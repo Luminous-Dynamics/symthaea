@@ -117,8 +117,7 @@ fn binary_entropy_bits(probability: f64) -> f64 {
     if probability == 0.0 || probability == 1.0 {
         return 0.0;
     }
-    -probability * probability.log2()
-        - (1.0 - probability) * (1.0 - probability).log2()
+    -probability * probability.log2() - (1.0 - probability) * (1.0 - probability).log2()
 }
 
 #[derive(Clone, Copy)]
@@ -157,9 +156,7 @@ fn candidate_policy_history(policy: SamplingPolicy) -> Vec<CandidateObservation>
     ]
 }
 
-fn realized_reference_diagnosis(
-    probe: Option<&CandidateObservation>,
-) -> Option<bool> {
+fn realized_reference_diagnosis(probe: Option<&CandidateObservation>) -> Option<bool> {
     let probe = probe?;
     if probe.modality != "independent-reference-thermal"
         || probe.sampling_policy_id != "authorized-reference-probe-v1"
@@ -190,7 +187,9 @@ fn passive_observations_cannot_identify_opposite_physical_mechanisms() {
     assert_eq!(passive_posterior, 0.5);
     assert_eq!(passive_eig, 0.0);
     assert!(is_critical(physically_hot.physical_temperature));
-    assert!(!is_critical(physically_cool_sensor_offset.physical_temperature));
+    assert!(!is_critical(
+        physically_cool_sensor_offset.physical_temperature
+    ));
 
     // The evaluator knows the worlds differ; the candidate-visible histories
     // do not. No model-identification claim is justified from this stream.
@@ -220,14 +219,15 @@ fn independent_reference_probe_has_positive_decision_value() {
     // The reference probe reveals which of the two mechanisms generated the
     // passive stream. The oracle then selects the correct action in either
     // world, yielding zero terminal decision loss.
-    let post_probe_risk = 0.5 * decision_loss(
-        optimal_decision(is_critical(hot_probe.value.unwrap())),
-        is_critical(physically_hot.physical_temperature),
-    ) + 0.5
-        * decision_loss(
-            optimal_decision(is_critical(cool_probe.value.unwrap())),
-            is_critical(physically_cool_sensor_offset.physical_temperature),
-        );
+    let post_probe_risk =
+        0.5 * decision_loss(
+            optimal_decision(is_critical(hot_probe.value.unwrap())),
+            is_critical(physically_hot.physical_temperature),
+        ) + 0.5
+            * decision_loss(
+                optimal_decision(is_critical(cool_probe.value.unwrap())),
+                is_critical(physically_cool_sensor_offset.physical_temperature),
+            );
 
     let evsi = prior_risk - post_probe_risk;
     assert!((evsi - 1.0).abs() < 1e-12);
@@ -256,10 +256,7 @@ fn mask_only_policy_information_has_zero_value_for_unchanged_decision() {
     assert_eq!(regular[0].value, sparse[0].value);
     assert_eq!(regular[1].value, Some(1.0));
     assert_eq!(sparse[1].value, None);
-    assert_eq!(
-        sparse[1].missingness,
-        Some(MissingnessReason::NotScheduled)
-    );
+    assert_eq!(sparse[1].missingness, Some(MissingnessReason::NotScheduled));
 
     // The two candidate views identify the sampling policy perfectly (one bit),
     // but both possible physical states are safely below the decision threshold.
