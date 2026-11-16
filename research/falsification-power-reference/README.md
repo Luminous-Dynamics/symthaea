@@ -110,3 +110,20 @@ The gaussian_terminal_induction module derives an anytime-valid randomized test 
 For a deterministic design with H0 residuals Normal(0, sigma_t^2) and H1 residuals Normal(d_t, sigma_t^2), the induced prefix value is the null-conditional probability that the fixed terminal NP test rejects. It is a [0,1]-valued test value, not a p-value. At any bounded stopping time, an independent uniform randomizer U and the rule U < phi_tau preserve the terminal test's level; at the planned horizon the process equals the original terminal test exactly.
 
 This v0 requires all future d_t and sigma_t to be frozen before observations. It is not the adaptive Gaussian e-process in the sequential module, does not cover unknown variance or composite nulls, and does not automatically transfer to physical trajectories. See docs/research/GAUSSIAN_TERMINAL_TEST_INDUCTION_V0_2026-11-16.md.
+
+
+## Paired Gaussian terminal-test method comparison
+
+The standalone binary gaussian_terminal_induction_calibration runs the fixed-design comparator:
+
+    cargo run --locked --manifest-path research/falsification-power-reference/Cargo.toml --bin gaussian_terminal_induction_calibration
+
+For the same generated outcome path it compares:
+- the fixed-horizon Neyman–Pearson terminal test;
+- the induced conditional-rejection test with an early-stop threshold and independent randomization at the stopping time;
+- the Gaussian e-process Ville-boundary crossing rule;
+- naive repeated fixed-time z tests as an invalid optional-stopping control.
+
+It reports null/alternative rejection rates with Wilson intervals, mean stopping look, e-process crossing delay, the analytically computed terminal NP power and a terminal-equivalence mismatch count. The binary uses separate deterministic observation and randomizer streams; its PRNG is for simulation only.
+
+This campaign is restricted to one frozen simple Gaussian design. It is not a general adaptive-discovery benchmark or physical validation.
