@@ -48,6 +48,9 @@ pub struct ValidationAssessmentProfile {
     pub minimum_holdout_count: usize,
     pub minimum_distinct_facilities: usize,
     pub minimum_distinct_operating_points: usize,
+    /// Categorical slices frozen before the holdout is unsealed.
+    pub slice_dimensions: Vec<ValidationSliceDimension>,
+    pub minimum_per_slice_count: usize,
     pub observables: Vec<ObservableValidationSpec>,
 }
 
@@ -129,6 +132,9 @@ pub enum ValidationAssessmentErrorKind {
     ZeroMinimumFacilityCount,
     ZeroMinimumOperatingPointCount,
     EmptyObservableSet,
+    EmptySliceDimensions,
+    DuplicateSliceDimension,
+    ZeroMinimumPerSliceCount,
     DuplicateObservableSpec,
     InvalidObservableIdentity,
     InvalidObservableUnit,
@@ -209,6 +215,8 @@ pub struct PerCaseValidationResult {
     pub facility_id: String,
     pub case_id: String,
     pub operating_point_id: String,
+    pub regime_id: String,
+    pub geometry_sha256: String,
     pub model_run_id: String,
     pub observable_id: String,
     pub measured_value: f64,
@@ -250,6 +258,68 @@ pub struct PerObservableValidationMetrics {
     pub meets_declared_acceptance: bool,
 }
 
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub enum ValidationSliceDimension {
+    Facility,
+    Case,
+    OperatingPoint,
+    Regime,
+    Geometry,
+}
+
+impl ValidationSliceDimension {
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Facility => "facility",
+            Self::Case => "case",
+            Self::OperatingPoint => "operating-point",
+            Self::Regime => "regime",
+            Self::Geometry => "geometry",
+        }
+    }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd)]
+pub struct ValidationSliceKey {
+    pub dimension: ValidationSliceDimension,
+    pub value: String,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum ValidationSliceDisposition {
+    MeetsDeclaredAcceptance,
+    OutsideDeclaredAcceptance,
+    InsufficientSliceEvidence,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum WorstSliceCriterion {
+    NormalizedRmse,
+    AbsoluteNormalizedBias,
+    MaximumNormalizedAbsoluteError,
+    EmpiricalPointIntervalCoverage,
+    MeanNormalizedIntervalWidth,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PerSliceValidationMetrics {
+    pub key: ValidationSliceKey,
+    pub observable_id: String,
+    pub sample_count: usize,
+    pub metrics: PerObservableValidationMetrics,
+    pub disposition: ValidationSliceDisposition,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct WorstSliceFinding {
+    pub observable_id: String,
+    pub criterion: WorstSliceCriterion,
+    pub extreme_value: f64,
+    /// All exact ties, sorted by dimension then categorical value.
+    pub slice_keys: Vec<ValidationSliceKey>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ValidationAssessmentReport {
     pub contract_version: &'static str,
@@ -267,6 +337,9 @@ pub struct ValidationAssessmentReport {
     pub calibration_episode_count: usize,
     pub admitted_holdout_record_ids: Vec<String>,
     pub per_observable_metrics: Vec<PerObservableValidationMetrics>,
+    pub slice_disposition: ValidationSliceDisposition,
+    pub per_slice_metrics: Vec<PerSliceValidationMetrics>,
+    pub worst_slice_findings: Vec<WorstSliceFinding>,
     pub per_case_results: Vec<PerCaseValidationResult>,
     pub unseal_receipt_refs: Vec<String>,
     pub model_run_receipt_refs: Vec<String>,
@@ -1154,6 +1227,8 @@ fn validate_case_observables(
                 facility_id: observation.facility_id.clone(),
                 case_id: observation.case_id.clone(),
                 operating_point_id: observation.operating_point_id.clone(),
+                regime_id: observation.regime_id.clone(),
+                geometry_sha256: observation.geometry_sha256.clone(),
                 model_run_id: case.model_run.run_id.clone(),
                 observable_id: spec.observable_id.clone(),
                 measured_value: measured.measured_value,
@@ -1223,6 +1298,11 @@ mod tests {
             minimum_holdout_count: 3,
             minimum_distinct_facilities: 2,
             minimum_distinct_operating_points: 3,
+            slice_dimensions: vec![
+                ValidationSliceDimension::Facility,
+                ValidationSliceDimension::OperatingPoint,
+            ],
+            minimum_per_slice_count: 1,
             observables: vec![ObservableValidationSpec {
                 observable_id: "net-heat-flux".to_string(),
                 unit_ref: "MW/m2".to_string(),
