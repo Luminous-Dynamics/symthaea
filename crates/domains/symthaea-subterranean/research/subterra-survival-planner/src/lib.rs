@@ -335,14 +335,6 @@ impl ExpectedResources {
         Ok(result)
     }
 
-    fn as_cost(self) -> ResourceCost {
-        ResourceCost {
-            energy_j: self.energy_j,
-            duration_s: self.duration_s,
-            data_bytes: self.data_bytes,
-            exposure_units: self.exposure_units,
-        }
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
