@@ -50,9 +50,9 @@
     "breach_index_key": [
       "source_identity",
       "event_time_us",
-      "recorded_at_us"
+      "nested_recorded_at_us"
     ],
-    "known_at_behavior": "future_receipts_excluded_by_ordered_index_range_before_candidate_visit"
+    "known_at_behavior": "each_event_time_bucket_range_is_cut_off_at_known_at"
   },
   "arrival": {
     "event_time_less_than_prior_watermark": "late_breach",
@@ -226,7 +226,8 @@
       "indexed_vs_audited_report_mismatch_count",
       "indexed_query_p50_p95_p99_us",
       "verified_query_p50_p95_p99_us",
-      "future_known_breach_candidates_pruned"
+      "future_known_breach_candidates_pruned",
+      "late_breach_index_buckets_examined"
     ]
   },
   "qualification_targets": {
@@ -259,7 +260,8 @@
     "interval_width_us": 16,
     "event_time_order": "deterministic_permutation_relative_to_arrival_order",
     "outputs": [
-      "indexed_candidates_examined",
+      "indexed_event_time_buckets_visited",
+      "indexed_receipt_candidates_examined",
       "matching_breaches",
       "indexed_p50_p95_p99_us",
       "verified_p50_p95_p99_us"
