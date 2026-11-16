@@ -305,7 +305,9 @@ pub struct SourceWatermarkLedger {
     event_arrivals: Vec<EventArrivalReceipt>,
     seen_event_ids: BTreeSet<u64>,
     late_breaches: Vec<LateEventBreach>,
-    late_breaches_by_source_event_time: BTreeMap<(SourceKey, i64), Vec<usize>>,
+    /// Secondary index includes knowledge time so historical queries can
+    /// prune future receipts before visiting breach records.
+    late_breaches_by_source_event_time_recorded_at: BTreeMap<(SourceKey, i64, i64), Vec<usize>>,
 }
 
 fn hash_progress_evidence(hasher: &mut Sha256, evidence: SourceProgressEvidence) {
@@ -556,12 +558,15 @@ impl SourceWatermarkLedger {
         // visibility is still filtered by transaction/knowledge time.
         let mut late_breaches = Vec::new();
         let mut late_breach_candidates_examined = 0usize;
+        let inclusive_event_time_end = interval_end_exclusive_us
+            .checked_sub(1)
+            .ok_or(WatermarkError::ArithmeticOverflow)?;
         for source in &unique {
-            let start = (*source, interval_start_us);
-            let end = (*source, interval_end_exclusive_us);
+            let start = (*source, interval_start_us, i64::MIN);
+            let end = (*source, inclusive_event_time_end, known_at_us);
             for indices in self
-                .late_breaches_by_source_event_time
-                .range(start..end)
+                .late_breaches_by_source_event_time_recorded_at
+                .range(start..=end)
                 .map(|(_, indices)| indices)
             {
                 for index in indices {
@@ -572,9 +577,7 @@ impl SourceWatermarkLedger {
                         .late_breaches
                         .get(*index)
                         .ok_or(WatermarkError::InvalidHistory)?;
-                    if breach.recorded_at_us <= known_at_us {
-                        late_breaches.push(*breach);
-                    }
+                    late_breaches.push(*breach);
                 }
             }
         }
@@ -730,8 +733,8 @@ impl SourceWatermarkLedger {
                 recorded_at_us,
                 kind,
             });
-            self.late_breaches_by_source_event_time
-                .entry((source, event.event_time_us))
+            self.late_breaches_by_source_event_time_recorded_at
+                .entry((source, event.event_time_us, recorded_at_us))
                 .or_default()
                 .push(index);
         }
@@ -1066,6 +1069,43 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn historical_range_index_prunes_future_known_late_receipts_before_visit() {
+        let mut ledger = SourceWatermarkLedger::default();
+        ledger
+            .append(progress(1, 1, 1, 1, 10, 100, false))
+            .unwrap();
+        ledger
+            .record_event_arrival(event(1, 1, 50, 20), 20)
+            .unwrap();
+        ledger
+            .record_event_arrival(event(2, 1, 50, 20), 30)
+            .unwrap();
+        ledger
+            .record_event_arrival(event(3, 1, 50, 20), 40)
+            .unwrap();
+
+        let before_first = ledger
+            .completeness(1, &[source(1)], 0, 100, 15)
+            .unwrap();
+        assert_eq!(before_first.verdict, CompletenessVerdict::Complete);
+        assert!(before_first.late_breaches.is_empty());
+        assert_eq!(before_first.late_breach_candidates_examined, 0);
+
+        let as_known_first = ledger
+            .completeness(1, &[source(1)], 0, 100, 20)
+            .unwrap();
+        assert_eq!(as_known_first.late_breaches.len(), 1);
+        assert_eq!(as_known_first.late_breach_candidates_examined, 1);
+
+        let as_known_all = ledger
+            .completeness(1, &[source(1)], 0, 100, 40)
+            .unwrap();
+        assert_eq!(as_known_all.late_breaches.len(), 3);
+        assert_eq!(as_known_all.late_breach_candidates_examined, 3);
+        assert_eq!(ledger.verify_consistency(), Ok(()));
     }
 
     #[test]
