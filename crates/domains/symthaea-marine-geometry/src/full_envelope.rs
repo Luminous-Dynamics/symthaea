@@ -1320,7 +1320,11 @@ mod tests {
         spec.boundary_semantics.exterior_shell = ExteriorShellSemantics::ExplicitBoundaryLoops;
         spec.boundary_semantics.openings.push(OpeningBoundary {
             opening_id: "UNMODELED-OPENING".into(),
-            boundary_point_refs: vec!["A".into(), "B".into(), "C".into()],
+            boundary_point_refs: vec![
+                "BOW-KEEL".into(),
+                "BOW-WL-S".into(),
+                "BOW-SHEER-S".into(),
+            ],
             status: OpeningStatus::UnsupportedRequiresReview,
         });
         let report = validate_full_envelope_spec(&spec);
@@ -1379,6 +1383,62 @@ mod tests {
     fn unknown_component_and_profile_fields_are_not_accepted() {
         let mut value = serde_json::to_value(box_fixture()).unwrap();
         value["unexpected"] = serde_json::json!(true);
+        assert!(serde_json::from_value::<FullEnvelopeSpec>(value).is_err());
+    }
+
+
+    #[test]
+    fn pointed_bow_deck_may_collapse_to_one_centreplane_point() {
+        let mut spec = box_fixture();
+        spec.end_conditions.bow = HullEndCondition::PointedStem;
+        for point in &mut spec.stations[0].starboard_profile {
+            point.y_m = 0.0;
+        }
+        spec.deck_surface.sections[0].points = vec![DeckPoint {
+            point_id: "BOW-SHEER-S".into(),
+            y_m: 0.0,
+            z_m: -4.0,
+            role: DeckPointRole::DeckCrown,
+        }];
+        let report = validate_full_envelope_spec(&spec);
+        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert!(report.issues.is_empty());
+    }
+
+    #[test]
+    fn opening_boundary_point_references_must_resolve() {
+        let mut spec = box_fixture();
+        spec.boundary_semantics.exterior_shell = ExteriorShellSemantics::ExplicitBoundaryLoops;
+        spec.boundary_semantics.openings.push(OpeningBoundary {
+            opening_id: "HATCH-001".into(),
+            boundary_point_refs: vec!["UNKNOWN-A".into(), "UNKNOWN-B".into(), "UNKNOWN-C".into()],
+            status: OpeningStatus::Supported,
+        });
+        assert_rejected(&spec, "opening_boundary_point_reference");
+    }
+
+    #[test]
+    fn empty_profile_is_rejected_without_panicking() {
+        let mut spec = box_fixture();
+        spec.stations[0].starboard_profile.clear();
+        let report = validate_full_envelope_spec(&spec);
+        assert_eq!(report.disposition, FullEnvelopeDisposition::Rejected);
+        assert!(report.issues.iter().any(|item| item.code == "profile_point_count"));
+    }
+
+    #[test]
+    fn unsupported_profile_segment_is_incomplete_not_valid() {
+        let mut spec = box_fixture();
+        spec.stations[0].starboard_profile[0].region_to_next = ProfileRegion::Unsupported;
+        let report = validate_full_envelope_spec(&spec);
+        assert_eq!(report.disposition, FullEnvelopeDisposition::Incomplete);
+        assert!(report.issues.iter().any(|item| item.code == "unsupported_profile_region"));
+    }
+
+    #[test]
+    fn schema_deserializer_rejects_unknown_nested_fields() {
+        let mut value = serde_json::to_value(box_fixture()).unwrap();
+        value["stations"][0]["starboard_profile"][0]["mystery"] = serde_json::json!(9);
         assert!(serde_json::from_value::<FullEnvelopeSpec>(value).is_err());
     }
 
