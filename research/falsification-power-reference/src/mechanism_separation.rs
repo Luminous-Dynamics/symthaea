@@ -669,10 +669,7 @@ mod tests {
     #[test]
     fn action_space_aliases_remain_one_equivalence_class() {
         let report = compute_identifiability_envelope(
-            vec![
-                action("x", 0.1, 1.0),
-                action("y", 0.2, 1.0),
-            ],
+            vec![action("x", 0.1, 1.0), action("y", 0.2, 1.0)],
             vec![
                 mechanism("m-a", &[1.0, 2.0]),
                 mechanism("m-b", &[1.0, 2.0]),
@@ -724,10 +721,7 @@ mod tests {
             6,
         )
         .unwrap();
-        assert_eq!(
-            report.disposition,
-            SeparationDisposition::BudgetInsufficient
-        );
+        assert_eq!(report.disposition, SeparationDisposition::BudgetInsufficient);
         assert_eq!(report.equivalence_class_count, 2);
         assert_eq!(report.total_observations, 6);
         assert!(report.worst_pair.unwrap().power < 0.80);
@@ -797,10 +791,7 @@ mod tests {
     #[test]
     fn joint_schedule_separates_multiple_classes_that_no_single_action_can_resolve() {
         let report = compute_identifiability_envelope(
-            vec![
-                action("first", 0.5, 1.0),
-                action("second", 0.5, 1.0),
-            ],
+            vec![action("first", 0.5, 1.0), action("second", 0.5, 1.0)],
             vec![
                 mechanism("a", &[0.0, 0.0]),
                 mechanism("b", &[1.0, 0.0]),
@@ -869,10 +860,7 @@ mod tests {
     #[test]
     fn report_is_invariant_to_input_order() {
         let first = compute_identifiability_envelope(
-            vec![
-                action("b", 0.5, 2.0),
-                action("a", 1.0, 1.0),
-            ],
+            vec![action("b", 0.5, 2.0), action("a", 1.0, 1.0)],
             vec![
                 mechanism("z", &[1.0, 2.0]),
                 mechanism("b", &[0.0, 0.0]),
@@ -884,10 +872,7 @@ mod tests {
         )
         .unwrap();
         let replay = compute_identifiability_envelope(
-            vec![
-                action("a", 1.0, 1.0),
-                action("b", 0.5, 2.0),
-            ],
+            vec![action("a", 1.0, 1.0), action("b", 0.5, 2.0)],
             vec![
                 mechanism("a", &[0.0, 0.0]),
                 mechanism("z", &[2.0, 1.0]),
