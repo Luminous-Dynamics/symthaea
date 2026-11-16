@@ -39,21 +39,24 @@ The current version evaluates one measurement and its two finite outcomes. Proba
 
 ## Adaptive depth-two extension
 
-The crate now includes an exact two-stage policy-tree evaluator in `sequential.rs`. It enumerates each admissible first measurement, updates the posterior for each non-zero-probability outcome, then chooses a second test or stops on that observed branch. It never sees a hidden scenario label or a future test outcome.
+The crate includes an exact two-stage policy-tree evaluator in `sequential.rs`. It enumerates each admissible first measurement, updates the posterior for each non-zero-probability outcome, then chooses a second test or stops on that observed branch. It never sees a hidden scenario label or a future test outcome.
 
 Frozen pump/valve result with a measurement budget of 4.0 synthetic cost units:
 
 - No-test baseline expected loss: 11.4.
-- Greedy one-step net-VoI selects the independent process-safety test; expected total loss including cost: 9.77.
-- Exact depth-two policy selects the calibration reference artifact first. After a positive result it stops and chooses recalibrate/retest; after a negative result it conducts the independent process-safety test.
+- Greedy one-step net-VoI chooses the independent process-safety test; expected total loss including cost: 9.77.
+- Exact depth-two policy chooses the calibration reference artifact first. After a positive result it stops and chooses recalibrate/retest; after a negative result it conducts the independent process-safety test.
 - Adaptive depth-two expected terminal decision loss: 4.248.
 - Expected measurement cost: 2.35 (first test cost 1.0 plus second test cost 2.0 on the 0.675-probability negative branch).
-- Expected total loss: 6.598.
-- Worst-case path total loss in the two-branch policy: 7.204444.
+- Expected total loss: 6.598, an expected improvement of 4.802 over no-test.
+- **Worst-case leaf total loss: 15.0**, a worst-case excess of 3.6 over the no-test baseline.
 
-These values are finite-model outputs in dimensionless synthetic units. They demonstrate the value of adaptive sequencing relative to a greedy one-step policy on this constructed fixture; they are not real diagnostic performance, cost savings or safety advice.
+The negative calibration branch has a 0.207778 probability of a positive process-safety test, leading to STOP_AND_QUARANTINE and a 15.0-unit path loss. Its 0.792222 negative branch leads to CONTINUE with a 5.159888-unit path loss. The positive calibration branch stops early at a 5.338462-unit path loss.
 
-The depth-two evaluator assumes conditional independence between different evidence origins given the supplied hypotheses. It blocks reuse of the same measurement ID and same evidence origin, charges first and branch-specific second-test costs once, respects a total path budget, and abstains from zero-probability branches. Cross-origin correlated measurement models, timing/downtime, likelihood uncertainty and high-consequence robust constraints remain future work.
+This is an important counterexample to optimizing expected VoI alone: the adaptive policy improves mean loss but has a worst path worse than taking no test. The v0.1 policy is an exact expected-loss optimizer over the bounded two-stage tree, **not a risk-safe recommendation**. A real industrial policy needs additional hard constraints, risk budgets or minimax/CVaR-style evaluation for rare high-consequence outcomes before any test or operating action is proposed.
+
+The depth-two evaluator assumes conditional independence between different evidence origins given the supplied hypotheses. It blocks reuse of the same measurement ID and evidence origin, charges first and branch-specific second-test costs once, respects a total path budget, and abstains from zero-probability branches. Cross-origin correlated measurement models, likelihood uncertainty, test duration/downtime and robust high-consequence constraints remain future work.
+
 
 ## Metrics
 
