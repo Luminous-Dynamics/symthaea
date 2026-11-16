@@ -167,3 +167,15 @@ The standalone binary `gaussian_terminal_multiseed_calibration` repeats the froz
 It preserves every seed, emits per-seed and pooled terminal NP rates/Wilson intervals, all three induced stopping thresholds (0.75, 0.90, 0.99), randomized rejection rates, early-stop rates, mean stopping looks and zero-mismatch counts. The same observation path is used within each method comparison; each threshold uses a separate randomizer stream.
 
 The workflow checks 100,000 pooled paths per scenario, the five-seed inventory, Wilson interval consistency, null operating characteristics, alternative analytic-power proximity and the monotone early-stop-cost relationship. This is a numerical stability diagnostic for one frozen synthetic Gaussian design only. See `docs/research/GAUSSIAN_TERMINAL_MULTISEED_CALIBRATION_V0_2026-11-16.md`.
+
+
+### Exact-head multi-seed stability result (2026-11-16)
+
+Exact head `eadfdca561b50fda49ba5f61591e08071aaf9b04` passed format, all-target tests, both existing calibration campaigns, the five-seed campaign, all artifact uploads and strict Clippy. The new campaign produced:
+- pooled null terminal NP rejection: 5.026% (Wilson95 4.892–5.163%);
+- pooled alternative terminal NP rejection: 79.476% (Wilson95 79.225–79.725%) against analytic power 79.241%;
+- 0.75 / 0.90 / 0.99 stopped-test alternative rejection: 65.477% / 74.723% / 79.104%;
+- corresponding early-stop rates: 79.246% / 75.714% / 70.680%;
+- zero terminal-induced mismatches across 200,000 paths.
+
+The five-seed output retains every per-seed record and is source/report-digest bound. This remains a fixed Gaussian simulation calibration, not a general sequential-test or physical-validation claim. Details and digests are in `docs/research/GAUSSIAN_TERMINAL_MULTISEED_CALIBRATION_V0_2026-11-16.md` and workflow https://github.com/Luminous-Dynamics/symthaea/actions/runs/43849094332.
