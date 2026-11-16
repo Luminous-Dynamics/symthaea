@@ -582,8 +582,11 @@ pub fn assess_blind_holdout_campaign(
         PredictiveAssessmentDisposition::WithinDeclaredAcceptance
     };
 
-    let mut admitted_holdout_record_ids: Vec<String> =
-        campaign.cases.iter().map(|case| case.plan.blind_holdout.observation.record_id.clone()).collect();
+    let mut admitted_holdout_record_ids: Vec<String> = campaign
+        .cases
+        .iter()
+        .map(|case| case.plan.blind_holdout.observation.record_id.clone())
+        .collect();
     admitted_holdout_record_ids.sort();
 
     Ok(ValidationAssessmentReport {
@@ -617,81 +620,191 @@ pub fn assess_blind_holdout_campaign(
     })
 }
 
-fn validate_profile(
-    profile: &ValidationAssessmentProfile,
-) -> Vec<ValidationAssessmentError> {
+fn validate_profile(profile: &ValidationAssessmentProfile) -> Vec<ValidationAssessmentError> {
     let mut errors = Vec::new();
     if profile.profile_id.trim().is_empty() {
-        push_error(&mut errors, ValidationAssessmentErrorKind::EmptyProfileIdentity, None, None);
+        push_error(
+            &mut errors,
+            ValidationAssessmentErrorKind::EmptyProfileIdentity,
+            None,
+            None,
+        );
     }
     if !is_sha256(&profile.profile_sha256) {
-        push_error(&mut errors, ValidationAssessmentErrorKind::InvalidProfileDigest, None, None);
+        push_error(
+            &mut errors,
+            ValidationAssessmentErrorKind::InvalidProfileDigest,
+            None,
+            None,
+        );
     }
     if profile.domain_id.trim().is_empty() {
-        push_error(&mut errors, ValidationAssessmentErrorKind::EmptyDomainIdentity, None, None);
+        push_error(
+            &mut errors,
+            ValidationAssessmentErrorKind::EmptyDomainIdentity,
+            None,
+            None,
+        );
     }
     if profile.model_revision.trim().is_empty() {
-        push_error(&mut errors, ValidationAssessmentErrorKind::EmptyModelRevision, None, None);
+        push_error(
+            &mut errors,
+            ValidationAssessmentErrorKind::EmptyModelRevision,
+            None,
+            None,
+        );
     }
     if profile.regime_id.trim().is_empty() {
-        push_error(&mut errors, ValidationAssessmentErrorKind::EmptyDomainIdentity, None, None);
+        push_error(
+            &mut errors,
+            ValidationAssessmentErrorKind::EmptyDomainIdentity,
+            None,
+            None,
+        );
     }
     if profile.minimum_holdout_count == 0 {
-        push_error(&mut errors, ValidationAssessmentErrorKind::ZeroMinimumHoldoutCount, None, None);
+        push_error(
+            &mut errors,
+            ValidationAssessmentErrorKind::ZeroMinimumHoldoutCount,
+            None,
+            None,
+        );
     }
     if profile.minimum_distinct_facilities == 0 {
-        push_error(&mut errors, ValidationAssessmentErrorKind::ZeroMinimumFacilityCount, None, None);
+        push_error(
+            &mut errors,
+            ValidationAssessmentErrorKind::ZeroMinimumFacilityCount,
+            None,
+            None,
+        );
     }
     if profile.minimum_distinct_operating_points == 0 {
-        push_error(&mut errors, ValidationAssessmentErrorKind::ZeroMinimumOperatingPointCount, None, None);
+        push_error(
+            &mut errors,
+            ValidationAssessmentErrorKind::ZeroMinimumOperatingPointCount,
+            None,
+            None,
+        );
     }
     if profile.observables.is_empty() {
-        push_error(&mut errors, ValidationAssessmentErrorKind::EmptyObservableSet, None, None);
+        push_error(
+            &mut errors,
+            ValidationAssessmentErrorKind::EmptyObservableSet,
+            None,
+            None,
+        );
     }
 
     let mut seen = BTreeSet::new();
     for spec in &profile.observables {
         let observable = Some(spec.observable_id.clone());
         if spec.observable_id.trim().is_empty() {
-            push_error(&mut errors, ValidationAssessmentErrorKind::InvalidObservableIdentity, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::InvalidObservableIdentity,
+                None,
+                observable.clone(),
+            );
         }
         if !seen.insert(spec.observable_id.clone()) {
-            push_error(&mut errors, ValidationAssessmentErrorKind::DuplicateObservableSpec, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::DuplicateObservableSpec,
+                None,
+                observable.clone(),
+            );
         }
         if spec.unit_ref.trim().is_empty() {
-            push_error(&mut errors, ValidationAssessmentErrorKind::InvalidObservableUnit, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::InvalidObservableUnit,
+                None,
+                observable.clone(),
+            );
         }
         if spec.service_boundary_ref.trim().is_empty() {
-            push_error(&mut errors, ValidationAssessmentErrorKind::InvalidObservableBoundary, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::InvalidObservableBoundary,
+                None,
+                observable.clone(),
+            );
         }
         if spec.averaging_window_ref.trim().is_empty() {
-            push_error(&mut errors, ValidationAssessmentErrorKind::InvalidAveragingWindow, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::InvalidAveragingWindow,
+                None,
+                observable.clone(),
+            );
         }
         if !spec.normalization_scale.is_finite() || spec.normalization_scale <= 0.0 {
-            push_error(&mut errors, ValidationAssessmentErrorKind::InvalidNormalizationScale, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::InvalidNormalizationScale,
+                None,
+                observable.clone(),
+            );
         }
         if !valid_probability(spec.nominal_interval_coverage) {
-            push_error(&mut errors, ValidationAssessmentErrorKind::InvalidNominalCoverage, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::InvalidNominalCoverage,
+                None,
+                observable.clone(),
+            );
         }
         if spec.interval_method_ref.trim().is_empty() {
-            push_error(&mut errors, ValidationAssessmentErrorKind::EmptyIntervalMethod, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::EmptyIntervalMethod,
+                None,
+                observable.clone(),
+            );
         }
         if spec.interval_assumption_ref.trim().is_empty() {
-            push_error(&mut errors, ValidationAssessmentErrorKind::EmptyIntervalAssumption, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::EmptyIntervalAssumption,
+                None,
+                observable.clone(),
+            );
         }
         if !valid_probability(spec.minimum_empirical_point_coverage) {
-            push_error(&mut errors, ValidationAssessmentErrorKind::InvalidMinimumCoverage, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::InvalidMinimumCoverage,
+                None,
+                observable.clone(),
+            );
         }
         if !spec.maximum_normalized_rmse.is_finite() || spec.maximum_normalized_rmse < 0.0 {
-            push_error(&mut errors, ValidationAssessmentErrorKind::InvalidMaximumNormalizedRmse, None, observable.clone());
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::InvalidMaximumNormalizedRmse,
+                None,
+                observable.clone(),
+            );
         }
-        if !spec.maximum_absolute_normalized_bias.is_finite() || spec.maximum_absolute_normalized_bias < 0.0 {
-            push_error(&mut errors, ValidationAssessmentErrorKind::InvalidMaximumNormalizedBias, None, observable.clone());
+        if !spec.maximum_absolute_normalized_bias.is_finite()
+            || spec.maximum_absolute_normalized_bias < 0.0
+        {
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::InvalidMaximumNormalizedBias,
+                None,
+                observable.clone(),
+            );
         }
         if !spec.maximum_mean_normalized_interval_width.is_finite()
             || spec.maximum_mean_normalized_interval_width < 0.0
         {
-            push_error(&mut errors, ValidationAssessmentErrorKind::InvalidMaximumIntervalWidth, None, observable);
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::InvalidMaximumIntervalWidth,
+                None,
+                observable,
+            );
         }
     }
     errors
@@ -724,7 +837,10 @@ fn validate_case_observables(
                 Some(prediction.observable_id.clone()),
             );
         }
-        if predictions.insert(prediction.observable_id.as_str(), prediction).is_some() {
+        if predictions
+            .insert(prediction.observable_id.as_str(), prediction)
+            .is_some()
+        {
             push_error(
                 errors,
                 ValidationAssessmentErrorKind::DuplicatePrediction,
@@ -742,7 +858,10 @@ fn validate_case_observables(
                 Some(measurement.observable_id.clone()),
             );
         }
-        if measurements.insert(measurement.observable_id.as_str(), measurement).is_some() {
+        if measurements
+            .insert(measurement.observable_id.as_str(), measurement)
+            .is_some()
+        {
             push_error(
                 errors,
                 ValidationAssessmentErrorKind::DuplicateMeasurement,
@@ -775,86 +894,220 @@ fn validate_case_observables(
         };
 
         if predicted.model_run_id != case.model_run.run_id {
-            push_error(errors, ValidationAssessmentErrorKind::PredictionRunIdentityMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::PredictionRunIdentityMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if predicted.model_output_sha256 != case.model_run.output_sha256
             || !is_sha256(&predicted.model_output_sha256)
         {
-            push_error(errors, ValidationAssessmentErrorKind::PredictionOutputDigestMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::PredictionOutputDigestMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if predicted.interval_method_ref != spec.interval_method_ref {
-            push_error(errors, ValidationAssessmentErrorKind::PredictionIntervalMethodMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::PredictionIntervalMethodMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if predicted.interval_assumption_ref != spec.interval_assumption_ref {
-            push_error(errors, ValidationAssessmentErrorKind::PredictionIntervalAssumptionMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::PredictionIntervalAssumptionMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if !predicted.predicted_value.is_finite() {
-            push_error(errors, ValidationAssessmentErrorKind::NonFinitePrediction, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::NonFinitePrediction,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if !measured.measured_value.is_finite() {
-            push_error(errors, ValidationAssessmentErrorKind::NonFiniteMeasurement, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::NonFiniteMeasurement,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
-        if !predicted.prediction_interval_lower.is_finite() || !predicted.prediction_interval_upper.is_finite() {
-            push_error(errors, ValidationAssessmentErrorKind::NonFinitePredictionInterval, Some(case_id.clone()), Some(spec.observable_id.clone()));
+        if !predicted.prediction_interval_lower.is_finite()
+            || !predicted.prediction_interval_upper.is_finite()
+        {
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::NonFinitePredictionInterval,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
-        if !measured.measurement_interval_lower.is_finite() || !measured.measurement_interval_upper.is_finite() {
-            push_error(errors, ValidationAssessmentErrorKind::NonFiniteMeasurementInterval, Some(case_id.clone()), Some(spec.observable_id.clone()));
+        if !measured.measurement_interval_lower.is_finite()
+            || !measured.measurement_interval_upper.is_finite()
+        {
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::NonFiniteMeasurementInterval,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if predicted.prediction_interval_lower > predicted.prediction_interval_upper {
-            push_error(errors, ValidationAssessmentErrorKind::InvertedPredictionInterval, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::InvertedPredictionInterval,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if measured.measurement_interval_lower > measured.measurement_interval_upper {
-            push_error(errors, ValidationAssessmentErrorKind::InvertedMeasurementInterval, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::InvertedMeasurementInterval,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if predicted.predicted_value < predicted.prediction_interval_lower
             || predicted.predicted_value > predicted.prediction_interval_upper
         {
-            push_error(errors, ValidationAssessmentErrorKind::PredictionOutsideItsInterval, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::PredictionOutsideItsInterval,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if measured.measured_value < measured.measurement_interval_lower
             || measured.measured_value > measured.measurement_interval_upper
         {
-            push_error(errors, ValidationAssessmentErrorKind::MeasurementOutsideItsInterval, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::MeasurementOutsideItsInterval,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if predicted.unit_ref != spec.unit_ref {
-            push_error(errors, ValidationAssessmentErrorKind::PredictionUnitMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::PredictionUnitMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if measured.unit_ref != spec.unit_ref {
-            push_error(errors, ValidationAssessmentErrorKind::MeasurementUnitMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::MeasurementUnitMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if predicted.service_boundary_ref != spec.service_boundary_ref {
-            push_error(errors, ValidationAssessmentErrorKind::PredictionBoundaryMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::PredictionBoundaryMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if measured.service_boundary_ref != spec.service_boundary_ref {
-            push_error(errors, ValidationAssessmentErrorKind::MeasurementBoundaryMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::MeasurementBoundaryMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if predicted.averaging_window_ref != spec.averaging_window_ref {
-            push_error(errors, ValidationAssessmentErrorKind::PredictionAveragingWindowMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::PredictionAveragingWindowMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if measured.averaging_window_ref != spec.averaging_window_ref {
-            push_error(errors, ValidationAssessmentErrorKind::MeasurementAveragingWindowMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::MeasurementAveragingWindowMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if measured.source_artifact_sha256 != observation.source_artifact_sha256 {
-            push_error(errors, ValidationAssessmentErrorKind::MeasurementArtifactMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::MeasurementArtifactMismatch,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if !is_sha256(&measured.source_artifact_sha256) {
-            push_error(errors, ValidationAssessmentErrorKind::InvalidMeasurementArtifactDigest, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::InvalidMeasurementArtifactDigest,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if predicted.source_locator.trim().is_empty() {
-            push_error(errors, ValidationAssessmentErrorKind::EmptyPredictionLocator, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::EmptyPredictionLocator,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if measured.source_locator.trim().is_empty() {
-            push_error(errors, ValidationAssessmentErrorKind::EmptyMeasurementLocator, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::EmptyMeasurementLocator,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if predicted.evidence_ref.trim().is_empty() {
-            push_error(errors, ValidationAssessmentErrorKind::EmptyPredictionEvidence, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::EmptyPredictionEvidence,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         } else if !prediction_refs.insert(predicted.evidence_ref.clone()) {
-            push_error(errors, ValidationAssessmentErrorKind::DuplicatePredictionEvidence, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::DuplicatePredictionEvidence,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
         if measured.evidence_ref.trim().is_empty() {
-            push_error(errors, ValidationAssessmentErrorKind::EmptyMeasurementEvidence, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::EmptyMeasurementEvidence,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         } else if !measurement_refs.insert(measured.evidence_ref.clone()) {
-            push_error(errors, ValidationAssessmentErrorKind::DuplicateMeasurementEvidence, Some(case_id.clone()), Some(spec.observable_id.clone()));
+            push_error(
+                errors,
+                ValidationAssessmentErrorKind::DuplicateMeasurementEvidence,
+                Some(case_id.clone()),
+                Some(spec.observable_id.clone()),
+            );
         }
 
         if [
@@ -895,7 +1148,7 @@ fn validate_case_observables(
             let absolute_error = signed_error.abs();
             let measurement_interval_overlaps_prediction_interval =
                 measured.measurement_interval_lower <= predicted.prediction_interval_upper
-                && predicted.prediction_interval_lower <= measured.measurement_interval_upper;
+                    && predicted.prediction_interval_lower <= measured.measurement_interval_upper;
             results.push(PerCaseValidationResult {
                 holdout_record_id: case_id.clone(),
                 facility_id: observation.facility_id.clone(),
@@ -911,7 +1164,8 @@ fn validate_case_observables(
                 normalized_absolute_error: absolute_error / spec.normalization_scale,
                 prediction_interval_lower: predicted.prediction_interval_lower,
                 prediction_interval_upper: predicted.prediction_interval_upper,
-                point_inside_prediction_interval: measured.measured_value >= predicted.prediction_interval_lower
+                point_inside_prediction_interval: measured.measured_value
+                    >= predicted.prediction_interval_lower
                     && measured.measured_value <= predicted.prediction_interval_upper,
                 measurement_interval_lower: measured.measurement_interval_lower,
                 measurement_interval_upper: measured.measurement_interval_upper,
@@ -1036,7 +1290,11 @@ mod tests {
         );
         let holdout_observation = observation(
             &holdout_id,
-            if index == 0 { "facility-a" } else { "facility-b" },
+            if index == 0 {
+                "facility-a"
+            } else {
+                "facility-b"
+            },
             &format!("validation-case-{index}"),
             &format!("operating-point-{index}"),
             &format!("validation-dataset-{index}"),
@@ -1190,58 +1448,83 @@ mod tests {
     #[test]
     fn exposed_holdout_is_refused_before_metric_evaluation() {
         let mut source = campaign();
-        source.cases[0].plan.blind_holdout.exposure.used_for_hyperparameter_selection = true;
+        source.cases[0]
+            .plan
+            .blind_holdout
+            .exposure
+            .used_for_hyperparameter_selection = true;
         let errors = assess_blind_holdout_campaign(&source).unwrap_err();
-        assert!(errors.iter().any(|error| {
-            error.kind == ValidationAssessmentErrorKind::HoldoutAdmissionRefused
-        }));
+        assert!(
+            errors.iter().any(|error| {
+                error.kind == ValidationAssessmentErrorKind::HoldoutAdmissionRefused
+            })
+        );
     }
 
     #[test]
     fn holdout_dataset_and_artifact_must_be_unique_across_campaign() {
         let mut source = campaign();
-        source.cases[1].plan.blind_holdout.observation.dataset_id =
-            source.cases[0].plan.blind_holdout.observation.dataset_id.clone();
+        source.cases[1].plan.blind_holdout.observation.dataset_id = source.cases[0]
+            .plan
+            .blind_holdout
+            .observation
+            .dataset_id
+            .clone();
         let errors = assess_blind_holdout_campaign(&source).unwrap_err();
-        assert!(errors.iter().any(|error| {
-            error.kind == ValidationAssessmentErrorKind::DuplicateHoldoutDataset
-        }));
+        assert!(
+            errors.iter().any(|error| {
+                error.kind == ValidationAssessmentErrorKind::DuplicateHoldoutDataset
+            })
+        );
     }
 
     #[test]
     fn holdout_model_revision_must_match_profile_and_run() {
         let mut source = campaign();
         source.cases[0].model_run.model_revision = "stale-model-r16".to_string();
-        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
-            |error| error.kind == ValidationAssessmentErrorKind::HoldoutModelRevisionMismatch
-        ));
+        assert!(
+            assess_blind_holdout_campaign(&source)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.kind
+                    == ValidationAssessmentErrorKind::HoldoutModelRevisionMismatch)
+        );
     }
 
     #[test]
     fn model_run_output_digest_cannot_be_reused_for_another_holdout() {
         let mut source = campaign();
         source.cases[1].model_run.output_sha256 = source.cases[0].model_run.output_sha256.clone();
-        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
-            |error| error.kind == ValidationAssessmentErrorKind::ReusedModelOutputDigest
-        ));
+        assert!(
+            assess_blind_holdout_campaign(&source)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.kind == ValidationAssessmentErrorKind::ReusedModelOutputDigest)
+        );
     }
 
     #[test]
     fn missing_prediction_is_refused_not_imputed() {
         let mut source = campaign();
         source.cases[0].predictions.clear();
-        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
-            |error| error.kind == ValidationAssessmentErrorKind::MissingPrediction
-        ));
+        assert!(
+            assess_blind_holdout_campaign(&source)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.kind == ValidationAssessmentErrorKind::MissingPrediction)
+        );
     }
 
     #[test]
     fn missing_measurement_is_refused_not_imputed() {
         let mut source = campaign();
         source.cases[0].measurements.clear();
-        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
-            |error| error.kind == ValidationAssessmentErrorKind::MissingMeasurement
-        ));
+        assert!(
+            assess_blind_holdout_campaign(&source)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.kind == ValidationAssessmentErrorKind::MissingMeasurement)
+        );
     }
 
     #[test]
@@ -1251,9 +1534,21 @@ mod tests {
         source.cases[1].measurements[0].service_boundary_ref = "wrong-boundary".to_string();
         source.cases[2].predictions[0].averaging_window_ref = "instantaneous".to_string();
         let errors = assess_blind_holdout_campaign(&source).unwrap_err();
-        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::PredictionUnitMismatch));
-        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::MeasurementBoundaryMismatch));
-        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::PredictionAveragingWindowMismatch));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.kind == ValidationAssessmentErrorKind::PredictionUnitMismatch)
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.kind
+                    == ValidationAssessmentErrorKind::MeasurementBoundaryMismatch)
+        );
+        assert!(
+            errors.iter().any(|error| error.kind
+                == ValidationAssessmentErrorKind::PredictionAveragingWindowMismatch)
+        );
     }
 
     #[test]
@@ -1262,17 +1557,27 @@ mod tests {
         source.cases[0].predictions[0].prediction_interval_lower = 120.0;
         source.cases[1].measurements[0].measurement_interval_upper = 100.0;
         let errors = assess_blind_holdout_campaign(&source).unwrap_err();
-        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::InvertedPredictionInterval));
-        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::MeasurementOutsideItsInterval));
+        assert!(
+            errors.iter().any(
+                |error| error.kind == ValidationAssessmentErrorKind::InvertedPredictionInterval
+            )
+        );
+        assert!(errors.iter().any(
+            |error| error.kind == ValidationAssessmentErrorKind::MeasurementOutsideItsInterval
+        ));
     }
 
     #[test]
     fn measurement_payload_digest_must_match_admitted_holdout() {
         let mut source = campaign();
         source.cases[0].measurements[0].source_artifact_sha256 = sha('z');
-        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
-            |error| error.kind == ValidationAssessmentErrorKind::MeasurementArtifactMismatch
-        ));
+        assert!(
+            assess_blind_holdout_campaign(&source)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.kind
+                    == ValidationAssessmentErrorKind::MeasurementArtifactMismatch)
+        );
     }
 
     #[test]
@@ -1280,8 +1585,16 @@ mod tests {
         let mut source = campaign();
         for case in &mut source.cases {
             case.plan.blind_holdout.observation.facility_id = "one-facility".to_string();
-            if !case.plan.domain.allowed_facility_ids.contains(&"one-facility".to_string()) {
-                case.plan.domain.allowed_facility_ids.push("one-facility".to_string());
+            if !case
+                .plan
+                .domain
+                .allowed_facility_ids
+                .contains(&"one-facility".to_string())
+            {
+                case.plan
+                    .domain
+                    .allowed_facility_ids
+                    .push("one-facility".to_string());
             }
         }
         source.profile.minimum_distinct_facilities = 2;
@@ -1300,7 +1613,9 @@ mod tests {
         source.cases[2].measurements[0].measured_value = 110.0;
         let report = assess_blind_holdout_campaign(&source).unwrap();
         let metric = &report.per_observable_metrics[0];
-        assert!(metric.measurement_interval_overlap_coverage > metric.empirical_point_interval_coverage);
+        assert!(
+            metric.measurement_interval_overlap_coverage > metric.empirical_point_interval_coverage
+        );
     }
 
     #[test]
@@ -1316,19 +1631,28 @@ mod tests {
     fn final_unseal_authorization_is_required() {
         let mut source = campaign();
         source.cases[0].unseal_receipt_ref.clear();
-        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
-            |error| error.kind == ValidationAssessmentErrorKind::EmptyUnsealReceipt
-        ));
+        assert!(
+            assess_blind_holdout_campaign(&source)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.kind == ValidationAssessmentErrorKind::EmptyUnsealReceipt)
+        );
     }
 
     #[test]
     fn no_holdout_values_are_accepted_when_measurement_source_is_unmeasured() {
         let mut source = campaign();
-        source.cases[0].plan.blind_holdout.observation.evidence_class = EvidenceClass::ModelOutput;
+        source.cases[0]
+            .plan
+            .blind_holdout
+            .observation
+            .evidence_class = EvidenceClass::ModelOutput;
         let errors = assess_blind_holdout_campaign(&source).unwrap_err();
-        assert!(errors.iter().any(|error| {
-            error.kind == ValidationAssessmentErrorKind::HoldoutAdmissionRefused
-        }));
+        assert!(
+            errors.iter().any(|error| {
+                error.kind == ValidationAssessmentErrorKind::HoldoutAdmissionRefused
+            })
+        );
     }
 
     #[test]
@@ -1344,43 +1668,72 @@ mod tests {
     fn prediction_must_bind_exact_model_run_and_output_digest() {
         let mut source = campaign();
         source.cases[0].predictions[0].model_run_id = "stale-run".to_string();
-        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
-            |error| error.kind == ValidationAssessmentErrorKind::PredictionRunIdentityMismatch
-        ));
+        assert!(
+            assess_blind_holdout_campaign(&source)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.kind
+                    == ValidationAssessmentErrorKind::PredictionRunIdentityMismatch)
+        );
         let mut source = campaign();
         source.cases[0].predictions[0].model_output_sha256 = sha('x');
-        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
-            |error| error.kind == ValidationAssessmentErrorKind::PredictionOutputDigestMismatch
-        ));
+        assert!(
+            assess_blind_holdout_campaign(&source)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.kind
+                    == ValidationAssessmentErrorKind::PredictionOutputDigestMismatch)
+        );
     }
 
     #[test]
     fn prediction_interval_method_and_assumption_must_match_frozen_profile() {
         let mut source = campaign();
         source.cases[0].predictions[0].interval_method_ref = "post-hoc-tuned-band".to_string();
-        source.cases[1].predictions[0].interval_assumption_ref.clear();
+        source.cases[1].predictions[0]
+            .interval_assumption_ref
+            .clear();
         let errors = assess_blind_holdout_campaign(&source).unwrap_err();
-        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::PredictionIntervalMethodMismatch));
-        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::PredictionIntervalAssumptionMismatch));
+        assert!(
+            errors.iter().any(|error| error.kind
+                == ValidationAssessmentErrorKind::PredictionIntervalMethodMismatch)
+        );
+        assert!(errors.iter().any(|error| error.kind
+            == ValidationAssessmentErrorKind::PredictionIntervalAssumptionMismatch));
     }
 
     #[test]
     fn unseal_and_model_run_receipts_cannot_be_reused_between_holdouts() {
         let mut source = campaign();
         source.cases[1].unseal_receipt_ref = source.cases[0].unseal_receipt_ref.clone();
-        source.cases[2].model_run.run_receipt_ref = source.cases[1].model_run.run_receipt_ref.clone();
+        source.cases[2].model_run.run_receipt_ref =
+            source.cases[1].model_run.run_receipt_ref.clone();
         let errors = assess_blind_holdout_campaign(&source).unwrap_err();
-        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::ReusedUnsealReceipt));
-        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::ReusedModelRunReceipt));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.kind == ValidationAssessmentErrorKind::ReusedUnsealReceipt)
+        );
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.kind == ValidationAssessmentErrorKind::ReusedModelRunReceipt)
+        );
     }
 
     #[test]
     fn holdout_count_does_not_hide_out_of_domain_observation() {
         let mut source = campaign();
-        source.cases[0].plan.blind_holdout.observation.geometry_sha256 = sha('z');
-        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
-            |error| error.kind == ValidationAssessmentErrorKind::HoldoutAdmissionRefused
-        ));
+        source.cases[0]
+            .plan
+            .blind_holdout
+            .observation
+            .geometry_sha256 = sha('z');
+        assert!(
+            assess_blind_holdout_campaign(&source)
+                .unwrap_err()
+                .iter()
+                .any(|error| error.kind == ValidationAssessmentErrorKind::HoldoutAdmissionRefused)
+        );
     }
 }
-
