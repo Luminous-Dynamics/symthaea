@@ -1110,7 +1110,10 @@ mod tests {
         let mut test_plan = plan(39, 1.0);
         test_plan.profile.minimum_calibration_samples = 40;
         let report = evaluate_model_form_discrepancy(&test_plan);
-        assert_eq!(report.disposition, ModelFormDisposition::InsufficientCalibration);
+        assert_eq!(
+            report.disposition,
+            ModelFormDisposition::InsufficientCalibration
+        );
         assert_eq!(report.conformal_rank_one_based, None);
     }
 
@@ -1328,7 +1331,10 @@ mod tests {
         plan.calibration_residuals[18].absolute_residual_mwe = 100.0;
         let report = evaluate_model_form_discrepancy(&plan);
         assert_eq!(report.discrepancy_allowance_mwe, Some(100.0));
-        assert_eq!(report.disposition, ModelFormDisposition::MaterialDiscrepancy);
+        assert_eq!(
+            report.disposition,
+            ModelFormDisposition::MaterialDiscrepancy
+        );
     }
 
     #[test]
