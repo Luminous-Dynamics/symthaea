@@ -3458,8 +3458,8 @@ mod tests {
     fn source_manifest_accepts_new_nh3_synthesis_and_co2_cases() {
         let source = frozen_source_manifest();
         let summary = audit_source_value(&source, "frozen-plasma-energy.json").unwrap();
-        assert_eq!(summary.case_count, 61);
-        assert_eq!(summary.benchmark_target_count, 14);
+        assert_eq!(summary.case_count, 66);
+        assert_eq!(summary.benchmark_target_count, 15);
         assert!(source["cases"].as_array().unwrap().iter().any(|case|
             case.get("case_id").and_then(Value::as_str) == Some("CO2-CYCLIC-REFORMING-GASIFICATION-2026")
         ));
@@ -3825,10 +3825,10 @@ mod tests {
         let plasma_summary = audit_source_value(&plasma, "plasma-source-cases").unwrap();
         let hts_summary = audit_source_value(&hts, "hts-source-cases").unwrap();
 
-        assert_eq!(plasma_summary.case_count, 61);
-        assert_eq!(plasma_summary.negative_control_count, 106);
+        assert_eq!(plasma_summary.case_count, 66);
+        assert_eq!(plasma_summary.negative_control_count, 114);
         assert_eq!(plasma_summary.derived_reference_check_count, 7);
-        assert_eq!(plasma_summary.benchmark_target_count, 14);
+        assert_eq!(plasma_summary.benchmark_target_count, 15);
         let plasma_case_ids: BTreeSet<_> = plasma
             .get("cases")
             .and_then(Value::as_array)
