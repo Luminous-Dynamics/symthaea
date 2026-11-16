@@ -118,6 +118,10 @@ pub struct SelectorPacket {
     /// The selector must echo this exact identity in its trace.
     pub candidate_pool_sha256: String,
     pub metric_mask: MetricMask,
+    /// One task-native cost meter. Other resources remain separate and are
+    /// not silently converted into this unit.
+    pub cost_unit_id: String,
+    pub budget_limit_cost_units: f64,
     pub permitted_evidence: Vec<PermittedEvidence>,
     pub candidates: Vec<SelectorCandidate>,
 }
@@ -146,6 +150,7 @@ pub trait CandidateSelectionPolicy {
 pub struct SelectionTrace {
     pub task_id: String,
     pub candidate_pool_sha256: String,
+    pub cost_unit_id: String,
     pub policy_id: String,
     pub decision: SelectionDecision,
     pub consumed_evidence_ids: Vec<String>,
@@ -163,6 +168,7 @@ pub fn run_selector<P: CandidateSelectionPolicy>(
     let trace = SelectionTrace {
         task_id: packet.task_id.clone(),
         candidate_pool_sha256: packet.candidate_pool_sha256.clone(),
+        cost_unit_id: packet.cost_unit_id.clone(),
         policy_id: policy.policy_id().to_owned(),
         decision: observation.decision,
         consumed_evidence_ids: observation.consumed_evidence_ids,
@@ -260,6 +266,9 @@ pub struct CandidateSelectionAudit {
     pub task_id: String,
     pub candidate_pool_sha256: String,
     pub policy_id: String,
+    pub cost_unit_id: String,
+    pub selection_cost_units: f64,
+    pub budget_limit_cost_units: f64,
     pub attempted_candidates: usize,
     pub scored_candidates: usize,
     pub qualified_candidates: usize,
@@ -299,6 +308,10 @@ pub enum SelectionAuditError {
     TraceTaskMismatch,
     TracePoolDigestMismatch,
     InvalidCost,
+    InvalidCostUnitId,
+    InvalidBudget,
+    TraceCostUnitMismatch,
+    BudgetExceeded,
     EmptyAbstentionReason,
     UnknownSelectedCandidate(String),
     SelectedCandidateUnavailable(String),
@@ -353,6 +366,10 @@ impl fmt::Display for SelectionAuditError {
                 )
             }
             Self::InvalidCost => write!(f, "all-in selector cost must be finite and nonnegative"),
+            Self::InvalidCostUnitId => write!(f, "task-native cost unit ID must not be empty"),
+            Self::InvalidBudget => write!(f, "task-native cost budget must be finite and nonnegative"),
+            Self::TraceCostUnitMismatch => write!(f, "selector trace cost unit does not match task contract"),
+            Self::BudgetExceeded => write!(f, "selector cost exceeds the task-native hard budget"),
             Self::EmptyAbstentionReason => write!(f, "abstention reason must not be empty"),
             Self::UnknownSelectedCandidate(id) => {
                 write!(f, "selected candidate is not in the frozen pool: {id}")
@@ -474,6 +491,12 @@ pub fn validate_selector_packet(packet: &SelectorPacket) -> Result<(), Selection
     if packet.candidates.is_empty() {
         return Err(SelectionAuditError::EmptyCandidatePool);
     }
+    if packet.cost_unit_id.trim().is_empty() {
+        return Err(SelectionAuditError::InvalidCostUnitId);
+    }
+    if !packet.budget_limit_cost_units.is_finite() || packet.budget_limit_cost_units < 0.0 {
+        return Err(SelectionAuditError::InvalidBudget);
+    }
 
     let mut candidate_ids = BTreeSet::new();
     for candidate in &packet.candidates {
@@ -555,8 +578,14 @@ pub fn validate_selection_trace(
     if trace.policy_id.trim().is_empty() {
         return Err(SelectionAuditError::EmptyPolicyId);
     }
+    if trace.cost_unit_id != packet.cost_unit_id {
+        return Err(SelectionAuditError::TraceCostUnitMismatch);
+    }
     if !trace.all_in_cost_units.is_finite() || trace.all_in_cost_units < 0.0 {
         return Err(SelectionAuditError::InvalidCost);
+    }
+    if trace.all_in_cost_units > packet.budget_limit_cost_units {
+        return Err(SelectionAuditError::BudgetExceeded);
     }
 
     let allowed = packet
@@ -812,6 +841,9 @@ pub fn audit_submission(
         task_id: packet.task_id.clone(),
         candidate_pool_sha256: packet.candidate_pool_sha256.clone(),
         policy_id: trace.policy_id.clone(),
+        cost_unit_id: trace.cost_unit_id.clone(),
+        selection_cost_units: trace.all_in_cost_units,
+        budget_limit_cost_units: packet.budget_limit_cost_units,
         attempted_candidates: packet.candidates.len(),
         scored_candidates: scored,
         qualified_candidates: qualified,
@@ -921,6 +953,9 @@ impl CandidateSelectionAudit {
                 "\"task_id\":{},",
                 "\"candidate_pool_sha256\":{},",
                 "\"policy_id\":{},",
+                "\"cost_unit_id\":{},",
+                "\"selection_cost_units\":{:.8},",
+                "\"budget_limit_cost_units\":{:.8},",
                 "\"attempted_candidates\":{},",
                 "\"scored_candidates\":{},",
                 "\"qualified_candidates\":{},",
@@ -947,6 +982,9 @@ impl CandidateSelectionAudit {
             json_escape(&self.task_id),
             json_escape(&self.candidate_pool_sha256),
             json_escape(&self.policy_id),
+            json_escape(&self.cost_unit_id),
+            self.selection_cost_units,
+            self.budget_limit_cost_units,
             self.attempted_candidates,
             self.scored_candidates,
             self.qualified_candidates,
@@ -1008,6 +1046,8 @@ mod tests {
             task_id: "scilaws-real-fixture".to_owned(),
             candidate_pool_sha256: POOL_SHA.to_owned(),
             metric_mask: MetricMask::REAL_FIT_AND_VALIDITY,
+            cost_unit_id: "fixture_cost_units".to_owned(),
+            budget_limit_cost_units: 20.0,
             permitted_evidence: vec![PermittedEvidence {
                 evidence_id: "dev-fold-1".to_owned(),
                 sha256: EVIDENCE_SHA.to_owned(),
@@ -1025,6 +1065,7 @@ mod tests {
         SelectionTrace {
             task_id: "scilaws-real-fixture".to_owned(),
             candidate_pool_sha256: POOL_SHA.to_owned(),
+            cost_unit_id: "fixture_cost_units".to_owned(),
             policy_id: "test-policy-v1".to_owned(),
             decision,
             consumed_evidence_ids: vec!["dev-fold-1".to_owned()],
@@ -1122,6 +1163,25 @@ mod tests {
         assert_eq!(
             validate_selection_trace(&packet, &frozen),
             Err(SelectionAuditError::TracePoolDigestMismatch)
+        );
+    }
+
+    #[test]
+    fn cost_unit_and_hard_budget_are_bound_to_the_task_contract() {
+        let packet = packet();
+        let mut frozen = trace(SelectionDecision::Select {
+            candidate_id: "a".to_owned(),
+        });
+        frozen.all_in_cost_units = 21.0;
+        assert_eq!(
+            validate_selection_trace(&packet, &frozen),
+            Err(SelectionAuditError::BudgetExceeded)
+        );
+        frozen.all_in_cost_units = 2.0;
+        frozen.cost_unit_id = "unrelated_cost_unit".to_owned();
+        assert_eq!(
+            validate_selection_trace(&packet, &frozen),
+            Err(SelectionAuditError::TraceCostUnitMismatch)
         );
     }
 
