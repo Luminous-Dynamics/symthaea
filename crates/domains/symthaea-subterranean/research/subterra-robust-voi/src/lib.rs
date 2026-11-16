@@ -181,8 +181,8 @@ fn validate_model_schema(models: &[ModelScenario]) -> Result<(), RobustError> {
 ///
 /// The model family is finite, explicit and caller supplied. Each model must
 /// share the same hypothesis IDs/order, mission decisions/losses, action IDs,
-/// modalities, resource costs, external-gate results and outcome IDs/order.
-/// Priors and outcome likelihood values may vary between models.
+/// modalities, resource costs and outcome IDs/order. Priors, likelihoods and
+/// external-gate dispositions may vary; any gate denial excludes the action.
 ///
 /// An action denied by an external gate or over budget in any model is
 /// excluded from robust selection. Hard constraints are not averaged.
