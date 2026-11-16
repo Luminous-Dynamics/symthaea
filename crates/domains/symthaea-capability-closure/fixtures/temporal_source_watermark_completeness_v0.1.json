@@ -252,7 +252,9 @@
     "targets_are_results": false,
     "watermark_test_functions_authored": 25,
     "crate_test_functions_authored": 81,
-    "benchmark_protocol_authored": true
+    "benchmark_protocol_authored": true,
+    "clock_calibration_test_functions_authored": 10,
+    "clock_calibration_tests_executed": false
   },
   "benchmark_protocol": {
     "executable": "research/irregular-event-contract/src/bin/watermark_scaling.rs",
@@ -315,5 +317,25 @@
       5000,
       10000
     ]
+  },
+  "clock_calibration_contract": {
+    "module": "research/irregular-event-contract/src/clock.rs",
+    "authored_test_functions": 10,
+    "mapping": "affine_reference_coordinate_with_bounded_anchor_offset_and_max_absolute_drift_ppb",
+    "drift_rounding": "outward_ceiling",
+    "completeness_bound": "earliest_possible_mapped_exclusive_watermark",
+    "aggregation": "minimum_earliest_bound_only_after_same_reference_domain_check",
+    "knowledge_time": "calibration_recorded_at_must_be_no_later_than_decision_cutoff",
+    "failure_modes": [
+      "future_calibration",
+      "expired_source_time_range",
+      "wrong_source_domain",
+      "mixed_reference_domains",
+      "invalid_parameters",
+      "arithmetic_overflow"
+    ],
+    "result_types_non_forgeable": true,
+    "ledger_integration": "not_yet_automatic; v0.1 SourceWatermarkLedger expects timestamps in one common reference coordinate",
+    "authentication": "policy_sha256_only; no calibration-authority signature verification or key revocation"
   }
 }
