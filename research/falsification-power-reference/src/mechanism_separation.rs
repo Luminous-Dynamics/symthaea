@@ -322,7 +322,7 @@ fn build_equivalence_classes(
     mechanisms: &mut [CanonicalMechanism],
 ) -> Vec<MechanismEquivalenceClass> {
     let mut classes: Vec<MechanismEquivalenceClass> = Vec::new();
-    let mut signatures: Vec<Vec<i64>> = Vec::new();
+    let mut signatures: Vec<Vec<u64>> = Vec::new();
 
     for mechanism in mechanisms.iter_mut() {
         let class_index =
