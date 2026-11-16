@@ -6,10 +6,11 @@
 //! through an out-of-band channel.
 //!
 //! Validity requires the conditional simple null
-//! Y_t | F_{t-1}, A_t ~ N(0, sigma^2), known common sigma, and a discrepancy
-//! committed using only information available before Y_t. Unknown variance,
-//! composite nulls, unmodelled dependence and arbitrary physical trajectories
-//! require separate methods and qualification.
+//! Y_t | F_{t-1}, A_t ~ N(mu_t, sigma_t^2), where mu_t and sigma_t are known
+//! predictable quantities and each alternative discrepancy d_t is committed
+//! before Y_t. Unknown/estimated conditional means or variances, misspecified
+//! state models, composite nulls and arbitrary physical trajectories require
+//! separate methods and qualification.
 
 use std::collections::BTreeSet;
 use std::error::Error;
@@ -28,6 +29,7 @@ pub enum SequentialError {
     ObservationIdMismatch { expected: String, actual: String },
     DecisionDigestMismatch,
     NonFiniteDiscrepancy,
+    NonFiniteConditionalMean,
     NonFiniteObservation,
     EmptyAlternativeSet,
     EmptyAlternativeId,
@@ -69,6 +71,7 @@ impl fmt::Display for SequentialError {
                 "observation decision digest differs from the committed prediction"
             ),
             Self::NonFiniteDiscrepancy => write!(f, "predicted discrepancy must be finite"),
+            Self::NonFiniteConditionalMean => write!(f, "null conditional mean must be finite"),
             Self::NonFiniteObservation => write!(f, "observed residual must be finite"),
             Self::EmptyAlternativeSet => write!(f, "alternative set must not be empty"),
             Self::EmptyAlternativeId => write!(f, "alternative ID must not be empty"),
@@ -104,6 +107,7 @@ pub struct SequentialUpdate {
     pub decision_digest: String,
     pub alpha: f64,
     pub expected_residual: f64,
+    pub null_conditional_mean: f64,
     pub sigma: f64,
     pub observations: u64,
     pub log_e_value: f64,
@@ -134,6 +138,7 @@ pub struct MixtureSequentialUpdate {
     pub observation_id: String,
     pub decision_digest: String,
     pub alpha: f64,
+    pub null_conditional_mean: f64,
     pub sigma: f64,
     pub observations: u64,
     pub components: Vec<MixtureComponentUpdate>,
@@ -148,6 +153,7 @@ struct PendingPrediction {
     observation_id: String,
     decision_digest: String,
     residuals: Vec<f64>,
+    null_conditional_mean: f64,
     sigma: f64,
 }
 
@@ -176,19 +182,29 @@ fn validate_prediction_identity(
 
 fn likelihood_ratio_increment(
     discrepancy: f64,
-    observed_residual: f64,
+    observed_value: f64,
+    null_conditional_mean: f64,
     sigma: f64,
 ) -> Result<f64, SequentialError> {
     if !discrepancy.is_finite() {
         return Err(SequentialError::NonFiniteDiscrepancy);
     }
-    if !observed_residual.is_finite() {
+    if !null_conditional_mean.is_finite() {
+        return Err(SequentialError::NonFiniteConditionalMean);
+    }
+    if !observed_value.is_finite() {
         return Err(SequentialError::NonFiniteObservation);
     }
 
+    // Under H0 the predictable innovation Y_t - mu_t is conditionally
+    // N(0, sigma_t^2). The alternative changes its conditional mean by d_t.
+    let innovation = observed_value - null_conditional_mean;
+    if !innovation.is_finite() {
+        return Err(SequentialError::NumericalOverflow);
+    }
     let standardized_discrepancy = discrepancy / sigma;
-    let standardized_observation = observed_residual / sigma;
-    let increment = standardized_discrepancy * standardized_observation
+    let standardized_innovation = innovation / sigma;
+    let increment = standardized_discrepancy * standardized_innovation
         - 0.5 * standardized_discrepancy * standardized_discrepancy;
     if !increment.is_finite() {
         return Err(SequentialError::NumericalOverflow);
@@ -204,13 +220,16 @@ fn anytime_p_value(maximum_log_e_value: f64) -> f64 {
 ///
 /// For each time t, the evaluator must call commit_prediction before observe.
 /// Under the conditional Gaussian simple null, the likelihood-ratio increment
-/// exp(d_t * Y_t / sigma^2 - d_t^2 / (2*sigma^2)) has conditional expectation 1
-/// when d_t is predictable. The product is therefore a nonnegative martingale.
+/// exp(d_t * (Y_t - mu_t) / sigma_t^2 - d_t^2 / (2*sigma_t^2)) has conditional
+/// expectation 1 when mu_t, sigma_t and d_t are predictable and the conditional
+/// Gaussian null is correctly specified. The product is therefore a
+/// nonnegative martingale.
 ///
 /// The anytime p-value is 1 / max_{s <= t} E_s, capped at one. Ville's
 /// inequality controls the probability of ever crossing 1/alpha under the
 /// declared null. This is not valid automatically for estimated sigma,
-/// composite nulls, correlated observations or non-predictable d_t.
+/// composite nulls, a misspecified conditional-mean/state model, or
+/// non-predictable mu_t, sigma_t or d_t.
 #[derive(Debug, Clone)]
 pub struct PredictableGaussianEProcess {
     sigma: f64,
@@ -261,6 +280,30 @@ impl PredictableGaussianEProcess {
         expected_residual: f64,
         sigma: f64,
     ) -> Result<(), SequentialError> {
+        self.commit_prediction_with_conditional_gaussian(
+            observation_id,
+            decision_digest,
+            expected_residual,
+            0.0,
+            sigma,
+        )
+    }
+
+    /// Commit an alternative discrepancy and the known conditional Gaussian
+    /// null N(mu_t, sigma_t^2) before the corresponding observation is released.
+    ///
+    /// mu_t and sigma_t may depend on the previous history/action, but must be
+    /// fixed before the current outcome. This permits correctly specified
+    /// predictable AR/state-dependent innovations; it does not estimate or
+    /// validate the conditional-mean model.
+    pub fn commit_prediction_with_conditional_gaussian(
+        &mut self,
+        observation_id: impl Into<String>,
+        decision_digest: impl Into<String>,
+        expected_residual: f64,
+        null_conditional_mean: f64,
+        sigma: f64,
+    ) -> Result<(), SequentialError> {
         let observation_id = observation_id.into();
         let decision_digest = decision_digest.into();
         validate_prediction_identity(&observation_id, &decision_digest)?;
@@ -269,6 +312,9 @@ impl PredictableGaussianEProcess {
         }
         if !expected_residual.is_finite() {
             return Err(SequentialError::NonFiniteDiscrepancy);
+        }
+        if !null_conditional_mean.is_finite() {
+            return Err(SequentialError::NonFiniteConditionalMean);
         }
         if self.pending.is_some() {
             return Err(SequentialError::PredictionAlreadyPending);
@@ -280,6 +326,7 @@ impl PredictableGaussianEProcess {
             observation_id,
             decision_digest,
             residuals: vec![expected_residual],
+            null_conditional_mean,
             sigma,
         });
         Ok(())
@@ -312,7 +359,12 @@ impl PredictableGaussianEProcess {
         }
 
         let increment =
-            likelihood_ratio_increment(pending.residuals[0], observed_residual, pending.sigma)?;
+            likelihood_ratio_increment(
+                pending.residuals[0],
+                observed_residual,
+                pending.null_conditional_mean,
+                pending.sigma,
+            )?;
         let next_log_e_value = self.log_e_value + increment;
         if !next_log_e_value.is_finite() {
             return Err(SequentialError::NumericalOverflow);
@@ -341,6 +393,7 @@ impl PredictableGaussianEProcess {
             decision_digest: pending.decision_digest,
             alpha: self.alpha,
             expected_residual: pending.residuals[0],
+            null_conditional_mean: pending.null_conditional_mean,
             sigma: pending.sigma,
             observations: self.observations,
             log_e_value: self.log_e_value,
@@ -450,11 +503,33 @@ impl PredictableGaussianMixture {
         expected_residuals: &[f64],
         sigma: f64,
     ) -> Result<(), SequentialError> {
+        self.commit_predictions_with_conditional_gaussian(
+            observation_id,
+            decision_digest,
+            expected_residuals,
+            0.0,
+            sigma,
+        )
+    }
+
+    /// Commit a fixed alternative mixture and known conditional Gaussian null
+    /// N(mu_t, sigma_t^2) before the shared observation is released.
+    pub fn commit_predictions_with_conditional_gaussian(
+        &mut self,
+        observation_id: impl Into<String>,
+        decision_digest: impl Into<String>,
+        expected_residuals: &[f64],
+        null_conditional_mean: f64,
+        sigma: f64,
+    ) -> Result<(), SequentialError> {
         let observation_id = observation_id.into();
         let decision_digest = decision_digest.into();
         validate_prediction_identity(&observation_id, &decision_digest)?;
         if !sigma.is_finite() || sigma <= 0.0 {
             return Err(SequentialError::InvalidSigma);
+        }
+        if !null_conditional_mean.is_finite() {
+            return Err(SequentialError::NonFiniteConditionalMean);
         }
         if self.pending.is_some() {
             return Err(SequentialError::PredictionAlreadyPending);
@@ -475,6 +550,7 @@ impl PredictableGaussianMixture {
             observation_id,
             decision_digest,
             residuals: expected_residuals.to_vec(),
+            null_conditional_mean,
             sigma,
         });
         Ok(())
@@ -513,7 +589,12 @@ impl PredictableGaussianMixture {
             .zip(self.component_log_e_values.iter().copied())
         {
             let increment =
-                likelihood_ratio_increment(discrepancy, observed_residual, pending.sigma)?;
+                likelihood_ratio_increment(
+                    discrepancy,
+                    observed_residual,
+                    pending.null_conditional_mean,
+                    pending.sigma,
+                )?;
             let next = current + increment;
             if !next.is_finite() {
                 return Err(SequentialError::NumericalOverflow);
@@ -573,6 +654,7 @@ impl PredictableGaussianMixture {
             observation_id: pending.observation_id,
             decision_digest: pending.decision_digest,
             alpha: self.alpha,
+            null_conditional_mean: pending.null_conditional_mean,
             sigma: pending.sigma,
             observations: self.observations,
             components,
