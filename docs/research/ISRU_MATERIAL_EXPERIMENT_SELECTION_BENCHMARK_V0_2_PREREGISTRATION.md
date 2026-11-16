@@ -172,7 +172,7 @@ The frozen tournament should cover at least these scenario families:
 | Heteroscedastic metrology | Noise changes with signal/condition | Noise-aware EIG and calibrated surrogates |
 | Drift and common-cause failure | Shared calibration or sensor drift corrupts several outputs | Fault-aware acquisition and fail-closed controls |
 | Missing/censored outcomes | Failures and below-detection-limit values are informative | Censored/count models vs naive zero fill |
-| Carry-over and apparatus degradation | Fouling changes later runs | Nonstationary model and reset/check policy |
+| Dynamic optical contamination | Organic vapour/particles alter throughput and apparent material response during a campaign | Time-varying apparatus-state model; QCM/witness/reference-channel actions; maintenance-aware policy |
 | Variable cost and fidelity | Assay, run time and energy differ | Cost-aware and multi-fidelity BO |
 | Batch/asynchronous runs | Results arrive out of order or campaigns are interrupted | Batch and resumable acquisition |
 | OOD response | True family is outside model support | OOD detection, abstention and false-confidence |
@@ -181,6 +181,19 @@ The frozen tournament should cover at least these scenario families:
 | Budget-limited stopping | Further data cannot justify cost | Stop / continue / abstain comparison |
 
 Whole batches, morphology classes and at least one entire material family must be held out. Never random-split observations from the same specimen or batch across training and test.
+
+### 6.1 Dynamic apparatus state: contamination and optical fouling
+
+The 2025 Nectar A/B optical-mining study reports that organic-vapour deposition hampers excavation and water-production rates. Therefore the apparatus and optical path must be treated as time-varying causal state, not merely as stationary sensor noise. Include at least one scenario where the material response is constant but deposition causes an apparent yield/irradiance drift, and one where fouling and a genuine material regime change occur together.
+
+The policy's action set must include more than material exposures: a QCM/witness readout, clean reference-beam check, pause, optical-path inspection, shield/baffle configuration test, sacrificial witness replacement or a cleaning/requalification experiment may be the decision-value-optimal next action. Candidate interventions are research actions, not assumed safe or effective remedies; an independent equipment authority approves physical execution.
+
+A QCM measures deposited mass at its own crystal, not species identity or the optical loss on a separate surface. Pair it with representative witness surfaces and direct optical measurements (for example, spectral transmission/reflectance/scatter on an exposed witness and a clean reference). Temperature, orientation and location must be recorded. Distinguish molecular films, particulate deposition, redeposition and instrument/window drift; do not infer all of them from one sensor.
+
+Relevant measurement-method references include [ASTM E1559-09(2022)](https://store.astm.org/e1559-09r22.html), which measures outgassing mass flux and deposition with QCMs under its defined test scope, [ECSS-Q-ST-70-01C Rev.1 (2025)](https://ecss.nl/wp-content/uploads/2025/10/ECSS-Q-ST-70-01C-Rev.1%2815October2025%29.pdf), and NASA's [OSIRIS-REx contamination-control practice](https://science.gsfc.nasa.gov/sed/content/uploadFiles/publication_files/Dworkin2018%20OSIRIS-REx%20Contam.pdf), which includes optical witness surfaces and reflectance-degradation checks. These are methods to adapt and evaluate; their temperature ranges, environments and acceptance limits do not automatically qualify a hot ISRU process.
+
+Report deposition mass flux/cumulative areal mass separately from wavelength-dependent optical loss, focal irradiance bias, process response bias, detection delay, false fouling alarms, false attribution of apparatus drift to material physics, recovery fraction, maintenance time/consumables and accepted-product throughput including downtime. The campaign's resource vector must charge all checks, pauses, cleaning, replacement and requalification.
+
 
 ## 7. Resource matching
 
