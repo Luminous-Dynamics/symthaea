@@ -65,6 +65,34 @@ The initial 15 authored tests cover matched outputs, descriptive-only and covari
 
 The graph helper returns the changed nodes and their full transitive downstream closure. Cycles are tolerated and traversal is deterministic. This is a structural impact calculation, not automatic revocation of an external certificate or authority decision.
 
+
+## Quantitative blind-holdout predictive assessment
+
+The `validation_domain` module remains the admission gate: it checks calibration/test-stand/holdout non-overlap, measured evidence class, measurement provenance, blind exposure flags, exact model revision and intended use, and declared regime/geometry/facility/case/operating-point scope. It does not measure prediction performance.
+
+The follow-on `validation_assessment` module calls that existing gate for every campaign case before computing any metrics. It then requires a final holdout-unseal receipt, exact model-run ID/revision/input/output digests, and complete predicted/measured values for every frozen observable.
+
+Per observable, the campaign reports:
+- mean signed error, bias, MAE and RMSE;
+- normalized bias and normalized RMSE under a predeclared physical scale;
+- maximum absolute normalized residual;
+- empirical point-in-prediction-interval coverage;
+- measurement-uncertainty interval overlap coverage, separately reported;
+- mean normalized prediction-interval width.
+
+The assessment profile freezes quantity ID, unit, service boundary, averaging window, normalization scale, nominal coverage, interval-generation method and its assumption reference, error limits, minimum coverage and maximum interval width. It also requires minimum holdout count and facility/operating-point diversity. Prediction values bind their exact model run/output digest; measurement values bind the exact measured holdout artifact. Unseal/model-run receipts cannot be reused between holdout cases.
+
+A report only means the finite campaign met the declared profile. Empirical point coverage is descriptive; the module does not attach a confidence interval, assume independent samples, fit a model or calibrate prediction bands. Measurement-interval overlap is not substituted for point coverage. Wide intervals are penalized through the mean normalized width ceiling.
+
+The module has 23 authored tests covering known-answer metric calculations, split leakage, stale model and output identity, reused receipts, incomplete observables, unit/boundary/time-window mismatch, malformed intervals, artifact provenance, sample-diversity gates, point versus measurement-interval coverage, order-invariant output and out-of-domain refusal. The synthetic runner uses three holdout cases across two facilities and three operating points; all values and the expected acceptance profile are synthetic.
+
+### External validation benchmark alignment
+
+The DOE's June 2026 roadmap calls for an end-to-end plant-model workflow against experimental data with quantified uncertainty, independent reproducibility, an enforced validity domain and holdout validation at a different operating point/case/facility while maintaining uncertainty bounds. It also calls for model comparisons against coupled experiments. This module adds the predictive-metric side of that requirement while keeping specialist experiment, metrology and physics-model ownership external.
+
+A July 2026 *Fusion Science and Technology* article on integral nuclear-data benchmarking emphasizes measured integral responses representative of the materials/radiation/temperature conditions and rigorous benchmark models with experimental uncertainties. A 2021 multiscale fusion VVUQ study explores distribution-similarity validation; this implementation uses transparent point errors and interval metrics as a reproducible v0.1 baseline, not as a claim to supersede specialist validation methods.
+
+
 ## Run locally
 
 From this directory:
@@ -76,6 +104,7 @@ cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
 cargo run --manifest-path Cargo.toml --bin verify_validation_domain_corpus
 cargo run --manifest-path Cargo.toml --bin compare_solver_outputs
 cargo run --manifest-path Cargo.toml --bin qualify_plant_service
+cargo run --manifest-path Cargo.toml --bin audit_validation_assessment
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
