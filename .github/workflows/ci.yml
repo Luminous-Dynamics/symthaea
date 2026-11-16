@@ -42,6 +42,35 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
+  hdc-zkp-bench:
+    name: HDC Binius proof-circuit tests
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt
+
+      - name: Cache standalone HDC crate dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            crates/hdc-zkp-bench/target
+          key: ${{ runner.os }}-cargo-hdc-zkp-${{ hashFiles('crates/hdc-zkp-bench/Cargo.toml', 'crates/hdc-zkp-bench/Cargo.lock', 'vendor/binius64/**/Cargo.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-hdc-zkp-
+
+      - name: Check isolated-crate formatting
+        run: cargo fmt --manifest-path crates/hdc-zkp-bench/Cargo.toml -- --check
+
+      - name: Run proof-circuit tests and demonstrations
+        run: bash papers/theory-foundations/binius-hdc/reproduce.sh
   governance:
     name: Governance Check (Class A/B Changes)
     runs-on: ubuntu-latest

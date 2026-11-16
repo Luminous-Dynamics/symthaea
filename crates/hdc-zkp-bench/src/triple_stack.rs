@@ -1,45 +1,14 @@
 // Copyright (C) 2024-2026 Tristan Stoltz / Luminous Dynamics
 // SPDX-License-Identifier: AGPL-3.0-or-later
-//! Triple Stack Prototype: HDC + FHE + ZKP
+//! Legacy module path for a packed-word XOR integrity-proof demonstration.
 //!
-//! Proves: "I correctly computed XOR binding on OTP-encrypted vectors"
-//! without revealing the plaintext vectors or the encryption masks.
+//! The only constrained relation is `word_c = word_a XOR word_b`. The host
+//! generates opaque random words; no encryption, mask generation, plaintext
+//! relation, or participant identity is part of the circuit.
 //!
-//! ## The Triple Alignment
-//!
-//! In GF(2):
-//! - **Plaintext**: XOR binding is a bitwise XOR (nanoseconds)
-//! - **FHE (OTP)**: Encryption is XOR with mask; binding ciphertexts = XOR ciphertexts
-//! - **ZKP (Binius)**: XOR is field addition (zero AND constraints)
-//!
-//! All three layers operate via the same algebraic operation. The proof
-//! verifies that `ct_c = ct_a XOR ct_b` without knowing `pt_a`, `pt_b`,
-//! `mask_a`, or `mask_b`. The verifier sees only ciphertexts.
-//!
-//! ## Why This Works
-//!
-//! OTP encryption: enc(v, m) = v XOR m
-//! Binding: bind(a, b) = a XOR b
-//!
-//! Encrypted binding:
-//!   ct_a XOR ct_b
-//!   = (pt_a XOR mask_a) XOR (pt_b XOR mask_b)
-//!   = (pt_a XOR pt_b) XOR (mask_a XOR mask_b)
-//!   = bind(pt_a, pt_b) XOR combined_mask
-//!   = enc(bind(pt_a, pt_b), mask_a XOR mask_b)
-//!
-//! The result is automatically encrypted under the combined mask!
-//! This is the homomorphic property of XOR-OTP encryption.
-//!
-//! ## What the Proof Actually Proves
-//!
-//! The Binius circuit proves:
-//! 1. ct_c = ct_a XOR ct_b (the ciphertext computation was correct)
-//! 2. The prover knows ct_a, ct_b, and ct_c (via witness)
-//! 3. The verifier sees only ct_c (public output)
-//!
-//! This does NOT reveal pt_a, pt_b, or the masks. Perfect secrecy
-//! is maintained because OTP is information-theoretically secure.
+//! The vendored `vendor/binius64/ARCHITECTURE.md` explicitly marks the standard
+//! Binius64 prover/verifier backend as not zero-knowledge. A proof from this
+//! backend therefore carries no input-confidentiality guarantee.
 
 use std::time::Instant;
 
@@ -56,7 +25,7 @@ use binius_verifier::{
     hash::{StdCompression, StdDigest},
 };
 
-pub struct TripleStackResult {
+pub struct OpaqueXorBenchResult {
     pub dim_words: usize,
     pub and_constraints: usize,
     pub prove_time_ms: f64,
@@ -64,36 +33,33 @@ pub struct TripleStackResult {
     pub proof_size_bytes: usize,
 }
 
-/// Prove encrypted XOR binding: ct_c = ct_a XOR ct_b
+/// Prove the packed-word relation `word_c = word_a XOR word_b`.
 ///
-/// The prover has: pt_a, pt_b, mask_a, mask_b (all private)
-/// The verifier sees: ct_c (public output only)
-///
-/// The proof guarantees the computation was correct WITHOUT
-/// revealing any plaintext or mask values.
-pub fn bench_triple_stack(dim_words: usize) -> TripleStackResult {
-    let dim_bits = dim_words * 64;
+/// This demonstrates computational integrity only. It does not prove that the
+/// words are ciphertexts, that masks were generated or applied correctly, or
+/// that witness values remain confidential under the selected Binius64 backend.
+pub fn bench_opaque_xor_relation(dim_words: usize) -> OpaqueXorBenchResult {
+    let dim_bits = dim_words.checked_mul(64).expect("dimension overflow");
     println!(
-        "\n=== TRIPLE STACK: HDC-OTP + Binius ({} bits) ===\n",
+        "\n=== OPAQUE XOR RELATION: Binius64 ({} bits) ===\n",
         dim_bits
     );
-    println!("  Proving: encrypted XOR binding was computed correctly");
-    println!("  Verifier sees: only the ciphertext result (ct_c)");
-    println!("  Hidden: plaintext vectors, encryption masks\n");
+    println!("  Statement: public word_c = witness word_a XOR witness word_b");
+    println!("  Scope: computational integrity only; witness confidentiality is not guaranteed.\n");
 
     let builder = CircuitBuilder::new();
 
-    // Private witnesses: the two ciphertexts (encrypted vectors)
-    let ct_a: Vec<_> = (0..dim_words).map(|_| builder.add_witness()).collect();
-    let ct_b: Vec<_> = (0..dim_words).map(|_| builder.add_witness()).collect();
+    // Witness words: the circuit does not establish encryption or confidentiality.
+    let word_a: Vec<_> = (0..dim_words).map(|_| builder.add_witness()).collect();
+    let word_b: Vec<_> = (0..dim_words).map(|_| builder.add_witness()).collect();
 
-    // Public output: the encrypted binding result
-    let ct_c: Vec<_> = (0..dim_words).map(|_| builder.add_inout()).collect();
+    // Public output: the XOR result
+    let word_c: Vec<_> = (0..dim_words).map(|_| builder.add_inout()).collect();
 
-    // XOR binding on ciphertexts: ct_c = ct_a XOR ct_b (FREE in Binius!)
+    // Constrain the opaque-word XOR relation: word_c = word_a XOR word_b.
     for i in 0..dim_words {
-        let result = builder.bxor(ct_a[i], ct_b[i]);
-        builder.assert_eq(&format!("enc_bind_{}", i), result, ct_c[i]);
+        let result = builder.bxor(word_a[i], word_b[i]);
+        builder.assert_eq(&format!("opaque_xor_{}", i), result, word_c[i]);
     }
 
     let circuit = builder.build();
@@ -103,31 +69,29 @@ pub fn bench_triple_stack(dim_words: usize) -> TripleStackResult {
         "  AND constraints: {} (structural assert_eq only — XOR is FREE)",
         stat.n_and_constraints
     );
-    println!("  The XOR binding on encrypted data costs ZERO non-linear constraints!");
+    println!("  XOR itself is linear; structural equality constraints are still counted.");
 
-    // Generate encrypted data
+    // Generate opaque witness words
     let mut witness = circuit.new_witness_filler();
 
-    // Simulate OTP encryption: ct = pt XOR mask
+    // Use opaque deterministic fixture words. This example intentionally does not model OTP.
+    let a_values = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_TRIPLE_XOR_A,
+        dim_words,
+    );
+    let b_values = crate::bench_inputs::deterministic_words(
+        crate::bench_inputs::SEED_TRIPLE_XOR_B,
+        dim_words,
+    );
     for i in 0..dim_words {
-        let pt_a: u64 = rand::random(); // Private plaintext
-        let mask_a: u64 = rand::random(); // Private mask
-        let ct_a_val = pt_a ^ mask_a; // Ciphertext
+        let a = a_values[i];
+        let b = b_values[i];
+        let c = a ^ b;
 
-        let pt_b: u64 = rand::random();
-        let mask_b: u64 = rand::random();
-        let ct_b_val = pt_b ^ mask_b;
-
-        // The encrypted binding result
-        let ct_c_val = ct_a_val ^ ct_b_val;
-        // This equals: (pt_a XOR pt_b) XOR (mask_a XOR mask_b)
-        // = enc(bind(pt_a, pt_b), mask_a XOR mask_b)
-
-        witness[ct_a[i]] = Word(ct_a_val);
-        witness[ct_b[i]] = Word(ct_b_val);
-        witness[ct_c[i]] = Word(ct_c_val);
+        witness[word_a[i]] = Word(a);
+        witness[word_b[i]] = Word(b);
+        witness[word_c[i]] = Word(c);
     }
-
     circuit
         .populate_wire_witness(&mut witness)
         .expect("witness failed");
@@ -173,15 +137,14 @@ pub fn bench_triple_stack(dim_words: usize) -> TripleStackResult {
         "  Verifier time: {:.3} ms",
         verify_time.as_secs_f64() * 1000.0
     );
-    println!("  Verification: PASSED (real cryptographic proof)");
+    println!("  Verification: PASSED (integrity proof; no Binius64 ZK privacy guarantee)");
 
-    println!("\n  TRIPLE STACK VERIFIED:");
-    println!("  ✓ OTP encryption (Shannon perfect secrecy)");
-    println!("  ✓ Binius proof (XOR binding = 0 non-linear constraints)");
-    println!("  ✓ Verifier sees only ciphertext result");
-    println!("  ✓ Plaintext and masks never revealed");
+    println!("\n  XOR RELATION VERIFIED (COMPUTATIONAL INTEGRITY ONLY):");
+    println!("  ✓ Public word_c equals word_a XOR word_b");
+    println!("  ✗ No OTP encryption or mask-generation relation is constrained");
+    println!("  ✗ This Binius64 backend provides no zero-knowledge input-privacy guarantee");
 
-    TripleStackResult {
+    OpaqueXorBenchResult {
         dim_words,
         and_constraints: stat.n_and_constraints,
         prove_time_ms: prove_time.as_secs_f64() * 1000.0,

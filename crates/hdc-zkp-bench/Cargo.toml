@@ -3,7 +3,7 @@ name = "hdc-zkp-bench"
 version = "0.1.0"
 edition = "2024"
 license = "AGPL-3.0-or-later"
-description = "Benchmark: HDC XOR binding proof on Binius (real prover, measured) plus an analytic Winterfell estimate (no real Winterfell prover)"
+description = "HDC XOR computational-integrity benchmark: measured Binius proof execution and analytic Winterfell estimate; standard Binius64 backend does not provide witness privacy"
 authors = ["Tristan Stoltz <tristan.stoltz@evolvingresonantcocreationism.com>"]
 
 [[bin]]
@@ -24,13 +24,21 @@ binius-hash = { path = "../../vendor/binius64/crates/hash" }
 
 # NOTE: No Winterfell dependency. The "Winterfell" numbers this benchmark
 # prints are an ANALYTIC ESTIMATE (constraint-count model) — no AIR is
-# implemented and no Winterfell prover runs. A real, measured Winterfell
-# 16,384-bit XOR circuit lives in crates/mycelix-zkp-core (monorepo root).
+# implemented and no Winterfell prover runs in this standalone artifact.
+# No measured same-scale Winterfell result is available from this crate.
 
 # Common
 rand = "0.9"
 sha2 = "0.10"
 serde_json = "1.0"
+
+
+[dev-dependencies]
+# Minimal standalone Iron Spartan proof smoke test only; not a witness-privacy audit.
+binius-field = { path = "../../vendor/binius64/crates/field" }
+binius-spartan-frontend = { path = "../../vendor/binius64/crates/spartan-frontend" }
+binius-spartan-prover = { path = "../../vendor/binius64/crates/spartan-prover" }
+binius-spartan-verifier = { path = "../../vendor/binius64/crates/spartan-verifier" }
 
 # Cargo does not support nested workspaces: this crate path-depends on
 # vendor/binius64/crates/*, which is itself a full [workspace] with its
