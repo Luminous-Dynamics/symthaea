@@ -35,9 +35,10 @@ This is not a sandbox/security boundary by itself. Production execution must put
 
 The dependency-free Rust reference:
 - validates task, pool, candidate and artifact identities;
-- validates SHA-256 string shape and exact candidate-pool binding;
+- validates SHA-256 string shapes; requires every Ready candidate to carry a model-artifact digest while still retaining failed attempts without one;
+- binds the candidate-pool digest supplied by the upstream canonical manifest producer to the selection trace. This crate does not recompute the digest over packet contents; the production adapter must verify the manifest-to-packet binding before constructing SelectorPacket;
 - retains candidate attempts in Ready, failed, timed-out, invalid, rejected or incomplete states;
-- makes exact semantic model duplicates visible as groups instead of silently deduplicating them;
+- makes byte-identical model artifacts (same SHA-256) visible as groups instead of silently deduplicating them; it does not claim semantic equivalence between different artifacts;
 - checks selector evidence references against the permitted evidence manifest;
 - refuses selection of unavailable or development-ineligible candidates;
 - allows explicit abstention with a reason;
@@ -81,19 +82,22 @@ This is a known-answer fixture demonstrating the audit math. It is not a live Sy
 
 ## 6. Tests and acceptance
 
-Twelve authored Rust tests cover:
+Fifteen authored Rust tests cover:
 1. selector API receives only the development packet;
 2. evaluator-only artifact IDs are rejected from the selector trace;
 3. candidate-pool and task identity are bound;
 4. strict dominance and per-metric regret;
 5. incomparable candidate preservation;
 6. failed, timed-out and missing outcomes remain in the attempt denominator;
-7. semantic duplicate identity is reported;
-8. explicit abstention when no candidate is development-eligible;
-9. exact task metric profile and missing-dimension failure;
-10. duplicate/unknown evaluator outcomes fail closed;
-11. non-finite metrics and unavailable/ineligible selections fail closed;
-12. deterministic JSON receipt preserves axes and denominators.
+7. byte-identical model-artifact duplicate groups are reported in a candidate-order-independent form;
+8. every Ready candidate must carry a valid model-artifact digest, while failed attempts may lack an artifact;
+9. explicit abstention when no candidate is development-eligible;
+10. exact task metric profile and missing-dimension failure;
+11. duplicate/unknown evaluator outcomes fail closed;
+12. non-finite metrics, malformed digests and unavailable/ineligible selections fail closed;
+13. deterministic JSON receipt preserves axes and denominators.
+14. task-native cost unit and hard cap binding.
+15. duplicate artifact groups remain stable when candidate order changes.
 
 The exact-head workflow must pass format, tests, strict Clippy and known-answer CLI receipt checks. These checks have not been claimed as passed until CI verifies the exact PR head.
 
