@@ -59,7 +59,9 @@
           "unsupported_causal_claim_count",
           "unnecessary_abstention_count",
           "future_evidence_leakage_count",
-          "critical_unsupported_claim_count"
+          "critical_unsupported_claim_count",
+          "missed_compromise_count",
+          "unsupported_compromise_claim_count"
         ],
         "properties": {
           "trace_id": {
@@ -88,7 +90,9 @@
                 "unsupported_causal_claim",
                 "unnecessary_abstention",
                 "future_evidence_event_ids",
-                "world_relations"
+                "world_relations",
+                "missed_compromise",
+                "unsupported_compromise_claim"
               ],
               "properties": {
                 "left_event_id": {
@@ -148,6 +152,12 @@
                       }
                     }
                   }
+                },
+                "missed_compromise": {
+                  "type": "boolean"
+                },
+                "unsupported_compromise_claim": {
+                  "type": "boolean"
                 }
               }
             }
@@ -184,6 +194,14 @@
           },
           "critical_unsupported_claim_count": {
             "type": "integer"
+          },
+          "missed_compromise_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unsupported_compromise_claim_count": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       }
