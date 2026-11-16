@@ -151,6 +151,7 @@ Official catalogue: https://www.bipm.org/en/committees/jc/jcgm/publications/
 
 - **Symtropy PR #4743 — PHRI-CONTINUOUS-COUPLING-001:** provides the existing standalone flat 32×32 calibrated normal-pressure field reducer (integrated normal force, thresholded area and centre of pressure). It rejects incomplete/saturated fields and is not a live sensor, shear/slip estimator, curved-surface or multi-tile implementation. Reuse it as the existing normal-pressure reference primitive; do not fork or duplicate it.
 - **Symtropy #4753 — PHRI-TAC-PHANTOM-001:** owns the non-human tactile calibration phantom, physical fixture/reference geometry, reference instrument setup and phantom measurement campaign.
+- **Symtropy #4776 — PHRI-TAC-TRANSFER-001:** owns cross-unit/cross-family/cross-revision/aging calibration-transfer regimes and sensor/lot/contact-sequence split protocol. Symthaea consumes transfer results for representation/task evaluation; it must not create a second calibration-transfer evidence service.
 - **Symtropy #4754 — PHRI-QUAL-BENCH-001:** owns the matched physical-interaction/tactile-coupling comparative benchmark and its scorecards. This Symthaea campaign contributes sensor co-design arms and must not duplicate pHRI controller/passivity or human-agency benchmark semantics.
 - **Symtropy #4790 — PHRI-CONTACT-EXPOSURE-001:** owns phantom material-stack/contact-exposure characterization. Its non-human pressure/deformation results do not establish human injury, comfort, consent or safety thresholds.
 - **Symtropy #4531 / #5335:** own the unoccupied room-scale service test cell and WaterLoop physical demonstrator. A water-quality/flow instrument is a later, separate sensor application.
@@ -177,6 +178,7 @@ The first tactile campaign should have two distinct tracks:
 | **TacO (2026)** | Four sensor modalities (visual, acoustic, magnetic, resistive) and three contact-rich manipulation tasks: unknown-mass pick-and-place, object reorientation and plug insertion | Sensor modality × material friction × task interaction; compare sensor utility under matched manipulation policies | Task-policy performance is not physical calibration; no universal best modality is implied |
 | **TacMind (30 Oct 2026)** | 128 simulation tasks, Precise / Recognition / Dynamic regimes, static and dynamic variants, 12 perturbation settings; action-conditioned tactile-history world model | Temporal prediction, contact-state discrimination, policy robustness and whether tactile history improves decision quality | Simulation benchmark only; physical transfer still required |
 | **RCT (2026 preprint)** | 29,279 tactile frames, per-press contact sequences, force signals, indentation depth, materials, categories, sensors and contact positions; held-out presses/materials/sensors/positions | Contact-sequence generalization and sensor/material transfer using its official sequence-level splits | Frame-random splitting leaks near-duplicate frames from the same press; preserve press/article lineage |
+| **GenForce (Nature Communications, 28 Jan 2026)** | Cross-sensor spatiotemporal force prediction across GelSight, uSkin and TacTip using marker-space translation | Mandatory learned-transfer comparator for force estimation; reproduce on exact hardware/data and evaluate target-unit calibration, uncertainty and held-out sensor articles separately | Published force MAE and transfer results are paper-specific; successful learned transfer is not itself target-device metrological traceability |
 | **TacVerse (2026)** | 106,800 images across 7 vision-based tactile platforms; within-sensor, zero-shot cross-sensor and few-shot adaptation protocols | Cross-sensor representation transfer, calibration/adaptation sample efficiency and degradation under sensor shift | Vision-based tactile family only; it does not compare all physical modalities |
 | **HT-Bench (2026)** | 10M RGB frames, 7.8M tactile frames, 226 tasks; retrieval, masked tactile inpainting, vision-to-tactile synthesis and multimodal prediction | Full-hand tactile representation, temporal/multimodal alignment and transfer to unseen tasks | Representation-task metrics are not force/pressure metrology |
 | **Sparsh / TacBench (Meta, 2024)** | Self-supervised tactile representation pretraining on 460k+ tactile images and six downstream tasks; reports strong gains over task-specific training | Mandatory learned-representation baseline for vision-based tactile inputs, including DINO/I-JEPA-style methods | The reported average relative gain is specific to the paper's tasks and baselines; do not compare it as a universal sensor accuracy |
@@ -187,11 +189,16 @@ Source registry:
 - TacMind: https://arxiv.org/abs/2611.00455 and https://tacmind-bench.github.io/
 - RCT: https://arxiv.org/abs/2606.31694 and https://faerber-lab.github.io/RCT/
 - TacVerse: https://lannwei.github.io/Tactile_Database/
+- GenForce: https://www.nature.com/articles/s41467-026-68753-1
 - HT-Bench: https://arxiv.org/abs/2606.19161
 - Sparsh / TacBench: https://ai.meta.com/research/publications/sparsh-self-supervised-touch-representations-for-vision-based-tactile-sensing/
 - TactiDex: https://tactidex.github.io/ and https://arxiv.org/abs/2607.09190
 
 No third-party benchmark result is a Symthaea result. Use the original benchmark license and official split/capture protocols. Do not silently redistribute external data or claim reproduction from a paper abstract alone.
+
+### Transfer novelty boundary
+
+Cross-sensor tactile force prediction is already an active published result, not a Luminous novelty claim. GenForce is a required comparison baseline. Luminous's testable differentiation is **metrology-preserving transfer**: lower target-unit labelled calibration burden while retaining target-unit calibration identity, uncertainty coverage, guard-band qualification, held-out sequence/unit/lot splits, aging/revision applicability and correct recalibration/abstention. Symtropy #4776 owns this transfer protocol; the Symthaea task/representation campaign consumes its qualified outputs. A strong predictor remains a model estimate unless the target measurement chain independently qualifies the claimed measurand.
 
 ### Luminous competitive hypothesis
 
