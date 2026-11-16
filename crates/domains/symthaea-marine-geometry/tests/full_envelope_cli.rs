@@ -13,7 +13,6 @@ fn run_cli(args: &[&str]) -> std::process::Output {
         .expect("full-envelope validation CLI must launch")
 }
 
-
 fn run_cli_with_spec(name: &str, specification: &serde_json::Value) -> std::process::Output {
     let path = std::env::temp_dir().join(format!(
         "symthaea-full-envelope-{}-{name}.json",
