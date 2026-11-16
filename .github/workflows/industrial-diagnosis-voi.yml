@@ -37,3 +37,11 @@ jobs:
         test "$(wc -l < /tmp/industrial-diagnosis-voi.tsv)" -eq 7
         awk -F '\t' '$1 == "POLICY" && $3 == "MAX_EXPECTED_INFORMATION_GAIN" && $4 == "CALIBRATION_REFERENCE_ARTIFACT" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-voi.tsv
         awk -F '\t' '$1 == "POLICY" && $3 == "MAX_NET_VALUE_OF_INFORMATION" && $4 == "INDEPENDENT_PROCESS_SAFETY_TEST" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-voi.tsv
+    - name: Emit and verify adaptive depth-two policy tree
+      run: |
+        cargo run --quiet --manifest-path tools/industrial-diagnosis-voi/Cargo.toml --bin voi-sequential-report | tee /tmp/industrial-diagnosis-sequential-voi.tsv
+        test "$(wc -l < /tmp/industrial-diagnosis-sequential-voi.tsv)" -eq 6
+        awk -F '\t' '$1 == "GREEDY_ONE_STEP" && $3 == "INDEPENDENT_PROCESS_SAFETY_TEST" && $7 == "7.770000" && $8 == "2.000000" && $9 == "9.770000" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
+        awk -F '\t' '$1 == "ADAPTIVE_DEPTH_TWO" && $3 == "CALIBRATION_REFERENCE_ARTIFACT" && $7 == "4.248000" && $8 == "2.350000" && $9 == "6.598000" && $10 == "7.204444" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
+        awk -F '\t' '$1 == "BRANCH" && $4 == "POSITIVE" && $5 == "STOP" && $11 == "0.325000" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
+        awk -F '\t' '$1 == "BRANCH" && $4 == "NEGATIVE" && $5 == "INDEPENDENT_PROCESS_SAFETY_TEST" && $11 == "0.675000" { found=1 } END { exit !found }' /tmp/industrial-diagnosis-sequential-voi.tsv
