@@ -36,9 +36,9 @@ For a pair of mechanisms, a replication vector r_a yields simple Gaussian likeli
 
     I_(m,n)(r) = sum_a r_a * (mu_(m,a) - mu_(n,a))^2 / sigma_a^2
 
-With K distinct signature classes, the v0 reference uses the conservative Bonferroni allocation:
+Let P be the number of cross-class mechanism pairs (all choose(M,2) mechanism pairs minus the irreducible within-class pairs). The v0 reference uses the conservative Bonferroni allocation across every pair that the report evaluates:
 
-    alpha_pair = alpha_familywise / choose(K, 2)
+    alpha_pair = alpha_familywise / P
 
 For a one-sided known-direction Gaussian likelihood-ratio test:
 
