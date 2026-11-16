@@ -4153,11 +4153,28 @@ mod tests {
                 "unqualified_coproduct_credit_forbidden": true
             })
         };
-        let comparator_case_id = match lane {
-            "CO2_DBD_MODEL_GENERALIZATION" => "CO2-DBD-ML-358-DATASET-2026",
-            "CO2_WARM_PLASMA_RWGS" => "CO2-RWGS-GLIDING-ARC-2026",
-            "CO2_CYCLIC_CARBON_UTILIZATION" => "CO2-CYCLIC-REFORMING-GASIFICATION-2026",
-            _ => "case-1"
+        let (comparator_case_id, comparator_case) = match lane {
+            "CO2_DBD_MODEL_GENERALIZATION" => (
+                "CO2-DBD-ML-358-DATASET-2026",
+                frozen_case("CO2-DBD-ML-358-DATASET-2026"),
+            ),
+            "CO2_WARM_PLASMA_RWGS" => (
+                "CO2-RWGS-GLIDING-ARC-2026",
+                frozen_case("CO2-RWGS-GLIDING-ARC-2026"),
+            ),
+            "CO2_CYCLIC_CARBON_UTILIZATION" => (
+                "CO2-CYCLIC-REFORMING-GASIFICATION-2026",
+                frozen_case("CO2-CYCLIC-REFORMING-GASIFICATION-2026"),
+            ),
+            _ => (
+                "case-1",
+                serde_json::json!({
+                    "case_id": "case-1",
+                    "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
+                    "luminous_reproduction": false,
+                    "source": {"url": "https://example.org/source"}
+                }),
+            ),
         };
         serde_json::json!({
             "programme": "PLASMA-ENERGY-001",
@@ -4172,14 +4189,7 @@ mod tests {
                 "GOVERNMENT_RESEARCH_FACILITY_DESCRIPTION",
                 "GOVERNMENT_ROADMAP"
             ],
-            "cases": [
-                {
-                    "case_id": comparator_case_id,
-                    "evidence_class": "PUBLISHED_LAB_EXPERIMENT",
-                    "luminous_reproduction": false,
-                    "source": {"url": "https://example.org/source"}
-                }
-            ],
+            "cases": [comparator_case],
             "benchmark_targets": [{
                 "target_id": "target-1",
                 "lane": lane,
