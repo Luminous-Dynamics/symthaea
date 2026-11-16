@@ -949,8 +949,7 @@ pub fn solve_upright_mass_balance(
                 request.mass_tolerance_tonnes,
                 request.plane_tolerance_m,
                 request.maximum_iterations
-            )
-            .into(),
+            ),
         }]);
     };
     let residual = (best_result.displaced_mass_tonnes - request.target_mass_tonnes).abs();
