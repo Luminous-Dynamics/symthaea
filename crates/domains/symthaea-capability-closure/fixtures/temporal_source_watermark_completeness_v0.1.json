@@ -257,7 +257,6 @@
     ],
     "indexed_query_repetitions": 51,
     "verified_query_repetitions": 15,
-    "interval_width_us": 16,
     "event_time_order": "deterministic_permutation_relative_to_arrival_order",
     "outputs": [
       "source_count",
