@@ -27,6 +27,7 @@ pub enum DataSplit {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActionContract {
     pub action_id: String,
+    pub modality: String,
     /// Ordered, exhaustive categorical outcomes for this action.
     pub outcome_ids: Vec<String>,
 }
@@ -147,6 +148,12 @@ impl CalibrationDataset {
             }
             if !action_ids.insert(action.action_id.as_str()) {
                 return Err(CalibrationError::DuplicateActionId(action.action_id.clone()));
+            }
+            if !nonempty(&action.modality) {
+                return Err(CalibrationError::EmptyField {
+                    case_id: action.action_id.clone(),
+                    field: "modality",
+                });
             }
             if action.outcome_ids.is_empty() {
                 return Err(CalibrationError::ActionHasNoOutcomes(action.action_id.clone()));
@@ -358,6 +365,11 @@ impl CalibrationDataset {
             dataset_id: self.dataset_id.clone(),
             hypothesis_ids: self.hypothesis_ids.clone(),
             action_ids: self.actions.iter().map(|action| action.action_id.clone()).collect(),
+            action_modalities: self
+                .actions
+                .iter()
+                .map(|action| (action.action_id.clone(), action.modality.clone()))
+                .collect(),
             estimator_id: "dirichlet-categorical-v0.1".to_string(),
             training_split_only: true,
             dirichlet_alpha,
@@ -380,6 +392,8 @@ impl CalibrationDataset {
             || table.estimator_id != "dirichlet-categorical-v0.1"
             || table.hypothesis_ids != self.hypothesis_ids
             || table.action_ids != self.actions.iter().map(|action| action.action_id.clone()).collect::<Vec<_>>()
+            || table.action_modalities
+                != self.actions.iter().map(|action| (action.action_id.clone(), action.modality.clone())).collect::<Vec<_>>()
             || !table.dirichlet_alpha.is_finite()
             || table.dirichlet_alpha <= 0.0
             || table.minimum_training_sites == 0
@@ -552,6 +566,7 @@ pub struct EmpiricalLikelihoodTable {
     pub dataset_id: String,
     pub hypothesis_ids: Vec<String>,
     pub action_ids: Vec<String>,
+    pub action_modalities: Vec<(String, String)>,
     pub estimator_id: String,
     pub training_split_only: bool,
     pub dirichlet_alpha: f64,
@@ -657,9 +672,15 @@ impl EmpiricalLikelihoodTable {
             let policy = policy_map
                 .get(action_id)
                 .ok_or(CalibrationError::PlannerActionPolicyMismatch)?;
+            let modality = self
+                .action_modalities
+                .iter()
+                .find(|(id, _)| id == action_id)
+                .map(|(_, modality)| modality.clone())
+                .ok_or(CalibrationError::InvalidLikelihoodTable)?;
             actions.push(PlannerMeasurementAction {
                 id: action_id.clone(),
-                modality: action_id.clone(),
+                modality,
                 outcomes,
                 cost: policy.resource_cost,
                 external_gate_passed: policy.external_gate_passed,
@@ -729,11 +750,12 @@ mod tests {
                 "unknown".into(),
             ],
             actions: vec![ActionContract {
-                action_id: "gpr".into(),
+                action_id: "gpr-survey-01".into(),
+                modality: "ground_penetrating_radar".into(),
                 outcome_ids: vec!["signal".into(), "no_signal".into()],
             }],
             cases: vec![
-                case("t1", "site-t1", "gpr", "tunnel", "signal", DataSplit::Training),
+                case("t1", "site-t1", "gpr-survey-01", "tunnel", "signal", DataSplit::Training),
                 case("t2", "site-t2", "gpr", "tunnel", "signal", DataSplit::Training),
                 case("t3", "site-t3", "gpr", "tunnel", "no_signal", DataSplit::Training),
                 case("c1", "site-c1", "gpr", "collapse", "no_signal", DataSplit::Training),
