@@ -37,19 +37,23 @@ jobs:
         run: |
           test "$(git hash-object docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.json)" = "e9349751590c4a3a28f4be81a5a11f8170ef2212"
           test "$(git hash-object docs/research/fixtures/SENSE_TAC_001B_FAULT_CORPUS_V0_1.schema.json)" = "7b531325c1c8f105879dd80e0ba6016555a4b645"
-      - name: Diagnostic lock resolution (temporary)
+      - name: Regenerate and format diagnostic outputs (temporary)
         run: |
           cargo generate-lockfile --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
-          if git diff --quiet -- tools/sense-tac-001b-oracle/Cargo.lock; then
-            echo "lockfile_current=true"
-          else
-            echo "lockfile_current=false; regenerated diff follows"
-            git diff -- tools/sense-tac-001b-oracle/Cargo.lock
-          fi
+          cargo fmt --manifest-path tools/sense-tac-001b-oracle/Cargo.toml --all
+      - name: Upload canonical lock and formatted source for commit
+        uses: actions/upload-artifact@v4
+        with:
+          name: sense-tac-001b-regenerated-lock-and-formatted-source
+          path: |
+            tools/sense-tac-001b-oracle/Cargo.lock
+            tools/sense-tac-001b-oracle/src/lib.rs
+          if-no-files-found: error
+          retention-days: 3
+      - name: Verify formatting
+        run: cargo fmt --manifest-path tools/sense-tac-001b-oracle/Cargo.toml --all -- --check
       - name: Fetch locked dependencies
         run: cargo fetch --locked --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
-      - name: Check formatting
-        run: cargo fmt --manifest-path tools/sense-tac-001b-oracle/Cargo.toml --all -- --check
       - name: Run offline mutation tests
         run: cargo test --locked --offline --manifest-path tools/sense-tac-001b-oracle/Cargo.toml
       - name: Run strict Clippy
