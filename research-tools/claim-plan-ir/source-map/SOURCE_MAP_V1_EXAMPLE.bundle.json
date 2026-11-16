@@ -180,7 +180,7 @@
     {
       "stage_id": "stage-http-body",
       "ordinal": 1,
-      "operation": "http_message_extract",
+      "operation": "http_body_extract",
       "profile_id": "luminous.cpir.range-map.v1",
       "profile_digest": "ee6a158e5ca2f82c6580180778f9011424e882cf32860a9383456896a53128b4",
       "implementation_id": "synthetic-fixture-builder-v1",
