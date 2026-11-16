@@ -168,6 +168,16 @@ def main() -> None:
                 _, second_id, terminal_loss, second_cost, second_outcomes = sorted(
                     second_candidates, key=lambda item: (-item[0], item[1])
                 )[0]
+                positive_decision_loss = (
+                    min_decision(second_outcomes["positive_posterior"])[1]
+                    if second_outcomes["positive_posterior"] is not None
+                    else None
+                )
+                negative_decision_loss = (
+                    min_decision(second_outcomes["negative_posterior"])[1]
+                    if second_outcomes["negative_posterior"] is not None
+                    else None
+                )
                 positive_decision = (
                     min_decision(second_outcomes["positive_posterior"])[0]
                     if second_outcomes["positive_posterior"] is not None
@@ -178,6 +188,18 @@ def main() -> None:
                     if second_outcomes["negative_posterior"] is not None
                     else None
                 )
+                second_positive_probability = second_outcomes["positive_probability"]
+                second_negative_probability = second_outcomes["negative_probability"]
+                positive_leaf = (
+                    first["cost"] + second_cost + positive_decision_loss
+                    if positive_decision_loss is not None else None
+                )
+                negative_leaf = (
+                    first["cost"] + second_cost + negative_decision_loss
+                    if negative_decision_loss is not None else None
+                )
+                leaf_losses = [loss for loss in (positive_leaf, negative_leaf) if loss is not None]
+                worst_case_leaf = max(leaf_losses)
                 stop = None
             else:
                 second_id = "STOP"
@@ -185,6 +207,11 @@ def main() -> None:
                 second_cost = 0.0
                 positive_decision = None
                 negative_decision = None
+                second_positive_probability = None
+                second_negative_probability = None
+                positive_leaf = None
+                negative_leaf = None
+                worst_case_leaf = first["cost"] + current_loss
                 stop = stop_decision
 
             branch_total = first["cost"] + terminal_loss + second_cost
@@ -197,9 +224,14 @@ def main() -> None:
                 "stop_decision": stop,
                 "second_positive_decision": positive_decision,
                 "second_negative_decision": negative_decision,
+                "second_positive_probability": second_positive_probability,
+                "second_negative_probability": second_negative_probability,
+                "second_positive_leaf_total_loss": positive_leaf,
+                "second_negative_leaf_total_loss": negative_leaf,
                 "terminal_loss": terminal_loss,
                 "second_cost": second_cost,
                 "branch_total_loss": branch_total,
+                "worst_case_leaf_total_loss": worst_case_leaf,
             })
 
         total = expected_terminal + expected_cost
@@ -210,7 +242,8 @@ def main() -> None:
                 "expected_terminal_loss": expected_terminal,
                 "expected_measurement_cost": expected_cost,
                 "expected_total_loss": total,
-                "worst_case_branch_total_loss": max(branch["branch_total_loss"] for branch in branches),
+                "worst_case_leaf_total_loss": max(branch["worst_case_leaf_total_loss"] for branch in branches),
+                "worst_case_regret_vs_no_test": max(0.0, max(branch["worst_case_leaf_total_loss"] for branch in branches) - baseline_loss),
                 "improvement_over_no_test": baseline_loss - total,
             })
 
