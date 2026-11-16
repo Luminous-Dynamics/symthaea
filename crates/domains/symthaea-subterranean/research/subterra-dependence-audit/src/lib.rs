@@ -143,6 +143,36 @@ pub enum ManifestError {
     MissingSplitAssignment(String),
     UnknownSplitAssignment(String),
     SplitAudit(AuditError),
+    MissingSiteEvidenceDocuments,
+    InvalidSiteEvidenceJson(String),
+    UnsupportedSiteEvidenceSchemaVersion(String),
+    EmptySiteEvidenceSiteId,
+    DuplicateSiteEvidenceSite(String),
+    EmptySiteEvidenceObservationId { site_id: String },
+    DuplicateSiteEvidenceObservationId {
+        observation_id: String,
+        first_site_id: String,
+        duplicate_site_id: String,
+    },
+    ManifestObservationNotFound {
+        record_id: String,
+        site_id: String,
+        observation_id: String,
+    },
+    ManifestObservationSiteMismatch {
+        record_id: String,
+        expected_site_id: String,
+        actual_site_id: String,
+    },
+    DuplicateManifestObservationId {
+        observation_id: String,
+        first_record_id: String,
+        duplicate_record_id: String,
+    },
+    SiteEvidenceObservationUnmapped {
+        site_id: String,
+        observation_id: String,
+    },
 }
 
 impl std::fmt::Display for ManifestError {
@@ -152,6 +182,19 @@ impl std::fmt::Display for ManifestError {
 }
 
 impl std::error::Error for ManifestError {}
+
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+struct SiteEvidenceObservationProjection {
+    schema_version: String,
+    site_id: String,
+    observations: Vec<SiteEvidenceObservationProjectionItem>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+struct SiteEvidenceObservationProjectionItem {
+    observation_id: String,
+}
 
 pub fn parse_lineage_manifest(input: &str) -> Result<ObservationLineageManifest, ManifestError> {
     let manifest: ObservationLineageManifest =
@@ -402,6 +445,119 @@ impl ObservationLineageManifest {
             dataset_id: self.dataset_id.clone(),
             cases,
         })
+    }
+
+
+    /// Cross-check every lineage record against the observation arrays in
+    /// schema-conforming Symtropy site-evidence JSON documents. This is a
+    /// strict projection of the required fields; the producer's JSON Schema
+    /// remains responsible for validating the full site-evidence document.
+    pub fn validate_against_site_evidence_json(
+        &self,
+        site_evidence_json: &[&str],
+    ) -> Result<(), ManifestError> {
+        self.validate()?;
+        if site_evidence_json.is_empty() {
+            return Err(ManifestError::MissingSiteEvidenceDocuments);
+        }
+
+        let mut site_ids = BTreeSet::<String>::new();
+        let mut observations_by_id = BTreeMap::<String, String>::new();
+
+        for input in site_evidence_json {
+            let site: SiteEvidenceObservationProjection =
+                serde_json::from_str(input)
+                    .map_err(|error| ManifestError::InvalidSiteEvidenceJson(error.to_string()))?;
+            if site.schema_version != "0.1" {
+                return Err(ManifestError::UnsupportedSiteEvidenceSchemaVersion(
+                    site.schema_version,
+                ));
+            }
+            if !nonempty(&site.site_id) {
+                return Err(ManifestError::EmptySiteEvidenceSiteId);
+            }
+            if !site_ids.insert(site.site_id.clone()) {
+                return Err(ManifestError::DuplicateSiteEvidenceSite(site.site_id));
+            }
+
+            let mut local_observations = BTreeSet::new();
+            for observation in site.observations {
+                if !nonempty(&observation.observation_id) {
+                    return Err(ManifestError::EmptySiteEvidenceObservationId {
+                        site_id: site.site_id.clone(),
+                    });
+                }
+                if !local_observations.insert(observation.observation_id.clone()) {
+                    return Err(ManifestError::DuplicateSiteEvidenceObservationId {
+                        observation_id: observation.observation_id,
+                        first_site_id: site.site_id.clone(),
+                        duplicate_site_id: site.site_id.clone(),
+                    });
+                }
+                if let Some(first_site_id) = observations_by_id.insert(
+                    observation.observation_id.clone(),
+                    site.site_id.clone(),
+                ) {
+                    return Err(ManifestError::DuplicateSiteEvidenceObservationId {
+                        observation_id: observation.observation_id,
+                        first_site_id,
+                        duplicate_site_id: site.site_id.clone(),
+                    });
+                }
+            }
+        }
+
+        let mut manifest_observations = BTreeMap::<&str, &str>::new();
+        for record in &self.records {
+            if let Some(first_record_id) = manifest_observations.insert(
+                record.observation_id.as_str(),
+                record.record_id.as_str(),
+            ) {
+                return Err(ManifestError::DuplicateManifestObservationId {
+                    observation_id: record.observation_id.clone(),
+                    first_record_id: first_record_id.to_string(),
+                    duplicate_record_id: record.record_id.clone(),
+                });
+            }
+
+            match observations_by_id.get(&record.observation_id) {
+                None => {
+                    return Err(ManifestError::ManifestObservationNotFound {
+                        record_id: record.record_id.clone(),
+                        site_id: record.site_id.clone(),
+                        observation_id: record.observation_id.clone(),
+                    });
+                }
+                Some(actual_site_id) if actual_site_id != &record.site_id => {
+                    return Err(ManifestError::ManifestObservationSiteMismatch {
+                        record_id: record.record_id.clone(),
+                        expected_site_id: record.site_id.clone(),
+                        actual_site_id: actual_site_id.clone(),
+                    });
+                }
+                Some(_) => {}
+            }
+        }
+
+        for (observation_id, site_id) in &observations_by_id {
+            if !manifest_observations.contains_key(observation_id.as_str()) {
+                return Err(ManifestError::SiteEvidenceObservationUnmapped {
+                    site_id: site_id.clone(),
+                    observation_id: observation_id.clone(),
+                });
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn audit_with_site_evidence_json(
+        &self,
+        site_evidence_json: &[&str],
+        split_by_record_id: &BTreeMap<String, DataSplit>,
+    ) -> Result<DependencyAuditReport, ManifestError> {
+        self.validate_against_site_evidence_json(site_evidence_json)?;
+        self.audit_with_splits(split_by_record_id)
     }
 
     pub fn audit_with_splits(
@@ -1586,6 +1742,151 @@ mod tests {
                 "record-site-a-raw-01".into()
             ))
         );
+    }
+
+    const SITE_EVIDENCE_A: &str =
+        include_str!("../fixtures/site-evidence-lineage-a-synthetic.json");
+    const SITE_EVIDENCE_B: &str =
+        include_str!("../fixtures/site-evidence-lineage-b-synthetic.json");
+    const SITE_EVIDENCE_C: &str =
+        include_str!("../fixtures/site-evidence-lineage-c-synthetic.json");
+
+    fn site_evidence_fixture_set() -> [&'static str; 3] {
+        [SITE_EVIDENCE_A, SITE_EVIDENCE_B, SITE_EVIDENCE_C]
+    }
+
+    #[test]
+    fn lineage_observations_resolve_exactly_once_to_their_site_evidence() {
+        let manifest = fixture_manifest();
+        assert!(manifest
+            .validate_against_site_evidence_json(&site_evidence_fixture_set())
+            .is_ok());
+        let report = manifest
+            .audit_with_site_evidence_json(
+                &site_evidence_fixture_set(),
+                &fixture_splits(&manifest),
+            )
+            .unwrap();
+        assert_eq!(report.total_cases, 6);
+        assert_eq!(report.unique_sites, 3);
+    }
+
+    #[test]
+    fn site_evidence_fixture_set_must_cover_all_records() {
+        let manifest = fixture_manifest();
+        assert_eq!(
+            manifest.validate_against_site_evidence_json(&[]),
+            Err(ManifestError::MissingSiteEvidenceDocuments)
+        );
+        assert!(matches!(
+            manifest.validate_against_site_evidence_json(&[SITE_EVIDENCE_A, SITE_EVIDENCE_B]),
+            Err(ManifestError::ManifestObservationNotFound { .. })
+        ));
+    }
+
+    #[test]
+    fn observation_ids_must_be_unique_across_site_documents() {
+        let manifest = fixture_manifest();
+        let duplicate = SITE_EVIDENCE_B.replace(
+            "obs-site-b-raw-01",
+            "obs-site-a-raw-01"
+        );
+        assert!(matches!(
+            manifest.validate_against_site_evidence_json(&[
+                SITE_EVIDENCE_A,
+                &duplicate,
+                SITE_EVIDENCE_C
+            ]),
+            Err(ManifestError::DuplicateSiteEvidenceObservationId { .. })
+        ));
+    }
+
+    #[test]
+    fn manifest_observation_must_belong_to_the_declared_site() {
+        let mut manifest = fixture_manifest();
+        manifest.records[0].site_id = "synthetic-site-b".into();
+        assert_eq!(
+            manifest.validate_against_site_evidence_json(&site_evidence_fixture_set()),
+            Err(ManifestError::ManifestObservationSiteMismatch {
+                record_id: "record-site-a-raw-01".into(),
+                expected_site_id: "synthetic-site-b".into(),
+                actual_site_id: "synthetic-site-a".into()
+            })
+        );
+    }
+
+    #[test]
+    fn every_site_evidence_observation_must_have_a_lineage_record() {
+        let manifest = fixture_manifest();
+        let extra = SITE_EVIDENCE_C.replace(
+            "obs-site-c-raw-01",
+            "obs-site-c-raw-01\", \"observation_id\": \"unmapped-extra"
+        );
+        assert!(matches!(
+            manifest.validate_against_site_evidence_json(&[
+                SITE_EVIDENCE_A,
+                SITE_EVIDENCE_B,
+                &extra
+            ]),
+            Err(ManifestError::InvalidSiteEvidenceJson(_))
+                | Err(ManifestError::SiteEvidenceObservationUnmapped { .. })
+        ));
+    }
+
+    #[test]
+    fn duplicate_manifest_observation_bindings_are_rejected() {
+        let mut manifest = fixture_manifest();
+        manifest.records[1].observation_id = manifest.records[0].observation_id.clone();
+        assert!(matches!(
+            manifest.validate_against_site_evidence_json(&site_evidence_fixture_set()),
+            Err(ManifestError::DuplicateManifestObservationId { .. })
+        ));
+    }
+
+    #[test]
+    fn unsupported_or_malformed_site_evidence_json_is_rejected() {
+        let manifest = fixture_manifest();
+        assert!(matches!(
+            manifest.validate_against_site_evidence_json(&["{"]),
+            Err(ManifestError::InvalidSiteEvidenceJson(_))
+        ));
+        let unsupported = SITE_EVIDENCE_A.replace(
+            "\"schema_version\": \"0.1\"",
+            "\"schema_version\": \"0.2\""
+        );
+        assert_eq!(
+            manifest.validate_against_site_evidence_json(&[
+                &unsupported,
+                SITE_EVIDENCE_B,
+                SITE_EVIDENCE_C
+            ]),
+            Err(ManifestError::UnsupportedSiteEvidenceSchemaVersion("0.2".into()))
+        );
+    }
+
+    #[test]
+    fn duplicate_site_documents_and_local_observations_are_rejected() {
+        let manifest = fixture_manifest();
+        assert_eq!(
+            manifest.validate_against_site_evidence_json(&[
+                SITE_EVIDENCE_A,
+                SITE_EVIDENCE_A,
+                SITE_EVIDENCE_C
+            ]),
+            Err(ManifestError::DuplicateSiteEvidenceSite("synthetic-site-a".into()))
+        );
+        let duplicate_local = SITE_EVIDENCE_A.replace(
+            "\"observation_id\": \"obs-site-a-raw-02\"",
+            "\"observation_id\": \"obs-site-a-raw-01\""
+        );
+        assert!(matches!(
+            manifest.validate_against_site_evidence_json(&[
+                &duplicate_local,
+                SITE_EVIDENCE_B,
+                SITE_EVIDENCE_C
+            ]),
+            Err(ManifestError::DuplicateSiteEvidenceObservationId { .. })
+        ));
     }
 
 }
