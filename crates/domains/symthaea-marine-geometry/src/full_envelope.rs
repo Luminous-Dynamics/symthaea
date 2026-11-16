@@ -566,16 +566,15 @@ fn validate_symmetry_and_port_profiles(
                 for (port_point, starboard_point) in
                     port.iter().zip(station.starboard_profile.iter())
                 {
-                    if port_point.role != starboard_point.role
+                    if port_point.point_id == starboard_point.point_id
+                        || port_point.role != starboard_point.role
                         || port_point.region_to_next != starboard_point.region_to_next
-                        || !close(port_point.y_m, -starboard_point.y_m)
-                        || !close(port_point.z_m, starboard_point.z_m)
                     {
                         reject(
                             issues,
                             "port_starboard_correspondence",
                             format!(
-                                "station {} port point {} does not mirror starboard point {}",
+                                "station {} port point {} must have a distinct identity and matching semantic role/breakline with starboard point {}",
                                 station.station_id, port_point.point_id, starboard_point.point_id
                             ),
                         );
@@ -742,13 +741,13 @@ fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssu
                 };
                 if port_point.role != ProfilePointRole::Waterline
                     || !close(port_point.z_m, 0.0)
-                    || !close(port_point.y_m, -starboard_point.y_m)
+                    || port_point.y_m >= -COORDINATE_TOLERANCE_M
                 {
                     reject(
                         issues,
                         "waterline_port_semantics",
                         format!(
-                            "station {} port reference is not the mirrored z=0 waterline point",
+                            "station {} explicit port reference must be a negative-y waterline point on z=0",
                             station.station_id
                         ),
                     );
@@ -1412,7 +1411,7 @@ mod tests {
             let mut port = station.starboard_profile.clone();
             for point in &mut port {
                 point.point_id = format!("PORT-{}", point.point_id);
-                point.y_m = -point.y_m;
+                point.y_m = -0.9 * point.y_m;
             }
             station.port_profile = Some(port);
         }
