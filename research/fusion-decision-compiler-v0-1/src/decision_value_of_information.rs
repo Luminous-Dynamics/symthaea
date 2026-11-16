@@ -810,6 +810,7 @@ mod tests {
         id: &str,
         direct_cost: f64,
         opportunity_cost: f64,
+        predictive_variance_score: f64,
         signal_groups: &[(&str, &str)],
     ) -> InformationExperiment {
         InformationExperiment {
