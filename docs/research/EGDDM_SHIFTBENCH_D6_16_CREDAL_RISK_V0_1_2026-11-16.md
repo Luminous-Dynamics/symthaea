@@ -52,6 +52,8 @@ Ten traces test:
 
 The values are synthetic evaluator fixture calculations, not real-world incident probabilities, agent trials or calibrated safety estimates.
 
+The Rust test module additionally covers candidate attempts to alter authoritative prior bounds, action policies, decision cutoff and option availability; infeasible prior sets; future/backwards timestamps; false observations; and zero posterior support. These tests are authored controls, not executed results until a Rust toolchain is available.
+
 ## Metrics and benchmark comparisons
 
 Report nominal risk, worst-case posterior risk, prior-optimism gap, ambiguity width, robust/nominal action coverage, unsupported action rate, actual unsafe action, false-safe decisions, unnecessary deferral, false-observation acceptance, and prior-bound sensitivity. Do not collapse these into a weighted score; hard safety failures remain exclusions.
