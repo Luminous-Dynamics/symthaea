@@ -97,7 +97,7 @@ pub struct ClockCalibrationV1 {
     /// Maximum absolute relative clock-rate error, in parts per billion.
     pub max_abs_drift_ppb: u64,
     /// Knowledge-time coordinate at which this calibration became available.
-    pub recorded_at_us: i64,
+    pub recorded_at_knowledge_us: i64,
     pub policy_sha256: [u8; 32],
 }
 
@@ -111,8 +111,8 @@ pub enum ClockCalibrationError {
     AnchorOutsideValidityRange,
     InvertedOffsetInterval,
     FutureCalibration {
-        recorded_at_us: i64,
-        known_at_us: i64,
+        recorded_at_knowledge_us: i64,
+        known_at_knowledge_us: i64,
     },
     SourceDomainMismatch {
         expected: ClockDomainId,
@@ -141,9 +141,9 @@ impl fmt::Display for ClockCalibrationError {
             Self::InvalidValidityRange => write!(f, "clock calibration validity range must be non-empty"),
             Self::AnchorOutsideValidityRange => write!(f, "clock calibration anchor must lie inside its validity range"),
             Self::InvertedOffsetInterval => write!(f, "clock calibration lower offset exceeds upper offset"),
-            Self::FutureCalibration { recorded_at_us, known_at_us } => write!(
+            Self::FutureCalibration { recorded_at_knowledge_us, known_at_knowledge_us } => write!(
                 f,
-                "clock calibration recorded at {recorded_at_us} is not known at cutoff {known_at_us}"
+                "clock calibration recorded at {recorded_at_knowledge_us} is not known at cutoff {known_at_knowledge_us}"
             ),
             Self::SourceDomainMismatch { expected, actual } => write!(
                 f,
@@ -212,7 +212,7 @@ impl ClockCalibrationV1 {
         hasher.update(self.offset_lower_us.to_le_bytes());
         hasher.update(self.offset_upper_us.to_le_bytes());
         hasher.update(self.max_abs_drift_ppb.to_le_bytes());
-        hasher.update(self.recorded_at_us.to_le_bytes());
+        hasher.update(self.recorded_at_knowledge_us.to_le_bytes());
         hasher.update(self.policy_sha256);
         hasher.finalize().into()
     }
@@ -224,7 +224,7 @@ impl ClockCalibrationV1 {
         &self,
         actual_source_domain: ClockDomainId,
         source_time_us: i64,
-        known_at_us: i64,
+        known_at_knowledge_us: i64,
     ) -> Result<MappedClockTime, ClockCalibrationError> {
         self.validate()?;
         if actual_source_domain != self.source_domain {
@@ -233,10 +233,10 @@ impl ClockCalibrationV1 {
                 actual: actual_source_domain,
             });
         }
-        if self.recorded_at_us > known_at_us {
+        if self.recorded_at_knowledge_us > known_at_knowledge_us {
             return Err(ClockCalibrationError::FutureCalibration {
-                recorded_at_us: self.recorded_at_us,
-                known_at_us,
+                recorded_at_knowledge_us: self.recorded_at_knowledge_us,
+                known_at_knowledge_us,
             });
         }
         if source_time_us < self.valid_from_source_us
@@ -258,8 +258,13 @@ impl ClockCalibrationV1 {
             .ok_or(ClockCalibrationError::ArithmeticOverflow)?;
         let denominator = DRIFT_DENOMINATOR as u128;
         let drift_floor = drift_numerator / denominator;
+        let round_up = if drift_numerator % denominator == 0 {
+            0
+        } else {
+            1
+        };
         let drift_ceil = drift_floor
-            .checked_add(u128::from(drift_numerator % denominator != 0))
+            .checked_add(round_up)
             .ok_or(ClockCalibrationError::ArithmeticOverflow)?;
         let drift_uncertainty = i128::try_from(drift_ceil)
             .map_err(|_| ClockCalibrationError::ArithmeticOverflow)?;
@@ -294,9 +299,9 @@ impl ClockCalibrationV1 {
     pub fn map_exclusive_watermark(
         &self,
         source_exclusive_watermark_us: i64,
-        known_at_us: i64,
+        known_at_knowledge_us: i64,
     ) -> Result<MappedExclusiveWatermark, ClockCalibrationError> {
-        let mapped = self.map_time(self.source_domain, source_exclusive_watermark_us, known_at_us)?;
+        let mapped = self.map_time(self.source_domain, source_exclusive_watermark_us, known_at_knowledge_us)?;
         Ok(MappedExclusiveWatermark {
             source_domain: mapped.source_domain,
             reference_domain: mapped.reference_domain,
@@ -352,7 +357,7 @@ mod tests {
             offset_lower_us: 2,
             offset_upper_us: 4,
             max_abs_drift_ppb: 0,
-            recorded_at_us: 100,
+            recorded_at_knowledge_us: 100,
             policy_sha256: [0xA5; 32],
         }
     }
@@ -377,8 +382,8 @@ mod tests {
         clock.max_abs_drift_ppb = 1_000_000;
 
         let mapped = clock.map_time(ClockDomainId(1), 1_001, 100).unwrap();
-        assert_eq!(mapped.earliest_reference_us, -2);
-        assert_eq!(mapped.latest_reference_us, 2);
+        assert_eq!(mapped.earliest_reference_us, 998);
+        assert_eq!(mapped.latest_reference_us, 1_004);
     }
 
     #[test]
@@ -387,8 +392,8 @@ mod tests {
         assert_eq!(
             clock.map_time(ClockDomainId(1), 1_000, 99),
             Err(ClockCalibrationError::FutureCalibration {
-                recorded_at_us: 100,
-                known_at_us: 99,
+                recorded_at_knowledge_us: 100,
+                known_at_knowledge_us: 99,
             })
         );
     }
