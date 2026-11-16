@@ -122,6 +122,40 @@ fn cli_returns_typed_rejection_for_non_positive_density() {
     );
 }
 
+
+#[test]
+fn cli_independently_verifies_a_loading_sweep_receipt() {
+    let request = fixture_path("marine-full-envelope-loading-sweep-001.json");
+    let request_arg = request.to_str().expect("fixture path must be UTF-8");
+    let evaluated = run_cli(&[request_arg]);
+    assert_eq!(evaluated.status.code(), Some(0));
+    let report: serde_json::Value =
+        serde_json::from_slice(&evaluated.stdout).expect("CLI must emit a JSON report");
+    let receipt_path = std::env::temp_dir().join(format!(
+        "symthaea-sectional-receipt-{}.json",
+        std::process::id()
+    ));
+    fs::write(
+        &receipt_path,
+        serde_json::to_vec(&report["receipt"]).expect("receipt must serialize"),
+    )
+    .expect("receipt must be written");
+    let receipt_arg = receipt_path.to_str().expect("receipt path must be UTF-8");
+    let verified = run_cli(&[request_arg, "--verify", receipt_arg]);
+    fs::remove_file(&receipt_path).expect("temporary receipt must be removed");
+
+    assert_eq!(
+        verified.status.code(),
+        Some(0),
+        "receipt verification failed: {}",
+        String::from_utf8_lossy(&verified.stderr)
+    );
+    let verification: serde_json::Value =
+        serde_json::from_slice(&verified.stdout).expect("verification must emit JSON");
+    assert_eq!(verification["status"], "verified");
+    assert_eq!(verification["result_count"], 3);
+}
+
 #[test]
 fn cli_help_documents_the_method_boundary() {
     let output = run_cli(&["--help"]);
