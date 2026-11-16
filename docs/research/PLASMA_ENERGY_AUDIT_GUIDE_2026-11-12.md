@@ -346,3 +346,18 @@ The new derived source check computes reciprocal yields, the source-metric ratio
 A seventh target, `NH3-PLASMA-SYNTHESIS-SOEC-HB-COMPETITIVENESS-001`, now requires <=7.32 kWh/kg accepted NH3 (at least 10% below the 8.14 kWh/kg modeled baseline) with matching product and plant boundaries, including H2 generation, nitrogen supply, feedwater conditioning/desalination, auxiliaries, duty cycle and explicit baseline exclusions. The prior >=3 g/kWh target remains an intermediate research milestone, not industrial parity.
 
 The corpus now has 44 unique cases / 76 unique negative controls / 6 derived checks / 7 research targets.
+
+
+## 9.29 Pulsed-plasma methane regeneration and full-chain ammonia flexibility — 2026-11-16
+
+The audit corpus now includes four new source cases:
+- CH4-PLASMA-PULSED-HEATING-REGEN-2026 (1 November 2026): the source's 95% CH4 conversion / 100% H2 selectivity result is a 10/90 CH4/He point at 46 V / 5 kV. The separate 27 kWh/kg H2 figure is under pure methane at 46 V / 3 kV. CO2-plasma regeneration removes deposits as CO and is reported over four cycles. The source audit now requires these two operating points to remain separate and regeneration energy to remain unknown where unreported.
+- NH3-HB-ROBUST-LOAD-FLEX-2026: dynamic Haber–Bosch model at 10–120% load and 3%/min.
+- NH3-HB-FATIGUE-YEAR-SCHEDULING-2026: a one-year renewable profile with modeled 10–100% load, 3%/min and fatigue-aware feedforward control.
+- NH3-P2A-THREE-LEVEL-DISPATCH-2026: modeled three-level scheduling reducing annual reactor cycling by >80% relative to the study's fully flexible comparison.
+
+Two additional research targets are audited:
+- CH4-PPH-FULL-CHAIN-PARETO-001: >=90% conversion, >=99% H2 selectivity, <=25 kWh/kg accepted purified H2 at the complete wall-plug boundary, 100 reaction/regeneration cycles and >=90% productivity retention. All thresholds must hold at one feed/operating point; the source's diluted conversion and pure-methane energy points are not combined.
+- AMMONIA-SUPPLY-CHAIN-DYNAMIC-FLEX-001: accepted NH3 at 10–120% load and up to 3%/min ramps with a one-year renewable trace, H2/N2 buffers, pressure/thermal fatigue and accepted product contract. A plasma source ramp cannot stand in for plant-level product ramp; flexible Haber–Bosch is the baseline.
+
+New tests enforce source-point pairings, four-cycle regeneration claim ceiling, and dynamic target guard/comparator integrity. These are benchmark contracts, not Luminous results or physical process qualification.
