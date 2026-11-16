@@ -27,6 +27,8 @@ pub struct ObservableValidationSpec {
     pub normalization_scale: f64,
     /// Nominal prediction-interval coverage stated by the producer.
     pub nominal_interval_coverage: f64,
+    pub interval_method_ref: String,
+    pub interval_assumption_ref: String,
     /// Descriptive empirical coverage threshold; not a confidence bound.
     pub minimum_empirical_point_coverage: f64,
     pub maximum_normalized_rmse: f64,
@@ -41,6 +43,7 @@ pub struct ValidationAssessmentProfile {
     pub profile_sha256: String,
     pub domain_id: String,
     pub model_revision: String,
+    pub regime_id: String,
     pub requested_use: ModelUse,
     pub minimum_holdout_count: usize,
     pub minimum_distinct_facilities: usize,
@@ -60,6 +63,10 @@ pub struct ModelRunIdentity {
 #[derive(Clone, Debug, PartialEq)]
 pub struct PredictedObservable {
     pub observable_id: String,
+    pub model_run_id: String,
+    pub model_output_sha256: String,
+    pub interval_method_ref: String,
+    pub interval_assumption_ref: String,
     pub unit_ref: String,
     pub service_boundary_ref: String,
     pub averaging_window_ref: String,
@@ -129,6 +136,14 @@ pub enum ValidationAssessmentErrorKind {
     InvalidAveragingWindow,
     InvalidNormalizationScale,
     InvalidNominalCoverage,
+    EmptyIntervalMethod,
+    EmptyIntervalAssumption,
+    PredictionRunIdentityMismatch,
+    PredictionOutputDigestMismatch,
+    PredictionIntervalMethodMismatch,
+    PredictionIntervalAssumptionMismatch,
+    ReusedUnsealReceipt,
+    ReusedModelRunReceipt,
     InvalidMinimumCoverage,
     InvalidMaximumNormalizedRmse,
     InvalidMaximumNormalizedBias,
@@ -218,6 +233,8 @@ pub struct PerObservableValidationMetrics {
     pub service_boundary_ref: String,
     pub averaging_window_ref: String,
     pub nominal_interval_coverage: f64,
+    pub interval_method_ref: String,
+    pub interval_assumption_ref: String,
     pub sample_count: usize,
     pub mean_signed_error: f64,
     pub mean_absolute_error: f64,
@@ -316,7 +333,9 @@ pub fn assess_blind_holdout_campaign(
                 None,
             );
         }
-        if case.plan.domain.domain_id != campaign.profile.domain_id {
+        if case.plan.domain.domain_id != campaign.profile.domain_id
+            || case.plan.domain.regime_id != campaign.profile.regime_id
+        {
             push_error(
                 &mut errors,
                 ValidationAssessmentErrorKind::HoldoutDomainMismatch,
@@ -443,11 +462,25 @@ pub fn assess_blind_holdout_campaign(
             }
         }
 
-        if !case.unseal_receipt_ref.trim().is_empty() {
-            unseal_refs.insert(case.unseal_receipt_ref.clone());
+        if !case.unseal_receipt_ref.trim().is_empty()
+            && !unseal_refs.insert(case.unseal_receipt_ref.clone())
+        {
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::ReusedUnsealReceipt,
+                Some(case_id.clone()),
+                None,
+            );
         }
-        if !case.model_run.run_receipt_ref.trim().is_empty() {
-            run_receipt_refs.insert(case.model_run.run_receipt_ref.clone());
+        if !case.model_run.run_receipt_ref.trim().is_empty()
+            && !run_receipt_refs.insert(case.model_run.run_receipt_ref.clone())
+        {
+            push_error(
+                &mut errors,
+                ValidationAssessmentErrorKind::ReusedModelRunReceipt,
+                Some(case_id.clone()),
+                None,
+            );
         }
 
         validate_case_observables(
@@ -519,6 +552,8 @@ pub fn assess_blind_holdout_campaign(
             service_boundary_ref: spec.service_boundary_ref.clone(),
             averaging_window_ref: spec.averaging_window_ref.clone(),
             nominal_interval_coverage: spec.nominal_interval_coverage,
+            interval_method_ref: spec.interval_method_ref.clone(),
+            interval_assumption_ref: spec.interval_assumption_ref.clone(),
             sample_count: count,
             mean_signed_error: signed_sum / n,
             mean_absolute_error: absolute_sum / n,
@@ -596,6 +631,9 @@ fn validate_profile(
     if profile.model_revision.trim().is_empty() {
         push_error(&mut errors, ValidationAssessmentErrorKind::EmptyModelRevision, None, None);
     }
+    if profile.regime_id.trim().is_empty() {
+        push_error(&mut errors, ValidationAssessmentErrorKind::EmptyDomainIdentity, None, None);
+    }
     if profile.minimum_holdout_count == 0 {
         push_error(&mut errors, ValidationAssessmentErrorKind::ZeroMinimumHoldoutCount, None, None);
     }
@@ -632,6 +670,12 @@ fn validate_profile(
         }
         if !valid_probability(spec.nominal_interval_coverage) {
             push_error(&mut errors, ValidationAssessmentErrorKind::InvalidNominalCoverage, None, observable.clone());
+        }
+        if spec.interval_method_ref.trim().is_empty() {
+            push_error(&mut errors, ValidationAssessmentErrorKind::EmptyIntervalMethod, None, observable.clone());
+        }
+        if spec.interval_assumption_ref.trim().is_empty() {
+            push_error(&mut errors, ValidationAssessmentErrorKind::EmptyIntervalAssumption, None, observable.clone());
         }
         if !valid_probability(spec.minimum_empirical_point_coverage) {
             push_error(&mut errors, ValidationAssessmentErrorKind::InvalidMinimumCoverage, None, observable.clone());
@@ -728,6 +772,20 @@ fn validate_case_observables(
             continue;
         };
 
+        if predicted.model_run_id != case.model_run.run_id {
+            push_error(errors, ValidationAssessmentErrorKind::PredictionRunIdentityMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+        }
+        if predicted.model_output_sha256 != case.model_run.output_sha256
+            || !is_sha256(&predicted.model_output_sha256)
+        {
+            push_error(errors, ValidationAssessmentErrorKind::PredictionOutputDigestMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+        }
+        if predicted.interval_method_ref != spec.interval_method_ref {
+            push_error(errors, ValidationAssessmentErrorKind::PredictionIntervalMethodMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+        }
+        if predicted.interval_assumption_ref != spec.interval_assumption_ref {
+            push_error(errors, ValidationAssessmentErrorKind::PredictionIntervalAssumptionMismatch, Some(case_id.clone()), Some(spec.observable_id.clone()));
+        }
         if !predicted.predicted_value.is_finite() {
             push_error(errors, ValidationAssessmentErrorKind::NonFinitePrediction, Some(case_id.clone()), Some(spec.observable_id.clone()));
         }
@@ -815,6 +873,10 @@ fn validate_case_observables(
             && measured.source_locator.trim() != ""
             && predicted.evidence_ref.trim() != ""
             && measured.evidence_ref.trim() != ""
+            && predicted.model_run_id == case.model_run.run_id
+            && predicted.model_output_sha256 == case.model_run.output_sha256
+            && predicted.interval_method_ref == spec.interval_method_ref
+            && predicted.interval_assumption_ref == spec.interval_assumption_ref
             && measured.source_artifact_sha256 == observation.source_artifact_sha256
             && is_sha256(&measured.source_artifact_sha256)
             && predicted.prediction_interval_lower <= predicted.predicted_value
@@ -898,6 +960,7 @@ mod tests {
             profile_sha256: sha('a'),
             domain_id: "tokamak-hmode-domain-v1".to_string(),
             model_revision: "transport-model-r17".to_string(),
+            regime_id: "tokamak-hmode".to_string(),
             requested_use: ModelUse::SingleStepPrediction,
             minimum_holdout_count: 3,
             minimum_distinct_facilities: 2,
@@ -913,6 +976,8 @@ mod tests {
                 maximum_normalized_rmse: 0.20,
                 maximum_absolute_normalized_bias: 0.10,
                 maximum_mean_normalized_interval_width: 0.25,
+                interval_method_ref: "synthetic-empirical-quantile-band-v1".to_string(),
+                interval_assumption_ref: "synthetic-known-answer-fixture-v1".to_string(),
             }],
         }
     }
@@ -1030,6 +1095,10 @@ mod tests {
             },
             predictions: vec![PredictedObservable {
                 observable_id: "net-heat-flux".to_string(),
+                model_run_id: format!("model-run-{index}"),
+                model_output_sha256: sha(char::from(b'j' + index as u8)),
+                interval_method_ref: "synthetic-empirical-quantile-band-v1".to_string(),
+                interval_assumption_ref: "synthetic-known-answer-fixture-v1".to_string(),
                 unit_ref: "MW/m2".to_string(),
                 service_boundary_ref: "divertor-target-surface-v1".to_string(),
                 averaging_window_ref: "steady-state-1s-v1".to_string(),
@@ -1265,6 +1334,40 @@ mod tests {
         assert_eq!(report.measurement_evidence_refs.len(), 3);
         assert_eq!(report.model_run_receipt_refs.len(), 3);
         assert_eq!(report.unseal_receipt_refs.len(), 3);
+    }
+
+    #[test]
+    fn prediction_must_bind_exact_model_run_and_output_digest() {
+        let mut source = campaign();
+        source.cases[0].predictions[0].model_run_id = "stale-run".to_string();
+        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
+            |error| error.kind == ValidationAssessmentErrorKind::PredictionRunIdentityMismatch
+        ));
+        let mut source = campaign();
+        source.cases[0].predictions[0].model_output_sha256 = sha('x');
+        assert!(assess_blind_holdout_campaign(&source).unwrap_err().iter().any(
+            |error| error.kind == ValidationAssessmentErrorKind::PredictionOutputDigestMismatch
+        ));
+    }
+
+    #[test]
+    fn prediction_interval_method_and_assumption_must_match_frozen_profile() {
+        let mut source = campaign();
+        source.cases[0].predictions[0].interval_method_ref = "post-hoc-tuned-band".to_string();
+        source.cases[1].predictions[0].interval_assumption_ref.clear();
+        let errors = assess_blind_holdout_campaign(&source).unwrap_err();
+        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::PredictionIntervalMethodMismatch));
+        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::PredictionIntervalAssumptionMismatch));
+    }
+
+    #[test]
+    fn unseal_and_model_run_receipts_cannot_be_reused_between_holdouts() {
+        let mut source = campaign();
+        source.cases[1].unseal_receipt_ref = source.cases[0].unseal_receipt_ref.clone();
+        source.cases[2].model_run.run_receipt_ref = source.cases[1].model_run.run_receipt_ref.clone();
+        let errors = assess_blind_holdout_campaign(&source).unwrap_err();
+        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::ReusedUnsealReceipt));
+        assert!(errors.iter().any(|error| error.kind == ValidationAssessmentErrorKind::ReusedModelRunReceipt));
     }
 
     #[test]
