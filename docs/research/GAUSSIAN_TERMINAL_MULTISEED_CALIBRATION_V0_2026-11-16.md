@@ -73,3 +73,54 @@ The fixed-design terminal induction remains distinct from the predictable Gaussi
 The exact-head Rust workflow must pass formatting, all-target tests, the original single-seed sequential and terminal campaigns, this multi-seed campaign, artifact upload and strict Clippy. The uploaded report, source SHA and SHA-256 digest must all bind to the same PR head.
 
 A passing workflow establishes only implementation and Monte Carlo calibration for the declared generator, not scientific model discovery, SOTA performance, a general sequential-test guarantee or physical validation.
+
+
+## 7. Exact-head calibration result (2026-11-16)
+
+<Verified> Exact PR head `eadfdca561b50fda49ba5f61591e08071aaf9b04` passed the focused workflow:
+- pinned Rust 1.96 and rustfmt;
+- all-target Rust tests;
+- the existing sequential null/alternative campaign and receipt upload;
+- the original single-seed terminal-test induction campaign and receipt upload;
+- the five-seed multi-seed campaign and receipt upload;
+- strict Clippy with warnings denied.
+
+Workflow: https://github.com/Luminous-Dynamics/symthaea/actions/runs/43849094332
+
+### Pooled operating characteristics
+
+| Scenario / policy | Rejection rate | Wilson 95% interval | Early-stop rate | Mean stop look |
+|---|---:|---:|---:|---:|
+| Null — terminal NP | 5.026% | 4.892–5.163% | — | 80 |
+| Null — threshold 0.75 | 5.021% | — | 5.479% | 79.207 |
+| Null — threshold 0.90 | 5.050% | — | 4.091% | 79.616 |
+| Null — threshold 0.99 | 5.019% | — | 2.843% | 79.849 |
+| Alternative — terminal NP | 79.476% | 79.225–79.725% | — | 80 |
+| Alternative — threshold 0.75 | 65.477% | 65.182–65.771% | 79.246% | 60.796 |
+| Alternative — threshold 0.90 | 74.723% | 74.453–74.991% | 75.714% | 65.996 |
+| Alternative — threshold 0.99 | 79.104% | 78.851–79.355% | 70.680% | 71.428 |
+
+The analytic terminal NP power for the fixed design is **79.241%**. The pooled terminal NP alternative estimate (79.476%) differs by 0.235 percentage points and its pooled Wilson interval contains the analytic value. The null terminal and all three null induced-test rates remain near 5%.
+
+### Per-seed stability
+
+Alternative terminal NP rejection across the five frozen root seeds was:
+- 79.970%
+- 79.475%
+- 79.065%
+- 79.405%
+- 79.465%
+
+Mean: 79.476%; sample standard deviation across seed-level rates: 0.323 percentage points; range: 79.065–79.970%. All five per-seed records are retained in the report. The null per-seed terminal rates were 5.435%, 4.865%, 4.835%, 5.005% and 4.990%.
+
+Across all 100,000 null and 100,000 alternative paths, terminal induced mismatches were zero. The higher stopping thresholds reduced early stopping and moved alternative rejection closer to the fixed-horizon terminal test, while the randomized stopped tests retained nominal null size in this campaign.
+
+### Reproducibility bindings
+
+- Source commit: `eadfdca561b50fda49ba5f61591e08071aaf9b04`
+- Multi-seed report JSON SHA-256: `683c7262b66cb5eacddb2018d75e67313bed05f909b150367f003c9155d2ff10`
+- Uploaded ZIP artifact SHA-256: `1359f51c1eb6c3adf6528b4218728def7ef151a5c0bc94c3ac2638b4eac046b0`
+- Sequential calibration artifact ZIP digest: `6d16bce12465bbac89cbbbc24102cbfc94f7a934e86805ae133b83a9f1e9260b`
+- Single-seed terminal-test artifact ZIP digest: `6159635b57d315c472e123a7a5d618f6dc5bd935e9188a508454e52cc2d85fda`
+
+These are implementation/calibration results for the declared fixed simple Gaussian generator. They do not establish a general sequential-testing guarantee, adaptive-design validity or physical measurement validity.
