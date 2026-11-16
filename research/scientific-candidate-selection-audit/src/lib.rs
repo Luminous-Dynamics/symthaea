@@ -526,9 +526,7 @@ pub fn validate_selector_packet(packet: &SelectorPacket) -> Result<(), Selection
                 candidate_id: candidate.candidate_id.clone(),
             });
         }
-        if candidate.state == CandidateState::Ready
-            && candidate.canonical_model_sha256.is_none()
-        {
+        if candidate.state == CandidateState::Ready && candidate.canonical_model_sha256.is_none() {
             return Err(SelectionAuditError::MissingModelDigest {
                 candidate_id: candidate.candidate_id.clone(),
             });
