@@ -40,19 +40,34 @@ pub enum ScilawsSelectionError {
     EmptyCandidatePool,
     EmptyCandidateId,
     DuplicateCandidateId(String),
-    InvalidAssumptionCheckId { candidate_id: String },
-    InvalidDigest { field: String },
-    InvalidDevelopmentRmse { candidate_id: String },
-    InvalidComplexity { candidate_id: String },
+    InvalidAssumptionCheckId {
+        candidate_id: String,
+    },
+    InvalidDigest {
+        field: String,
+    },
+    InvalidDevelopmentRmse {
+        candidate_id: String,
+    },
+    InvalidComplexity {
+        candidate_id: String,
+    },
     CampaignMismatch,
     TaskManifestMismatch,
     LiveCandidateMissingEvaluatorRecord(String),
     EvaluatorCandidateMissingLiveRecord(String),
     CandidateModelDigestMismatch(String),
     DuplicateEvaluatorCandidateId(String),
-    IncompleteMetrics { candidate_id: String },
-    UnexpectedMetricsForNonComplete { candidate_id: String },
-    InvalidMetricRange { candidate_id: String, metric: String },
+    IncompleteMetrics {
+        candidate_id: String,
+    },
+    UnexpectedMetricsForNonComplete {
+        candidate_id: String,
+    },
+    InvalidMetricRange {
+        candidate_id: String,
+        metric: String,
+    },
     SubmittedCandidateMissing(String),
     Pareto(String),
 }
@@ -72,19 +87,30 @@ impl fmt::Display for ScilawsSelectionError {
             Self::EmptyCandidateId => write!(f, "candidate ID must not be empty"),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate ID: {id}"),
             Self::InvalidAssumptionCheckId { candidate_id } => {
-                write!(f, "assumption check IDs must be non-empty and unique for candidate {candidate_id}")
+                write!(
+                    f,
+                    "assumption check IDs must be non-empty and unique for candidate {candidate_id}"
+                )
             }
             Self::InvalidDigest { field } => {
                 write!(f, "{field} must be a lowercase 64-character SHA-256 digest")
             }
             Self::InvalidDevelopmentRmse { candidate_id } => {
-                write!(f, "development RMSE is invalid for candidate {candidate_id}")
+                write!(
+                    f,
+                    "development RMSE is invalid for candidate {candidate_id}"
+                )
             }
             Self::InvalidComplexity { candidate_id } => {
-                write!(f, "symbolic complexity is invalid for candidate {candidate_id}")
+                write!(
+                    f,
+                    "symbolic complexity is invalid for candidate {candidate_id}"
+                )
             }
             Self::CampaignMismatch => write!(f, "live and evaluator campaign IDs differ"),
-            Self::TaskManifestMismatch => write!(f, "live and evaluator task-manifest digests differ"),
+            Self::TaskManifestMismatch => {
+                write!(f, "live and evaluator task-manifest digests differ")
+            }
             Self::LiveCandidateMissingEvaluatorRecord(id) => {
                 write!(f, "live candidate has no evaluator record: {id}")
             }
@@ -92,7 +118,10 @@ impl fmt::Display for ScilawsSelectionError {
                 write!(f, "evaluator record has no live candidate: {id}")
             }
             Self::CandidateModelDigestMismatch(id) => {
-                write!(f, "candidate model digest differs between live/evaluator records: {id}")
+                write!(
+                    f,
+                    "candidate model digest differs between live/evaluator records: {id}"
+                )
             }
             Self::DuplicateEvaluatorCandidateId(id) => {
                 write!(f, "duplicate evaluator candidate ID: {id}")
@@ -107,9 +136,15 @@ impl fmt::Display for ScilawsSelectionError {
             Self::InvalidMetricRange {
                 candidate_id,
                 metric,
-            } => write!(f, "{metric} must be finite and in [0,1] for candidate {candidate_id}"),
+            } => write!(
+                f,
+                "{metric} must be finite and in [0,1] for candidate {candidate_id}"
+            ),
             Self::SubmittedCandidateMissing(id) => {
-                write!(f, "submitted candidate is absent from the frozen live pool: {id}")
+                write!(
+                    f,
+                    "submitted candidate is absent from the frozen live pool: {id}"
+                )
             }
             Self::Pareto(message) => write!(f, "Pareto evaluator failed: {message}"),
         }
@@ -481,13 +516,9 @@ pub fn audit_real_candidate_selection(
         .collect::<BTreeMap<_, _>>();
 
     for (candidate_id, live_candidate) in &live_by_id {
-        let evaluator_candidate = evaluator_by_id
-            .get(candidate_id)
-            .ok_or_else(|| {
-                ScilawsSelectionError::LiveCandidateMissingEvaluatorRecord(
-                    (*candidate_id).to_owned(),
-                )
-            })?;
+        let evaluator_candidate = evaluator_by_id.get(candidate_id).ok_or_else(|| {
+            ScilawsSelectionError::LiveCandidateMissingEvaluatorRecord((*candidate_id).to_owned())
+        })?;
         if live_candidate.model_sha256 != evaluator_candidate.model_sha256 {
             return Err(ScilawsSelectionError::CandidateModelDigestMismatch(
                 (*candidate_id).to_owned(),
@@ -659,15 +690,13 @@ pub fn audit_real_candidate_selection(
                     SubmittedCandidateDisposition::Infeasible
                 }
                 EvaluatorCandidateStatus::Complete => {
-                    let dominated_by = pareto_summary
-                        .as_ref()
-                        .and_then(|summary| {
-                            summary
-                                .candidate_results
-                                .iter()
-                                .find(|row| row.candidate_id == submitted_id)
-                                .and_then(|row| row.dominated_by.clone())
-                        });
+                    let dominated_by = pareto_summary.as_ref().and_then(|summary| {
+                        summary
+                            .candidate_results
+                            .iter()
+                            .find(|row| row.candidate_id == submitted_id)
+                            .and_then(|row| row.dominated_by.clone())
+                    });
                     match dominated_by {
                         Some(dominator_candidate_id) => {
                             SubmittedCandidateDisposition::StrictlyDominated {
@@ -910,9 +939,36 @@ mod tests {
             Some("submitted"),
         );
         let evaluator = evaluator_pool(vec![
-            evaluator_candidate("submitted", 'a', Some(0.70), Some(0.80), true, true, EvaluatorCandidateStatus::Complete, '1'),
-            evaluator_candidate("dominator", 'b', Some(0.78), Some(0.82), true, true, EvaluatorCandidateStatus::Complete, '2'),
-            evaluator_candidate("tradeoff", 'c', Some(0.90), Some(0.50), true, true, EvaluatorCandidateStatus::Complete, '3'),
+            evaluator_candidate(
+                "submitted",
+                'a',
+                Some(0.70),
+                Some(0.80),
+                true,
+                true,
+                EvaluatorCandidateStatus::Complete,
+                '1',
+            ),
+            evaluator_candidate(
+                "dominator",
+                'b',
+                Some(0.78),
+                Some(0.82),
+                true,
+                true,
+                EvaluatorCandidateStatus::Complete,
+                '2',
+            ),
+            evaluator_candidate(
+                "tradeoff",
+                'c',
+                Some(0.90),
+                Some(0.50),
+                true,
+                true,
+                EvaluatorCandidateStatus::Complete,
+                '3',
+            ),
         ]);
 
         let audit = audit_real_candidate_selection(&live, &evaluator).unwrap();
@@ -937,12 +993,33 @@ mod tests {
     #[test]
     fn fit_validity_tradeoff_is_not_collapsed_to_a_scalar_winner() {
         let live = live_packet(
-            vec![live_candidate("fit", 'a', 0.1), live_candidate("valid", 'b', 0.2)],
+            vec![
+                live_candidate("fit", 'a', 0.1),
+                live_candidate("valid", 'b', 0.2),
+            ],
             Some("fit"),
         );
         let evaluator = evaluator_pool(vec![
-            evaluator_candidate("fit", 'a', Some(0.95), Some(0.55), true, true, EvaluatorCandidateStatus::Complete, '1'),
-            evaluator_candidate("valid", 'b', Some(0.75), Some(0.92), true, true, EvaluatorCandidateStatus::Complete, '2'),
+            evaluator_candidate(
+                "fit",
+                'a',
+                Some(0.95),
+                Some(0.55),
+                true,
+                true,
+                EvaluatorCandidateStatus::Complete,
+                '1',
+            ),
+            evaluator_candidate(
+                "valid",
+                'b',
+                Some(0.75),
+                Some(0.92),
+                true,
+                true,
+                EvaluatorCandidateStatus::Complete,
+                '2',
+            ),
         ]);
 
         let audit = audit_real_candidate_selection(&live, &evaluator).unwrap();
@@ -957,12 +1034,33 @@ mod tests {
     #[test]
     fn anti_hacking_failure_is_infeasible_even_with_high_numeric_fit() {
         let live = live_packet(
-            vec![live_candidate("hacked", 'a', 0.01), live_candidate("valid", 'b', 0.2)],
+            vec![
+                live_candidate("hacked", 'a', 0.01),
+                live_candidate("valid", 'b', 0.2),
+            ],
             Some("hacked"),
         );
         let evaluator = evaluator_pool(vec![
-            evaluator_candidate("hacked", 'a', Some(0.99), Some(0.02), true, false, EvaluatorCandidateStatus::Complete, '1'),
-            evaluator_candidate("valid", 'b', Some(0.70), Some(0.91), true, true, EvaluatorCandidateStatus::Complete, '2'),
+            evaluator_candidate(
+                "hacked",
+                'a',
+                Some(0.99),
+                Some(0.02),
+                true,
+                false,
+                EvaluatorCandidateStatus::Complete,
+                '1',
+            ),
+            evaluator_candidate(
+                "valid",
+                'b',
+                Some(0.70),
+                Some(0.91),
+                true,
+                true,
+                EvaluatorCandidateStatus::Complete,
+                '2',
+            ),
         ]);
 
         let audit = audit_real_candidate_selection(&live, &evaluator).unwrap();
@@ -984,9 +1082,36 @@ mod tests {
             Some("complete"),
         );
         let evaluator = evaluator_pool(vec![
-            evaluator_candidate("complete", 'a', Some(0.8), Some(0.8), true, true, EvaluatorCandidateStatus::Complete, '1'),
-            evaluator_candidate("failed", 'b', None, None, false, false, EvaluatorCandidateStatus::Failed, '2'),
-            evaluator_candidate("unknown", 'c', None, None, false, false, EvaluatorCandidateStatus::NotEvaluable, '3'),
+            evaluator_candidate(
+                "complete",
+                'a',
+                Some(0.8),
+                Some(0.8),
+                true,
+                true,
+                EvaluatorCandidateStatus::Complete,
+                '1',
+            ),
+            evaluator_candidate(
+                "failed",
+                'b',
+                None,
+                None,
+                false,
+                false,
+                EvaluatorCandidateStatus::Failed,
+                '2',
+            ),
+            evaluator_candidate(
+                "unknown",
+                'c',
+                None,
+                None,
+                false,
+                false,
+                EvaluatorCandidateStatus::NotEvaluable,
+                '3',
+            ),
         ]);
 
         let audit = audit_real_candidate_selection(&live, &evaluator).unwrap();
@@ -1020,10 +1145,7 @@ mod tests {
 
     #[test]
     fn no_admissible_candidate_can_end_in_explicit_abstention() {
-        let live = live_packet(
-            vec![live_candidate("invalid", 'a', 0.2)],
-            None,
-        );
+        let live = live_packet(vec![live_candidate("invalid", 'a', 0.2)], None);
         let evaluator = evaluator_pool(vec![evaluator_candidate(
             "invalid",
             'a',
@@ -1046,7 +1168,10 @@ mod tests {
     #[test]
     fn duplicate_model_artifacts_are_retained_and_flagged() {
         let live = live_packet(
-            vec![live_candidate("first", 'a', 0.1), live_candidate("second", 'a', 0.2)],
+            vec![
+                live_candidate("first", 'a', 0.1),
+                live_candidate("second", 'a', 0.2),
+            ],
             Some("first"),
         );
         live.validate().unwrap();
@@ -1083,8 +1208,26 @@ mod tests {
             Some("a"),
         );
         let evaluator = evaluator_pool(vec![
-            evaluator_candidate("a", 'a', Some(0.8), Some(0.9), true, true, EvaluatorCandidateStatus::Complete, '1'),
-            evaluator_candidate("b", 'b', Some(0.9), Some(0.7), true, true, EvaluatorCandidateStatus::Complete, '2'),
+            evaluator_candidate(
+                "a",
+                'a',
+                Some(0.8),
+                Some(0.9),
+                true,
+                true,
+                EvaluatorCandidateStatus::Complete,
+                '1',
+            ),
+            evaluator_candidate(
+                "b",
+                'b',
+                Some(0.9),
+                Some(0.7),
+                true,
+                true,
+                EvaluatorCandidateStatus::Complete,
+                '2',
+            ),
         ]);
         let live_json = serde_json::to_string(&live).unwrap();
         let evaluator_json = serde_json::to_string(&evaluator).unwrap();
