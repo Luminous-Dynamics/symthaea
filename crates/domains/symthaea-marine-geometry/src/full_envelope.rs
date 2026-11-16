@@ -519,7 +519,7 @@ fn validate_symmetry_and_port_profiles(
     spec: &FullEnvelopeSpec,
     issues: &mut Vec<FullEnvelopeIssue>,
 ) {
-    for station in &spec.stations {
+    for (station_index, station) in spec.stations.iter().enumerate() {
         match spec.symmetry {
             SymmetryPolicy::SymmetricAboutY0 => {
                 if station.port_profile.is_some() {
@@ -563,20 +563,38 @@ fn validate_symmetry_and_port_profiles(
                     );
                     continue;
                 }
+                let pointed_end = (station_index == 0
+                    && spec.end_conditions.bow == HullEndCondition::PointedStem)
+                    || (station_index + 1 == spec.stations.len()
+                        && spec.end_conditions.stern == HullEndCondition::PointedStem);
                 for (port_point, starboard_point) in
                     port.iter().zip(station.starboard_profile.iter())
                 {
-                    if port_point.point_id == starboard_point.point_id
-                        || port_point.role != starboard_point.role
-                        || port_point.region_to_next != starboard_point.region_to_next
-                    {
+                    let semantic_mismatch = port_point.role != starboard_point.role
+                        || port_point.region_to_next != starboard_point.region_to_next;
+                    let identity_or_geometry_mismatch = if pointed_end {
+                        port_point.point_id != starboard_point.point_id
+                            || !close(port_point.y_m, 0.0)
+                            || !close(starboard_point.y_m, 0.0)
+                            || !close(port_point.z_m, starboard_point.z_m)
+                    } else {
+                        port_point.point_id == starboard_point.point_id
+                    };
+                    if semantic_mismatch || identity_or_geometry_mismatch {
                         reject(
                             issues,
                             "port_starboard_correspondence",
-                            format!(
-                                "station {} port point {} must have a distinct identity and matching semantic role/breakline with starboard point {}",
-                                station.station_id, port_point.point_id, starboard_point.point_id
-                            ),
+                            if pointed_end {
+                                format!(
+                                    "station {} pointed stem requires shared port/starboard point identity and coincident centreplane coordinates for {:?}",
+                                    station.station_id, starboard_point.role
+                                )
+                            } else {
+                                format!(
+                                    "station {} explicit port point {} must have a distinct identity and matching semantic role/breakline with starboard point {}",
+                                    station.station_id, port_point.point_id, starboard_point.point_id
+                                )
+                            },
                         );
                     }
                 }
@@ -828,15 +846,21 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
         }
         if is_pointed_end {
             let point = &deck_section.points[0];
+            let starboard_sheer = station.starboard_profile.last();
             if point.role != DeckPointRole::DeckCrown
                 || !close(point.y_m, 0.0)
                 || point.z_m >= -COORDINATE_TOLERANCE_M
+                || starboard_sheer.is_none_or(|sheer| {
+                    point.point_id != sheer.point_id
+                        || !close(point.y_m, sheer.y_m)
+                        || !close(point.z_m, sheer.z_m)
+                })
             {
                 reject(
                     issues,
                     "pointed_deck_endpoint",
                     format!(
-                        "pointed-end deck section {} must collapse to one above-waterline centreplane crown point",
+                        "pointed-end deck section {} must share the exact above-waterline centreplane sheer/crown point identity and coordinates",
                         station.station_id
                     ),
                 );
