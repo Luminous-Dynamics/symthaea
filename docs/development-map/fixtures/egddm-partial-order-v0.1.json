@@ -58,7 +58,7 @@
       },
       {
         "event_id": "branch-b-docs",
-        "event_time": "2026-11-16T01:00:00Z",
+        "event_time": "2026-11-16T01:01:00Z",
         "available_at": "2026-11-16T01:05:00Z",
         "branch_id": "branch-b",
         "event_kind": "contract_change",
@@ -68,7 +68,7 @@
       },
       {
         "event_id": "branch-b-policy",
-        "event_time": "2026-11-16T01:10:00Z",
+        "event_time": "2026-11-16T01:11:00Z",
         "available_at": "2026-11-16T01:15:00Z",
         "branch_id": "branch-b",
         "event_kind": "policy_change",
