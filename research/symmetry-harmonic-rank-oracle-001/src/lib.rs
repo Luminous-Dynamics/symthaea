@@ -240,7 +240,7 @@ pub fn dihedral_character_fixed_dimension(
         return Err(TemplateErrorV1::InvalidDihedralOrder);
     }
     let cyclic_character_sum = cyclic_fixed_dimension(degree, order)?;
-    let half_turn_character = if degree % 2 == 0 { 1 } else { 0 };
+    let half_turn_character = if degree.is_multiple_of(2) { 1 } else { 0 };
     let numerator = if half_turn_character == 1 {
         cyclic_character_sum
             .checked_add(1)
@@ -250,7 +250,7 @@ pub fn dihedral_character_fixed_dimension(
             .checked_sub(1)
             .ok_or(TemplateErrorV1::ArithmeticOverflow)?
     };
-    if numerator % 2 != 0 {
+    if !numerator.is_multiple_of(2) {
         return Err(TemplateErrorV1::ArithmeticOverflow);
     }
     Ok(numerator / 2)
@@ -335,7 +335,7 @@ pub fn is_subgroup_of(
     supergroup.validate()?;
     let d = subgroup.rotational_parameter();
     let n = supergroup.rotational_parameter();
-    let divides = n % d == 0;
+    let divides = n.is_multiple_of(d);
 
     Ok(match (subgroup, supergroup) {
         (GroupHypothesisV1::Cyclic { .. }, GroupHypothesisV1::Cyclic { .. }) => divides,
@@ -612,7 +612,7 @@ mod tests {
     fn divisor_subgroups_obey_degreewise_monotonicity() {
         for parent_order in 2..=32 {
             for divisor in 1..=parent_order {
-                if parent_order % divisor != 0 {
+                if !parent_order.is_multiple_of(divisor) {
                     continue;
                 }
                 assert!(
@@ -700,6 +700,19 @@ mod tests {
         assert_eq!(first_divergence_degree(c3, c4, 3, budget()).unwrap(), Some(3));
         assert_eq!(first_divergence_degree(d3, d4, 2, budget()).unwrap(), None);
         assert_eq!(first_divergence_degree(d3, d4, 3, budget()).unwrap(), Some(3));
+    }
+
+    #[test]
+    fn canonical_proposal_bytes_bind_the_observed_signature_and_search_family() {
+        let c3 = rank_template(GroupHypothesisV1::Cyclic { order: 3 }, 3, budget()).unwrap();
+        let c4 = rank_template(GroupHypothesisV1::Cyclic { order: 4 }, 3, budget()).unwrap();
+        let proposal_c3 = match_signature(&c3, 6, budget()).unwrap();
+        let proposal_c4 = match_signature(&c4, 6, budget()).unwrap();
+
+        assert_ne!(proposal_c3.observed_signature, proposal_c4.observed_signature);
+        assert_ne!(proposal_c3.canonical_bytes(), proposal_c4.canonical_bytes());
+        assert_eq!(proposal_c3.maximum_group_parameter, 6);
+        assert_eq!(proposal_c3.maximum_degree, 3);
     }
 
     #[test]
