@@ -606,33 +606,34 @@ pub fn validate_selection_trace(
     Ok(())
 }
 
-fn metric_mask(metrics: EvaluatorMetrics) -> u8 {
-    (if metrics.numeric_fit.is_some() {
-        METRIC_NUMERIC_FIT
-    } else {
-        0
-    }) | (if metrics.scientific_validity.is_some() {
-        METRIC_SCIENTIFIC_VALIDITY
-    } else {
-        0
-    }) | (if metrics.structure_recovery.is_some() {
-        METRIC_STRUCTURE_RECOVERY
-    } else {
-        0
-    })
+fn admissibility_rank(value: EvaluatorAdmissibility) -> u8 {
+    match value {
+        EvaluatorAdmissibility::NotAssessed => 0,
+        EvaluatorAdmissibility::Unqualified => 1,
+        EvaluatorAdmissibility::Qualified => 2,
+    }
 }
 
 fn dominates(
-    left: EvaluatorMetrics,
-    right: EvaluatorMetrics,
+    left: &EvaluatorOutcome,
+    right: &EvaluatorOutcome,
     mask: MetricMask,
 ) -> bool {
-    if !left.matches_mask(mask) || !right.matches_mask(mask) {
+    if left.status != EvaluatorStatus::Scored
+        || right.status != EvaluatorStatus::Scored
+        || !left.metrics.matches_mask(mask)
+        || !right.metrics.matches_mask(mask)
+    {
         return false;
     }
-    let left_values = left.values(mask);
-    let right_values = right.values(mask);
-    let mut strictly_better = false;
+    let left_rank = admissibility_rank(left.admissibility);
+    let right_rank = admissibility_rank(right.admissibility);
+    if left_rank < right_rank {
+        return false;
+    }
+    let left_values = left.metrics.values(mask);
+    let right_values = right.metrics.values(mask);
+    let mut strictly_better = left_rank > right_rank;
     for (a, b) in left_values.into_iter().zip(right_values) {
         if a < b {
             return false;
@@ -713,7 +714,6 @@ pub fn audit_submission(
                 }
             }
         }
-        let _ = metric_mask(outcome.metrics);
     }
 
     let mut scored = 0;
@@ -772,11 +772,7 @@ pub fn audit_submission(
             };
             other_outcome.status == EvaluatorStatus::Scored
                 && other_outcome.admissibility == EvaluatorAdmissibility::Qualified
-                && dominates(
-                    other_outcome.metrics,
-                    outcome.metrics,
-                    packet.metric_mask,
-                )
+                && dominates(other_outcome, outcome, packet.metric_mask)
         });
         if !is_dominated {
             frontier.push(candidate.candidate_id.clone());
@@ -801,7 +797,7 @@ pub fn audit_submission(
                 }
                 if let Some(other) = by_id.get(candidate.candidate_id.as_str()) {
                     if other.status == EvaluatorStatus::Scored
-                        && dominates(other.metrics, submitted.metrics, packet.metric_mask)
+                        && dominates(other, submitted, packet.metric_mask)
                     {
                         dominators.push(candidate.candidate_id.clone());
                     }
@@ -1188,6 +1184,23 @@ mod tests {
         let report = audit_submission(&packet, &frozen, &outcomes).unwrap();
         assert_eq!(report.qualified_pareto_frontier_ids, vec!["a", "b"]);
         assert_eq!(report.submitted_is_strictly_dominated, Some(false));
+    }
+
+    #[test]
+    fn unqualified_candidate_cannot_dominate_a_qualified_submission() {
+        let packet = packet();
+        let frozen = trace(SelectionDecision::Select {
+            candidate_id: "a".to_owned(),
+        });
+        let outcomes = vec![
+            real_outcome("a", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
+            real_outcome("b", 99.0, 99.0, EvaluatorAdmissibility::Unqualified),
+            real_outcome("c", 65.0, 75.0, EvaluatorAdmissibility::Unqualified),
+        ];
+        let report = audit_submission(&packet, &frozen, &outcomes).unwrap();
+        assert_eq!(report.submitted_is_strictly_dominated, Some(false));
+        assert!(report.submitted_dominator_ids.is_empty());
+        assert_eq!(report.qualified_pareto_frontier_ids, vec!["a"]);
     }
 
     #[test]
