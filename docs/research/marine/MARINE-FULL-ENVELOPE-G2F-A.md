@@ -531,3 +531,130 @@ These are programme targets, not measured achievements:
 A valid full-envelope input contract is not a valid hull surface. A closed displacement volume is not a full external hull. A mass-balanced upright waterplane is not a trim/heel equilibrium. Hydrostatics is not stability approval. A correct CAD export header is not a valid B-rep. A low CFD residual is not experimental validation. A Pareto point is not a safe, class-approved or seaworthy vessel.
 
 The first competitive milestone should be a reproducible, rights-cleared public benchmark in which an external evaluator can regenerate the geometry, independently recover the CAD, recompute multi-waterline properties, and inspect every provenance/uncertainty boundary without trusting Symthaea's own generator or solver.
+
+
+## 12. G2f-a6 — make solver settings part of upright mass-balance evidence (16 Nov 2026)
+
+The upright mass-balance receipt is now schema v2 / algorithm `upright-mass-balance-bisection-v2`. It binds:
+- mass residual tolerance (tonnes);
+- waterplane bracket tolerance (metres);
+- requested maximum iteration budget;
+- initial and final waterplane brackets;
+- exact full-envelope source digest, load case, target mass and water density;
+- equilibrium properties, residual, actual iteration count and stop reason.
+
+These numerical stopping parameters are included in the BLAKE3 receipt identity. A regression test solves the same exact midpoint load case with different requested iteration budgets and verifies that, even when both runs produce the same equilibrium plane, their receipts differ. The receipt schema version is advanced explicitly rather than silently changing a v1 evidence contract.
+
+The CLI's large receipt variant is boxed to keep the command-line report enum compact. No Clippy lint is suppressed.
+
+This change closes a subtle reproducibility gap: the final result alone does not fully describe how it was accepted. Numerical tolerances and evaluation budgets are part of the engineering evidence.
+
+## 13. Static attitude equilibrium — next new workstream
+
+Created [MARINE-STATIC-ATTITUDE-EQUILIBRIUM-001 #12498](https://github.com/Luminous-Dynamics/symthaea/issues/12498).
+
+The current upright bisection solves only one unknown: waterplane offset for a known mass. A vessel with a longitudinal or transverse CG offset also needs trim and heel. The next solver should find the static pose using:
+- force residual: displaced mass minus declared vessel mass;
+- two independent moment residuals from `(r_B-r_G) × g_b`;
+- exactly three unknowns: waterplane offset, pitch and roll; calm-water yaw is a gauge/fixed variable;
+- an oblique waterplane in the body frame, `g_b · r = c`, with section clipping performed against the true plane rather than approximated by LCB/TCB at an assumed upright gravity direction.
+
+This is not the same as the existing WAPS 3-DOF manoeuvring/leeway/rudder coupling. It is also not a GZ/stability solver. An equilibrium can be unstable; intact/damage stability, free-surface/tank, downflooding and statutory criteria must remain separate.
+
+The issue includes a bounded 3-variable solver contract, body-frame equations, analytical box/wedge/asymmetric fixtures, cross-checks against the existing polyhedral G2c path and matched Maxsurf/NAPA cases. It explicitly rejects unsupported deck immersion/flooding and non-convergence.
+
+## 14. Reassessed 2026 SOTA and industry comparison (verified 16 Nov 2026)
+
+### Generative hull design
+
+Current research already covers several techniques that might otherwise look like novel Luminous directions:
+
+- **Representation-aware generative ship design (Htein et al., JMSE 2026, 14(7), 642):** shared latent encoding from surface point clouds, waterline sections and buttock curves, a conditional latent diffusion generator and surface reconstruction. The authors report improved geometric coherence and controllability on a synthetic dataset. This means multi-representation latent generation by itself is not a defensible novelty claim. Source: https://www.mdpi.com/2077-1312/14/7/642
+- **GAN vs VAE-PCT ship hull generation (JMSE 2026, 14(18), 1707):** a CAD-to-CAD workflow processes 8,000 generated CAD hulls, pulls discrete outputs back to B-spline surfaces via lofting/fairing and evaluates geometric validity, non-dimensional form coefficients and early-stage calm-water resistance. This is a strong reproduction baseline, not an industry-wide performance guarantee. Source: https://www.mdpi.com/2077-1312/14/18/1707
+- **Offline data-driven evolutionary hull optimization (Ocean Engineering, 15 June 2026, 125935):** searches a learned latent geometry space under strict CFD evaluation budgets and directly addresses parent-hull dependence and surrogate-then-optimize bias. We must compare against this architecture, not just conventional parametric variation. Source: https://www.sciencedirect.com/science/article/pii/S0029801826017695
+- **Hydrostatic-constrained reconstruction from insufficient data (IJNAOE 2026, 18, 100732):** reconstructs hull forms using hydrostatic constraints, area-constrained waterlines and curve-fairness terms; the study evaluates container, bulk-carrier and twin-skeg examples. Hydrostatic constraints in reconstruction are established research and must be included as a baseline. Source: https://www.sciencedirect.com/science/article/pii/S2092678225000901
+- **Experimental toroidal propulsor co-design (Engineering Applications of AI, 15 Nov 2026, 116126):** combines open-water experiment-validated CFD, 14 design variables and adaptive RBF/evolutionary search. It reports a 7.26% power reduction at matched thrust and a 1.74 dB noise reduction relative to its best sampled design. This is study-specific. It should be reproduced as an architecture-specific comparator, not treated as a generic expected gain. Source: https://www.sciencedirect.com/science/article/pii/S0952197626024103
+
+### Commercial engineering capability
+
+The programme must be honest about current product capability:
+
+| System | Documented capability | Our comparative opportunity |
+|---|---|---|
+| Bentley Maxsurf Stability | Direct trimmed-NURBS integration, loading conditions, equilibrium, GZ, intact/damage stability, tank/compartment modelling, criteria and longitudinal strength | Evidence lineage, reproducible data exchange and open independent validation; do not claim feature parity |
+| NAPA | Comprehensive naval-architecture calculations and stability; NAPA 2026.1 prepared Designer/Engineer for AI-assisted workflows | Bind approved hull/compartment configurations to digital-twin/loading workflows, preserving revision and evidence provenance |
+| Siemens Simcenter STAR-CCM+ | Transient multiphase free-surface VOF, DFBI and six-degree-of-freedom ship motion; full hull/propulsion/rudder/appendage interaction workflows | Integrate specialist solvers; compete on validated decision efficiency, not on an unvalidated home-grown CFD solver |
+| CAx-IF / STEP AP242 ecosystem | Managed-model exchange, product structure, persistent IDs and validation-property recommended practices | Demonstrate semantic round-trip fidelity across actual independent CAD kernels, not just a valid STEP header |
+
+Sources:
+- Maxsurf Stability: https://maxsurf.net/stability and https://maxsurf.net/stability-capability
+- NAPA: https://www.napa.fi/software-and-services/ship-design/software/napa/ ; 2026.1 https://www.napa.fi/napa-release-2026-1/ ; digital-twin/loading bridge: https://www.napa.fi/a-digital-twins-best-foundation-is-meaningful-use-of-data/
+- Siemens hull-performance workflow: https://static.sw.cdn.siemens.com/siemens-disw-assets/public/4b92hDfRCo5ND51UfBtk7p/en-US/Siemens-SW-Simcenter-STAR-CCM%2B-Hull-Performance-Workflow-Fact-Sheet_tcm27-80626.pdf
+- ISO 10303-242:2025 Edition 4 (published 25 August 2025): https://www.iso.org/standard/84300.html
+- ISO/CD 10303-242 Edition 5 entered committee development on 23 February 2026: https://committee.iso.org/cms/live/live/en/sites/isoorg/contents/data/standard/09/32/93277.html
+- CAx-IF current recommendations include Persistent IDs v1.8 (13 March 2026), Cross-Domain Exchange v1.0 (29 January 2026) and Composite Material Validation Properties v1.0 (23 June 2026): https://www.mbx-if.org/home/cax/recpractices/
+
+### CFD verification and validation baseline
+
+Use the applicable current ITTC procedures and freeze the revision in every test manifest:
+- 7.5-03-01-01 Revision 05 (2024), uncertainty analysis in CFD verification and validation: https://www.ittc.info/media/11950/75-03-01-01.pdf
+- 7.5-03-02-01 Revision 02 (2024), uncertainty analysis examples for resistance and flow: https://www.ittc.info/media/11954/75-03-02-01.pdf
+- 7.5-03-02-02 Revision 03 (2024), benchmark database for CFD validation in resistance and propulsion: https://www.ittc.info/media/11956/75-03-02-02.pdf
+- 7.5-03-02-04 Revision 02 (2024), practical guidelines for ship resistance CFD, as listed in the ITTC catalogue: https://www.ittc.info/search/?q=7.5-03-02-
+
+Do not label a global solver validated because one observable or one operating point agrees. Report grid/time-step/iterative uncertainty, validation uncertainty, model discrepancy and experimental uncertainty separately, with an explicit applicability domain per observable.
+
+### How to beat the state of the art fairly
+
+The strongest defensible differentiation is not another generator architecture. It is the **cost to independently validated engineering improvement**.
+
+Run matched, rights-cleared, parent-hull-family-held-out experiments:
+
+1. Deterministic parametric/section loft baseline.
+2. Reproduced GAN baseline from the published CAD-to-CAD comparison.
+3. Reproduced VAE-PCT baseline.
+4. Representation-aware shared-latent point-cloud/waterline/buttock generator.
+5. Conditional latent-diffusion model as a separately measured arm.
+6. Offline latent-space evolutionary optimization under a fixed CFD budget.
+7. Luminous evidence-carrying design pipeline: geometry admission, multi-waterline curves, loading-equilibrium qualification, real AP242 round-trip, specialist CFD/EFD evidence and robust Pareto selection.
+
+Freeze the same train/test parent-hull families, geometry normalization, dimensional constraints, operating cases, high-fidelity evaluation budget and random seeds. Near-identical sister hulls must not leak across train/test. Do not compare published headline metrics obtained on different datasets as if they were matched.
+
+### Benchmark scorecard
+
+| Layer | Required measurements |
+|---|---|
+| Generation/reconstruction | Validity rate, diversity, coverage, MMD/JSD where definitions are reproducible, Chamfer and Hausdorff/HD95, normal deviation, curvature/fairness, form-coefficient error |
+| Representation consistency | Point-cloud/section/buttock/waterline round-trip error, deck/stem/transom seam mismatch, region inventory, unaccounted boundaries |
+| Hydrostatics/loading | Displacement and waterplane curves, LCB/TCB/VCB, waterplane moments, TPC, upright mass residual, then trim/heel force and moment residuals |
+| CAD interoperability | Independent kernel import/export, B-rep validity, geometric deviation, persistent-ID continuity, PMI/GD&T and validation-property preservation |
+| Hydrodynamics | ITTC resistance/propulsion/wake observables, grid/time-step uncertainty, independent CFD/EFD discrepancy, applicability regime |
+| Propulsion | Matched thrust, delivered power, rpm, advance coefficient, propulsive efficiency, cavitation and underwater radiated noise |
+| Mission | Energy/GHG/lifecycle cost per delivered cargo-work, operability, availability and degradation under frozen route/loading/weather distributions |
+| Evidence economics | False-feasible rate, rank reversal, validated selection regret, cost per independently verified Pareto improvement and cost to confirmed frontier |
+
+### Target ladder — targets, not achievements
+
+- **100%** explicit surface-region and boundary-loop accounting for full-envelope artifacts.
+- **0** silent repairs, coordinate-frame/unit inference or displacement-shell/full-external-hull semantic confusion.
+- **100%** loading receipts bind source hull revision, load case, density, frame, solver method and numerical stopping settings.
+- **0** candidates accepted with unsupported topology, unaccounted openings or false-feasible hard constraints.
+- **95%** empirical coverage of declared 95% prediction intervals on genuinely held-out hull families and operating regimes, reported separately by observable and regime; recalibrate or abstain when coverage fails.
+- **10%+** mission-energy improvement as an initial target and **15%** stretch target only when independently validated on matched service and operating-envelope coverage.
+- **10%+** validated Pareto hypervolume improvement and **20%** reduction in cost to reach the independently validated frontier versus matched baselines.
+- **0** mandatory safety or statutory violations accepted.
+- A generator must improve the number/value of independently validated designs per fixed high-fidelity/physical-evaluation budget, not just improve a generative score.
+
+### Paradigm shifts
+
+1. **External object vs operating-state family:** one immutable full external hull revision should support many loading waterplanes, attitudes and service cases, each with a linked derived displacement/control-volume artifact.
+2. **Geometry as evidence-bearing configuration:** persistent surface/feature identity, uncertainty, tolerances and CAD validation properties travel with the geometry.
+3. **Inverse design and reconstruction as one continuum:** new designs and archival/as-built reconstructions use the same declared profile semantics, with uncertainty alternatives preserved instead of forcing one falsely precise hull.
+4. **Multifidelity acquisition by decision consequence:** choose the next physical or high-fidelity experiment for its expected probability of changing a feasible engineering decision, not merely maximum uncertainty reduction.
+5. **Lifecycle engineering rather than one-shot optimization:** measure improvement through loading, refit, fouling/maintenance, degradation, route/weather variability and downstream service.
+
+The falsifiable competitive hypothesis is:
+
+**At the same compute and specialist-evaluation budget, the evidence-carrying pipeline produces more independently validated Pareto improvements, with lower false-feasible rate and lower cost to confirmed frontier, than reproduced generative and latent-space optimization baselines.**
+
+If the matched experiment does not support this, we must report that result rather than assert superiority.
