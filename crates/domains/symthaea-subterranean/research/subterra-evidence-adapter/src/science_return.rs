@@ -10,6 +10,8 @@
 
 use std::collections::BTreeSet;
 
+pub const MIN_CLOCK_UNCERTAINTY_MS: u64 = 1_000;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{SiteEvidenceRecord, SiteIssue};
@@ -94,6 +96,11 @@ pub enum ScienceReturnIssue {
     EmptyRecordedAt(String),
     InvalidRecordedAt(String),
     EmptyClockId(String),
+    ClockUncertaintyBelowResolution {
+        event_id: String,
+        observed_ms: u64,
+        minimum_ms: u64,
+    },
     TimestampRegression {
         clock_id: String,
         previous_event_id: String,
@@ -261,6 +268,12 @@ impl ScienceReturnRecord {
             } else if let Some(timestamp_ms) = parse_canonical_utc_millis(&event.recorded_at) {
                 if !nonempty(&event.clock_id) {
                     issues.push(ScienceReturnIssue::EmptyClockId(event.event_id.clone()));
+                } else if event.clock_uncertainty_ms < MIN_CLOCK_UNCERTAINTY_MS {
+                    issues.push(ScienceReturnIssue::ClockUncertaintyBelowResolution {
+                        event_id: event.event_id.clone(),
+                        observed_ms: event.clock_uncertainty_ms,
+                        minimum_ms: MIN_CLOCK_UNCERTAINTY_MS,
+                    });
                 } else if let Some((previous_ms, previous_uncertainty, previous_event_id)) =
                     last_clock_times.get(&event.clock_id)
                 {
@@ -452,7 +465,7 @@ mod tests {
             stage,
             recorded_at: format!("2026-11-16T12:{:02}:00Z", sequence),
             clock_id: "synthetic-robot-clock-01".into(),
-            clock_uncertainty_ms: 100,
+            clock_uncertainty_ms: MIN_CLOCK_UNCERTAINTY_MS,
             actor_id: "synthetic-robot-01".into(),
             evidence_ref: format!("synthetic-evidence-{event_id}"),
             calibration_ref: None,
@@ -693,6 +706,19 @@ mod tests {
         let issues = record.validate().unwrap_err();
         assert!(issues.contains(&ScienceReturnIssue::EmptyRecordedAt("proposed".into())));
         assert!(!issues.contains(&ScienceReturnIssue::EmptyClockId("proposed".into())));
+    }
+
+    #[test]
+    fn declared_clock_uncertainty_must_cover_second_precision_quantization() {
+        let mut record = complete_record();
+        record.events[0].clock_uncertainty_ms = MIN_CLOCK_UNCERTAINTY_MS - 1;
+        assert!(record.validate().unwrap_err().contains(
+            &ScienceReturnIssue::ClockUncertaintyBelowResolution {
+                event_id: "proposed".into(),
+                observed_ms: MIN_CLOCK_UNCERTAINTY_MS - 1,
+                minimum_ms: MIN_CLOCK_UNCERTAINTY_MS,
+            }
+        ));
     }
 
 }

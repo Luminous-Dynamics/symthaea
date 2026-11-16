@@ -406,3 +406,6 @@ The science-return state machine now distinguishes sequence order from wall-cloc
 | CrossClockHandoffBench | Robot/relay/ground timestamps from different clocks are not naïvely compared | Sequence order remains authoritative; no cross-clock false rejection |
 
 These checks improve event-log coherence but do not establish clock synchronization, trusted time, actor identity or cryptographic custody.
+
+
+The fixed-width whole-second timestamp representation imposes a minimum declared absolute uncertainty of 1,000 ms, including timestamp quantization. A future sub-second timestamp format must be versioned and tested separately before permitting smaller clock bounds.
