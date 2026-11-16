@@ -6,6 +6,7 @@ on:
       - research/plasma-energy-offline-audit-v0-1
     paths:
       - "xtask/src/plasma_energy_audit.rs"
+      - "xtask/src/plasma_pathway_decision.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
       - "xtask/plasma-audit-harness/**"
@@ -16,6 +17,7 @@ on:
   pull_request:
     paths:
       - "xtask/src/plasma_energy_audit.rs"
+      - "xtask/src/plasma_pathway_decision.rs"
       - "xtask/src/main.rs"
       - "xtask/Cargo.toml"
       - "xtask/plasma-audit-harness/**"
@@ -43,6 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           rustfmt --edition 2024 xtask/src/plasma_energy_audit.rs
+          rustfmt --edition 2024 xtask/src/plasma_pathway_decision.rs
           echo "PLASMA_AUDIT_RUSTFMT_BEGIN"
           base64 -w0 xtask/src/plasma_energy_audit.rs
           echo
