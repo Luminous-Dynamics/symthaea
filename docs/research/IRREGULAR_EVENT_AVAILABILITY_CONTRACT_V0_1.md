@@ -2,7 +2,7 @@
 
 **Tracking:** NEURO-SILICON-011 / #9700  
 **Implementation:** `research/irregular-event-contract/`  
-**Status:** source and test functions authored; no Rust build or test execution
+**Status:** 81 Rust test functions authored. An earlier pinned Rust 1.96 whole-crate compile exposed and led to fixes for four type errors. The latest exact-head format/test/benchmark/Clippy workflow is pending; no test or benchmark pass is claimed.
 
 ## 1. Event-time and availability-time contract
 
