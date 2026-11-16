@@ -294,7 +294,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!(
         concat!(
             "{{",
-            "\"schema\":\"gaussian_terminal_test_induction_calibration_v0\",",
+            "\"schema\":\"gaussian_terminal_test_induction_calibration_v1\",",
             "\"root_seed\":\"0x{:016x}\",",
             "\"prng\":\"splitmix64_box_muller_split_streams_v1\",",
             "\"nominal_alpha\":{:.8},",
