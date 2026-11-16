@@ -258,3 +258,26 @@ The adapter-level profile summary reports observed-only length-weighted dimensio
 ### Current status
 
 The standalone site/network/profile adapter and source fixtures are AUTHORED. Fixture JSON syntax has been checked. The 25 adapter test cases are AUTHORED but not compiled or executed. No JSON Schema meta-validation, Rust test execution, CI qualification, robot-in-the-loop or analogue result is claimed for this adapter increment.
+
+
+## 11. Science-return lifecycle benchmark
+
+The typed science-return record adds an independently testable operational boundary. The benchmark must distinguish the following event stages:
+
+\`Proposed → Executed → Acquired → IntegrityVerified → Persisted → Delivered → Admitted\`
+
+Failure and cancellation are terminal dispositions. Store-and-forward is a distinct state after persistence and before delivery.
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| ScienceReturnLifecycleBench | Stages occur in order; no skipping or terminal-state resurrection | Reject every skipped, reordered or post-terminal transition in the finite adversarial suite |
+| AcquisitionTruthBench | A command execution cannot count as an acquired observation | Zero observations credited before an acquisition event |
+| IntegrityAdmissionBench | Acquired evidence is not admitted without a separate integrity/calibration reference | Zero integrity-verified claims without a calibration reference |
+| PersistenceCustodyBench | Acquired data are not labelled persisted without a custody/storage reference | Zero persistence claims without a custody reference |
+| DeliveryReceiptBench | Local persistence or store-and-forward is not labelled delivered | Zero delivery claims without an external delivery receipt and custody reference |
+| ScientificAdmissionBench | Delivered observations are not automatically admitted into scientific belief | Zero admitted observations without a separate admission reference |
+| SiteObservationBindingBench | Return records link to a declared site and observation ID | Zero unknown site/observation associations |
+| EvidenceReturnResilienceBench | Relay loss yields explicit store-and-forward disposition; later delivery requires a new verified receipt | No buffered record counted as delivered until retrieval/delivery evidence exists |
+
+All percentage targets are secondary to the hard state-transition invariants. The record validator checks local ordering and required references only; it does not authenticate signatures, establish durable storage, verify actual transport delivery, or grant custody authority. Those require separate independent verifiers and a versioned cryptographic receipt contract.
+
