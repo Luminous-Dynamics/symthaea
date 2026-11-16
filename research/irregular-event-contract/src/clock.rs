@@ -210,10 +210,20 @@ impl fmt::Display for ClockCalibrationError {
             Self::ZeroCalibrationId => write!(f, "clock calibration ID must be nonzero"),
             Self::ZeroPolicyDigest => write!(f, "clock calibration policy digest must be nonzero"),
             Self::SameClockDomain => write!(f, "source and reference clock domains must differ"),
-            Self::InvalidValidityRange => write!(f, "clock calibration validity range must be non-empty"),
-            Self::AnchorOutsideValidityRange => write!(f, "clock calibration anchor must lie inside its validity range"),
-            Self::InvertedOffsetInterval => write!(f, "clock calibration lower offset exceeds upper offset"),
-            Self::FutureCalibration { recorded_at_knowledge_us, known_at_knowledge_us } => write!(
+            Self::InvalidValidityRange => {
+                write!(f, "clock calibration validity range must be non-empty")
+            }
+            Self::AnchorOutsideValidityRange => write!(
+                f,
+                "clock calibration anchor must lie inside its validity range"
+            ),
+            Self::InvertedOffsetInterval => {
+                write!(f, "clock calibration lower offset exceeds upper offset")
+            }
+            Self::FutureCalibration {
+                recorded_at_knowledge_us,
+                known_at_knowledge_us,
+            } => write!(
                 f,
                 "clock calibration recorded at {recorded_at_knowledge_us} is not known at cutoff {known_at_knowledge_us}"
             ),
@@ -230,13 +240,17 @@ impl fmt::Display for ClockCalibrationError {
                 f,
                 "source time {source_time_us} lies outside calibration validity [{valid_from_source_us}, {valid_through_source_us}]"
             ),
-            Self::EmptyWatermarkSet => write!(f, "at least one mapped source watermark is required"),
+            Self::EmptyWatermarkSet => {
+                write!(f, "at least one mapped source watermark is required")
+            }
             Self::ReferenceDomainMismatch { expected, actual } => write!(
                 f,
                 "mapped watermark reference domain {:?} does not match {:?}",
                 actual, expected
             ),
-            Self::ArithmeticOverflow => write!(f, "clock conversion or uncertainty arithmetic overflowed"),
+            Self::ArithmeticOverflow => {
+                write!(f, "clock conversion or uncertainty arithmetic overflowed")
+            }
         }
     }
 }
@@ -338,8 +352,8 @@ impl ClockCalibrationV1 {
         let drift_ceil = drift_floor
             .checked_add(round_up)
             .ok_or(ClockCalibrationError::ArithmeticOverflow)?;
-        let drift_uncertainty = i128::try_from(drift_ceil)
-            .map_err(|_| ClockCalibrationError::ArithmeticOverflow)?;
+        let drift_uncertainty =
+            i128::try_from(drift_ceil).map_err(|_| ClockCalibrationError::ArithmeticOverflow)?;
 
         let nominal_reference = i128::from(self.anchor_reference_us)
             .checked_add(delta)
@@ -373,7 +387,11 @@ impl ClockCalibrationV1 {
         source_exclusive_watermark_us: i64,
         known_at_knowledge_us: i64,
     ) -> Result<MappedExclusiveWatermark, ClockCalibrationError> {
-        let mapped = self.map_time(self.source_domain, source_exclusive_watermark_us, known_at_knowledge_us)?;
+        let mapped = self.map_time(
+            self.source_domain,
+            source_exclusive_watermark_us,
+            known_at_knowledge_us,
+        )?;
         Ok(MappedExclusiveWatermark {
             source_domain: mapped.source_domain,
             reference_domain: mapped.reference_domain,
@@ -498,7 +516,10 @@ mod tests {
 
         let mut clock = calibration();
         clock.policy_sha256 = [0; 32];
-        assert_eq!(clock.validate(), Err(ClockCalibrationError::ZeroPolicyDigest));
+        assert_eq!(
+            clock.validate(),
+            Err(ClockCalibrationError::ZeroPolicyDigest)
+        );
     }
 
     #[test]
@@ -519,8 +540,8 @@ mod tests {
         second_clock.anchor_reference_us = 9_500;
         let second = second_clock.map_exclusive_watermark(1_000, 100).unwrap();
 
-        let combined = conservative_min_exclusive_watermark(ClockDomainId(2), &[first, second])
-            .unwrap();
+        let combined =
+            conservative_min_exclusive_watermark(ClockDomainId(2), &[first, second]).unwrap();
         assert_eq!(combined.earliest_guaranteed_exclusive_us(), 10_502);
         assert_eq!(combined.source_count(), 2);
         assert!(combined.closes_half_open_interval(10_502));
