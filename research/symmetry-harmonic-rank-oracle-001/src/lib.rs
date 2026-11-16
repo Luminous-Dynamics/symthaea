@@ -199,6 +199,7 @@ pub fn cyclic_fixed_dimension(degree: usize, order: usize) -> Result<usize, Temp
 
 /// Independent explicit weight count for C_n. It is intentionally simple and
 /// used as an oracle for the closed-form cyclic formula.
+#[cfg(test)]
 fn cyclic_weight_count(degree: usize, order: usize) -> Result<usize, TemplateErrorV1> {
     if order == 0 {
         return Err(TemplateErrorV1::ZeroGroupOrder);
@@ -251,6 +252,7 @@ pub fn dihedral_character_fixed_dimension(
 /// Independent weight-pair derivation for D_n:
 /// each positive multiple of n contributes one invariant ±m combination;
 /// m=0 contributes one extra mode exactly when l is even.
+#[cfg(test)]
 fn dihedral_weight_pair_count(degree: usize, order: usize) -> Result<usize, TemplateErrorV1> {
     if order < 2 {
         return Err(TemplateErrorV1::InvalidDihedralOrder);
@@ -574,7 +576,7 @@ mod tests {
 
     #[test]
     fn cyclic_group_is_subgroup_of_same_order_rotational_dihedral_group() {
-        for order in 2..=32 {
+        for order in 2_usize..=64 {
             assert!(
                 is_subgroup_of(
                     GroupHypothesisV1::Cyclic { order },
@@ -596,7 +598,7 @@ mod tests {
 
     #[test]
     fn divisor_subgroups_obey_degreewise_monotonicity() {
-        for parent_order in 2..=32 {
+        for parent_order in 2_usize..=64 {
             for divisor in 1..=parent_order {
                 if !parent_order.is_multiple_of(divisor) {
                     continue;
@@ -748,7 +750,7 @@ mod tests {
     }
 
     #[test]
-    fn invalid_orders_empty_signatures_and_budget_exhaustion_fail_closed() {
+    fn dihedral_template_has_expected_low_degree_values() {
         let d3 = GroupHypothesisV1::RotationalDihedral { order: 3 };
         assert_eq!(
             rank_template(d3, 6, budget()).unwrap(),
