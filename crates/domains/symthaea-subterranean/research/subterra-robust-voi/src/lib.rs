@@ -110,7 +110,6 @@ fn validate_model_schema(models: &[ModelScenario]) -> Result<(), RobustError> {
             (
                 action.modality.as_str(),
                 action.cost,
-                action.external_gate_passed,
                 outcomes,
             ),
         );
@@ -150,7 +149,7 @@ fn validate_model_schema(models: &[ModelScenario]) -> Result<(), RobustError> {
         }
 
         for action in &problem.actions {
-            let Some((modality, cost, gate, outcome_ids)) =
+            let Some((modality, cost, outcome_ids)) =
                 first_actions.get(action.id.as_str())
             else {
                 return Err(RobustError::ModelSchemaMismatch(format!(
@@ -165,7 +164,6 @@ fn validate_model_schema(models: &[ModelScenario]) -> Result<(), RobustError> {
                 .collect::<Vec<_>>();
             if action.modality != *modality
                 || action.cost != *cost
-                || action.external_gate_passed != *gate
                 || model_outcome_ids != *outcome_ids
             {
                 return Err(RobustError::ModelSchemaMismatch(format!(
