@@ -230,7 +230,7 @@ pub fn dihedral_character_fixed_dimension(
         return Err(TemplateErrorV1::InvalidDihedralOrder);
     }
     let cyclic_character_sum = cyclic_fixed_dimension(degree, order)?;
-    let half_turn_character = usize::from(degree % 2 == 0);
+    let half_turn_character = if degree % 2 == 0 { 1 } else { 0 };
     let numerator = if half_turn_character == 1 {
         cyclic_character_sum
             .checked_add(1)
