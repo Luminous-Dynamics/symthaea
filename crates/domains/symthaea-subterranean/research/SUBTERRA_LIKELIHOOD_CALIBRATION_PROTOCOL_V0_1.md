@@ -143,10 +143,11 @@ The dependency-free reference implements:
 - Training-only Dirichlet categorical likelihood estimation;
 - minimum support with abstention/no emitted vector;
 - separate Calibration and Evaluation Brier/NLL scoring;
-- table re-derivation before holdout scoring to reject tampered likelihood cells.
+- table re-derivation before holdout scoring to reject tampered likelihood cells;
+- guarded conversion to one-step EVSI inputs using caller-supplied priors, decision losses, resource costs and external gate dispositions.
 
-Fourteen unit-test cases are authored. Rust formatting, compilation, tests and Clippy have not been executed in the current authoring environment because cargo/rustc/rustfmt are absent. No empirical calibration claim is made.
+Nineteen unit-test cases are authored. Rust formatting, compilation, tests and Clippy have not been executed in the current authoring environment because cargo/rustc/rustfmt are absent. No empirical calibration claim is made.
 
 ## 9. Non-claims
 
-This estimator does not authenticate labels or observations, infer a prior over geological hypotheses, solve sensor correlation, model temporal drift, detect OOD by itself, guarantee calibration under distribution shift, qualify a planetary site or establish that a selected measurement is safe. It produces a bounded empirical likelihood reference whose adequacy must be established on independent site-held-out evidence before planner use.
+This estimator does not authenticate labels or observations, infer a prior over geological hypotheses, solve sensor correlation, model temporal drift, detect OOD by itself, guarantee calibration under distribution shift, qualify a planetary site or establish that a selected measurement is safe. It produces a bounded empirical likelihood reference whose adequacy must be established on independent site-held-out evidence before planner use. A guarded helper converts only fully supported cells into one-step EVSI inputs; it does not authenticate or recalibrate the empirical likelihoods.
