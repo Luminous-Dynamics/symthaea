@@ -2714,12 +2714,34 @@ mod tests {
     #[test]
     fn nh3_synthesis_reciprocal_yield_rejects_wrong_value() {
         let mut source = frozen_source_manifest();
-        let check = source["derived_reference_checks"].as_array_mut().unwrap().iter_mut().find(|check|
-            check.get("check_id").and_then(Value::as_str)
-                == Some("NH3-PLASMA-SYNTHESIS-RECIPROCAL-YIELD-2026")
-        ).unwrap();
-        check["derivation"]["rga_norr_energy_yield_g_NH3_per_kWh"] = serde_json::json!(99.0);
-        let error = validate_nh3_synthesis_energy_reciprocal_check(check, &source, "nh3-energy.json").unwrap_err();
+        {
+            let check = source["derived_reference_checks"]
+                .as_array_mut()
+                .unwrap()
+                .iter_mut()
+                .find(|check| {
+                    check.get("check_id").and_then(Value::as_str)
+                        == Some("NH3-PLASMA-SYNTHESIS-RECIPROCAL-YIELD-2026")
+                })
+                .unwrap();
+            check["derivation"]["rga_norr_energy_yield_g_NH3_per_kWh"] =
+                serde_json::json!(99.0);
+        }
+        let check = source["derived_reference_checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|check| {
+                check.get("check_id").and_then(Value::as_str)
+                    == Some("NH3-PLASMA-SYNTHESIS-RECIPROCAL-YIELD-2026")
+            })
+            .unwrap();
+        let error = validate_nh3_synthesis_energy_reciprocal_check(
+            check,
+            &source,
+            "nh3-energy.json",
+        )
+        .unwrap_err();
         assert!(error.to_string().contains("must equal 1000 / source"));
     }
 
@@ -2964,9 +2986,10 @@ mod tests {
         let plasma_summary = audit_source_value(&plasma, "plasma-source-cases").unwrap();
         let hts_summary = audit_source_value(&hts, "hts-source-cases").unwrap();
 
-        assert_eq!(plasma_summary.case_count, 49);
-        assert_eq!(plasma_summary.negative_control_count, 88);
-        assert_eq!(plasma_summary.benchmark_target_count, 9);
+        assert_eq!(plasma_summary.case_count, 53);
+        assert_eq!(plasma_summary.negative_control_count, 98);
+        assert_eq!(plasma_summary.derived_reference_check_count, 7);
+        assert_eq!(plasma_summary.benchmark_target_count, 12);
         let plasma_case_ids: BTreeSet<_> = plasma
             .get("cases")
             .and_then(Value::as_array)
