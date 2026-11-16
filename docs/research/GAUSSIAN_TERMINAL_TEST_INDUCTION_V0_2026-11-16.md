@@ -76,7 +76,7 @@ It does not automatically extend to:
 - serial dependence, heavy tails or unmodelled measurement shifts;
 - a growing or post-hoc selected alternative family.
 
-The predictable Gaussian e-process in #12405 has a different scope: its one-step predictions and known sigma_t may adapt to prior observations, but its test is a simple conditional-null LR reference. The induced terminal process preserves a fixed terminal NP test and is a specialist fixed-design comparator. Compare the two empirically under compatible conditions; do not claim either universally dominates.
+The predictable Gaussian e-process in #12405 has a different scope: its one-step predictions and known sigma_t may adapt to prior observations, but its test is a simple conditional-null LR reference. The induced terminal process preserves a fixed terminal NP test and is a specialist fixed-design comparator. Compare the two empirically under compatible conditions; do not claim either universally dominates. The current paired campaign freezes three induced-test thresholds (0.75, 0.90, 0.99) before evaluation, uses the same outcome paths for all methods, and assigns each threshold a separate randomizer stream. This produces a stopping-cost/power frontier rather than one threshold selected after inspecting the results.
 
 ## 5. Matched benchmark
 
@@ -91,7 +91,7 @@ Report:
 - null rejection rate and episode-level confidence interval;
 - terminal power and exact terminal-decision equality;
 - power at each separated alternative;
-- early stopping frequency and stopping-look distribution;
+- early stopping frequency and stopping-look distribution at each frozen threshold;
 - expected cost and compute at decision;
 - unresolved / no-crossing rate;
 - paired differences with uncertainty.
