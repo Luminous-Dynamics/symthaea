@@ -14,7 +14,7 @@ pub mod splits;
 pub mod scaler;
 pub mod time_imm;
 pub mod watermarks;
-pub use watermarks::{CompletenessReport, CompletenessVerdict, EventArrivalClassification, LateEventBreach, LateEventKind, SourceCompleteness, SourceCompletenessEntry, SourceKey, SourceProgressEvidence, SourceProgressOperation, SourceProgressRevision, SourceWatermarkLedger, WatermarkError};
+pub use watermarks::{CompletenessReport, CompletenessVerdict, EventArrivalClassification, LateEventBreach, LateEventKind, SourceCompleteness, SourceCompletenessEntry, SourceKey, SourceProgressEvidence, SourceProgressOperation, SourceProgressRevision, SourceWatermarkLedger, VerifiedCompletenessReport, WatermarkError};
 pub use time_imm::{AvailabilityPolicy, NaiveTimestampZone, NumericFeatureSpec, TimeImmAdapterConfig, TimeImmAdapterError, TimeImmCsvAdapter, TimeImmParsedTable};
 pub use scaler::{FeatureScale, TrainOnlyStandardizer, WindowFeatureValue, ScalerError};
 pub use splits::{purged_chronological_split, EntitySplitBoundaries, ForecastWindow, PurgedSplitPlan, SplitError};
