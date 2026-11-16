@@ -358,13 +358,12 @@ impl PredictableGaussianEProcess {
             return Err(SequentialError::DecisionDigestMismatch);
         }
 
-        let increment =
-            likelihood_ratio_increment(
-                pending.residuals[0],
-                observed_residual,
-                pending.null_conditional_mean,
-                pending.sigma,
-            )?;
+        let increment = likelihood_ratio_increment(
+            pending.residuals[0],
+            observed_residual,
+            pending.null_conditional_mean,
+            pending.sigma,
+        )?;
         let next_log_e_value = self.log_e_value + increment;
         if !next_log_e_value.is_finite() {
             return Err(SequentialError::NumericalOverflow);
@@ -588,13 +587,12 @@ impl PredictableGaussianMixture {
             .copied()
             .zip(self.component_log_e_values.iter().copied())
         {
-            let increment =
-                likelihood_ratio_increment(
-                    discrepancy,
-                    observed_residual,
-                    pending.null_conditional_mean,
-                    pending.sigma,
-                )?;
+            let increment = likelihood_ratio_increment(
+                discrepancy,
+                observed_residual,
+                pending.null_conditional_mean,
+                pending.sigma,
+            )?;
             let next = current + increment;
             if !next.is_finite() {
                 return Err(SequentialError::NumericalOverflow);
