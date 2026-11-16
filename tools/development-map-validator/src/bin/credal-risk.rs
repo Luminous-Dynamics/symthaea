@@ -266,7 +266,8 @@ fn parse_hypotheses(
             return Err(format!("duplicate oracle hypothesis {id:?}"));
         }
     }
-    if output.keys().cloned().collect::<BTreeSet<_>>() != *hypothesis_ids {
+    let parsed_ids: BTreeSet<String> = output.keys().cloned().collect();
+    if &parsed_ids != hypothesis_ids {
         return Err("oracle hypothesis set must match prior-bound IDs exactly".to_owned());
     }
     Ok(output)
@@ -807,7 +808,20 @@ mod tests {
     }
 
     #[test]
-    fn future_evidence_and_unknown_fields_fail_closed() {
+    fn future_evidence_is_rejected_without_narrowing_the_hypothesis_set() {
+        let mut candidate: Value = serde_json::from_str(CANDIDATE).unwrap();
+        let oracle: Value = serde_json::from_str(ORACLE).unwrap();
+        candidate["traces"][1]["acquisitions"][0]["at"] = json!("2026-11-16T10:01:00Z");
+        let result = evaluate_credal_risk_parts_json(&candidate.to_string(), &oracle.to_string()).unwrap();
+        let trace = result["traces"].as_array().unwrap().iter()
+            .find(|item| item["trace_id"] == "robust-probe-after-cheap-signal").unwrap();
+        assert_eq!(trace["future_evidence_leakage_count"], 1);
+        assert_eq!(trace["surviving_hypothesis_count"], 4);
+        assert_eq!(trace["worst_case_posterior_risk_bps"], 3000);
+    }
+
+    #[test]
+    fn unknown_fields_fail_closed() {
         let mut candidate: Value = serde_json::from_str(CANDIDATE).unwrap();
         let oracle: Value = serde_json::from_str(ORACLE).unwrap();
         candidate["options"][0]["untrusted_override"] = json!(true);
