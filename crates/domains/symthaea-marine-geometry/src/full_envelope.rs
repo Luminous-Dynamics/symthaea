@@ -1932,7 +1932,6 @@ mod tests {
         assert!(report.issues.is_empty());
     }
 
-
     #[test]
     fn pointed_deck_endpoint_must_share_terminal_sheer_identity() {
         let mut spec = box_fixture();
