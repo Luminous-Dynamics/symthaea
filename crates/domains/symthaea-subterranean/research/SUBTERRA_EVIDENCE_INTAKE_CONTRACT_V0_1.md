@@ -18,6 +18,7 @@ Upstream record/schema provenance:
 - Synthetic site fixture blob: 31813b808d596f9ddb78c4de49a15f1773026fc9.
 - Synthetic cave-network fixture blob: 95fa93de34773569aa3abcb9c3f808f2f9986e97.
 - Synthetic non-uniform profile fixture blob: a8305c9881f3483a762e3bc6717b86009d583039.
+- Pinned schema/fixture manifest blob: c6c5773546335913175d74e2380ff6a9e6da01e1.
 - Upstream research branch / draft: https://github.com/Luminous-Dynamics/symtropy/pull/5486.
 
 The Symtropy typed semantic validator was also corrected in commit 82c2eccb49bcbd7567143b7b2e5ae98f7e61d916: directly observed connectivity no longer requires demonstrated access or a completed interior survey. This restores the original independent-claim model and has two new regression tests authored; it remains uncompiled/unexecuted.
@@ -145,9 +146,9 @@ Contents:
 - non-uniform profile adapter and observed-only summary;
 - science-return lifecycle validator and site/observation linkage;
 - copied synthetic site, network and profile fixtures;
-- 19 site/network tests, 6 profile tests and 10 science-return tests (35 adapter cases total).
+- 21 site/network tests, 6 profile tests and 10 science-return tests (37 adapter cases total).
 
-Across the complete current Symthaea Subterra PR, the one-step EVSI, survival planner, robust EVSI, site/network/profile adapter and science-return lifecycle together have 66 authored Rust unit tests. This count is source inspection only. None has been compiled or executed in the current environment.
+Across the complete current Symthaea Subterra PR, the one-step EVSI, survival planner, robust EVSI, site/network/profile adapter and science-return lifecycle together have 68 authored Rust unit tests. This count is source inspection only. None has been compiled or executed in the current environment.
 
 ### Verification status
 
@@ -162,7 +163,7 @@ Across the complete current Symthaea Subterra PR, the one-step EVSI, survival pl
 
 ## 8. Next increments
 
-1. Add a machine-readable pinned schema manifest and negative fixtures; reject unsupported version/digest drift.
+1. Add runtime/source-level enforcement of the pinned schema manifest and negative fixtures; reject unsupported version/blob drift.
 2. Connect verified observation lineage and source-trust receipts; retain common-cause correlations.
 3. Create a separate calibration model that maps site evidence to prior/likelihood distributions with non-zero unknown mass.
 4. Add direct adapters from validated site/network/profile packets into finite model-ensemble EVSI inputs, without copying source claims into numeric probabilities.
