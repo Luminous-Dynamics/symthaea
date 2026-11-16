@@ -19,14 +19,14 @@ The crate is intentionally outside Symthaea's default Cargo workspace. Direct de
 2. Parse into a duplicate-aware JSON representation. Duplicate decoded member names reject before ordinary map parsing.
 3. Reject floating-point and non-safe-integer numeric tokens before canonicalization.
 4. Validate against the checked-in JSON Schema 2020-12 with format assertions enabled.
-5. Run semantic checks the schema cannot express: unique field IDs and pointers, RFC 6901 `~0`/`~1` escape validity, consistent parser/schema profile across same-response fields, typed predicate references, freshness field type, status specification/maturity pairing, HTTPS origin semantics, server identity/origin continuity, positive request lifetime, and source-mode/trust-witness/verification-scope compatibility.
+5. Run semantic checks the schema cannot express: unique field IDs and pointers, RFC 6901 `~0`/`~1` escape validity, consistent parser/schema profile across same-response fields, typed predicate references, freshness field type, status specification/maturity pairing, canonical lowercase HTTPS DNS A-label origins, numeric port range/default-port rules, DNS server identity/origin continuity, origin-relative path shape, positive request lifetime, and source-mode/trust-witness/verification-scope compatibility.
 6. Canonicalize with RFC 8785 JCS and compute the versioned SHA-256 plan digest.
 
 ## Claim ceiling
 
 A preflight pass means only that the plan is structurally admissible under this prototype and its semantic checks. Output deliberately keeps source authenticity, proof validity, issuer qualification, currentness and authority unevaluated. No TLS verifier, notary signature, credential, proof backend, status-list network retrieval, LISE adapter, nullifier ledger or Xenia action boundary is implemented.
 
-The authored tests additionally pin RFC 8785 UTF-16 property-key ordering with a BMP/astral pair. The implementation is research code. It is **not compiled or tested in the authoring environment** because rustc/Cargo are unavailable. Authored tests are not passed tests.
+The 17 authored tests additionally pin RFC 8785 UTF-16 property-key ordering with a BMP/astral pair, trust-scope anti-overclaim, port-range/default-port constraints, and DNS server/origin identity matching. The implementation is research code. It is **not compiled or tested in the authoring environment** because rustc/Cargo are unavailable. Authored tests are not passed tests.
 
 ## Trust and transferability
 
