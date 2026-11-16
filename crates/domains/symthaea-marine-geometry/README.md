@@ -112,7 +112,8 @@ Exit codes: 0 = valid input contract; 1 = incomplete/unsupported input; 2 = reje
 
 The canonical G2f-a schema and fixture are:
 - `docs/research/marine/schemas/marine-full-envelope-spec.schema.json`
-- `docs/research/marine/fixtures/marine-full-envelope-box-001.json`
+- `docs/research/marine/fixtures/marine-full-envelope-box-001.json` (symmetric transom/transom known-answer input)
+- `docs/research/marine/fixtures/marine-full-envelope-asymmetric-001.json` (explicitly asymmetric port/starboard input; distinct waterline references)
 - `docs/research/marine/MARINE-FULL-ENVELOPE-G2F-A.md`
 
 Symmetric port geometry must be explicitly declared as derived by reflection; asymmetric geometry must supply a separate port profile. The deck is a separate surface definition. Pointed bow/stern sections may collapse to one deck crown point; they may not be forced into a rectangular deck section.
