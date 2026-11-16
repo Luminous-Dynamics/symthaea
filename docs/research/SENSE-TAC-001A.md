@@ -1,0 +1,229 @@
+# SENSE-TAC-001A — First Tactile Co-Design Benchmark Constitution
+
+Status: benchmark constitution / design freeze only  
+Parent: Symthaea #5821  
+Related: #5820, #5823, #5826, #5827, #5831, #4918, FIELD-000 #3589, FIELD-001A #3633, ROB-INSTR #4866
+
+## 1. Objective
+
+Freeze a small, falsifiable first tactile-sensor campaign before selecting dimensions, material formulations, electronics, fabrication process, or a candidate winner.
+
+Primary question:
+
+> Can an accessible, repairable, mechanically encoded multimodal tactile patch improve contact localization and incipient-slip evidence over credible low-complexity and commercial baselines, on held-out physical conditions, without hiding regressions in calibration, saturation, hysteresis, drift, latency, power, repairability, or calibration burden?
+
+This tranche does not select a product design or authorize a physical build. It defines the comparison and evidence needed to make those decisions.
+
+## 2. Research position and paradigm shift
+
+The tactile system is the complete physical information path, not the transducer alone:
+
+    contact / load / motion
+            ↓
+    mechanical morphology and contact interface
+            ↓
+    transducer (capacitive / resistive / optical / magnetic / other)
+            ↓
+    excitation + analog front end + ADC/readout
+            ↓
+    time, calibration, environmental and fault evidence
+            ↓
+    raw physical observation + uncertainty
+            ├──→ immutable source/evidence lineage
+            ├──→ conventional signal-processing baseline
+            └──→ HDC / event / temporal representation
+                        ↓
+                 task inference / proposal
+                        ↓
+              independently measured task outcome
+
+The design hypothesis is that **mechanical morphology can be an information operator**: compliant structures, cell geometry, electrode/marker layout and mechanical decoupling can transform a contact stimulus before computation. This must be tested with fixed-electronics/fixed-algorithm ablations; it is not assumed to be true for every geometry.
+
+A second hypothesis is that a two-path representation may be useful:
+
+- a fast, bounded path for transient/contact/slip cues;
+- a richer path for slower semantic and context interpretation.
+
+Both are descendants of the same physical observations. They are not independent sensors, and a fast path gains no motor or reflex authority.
+
+## 3. Frozen scope
+
+V1 is a non-human-contact tactile coupon/patch on a bench fixture or simple robotic test surface.
+
+Out of scope: whole-body e-skin, human-contact safety, clinical palpation, production gripper control, custom MEMS/ASIC fabrication, autonomous actuator control, and universal tactile superiority claims.
+
+### Primary tasks
+
+**T1 — contact localization**
+
+Given a declared contact-indenter family and bounded fixture region, estimate contact location on held-out positions and contact geometries. Primary outcome: spatial localization error and task disposition, with the reference position produced independently of the candidate sensor.
+
+**T2 — incipient-slip discrimination**
+
+Under a declared normal-load and surface/friction profile, distinguish stable contact from incipient slip before gross relative motion, where the fixture can define a defensible reference event. Report event precision/recall or proper event score, detection delay from the independent reference event, missed events, and false alarms per episode.
+
+A task score is not a force/shear calibration result.
+
+### Secondary physical characterization
+
+Keep each axis separate: normal response and calibration residual; shear response and cross-axis sensitivity; dynamic response/bandwidth; bias/noise; resolution; nonlinearity; hysteresis; creep; drift; temperature dependence; saturation/recovery; dropout/stuck-at behavior; remount variance; curvature transfer; and between-article variation.
+
+### System/resource characterization
+
+Keep separate: sensor/readout power; host and transfer energy where measurable; data rate; compute and memory traffic; end-to-end latency distribution (including tail); wiring/channel count; fabrication and repair time; calibration time; reference-equipment burden; consumables; and lifecycle cost. Unknown resource values remain unknown.
+
+## 4. Candidate and baseline ladder
+
+No family is pre-ranked. Select the smallest useful subset after the reference-fixture and capability audit.
+
+| ID | Family | Purpose |
+|---|---|---|
+| B0 | Commodity FSR / single-point load or pressure pad | Low-complexity baseline |
+| C1 | Capacitive/compliant patch with COTS readout | Accessible candidate transducer |
+| C2 | C1 with changed morphology/electrode/cell geometry, same readout | Isolate mechanical/electrode encoding |
+| C3 | Vision-based tactile sensor (DIGIT or GelSight Mini) | Optional optical comparator |
+| C4 | Direct multi-axis commercial tactile instrument (XELA uSkin or Contactile PapillArray) | Optional calibrated-3D-force/system comparator |
+
+C3/C4 are not required for the first bench run. Their inclusion depends on availability, interface access, exact model/revision, and fair task applicability. A baseline must not be deliberately weakened.
+
+### Published commercial comparison anchors (reference only)
+
+Pin exact model, datasheet revision, SDK/firmware, units, calibration state, and capture boundary before any comparison.
+
+- **DIGIT**: the manufacturer describes it as an open-source, compact, high-resolution vision-based tactile sensor. Its output is tactile imagery; normal-force estimates and marker-assisted shear estimates are downstream interpretations. Official product page: https://digit.ml/digit.html. Commercial assembled listing snapshot: https://www.gelsight.com/product/digit-tactile-sensor/ (USD 355 listed at the research cut; price/lead time may change).
+- **GelSight Mini**: commercial optical tactile instrument with 2D/3D mapping and replaceable gel; listing snapshot USD 510: https://www.gelsight.com/product/gelsight-mini-system/. Do not treat its 3D reconstruction as automatically calibrated 3-axis force.
+- **XELA uSkin uSPa44-S**: vendor datasheet describes 16 taxels, 3-axis sensing, 133 Hz sampling, and model-specific noise/range in LSB. The LSB values must not be mistaken for SI force uncertainty without exact physical calibration: https://assets-global.website-files.com/630ccaa81fd45082532631d0/65af8c18b1ee6dd10d114f9f_uSPa44_Datasheet%20-%20Jan%202024.pdf. Vendor technology page describes its 3-axis displacement approach and published 0.1 gf resolution: https://xelarobotics.com/technology/.
+- **Contactile PapillArray v2.0**: vendor development-kit sheet describes 9 sensing pillars, local 3-axis displacement/force, global 3D force/torque and 1 kHz sampling. The sheet also defines a limited lab/light-manufacturing environment; preserve that limitation: https://contactile.com/wp-content/uploads/2022/01/Contactile_PTSDevKit2.0_SpecSheet_JAN22.pdf.
+
+These are comparison anchors, not an assertion that vendor claims have been independently reproduced. Commercial listing prices are time-stamped context, not a procurement recommendation.
+
+## 5. Reference fixture and evidence design
+
+The fixture is a separate measurement instrument and must itself have an inspectable calibration and uncertainty chain.
+
+### Required capabilities
+
+- repeatable normal loading/unloading across a declared range;
+- tangential/shear loading while controlling or measuring normal loading;
+- repeatable contact-position grid and indenter geometry;
+- independently measured fixture displacement/velocity and slip reference;
+- flat mounting and one explicitly declared curved/remount profile if the selected candidate claims it;
+- temperature/environment observation only where relevant and instrumented;
+- safe, non-destructive saturation/range-boundary and channel-fault injection;
+- synchronization sufficient to estimate end-to-end event timing.
+
+### Reference channels
+
+Use appropriately calibrated reference force-proving equipment for axial force. ISO 376:2011 is a current method for calibration/classification of force-proving instruments used in static verification of uniaxial testing machines; it is **not automatically a complete multi-axis tactile calibration method**. The exact shear/torque/displacement/slip references require a separately reviewed method and uncertainty budget.
+
+Standard anchor: ISO 376:2011 current status confirmed 2026-08-14: https://www.iso.org/standard/44661.html.
+
+Reference independence is proposition-specific. The candidate sensor must not label its own force, slip, or contact position for the test that scores it. Shared load-cell references, fixtures, clocks, ADC rails and calibration roots must be recorded and assessed through ENG-EVID-INDEP #4918.
+
+A commanded stage position is not measured force. A fixture motor command is not slip truth. A video annotation is not automatically a calibrated displacement reference.
+
+### Calibration chain
+
+For every reference and candidate channel, bind exact instrument/article/channel identity, calibration record and source digest, covered measurand/unit/range/method, calibration conditions and uncertainty, installation/fixture geometry, firmware/readout profile, timing identity, and sample lineage. The verifier must resolve applicability; a producer-declared calibrated flag is insufficient.
+
+## 6. Comparison and causal attribution
+
+Minimum arm set where physically feasible:
+
+| Arm | Physical system | Processing | What it can isolate |
+|---|---|---|---|
+| A0 | B0 simple pad | simple threshold/filter | incumbent low-complexity baseline |
+| A1 | C1 candidate patch | same simple processing | total hardware-system difference |
+| A2 | C1 candidate patch | stronger task model | algorithm contribution on candidate hardware |
+| A3 | B0 where signal interface permits | same stronger task model | algorithm benefit independent of new hardware |
+| A4 | C2 morphology variant | same readout and algorithm as C1 | morphology/electrode contribution |
+
+If exact parity is impossible, state the confound. Use factorial/ablation logic where it can distinguish morphology, transducer, front-end, calibration, representation and task model contributions.
+
+The comparison must report three non-substitutable planes:
+
+- **P1 physical:** calibration error/residual, hysteresis, drift, cross-axis, range, bandwidth, etc.
+- **P2 task:** localization, slip detection, timing and task utility.
+- **P3 system:** energy, latency, data, size, maintenance and calibration burden.
+
+Use profile-relative dispositions: ParetoImprovedUnderProfile, TradeoffUnderProfile, EquivalentWithinDeclaredTolerance, RegressionOnProtectedAxis, EvidenceInsufficient, ComparisonInvalid, OutOfProfile, or Dominated. Never reduce the result to one universal sensor-quality score.
+
+## 7. Development, confirmation and replication
+
+Separate calibration/development, design search, and held-out confirmation. Freeze exact physical article generation, mount/remount session, contact episode, surface/indenter, fixture session, calibration root, and held-out condition identity.
+
+Do not split adjacent samples from one physical episode into training and test and call them independent trials. A second independently realized patch is needed before claiming article-level reproducibility. Multi-lab reproducibility and production-lot variation are separate later evidence strata.
+
+After held-out reveal, a material change to geometry, material, front end, firmware, calibration model, threshold, representation or task model creates a new comparison generation.
+
+## 8. Adversarial controls
+
+At minimum include:
+
+1. high sensitivity but early saturation;
+2. low normal error but high shear cross-talk;
+3. strong task score with invalid physical calibration;
+4. better physical calibration with no task improvement;
+5. morphology variant tested with changed algorithm (causal attribution unresolved);
+6. held-out surface/position leaking into tuning;
+7. candidate-defined force/slip labels (circular reference);
+8. flat calibration transferred to curved mounting without evidence;
+9. remount shift not reflected in calibration generation;
+10. high sample rate with worse host buffering/tail latency;
+11. high-resolution array with no decision benefit but higher data/power;
+12. channels sharing a failing ADC/reference rail;
+13. algorithm hides a physical bias without repairing metrology;
+14. one physical patch producing many samples presented as multi-article replication;
+15. drift after cycling while the sensor remains electrically responsive;
+16. self-test passes while scale/calibration drift remains;
+17. missing energy/reference/timing data silently treated as zero;
+18. human-contact or actuator authority inferred from the non-human bench.
+
+## 9. Benchmark reporting
+
+Publish, per profile and stratum:
+
+- calibration residual and independent reference uncertainty;
+- bias, repeatability, hysteresis, linearity/nonlinearity, drift and cross-axis response;
+- force/displacement range, saturation and recovery;
+- bandwidth and sensor-to-host/task latency p50/p95/p99 with clock uncertainty;
+- T1 spatial error distribution, worst tested strata and out-of-profile cases;
+- T2 event precision/recall, false alarms per episode and delay from independent slip reference;
+- valid sample coverage, dropout and fault-detection results;
+- per-run energy, total data rate, compute and operator/calibration time;
+- repair/remount and recalibration burden;
+- article/session/condition variance and missingness;
+- uncertainty budget and unexplained residual.
+
+### Proposed benchmark gates (targets, not achieved results)
+
+- **Synthetic correctness:** 100% frozen known-answer/adversarial disposition agreement; 0 false-valid results from seeded saturation, missingness, stale calibration, channel swap, shared-reference fault or held-out leakage.
+- **Physical metrology:** every claimed P1 axis has an independent reference, a documented uncertainty budget, and a frozen acceptance rule before data collection. Numerical thresholds are selected only after the specific range, method and reference capability are chosen.
+- **Task utility:** compare to strongest feasible incumbent on identical held-out episodes; report effect sizes and uncertainty, not only accuracy. No predeclared universal superiority percentage.
+- **Timing:** include the whole sensor/readout/transport/representation/task path and the actual deadline. Do not compare source sample-rate to end-to-end response.
+- **Reproducibility:** report within-article repeatability, between-session/remount, between-article, between-lab, and field transfer separately.
+- **Resources:** complete-system energy and calibration/maintenance labour included; no core-only power claim.
+- **Robustness:** no protected-axis regression may be hidden by task gains.
+
+## 10. Stage gates and claim ceiling
+
+1. **Design freeze:** this constitution, method audit and reference-fixture uncertainty plan.
+2. **Synthetic fault model:** #5831 known-answer corpus; no physical claims.
+3. **Design subject:** bounded C1/C2 parametric candidates; no fabrication claim.
+4. **M0 engineering review:** fixture design, hazards, reference chain, safe load boundaries.
+5. **M1 bench characterization:** only after reviewed fixture and admitted channels/reference instruments.
+6. **Held-out confirmation:** locked design and evaluation protocol.
+7. **Second-article/lab transfer:** before broader reproduction claims.
+8. **Task/control integration:** proposal-only until the relevant robotics authority/safety owner qualifies any actuation route.
+
+This document authorizes no purchase, fabrication, energization, human contact, physical actuation, certification, or deployment. A synthetic pass is not a physical sensor pass. A physical patch pass is not human-contact safety, production reliability, or universal sensor superiority.
+
+## 11. Research / incumbent references
+
+- Xue & Du (June 2026), review of multimodal tactile-sensor mechanisms and signal-decoupling strategies: https://doi.org/10.1016/j.snr.2026.100459.
+- 2026 review of tactile electronic skin and intelligent interfaces, including hysteresis, crosstalk, scalability, mechanical decoupling and application trade-offs: https://www.sciencedirect.com/science/article/pii/S0924424726007016.
+- 2026 review, *Tactile robotics: Past and future*: https://doi.org/10.1177/02783649261421615.
+- ISO 376:2011 force-proving instrument calibration/classification scope (current as reviewed in 2026): https://www.iso.org/standard/44661.html.
+- NIST metrological traceability: https://www.nist.gov/calibrations/traceability.
+
+Research literature informs hypotheses and method selection; commercial specifications are vendor claims; neither is Symthaea physical performance evidence.
