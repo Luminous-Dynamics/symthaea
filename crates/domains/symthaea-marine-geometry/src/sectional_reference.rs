@@ -1497,6 +1497,66 @@ mod tests {
         assert!((result.tonnes_per_cm_immersion - 15.375).abs() < 1.0e-9);
     }
 
+
+    #[test]
+    fn displacement_curve_derivative_matches_waterplane_area_for_prismatic_hull() {
+        let receipt = evaluate_loading_sweep(&fixture_request()).unwrap();
+        let overload = result_by_id(&receipt, "OVERLOAD-Z-NEG2");
+        let design = result_by_id(&receipt, "DESIGN-WL-Z0");
+        let light = result_by_id(&receipt, "LIGHT-Z-POS2");
+
+        assert!(overload.displacement_volume_m3 > design.displacement_volume_m3);
+        assert!(design.displacement_volume_m3 > light.displacement_volume_m3);
+
+        // z is positive down, so increasing draft is decreasing z. The
+        // displacement derivative with respect to immersion equals waterplane
+        // area for this prismatic known-answer fixture.
+        let overload_immersion_step = design.waterplane_z_m - overload.waterplane_z_m;
+        let design_immersion_step = light.waterplane_z_m - design.waterplane_z_m;
+        let overload_mean_area =
+            0.5 * (overload.waterplane_area_m2 + design.waterplane_area_m2);
+        let design_mean_area = 0.5 * (design.waterplane_area_m2 + light.waterplane_area_m2);
+        assert!(
+            ((overload.displacement_volume_m3 - design.displacement_volume_m3)
+                / overload_immersion_step
+                - overload_mean_area)
+                .abs()
+                < 1.0e-9
+        );
+        assert!(
+            ((design.displacement_volume_m3 - light.displacement_volume_m3)
+                / design_immersion_step
+                - design_mean_area)
+                .abs()
+                < 1.0e-9
+        );
+    }
+
+    #[test]
+    fn changing_density_scales_mass_not_geometry_or_centres() {
+        let request = fixture_request();
+        let baseline = evaluate_loading_sweep(&request).unwrap();
+        let mut denser_request = request;
+        for condition in &mut denser_request.loading_conditions {
+            condition.water_density_kg_m3 *= 1.01;
+        }
+        let denser = evaluate_loading_sweep(&denser_request).unwrap();
+        for (base, changed) in baseline.results.iter().zip(denser.results.iter()) {
+            assert_eq!(base.displacement_volume_m3, changed.displacement_volume_m3);
+            assert_eq!(base.waterplane_area_m2, changed.waterplane_area_m2);
+            assert_eq!(
+                base.longitudinal_center_of_buoyancy_m,
+                changed.longitudinal_center_of_buoyancy_m
+            );
+            assert_eq!(
+                base.vertical_center_of_buoyancy_m,
+                changed.vertical_center_of_buoyancy_m
+            );
+            assert!((changed.displaced_mass_tonnes / base.displaced_mass_tonnes - 1.01).abs() < 1.0e-12);
+            assert!((changed.tonnes_per_cm_immersion / base.tonnes_per_cm_immersion - 1.01).abs() < 1.0e-12);
+        }
+    }
+
     #[test]
     fn loading_sweep_digest_is_deterministic_and_verifiable() {
         let request = fixture_request();
