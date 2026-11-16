@@ -930,8 +930,8 @@ mod tests {
         assert_eq!(audit.best_available_s_v, Some(0.82));
         assert_eq!(audit.submitted_s_n, Some(0.70));
         assert_eq!(audit.submitted_s_v, Some(0.80));
-        assert_eq!(audit.s_n_regret, Some(0.20));
-        assert_eq!(audit.s_v_regret, Some(0.02));
+        assert!((audit.s_n_regret.unwrap() - 0.20).abs() < 1.0e-12);
+        assert!((audit.s_v_regret.unwrap() - 0.02).abs() < 1.0e-12);
     }
 
     #[test]
@@ -1091,7 +1091,9 @@ mod tests {
         let first = audit_real_candidate_selection_json(&live_json, &evaluator_json).unwrap();
         let replay = audit_real_candidate_selection_json(&live_json, &evaluator_json).unwrap();
         assert_eq!(first, replay);
-        assert!(first.contains("\"s_n_regret\": 0.09999999999999998"));
+        let report: serde_json::Value = serde_json::from_str(&first).unwrap();
+        let regret = report["s_n_regret"].as_f64().unwrap();
+        assert!((regret - 0.1).abs() < 1.0e-12);
     }
 
     #[test]
