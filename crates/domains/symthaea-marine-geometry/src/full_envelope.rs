@@ -1520,6 +1520,52 @@ mod tests {
         assert_rejected(&spec, "explicit_port_profile_missing");
     }
 
+
+    #[test]
+    fn explicit_port_and_starboard_profiles_share_point_ids_at_pointed_stem_only() {
+        let mut spec = box_fixture();
+        spec.symmetry = SymmetryPolicy::ExplicitPortAndStarboard;
+        spec.end_conditions.bow = HullEndCondition::PointedStem;
+
+        let bow_starboard = &mut spec.stations[0].starboard_profile;
+        for point in bow_starboard.iter_mut() {
+            point.y_m = 0.0;
+        }
+        spec.stations[0].port_profile = Some(bow_starboard.clone());
+
+        let mut stern_port = spec.stations[1].starboard_profile.clone();
+        for point in &mut stern_port {
+            point.point_id = format!("PORT-{}", point.point_id);
+            point.y_m = -0.9 * point.y_m;
+        }
+        spec.stations[1].port_profile = Some(stern_port);
+
+        for intersection in &mut spec.design_waterline.station_intersections {
+            intersection.port_source = WaterlinePortSource::ExplicitPortProfile;
+            if intersection.station_id == spec.stations[0].station_id {
+                intersection.port_point_id = Some(intersection.starboard_point_id.clone());
+            } else {
+                intersection.port_point_id = Some(format!("PORT-{}", intersection.starboard_point_id));
+            }
+        }
+
+        spec.deck_surface.sections[0].points = vec![DeckPoint {
+            point_id: "BOW-SHEER-S".into(),
+            y_m: 0.0,
+            z_m: -4.0,
+            role: DeckPointRole::DeckCrown,
+        }];
+        let stern_port_sheer = spec.stations[1].port_profile.as_ref().unwrap().last().unwrap();
+        let stern_deck_port = spec.deck_surface.sections[1].points.first_mut().unwrap();
+        stern_deck_port.point_id = stern_port_sheer.point_id.clone();
+        stern_deck_port.y_m = stern_port_sheer.y_m;
+        stern_deck_port.z_m = stern_port_sheer.z_m;
+
+        let report = validate_full_envelope_spec(&spec);
+        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert!(report.issues.is_empty());
+    }
+
     #[test]
     fn pointed_bow_must_have_exactly_collapsed_transverse_profile() {
         let mut spec = box_fixture();
