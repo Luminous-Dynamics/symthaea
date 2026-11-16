@@ -52,6 +52,7 @@ Ownership remains split:
 - Symthaea #12328 / PR #12336: exact HTTP/JSON field semantics and bounded structural selector.
 - Symthaea #12373: TLSNotary typed verified-commitment API boundary.
 - Symthaea #12423: trust-equivalent network-round-trip benchmarking, direct packet instrumentation, multi-claim session amortization and privacy-composition controls.
+- Symthaea #12435: distinguish joint threshold/MPC TLS-session witnessing from post-session threshold countersigning and independent-session corroboration.
 - Symthaea #12269: issuer/source and verifier-request binding.
 - Mycelix #6230 / #6245 / #6251 / #6219: PPAC composition, source profile, domain-scoped uniqueness, and LISE requalification.
 - Mycelix #5401 / #5404 / #5405 / #5411 / #5466 / #5468: cross-session linkability, cumulative disclosure inference, proof-shape correlation, and federated disclosure-budget conservation. CPIR references these owners rather than implementing a duplicate privacy ledger.
@@ -118,6 +119,15 @@ Source-specific reading:
 - Scribe's STARK verifies the attestation signature, commitment and policy, while its security analysis explicitly assumes an honest attestation node for TLS provenance. https://link.springer.com/article/10.1007/s12083-026-02246-2
 
 A syntactically valid trust block does not authenticate these identities. The referenced profile digests must be resolved by their owner and checked against fresh, independently qualified trust-root evidence before any decision.
+
+**Threshold witness versus threshold publisher:** keep these as different trust propositions.
+
+- A threshold signature applied after a single notary has witnessed a TLS session can distribute control over attestation publication, key availability or organizational approval. It does not retroactively make the session witness a quorum.
+- A true threshold-session witness would require multiple parties to participate in, or jointly verify a formally specified MPC/TLS session-key and record-authentication relation that binds the same session identity, server identity, request, response ordinal and transcript root.
+- Multiple independent fetches are separate sessions. Their agreement is corroboration under a time/consistency model, not joint proof of one session.
+
+CPIR v1 deliberately has no `threshold_session_witness` enum. Such a profile must not be inferred from a threshold-signed attestation or a collection of independent fetch receipts. The separate research owner is [SYM-ZK-TLSN-WITNESS-QUORUM-001 / #12435](https://github.com/Luminous-Dynamics/symthaea/issues/12435). It compares post-session threshold countersigning, actual joint MPC/TLS session witnessing and independent-session corroboration. NIST's threshold-cryptography work is a relevant building block for threshold signatures/key operations, but it does not by itself prove a distributed TLS-session witness relation. Sources: https://csrc.nist.gov/projects/threshold-cryptography and https://tlsnotary.org/docs/protocol/mpc-tls/handshake/.
+
 
 
 ### 4.3 Commitment opening
