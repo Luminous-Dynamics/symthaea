@@ -710,6 +710,112 @@ mod tests {
     }
 
     #[test]
+    fn predictable_conditional_mean_innovation_matches_known_answer() {
+        let mut process = PredictableGaussianEProcess::new(0.5, 0.05).unwrap();
+        process
+            .commit_prediction_with_conditional_gaussian(
+                "obs-1",
+                "sha256:decision-1",
+                0.2,
+                0.5,
+                0.5,
+            )
+            .unwrap();
+        let result = process.observe("obs-1", "sha256:decision-1", 0.7).unwrap();
+        // d * (y - mu) / sigma^2 - d^2 / (2 sigma^2)
+        // = 0.2 * 0.2 / 0.25 - 0.04 / 0.5 = 0.08.
+        assert!((result.log_e_value - 0.08).abs() < 1.0e-12);
+        assert_eq!(result.null_conditional_mean, 0.5);
+        assert_eq!(result.expected_residual, 0.2);
+        assert_eq!(result.sigma, 0.5);
+    }
+
+    #[test]
+    fn predictable_ar1_null_is_controlled_but_zero_mean_misspecification_is_not() {
+        const PATHS: u64 = 20_000;
+        const HORIZON: u64 = 100;
+        const RHO: f64 = 0.65;
+        const DISCREPANCY: f64 = 0.22;
+        const SIGMA: f64 = 0.80;
+
+        let mut conditional_false_alarms = 0_u64;
+        let mut zero_mean_false_alarms = 0_u64;
+
+        for path in 0..PATHS {
+            let mut state = 0x7a31_9cde_0428_b5f1_u64
+                ^ path.wrapping_mul(0xd6e8_feb8_6659_fd93);
+            let mut conditional =
+                PredictableGaussianEProcess::new(SIGMA, 0.05).unwrap();
+            let mut zero_mean = PredictableGaussianEProcess::new(SIGMA, 0.05).unwrap();
+            let mut previous_observation = 0.0;
+            let mut conditional_crossed = false;
+            let mut zero_mean_crossed = false;
+
+            for step in 0..HORIZON {
+                // The AR(1) conditional mean is completely determined by
+                // the previous observation and is committed before this draw.
+                let conditional_mean = RHO * previous_observation;
+                let observed = conditional_mean
+                    + SIGMA * deterministic_standard_normal(&mut state);
+                let conditional_id = format!("conditional-{path}-{step}");
+                let zero_mean_id = format!("zero-mean-{path}-{step}");
+                let conditional_digest = format!("conditional-decision-{path}-{step}");
+                let zero_mean_digest = format!("zero-mean-decision-{path}-{step}");
+
+                if !conditional_crossed {
+                    conditional
+                        .commit_prediction_with_conditional_gaussian(
+                            &conditional_id,
+                            &conditional_digest,
+                            DISCREPANCY,
+                            conditional_mean,
+                            SIGMA,
+                        )
+                        .unwrap();
+                    let update = conditional
+                        .observe(&conditional_id, &conditional_digest, observed)
+                        .unwrap();
+                    conditional_crossed = update.crossed_alpha_boundary;
+                }
+
+                if !zero_mean_crossed {
+                    zero_mean
+                        .commit_prediction_with_sigma(
+                            &zero_mean_id,
+                            &zero_mean_digest,
+                            DISCREPANCY,
+                            SIGMA,
+                        )
+                        .unwrap();
+                    let update = zero_mean
+                        .observe(&zero_mean_id, &zero_mean_digest, observed)
+                        .unwrap();
+                    zero_mean_crossed = update.crossed_alpha_boundary;
+                }
+
+                previous_observation = observed;
+                if conditional_crossed && zero_mean_crossed {
+                    break;
+                }
+            }
+
+            conditional_false_alarms += u64::from(conditional_crossed);
+            zero_mean_false_alarms += u64::from(zero_mean_crossed);
+        }
+
+        let conditional_rate = conditional_false_alarms as f64 / PATHS as f64;
+        let zero_mean_rate = zero_mean_false_alarms as f64 / PATHS as f64;
+        assert!(
+            conditional_rate <= 0.06,
+            "conditional AR(1) null crossing rate {conditional_rate:.4} exceeded 0.06"
+        );
+        assert!(
+            zero_mean_rate > 0.10,
+            "zero-mean misspecification negative control was not detected: {zero_mean_rate:.4}"
+        );
+    }
+
+    #[test]
     fn predictable_per_observation_sigma_is_used_in_the_likelihood_ratio() {
         let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
         process
