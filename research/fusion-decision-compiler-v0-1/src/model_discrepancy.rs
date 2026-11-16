@@ -928,6 +928,7 @@ fn validate_parametric(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn report(
     profile: &DiscrepancyCalibrationProfile,
     run: &PowerBalanceRun,
@@ -1228,7 +1229,7 @@ mod tests {
     fn synthetic_calibration_fixture_never_qualifies_model_form() {
         let profile = discrepancy_profile();
         let residuals: Vec<_> = (1..=39)
-            .map(|index| residual(index, index as f64, EvidenceClass::SyntheticFixture))
+            .map(|index| residual(index, index as f64 / 2.0, EvidenceClass::SyntheticFixture))
             .collect();
         let report = evaluate(
             &profile,
