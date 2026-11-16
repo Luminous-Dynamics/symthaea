@@ -144,7 +144,11 @@ Run the analytical sweep fixture:
 
     cargo run --locked -p symthaea-marine-geometry --bin marine-sectional-hydrostatics-reference -- docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json --output /tmp/marine-sectional-reference.json
 
-Exit codes: 0 = evaluated; 1 = typed source/loading/integration rejection; 2 = CLI/I/O/JSON parse failure. The emitted receipt includes source-spec and per-condition BLAKE3 digests. The verifier recomputes the exact request rather than trusting a caller-supplied output.
+Exit codes: 0 = evaluated or independently verified; 1 = typed source/loading/integration/integrity rejection; 2 = CLI/I/O/JSON parse failure. The emitted receipt includes source-spec and per-condition BLAKE3 digests. Independently re-evaluate a previously saved receipt with the exact original request:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-sectional-hydrostatics-reference -- docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json --verify /tmp/marine-sectional-reference.json
+
+The verifier recomputes the exact request rather than trusting the caller-supplied output, and reports the bound sweep digest on success.
 
 ### Synthetic known answers
 
