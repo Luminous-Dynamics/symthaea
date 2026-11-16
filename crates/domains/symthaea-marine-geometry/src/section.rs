@@ -9,7 +9,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::CoordinateFrame;
 
-
 const SECTION_SCHEMA_VERSION: u32 = 2;
 const ENDPOINT_TOLERANCE: f64 = 1.0e-12;
 const MAX_STATIONS: usize = 512;
@@ -36,7 +35,6 @@ pub struct LongitudinalEndConditions {
     #[serde(default)]
     pub stern: LongitudinalEndCondition,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -141,7 +139,9 @@ fn compute_section_family_manifest_digest(
         longitudinal_end_conditions: artifact.longitudinal_end_conditions,
         station_count: artifact.sections.len(),
     };
-    Ok(blake3::hash(&serde_json::to_vec(&identity)?).to_hex().to_string())
+    Ok(blake3::hash(&serde_json::to_vec(&identity)?)
+        .to_hex()
+        .to_string())
 }
 
 /// Verify section coordinates and all semantic metadata against their digests.
@@ -158,7 +158,11 @@ pub fn verify_section_family_artifact_integrity(
         );
     }
     if artifact.candidate_id.trim().is_empty() {
-        violation(&mut errors, "candidate_id", "candidate ID must not be empty");
+        violation(
+            &mut errors,
+            "candidate_id",
+            "candidate ID must not be empty",
+        );
     }
     if artifact.units != "m"
         || !finite_positive(artifact.length_m)
@@ -172,7 +176,10 @@ pub fn verify_section_family_artifact_integrity(
         );
     }
     if artifact.source_spec_digest_blake3.len() != 64
-        || !artifact.source_spec_digest_blake3.bytes().all(|byte| byte.is_ascii_hexdigit())
+        || !artifact
+            .source_spec_digest_blake3
+            .bytes()
+            .all(|byte| byte.is_ascii_hexdigit())
     {
         violation(
             &mut errors,
@@ -250,23 +257,27 @@ pub fn verify_section_family_artifact_integrity(
                     violation(
                         &mut errors,
                         "collapsed_end_geometry",
-                        format!("collapsed endpoint station {index} must have every transverse sample exactly on y=0"),
+                        format!(
+                            "collapsed endpoint station {index} must have every transverse sample exactly on y=0"
+                        ),
                     );
                 }
-                Some(LongitudinalEndCondition::PlanarEndCap)
-                    if final_point[1] <= 0.0 =>
-                {
+                Some(LongitudinalEndCondition::PlanarEndCap) if final_point[1] <= 0.0 => {
                     violation(
                         &mut errors,
                         "planar_end_geometry",
-                        format!("planar endpoint station {index} must have positive waterline half-breadth"),
+                        format!(
+                            "planar endpoint station {index} must have positive waterline half-breadth"
+                        ),
                     );
                 }
                 None if final_point[1] <= 0.0 => {
                     violation(
                         &mut errors,
                         "interior_end_geometry",
-                        format!("interior station {index} must have positive waterline half-breadth"),
+                        format!(
+                            "interior station {index} must have positive waterline half-breadth"
+                        ),
                     );
                 }
                 _ => {}
@@ -296,7 +307,8 @@ pub fn verify_section_family_artifact_integrity(
     }
 
     match compute_section_family_manifest_digest(artifact) {
-        Ok(actual) if actual.eq_ignore_ascii_case(&artifact.section_family_manifest_digest_blake3) => {}
+        Ok(actual)
+            if actual.eq_ignore_ascii_case(&artifact.section_family_manifest_digest_blake3) => {}
         Ok(_) => violation(
             &mut errors,
             "section_family_manifest_digest",
@@ -309,7 +321,11 @@ pub fn verify_section_family_artifact_integrity(
         ),
     }
 
-    if errors.is_empty() { Ok(()) } else { Err(errors) }
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
 }
 
 fn violation(violations: &mut Vec<SectionViolation>, code: &str, detail: impl Into<String>) {
@@ -352,7 +368,11 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
     }
 
     if spec.candidate_id.trim().is_empty() {
-        violation(&mut violations, "candidate_id", "candidate_id must not be empty");
+        violation(
+            &mut violations,
+            "candidate_id",
+            "candidate_id must not be empty",
+        );
     }
 
     for (code, value) in [
@@ -407,10 +427,8 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
     }
 
     if spec.stations.len() == 2
-        && spec.longitudinal_end_conditions.bow
-            == LongitudinalEndCondition::CollapsedCentreline
-        && spec.longitudinal_end_conditions.stern
-            == LongitudinalEndCondition::CollapsedCentreline
+        && spec.longitudinal_end_conditions.bow == LongitudinalEndCondition::CollapsedCentreline
+        && spec.longitudinal_end_conditions.stern == LongitudinalEndCondition::CollapsedCentreline
     {
         violation(
             &mut violations,
@@ -427,10 +445,7 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
                 "the first station must be at x/L = 0",
             );
         }
-        if !close_enough(
-            spec.stations[spec.stations.len() - 1].x_over_length,
-            1.0,
-        ) {
+        if !close_enough(spec.stations[spec.stations.len() - 1].x_over_length, 1.0) {
             violation(
                 &mut violations,
                 "last_station",
@@ -442,9 +457,7 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
     let mut previous_x: Option<f64> = None;
     let mut total_output_points = 0_usize;
     for (station_index, station) in spec.stations.iter().enumerate() {
-        if !station.x_over_length.is_finite()
-            || !(0.0..=1.0).contains(&station.x_over_length)
-        {
+        if !station.x_over_length.is_finite() || !(0.0..=1.0).contains(&station.x_over_length) {
             violation(
                 &mut violations,
                 "station_x",
@@ -543,18 +556,14 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
 
         let first = station.control_points[0];
         let last = station.control_points[station.control_points.len() - 1];
-        if !close_enough(first.breadth_fraction, 0.0)
-            || !close_enough(first.depth_fraction, 1.0)
-        {
+        if !close_enough(first.breadth_fraction, 0.0) || !close_enough(first.depth_fraction, 1.0) {
             violation(
                 &mut violations,
                 "keel_endpoint",
                 format!("station {station_index} first control point must be keel [0, 1]"),
             );
         }
-        if !close_enough(last.breadth_fraction, 1.0)
-            || !close_enough(last.depth_fraction, 0.0)
-        {
+        if !close_enough(last.breadth_fraction, 1.0) || !close_enough(last.depth_fraction, 0.0) {
             violation(
                 &mut violations,
                 "sheer_endpoint",
@@ -609,13 +618,9 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
             .control_points
             .len()
             .checked_sub(1)
-            .and_then(|segments| {
-                segments.checked_mul(spec.samples_per_segment as usize)
-            })
+            .and_then(|segments| segments.checked_mul(spec.samples_per_segment as usize))
             .and_then(|points| points.checked_add(1));
-        match station_output_points
-            .and_then(|points| total_output_points.checked_add(points))
-        {
+        match station_output_points.and_then(|points| total_output_points.checked_add(points)) {
             Some(total) => {
                 total_output_points = total;
                 if total_output_points > MAX_TOTAL_OUTPUT_POINTS {
@@ -644,9 +649,7 @@ pub fn validate_section_spec(spec: &SectionHullSpec) -> Result<(), Vec<SectionVi
 }
 
 /// Compute a deterministic digest of the normalized, typed section specification.
-pub fn compute_section_spec_digest(
-    spec: &SectionHullSpec,
-) -> Result<String, serde_json::Error> {
+pub fn compute_section_spec_digest(spec: &SectionHullSpec) -> Result<String, serde_json::Error> {
     let bytes = serde_json::to_vec(spec)?;
     Ok(blake3::hash(&bytes).to_hex().to_string())
 }
@@ -673,8 +676,7 @@ pub fn generate_sections(
 
     for (station_index, station) in spec.stations.iter().enumerate() {
         let x_m = station.x_over_length * spec.length_m;
-        let local_half_beam_m =
-            0.5 * spec.beam_m * station.half_breadth_fraction;
+        let local_half_beam_m = 0.5 * spec.beam_m * station.half_breadth_fraction;
         let local_draft_m = spec.draft_m * station.draft_fraction;
 
         let mut points = Vec::with_capacity(
@@ -689,14 +691,10 @@ pub fn generate_sections(
                 let alpha = step as f64 / spec.samples_per_segment as f64;
                 let breadth = start.breadth_fraction
                     + alpha * (end.breadth_fraction - start.breadth_fraction);
-                let depth = start.depth_fraction
-                    + alpha * (end.depth_fraction - start.depth_fraction);
+                let depth =
+                    start.depth_fraction + alpha * (end.depth_fraction - start.depth_fraction);
 
-                points.push([
-                    x_m,
-                    local_half_beam_m * breadth,
-                    local_draft_m * depth,
-                ]);
+                points.push([x_m, local_half_beam_m * breadth, local_draft_m * depth]);
             }
         }
 
@@ -837,10 +835,12 @@ mod tests {
             *generated[1].keel_to_sheer_m.last().unwrap(),
             [50.0, 10.0, 0.0]
         );
-        assert!(generated.iter().all(|section| section
-            .keel_to_sheer_m
-            .iter()
-            .all(|point| point.iter().all(|value| value.is_finite()))));
+        assert!(generated.iter().all(|section| {
+            section
+                .keel_to_sheer_m
+                .iter()
+                .all(|point| point.iter().all(|value| value.is_finite()))
+        }));
     }
 
     #[test]
@@ -864,7 +864,11 @@ mod tests {
         let mut spec = valid_spec();
         spec.stations[1].control_points[2].depth_fraction = 0.9;
         let error = validate_section_spec(&spec).unwrap_err();
-        assert!(error.iter().any(|item| item.code == "section_control_order"));
+        assert!(
+            error
+                .iter()
+                .any(|item| item.code == "section_control_order")
+        );
     }
 
     #[test]
@@ -930,15 +934,17 @@ mod tests {
         assert!(error.iter().any(|item| item.code == "section_point_budget"));
     }
 
-
     #[test]
-    fn section_family_manifest_binds_longitudinal_end_conditions() {
+    fn section_family_manifest_binds_longitudinal_end_conditions) {
         let mut artifact = generate_section_artifact(&valid_spec()).unwrap();
         verify_section_family_artifact_integrity(&artifact).unwrap();
-        artifact.longitudinal_end_conditions.bow =
-            LongitudinalEndCondition::CollapsedCentreline;
+        artifact.longitudinal_end_conditions.bow = LongitudinalEndCondition::CollapsedCentreline;
         let errors = verify_section_family_artifact_integrity(&artifact).unwrap_err();
-        assert!(errors.iter().any(|item| item.code == "section_family_manifest_digest"));
+        assert!(
+            errors
+                .iter()
+                .any(|item| item.code == "section_family_manifest_digest")
+        );
     }
 
     #[test]
@@ -949,13 +955,11 @@ mod tests {
         assert!(errors.iter().any(|item| item.code == "section_family_manifest_digest"));
     }
 
-
     #[test]
-    fn collapsed_endpoint_semantics_are_checked_even_after_manifest_rebinding() {
+    fn collapsed_endpoint_semantics_are_checked_even_after_manifest_rebinding) {
         let mut spec = valid_spec();
         spec.schema_version = 2;
-        spec.longitudinal_end_conditions.bow =
-            LongitudinalEndCondition::CollapsedCentreline;
+        spec.longitudinal_end_conditions.bow = LongitudinalEndCondition::CollapsedCentreline;
         spec.stations[0].half_breadth_fraction = 0.0;
         let mut artifact = generate_section_artifact(&spec).unwrap();
 
@@ -966,9 +970,11 @@ mod tests {
             compute_section_family_manifest_digest(&artifact).unwrap();
 
         let errors = verify_section_family_artifact_integrity(&artifact).unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|item| item.code == "collapsed_end_geometry"));
+        assert!(
+            errors
+                .iter()
+                .any(|item| item.code == "collapsed_end_geometry")
+        );
     }
 
     #[test]
@@ -985,15 +991,16 @@ mod tests {
         spec.longitudinal_end_conditions.bow =
             LongitudinalEndCondition::CollapsedCentreline;
         spec.stations[0].half_breadth_fraction = 0.0;
-        assert!(validate_section_spec(&spec)
-            .unwrap_err()
-            .iter()
-            .any(|item| item.code == "end_conditions_require_schema_v2"));
+        assert!(
+            validate_section_spec(&spec)
+                .unwrap_err()
+                .iter()
+                .any(|item| item.code == "end_conditions_require_schema_v2")
+        );
     }
 
-
     #[test]
-    fn legacy_v1_json_without_end_condition_field_defaults_to_planar() {
+    fn legacy_v1_json_without_end_condition_field_defaults_to_planar) {
         let spec = valid_spec();
         let mut legacy = serde_json::to_value(&spec).unwrap();
         legacy
@@ -1017,9 +1024,11 @@ mod tests {
         object.remove("section_family_manifest_digest_blake3");
         let parsed: SectionFamilyArtifact = serde_json::from_value(legacy).unwrap();
         let errors = verify_section_family_artifact_integrity(&parsed).unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|item| item.code == "artifact_schema_version"));
+        assert!(
+            errors
+                .iter()
+                .any(|item| item.code == "artifact_schema_version")
+        );
     }
 
     #[test]
@@ -1031,10 +1040,12 @@ mod tests {
         spec.stations[0].half_breadth_fraction = 0.0;
         let artifact = generate_section_artifact(&spec).unwrap();
         assert!(verify_section_family_artifact_integrity(&artifact).is_ok());
-        assert!(artifact.sections[0]
-            .keel_to_sheer_m
-            .iter()
-            .all(|point| point[1] == 0.0));
+        assert!(
+            artifact.sections[0]
+                .keel_to_sheer_m
+                .iter()
+                .all(|point| point[1] == 0.0)
+        );
     }
 
     #[test]
