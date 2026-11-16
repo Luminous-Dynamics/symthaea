@@ -473,3 +473,19 @@ An acquired science-return record now binds a canonical SHA-256 digest and byte 
 | PayloadStageBoundaryBench | Payload metadata cannot precede acquisition | Zero pre-acquisition payload promotions |
 
 A digest only detects byte changes relative to the digest value. It does not authenticate who declared the digest or prove sensor identity, calibration, durable custody or delivery. Those require separate signed, verifier-bound receipts.
+
+
+## 19. Signed science-return payload attestation
+
+The science-return reference supports detached Ed25519 v1 attestations. The verifier checks acquired byte digest/length, externally expected actor and key IDs, Ed25519 public key, canonical signature encoding and strict signature validity. Its domain-separated message binds site ID, observation ID, acquisition event ID, acquired actor, timestamp, clock ID/uncertainty, SHA-256 digest, byte length and key ID.
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| TrustedKeyBindingBench | Declared key ID equals the evaluator's externally resolved expected key ID | Zero untrusted key-ID substitution |
+| TrustedActorBindingBench | Acquired event actor equals actor identity authorized by the external key registry | Zero actor/key identity mismatch |
+| Ed25519StrictVerificationBench | Valid attestation verifies; altered signature/public key fails strict verification | 100% frozen positive/negative controls |
+| PayloadSignatureBindingBench | Signature binds site, observation, acquired event, actor, clock metadata, digest and length | Zero cross-site/observation/payload replay |
+| AlgorithmDowngradeBench | Unknown or malformed algorithm is rejected | Zero silent algorithm fallback |
+| PayloadTrustBoundaryBench | Record-supplied key is not treated as trusted absent an external trust registry | Zero self-authorized trust promotion |
+
+This is a signature verifier, not a PKI or custody authority. It does not authenticate the trust registry, key owner, device enrollment, key scope, revocation, expiry, secure element, timestamping authority, durable storage or delivery. A valid signature says that the matching private key signed the bound data; it does not prove that the key was authorized to make the scientific claim.

@@ -189,3 +189,12 @@ This adapter does not authenticate observations, establish geological truth, inf
 Event sequence numbers establish lifecycle order. Timestamps add an independent consistency check but do not replace sequence order. Every event declares a clock ID and an absolute uncertainty bound in milliseconds. Because v0.1 timestamps are whole-second values, uncertainty must be at least 1,000 ms to include timestamp quantization; smaller claims are rejected. Events from different clock IDs are never directly compared. For events from the same clock, a regression is rejected only when the current timestamp's upper uncertainty bound is earlier than the previous timestamp's lower bound. Overlapping uncertainty intervals are inconclusive, not proof of bad order.
 
 The reference accepts only fixed-width UTC timestamps in `YYYY-MM-DDTHH:MM:SSZ` form. Timezone offsets, fractional seconds and leap-second notation are outside v0.1. This deliberately narrow representation avoids silently comparing local-clock strings or ambiguous formats.
+
+
+### Signed payload attestation
+
+The research adapter supports detached Ed25519 v1 attestations over a domain-separated envelope containing site ID, observation ID, the acquired event's event ID, actor ID, timestamp, clock ID and uncertainty, the payload SHA-256 and byte length, and the signing key ID. Verification uses strict Ed25519 signature checks.
+
+The caller supplies the expected trusted actor ID, expected key ID and corresponding public key bytes from an independently governed key registry. A key ID or public key included only in the record is not trusted. The verifier first checks actual payload bytes, then confirms the external actor/key binding and verifies the signature over the canonical envelope. Unknown algorithm identifiers, malformed keys/signatures, mismatched actor/key IDs, modified payload bytes and cross-site/observation replay are rejected.
+
+This is not a complete identity or custody system. The crate does not create or authenticate the key registry, check certificate chains, key expiry/revocation/scope, device enrollment, signing authority, secure key storage, hardware attestation or durable custody. A valid signature proves that the corresponding private key signed the bound envelope; whether that key is authorized to speak for a sensor, rover, relay or institution remains an external trust-policy decision.

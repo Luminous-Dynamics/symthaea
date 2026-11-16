@@ -13,7 +13,8 @@ path = "src/lib.rs"
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-sha2 = "0.10"
+sha2 = "=0.11.1"
+ed25519-dalek = "=3.0.0"
 
 # Standalone research crate; deliberately outside the production workspace.
 [workspace]

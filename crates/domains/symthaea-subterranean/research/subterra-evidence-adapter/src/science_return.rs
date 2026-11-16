@@ -12,6 +12,7 @@
 use std::collections::BTreeSet;
 
 use crate::{SiteEvidenceRecord, SiteIssue};
+use ed25519_dalek::{Signature, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -78,6 +79,22 @@ pub struct ScienceReturnEvent {
     pub disposition_reason: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PayloadSignatureAlgorithm {
+    Ed25519V1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PayloadAttestation {
+    pub algorithm: PayloadSignatureAlgorithm,
+    /// Key identifier resolved by the caller against an independently trusted key registry.
+    pub key_id: String,
+    /// Canonical lowercase, 128-character Ed25519 signature over the bound payload envelope.
+    pub signature_hex: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ScienceReturnPayload {
@@ -85,6 +102,9 @@ pub struct ScienceReturnPayload {
     pub sha256: String,
     /// Exact byte length of the acquired payload.
     pub byte_length: u64,
+    /// Detached signature metadata. The record does not itself establish trust in the key.
+    #[serde(default)]
+    pub attestation: Option<PayloadAttestation>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -140,6 +160,23 @@ pub enum ScienceReturnIssue {
     PayloadByteLengthMismatch { expected: u64, actual: u64 },
     PayloadSha256Mismatch,
     PayloadNotDeclaredForVerification,
+    PayloadAttestationMissing,
+    PayloadAttestationKeyIdEmpty,
+    EmptyTrustedAttestationActorId,
+    EmptyTrustedAttestationKeyId,
+    PayloadAttestationActorIdMismatch {
+        acquired: String,
+        trusted: String,
+    },
+    PayloadAttestationKeyIdMismatch {
+        declared: String,
+        trusted: String,
+    },
+    MalformedPayloadAttestationSignature,
+    InvalidPayloadAttestationPublicKey,
+    InvalidPayloadAttestationSignature,
+    PayloadAttestationSignatureInvalid,
+    PayloadAcquisitionEventMissing,
 }
 
 fn transition_allowed(
@@ -259,6 +296,70 @@ fn sha256_hex(payload: &[u8]) -> String {
     output
 }
 
+
+fn is_canonical_lower_hex(value: &str, expected_chars: usize) -> bool {
+    value.len() == expected_chars
+        && value
+            .as_bytes()
+            .iter()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte))
+}
+
+fn decode_lower_hex(value: &str) -> Option<Vec<u8>> {
+    if value.len() % 2 != 0 || !is_canonical_lower_hex(value, value.len()) {
+        return None;
+    }
+    let mut decoded = Vec::with_capacity(value.len() / 2);
+    for pair in value.as_bytes().chunks_exact(2) {
+        let digit = |byte: u8| -> Option<u8> {
+            match byte {
+                b'0'..=b'9' => Some(byte - b'0'),
+                b'a'..=b'f' => Some(byte - b'a' + 10),
+                _ => None,
+            }
+        };
+        decoded.push((digit(pair[0])? << 4) | digit(pair[1])?);
+    }
+    Some(decoded)
+}
+
+fn encode_lower_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut output = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        output.push(char::from(HEX[(byte >> 4) as usize]));
+        output.push(char::from(HEX[(byte & 0x0f) as usize]));
+    }
+    output
+}
+
+fn append_len_prefixed(output: &mut Vec<u8>, value: &[u8]) {
+    output.extend_from_slice(&(value.len() as u64).to_be_bytes());
+    output.extend_from_slice(value);
+}
+
+fn payload_attestation_message(
+    site_id: &str,
+    observation_id: &str,
+    acquired_event: &ScienceReturnEvent,
+    payload: &ScienceReturnPayload,
+    key_id: &str,
+) -> Vec<u8> {
+    let mut message =
+        b"LUMINOUS-DYNAMICS\0SUBTERRA-SCIENCE-RETURN-PAYLOAD\0V0.1\0ED25519\0".to_vec();
+    append_len_prefixed(&mut message, site_id.as_bytes());
+    append_len_prefixed(&mut message, observation_id.as_bytes());
+    append_len_prefixed(&mut message, key_id.as_bytes());
+    append_len_prefixed(&mut message, acquired_event.event_id.as_bytes());
+    append_len_prefixed(&mut message, acquired_event.actor_id.as_bytes());
+    append_len_prefixed(&mut message, acquired_event.recorded_at.as_bytes());
+    append_len_prefixed(&mut message, acquired_event.clock_id.as_bytes());
+    message.extend_from_slice(&acquired_event.clock_uncertainty_ms.to_be_bytes());
+    append_len_prefixed(&mut message, payload.sha256.as_bytes());
+    message.extend_from_slice(&payload.byte_length.to_be_bytes());
+    message
+}
+
 impl ScienceReturnRecord {
     /// Validate event ordering and stage-specific references.
     ///
@@ -295,6 +396,16 @@ impl ScienceReturnRecord {
             (Some(payload), true) => {
                 if !is_canonical_sha256(&payload.sha256) {
                     issues.push(ScienceReturnIssue::MalformedPayloadSha256);
+                }
+                if let Some(attestation) = &payload.attestation {
+                    if !nonempty(&attestation.key_id) {
+                        issues.push(ScienceReturnIssue::PayloadAttestationKeyIdEmpty);
+                    }
+                    if !is_canonical_lower_hex(&attestation.signature_hex, 128) {
+                        issues.push(
+                            ScienceReturnIssue::MalformedPayloadAttestationSignature,
+                        );
+                    }
                 }
             }
             (None, false) => {}
@@ -486,6 +597,78 @@ impl ScienceReturnRecord {
         }
     }
 
+
+    /// Verify acquired bytes and their detached Ed25519 attestation using an
+    /// expected actor/key identity and public key supplied by an external,
+    /// independently trusted registry.
+    ///
+    /// The signed envelope binds the payload to site/observation identity and
+    /// the acquired event's ID, actor, clock and timestamp metadata. This
+    /// method does not create or authenticate the registry, authorize the
+    /// key's scope, check expiry/revocation, or establish durable custody.
+    pub fn verify_signed_payload_bytes(
+        &self,
+        payload_bytes: &[u8],
+        trusted_actor_id: &str,
+        trusted_key_id: &str,
+        trusted_public_key_bytes: &[u8],
+    ) -> Result<(), Vec<ScienceReturnIssue>> {
+        self.verify_payload_bytes(payload_bytes)?;
+
+        if !nonempty(trusted_actor_id) {
+            return Err(vec![ScienceReturnIssue::EmptyTrustedAttestationActorId]);
+        }
+        if !nonempty(trusted_key_id) {
+            return Err(vec![ScienceReturnIssue::EmptyTrustedAttestationKeyId]);
+        }
+        let Some(payload) = &self.payload else {
+            return Err(vec![ScienceReturnIssue::PayloadNotDeclaredForVerification]);
+        };
+        let Some(attestation) = &payload.attestation else {
+            return Err(vec![ScienceReturnIssue::PayloadAttestationMissing]);
+        };
+        if attestation.key_id != trusted_key_id {
+            return Err(vec![ScienceReturnIssue::PayloadAttestationKeyIdMismatch {
+                declared: attestation.key_id.clone(),
+                trusted: trusted_key_id.to_string(),
+            }]);
+        }
+        if !is_canonical_lower_hex(&attestation.signature_hex, 128) {
+            return Err(vec![ScienceReturnIssue::MalformedPayloadAttestationSignature]);
+        }
+
+        let acquired_event = self.events
+            .iter()
+            .find(|event| event.stage == ScienceReturnStage::Acquired)
+            .ok_or_else(|| vec![ScienceReturnIssue::PayloadAcquisitionEventMissing])?;
+        if acquired_event.actor_id != trusted_actor_id {
+            return Err(vec![ScienceReturnIssue::PayloadAttestationActorIdMismatch {
+                acquired: acquired_event.actor_id.clone(),
+                trusted: trusted_actor_id.to_string(),
+            }]);
+        }
+
+        let public_key_array: [u8; 32] = trusted_public_key_bytes
+            .try_into()
+            .map_err(|_| vec![ScienceReturnIssue::InvalidPayloadAttestationPublicKey])?;
+        let verifying_key = VerifyingKey::from_bytes(&public_key_array)
+            .map_err(|_| vec![ScienceReturnIssue::InvalidPayloadAttestationPublicKey])?;
+        let signature_bytes = decode_lower_hex(&attestation.signature_hex)
+            .ok_or_else(|| vec![ScienceReturnIssue::MalformedPayloadAttestationSignature])?;
+        let signature = Signature::from_slice(&signature_bytes)
+            .map_err(|_| vec![ScienceReturnIssue::InvalidPayloadAttestationSignature])?;
+        let message = payload_attestation_message(
+            &self.site_id,
+            &self.observation_id,
+            acquired_event,
+            payload,
+            &attestation.key_id,
+        );
+        verifying_key
+            .verify_strict(&message, &signature)
+            .map_err(|_| vec![ScienceReturnIssue::PayloadAttestationSignatureInvalid])
+    }
+
     /// Check that this record refers to a known observation in the source site
     /// record. This checks identifier linkage only; it does not authenticate
     /// the observation or any event evidence.
@@ -596,6 +779,7 @@ mod tests {
             payload: Some(ScienceReturnPayload {
                 sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".into(),
                 byte_length: 3,
+                attestation: None,
             }),
             events,
         }
@@ -891,6 +1075,235 @@ mod tests {
             .verify_payload_bytes(b"abc")
             .unwrap_err()
             .contains(&ScienceReturnIssue::PayloadNotDeclaredForVerification));
+    }
+
+    fn signed_record_and_public_key() -> (ScienceReturnRecord, [u8; 32]) {
+        use ed25519_dalek::{Signer, SigningKey};
+
+        let mut record = complete_record();
+        let key_id = "trusted-sensor-acquisition-key-01";
+        let acquired_event = record.events
+            .iter()
+            .find(|event| event.stage == ScienceReturnStage::Acquired)
+            .unwrap()
+            .clone();
+        let signing_key = SigningKey::from_bytes(&[7_u8; 32]);
+        let payload = record.payload.as_ref().unwrap();
+        let message = payload_attestation_message(
+            &record.site_id,
+            &record.observation_id,
+            &acquired_event,
+            payload,
+            key_id,
+        );
+        let signature = signing_key.sign(&message);
+        record.payload.as_mut().unwrap().attestation = Some(PayloadAttestation {
+            algorithm: PayloadSignatureAlgorithm::Ed25519V1,
+            key_id: key_id.into(),
+            signature_hex: encode_lower_hex(&signature.to_bytes()),
+        });
+        (record, signing_key.verifying_key().to_bytes())
+    }
+
+    const TRUSTED_ACTOR_ID: &str = "synthetic-robot-01";
+    const TRUSTED_KEY_ID: &str = "trusted-sensor-acquisition-key-01";
+
+    #[test]
+    fn signed_payload_verifies_against_the_declared_trusted_key() {
+        let (record, public_key) = signed_record_and_public_key();
+        assert!(record
+            .verify_signed_payload_bytes(
+                b"abc",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &public_key
+            )
+            .is_ok());
+    }
+
+    #[test]
+    fn signature_rejects_a_different_public_key() {
+        use ed25519_dalek::SigningKey;
+        let (record, _) = signed_record_and_public_key();
+        let other_key = SigningKey::from_bytes(&[8_u8; 32]).verifying_key().to_bytes();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abc",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &other_key
+            ),
+            Err(vec![ScienceReturnIssue::PayloadAttestationSignatureInvalid])
+        );
+    }
+
+    #[test]
+    fn signed_payload_requires_the_exact_trusted_key_id() {
+        let (record, public_key) = signed_record_and_public_key();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abc",
+                TRUSTED_ACTOR_ID,
+                "another-key",
+                &public_key
+            ),
+            Err(vec![ScienceReturnIssue::PayloadAttestationKeyIdMismatch {
+                declared: TRUSTED_KEY_ID.into(),
+                trusted: "another-key".into()
+            }])
+        );
+    }
+
+    #[test]
+    fn signed_payload_requires_the_exact_trusted_actor_id() {
+        let (record, public_key) = signed_record_and_public_key();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abc",
+                "another-robot",
+                TRUSTED_KEY_ID,
+                &public_key
+            ),
+            Err(vec![ScienceReturnIssue::PayloadAttestationActorIdMismatch {
+                acquired: TRUSTED_ACTOR_ID.into(),
+                trusted: "another-robot".into()
+            }])
+        );
+    }
+
+    #[test]
+    fn empty_trusted_actor_or_key_ids_fail_closed() {
+        let (record, public_key) = signed_record_and_public_key();
+        assert_eq!(
+            record.verify_signed_payload_bytes(b"abc", " ", TRUSTED_KEY_ID, &public_key),
+            Err(vec![ScienceReturnIssue::EmptyTrustedAttestationActorId])
+        );
+        assert_eq!(
+            record.verify_signed_payload_bytes(b"abc", TRUSTED_ACTOR_ID, " ", &public_key),
+            Err(vec![ScienceReturnIssue::EmptyTrustedAttestationKeyId])
+        );
+    }
+
+    #[test]
+    fn altered_signed_payload_fails_before_signature_acceptance() {
+        let (record, public_key) = signed_record_and_public_key();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abd",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &public_key
+            ),
+            Err(vec![ScienceReturnIssue::PayloadSha256Mismatch])
+        );
+    }
+
+    #[test]
+    fn attestation_cannot_be_replayed_to_another_site_or_observation() {
+        let (mut record, public_key) = signed_record_and_public_key();
+        record.site_id = "another-site".into();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abc",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &public_key
+            ),
+            Err(vec![ScienceReturnIssue::PayloadAttestationSignatureInvalid])
+        );
+        record.site_id = "synthetic-mars-subterranean-candidate-01".into();
+        record.observation_id = "another-observation".into();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abc",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &public_key
+            ),
+            Err(vec![ScienceReturnIssue::PayloadAttestationSignatureInvalid])
+        );
+    }
+
+    #[test]
+    fn acquired_event_identity_is_signed() {
+        let (mut record, public_key) = signed_record_and_public_key();
+        record.events[2].event_id = "acquired-substituted".into();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abc",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &public_key
+            ),
+            Err(vec![ScienceReturnIssue::PayloadAttestationSignatureInvalid])
+        );
+    }
+
+    #[test]
+    fn malformed_or_noncanonical_attestation_signature_is_rejected() {
+        let (mut record, public_key) = signed_record_and_public_key();
+        record.payload.as_mut().unwrap().attestation.as_mut().unwrap().signature_hex =
+            "ABC".into();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abc",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &public_key
+            ),
+            Err(vec![ScienceReturnIssue::MalformedPayloadAttestationSignature])
+        );
+    }
+
+    #[test]
+    fn missing_attestation_cannot_pass_the_signed_verification_path() {
+        let record = complete_record();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abc",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &[1_u8; 32]
+            ),
+            Err(vec![ScienceReturnIssue::PayloadAttestationMissing])
+        );
+    }
+
+    #[test]
+    fn malformed_trusted_public_key_is_rejected() {
+        let (record, _) = signed_record_and_public_key();
+        assert_eq!(
+            record.verify_signed_payload_bytes(
+                b"abc",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &[1_u8; 31]
+            ),
+            Err(vec![ScienceReturnIssue::InvalidPayloadAttestationPublicKey])
+        );
+    }
+
+    #[test]
+    fn signature_is_bound_to_payload_length_as_well_as_the_digest() {
+        let (mut record, public_key) = signed_record_and_public_key();
+        let payload = record.payload.as_mut().unwrap();
+        payload.byte_length = 4;
+        payload.sha256 = sha256_hex(b"abcd");
+        assert!(record
+            .verify_signed_payload_bytes(
+                b"abcd",
+                TRUSTED_ACTOR_ID,
+                TRUSTED_KEY_ID,
+                &public_key
+            )
+            .unwrap_err()
+            .contains(&ScienceReturnIssue::PayloadAttestationSignatureInvalid));
+    }
+
+    #[test]
+    fn unknown_signature_suites_fail_deserialization() {
+        let invalid = br#"{"algorithm":"rsa_sha256","key_id":"key-1","signature_hex":"00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"}"#;
+        assert!(serde_json::from_slice::<PayloadAttestation>(invalid).is_err());
     }
 
 }
