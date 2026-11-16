@@ -232,13 +232,8 @@ pub fn generate_maintenance_schedule(
             })
             .max()
             .unwrap_or(plan.campaign_start_second);
-        let start = earliest_resource_start(
-            task,
-            predecessor_finish,
-            &scheduled,
-            &resources,
-        )
-        .map_err(|diagnostic| {
+        let start = earliest_resource_start(task, predecessor_finish, &scheduled, &resources)
+            .map_err(|diagnostic| {
             vec![error(
                 diagnostic,
                 &task.task_id,
@@ -281,11 +276,16 @@ pub fn generate_maintenance_schedule(
         .saturating_sub(plan.campaign_start_second);
 
     scheduled.sort_by(|left, right| {
-        (left.start_second, left.end_second, left.task.task_id.as_str()).cmp(&(
-            right.start_second,
-            right.end_second,
-            right.task.task_id.as_str(),
-        ))
+        (
+            left.start_second,
+            left.end_second,
+            left.task.task_id.as_str(),
+        )
+            .cmp(&(
+                right.start_second,
+                right.end_second,
+                right.task.task_id.as_str(),
+            ))
     });
 
     let scheduled_tasks: Vec<ScheduledMaintenanceTask> = scheduled
@@ -311,10 +311,7 @@ pub fn generate_maintenance_schedule(
     let full_outage_window_seconds = full_outage_window
         .map(|(start, end)| end.saturating_sub(start))
         .unwrap_or(0);
-    let lifecycle_events = scheduled_tasks
-        .iter()
-        .map(to_lifecycle_event)
-        .collect();
+    let lifecycle_events = scheduled_tasks.iter().map(to_lifecycle_event).collect();
     let task_receipts = scheduled_tasks
         .iter()
         .map(|task| ScheduledTaskReceipt {
@@ -496,13 +493,7 @@ pub fn exact_small_instance_makespan(
     let mut best = u64::MAX;
     let mut scheduled = Vec::with_capacity(plan.tasks.len());
     let mut used = BTreeSet::new();
-    enumerate_active_orders(
-        plan,
-        &resources,
-        &mut scheduled,
-        &mut used,
-        &mut best,
-    );
+    enumerate_active_orders(plan, &resources, &mut scheduled, &mut used, &mut best);
     Ok(best.saturating_sub(plan.campaign_start_second))
 }
 
@@ -600,7 +591,10 @@ fn validate_plan(plan: &MaintenanceSchedulePlan) -> Vec<ScheduleError> {
                 "resource pool needs provenance",
             ));
         }
-        if resources.insert(resource.resource_id.as_str(), resource).is_some() {
+        if resources
+            .insert(resource.resource_id.as_str(), resource)
+            .is_some()
+        {
             errors.push(error(
                 ScheduleDiagnostic::DuplicateResourceId,
                 &resource.resource_id,
@@ -742,9 +736,7 @@ fn validate_plan(plan: &MaintenanceSchedulePlan) -> Vec<ScheduleError> {
     errors
 }
 
-fn topological_order(
-    plan: &MaintenanceSchedulePlan,
-) -> Result<Vec<String>, ScheduleDiagnostic> {
+fn topological_order(plan: &MaintenanceSchedulePlan) -> Result<Vec<String>, ScheduleDiagnostic> {
     let priority: BTreeMap<&str, usize> = plan
         .priority_order
         .iter()
@@ -846,7 +838,8 @@ fn earliest_resource_start(
                         })
                         .map(|existing| existing.end_second)
                         .min()?;
-                    bump_to = Some(bump_to.map_or(next_release, |current| current.min(next_release)));
+                    bump_to =
+                        Some(bump_to.map_or(next_release, |current| current.min(next_release)));
                     break;
                 }
             }
@@ -888,9 +881,7 @@ fn resource_capacity_exceeded(
             }
             let used: u64 = all
                 .iter()
-                .filter(|other| {
-                    other.start_second <= instant && instant < other.end_second
-                })
+                .filter(|other| other.start_second <= instant && instant < other.end_second)
                 .flat_map(|other| {
                     other
                         .resource_demands
@@ -907,9 +898,7 @@ fn resource_capacity_exceeded(
     false
 }
 
-fn serial_baseline_makespan(
-    plan: &MaintenanceSchedulePlan,
-) -> Result<u64, ScheduleDiagnostic> {
+fn serial_baseline_makespan(plan: &MaintenanceSchedulePlan) -> Result<u64, ScheduleDiagnostic> {
     let order = topological_order(plan)?;
     let mut cursor = plan.campaign_start_second;
     for task_id in order {
@@ -921,9 +910,7 @@ fn serial_baseline_makespan(
     Ok(cursor.saturating_sub(plan.campaign_start_second))
 }
 
-fn critical_path_lower_bound(
-    plan: &MaintenanceSchedulePlan,
-) -> Result<u64, ScheduleDiagnostic> {
+fn critical_path_lower_bound(plan: &MaintenanceSchedulePlan) -> Result<u64, ScheduleDiagnostic> {
     let order = topological_order(plan)?;
     let mut finish: BTreeMap<String, u64> = BTreeMap::new();
     for task_id in order {
@@ -1029,7 +1016,10 @@ mod tests {
             subsystem_id: format!("subsystem-{id}"),
             failure_mode_id: format!("failure-{id}"),
             duration_seconds: duration,
-            predecessor_ids: predecessors.iter().map(|value| (*value).to_string()).collect(),
+            predecessor_ids: predecessors
+                .iter()
+                .map(|value| (*value).to_string())
+                .collect(),
             resource_demands: if resource_id.is_empty() {
                 Vec::new()
             } else {
@@ -1047,7 +1037,10 @@ mod tests {
         }
     }
 
-    fn plan(tasks: Vec<MaintenanceTask>, resources: Vec<RenewableResource>) -> MaintenanceSchedulePlan {
+    fn plan(
+        tasks: Vec<MaintenanceTask>,
+        resources: Vec<RenewableResource>,
+    ) -> MaintenanceSchedulePlan {
         let mut priority_order: Vec<String> =
             tasks.iter().map(|task| task.task_id.clone()).collect();
         priority_order.sort();
@@ -1068,7 +1061,11 @@ mod tests {
                 task("b", 100, &[], "robot-b", ServiceImpact::FullOutage),
                 task("c", 50, &["a", "b"], "metrology", ServiceImpact::Derated),
             ],
-            vec![resource("robot-a", 1), resource("robot-b", 1), resource("metrology", 1)],
+            vec![
+                resource("robot-a", 1),
+                resource("robot-b", 1),
+                resource("metrology", 1),
+            ],
         );
         let schedule = generate_maintenance_schedule(&plan).unwrap();
         assert_eq!(schedule.makespan_seconds, 150);
@@ -1118,7 +1115,11 @@ mod tests {
         });
         let plan = plan(
             vec![first, second],
-            vec![resource("robot-a", 1), resource("robot-b", 1), resource("port-1", 1)],
+            vec![
+                resource("robot-a", 1),
+                resource("robot-b", 1),
+                resource("port-1", 1),
+            ],
         );
         let schedule = generate_maintenance_schedule(&plan).unwrap();
         assert_eq!(schedule.makespan_seconds, 200);
@@ -1134,8 +1135,16 @@ mod tests {
             vec![resource("robot-a", 1), resource("robot-b", 1)],
         );
         let schedule = generate_maintenance_schedule(&plan).unwrap();
-        let a = schedule.scheduled_tasks.iter().find(|task| task.task_id == "a").unwrap();
-        let b = schedule.scheduled_tasks.iter().find(|task| task.task_id == "b").unwrap();
+        let a = schedule
+            .scheduled_tasks
+            .iter()
+            .find(|task| task.task_id == "a")
+            .unwrap();
+        let b = schedule
+            .scheduled_tasks
+            .iter()
+            .find(|task| task.task_id == "b")
+            .unwrap();
         assert_eq!(b.start_second, a.end_second);
     }
 
@@ -1149,10 +1158,7 @@ mod tests {
             vec![resource("robot-a", 1), resource("robot-b", 1)],
         );
         let schedule = generate_maintenance_schedule(&plan).unwrap();
-        assert_eq!(
-            schedule.full_outage_window,
-            Some((1_000, 1_100))
-        );
+        assert_eq!(schedule.full_outage_window, Some((1_000, 1_100)));
         assert_eq!(schedule.full_outage_window_seconds, 100);
         assert_eq!(schedule.lifecycle_events.len(), 2);
     }
@@ -1161,8 +1167,20 @@ mod tests {
     fn derated_tasks_remain_visible_without_expanding_full_outage_window() {
         let plan = plan(
             vec![
-                task("full-outage", 100, &[], "robot-a", ServiceImpact::FullOutage),
-                task("derated-inspection", 200, &[], "robot-b", ServiceImpact::Derated),
+                task(
+                    "full-outage",
+                    100,
+                    &[],
+                    "robot-a",
+                    ServiceImpact::FullOutage,
+                ),
+                task(
+                    "derated-inspection",
+                    200,
+                    &[],
+                    "robot-b",
+                    ServiceImpact::Derated,
+                ),
             ],
             vec![resource("robot-a", 1), resource("robot-b", 1)],
         );
@@ -1178,18 +1196,24 @@ mod tests {
             task("b", 100, &[], "robot-b", ServiceImpact::FullOutage),
             task("c", 50, &["a", "b"], "metrology", ServiceImpact::Derated),
         ];
-        let first = plan(tasks.clone(), vec![
-            resource("robot-a", 1),
-            resource("robot-b", 1),
-            resource("metrology", 1),
-        ]);
+        let first = plan(
+            tasks.clone(),
+            vec![
+                resource("robot-a", 1),
+                resource("robot-b", 1),
+                resource("metrology", 1),
+            ],
+        );
         let mut reversed = tasks;
         reversed.reverse();
-        let second = plan(reversed, vec![
-            resource("metrology", 1),
-            resource("robot-b", 1),
-            resource("robot-a", 1),
-        ]);
+        let second = plan(
+            reversed,
+            vec![
+                resource("metrology", 1),
+                resource("robot-b", 1),
+                resource("robot-a", 1),
+            ],
+        );
         assert_eq!(
             generate_maintenance_schedule(&first).unwrap(),
             generate_maintenance_schedule(&second).unwrap()
@@ -1199,11 +1223,21 @@ mod tests {
     #[test]
     fn missing_predecessor_is_rejected() {
         let plan = plan(
-            vec![task("a", 10, &["missing"], "robot", ServiceImpact::FullOutage)],
+            vec![task(
+                "a",
+                10,
+                &["missing"],
+                "robot",
+                ServiceImpact::FullOutage,
+            )],
             vec![resource("robot", 1)],
         );
         let errors = generate_maintenance_schedule(&plan).unwrap_err();
-        assert!(errors.iter().any(|error| error.diagnostic == ScheduleDiagnostic::MissingPredecessor));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::MissingPredecessor)
+        );
     }
 
     #[test]
@@ -1216,7 +1250,11 @@ mod tests {
             vec![resource("robot-a", 1), resource("robot-b", 1)],
         );
         let errors = generate_maintenance_schedule(&plan).unwrap_err();
-        assert!(errors.iter().any(|error| error.diagnostic == ScheduleDiagnostic::PrecedenceCycle));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::PrecedenceCycle)
+        );
     }
 
     #[test]
@@ -1225,17 +1263,31 @@ mod tests {
         first.resource_demands[0].units = 2;
         let plan = plan(vec![first], vec![resource("robot", 1)]);
         let errors = generate_maintenance_schedule(&plan).unwrap_err();
-        assert!(errors.iter().any(|error| error.diagnostic == ScheduleDiagnostic::DemandExceedsCapacity));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::DemandExceedsCapacity)
+        );
     }
 
     #[test]
     fn missing_resource_pool_is_not_unlimited_capacity() {
         let plan = plan(
-            vec![task("a", 10, &[], "missing-robot", ServiceImpact::FullOutage)],
+            vec![task(
+                "a",
+                10,
+                &[],
+                "missing-robot",
+                ServiceImpact::FullOutage,
+            )],
             vec![],
         );
         let errors = generate_maintenance_schedule(&plan).unwrap_err();
-        assert!(errors.iter().any(|error| error.diagnostic == ScheduleDiagnostic::UnknownResource));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::UnknownResource)
+        );
     }
 
     #[test]
@@ -1249,7 +1301,11 @@ mod tests {
         );
         plan.priority_order.pop();
         let errors = generate_maintenance_schedule(&plan).unwrap_err();
-        assert!(errors.iter().any(|error| error.diagnostic == ScheduleDiagnostic::InvalidPriorityOrder));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::InvalidPriorityOrder)
+        );
     }
 
     #[test]
@@ -1262,7 +1318,11 @@ mod tests {
                 task("d", 30, &["b"], "port", ServiceImpact::Derated),
                 task("e", 20, &["c", "d"], "metrology", ServiceImpact::Derated),
             ],
-            vec![resource("robot", 1), resource("port", 1), resource("metrology", 1)],
+            vec![
+                resource("robot", 1),
+                resource("port", 1),
+                resource("metrology", 1),
+            ],
         );
         let heuristic = generate_maintenance_schedule(&plan).unwrap();
         let oracle = exact_small_instance_makespan(&plan).unwrap();
@@ -1307,7 +1367,11 @@ mod tests {
         let mut schedule = generate_maintenance_schedule(&plan).unwrap();
         schedule.scheduled_tasks[1].start_second = schedule.scheduled_tasks[0].start_second;
         let errors = validate_maintenance_schedule(&plan, &schedule);
-        assert!(errors.iter().any(|error| error.diagnostic == ScheduleDiagnostic::ResourceCapacityViolation));
+        assert!(
+            errors
+                .iter()
+                .any(|error| error.diagnostic == ScheduleDiagnostic::ResourceCapacityViolation)
+        );
     }
 
     #[test]
