@@ -26,12 +26,14 @@
       {
         "station_id": "ST-000",
         "starboard_point_id": "BOW-WL-S",
-        "port_point_id": "BOW-WL-P"
+        "port_point_id": null,
+        "port_source": "MIRRORED_FROM_STARBOARD"
       },
       {
         "station_id": "ST-100",
         "starboard_point_id": "STERN-WL-S",
-        "port_point_id": "STERN-WL-P"
+        "port_point_id": null,
+        "port_source": "MIRRORED_FROM_STARBOARD"
       }
     ]
   },
@@ -59,7 +61,7 @@
           "y_m": 10,
           "z_m": -4,
           "role": "SHEER",
-          "region_to_next": "DECK_EDGE_TRANSITION"
+          "region_to_next": "NONE"
         }
       ]
     },
@@ -86,7 +88,7 @@
           "y_m": 10,
           "z_m": -4,
           "role": "SHEER",
-          "region_to_next": "DECK_EDGE_TRANSITION"
+          "region_to_next": "NONE"
         }
       ]
     }
@@ -147,7 +149,8 @@
     "BOTTOM",
     "TOPSIDES",
     "DECK",
-    "STERN_TRANSOM_CLOSURE"
+    "BOW_END_CLOSURE",
+    "STERN_END_CLOSURE"
   ],
   "boundary_semantics": {
     "exterior_shell": "CLOSED_SHELL",
