@@ -91,6 +91,40 @@ CL-Bench 1.0 measures LLM agents learning from prior task experience; its curren
 
 Keep model architecture, prompt/context access, memory budget and evaluator information exposure explicit in any adapter comparison.
 
+## 2.8 Current time-series foundation-model scorecard (checked 16 Nov 2026)
+
+The standard zero-shot forecasting market has moved quickly. The current comparator set should explicitly include **TimeH2O-v1**, **Timestral-209M**, **ci-proto**, **TimeRSI-1.5**, **TimeRSI**, and **t0-gamma**, alongside Chronos-2, TimesFM-3 and Toto-2.0. Do not use one source or metric as a universal rank.
+
+### FEV-Bench snapshot and source discrepancy
+
+Two H2O public surfaces currently display different win-rate snapshots:
+
+| Public surface | TimeH2O-v1 | Timestral-209M | t0-gamma | TimesFM-3 | Chronos-2 | Toto-2.0-2.5B |
+|---|---:|---:|---:|---:|---:|---:|
+| H2O benchmark site (current page) | 91.50% | 89.00% | 87.40% | 82.00% | 75.80% | 72.20% |
+| H2O GitHub benchmark README (current fetched view) | 89.60% | 87.10% | 84.70% | 79.30% | 72.20% | 69.40% |
+
+- H2O benchmark page: https://h2oai.github.io/benchmarks/
+- H2O model card / repository: https://huggingface.co/h2oai/timeh2o-v1 and https://github.com/h2oai/benchmarks
+- Mistral Timestral release: https://mistral.ai/news/timestral/
+
+These public surfaces are inconsistent at the time of this check. Preserve both source URL, retrieval date, raw snapshot and aggregation code in any comparison; do not silently choose the more favorable number. The H2O model card separately reports TimeH2O-v1 FEV-Bench SQL skill 50.83 and MASE skill 39.95, as well as GIFT-Eval CRPS 0.441 / MASE 0.654. Its current model card lists a non-commercial licence: https://huggingface.co/h2oai/timeh2o-v1 . Accuracy references do not imply commercial self-hosting rights.
+
+### Cross-benchmark rankings are different questions
+
+The TSFM.ai mirror reports that its FEV-Bench point-accuracy MASE-skill view (data loaded 15 Nov 2026) has TimeRSI-1.5 at 41.44, ci-proto at 40.80 and TimeRSI at 40.58. Its GIFT-Eval page ranks grouped probabilistic slices by average MASE rank and is led by Taichu-TimeSeries-Agent-v2, STRIDE with Synapse and RegLab-AH-2. Its BOOM telemetry view is led by Toto 2.0 models on CRPS. Those are different datasets, metrics and aggregation procedures; they should not be mixed into a single table as though ranks were interchangeable: https://tsfm.ai/benchmarks .
+
+### Required matched comparison set
+
+1. **FEV-Bench:** use the official 100-task suite and record SQL / WQL / MASE / WAPE scores separately; retain raw per-task results, win-rate estimator and bootstrap uncertainty.
+2. **GIFT-Eval:** probabilistic CRPS, MASE, quantile coverage and slice-weighted rank; separate official zero-shot results from any fine-tuning.
+3. **TIME:** task-centric forecast accuracy over its official 50-dataset / 98-task surface; pin official task definitions and checkpoint.
+4. **BOOM:** observability telemetry CRPS and anomaly/forecasting behavior; do not generalize a telemetry advantage to arbitrary irregular multimodal series.
+5. **BITS and Time-IMM:** retain the irregular sampling, missingness, trigger/constraint/artifact causes, source cadence and event-vs-arrival semantics. These remain the closer target for the proposed Symthaea event contract than a broad regular-grid forecast score.
+6. **Cost Pareto:** record model size, cold/warm p50/p95/p99 latency, throughput at matched context/horizon/batch, peak memory and measured joules at the same hardware boundary. Separate inference cost from the full event-validation, preprocessing, update and memory pipeline.
+
+For each public baseline, freeze checkpoint hash/revision, licence, model card revision, tokenizer/normalizer, official harness commit, dataset release, split, context, horizon, covariate availability, quantile levels, tuning budget, metric implementation and aggregation. A vendor-reported lead is a comparator to reproduce, not proof that Symthaea has lost or won. Do not compare TimesFM 3.0 self-hosted weights with a hosted API result without recording the separate licence, service terms and system boundary.
+
 ## 3. Comparator tiers
 
 | Tier | Required comparator | Why it belongs | What it can establish |
