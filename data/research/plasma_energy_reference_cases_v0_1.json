@@ -1131,7 +1131,7 @@
         }
       ],
       "source_conclusion": "The paper reports three distinct operating points: >99% NH3 conversion at 45 g H2/kWh and 242 kJ/mol; 150 g H2/h at 92.4% conversion, 50 g H2/kWh and 217 kJ/mol; and its highest energy yield of 51 g H2/kWh with lowest energy cost of 210 kJ/mol at 76% conversion. These points must remain separately paired; the 150 g/h result is not the >99% conversion point.",
-      "comparison_status": "SOURCE_SPECIFIC_TWO_OPERATING_POINTS_NOT_MATCHED_TO_OTHER_STUDIES",
+      "comparison_status": "SOURCE_SPECIFIC_THREE_OPERATING_POINTS_NOT_MATCHED_TO_OTHER_STUDIES",
       "blockers": [
         "The >99% conversion / 45 g per kWh, 92.4% conversion / 150 g per hour / 50 g per kWh, and 76% conversion / 51 g per kWh results are three distinct operating points and must not be mixed.",
         "The reported energy yield must be traced to its exact electrical meter boundary and must not be assumed to be complete wall-plug-to-purified-H2 performance.",
@@ -3393,7 +3393,6 @@
     {
       "check_id": "NH3-PLASMA-SYNTHESIS-RECIPROCAL-YIELD-2026",
       "source_case_id": "NH3-PLASMA-SYNTHESIS-ROUTES-TEA-2026",
-      "reference_case_id": "NH3-IEA-HB-ASU-2026",
       "evidence_class": "DERIVED_ARITHMETIC_FROM_PUBLISHED_PROCESS_ENERGY",
       "luminous_measurement": false,
       "inputs": {
