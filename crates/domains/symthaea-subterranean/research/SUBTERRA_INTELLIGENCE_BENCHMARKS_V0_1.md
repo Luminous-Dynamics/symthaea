@@ -345,3 +345,18 @@ A 2026 *Earth and Planetary Science Letters* analysis reports that ignoring hier
 - Six standalone packages are now listed in the verification script.
 - This package is a raw-manifest preflight only. It does not rewrite the current likelihood-calibration dataset or claim integrated hierarchical estimation.
 - Rust formatting, compilation, tests and Clippy remain unexecuted until the six-package script runs on a Rust-equipped environment.
+
+
+## 14. Dependency-component uncertainty intervals
+
+A new paired percentile bootstrap consumes one aggregate baseline/candidate score pair per dependency component emitted by the dependence audit.
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| PairedClusterBootstrapBench | Resample dependency components, not raw evidence rows | Equal component weight; deterministic fixed seed; no duplicate IDs |
+| BootstrapReproducibilityBench | Same frozen component scores, order and seed produce byte-for-byte same report | Exact repeatability |
+| ClusterCountDisclosureBench | Confidence intervals expose the number of distinct components | Always publish component count; treat fewer than 20–30 as exploratory |
+| PairedEffectBench | Baseline and candidate evaluated on the same components | Report paired mean difference and percentile interval |
+| NumericalIntegrityBench | NaN, infinity, duplicate component IDs and excessive/insufficient replicates fail closed | Zero silently accepted invalid inputs |
+
+This interval routine is not an independence oracle. It assumes the supplied dependency components are appropriate resampling units and does not correct for undeclared dependence, selection bias or temporal/geological nonstationarity. It does not convert a few caves into a large effective sample.

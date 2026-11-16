@@ -398,6 +398,215 @@ impl LineageDataset {
     }
 }
 
+
+pub const MINIMUM_CLUSTER_BOOTSTRAP_CLUSTERS: usize = 10;
+pub const MINIMUM_CLUSTER_BOOTSTRAP_REPLICATES: usize = 200;
+pub const MAXIMUM_CLUSTER_BOOTSTRAP_REPLICATES: usize = 1_000_000;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClusterScorePair {
+    /// Must identify a dependency component from the lineage audit, not a raw row.
+    pub dependency_component_id: String,
+    /// One pre-aggregated score for this component and the baseline policy.
+    pub baseline_score: f64,
+    /// One pre-aggregated score for this component and the candidate policy.
+    pub candidate_score: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ClusterBootstrapConfig {
+    pub replicates: usize,
+    pub seed: u64,
+    /// Must be strictly between 0 and 1 (for example, 0.95).
+    pub confidence_level: f64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BootstrapInterval {
+    pub lower_bound: f64,
+    pub upper_bound: f64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PairedClusterBootstrapReport {
+    pub method_id: &'static str,
+    pub cluster_count: usize,
+    pub replicates: usize,
+    pub seed: u64,
+    pub confidence_level: f64,
+    pub mean_baseline_score: f64,
+    pub mean_candidate_score: f64,
+    /// Candidate minus baseline. For loss metrics, negative favors candidate.
+    pub mean_candidate_minus_baseline: f64,
+    pub candidate_minus_baseline_interval: BootstrapInterval,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BootstrapError {
+    EmptyClusterScores,
+    TooFewClusters { observed: usize, minimum: usize },
+    EmptyDependencyComponentId,
+    DuplicateDependencyComponentId(String),
+    NonFiniteScore { dependency_component_id: String },
+    NumericalOverflow,
+    InvalidConfidenceLevel,
+    TooFewReplicates { observed: usize, minimum: usize },
+    TooManyReplicates { observed: usize, maximum: usize },
+}
+
+impl std::fmt::Display for BootstrapError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for BootstrapError {}
+
+#[derive(Debug, Clone, Copy)]
+struct SplitMix64 {
+    state: u64,
+}
+
+impl SplitMix64 {
+    fn new(seed: u64) -> Self {
+        Self { state: seed }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut value = self.state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        value ^ (value >> 31)
+    }
+
+    fn index(&mut self, upper_exclusive: usize) -> usize {
+        (((self.next_u64() as u128) * (upper_exclusive as u128)) >> 64) as usize
+    }
+}
+
+/// Paired percentile bootstrap over already aggregated dependency components.
+///
+/// Each component receives equal weight. This intentionally prevents many
+/// correlated rows inside one component from dominating the estimate. The
+/// caller must orient the score consistently; for loss metrics, lower is
+/// better and a negative candidate-minus-baseline interval favors candidate.
+///
+/// This routine does not prove components are independent. Its interval is
+/// only as defensible as the caller's dependency grouping and sampling frame.
+pub fn paired_cluster_bootstrap(
+    scores: &[ClusterScorePair],
+    config: ClusterBootstrapConfig,
+) -> Result<PairedClusterBootstrapReport, BootstrapError> {
+    if scores.is_empty() {
+        return Err(BootstrapError::EmptyClusterScores);
+    }
+    if scores.len() < MINIMUM_CLUSTER_BOOTSTRAP_CLUSTERS {
+        return Err(BootstrapError::TooFewClusters {
+            observed: scores.len(),
+            minimum: MINIMUM_CLUSTER_BOOTSTRAP_CLUSTERS,
+        });
+    }
+    if config.replicates < MINIMUM_CLUSTER_BOOTSTRAP_REPLICATES {
+        return Err(BootstrapError::TooFewReplicates {
+            observed: config.replicates,
+            minimum: MINIMUM_CLUSTER_BOOTSTRAP_REPLICATES,
+        });
+    }
+    if config.replicates > MAXIMUM_CLUSTER_BOOTSTRAP_REPLICATES {
+        return Err(BootstrapError::TooManyReplicates {
+            observed: config.replicates,
+            maximum: MAXIMUM_CLUSTER_BOOTSTRAP_REPLICATES,
+        });
+    }
+    if !config.confidence_level.is_finite()
+        || config.confidence_level <= 0.0
+        || config.confidence_level >= 1.0
+    {
+        return Err(BootstrapError::InvalidConfidenceLevel);
+    }
+
+    let mut ordered_scores = scores.to_vec();
+    ordered_scores.sort_by(|left, right| {
+        left.dependency_component_id
+            .cmp(&right.dependency_component_id)
+    });
+    let mut seen = BTreeSet::new();
+    for score in &ordered_scores {
+        if !nonempty(&score.dependency_component_id) {
+            return Err(BootstrapError::EmptyDependencyComponentId);
+        }
+        if !seen.insert(score.dependency_component_id.as_str()) {
+            return Err(BootstrapError::DuplicateDependencyComponentId(
+                score.dependency_component_id.clone(),
+            ));
+        }
+        if !score.baseline_score.is_finite() || !score.candidate_score.is_finite() {
+            return Err(BootstrapError::NonFiniteScore {
+                dependency_component_id: score.dependency_component_id.clone(),
+            });
+        }
+        if !(score.candidate_score - score.baseline_score).is_finite() {
+            return Err(BootstrapError::NumericalOverflow);
+        }
+    }
+
+    let cluster_count = ordered_scores.len();
+    let baseline_sum = ordered_scores.iter().map(|score| score.baseline_score).sum::<f64>();
+    let candidate_sum = ordered_scores.iter().map(|score| score.candidate_score).sum::<f64>();
+    if !baseline_sum.is_finite() || !candidate_sum.is_finite() {
+        return Err(BootstrapError::NumericalOverflow);
+    }
+    let mean_baseline_score = baseline_sum / cluster_count as f64;
+    let mean_candidate_score = candidate_sum / cluster_count as f64;
+    let mean_candidate_minus_baseline = mean_candidate_score - mean_baseline_score;
+    if !mean_baseline_score.is_finite()
+        || !mean_candidate_score.is_finite()
+        || !mean_candidate_minus_baseline.is_finite()
+    {
+        return Err(BootstrapError::NumericalOverflow);
+    }
+
+    let deltas = ordered_scores.iter()
+        .map(|score| score.candidate_score - score.baseline_score)
+        .collect::<Vec<_>>();
+    let mut rng = SplitMix64::new(config.seed);
+    let mut bootstrap_means = Vec::with_capacity(config.replicates);
+    for _ in 0..config.replicates {
+        let mut sum = 0.0;
+        for _ in 0..cluster_count {
+            sum += deltas[rng.index(cluster_count)];
+        }
+        let mean = sum / cluster_count as f64;
+        if !mean.is_finite() {
+            return Err(BootstrapError::NumericalOverflow);
+        }
+        bootstrap_means.push(mean);
+    }
+    bootstrap_means.sort_by(f64::total_cmp);
+
+    let tail_probability = (1.0 - config.confidence_level) / 2.0;
+    let last_index = (bootstrap_means.len() - 1) as f64;
+    let lower_index = (tail_probability * last_index).floor() as usize;
+    let upper_index = ((1.0 - tail_probability) * last_index).ceil() as usize;
+    let candidate_minus_baseline_interval = BootstrapInterval {
+        lower_bound: bootstrap_means[lower_index],
+        upper_bound: bootstrap_means[upper_index],
+    };
+
+    Ok(PairedClusterBootstrapReport {
+        method_id: "paired-percentile-cluster-bootstrap-v0.1",
+        cluster_count,
+        replicates: config.replicates,
+        seed: config.seed,
+        confidence_level: config.confidence_level,
+        mean_baseline_score,
+        mean_candidate_score,
+        mean_candidate_minus_baseline,
+        candidate_minus_baseline_interval,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -654,4 +863,135 @@ mod tests {
         let right = dataset(vec![c, b, a]).audit().unwrap();
         assert_eq!(left, right);
     }
+
+    fn bootstrap_scores() -> Vec<ClusterScorePair> {
+        (0..12)
+            .map(|index| ClusterScorePair {
+                dependency_component_id: format!("component-{index:02}"),
+                baseline_score: 2.0 + index as f64 / 10.0,
+                candidate_score: 1.0 + index as f64 / 10.0,
+            })
+            .collect()
+    }
+
+    fn bootstrap_config() -> ClusterBootstrapConfig {
+        ClusterBootstrapConfig {
+            replicates: 1_000,
+            seed: 0x5EED_2026,
+            confidence_level: 0.95,
+        }
+    }
+
+    #[test]
+    fn paired_bootstrap_uses_equal_component_weight_and_reports_effect() {
+        let report = paired_cluster_bootstrap(&bootstrap_scores(), bootstrap_config()).unwrap();
+        assert_eq!(report.cluster_count, 12);
+        assert_eq!(report.replicates, 1_000);
+        assert_eq!(report.seed, 0x5EED_2026);
+        assert!((report.mean_baseline_score - 2.55).abs() < 1.0e-12);
+        assert!((report.mean_candidate_score - 1.55).abs() < 1.0e-12);
+        assert!((report.mean_candidate_minus_baseline + 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn bootstrap_is_reproducible_under_input_permutation() {
+        let scores = bootstrap_scores();
+        let first = paired_cluster_bootstrap(&scores, bootstrap_config()).unwrap();
+        let mut reversed = scores;
+        reversed.reverse();
+        let second = paired_cluster_bootstrap(&reversed, bootstrap_config()).unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn constant_paired_delta_produces_degenerate_interval() {
+        let report = paired_cluster_bootstrap(&bootstrap_scores(), bootstrap_config()).unwrap();
+        assert!((report.candidate_minus_baseline_interval.lower_bound + 1.0).abs() < 1.0e-12);
+        assert!((report.candidate_minus_baseline_interval.upper_bound + 1.0).abs() < 1.0e-12);
+    }
+
+    #[test]
+    fn bootstrap_rejects_duplicate_component_ids() {
+        let mut scores = bootstrap_scores();
+        scores[1].dependency_component_id = scores[0].dependency_component_id.clone();
+        assert_eq!(
+            paired_cluster_bootstrap(&scores, bootstrap_config()),
+            Err(BootstrapError::DuplicateDependencyComponentId("component-00".into()))
+        );
+    }
+
+    #[test]
+    fn bootstrap_rejects_non_finite_scores() {
+        let mut scores = bootstrap_scores();
+        scores[0].candidate_score = f64::NAN;
+        assert_eq!(
+            paired_cluster_bootstrap(&scores, bootstrap_config()),
+            Err(BootstrapError::NonFiniteScore {
+                dependency_component_id: "component-00".into()
+            })
+        );
+    }
+
+    #[test]
+    fn bootstrap_rejects_too_few_dependency_components() {
+        let scores = bootstrap_scores().into_iter().take(9).collect::<Vec<_>>();
+        assert_eq!(
+            paired_cluster_bootstrap(&scores, bootstrap_config()),
+            Err(BootstrapError::TooFewClusters {
+                observed: 9,
+                minimum: MINIMUM_CLUSTER_BOOTSTRAP_CLUSTERS,
+            })
+        );
+    }
+
+    #[test]
+    fn bootstrap_rejects_invalid_replicate_counts() {
+        let scores = bootstrap_scores();
+        let mut config = bootstrap_config();
+        config.replicates = MINIMUM_CLUSTER_BOOTSTRAP_REPLICATES - 1;
+        assert!(matches!(
+            paired_cluster_bootstrap(&scores, config),
+            Err(BootstrapError::TooFewReplicates { .. })
+        ));
+        config.replicates = MAXIMUM_CLUSTER_BOOTSTRAP_REPLICATES + 1;
+        assert!(matches!(
+            paired_cluster_bootstrap(&scores, config),
+            Err(BootstrapError::TooManyReplicates { .. })
+        ));
+    }
+
+    #[test]
+    fn bootstrap_rejects_invalid_confidence_level() {
+        let scores = bootstrap_scores();
+        let mut config = bootstrap_config();
+        config.confidence_level = 1.0;
+        assert_eq!(
+            paired_cluster_bootstrap(&scores, config),
+            Err(BootstrapError::InvalidConfidenceLevel)
+        );
+        config.confidence_level = f64::NAN;
+        assert_eq!(
+            paired_cluster_bootstrap(&scores, config),
+            Err(BootstrapError::InvalidConfidenceLevel)
+        );
+    }
+
+    #[test]
+    fn bootstrap_rejects_empty_component_identity() {
+        let mut scores = bootstrap_scores();
+        scores[0].dependency_component_id = " ".into();
+        assert_eq!(
+            paired_cluster_bootstrap(&scores, bootstrap_config()),
+            Err(BootstrapError::EmptyDependencyComponentId)
+        );
+    }
+
+    #[test]
+    fn bootstrap_rejects_empty_input() {
+        assert_eq!(
+            paired_cluster_bootstrap(&[], bootstrap_config()),
+            Err(BootstrapError::EmptyClusterScores)
+        );
+    }
+
 }

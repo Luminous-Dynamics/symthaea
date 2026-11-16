@@ -92,7 +92,15 @@ For each split, publish:
 
 A site-cluster bootstrap is only meaningful when there are enough independent sites. Where sites share an environmental or calibration episode, bootstrap the larger dependency component or use a hierarchical method. Do not treat a thousand derived frames from three caves as a thousand independent replicates.
 
-## 7. Implementation status and limits
+## 7. Paired clustered uncertainty
+
+The crate includes a deterministic paired percentile bootstrap for one aggregate baseline/candidate score pair per dependency component. Components receive equal weight; raw rows inside a component do not multiply their influence. The report records the method ID, component count, replicate count, seed, confidence level, mean scores, mean paired difference and percentile interval.
+
+The implementation requires at least 10 dependency components and 200 resamples, rejects duplicate component IDs and non-finite values, sorts IDs before resampling, and uses a fixed-seed SplitMix64 generator for reproducibility. For loss metrics, negative candidate-minus-baseline values favor the candidate.
+
+This is a small-sample descriptive mechanism, not a universal confidence guarantee. Prefer 20–30 or more genuinely distinct components where feasible, and publish the component count. It does not repair selection bias, nonstationarity, incorrect grouping or undeclared confounders. It must not be described as an iid-row bootstrap.
+
+## 8. Implementation status and limits
 
 Standalone package:
 `subterra-dependence-audit/`
@@ -101,6 +109,6 @@ Standalone package:
 - Transitive dependency components.
 - Fail-closed split-crossing checks.
 - Exact component/group counts and maximum component size.
-- 15 authored tests.
+- 24 authored tests, including 9 paired cluster-bootstrap cases.
 
 The package is AUTHORED, not compiled or executed in the current environment. It does not estimate correlations, calculate effective sample size, bootstrap uncertainty, detect undeclared causes, authenticate IDs, or integrate with the likelihood fitter. Those are follow-on work, not implied capabilities.
