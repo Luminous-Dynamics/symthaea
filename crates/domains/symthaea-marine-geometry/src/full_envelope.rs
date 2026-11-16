@@ -4,7 +4,7 @@
 //! displacement geometry. It validates input semantics; it does not generate
 //! a hull surface, B-rep, displacement shell, or engineering approval.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::BTreeSet;
 
 pub const FULL_ENVELOPE_SCHEMA_VERSION: u32 = 1;
@@ -165,6 +165,7 @@ pub struct WaterlineStationIntersection {
     pub station_id: String,
     pub starboard_point_id: String,
     pub port_source: WaterlinePortSource,
+    #[serde(deserialize_with = "deserialize_present_nullable_string")]
     pub port_point_id: Option<String>,
 }
 
@@ -216,7 +217,6 @@ pub struct DeckPoint {
 #[serde(deny_unknown_fields)]
 pub struct BoundarySemantics {
     pub exterior_shell: ExteriorShellSemantics,
-    #[serde(default)]
     pub openings: Vec<OpeningBoundary>,
 }
 
@@ -314,6 +314,15 @@ fn finite(value: f64) -> bool {
 
 fn close(left: f64, right: f64) -> bool {
     (left - right).abs() <= COORDINATE_TOLERANCE_M
+}
+
+fn deserialize_present_nullable_string<'de, D>(
+    deserializer: D,
+) -> Result<Option<String>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<String>::deserialize(deserializer)
 }
 
 fn digest_is_hex(value: &str) -> bool {
@@ -731,10 +740,17 @@ fn validate_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssue>) {
             );
             continue;
         }
-        let is_pointed_end = (station.station_id == spec.stations[0].station_id
-            && spec.end_conditions.bow == HullEndCondition::PointedStem)
-            || (spec.stations.last().is_some_and(|item| station.station_id == item.station_id)
-                && spec.end_conditions.stern == HullEndCondition::PointedStem);
+        let is_pointed_bow = spec
+            .stations
+            .first()
+            .is_some_and(|first| station.station_id == first.station_id)
+            && spec.end_conditions.bow == HullEndCondition::PointedStem;
+        let is_pointed_stern = spec
+            .stations
+            .last()
+            .is_some_and(|last| station.station_id == last.station_id)
+            && spec.end_conditions.stern == HullEndCondition::PointedStem;
+        let is_pointed_end = is_pointed_bow || is_pointed_stern;
         if deck_section.points.len() > 128
             || (is_pointed_end && deck_section.points.len() != 1)
             || (!is_pointed_end && deck_section.points.len() < 2)
@@ -1433,6 +1449,24 @@ mod tests {
         let report = validate_full_envelope_spec(&spec);
         assert_eq!(report.disposition, FullEnvelopeDisposition::Incomplete);
         assert!(report.issues.iter().any(|item| item.code == "unsupported_profile_region"));
+    }
+
+
+    #[test]
+    fn required_nullable_port_point_id_must_be_present_in_json() {
+        let mut value = serde_json::to_value(box_fixture()).unwrap();
+        value["design_waterline"]["station_intersections"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("port_point_id");
+        assert!(serde_json::from_value::<FullEnvelopeSpec>(value).is_err());
+    }
+
+    #[test]
+    fn missing_openings_array_is_not_silently_defaulted() {
+        let mut value = serde_json::to_value(box_fixture()).unwrap();
+        value["boundary_semantics"].as_object_mut().unwrap().remove("openings");
+        assert!(serde_json::from_value::<FullEnvelopeSpec>(value).is_err());
     }
 
     #[test]
