@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "profile_id": "luminous.cpir.source-map.v1",
+  "corpus_id": "luminous.cpir.source-map.synthetic.v1",
+  "status": "synthetic_positive_control_and_mutation_expectations_not_tls_qualified",
+  "bundle_file": "SOURCE_MAP_V1_EXAMPLE.bundle.json",
+  "raw_http_fixture": "fixtures/identity_http_json_001.raw.b64",
+  "raw_http_fixture_encoding": "base64",
+  "raw_http_fixture_sha256": "5382261de838f40125e53a66fabce835e7c9e652fe842f458da90a85ff4ac697",
+  "raw_http_fixture_byte_length": 81,
+  "expected_response_ordinal": 0,
+  "expected_direction": "server_to_client",
+  "expected_commitment_id": "synthetic-commitment-001",
+  "expected_http_body": "{\"age\":30}",
+  "expected_canonical_json": "{\"age\":30}",
+  "expected_raw_field_token": "30",
+  "expected_predicate_input": "{\"op\":\"gte\",\"lhs\":30,\"rhs\":18}",
+  "map_files": {
+    "http-body-range-map-001": "fixtures/http_body_range_map_001.json",
+    "raw-token-range-map-001": "fixtures/raw_token_range_map_001.json",
+    "jcs-node-origin-map-001": "fixtures/jcs_node_origin_map_001.json"
+  },
+  "negative_controls": [
+    "wrong_source_coordinate_space",
+    "wrong_source_byte_span",
+    "wrong_raw_token_digest",
+    "wrong_response_ordinal",
+    "missing_http_body_range_map",
+    "missing_jcs_node_origin_map",
+    "wrong_transformation_profile_digest"
+  ],
+  "claim_ceiling": "Synthetic transform graph only. No TLSNotary session, commitment opening, HTTP decoder implementation, JSON schema runtime validation, proof or production qualification."
+}
