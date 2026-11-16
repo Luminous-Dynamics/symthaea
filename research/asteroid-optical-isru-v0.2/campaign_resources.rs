@@ -565,7 +565,7 @@ mod tests {
 
     #[test]
     fn scalar_cost_ranking_requires_explicit_shadow_prices() {
-        let candidates = vec![
+        let candidates = [
             action("low-energy", 4.0, vector(4.0, 100.0, 1.0, 10.0, 5.0, 1.0)),
             action("low-time", 4.0, vector(1.0, 700.0, 1.0, 10.0, 5.0, 1.0)),
         ];
