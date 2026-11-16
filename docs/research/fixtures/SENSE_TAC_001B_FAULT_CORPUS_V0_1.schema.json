@@ -225,6 +225,54 @@
               },
               "representation_output": {
                 "type": "number"
+              },
+              "replay_context": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "previous_sequence",
+                  "previous_payload_identity",
+                  "expected_relation"
+                ],
+                "properties": {
+                  "previous_sequence": {
+                    "type": "integer"
+                  },
+                  "previous_payload_identity": {
+                    "type": "string"
+                  },
+                  "expected_relation": {
+                    "type": "string",
+                    "enum": [
+                      "same_payload",
+                      "different_payload"
+                    ]
+                  }
+                }
+              },
+              "representation_comparison": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "comparison_trace_ref",
+                  "comparison_normal_raw",
+                  "comparison_shear_raw",
+                  "comparison_representation_id"
+                ],
+                "properties": {
+                  "comparison_trace_ref": {
+                    "type": "string"
+                  },
+                  "comparison_normal_raw": {
+                    "type": "number"
+                  },
+                  "comparison_shear_raw": {
+                    "type": "number"
+                  },
+                  "comparison_representation_id": {
+                    "type": "string"
+                  }
+                }
               }
             }
           },
