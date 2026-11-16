@@ -433,6 +433,59 @@ fn validate_semantics(value: &Value) -> Result<usize, String> {
         "protocol_mode",
         "source",
     )?;
+    let trust = value
+        .get("trust")
+        .ok_or_else(|| "trust profile is missing".to_owned())?;
+    let witness_kind = str_at(trust, "session_witness_kind", "trust")?;
+    let verification_scope = str_at(trust, "verification_scope", "trust")?;
+    let artifacts = trust
+        .get("evidence_artifact_kinds")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "trust.evidence_artifact_kinds must be an array".to_owned())?
+        .iter()
+        .filter_map(Value::as_str)
+        .collect::<HashSet<_>>();
+
+    let (expected_witness, expected_scope, required_artifact): (&str, &str, Option<&str>) =
+        match mode {
+            "tlsnotary_mpc_direct" | "deco_three_party" | "dido_plus_three_party"
+            | "zkpass_mpc" => ("direct_verifier", "same_session_participant", None),
+            "tlsnotary_proxy" | "zkpass_proxy" => {
+                ("proxy_verifier", "same_session_participant", None)
+            }
+            "tlsnotary_delegated_notary" => (
+                "delegated_notary",
+                "delegated_attestation_verifier",
+                Some("signed_transcript_attestation"),
+            ),
+            "reclaim_split_tee_mpc" => (
+                "tee_attestor",
+                "tcb_attestation_verifier",
+                Some("tee_quote"),
+            ),
+            "scribe_attestor_stark" => (
+                "protocol_attestor",
+                "delegated_attestation_verifier",
+                Some("signed_value_commitment"),
+            ),
+            unsupported => return Err(format!("unsupported v1 source mode: {unsupported}")),
+        };
+    if witness_kind != expected_witness || verification_scope != expected_scope {
+        return Err(format!(
+            "trust profile overstates or substitutes source-mode witness/scope: {mode} requires {expected_witness} / {expected_scope}"
+        ));
+    }
+    if let Some(required) = required_artifact {
+        if !artifacts.contains(required) {
+            return Err(format!(
+                "trust profile for {mode} requires evidence artifact {required}"
+            ));
+        }
+    }
+    if mode == "scribe_attestor_stark" && !artifacts.contains("transparent_zk_proof") {
+        return Err("Scribe trust profile also requires transparent_zk_proof".to_owned());
+    }
+
     let strategy = str_at(
         value.pointer("/source/commitment").ok_or("source.commitment missing")?,
         "strategy",
@@ -518,6 +571,8 @@ mod tests {
         include_str!("../../fixtures/negative/invalid_json_pointer_escape.json");
     const EXPIRED_REQUEST: &str =
         include_str!("../../fixtures/negative/expiry_not_after_issued_at.json");
+    const TRUST_SCOPE: &str =
+        include_str!("../../fixtures/negative/trust_scope_overclaim.json");
 
     #[test]
     fn jcs_uses_utf16_code_unit_order_for_object_keys() {
@@ -535,6 +590,13 @@ mod tests {
         let (digest, count) = validate_plan(POSITIVE).expect("positive fixture should pass");
         assert_eq!(count, 3);
         assert_eq!(digest.len(), 64);
+    }
+
+    #[test]
+    fn delegated_notary_cannot_claim_direct_or_public_verification_scope() {
+        let error = validate_plan(TRUST_SCOPE)
+            .expect_err("delegated attestation cannot claim direct session scope");
+        assert!(error.contains("trust profile overstates or substitutes"));
     }
 
     #[test]
