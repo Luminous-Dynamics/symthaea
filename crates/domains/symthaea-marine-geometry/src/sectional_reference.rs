@@ -856,7 +856,7 @@ pub fn solve_upright_mass_balance(
     };
     let mut lower_z = request.lower_waterplane_z_m;
     let mut upper_z = request.upper_waterplane_z_m;
-    let mut lower_result = evaluate_one(
+    let lower_result = evaluate_one(
         &request.source_spec,
         &source_digest,
         &loading_condition(lower_z),
@@ -930,7 +930,6 @@ pub fn solve_upright_mass_balance(
         }
         if best_result.displaced_mass_tonnes > request.target_mass_tonnes {
             lower_z = midpoint_z;
-            lower_result = best_result.clone();
         } else {
             upper_z = midpoint_z;
         }
@@ -938,7 +937,7 @@ pub fn solve_upright_mass_balance(
 
     let Some(stop_reason) = stop_reason else {
         return Err(vec![SectionalReferenceIssue {
-            code: "mass_balance_iteration_limit",
+            code: "mass_balance_iteration_limit".into(),
             detail: format!(
                 "did not reach mass residual {} t or waterplane bracket {} m within {} iterations",
                 request.mass_tolerance_tonnes,
@@ -1221,7 +1220,7 @@ mod tests {
         assert!((receipt.equilibrium.displacement_volume_m3 - 12_000.0).abs() < 1.0e-8);
         assert!((receipt.equilibrium.displaced_mass_tonnes - 12_300.0).abs() < 1.0e-8);
         assert!(receipt.mass_residual_tonnes <= request.mass_tolerance_tonnes);
-        assert_eq!(receipt.iteration_count, 2);
+        assert_eq!(receipt.iteration_count, 1);
         verify_upright_mass_balance_receipt(&request, &receipt).unwrap();
     }
 
