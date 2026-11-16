@@ -113,6 +113,8 @@ pub enum ControlDiagnostic {
     GuardUnsatisfied,
     GuardEvidenceMissing,
     GuardEvidenceDigestInvalid,
+    UnexpectedGuard,
+    UnknownState,
     TransitionAcknowledgementPending,
     TransitionAcknowledgementFailed,
     RequalificationRequired,
@@ -249,14 +251,16 @@ pub fn arbitrate_actuator_channel(
         return arbitration_report(
             timing,
             channel,
-            ControlDecisionDisposition::HoldSafe,
-            None,
-            None,
-            None,
-            rejections,
+            ArbitrationOutcome {
+                disposition: ControlDecisionDisposition::HoldSafe,
+                winner_proposal_id: None,
+                winner_controller_id: None,
+                selected_command_value: None,
+                rejected_proposals: rejections,
+                safety_authority_id: None,
+                diagnostics,
+            },
             proposals,
-            None,
-            diagnostics,
         );
     };
 
@@ -272,11 +276,11 @@ pub fn arbitrate_actuator_channel(
     {
         diagnostics.push(ControlDiagnostic::MissingSafetyAuthority);
     }
-    if safety
-        .independent_of_controller_ids
-        .iter()
-        .any(|controller_id| proposals.iter().any(|p| &p.controller_id == controller_id))
-    {
+    if proposals.iter().any(|proposal| {
+        !safety
+            .independent_of_controller_ids
+            .contains(&proposal.controller_id)
+    }) {
         diagnostics.push(ControlDiagnostic::AuthorityManifestConflict);
     }
 
@@ -285,20 +289,22 @@ pub fn arbitrate_actuator_channel(
         return arbitration_report(
             timing,
             channel,
-            ControlDecisionDisposition::HoldSafe,
-            None,
-            None,
-            None,
-            proposals
-                .iter()
-                .map(|proposal| ProposalRejection {
-                    proposal_id: proposal.proposal_id.clone(),
-                    diagnostics: vec![ControlDiagnostic::SafetyVetoActive],
-                })
-                .collect(),
+            ArbitrationOutcome {
+                disposition: ControlDecisionDisposition::HoldSafe,
+                winner_proposal_id: None,
+                winner_controller_id: None,
+                selected_command_value: None,
+                rejected_proposals: proposals
+                    .iter()
+                    .map(|proposal| ProposalRejection {
+                        proposal_id: proposal.proposal_id.clone(),
+                        diagnostics: vec![ControlDiagnostic::SafetyVetoActive],
+                    })
+                    .collect(),
+                safety_authority_id: Some(safety.authority_id.clone()),
+                diagnostics,
+            },
             proposals,
-            Some(safety.authority_id.clone()),
-            diagnostics,
         );
     }
     if safety.decision == SafetyDecision::Unknown {
@@ -306,14 +312,16 @@ pub fn arbitrate_actuator_channel(
         return arbitration_report(
             timing,
             channel,
-            ControlDecisionDisposition::HoldSafe,
-            None,
-            None,
-            None,
-            rejections,
+            ArbitrationOutcome {
+                disposition: ControlDecisionDisposition::HoldSafe,
+                winner_proposal_id: None,
+                winner_controller_id: None,
+                selected_command_value: None,
+                rejected_proposals: rejections,
+                safety_authority_id: Some(safety.authority_id.clone()),
+                diagnostics,
+            },
             proposals,
-            Some(safety.authority_id.clone()),
-            diagnostics,
         );
     }
 
@@ -328,6 +336,7 @@ pub fn arbitrate_actuator_channel(
         }
         if !seen_proposal_ids.insert(proposal.proposal_id.as_str()) {
             proposal_diagnostics.push(ControlDiagnostic::DuplicateProposalId);
+            diagnostics.push(ControlDiagnostic::DuplicateProposalId);
         }
         if !is_sha256(&proposal.observation_sha256) {
             proposal_diagnostics.push(ControlDiagnostic::InvalidObservationDigest);
@@ -418,14 +427,16 @@ pub fn arbitrate_actuator_channel(
         return arbitration_report(
             timing,
             channel,
-            ControlDecisionDisposition::HoldSafe,
-            None,
-            None,
-            None,
-            rejections,
+            ArbitrationOutcome {
+                disposition: ControlDecisionDisposition::HoldSafe,
+                winner_proposal_id: None,
+                winner_controller_id: None,
+                selected_command_value: None,
+                rejected_proposals: rejections,
+                safety_authority_id: Some(safety.authority_id.clone()),
+                diagnostics,
+            },
             proposals,
-            Some(safety.authority_id.clone()),
-            diagnostics,
         );
     }
     if valid.is_empty() {
@@ -433,14 +444,16 @@ pub fn arbitrate_actuator_channel(
         return arbitration_report(
             timing,
             channel,
-            ControlDecisionDisposition::HoldSafe,
-            None,
-            None,
-            None,
-            rejections,
+            ArbitrationOutcome {
+                disposition: ControlDecisionDisposition::HoldSafe,
+                winner_proposal_id: None,
+                winner_controller_id: None,
+                selected_command_value: None,
+                rejected_proposals: rejections,
+                safety_authority_id: Some(safety.authority_id.clone()),
+                diagnostics,
+            },
             proposals,
-            Some(safety.authority_id.clone()),
-            diagnostics,
         );
     }
 
@@ -489,14 +502,16 @@ pub fn arbitrate_actuator_channel(
         return arbitration_report(
             timing,
             channel,
-            ControlDecisionDisposition::HoldSafe,
-            None,
-            None,
-            None,
-            rejections,
+            ArbitrationOutcome {
+                disposition: ControlDecisionDisposition::HoldSafe,
+                winner_proposal_id: None,
+                winner_controller_id: None,
+                selected_command_value: None,
+                rejected_proposals: rejections,
+                safety_authority_id: Some(safety.authority_id.clone()),
+                diagnostics,
+            },
             proposals,
-            Some(safety.authority_id.clone()),
-            diagnostics,
         );
     };
 
@@ -509,28 +524,32 @@ pub fn arbitrate_actuator_channel(
         return arbitration_report(
             timing,
             channel,
-            ControlDecisionDisposition::Rejected,
-            None,
-            None,
-            None,
-            rejections,
+            ArbitrationOutcome {
+                disposition: ControlDecisionDisposition::Rejected,
+                winner_proposal_id: None,
+                winner_controller_id: None,
+                selected_command_value: None,
+                rejected_proposals: rejections,
+                safety_authority_id: Some(safety.authority_id.clone()),
+                diagnostics,
+            },
             proposals,
-            Some(safety.authority_id.clone()),
-            diagnostics,
         );
     }
 
     arbitration_report(
         timing,
         channel,
-        ControlDecisionDisposition::Allowed,
-        Some(winner.proposal_id.clone()),
-        Some(winner.controller_id.clone()),
-        Some(winner.command_value),
-        rejections,
+        ArbitrationOutcome {
+            disposition: ControlDecisionDisposition::Allowed,
+            winner_proposal_id: Some(winner.proposal_id.clone()),
+            winner_controller_id: Some(winner.controller_id.clone()),
+            selected_command_value: Some(winner.command_value),
+            rejected_proposals: rejections,
+            safety_authority_id: Some(safety.authority_id.clone()),
+            diagnostics,
+        },
         proposals,
-        Some(safety.authority_id.clone()),
-        diagnostics,
     )
 }
 
@@ -551,9 +570,7 @@ fn validate_timing(timing: &ControlTimingEvidence) -> Vec<ControlDiagnostic> {
     if timing.timing_evidence_ref.trim().is_empty() {
         diagnostics.push(ControlDiagnostic::MissingTimingEvidence);
     }
-    if timing.maximum_end_to_end_latency_ns == 0
-        || timing.maximum_clock_uncertainty_ns == 0
-    {
+    if timing.maximum_end_to_end_latency_ns == 0 {
         diagnostics.push(ControlDiagnostic::InvalidTimingProfile);
     }
     if timing.observed_clock_uncertainty_ns > timing.maximum_clock_uncertainty_ns {
@@ -565,17 +582,21 @@ fn validate_timing(timing: &ControlTimingEvidence) -> Vec<ControlDiagnostic> {
     diagnostics
 }
 
-fn arbitration_report(
-    timing: &ControlTimingEvidence,
-    channel: &ActuatorChannelProfile,
+struct ArbitrationOutcome {
     disposition: ControlDecisionDisposition,
     winner_proposal_id: Option<String>,
     winner_controller_id: Option<String>,
     selected_command_value: Option<f64>,
     rejected_proposals: Vec<ProposalRejection>,
-    proposals: &[ControllerProposal],
     safety_authority_id: Option<String>,
     diagnostics: Vec<ControlDiagnostic>,
+}
+
+fn arbitration_report(
+    timing: &ControlTimingEvidence,
+    channel: &ActuatorChannelProfile,
+    outcome: ArbitrationOutcome,
+    proposals: &[ControllerProposal],
 ) -> ArbitrationReport {
     let mut considered_proposal_ids: Vec<String> = proposals
         .iter()
@@ -593,15 +614,15 @@ fn arbitration_report(
         contract_version: AUTHORITY_TO_RECOVERY_VERSION,
         cycle_id: timing.cycle_id.clone(),
         channel_id: channel.channel_id.clone(),
-        disposition,
-        winner_proposal_id,
-        winner_controller_id,
-        selected_command_value,
-        rejected_proposals,
+        disposition: outcome.disposition,
+        winner_proposal_id: outcome.winner_proposal_id,
+        winner_controller_id: outcome.winner_controller_id,
+        selected_command_value: outcome.selected_command_value,
+        rejected_proposals: outcome.rejected_proposals,
         considered_proposal_ids,
-        safety_authority_id,
+        safety_authority_id: outcome.safety_authority_id,
         timing_evidence_ref: timing.timing_evidence_ref.clone(),
-        diagnostics,
+        diagnostics: outcome.diagnostics,
         evidence_classes,
         claim_ceiling: "proposal arbitration contract only; no actuator execution or safety certification",
     }
@@ -726,9 +747,19 @@ pub fn evaluate_state_transition(
         diagnostics.push(ControlDiagnostic::TransitionTimedOut);
     }
 
+    if !state_ids.contains(rule.from_state_id.as_str())
+        || !state_ids.contains(rule.to_state_id.as_str())
+    {
+        diagnostics.push(ControlDiagnostic::UnknownState);
+    }
+
     let mut expected_guards = rule.required_guard_ids.clone();
     expected_guards.sort();
+    let original_expected_guard_count = expected_guards.len();
     expected_guards.dedup();
+    if expected_guards.len() != original_expected_guard_count {
+        diagnostics.push(ControlDiagnostic::AuthorityManifestConflict);
+    }
     let mut supplied_guards: BTreeMap<&str, &GuardEvidence> = BTreeMap::new();
     for guard in &attempt.guards {
         if supplied_guards.insert(guard.guard_id.as_str(), guard).is_some() {
@@ -740,6 +771,13 @@ pub fn evaluate_state_transition(
         if !is_sha256(&guard.evidence_sha256) {
             diagnostics.push(ControlDiagnostic::GuardEvidenceDigestInvalid);
         }
+    }
+
+    if supplied_guards
+        .keys()
+        .any(|guard_id| !expected_guards.iter().any(|expected| expected == guard_id))
+    {
+        diagnostics.push(ControlDiagnostic::UnexpectedGuard);
     }
 
     for guard_id in &expected_guards {
@@ -1033,6 +1071,59 @@ mod tests {
         let report = arbitrate(&proposals, SafetyDecision::Permit, &timing(), &[]);
         assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
         assert!(report.diagnostics.contains(&ControlDiagnostic::MissingAuthorityTieBreak));
+    }
+
+    #[test]
+    fn safety_authority_must_explicitly_cover_every_controller() {
+        let mut safety_receipt = safety(SafetyDecision::Permit);
+        safety_receipt.independent_of_controller_ids = vec!["deterministic-mpc".to_string()];
+        let report = arbitrate_actuator_channel(
+            "steady-operation",
+            &channel(),
+            &authorities(),
+            &[proposal("p1", "ml-supervisor", "ml-r8", 40.0)],
+            Some(&safety_receipt),
+            &timing(),
+        );
+        assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
+        assert!(report.diagnostics.contains(&ControlDiagnostic::AuthorityManifestConflict));
+    }
+
+    #[test]
+    fn duplicate_proposal_ids_block_the_whole_arbitration_cycle() {
+        let proposals = vec![
+            proposal("duplicate", "deterministic-mpc", "mpc-r4", 40.0),
+            proposal("duplicate", "ml-supervisor", "ml-r8", 45.0),
+        ];
+        let report = arbitrate(
+            &proposals,
+            SafetyDecision::Permit,
+            &timing(),
+            &channel().tie_break_controller_order,
+        );
+        assert_eq!(report.disposition, ControlDecisionDisposition::HoldSafe);
+        assert!(report.diagnostics.contains(&ControlDiagnostic::DuplicateProposalId));
+    }
+
+    #[test]
+    fn out_of_manifest_guard_is_not_ignored() {
+        let manifest = transition_manifest();
+        let mut attempt = transition_attempt(
+            "enter-recovery-hold",
+            "steady-operation",
+            "recovery-hold",
+            TransitionAcknowledgement::Succeeded,
+            RequalificationResult::NotRequired,
+        );
+        attempt.guards.push(GuardEvidence {
+            guard_id: "unlisted-guard".to_string(),
+            result: GuardResult::Satisfied,
+            evidence_ref: "extra-guard".to_string(),
+            evidence_sha256: sha('f'),
+        });
+        let report = evaluate_state_transition(&manifest, &attempt);
+        assert_eq!(report.disposition, ControlDecisionDisposition::Rejected);
+        assert!(report.diagnostics.contains(&ControlDiagnostic::UnexpectedGuard));
     }
 
     #[test]
