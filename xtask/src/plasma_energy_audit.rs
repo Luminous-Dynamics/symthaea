@@ -759,6 +759,9 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         if case_id == "NH3-CRACK-MW-ATM-MECHANISM-2026" {
             validate_nh3_operating_points(case, display_name)?;
         }
+        if case_id == "CH4-PLASMA-PULSED-HEATING-REGEN-2026" {
+            validate_ch4_pph_operating_points(case, display_name)?;
+        }
         if case_id == "NH3-PLASMA-ELECTROCATALYSIS-JACS-2026" {
             validate_nh3_n2_vibrational_transfer_case(case, display_name)?;
         }
@@ -1027,6 +1030,60 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     );
                 }
             }
+            "METHANE_PYROLYSIS_PULSED_HEATING" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                ensure!(
+                    metrics.get("all_thresholds_must_hold_at_same_operating_point_and_feed")
+                        .and_then(Value::as_bool) == Some(true),
+                    "{display_name}: PPH target {target_id} must bind conversion, selectivity and energy to one feed/operating point"
+                );
+                for (key, minimum) in [
+                    ("methane_conversion_min_fraction", 0.90),
+                    ("hydrogen_selectivity_min_fraction", 0.99),
+                    ("minimum_reaction_regeneration_cycles", 100.0),
+                    ("accepted_h2_productivity_retention_after_cycles_min_fraction", 0.90),
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value >= minimum),
+                        "{display_name}: PPH target {target_id} has an insufficient or invalid threshold {key}"
+                    );
+                }
+                ensure!(
+                    close_f64(required_f64(metrics, "accepted_h2_specific_energy_max_kWh_per_kg", &format!("{display_name}: {target_id}"))?, 25.0),
+                    "{display_name}: PPH target {target_id} must retain the <=25 kWh/kg accepted-H2 stretch threshold"
+                );
+                ensure!(
+                    target.get("credit_policies").and_then(Value::as_array)
+                        .is_some_and(|items| items.iter().any(|item| item.as_str() == Some("NO_CREDIT"))),
+                    "{display_name}: PPH target {target_id} must include a no-credit carbon baseline"
+                );
+                for key in [
+                    "diluted_and_pure_methane_operating_points_must_remain_separate",
+                    "full_grid_to_accepted_h2_energy_boundary_required",
+                    "gas_separation_purification_and_compression_included",
+                    "co2_plasma_regeneration_energy_and_carbon_streams_included",
+                    "methane_derived_carbon_balance_and_unknowns_reported",
+                    "no_credit_carbon_baseline_required",
+                    "catalyst_support_electrode_and_replacement_lifecycle_included",
+                    "long_run_cycles_and_failed_batches_in_denominator",
+                    "matched_shock_wave_and_microwave_comparators_required",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: PPH target {target_id} is missing required guard {key}"
+                    );
+                }
+                for comparator in [
+                    "CH4-PLASMA-PULSED-HEATING-REGEN-2026",
+                    "METHANE-PYROLYSIS-HEATING-REVIEW-2026",
+                ] {
+                    ensure!(
+                        comparators.iter().any(|value| value.as_str() == Some(comparator)),
+                        "{display_name}: PPH target {target_id} must reference comparator {comparator}"
+                    );
+                }
+            }
             "METHANE_PYROLYSIS" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
                 ensure!(
@@ -1159,6 +1216,51 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
                     comparators.iter().any(|value| value.as_str() == Some("NH3-SOEC-HB-OFFSHORE-2026")),
                     "{display_name}: ammonia competitiveness target {target_id} must reference the integrated SOEC-HB baseline"
                 );
+            }
+            "AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY" => {
+                let metrics = target.get("metric_thresholds").expect("validated above");
+                for (key, minimum) in [
+                    ("accepted_nh3_min_load_fraction", 0.10),
+                    ("accepted_nh3_max_load_fraction", 1.20),
+                    ("accepted_nh3_ramp_rate_percent_nominal_per_minute", 3.0),
+                ] {
+                    ensure!(
+                        metrics.get(key).and_then(Value::as_f64)
+                            .is_some_and(|value| value.is_finite() && value >= minimum),
+                        "{display_name}: ammonia dynamic-flex target {target_id} has an insufficient or invalid envelope threshold {key}"
+                    );
+                }
+                ensure!(
+                    metrics.get("year_long_renewable_profile_required").and_then(Value::as_bool) == Some(true)
+                        && metrics.get("all_full_chain_quality_and_fatigue_gates_must_hold").and_then(Value::as_bool) == Some(true),
+                    "{display_name}: ammonia dynamic-flex target {target_id} must require year-long profile and all quality/fatigue gates"
+                );
+                for key in [
+                    "plant_level_accepted_nh3_ramp_measured_not_plasma_source_ramp",
+                    "hydrogen_generation_and_storage_dynamics_included",
+                    "nitrogen_and_plasma_or_nox_capture_transfer_dynamics_included",
+                    "synthesis_loop_pressure_and_temperature_fatigue_included",
+                    "accepted_product_purity_pressure_and_delivery_contract_matched",
+                    "startup_shutdown_standby_and_failed_batches_counted",
+                    "buffer_capacity_and_renewable_curtailment_reported",
+                    "baseline_uses_10_to_120_percent_3_percent_per_minute_haber_bosch_model",
+                    "no_flexibility_superiority_claim_without_same_trace_replay",
+                ] {
+                    ensure!(
+                        guards.get(key).and_then(Value::as_bool) == Some(true),
+                        "{display_name}: ammonia dynamic-flex target {target_id} is missing required guard {key}"
+                    );
+                }
+                for comparator in [
+                    "NH3-HB-ROBUST-LOAD-FLEX-2026",
+                    "NH3-HB-FATIGUE-YEAR-SCHEDULING-2026",
+                    "NH3-P2A-THREE-LEVEL-DISPATCH-2026",
+                ] {
+                    ensure!(
+                        comparators.iter().any(|value| value.as_str() == Some(comparator)),
+                        "{display_name}: ammonia dynamic-flex target {target_id} must reference comparator {comparator}"
+                    );
+                }
             }
             "AMMONIA_CRACKING_THERMAL_INTEGRATION" => {
                 let metrics = target.get("metric_thresholds").expect("validated above");
@@ -1341,6 +1443,116 @@ fn required_f64(object: &Value, key: &str, context: &str) -> Result<f64> {
         .and_then(Value::as_f64)
         .filter(|value| value.is_finite())
         .with_context(|| format!("{context}: missing/non-finite numeric field {key}"))
+}
+
+fn validate_ch4_pph_operating_points(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: pulsed-plasma methane operating-point and regeneration audit");
+    let points = case
+        .get("operating_points")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: operating_points array is missing"))?;
+    ensure!(
+        points.len() == 2,
+        "{context}: expected two distinct source operating points"
+    );
+    let mut ids = BTreeSet::new();
+    for point in points {
+        let point_id = point
+            .get("operating_point_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{context}: operating point has no identity"))?;
+        ensure!(
+            ids.insert(point_id.to_owned()),
+            "{context}: duplicate operating-point identity {point_id}"
+        );
+    }
+
+    let diluted = points
+        .iter()
+        .find(|point| {
+            point.get("operating_point_id").and_then(Value::as_str)
+                == Some("CH4-PPH-DILUTED-HIGH-CONVERSION")
+        })
+        .with_context(|| format!("{context}: diluted-feed operating point is missing"))?;
+    let pure = points
+        .iter()
+        .find(|point| {
+            point.get("operating_point_id").and_then(Value::as_str)
+                == Some("CH4-PPH-PURE-METHANE-LOWEST-ENERGY")
+        })
+        .with_context(|| format!("{context}: pure-methane energy operating point is missing"))?;
+
+    ensure!(
+        close_f64(required_f64(diluted, "methane_mole_fraction", &context)?, 0.10)
+            && close_f64(required_f64(diluted, "helium_mole_fraction", &context)?, 0.90),
+        "{context}: the 95% conversion point must retain its 10/90 CH4/He feed"
+    );
+    ensure!(
+        close_f64(required_f64(diluted, "pulsed_heating_voltage_V", &context)?, 46.0)
+            && close_f64(required_f64(diluted, "discharge_voltage_kV", &context)?, 5.0),
+        "{context}: diluted-feed conversion point must retain 46 V / 5 kV conditions"
+    );
+    ensure!(
+        close_f64(required_f64(diluted, "methane_conversion_fraction", &context)?, 0.95)
+            && close_f64(required_f64(diluted, "hydrogen_selectivity_fraction", &context)?, 1.0),
+        "{context}: diluted-feed point must retain 95% conversion and 100% H2 selectivity"
+    );
+    ensure!(
+        diluted
+            .get("specific_energy_kWh_per_kg_H2")
+            .is_some_and(Value::is_null),
+        "{context}: pure-methane 27 kWh/kg energy value must not be borrowed by the diluted-feed point"
+    );
+
+    ensure!(
+        close_f64(required_f64(pure, "methane_mole_fraction", &context)?, 1.0)
+            && close_f64(required_f64(pure, "helium_mole_fraction", &context)?, 0.0),
+        "{context}: 27 kWh/kg energy point must retain pure-methane feed"
+    );
+    ensure!(
+        close_f64(required_f64(pure, "pulsed_heating_voltage_V", &context)?, 46.0)
+            && close_f64(required_f64(pure, "discharge_voltage_kV", &context)?, 3.0),
+        "{context}: pure-methane energy point must retain 46 V / 3 kV conditions"
+    );
+    ensure!(
+        close_f64(required_f64(pure, "specific_energy_kWh_per_kg_H2", &context)?, 27.0),
+        "{context}: pure-methane point must retain 27 kWh/kg H2"
+    );
+    ensure!(
+        pure.get("methane_conversion_fraction").is_some_and(Value::is_null)
+            && pure.get("hydrogen_selectivity_fraction").is_some_and(Value::is_null),
+        "{context}: diluted-feed conversion/selectivity must not be borrowed by the pure-methane energy point"
+    );
+
+    let regeneration = case
+        .get("regeneration_evidence")
+        .with_context(|| format!("{context}: regeneration evidence is missing"))?;
+    ensure!(
+        regeneration.get("method").and_then(Value::as_str) == Some("CO2 plasma"),
+        "{context}: catalyst regeneration must explicitly identify CO2 plasma"
+    );
+    ensure!(
+        regeneration
+            .get("reported_regeneration_cycles")
+            .and_then(Value::as_u64)
+            == Some(4),
+        "{context}: source-reported four regeneration cycles must be preserved exactly"
+    );
+    ensure!(
+        regeneration
+            .get("energy_per_regeneration_cycle_kWh")
+            .is_some_and(Value::is_null),
+        "{context}: unreported regeneration energy must remain unknown, not zero"
+    );
+    ensure!(
+        regeneration
+            .get("carbon_capture_and_offtake_qualified")
+            .and_then(Value::as_bool)
+            == Some(false),
+        "{context}: carbon product qualification and offtake must remain unvalidated"
+    );
+    Ok(())
 }
 
 fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()> {
@@ -2449,6 +2661,93 @@ mod tests {
     }
 
     #[test]
+    fn source_manifest_accepts_pulsed_plasma_methane_points_and_regeneration_evidence() {
+        let source: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        )).unwrap();
+        let summary = audit_source_value(&source, "pulsed-methane-source.json").unwrap();
+        assert!(summary.case_count >= 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_pure_methane_energy_borrowed_by_diluted_conversion_point() {
+        let mut source: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        )).unwrap();
+        let case = source["cases"].as_array_mut().unwrap().iter_mut().find(|item| {
+            item["case_id"] == "CH4-PLASMA-PULSED-HEATING-REGEN-2026"
+        }).unwrap();
+        case["operating_points"][0]["specific_energy_kWh_per_kg_H2"] = serde_json::json!(27.0);
+        let error = audit_source_value(&source, "pulsed-methane-source.json").unwrap_err();
+        assert!(error.to_string().contains("must not be borrowed by the diluted-feed point"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_diluted_conversion_borrowed_by_pure_methane_energy_point() {
+        let mut source: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        )).unwrap();
+        let case = source["cases"].as_array_mut().unwrap().iter_mut().find(|item| {
+            item["case_id"] == "CH4-PLASMA-PULSED-HEATING-REGEN-2026"
+        }).unwrap();
+        case["operating_points"][1]["methane_conversion_fraction"] = serde_json::json!(0.95);
+        let error = audit_source_value(&source, "pulsed-methane-source.json").unwrap_err();
+        assert!(error.to_string().contains("must not be borrowed by the pure-methane energy point"));
+    }
+
+    #[test]
+    fn source_manifest_rejects_missing_co2_plasma_regeneration_energy_status() {
+        let mut source: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        )).unwrap();
+        let case = source["cases"].as_array_mut().unwrap().iter_mut().find(|item| {
+            item["case_id"] == "CH4-PLASMA-PULSED-HEATING-REGEN-2026"
+        }).unwrap();
+        case["regeneration_evidence"]["method"] = serde_json::json!("unspecified");
+        let error = audit_source_value(&source, "pulsed-methane-source.json").unwrap_err();
+        assert!(error.to_string().contains("must explicitly identify CO2 plasma"));
+    }
+
+    #[test]
+    fn source_manifest_accepts_pulsed_plasma_methane_full_chain_target() {
+        let mut source = minimal_benchmark_target_manifest("METHANE_PYROLYSIS_PULSED_HEATING");
+        source["cases"][0]["case_id"] = serde_json::json!("CH4-PLASMA-PULSED-HEATING-REGEN-2026");
+        source["benchmark_targets"][0]["comparator_case_ids"] = serde_json::json!([
+            "CH4-PLASMA-PULSED-HEATING-REGEN-2026",
+            "METHANE-PYROLYSIS-HEATING-REVIEW-2026"
+        ]);
+        let summary = audit_source_value(&source, "pph-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_accepts_ammonia_dynamic_flex_target_with_matched_haber_bosch_baselines() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY");
+        source["cases"][0]["case_id"] = serde_json::json!("NH3-HB-ROBUST-LOAD-FLEX-2026");
+        source["benchmark_targets"][0]["comparator_case_ids"] = serde_json::json!([
+            "NH3-HB-ROBUST-LOAD-FLEX-2026",
+            "NH3-HB-FATIGUE-YEAR-SCHEDULING-2026",
+            "NH3-P2A-THREE-LEVEL-DISPATCH-2026"
+        ]);
+        let summary = audit_source_value(&source, "ammonia-flex-target.json").unwrap();
+        assert_eq!(summary.benchmark_target_count, 1);
+    }
+
+    #[test]
+    fn source_manifest_rejects_plasma_source_ramp_substituted_for_accepted_nh3_ramp() {
+        let mut source = minimal_benchmark_target_manifest("AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY");
+        source["cases"][0]["case_id"] = serde_json::json!("NH3-HB-ROBUST-LOAD-FLEX-2026");
+        source["benchmark_targets"][0]["comparator_case_ids"] = serde_json::json!([
+            "NH3-HB-ROBUST-LOAD-FLEX-2026",
+            "NH3-HB-FATIGUE-YEAR-SCHEDULING-2026",
+            "NH3-P2A-THREE-LEVEL-DISPATCH-2026"
+        ]);
+        source["benchmark_targets"][0]["claim_guards"]["plant_level_accepted_nh3_ramp_measured_not_plasma_source_ramp"] = serde_json::json!(false);
+        let error = audit_source_value(&source, "ammonia-flex-target.json").unwrap_err();
+        assert!(error.to_string().contains("plant_level_accepted_nh3_ramp_measured_not_plasma_source_ramp"));
+    }
+
+    #[test]
     fn source_manifest_accepts_nh3_plasma_to_soec_hb_gap_arithmetic_without_claiming_comparability() {
         let source = nh3_synthesis_energy_gap_manifest();
         let summary = audit_source_value(&source, "nh3-synthesis-gap.json").unwrap();
@@ -2769,6 +3068,47 @@ mod tests {
                 "plasma_candidate_max_specific_energy_kWh_per_kg_NH3": 7.32,
                 "required_improvement_vs_integrated_reference_fraction": 0.10,
                 "all_thresholds_must_hold_at_same_operating_point": true
+            })
+        } else if lane == "METHANE_PYROLYSIS_PULSED_HEATING" {
+            serde_json::json!({
+                "methane_conversion_min_fraction": 0.90,
+                "hydrogen_selectivity_min_fraction": 0.99,
+                "accepted_h2_specific_energy_max_kWh_per_kg": 25.0,
+                "minimum_reaction_regeneration_cycles": 100.0,
+                "accepted_h2_productivity_retention_after_cycles_min_fraction": 0.90,
+                "all_thresholds_must_hold_at_same_operating_point_and_feed": true
+            })
+        } else if lane == "AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY" {
+            serde_json::json!({
+                "accepted_nh3_min_load_fraction": 0.10,
+                "accepted_nh3_max_load_fraction": 1.20,
+                "accepted_nh3_ramp_rate_percent_nominal_per_minute": 3.0,
+                "year_long_renewable_profile_required": true,
+                "all_full_chain_quality_and_fatigue_gates_must_hold": true
+            })
+        } else if lane == "METHANE_PYROLYSIS_PULSED_HEATING" {
+            serde_json::json!({
+                "diluted_and_pure_methane_operating_points_must_remain_separate": true,
+                "full_grid_to_accepted_h2_energy_boundary_required": true,
+                "gas_separation_purification_and_compression_included": true,
+                "co2_plasma_regeneration_energy_and_carbon_streams_included": true,
+                "methane_derived_carbon_balance_and_unknowns_reported": true,
+                "no_credit_carbon_baseline_required": true,
+                "catalyst_support_electrode_and_replacement_lifecycle_included": true,
+                "long_run_cycles_and_failed_batches_in_denominator": true,
+                "matched_shock_wave_and_microwave_comparators_required": true
+            })
+        } else if lane == "AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY" {
+            serde_json::json!({
+                "plant_level_accepted_nh3_ramp_measured_not_plasma_source_ramp": true,
+                "hydrogen_generation_and_storage_dynamics_included": true,
+                "nitrogen_and_plasma_or_nox_capture_transfer_dynamics_included": true,
+                "synthesis_loop_pressure_and_temperature_fatigue_included": true,
+                "accepted_product_purity_pressure_and_delivery_contract_matched": true,
+                "startup_shutdown_standby_and_failed_batches_counted": true,
+                "buffer_capacity_and_renewable_curtailment_reported": true,
+                "baseline_uses_10_to_120_percent_3_percent_per_minute_haber_bosch_model": true,
+                "no_flexibility_superiority_claim_without_same_trace_replay": true
             })
         } else if lane == "AMMONIA_N2_VIBRATIONAL_TRANSFER" {
             serde_json::json!({
