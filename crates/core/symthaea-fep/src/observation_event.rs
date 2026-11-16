@@ -920,10 +920,7 @@ mod tests {
             dimension("temperature", Some(0.5), Some(4.0), None),
             dimension("pressure", Some(0.8), Some(2.0), None),
         ]);
-        let predicted = prediction(&[
-            ("temperature", Some(0.25)),
-            ("pressure", Some(0.3)),
-        ]);
+        let predicted = prediction(&[("temperature", Some(0.25)), ("pressure", Some(0.3))]);
         let matrix = vec![vec![2.0, 4.0], vec![3.0, 5.0]];
         let gradient = observation
             .masked_belief_gradient(&predicted, &matrix, 1.0)
@@ -931,10 +928,8 @@ mod tests {
 
         let dense_weighted_error = [4.0 * (0.5 - 0.25), 2.0 * (0.8 - 0.3)];
         let dense_reference = vec![
-            matrix[0][0] * dense_weighted_error[0]
-                + matrix[0][1] * dense_weighted_error[1],
-            matrix[1][0] * dense_weighted_error[0]
-                + matrix[1][1] * dense_weighted_error[1],
+            matrix[0][0] * dense_weighted_error[0] + matrix[0][1] * dense_weighted_error[1],
+            matrix[1][0] * dense_weighted_error[0] + matrix[1][1] * dense_weighted_error[1],
         ];
 
         assert_eq!(gradient.observed_dimensions, 2);
