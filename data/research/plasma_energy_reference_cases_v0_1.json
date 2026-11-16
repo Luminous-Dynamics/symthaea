@@ -4760,7 +4760,7 @@
         "NH3-EC-MEA-CRACKER-NTU-2026",
         "NH3-PACKED-BED-MEMBRANE-OPTIMIZATION-2026",
         "NH3-CRACK-MW-ATM-MECHANISM-2026",
-        "NH3-CRACK-DYNAMIC-DELIVERY-RESPONSE-001"
+        "NH3-CRACK-MW-RESONATOR-DYNAMIC-2026"
       ],
       "metric_thresholds": {
         "same_accepted_h2_purity_and_contaminant_contract_required": true,
