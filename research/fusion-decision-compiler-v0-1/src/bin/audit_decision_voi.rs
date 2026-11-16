@@ -29,6 +29,7 @@ fn experiment(
     id: &str,
     direct_cost: f64,
     opportunity_cost: f64,
+    predictive_variance_score: f64,
     signals: &[(&str, &str)],
 ) -> InformationExperiment {
     InformationExperiment {
@@ -40,6 +41,8 @@ fn experiment(
         cost_basis_ref: "USD-2026-real-discount-6pct-v1".to_string(),
         cost_evidence_ref: format!("synthetic-cost-{id}"),
         evidence_ref: format!("synthetic-experiment-{id}"),
+        predictive_variance_score: Some(predictive_variance_score),
+        variance_score_evidence_ref: Some(format!("synthetic-variance-{id}")),
         signal_map: signals
             .iter()
             .map(|(scenario_id, signal_id)| ExperimentSignal {
@@ -100,18 +103,21 @@ fn main() {
                 "decision-discriminating",
                 3.0,
                 2.0,
+                1.0,
                 &[("s1", "left"), ("s2", "left"), ("s3", "right"), ("s4", "right")],
             ),
             experiment(
                 "high-variance-uninformative",
                 0.5,
                 0.5,
+                100.0,
                 &[("s1", "same"), ("s2", "same"), ("s3", "same"), ("s4", "same")],
             ),
             experiment(
                 "perfect-but-overpriced",
                 20.0,
                 0.0,
+                25.0,
                 &[("s1", "s1"), ("s2", "s2"), ("s3", "s3"), ("s4", "s4")],
             ),
         ],
@@ -138,8 +144,9 @@ fn main() {
     println!("evpi={:.6}", report.evpi.unwrap_or(f64::NAN));
     for experiment in &report.experiments {
         println!(
-            "experiment={},EVSI={:.6},direct_cost={:.6},opportunity_cost={:.6},net_VoI={:.6},remaining_regret={:.6}",
+            "experiment={},variance_score={},EVSI={:.6},direct_cost={:.6},opportunity_cost={:.6},net_VoI={:.6},remaining_regret={:.6}",
             experiment.experiment_id,
+            experiment.predictive_variance_score.unwrap_or(f64::NAN),
             experiment.evsi,
             experiment.direct_cost_value,
             experiment.opportunity_cost_value,
