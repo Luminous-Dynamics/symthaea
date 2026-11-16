@@ -147,7 +147,7 @@ pub mod markov_blanket;
 pub mod observation_event;
 pub use observation_event::{
     MissingnessReason, ObservationDimensionV1, ObservationEventError, ObservationEventV1,
-    ObservationLikelihoodV1,
+    ObservationLikelihoodV1, SourceHealthV1,
 };
 mod motor;
 mod td_learning;
