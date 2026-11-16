@@ -192,3 +192,10 @@ The binary holds the fixed iid-Gaussian test unchanged and measures its terminal
 Five frozen root seeds × 10,000 paths per seed × two paired scenarios are reported per regime, with Wilson intervals, residual moments and lag-one autocorrelation. This is an assumption-failure map for a fixed terminal test, not a robust replacement method or an extension of the Gaussian theorem.
 
 See docs/research/GAUSSIAN_ASSUMPTION_STRESS_V0_2026-11-16.md and Symthaea issue #12540.
+
+
+### Known-rho conditional AR(1) comparator
+
+The v1 stress report adds a separately labelled conditional-innovation terminal-test comparator for the AR(1) regime only. It uses the frozen evaluator-known rho=0.65 and transforms raw residuals into independent innovations with per-look conditional means and standard deviations. The comparator has its own analytic power and null/alternative rates; it is not the same test as the original IID Gaussian terminal statistic and is not a blind rho estimator.
+
+Only the AR(1) row contains `conditional_known_rho_ar1`; all other rows emit null. This comparator is valid only under the explicitly known, correctly specified Gaussian AR(1) conditional model. See #12442 for the conditional-innovation scope and the stress note for the exact transformation.
