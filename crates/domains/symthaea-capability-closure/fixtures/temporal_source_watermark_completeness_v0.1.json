@@ -181,6 +181,12 @@
       "name": "seeded_multi_source_indexed_vs_audited_differential",
       "expect": "identical_reports_for_180_source_interval_and_knowledge_time_queries",
       "safety": "secondary_index_matches_full_history_oracle_under_mixed_source_arrivals"
+    },
+    {
+      "id": "WM-020",
+      "name": "indexed_vs_verified_query_scaling",
+      "expect": "known_answer_and_exact_report_parity_at_1k_10k_100k_arrivals",
+      "safety": "query_latency_gain_never_substitutes_for_full_replay_audit"
     }
   ],
   "metrics": {
@@ -205,7 +211,9 @@
       "completeness_query_latency_p99_us",
       "late_breach_index_candidates_visited",
       "full_history_audit_rebuild_latency_us",
-      "indexed_vs_audited_report_mismatch_count"
+      "indexed_vs_audited_report_mismatch_count",
+      "indexed_query_p50_p95_p99_us",
+      "verified_query_p50_p95_p99_us"
     ]
   },
   "qualification_targets": {
@@ -223,6 +231,29 @@
     "benchmark_results_available": false,
     "targets_are_results": false,
     "watermark_test_functions_authored": 24,
-    "crate_test_functions_authored": 80
+    "crate_test_functions_authored": 80,
+    "benchmark_protocol_authored": true
+  },
+  "benchmark_protocol": {
+    "executable": "research/irregular-event-contract/src/bin/watermark_scaling.rs",
+    "event_counts": [
+      1000,
+      10000,
+      100000
+    ],
+    "indexed_query_repetitions": 101,
+    "verified_query_repetitions": 15,
+    "interval_width_us": 16,
+    "event_time_order": "deterministic_permutation_relative_to_arrival_order",
+    "outputs": [
+      "indexed_candidates_examined",
+      "matching_breaches",
+      "indexed_p50_p95_p99_us",
+      "verified_p50_p95_p99_us"
+    ],
+    "known_answer": "16 matching late breaches per query",
+    "correctness_gate": "indexed_and_verified_reports_equal_before_timing",
+    "measurement_boundary": "in_memory_release_build_cpu_time_only",
+    "energy_measurement": "not_measured"
   }
 }
