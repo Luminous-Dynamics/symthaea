@@ -703,14 +703,30 @@ mod tests {
     #[test]
     fn action_space_aliases_remain_one_equivalence_class() {
         let report = compute_identifiability_envelope(
-            vec![action("x", 0.1, 1.0, 1.0e-12), action("y", 0.2, 1.0, 1.0e-12)],
-            vec![mechanism("m-a", &[1.0, 2.0]), mechanism("m-b", &[1.0, 2.0]), mechanism("m-c", &[1.0, 2.0])],
-            0.05, 0.80, 16,
-        ).unwrap();
-        assert_eq!(report.disposition, SeparationDisposition::SingleEquivalenceClass);
+            vec![
+                action("x", 0.1, 1.0, 1.0e-12),
+                action("y", 0.2, 1.0, 1.0e-12),
+            ],
+            vec![
+                mechanism("m-a", &[1.0, 2.0]),
+                mechanism("m-b", &[1.0, 2.0]),
+                mechanism("m-c", &[1.0, 2.0]),
+            ],
+            0.05,
+            0.80,
+            16,
+        )
+        .unwrap();
+        assert_eq!(
+            report.disposition,
+            SeparationDisposition::SingleEquivalenceClass
+        );
         assert_eq!(report.equivalence_class_count, 1);
         assert_eq!(report.irreducible_equivalent_pair_count, 3);
-        assert_eq!(report.equivalence_classes[0].member_ids, vec!["m-a", "m-b", "m-c"]);
+        assert_eq!(
+            report.equivalence_classes[0].member_ids,
+            vec!["m-a", "m-b", "m-c"]
+        );
         assert_eq!(report.total_observations, 0);
         assert!(report.worst_pair.is_none());
     }
@@ -720,8 +736,11 @@ mod tests {
         let report = compute_identifiability_envelope(
             vec![action("probe", 1.0, 1.0, 1.0e-12)],
             vec![mechanism("low", &[0.0]), mechanism("high", &[1.0])],
-            0.05, 0.80, 16,
-        ).unwrap();
+            0.05,
+            0.80,
+            16,
+        )
+        .unwrap();
         assert_eq!(report.disposition, SeparationDisposition::TargetAchievable);
         assert_eq!(report.pairwise_alpha, 0.05);
         assert_eq!(report.total_observations, 7);
@@ -734,9 +753,15 @@ mod tests {
         let report = compute_identifiability_envelope(
             vec![action("probe", 1.0, 1.0, 1.0e-12)],
             vec![mechanism("low", &[0.0]), mechanism("high", &[1.0])],
-            0.05, 0.80, 6,
-        ).unwrap();
-        assert_eq!(report.disposition, SeparationDisposition::BudgetInsufficient);
+            0.05,
+            0.80,
+            6,
+        )
+        .unwrap();
+        assert_eq!(
+            report.disposition,
+            SeparationDisposition::BudgetInsufficient
+        );
         assert_eq!(report.equivalence_class_count, 2);
         assert_eq!(report.total_observations, 6);
         assert!(report.worst_pair.unwrap().power < 0.80);
@@ -746,17 +771,38 @@ mod tests {
     fn complementary_action_splits_a_narrow_design_alias() {
         let narrow = compute_identifiability_envelope(
             vec![action("along-diagonal", 0.1, 1.0, 1.0e-12)],
-            vec![mechanism("additive", &[1.0]), mechanism("interaction", &[1.0])],
-            0.05, 0.80, 16,
-        ).unwrap();
+            vec![
+                mechanism("additive", &[1.0]),
+                mechanism("interaction", &[1.0]),
+            ],
+            0.05,
+            0.80,
+            16,
+        )
+        .unwrap();
         let expanded = compute_identifiability_envelope(
-            vec![action("along-diagonal", 0.1, 1.0, 1.0e-12), action("off-diagonal", 0.1, 1.0, 1.0e-12)],
-            vec![mechanism("additive", &[1.0, 1.0]), mechanism("interaction", &[1.0, 2.0])],
-            0.05, 0.80, 16,
-        ).unwrap();
-        assert_eq!(narrow.disposition, SeparationDisposition::SingleEquivalenceClass);
+            vec![
+                action("along-diagonal", 0.1, 1.0, 1.0e-12),
+                action("off-diagonal", 0.1, 1.0, 1.0e-12),
+            ],
+            vec![
+                mechanism("additive", &[1.0, 1.0]),
+                mechanism("interaction", &[1.0, 2.0]),
+            ],
+            0.05,
+            0.80,
+            16,
+        )
+        .unwrap();
+        assert_eq!(
+            narrow.disposition,
+            SeparationDisposition::SingleEquivalenceClass
+        );
         assert_eq!(expanded.equivalence_class_count, 2);
-        assert_eq!(expanded.disposition, SeparationDisposition::TargetAchievable);
+        assert_eq!(
+            expanded.disposition,
+            SeparationDisposition::TargetAchievable
+        );
         assert_eq!(expanded.total_observations, 1);
         assert_eq!(expanded.replications[0].replicates, 0);
         assert_eq!(expanded.replications[1].replicates, 1);
@@ -765,10 +811,16 @@ mod tests {
     #[test]
     fn precise_expensive_action_can_beat_cheap_noisy_action() {
         let report = compute_identifiability_envelope(
-            vec![action("cheap-noisy", 2.0, 1.0, 1.0e-12), action("precise-expensive", 0.5, 3.0, 1.0e-12)],
+            vec![
+                action("cheap-noisy", 2.0, 1.0, 1.0e-12),
+                action("precise-expensive", 0.5, 3.0, 1.0e-12),
+            ],
             vec![mechanism("a", &[0.0, 0.0]), mechanism("b", &[1.0, 1.0])],
-            0.05, 0.80, 16,
-        ).unwrap();
+            0.05,
+            0.80,
+            16,
+        )
+        .unwrap();
         assert_eq!(report.disposition, SeparationDisposition::TargetAchievable);
         assert_eq!(report.replications[0].replicates, 0);
         assert_eq!(report.replications[1].replicates, 2);
@@ -801,13 +853,25 @@ mod tests {
     fn familywise_alpha_tightens_as_class_count_grows() {
         let actions = vec![action("probe", 1.0, 1.0, 1.0e-12)];
         let two = compute_identifiability_envelope(
-            actions.clone(), vec![mechanism("a", &[0.0]), mechanism("b", &[1.0])],
-            0.05, 0.80, 16,
-        ).unwrap();
+            actions.clone(),
+            vec![mechanism("a", &[0.0]), mechanism("b", &[1.0])],
+            0.05,
+            0.80,
+            16,
+        )
+        .unwrap();
         let three = compute_identifiability_envelope(
-            actions, vec![mechanism("a", &[0.0]), mechanism("b", &[1.0]), mechanism("c", &[2.0])],
-            0.05, 0.80, 16,
-        ).unwrap();
+            actions,
+            vec![
+                mechanism("a", &[0.0]),
+                mechanism("b", &[1.0]),
+                mechanism("c", &[2.0]),
+            ],
+            0.05,
+            0.80,
+            16,
+        )
+        .unwrap();
         assert!(three.pairwise_alpha < two.pairwise_alpha);
         assert!(three.required_pairwise_information > two.required_pairwise_information);
     }
@@ -836,18 +900,41 @@ mod tests {
     #[test]
     fn report_is_invariant_to_input_order() {
         let first = compute_identifiability_envelope(
-            vec![action("b", 0.5, 2.0, 1.0e-12), action("a", 1.0, 1.0, 1.0e-12)],
-            vec![mechanism("z", &[1.0, 2.0]), mechanism("b", &[0.0, 0.0]), mechanism("a", &[0.0, 0.0])],
-            0.05, 0.80, 10,
-        ).unwrap();
+            vec![
+                action("b", 0.5, 2.0, 1.0e-12),
+                action("a", 1.0, 1.0, 1.0e-12),
+            ],
+            vec![
+                mechanism("z", &[1.0, 2.0]),
+                mechanism("b", &[0.0, 0.0]),
+                mechanism("a", &[0.0, 0.0]),
+            ],
+            0.05,
+            0.80,
+            10,
+        )
+        .unwrap();
         let replay = compute_identifiability_envelope(
-            vec![action("a", 1.0, 1.0, 1.0e-12), action("b", 0.5, 2.0, 1.0e-12)],
-            vec![mechanism("a", &[0.0, 0.0]), mechanism("z", &[2.0, 1.0]), mechanism("b", &[0.0, 0.0])],
-            0.05, 0.80, 10,
-        ).unwrap();
+            vec![
+                action("a", 1.0, 1.0, 1.0e-12),
+                action("b", 0.5, 2.0, 1.0e-12),
+            ],
+            vec![
+                mechanism("a", &[0.0, 0.0]),
+                mechanism("z", &[2.0, 1.0]),
+                mechanism("b", &[0.0, 0.0]),
+            ],
+            0.05,
+            0.80,
+            10,
+        )
+        .unwrap();
         assert_eq!(first, replay);
         assert_eq!(first.equivalence_classes[0].canonical_id, "a");
-        assert_eq!(first.equivalence_classes[0].member_ids, vec!["a", "b"]);
+        assert_eq!(
+            first.equivalence_classes[0].member_ids,
+            vec!["a", "b"]
+        );
     }
 
     #[test]
@@ -855,33 +942,53 @@ mod tests {
         let merged = compute_identifiability_envelope(
             vec![action("probe", 0.001, 1.0, 0.1)],
             vec![mechanism("a", &[1.01]), mechanism("b", &[1.02])],
-            0.05, 0.80, 16,
-        ).unwrap();
+            0.05,
+            0.80,
+            16,
+        )
+        .unwrap();
         let split = compute_identifiability_envelope(
             vec![action("probe", 0.001, 1.0, 0.001)],
             vec![mechanism("a", &[1.01]), mechanism("b", &[1.02])],
-            0.05, 0.80, 16,
-        ).unwrap();
-        assert_eq!(merged.disposition, SeparationDisposition::SingleEquivalenceClass);
+            0.05,
+            0.80,
+            16,
+        )
+        .unwrap();
+        assert_eq!(
+            merged.disposition,
+            SeparationDisposition::SingleEquivalenceClass
+        );
         assert_eq!(split.equivalence_class_count, 2);
     }
 
     #[test]
     fn malformed_actions_and_mechanisms_fail_closed() {
         assert_eq!(
-            compute_identifiability_envelope(vec![], vec![mechanism("a", &[])], 0.05, 0.80, 8).err(),
+            compute_identifiability_envelope(vec![], vec![mechanism("a", &[])], 0.05, 0.80, 8)
+                .err(),
             Some(SeparationError::EmptyActions)
         );
         assert_eq!(
             compute_identifiability_envelope(
-                vec![action("x", 0.0, 1.0, 1.0)], vec![mechanism("a", &[0.0])], 0.05, 0.80, 8
-            ).err(),
-            Some(SeparationError::InvalidSigma { action_id: "x".into() })
+                vec![action("x", 0.0, 1.0, 1.0)],
+                vec![mechanism("a", &[0.0])],
+                0.05,
+                0.80,
+                8
+            )
+            .err(),
+            Some(SeparationError::InvalidSigma {
+                action_id: "x".into()
+            })
         );
         assert!(matches!(
             compute_identifiability_envelope(
-                vec![action("x", 1.0, 1.0, 1.0)], vec![mechanism("a", &[f64::NAN])],
-                0.05, 0.80, 8
+                vec![action("x", 1.0, 1.0, 1.0)],
+                vec![mechanism("a", &[f64::NAN])],
+                0.05,
+                0.80,
+                8
             ),
             Err(SeparationError::NonFiniteMean { .. })
         ));
@@ -889,14 +996,20 @@ mod tests {
             compute_identifiability_envelope(
                 vec![action("x", 1.0, 1.0, 1.0)],
                 vec![mechanism("a", &[0.0]), mechanism("a", &[1.0])],
-                0.05, 0.80, 8
-            ).err(),
+                0.05,
+                0.80,
+                8
+            )
+            .err(),
             Some(SeparationError::DuplicateMechanismId("a".into()))
         );
         assert!(matches!(
             compute_identifiability_envelope(
-                vec![action("x", 1.0, 1.0, 1.0)], vec![mechanism("a", &[0.0])],
-                0.05, 0.80, MAX_TOTAL_OBSERVATIONS + 1
+                vec![action("x", 1.0, 1.0, 1.0)],
+                vec![mechanism("a", &[0.0])],
+                0.05,
+                0.80,
+                MAX_TOTAL_OBSERVATIONS + 1
             ),
             Err(SeparationError::ObservationCapTooLarge { .. })
         ));
