@@ -108,7 +108,7 @@ The evaluator supplies a separate `record_id → split` map. The converter requi
 
 A six-record fixture is mirrored from Symtropy commit `2ca4a4897480ce3849be72cb2bdca975390471d4` (fixture blob `348f4e8e3f4e817f033ea6cc89d43bb24a07c2f3`; schema blob `06c7dcb36975fbedc4810f121e84a670768dc5e0`). The fixture demonstrates two raw acquisitions fused into one derived product, plus a shared calibration/environment episode across sites. The tests verify the expected 5-record common-cause component and a separate evaluation singleton.
 
-The consumer validates only the sidecar's internal derivation metadata. It does not yet cross-check that every `observation_id` exists exactly once in the corresponding Symtropy site-evidence record, authenticate provenance references, or prove the declared common-cause groups are complete.
+The consumer now cross-checks the manifest against schema-conforming site-evidence JSON projections. Every manifest record must resolve to one observation under the same site ID; observation IDs must be globally unique; every site observation must be represented exactly once. Negative controls cover missing records, duplicate site/observation IDs, cross-site binding, unsupported schema version, and unmapped site observations. This does not authenticate provenance references or prove the declared common-cause groups are complete.
 
 ## 9. Implementation status and limits
 
@@ -119,6 +119,6 @@ Standalone package:
 - Transitive dependency components.
 - Fail-closed split-crossing checks.
 - Exact component/group counts and maximum component size.
-- 39 authored tests, including 10 paired cluster-bootstrap cases, 3 multi-acquisition grouping cases and 11 strict JSON-manifest consumer cases.
+- 47 authored tests, including 10 paired cluster-bootstrap cases, 3 multi-acquisition grouping cases, 11 strict lineage-manifest consumer cases and 8 site-observation cross-reference cases.
 
 The package is AUTHORED, not compiled or executed in the current environment. It does not estimate correlations or effective sample size, detect undeclared causes, authenticate IDs, or integrate with the likelihood fitter. Those are follow-on work, not implied capabilities.

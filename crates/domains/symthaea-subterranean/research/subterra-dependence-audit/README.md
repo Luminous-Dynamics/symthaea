@@ -10,7 +10,14 @@ A new filename, case ID, reconstructed mesh or extracted feature vector does not
 
 The package consumes the versioned Symtropy observation-lineage manifest using strict Serde JSON deserialization. It validates unique record identity, source references, derivation-graph acyclicity, raw-versus-derived record shape, and exact inherited acquisition-lineage sets. Split assignments are supplied separately by the evaluator, converted to the existing audit types, and then checked for transitive leakage.
 
-The copied synthetic fixture is pinned to Symtropy branch `research/geobio-foundry-v0.2`, commit `2ca4a4897480ce3849be72cb2bdca975390471d4`, fixture blob `348f4e8e3f4e817f033ea6cc89d43bb24a07c2f3`; the matching producer schema blob is `06c7dcb36975fbedc4810f121e84a670768dc5e0`.
+The six-record observation-lineage fixture is pinned to Symtropy branch `research/geobio-foundry-v0.2`, commit `db71f6a3075352f303a3f647ce74fe86029430dd`, fixture blob `348f4e8e3f4e817f033ea6cc89d43bb24a07c2f3`; the matching producer schema blob is `06c7dcb36975fbedc4810f121e84a670768dc5e0`. Three schema-conforming site-evidence fixtures from the same producer branch are mirrored beside it and their individual blob IDs are recorded below.
+
+The site-evidence observation fixture blobs are:
+- Site A: `714803b2b5654819d0e75c23c2b41f1ebf6f42fe`
+- Site B: `2462e2b83e44f64d2f01a09315fcf6012b4ea27d`
+- Site C: `094d91e870e30cd3a299bbabe3efc06122f0f2d8`
+
+The consumer's observation cross-reference method verifies that every manifest record resolves to exactly one observation in the same site and that every site observation has exactly one lineage record. The input documents are projected to schema version, site ID and observation IDs; full schema validation remains the producer contract.
 
 ## Contract
 
@@ -41,4 +48,4 @@ The crate also includes a deterministic paired percentile bootstrap over one alr
 
 For loss metrics, a negative candidate-minus-baseline interval favors the candidate. This is not proof of statistical independence: component grouping quality and the sampling frame remain assumptions. With fewer than 20–30 genuinely distinct components, treat interval estimates as exploratory and publish the component count prominently. The bootstrap does not correct selection bias, nonstationarity or missing common causes.
 
-There are 39 authored tests in this package after manifest-consumer integration.
+There are 47 authored tests in this package after site-observation cross-reference integration.

@@ -376,3 +376,18 @@ The dependence auditor now consumes the Symtropy observation-lineage JSON with s
 | CrossRepoContractBench | Symtropy fixture parses to expected transitive dependency components in Symthaea | Exact group/component counts and frozen fixture IDs |
 
 The typed consumer still does not join observation IDs against their parent site-evidence JSON record, authenticate opaque provenance references, or establish completeness of declared common causes. Those are the next adapter-level gates.
+
+
+## 16. Site-observation lineage integrity
+
+The Symthaea dependence auditor cross-checks the lineage sidecar against the three schema-conforming Symtropy site-evidence fixtures. It requires complete one-to-one mapping between manifest records and site-evidence observations, global observation-ID uniqueness and matching site ownership.
+
+| Benchmark | Property | Proposed gate |
+|---|---|---|
+| ObservationReferenceResolutionBench | Every lineage record resolves to exactly one site observation | Zero dangling references |
+| SiteOwnershipBench | A lineage record's site ID equals the owning site-evidence record | Zero cross-site observation bindings |
+| ObservationUniquenessBench | Site observations and manifest observation IDs are globally unique | Zero duplicate observation identity |
+| ObservationCoverageBench | Every site evidence observation has exactly one lineage record | 100% coverage; zero untracked observations |
+| SchemaVersionBoundaryBench | Unsupported site-evidence schema versions fail closed | Zero silent downgrade |
+
+The consumer only projects schema version/site ID/observation IDs; full site-evidence validation must run against the pinned producer schema. Opaque provenance references remain unauthenticated.

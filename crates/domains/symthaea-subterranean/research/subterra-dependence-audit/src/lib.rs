@@ -1818,19 +1818,31 @@ mod tests {
     #[test]
     fn every_site_evidence_observation_must_have_a_lineage_record() {
         let manifest = fixture_manifest();
-        let extra = SITE_EVIDENCE_C.replace(
-            "obs-site-c-raw-01",
-            "obs-site-c-raw-01\", \"observation_id\": \"unmapped-extra"
-        );
-        assert!(matches!(
+        let mut extra_value: serde_json::Value =
+            serde_json::from_str(SITE_EVIDENCE_C).unwrap();
+        extra_value["observations"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "observation_id": "unmapped-extra",
+                "modality": "other",
+                "captured_at": "2026-11-16T00:05:00Z",
+                "native_resolution": null,
+                "coordinate_frame": "synthetic-local-frame-site-c",
+                "provenance_ref": "synthetic-provenance-unmapped-extra"
+            }));
+        let extra = extra_value.to_string();
+        assert_eq!(
             manifest.validate_against_site_evidence_json(&[
                 SITE_EVIDENCE_A,
                 SITE_EVIDENCE_B,
                 &extra
             ]),
-            Err(ManifestError::InvalidSiteEvidenceJson(_))
-                | Err(ManifestError::SiteEvidenceObservationUnmapped { .. })
-        ));
+            Err(ManifestError::SiteEvidenceObservationUnmapped {
+                site_id: "synthetic-site-c".into(),
+                observation_id: "unmapped-extra".into()
+            })
+        );
     }
 
     #[test]
