@@ -103,6 +103,16 @@ fn optimal_decision(critical: bool) -> Decision {
     }
 }
 
+fn posterior_hazard_probability(
+    prior_hazard_probability: f64,
+    likelihood_if_hazard: f64,
+    likelihood_if_offset: f64,
+) -> f64 {
+    let hazard_mass = prior_hazard_probability * likelihood_if_hazard;
+    let offset_mass = (1.0 - prior_hazard_probability) * likelihood_if_offset;
+    hazard_mass / (hazard_mass + offset_mass)
+}
+
 fn binary_entropy_bits(probability: f64) -> f64 {
     if probability == 0.0 || probability == 1.0 {
         return 0.0;
@@ -150,7 +160,13 @@ fn candidate_policy_history(policy: SamplingPolicy) -> Vec<CandidateObservation>
 fn realized_reference_diagnosis(
     probe: Option<&CandidateObservation>,
 ) -> Option<bool> {
-    let observed = probe?.value?;
+    let probe = probe?;
+    if probe.modality != "independent-reference-thermal"
+        || probe.sampling_policy_id != "authorized-reference-probe-v1"
+    {
+        return None;
+    }
+    let observed = probe.value?;
     Some(is_critical(observed))
 }
 
@@ -169,6 +185,10 @@ fn passive_observations_cannot_identify_opposite_physical_mechanisms() {
     let offset_view = candidate_passive_history(physically_cool_sensor_offset);
 
     assert_eq!(hot_view, offset_view);
+    let passive_posterior = posterior_hazard_probability(0.5, 1.0, 1.0);
+    let passive_eig = binary_entropy_bits(0.5) - binary_entropy_bits(passive_posterior);
+    assert_eq!(passive_posterior, 0.5);
+    assert_eq!(passive_eig, 0.0);
     assert!(is_critical(physically_hot.physical_temperature));
     assert!(!is_critical(physically_cool_sensor_offset.physical_temperature));
 
@@ -215,9 +235,16 @@ fn independent_reference_probe_has_positive_decision_value() {
     assert!((evsi - REFERENCE_PROBE_COST - 0.75).abs() < 1e-12);
 
     // Information-theoretic and decision-focused quantities are distinct:
-    // the passive history has zero EIG, while the reference probe has one bit.
-    assert_eq!(binary_entropy_bits(PRIOR_HAZARD_PROBABILITY), 1.0);
-    assert_eq!(binary_entropy_bits(0.0), 0.0);
+    // passive observations leave the posterior unchanged, while the independent
+    // reference outcome identifies the mechanism in this finite oracle fixture.
+    let posterior_after_hot_probe = posterior_hazard_probability(0.5, 1.0, 0.0);
+    let posterior_after_cool_probe = posterior_hazard_probability(0.5, 0.0, 1.0);
+    assert_eq!(posterior_after_hot_probe, 1.0);
+    assert_eq!(posterior_after_cool_probe, 0.0);
+    let reference_eig = binary_entropy_bits(0.5)
+        - 0.5 * binary_entropy_bits(posterior_after_hot_probe)
+        - 0.5 * binary_entropy_bits(posterior_after_cool_probe);
+    assert_eq!(reference_eig, 1.0);
 }
 
 #[test]
@@ -264,6 +291,18 @@ fn unavailable_reference_probe_yields_no_realized_information() {
 
     assert_eq!(realized_reference_diagnosis(Some(&unavailable)), None);
     assert_eq!(realized_reference_diagnosis(None), None);
+
+    let primary_sensor_observation = CandidateObservation {
+        capture_time_ns: 4_000_000,
+        value: Some(10.0),
+        modality: "primary-thermal",
+        sampling_policy_id: "passive-fixed-v1",
+        missingness: None,
+    };
+    assert_eq!(
+        realized_reference_diagnosis(Some(&primary_sensor_observation)),
+        None
+    );
 }
 
 #[test]
