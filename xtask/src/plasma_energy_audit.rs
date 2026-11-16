@@ -3086,30 +3086,6 @@ mod tests {
                 "year_long_renewable_profile_required": true,
                 "all_full_chain_quality_and_fatigue_gates_must_hold": true
             })
-        } else if lane == "METHANE_PYROLYSIS_PULSED_HEATING" {
-            serde_json::json!({
-                "diluted_and_pure_methane_operating_points_must_remain_separate": true,
-                "full_grid_to_accepted_h2_energy_boundary_required": true,
-                "gas_separation_purification_and_compression_included": true,
-                "co2_plasma_regeneration_energy_and_carbon_streams_included": true,
-                "methane_derived_carbon_balance_and_unknowns_reported": true,
-                "no_credit_carbon_baseline_required": true,
-                "catalyst_support_electrode_and_replacement_lifecycle_included": true,
-                "long_run_cycles_and_failed_batches_in_denominator": true,
-                "matched_shock_wave_and_microwave_comparators_required": true
-            })
-        } else if lane == "AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY" {
-            serde_json::json!({
-                "plant_level_accepted_nh3_ramp_measured_not_plasma_source_ramp": true,
-                "hydrogen_generation_and_storage_dynamics_included": true,
-                "nitrogen_and_plasma_or_nox_capture_transfer_dynamics_included": true,
-                "synthesis_loop_pressure_and_temperature_fatigue_included": true,
-                "accepted_product_purity_pressure_and_delivery_contract_matched": true,
-                "startup_shutdown_standby_and_failed_batches_counted": true,
-                "buffer_capacity_and_renewable_curtailment_reported": true,
-                "baseline_uses_10_to_120_percent_3_percent_per_minute_haber_bosch_model": true,
-                "no_flexibility_superiority_claim_without_same_trace_replay": true
-            })
         } else if lane == "AMMONIA_N2_VIBRATIONAL_TRANSFER" {
             serde_json::json!({
                 "all_required_evidence_gates_must_hold": true,
@@ -3161,6 +3137,30 @@ mod tests {
                 "availability_capacity_factor_and_duty_cycle_matched": true,
                 "no_faraday_efficiency_or_area_rate_substitutes_for_full_chain_energy": true,
                 "no_superiority_claim_before_source_data_reconstruction_and_uncertainty_analysis": true
+            })
+        } else if lane == "METHANE_PYROLYSIS_PULSED_HEATING" {
+            serde_json::json!({
+                "diluted_and_pure_methane_operating_points_must_remain_separate": true,
+                "full_grid_to_accepted_h2_energy_boundary_required": true,
+                "gas_separation_purification_and_compression_included": true,
+                "co2_plasma_regeneration_energy_and_carbon_streams_included": true,
+                "methane_derived_carbon_balance_and_unknowns_reported": true,
+                "no_credit_carbon_baseline_required": true,
+                "catalyst_support_electrode_and_replacement_lifecycle_included": true,
+                "long_run_cycles_and_failed_batches_in_denominator": true,
+                "matched_shock_wave_and_microwave_comparators_required": true
+            })
+        } else if lane == "AMMONIA_SYNTHESIS_DYNAMIC_FLEXIBILITY" {
+            serde_json::json!({
+                "plant_level_accepted_nh3_ramp_measured_not_plasma_source_ramp": true,
+                "hydrogen_generation_and_storage_dynamics_included": true,
+                "nitrogen_and_plasma_or_nox_capture_transfer_dynamics_included": true,
+                "synthesis_loop_pressure_and_temperature_fatigue_included": true,
+                "accepted_product_purity_pressure_and_delivery_contract_matched": true,
+                "startup_shutdown_standby_and_failed_batches_counted": true,
+                "buffer_capacity_and_renewable_curtailment_reported": true,
+                "baseline_uses_10_to_120_percent_3_percent_per_minute_haber_bosch_model": true,
+                "no_flexibility_superiority_claim_without_same_trace_replay": true
             })
         } else if lane == "AMMONIA_N2_VIBRATIONAL_TRANSFER" {
             serde_json::json!({
