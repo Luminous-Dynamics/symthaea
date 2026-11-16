@@ -23,70 +23,166 @@ pub struct PointGroupTemplateV1 {
 
 pub const CRYSTALLOGRAPHIC_TEMPLATES_V1: [PointGroupTemplateV1;
     CRYSTALLOGRAPHIC_POINT_GROUP_COUNT] = [
-    PointGroupTemplateV1 { schoenflies: "C1", hermann_mauguin: "1",
-        fixed_dimensions: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23] },
-    PointGroupTemplateV1 { schoenflies: "Ci", hermann_mauguin: "-1",
-        fixed_dimensions: [1, 0, 5, 0, 9, 0, 13, 0, 17, 0, 21, 0] },
-    PointGroupTemplateV1 { schoenflies: "C2", hermann_mauguin: "2",
-        fixed_dimensions: [1, 1, 3, 3, 5, 5, 7, 7, 9, 9, 11, 11] },
-    PointGroupTemplateV1 { schoenflies: "Cs", hermann_mauguin: "m",
-        fixed_dimensions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
-    PointGroupTemplateV1 { schoenflies: "C2h", hermann_mauguin: "2/m",
-        fixed_dimensions: [1, 0, 3, 0, 5, 0, 7, 0, 9, 0, 11, 0] },
-    PointGroupTemplateV1 { schoenflies: "D2", hermann_mauguin: "222",
-        fixed_dimensions: [1, 0, 2, 1, 3, 2, 4, 3, 5, 4, 6, 5] },
-    PointGroupTemplateV1 { schoenflies: "C2v", hermann_mauguin: "mm2",
-        fixed_dimensions: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6] },
-    PointGroupTemplateV1 { schoenflies: "D2h", hermann_mauguin: "mmm",
-        fixed_dimensions: [1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0] },
-    PointGroupTemplateV1 { schoenflies: "C4", hermann_mauguin: "4",
-        fixed_dimensions: [1, 1, 1, 1, 3, 3, 3, 3, 5, 5, 5, 5] },
-    PointGroupTemplateV1 { schoenflies: "S4", hermann_mauguin: "-4",
-        fixed_dimensions: [1, 0, 1, 2, 3, 2, 3, 4, 5, 4, 5, 6] },
-    PointGroupTemplateV1 { schoenflies: "C4h", hermann_mauguin: "4/m",
-        fixed_dimensions: [1, 0, 1, 0, 3, 0, 3, 0, 5, 0, 5, 0] },
-    PointGroupTemplateV1 { schoenflies: "D4", hermann_mauguin: "422",
-        fixed_dimensions: [1, 0, 1, 0, 2, 1, 2, 1, 3, 2, 3, 2] },
-    PointGroupTemplateV1 { schoenflies: "C4v", hermann_mauguin: "4mm",
-        fixed_dimensions: [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3] },
-    PointGroupTemplateV1 { schoenflies: "D2d", hermann_mauguin: "-42m",
-        fixed_dimensions: [1, 0, 1, 1, 2, 1, 2, 2, 3, 2, 3, 3] },
-    PointGroupTemplateV1 { schoenflies: "D4h", hermann_mauguin: "4/mmm",
-        fixed_dimensions: [1, 0, 1, 0, 2, 0, 2, 0, 3, 0, 3, 0] },
-    PointGroupTemplateV1 { schoenflies: "C3", hermann_mauguin: "3",
-        fixed_dimensions: [1, 1, 1, 3, 3, 3, 5, 5, 5, 7, 7, 7] },
-    PointGroupTemplateV1 { schoenflies: "S6", hermann_mauguin: "-3",
-        fixed_dimensions: [1, 0, 1, 0, 3, 0, 5, 0, 5, 0, 7, 0] },
-    PointGroupTemplateV1 { schoenflies: "D3", hermann_mauguin: "32",
-        fixed_dimensions: [1, 0, 1, 1, 2, 1, 3, 2, 3, 3, 4, 3] },
-    PointGroupTemplateV1 { schoenflies: "C3v", hermann_mauguin: "3m",
-        fixed_dimensions: [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4] },
-    PointGroupTemplateV1 { schoenflies: "D3d", hermann_mauguin: "-3m",
-        fixed_dimensions: [1, 0, 1, 0, 2, 0, 3, 0, 3, 0, 4, 0] },
-    PointGroupTemplateV1 { schoenflies: "C6", hermann_mauguin: "6",
-        fixed_dimensions: [1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3] },
-    PointGroupTemplateV1 { schoenflies: "C3h", hermann_mauguin: "-6",
-        fixed_dimensions: [1, 0, 1, 2, 1, 2, 3, 2, 3, 4, 3, 4] },
-    PointGroupTemplateV1 { schoenflies: "C6h", hermann_mauguin: "6/m",
-        fixed_dimensions: [1, 0, 1, 0, 1, 0, 3, 0, 3, 0, 3, 0] },
-    PointGroupTemplateV1 { schoenflies: "D6", hermann_mauguin: "622",
-        fixed_dimensions: [1, 0, 1, 0, 1, 0, 2, 1, 2, 1, 2, 1] },
-    PointGroupTemplateV1 { schoenflies: "C6v", hermann_mauguin: "6mm",
-        fixed_dimensions: [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2] },
-    PointGroupTemplateV1 { schoenflies: "D3h", hermann_mauguin: "-6m2",
-        fixed_dimensions: [1, 0, 1, 1, 1, 1, 2, 1, 2, 2, 2, 2] },
-    PointGroupTemplateV1 { schoenflies: "D6h", hermann_mauguin: "6/mmm",
-        fixed_dimensions: [1, 0, 1, 0, 1, 0, 2, 0, 2, 0, 2, 0] },
-    PointGroupTemplateV1 { schoenflies: "T", hermann_mauguin: "23",
-        fixed_dimensions: [1, 0, 0, 1, 1, 0, 2, 1, 1, 2, 2, 1] },
-    PointGroupTemplateV1 { schoenflies: "Th", hermann_mauguin: "m-3",
-        fixed_dimensions: [1, 0, 0, 0, 1, 0, 2, 0, 1, 0, 2, 0] },
-    PointGroupTemplateV1 { schoenflies: "O", hermann_mauguin: "432",
-        fixed_dimensions: [1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0] },
-    PointGroupTemplateV1 { schoenflies: "Td", hermann_mauguin: "-43m",
-        fixed_dimensions: [1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1] },
-    PointGroupTemplateV1 { schoenflies: "Oh", hermann_mauguin: "m-3m",
-        fixed_dimensions: [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0] },
+    PointGroupTemplateV1 {
+        schoenflies: "C1",
+        hermann_mauguin: "1",
+        fixed_dimensions: [1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "Ci",
+        hermann_mauguin: "-1",
+        fixed_dimensions: [1, 0, 5, 0, 9, 0, 13, 0, 17, 0, 21, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C2",
+        hermann_mauguin: "2",
+        fixed_dimensions: [1, 1, 3, 3, 5, 5, 7, 7, 9, 9, 11, 11],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "Cs",
+        hermann_mauguin: "m",
+        fixed_dimensions: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C2h",
+        hermann_mauguin: "2/m",
+        fixed_dimensions: [1, 0, 3, 0, 5, 0, 7, 0, 9, 0, 11, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "D2",
+        hermann_mauguin: "222",
+        fixed_dimensions: [1, 0, 2, 1, 3, 2, 4, 3, 5, 4, 6, 5],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C2v",
+        hermann_mauguin: "mm2",
+        fixed_dimensions: [1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "D2h",
+        hermann_mauguin: "mmm",
+        fixed_dimensions: [1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C4",
+        hermann_mauguin: "4",
+        fixed_dimensions: [1, 1, 1, 1, 3, 3, 3, 3, 5, 5, 5, 5],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "S4",
+        hermann_mauguin: "-4",
+        fixed_dimensions: [1, 0, 1, 2, 3, 2, 3, 4, 5, 4, 5, 6],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C4h",
+        hermann_mauguin: "4/m",
+        fixed_dimensions: [1, 0, 1, 0, 3, 0, 3, 0, 5, 0, 5, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "D4",
+        hermann_mauguin: "422",
+        fixed_dimensions: [1, 0, 1, 0, 2, 1, 2, 1, 3, 2, 3, 2],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C4v",
+        hermann_mauguin: "4mm",
+        fixed_dimensions: [1, 1, 1, 1, 2, 2, 2, 2, 3, 3, 3, 3],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "D2d",
+        hermann_mauguin: "-42m",
+        fixed_dimensions: [1, 0, 1, 1, 2, 1, 2, 2, 3, 2, 3, 3],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "D4h",
+        hermann_mauguin: "4/mmm",
+        fixed_dimensions: [1, 0, 1, 0, 2, 0, 2, 0, 3, 0, 3, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C3",
+        hermann_mauguin: "3",
+        fixed_dimensions: [1, 1, 1, 3, 3, 3, 5, 5, 5, 7, 7, 7],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "S6",
+        hermann_mauguin: "-3",
+        fixed_dimensions: [1, 0, 1, 0, 3, 0, 5, 0, 5, 0, 7, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "D3",
+        hermann_mauguin: "32",
+        fixed_dimensions: [1, 0, 1, 1, 2, 1, 3, 2, 3, 3, 4, 3],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C3v",
+        hermann_mauguin: "3m",
+        fixed_dimensions: [1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "D3d",
+        hermann_mauguin: "-3m",
+        fixed_dimensions: [1, 0, 1, 0, 2, 0, 3, 0, 3, 0, 4, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C6",
+        hermann_mauguin: "6",
+        fixed_dimensions: [1, 1, 1, 1, 1, 1, 3, 3, 3, 3, 3, 3],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C3h",
+        hermann_mauguin: "-6",
+        fixed_dimensions: [1, 0, 1, 2, 1, 2, 3, 2, 3, 4, 3, 4],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C6h",
+        hermann_mauguin: "6/m",
+        fixed_dimensions: [1, 0, 1, 0, 1, 0, 3, 0, 3, 0, 3, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "D6",
+        hermann_mauguin: "622",
+        fixed_dimensions: [1, 0, 1, 0, 1, 0, 2, 1, 2, 1, 2, 1],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "C6v",
+        hermann_mauguin: "6mm",
+        fixed_dimensions: [1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "D3h",
+        hermann_mauguin: "-6m2",
+        fixed_dimensions: [1, 0, 1, 1, 1, 1, 2, 1, 2, 2, 2, 2],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "D6h",
+        hermann_mauguin: "6/mmm",
+        fixed_dimensions: [1, 0, 1, 0, 1, 0, 2, 0, 2, 0, 2, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "T",
+        hermann_mauguin: "23",
+        fixed_dimensions: [1, 0, 0, 1, 1, 0, 2, 1, 1, 2, 2, 1],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "Th",
+        hermann_mauguin: "m-3",
+        fixed_dimensions: [1, 0, 0, 0, 1, 0, 2, 0, 1, 0, 2, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "O",
+        hermann_mauguin: "432",
+        fixed_dimensions: [1, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 0],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "Td",
+        hermann_mauguin: "-43m",
+        fixed_dimensions: [1, 0, 0, 1, 1, 0, 1, 1, 1, 1, 1, 1],
+    },
+    PointGroupTemplateV1 {
+        schoenflies: "Oh",
+        hermann_mauguin: "m-3m",
+        fixed_dimensions: [1, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0],
+    },
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -115,12 +211,18 @@ impl Default for SymFpProfileV1 {
 impl SymFpProfileV1 {
     /// Paper's validation-selected setting for degrees 0..6.
     pub fn paper_degree_6() -> Self {
-        Self { tau_rel: 3.0e-5, ..Self::default() }
+        Self {
+            tau_rel: 3.0e-5,
+            ..Self::default()
+        }
     }
 
     /// Paper's validation-selected setting for degrees 0..9.
     pub fn paper_degree_9() -> Self {
-        Self { tau_rel: 1.0e-6, ..Self::default() }
+        Self {
+            tau_rel: 1.0e-6,
+            ..Self::default()
+        }
     }
 }
 
@@ -240,7 +342,10 @@ fn validate_degrees(degrees: &[usize]) -> Result<(), SymFpErrorV1> {
         return Err(SymFpErrorV1::DegreesNotStrictlyIncreasing);
     }
     if degrees.iter().any(|degree| *degree > MAX_TEMPLATE_DEGREE) {
-        let degree = *degrees.iter().find(|degree| **degree > MAX_TEMPLATE_DEGREE).unwrap();
+        let degree = *degrees
+            .iter()
+            .find(|degree| **degree > MAX_TEMPLATE_DEGREE)
+            .unwrap();
         return Err(SymFpErrorV1::UnknownDegree { degree });
     }
     Ok(())
@@ -260,7 +365,9 @@ pub fn one_sided_jacobi_svd(
     if rows == 0 || columns == 0 {
         return Err(SymFpErrorV1::ZeroDimension);
     }
-    let expected = rows.checked_mul(columns).ok_or(SymFpErrorV1::NonFiniteDerivedValue)?;
+    let expected = rows
+        .checked_mul(columns)
+        .ok_or(SymFpErrorV1::NonFiniteDerivedValue)?;
     if values.len() != expected {
         return Err(SymFpErrorV1::MatrixLengthMismatch);
     }
@@ -268,7 +375,10 @@ pub fn one_sided_jacobi_svd(
         return Err(SymFpErrorV1::NonFiniteMatrix);
     }
 
-    let scale = values.iter().map(|value| value.abs()).fold(0.0_f64, f64::max);
+    let scale = values
+        .iter()
+        .map(|value| value.abs())
+        .fold(0.0_f64, f64::max);
     if scale == 0.0 {
         return Ok(SvdReceiptV1 {
             singular_values: vec![0.0; rows.min(columns)],
@@ -369,8 +479,7 @@ pub fn one_sided_jacobi_svd(
                 gamma += a * b;
             }
             if alpha > 0.0 && beta > 0.0 {
-                maximum_correlation =
-                    maximum_correlation.max(gamma.abs() / (alpha * beta).sqrt());
+                maximum_correlation = maximum_correlation.max(gamma.abs() / (alpha * beta).sqrt());
             }
         }
     }
@@ -418,12 +527,7 @@ pub fn symfp_from_representation_blocks(
         if block.rows != 2 * block.degree + 1 {
             return Err(SymFpErrorV1::MatrixLengthMismatch);
         }
-        let svd = one_sided_jacobi_svd(
-            block.rows,
-            block.columns,
-            &block.values,
-            profile,
-        )?;
+        let svd = one_sided_jacobi_svd(block.rows, block.columns, &block.values, profile)?;
         spectra.push(SpectrumBlockV1 {
             degree: block.degree,
             singular_values: svd.singular_values,
@@ -444,9 +548,7 @@ pub fn analyze_spectra(
     validate_degrees(&degrees)?;
 
     for block in spectra {
-        if block.singular_values.is_empty()
-            || block.singular_values.len() > 2 * block.degree + 1
-        {
+        if block.singular_values.is_empty() || block.singular_values.len() > 2 * block.degree + 1 {
             return Err(SymFpErrorV1::SingularSpectrumLengthMismatch);
         }
         if block.singular_values.iter().any(|value| !value.is_finite()) {
@@ -472,7 +574,13 @@ pub fn analyze_spectra(
 
     let rank_sequence = spectra
         .iter()
-        .map(|block| block.singular_values.iter().filter(|value| **value > tau).count())
+        .map(|block| {
+            block
+                .singular_values
+                .iter()
+                .filter(|value| **value > tau)
+                .count()
+        })
         .collect();
 
     Ok(SymFpReceiptV1 {
@@ -545,10 +653,7 @@ pub fn target_leakage(
             tail_energy += singular * singular;
         }
         let denominator = total_energy + receipt.profile.epsilon_norm;
-        if !total_energy.is_finite()
-            || !tail_energy.is_finite()
-            || !denominator.is_finite()
-        {
+        if !total_energy.is_finite() || !tail_energy.is_finite() || !denominator.is_finite() {
             return Err(SymFpErrorV1::NonFiniteDerivedValue);
         }
         let leakage = tail_energy / denominator;
@@ -585,9 +690,9 @@ pub fn templates_are_ordered_for_subgroup(
     supergroup: &PointGroupTemplateV1,
     degrees: &[usize],
 ) -> bool {
-    degrees.iter().all(|degree| {
-        subgroup.fixed_dimensions[*degree] >= supergroup.fixed_dimensions[*degree]
-    })
+    degrees
+        .iter()
+        .all(|degree| subgroup.fixed_dimensions[*degree] >= supergroup.fixed_dimensions[*degree])
 }
 
 #[cfg(test)]
@@ -637,7 +742,11 @@ mod tests {
                 .iter()
                 .map(|degree| template.fixed_dimensions[*degree])
                 .collect();
-            assert!(rows.insert(row), "duplicate template: {}", template.schoenflies);
+            assert!(
+                rows.insert(row),
+                "duplicate template: {}",
+                template.schoenflies
+            );
         }
     }
 
@@ -652,7 +761,10 @@ mod tests {
                 .collect();
             counts.entry(row).or_default().push(template.schoenflies);
         }
-        let ties: Vec<Vec<&str>> = counts.into_values().filter(|names| names.len() > 1).collect();
+        let ties: Vec<Vec<&str>> = counts
+            .into_values()
+            .filter(|names| names.len() > 1)
+            .collect();
         assert_eq!(ties.len(), 2);
         assert!(ties.iter().any(|names| names == &vec!["D6", "D6h"]));
         assert!(ties.iter().any(|names| names == &vec!["O", "Oh"]));
@@ -670,13 +782,10 @@ mod tests {
     fn rank_template_matching_recovers_each_exact_crystallographic_template_at_l9() {
         let profile = SymFpProfileV1::paper_degree_9();
         for template in &CRYSTALLOGRAPHIC_TEMPLATES_V1 {
-            let receipt = analyze_spectra(
-                &spectra_for_rank_template(template.schoenflies, 9),
-                profile,
-            )
-            .unwrap();
-            let matched =
-                classify_rank_template(&receipt, &CRYSTALLOGRAPHIC_TEMPLATES_V1).unwrap();
+            let receipt =
+                analyze_spectra(&spectra_for_rank_template(template.schoenflies, 9), profile)
+                    .unwrap();
+            let matched = classify_rank_template(&receipt, &CRYSTALLOGRAPHIC_TEMPLATES_V1).unwrap();
             assert_eq!(matched.minimum_l1_distance, 0);
             assert_eq!(matched.matched_schoenflies, vec![template.schoenflies]);
         }
@@ -825,21 +934,28 @@ mod tests {
         let profile = SymFpProfileV1::default();
         let first = one_sided_jacobi_svd(3, 3, &matrix, profile).unwrap();
         let second = one_sided_jacobi_svd(3, 3, &rotated, profile).unwrap();
-        for (left, right) in first.singular_values.iter().zip(second.singular_values.iter()) {
+        for (left, right) in first
+            .singular_values
+            .iter()
+            .zip(second.singular_values.iter())
+        {
             close(*left, *right, 2.0e-11);
         }
     }
 
     #[test]
     fn rank_deficient_and_zero_matrices_return_finite_sorted_spectra() {
-        let rank_one =
-            one_sided_jacobi_svd(3, 2, &[1.0, 2.0, 2.0, 4.0, -1.0, -2.0], SymFpProfileV1::default())
-                .unwrap();
+        let rank_one = one_sided_jacobi_svd(
+            3,
+            2,
+            &[1.0, 2.0, 2.0, 4.0, -1.0, -2.0],
+            SymFpProfileV1::default(),
+        )
+        .unwrap();
         assert!(rank_one.singular_values[0] > 0.0);
         assert!(rank_one.singular_values[1] < 1.0e-12);
 
-        let zero =
-            one_sided_jacobi_svd(3, 2, &[0.0; 6], SymFpProfileV1::default()).unwrap();
+        let zero = one_sided_jacobi_svd(3, 2, &[0.0; 6], SymFpProfileV1::default()).unwrap();
         assert_eq!(zero.singular_values, vec![0.0, 0.0]);
     }
 
