@@ -9,11 +9,9 @@
 use std::collections::BTreeSet;
 
 use super::cross_solver_comparison::ApplicabilityState;
+use super::plant_service_gate::{PowerBalanceProfile, PowerBalanceRun, PowerObservable};
 use super::robust_net_export::ModelFormValidity;
 use super::{EvidenceClass, ModelUse};
-use super::plant_service_gate::{
-    PowerBalanceProfile, PowerBalanceRun, PowerObservable,
-};
 
 pub const MODEL_DISCREPANCY_VERSION: &str = "fusion-model-discrepancy/0.1";
 pub const COVERAGE_BASIS_POINTS: u32 = 10_000;
@@ -303,13 +301,7 @@ pub fn evaluate_model_discrepancy(
     parametric: Option<&ParametricLowerBoundReceipt>,
 ) -> ModelDiscrepancyReport {
     let mut diagnostics = validate_profile(profile);
-    validate_target_and_run(
-        profile,
-        target,
-        power_profile,
-        power_run,
-        &mut diagnostics,
-    );
+    validate_target_and_run(profile, target, power_profile, power_run, &mut diagnostics);
     validate_residuals(profile, target, residuals, &mut diagnostics);
     validate_applicability(profile, target, power_run, applicability, &mut diagnostics);
 
@@ -390,10 +382,8 @@ pub fn evaluate_model_discrepancy(
         ApplicabilityState::InDeclaredDomain => {}
     }
 
-    let rank = conformal_order_statistic_rank(
-        residuals.len(),
-        profile.discrepancy_coverage_basis_points,
-    );
+    let rank =
+        conformal_order_statistic_rank(residuals.len(), profile.discrepancy_coverage_basis_points);
     if residuals.len() < profile.minimum_calibration_samples {
         return report(
             profile,
@@ -662,7 +652,9 @@ fn validate_target_and_run(
         diagnostics.push(ModelDiscrepancyDiagnostic::InputDigestMismatch);
     }
     if target.geometry_sha256.trim().is_empty()
-        || !profile.allowed_geometry_sha256.contains(&target.geometry_sha256)
+        || !profile
+            .allowed_geometry_sha256
+            .contains(&target.geometry_sha256)
     {
         diagnostics.push(ModelDiscrepancyDiagnostic::GeometryOutsideDomain);
     }
@@ -817,8 +809,7 @@ fn validate_applicability(
     if !is_sha256(&receipt.evidence_sha256) {
         diagnostics.push(ModelDiscrepancyDiagnostic::ApplicabilityEvidenceDigestInvalid);
     }
-    if receipt.solver_id != profile.solver_id
-        || receipt.solver_revision != profile.solver_revision
+    if receipt.solver_id != profile.solver_id || receipt.solver_revision != profile.solver_revision
     {
         diagnostics.push(ModelDiscrepancyDiagnostic::ApplicabilityModelMismatch);
     }
@@ -873,9 +864,7 @@ fn validate_parametric(
     if !is_sha256(&receipt.receipt_sha256) {
         diagnostics.push(ModelDiscrepancyDiagnostic::ParametricReceiptDigestInvalid);
     }
-    if !is_sha256(&receipt.evidence_sha256)
-        || !is_sha256(&receipt.assumption_manifest_sha256)
-    {
+    if !is_sha256(&receipt.evidence_sha256) || !is_sha256(&receipt.assumption_manifest_sha256) {
         diagnostics.push(ModelDiscrepancyDiagnostic::ParametricEvidenceDigestInvalid);
     }
     if receipt.run_id != run.run_id {
@@ -984,9 +973,7 @@ fn is_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::plant_service_gate::{
-        PowerBalanceProfile, PowerBalanceRun, PowerTermEvidence,
-    };
+    use crate::plant_service_gate::{PowerBalanceProfile, PowerBalanceRun, PowerTermEvidence};
 
     fn sha(character: char) -> String {
         character.to_string().repeat(64)
@@ -1180,7 +1167,13 @@ mod tests {
 
     fn measured_residuals(count: usize) -> Vec<CalibrationResidual> {
         (1..=count)
-            .map(|index| residual(index, index as f64 / 2.0, EvidenceClass::MeasuredObservation))
+            .map(|index| {
+                residual(
+                    index,
+                    index as f64 / 2.0,
+                    EvidenceClass::MeasuredObservation,
+                )
+            })
             .collect()
     }
 
@@ -1237,7 +1230,10 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert_eq!(report.disposition, ModelDiscrepancyDisposition::SyntheticOnly);
+        assert_eq!(
+            report.disposition,
+            ModelDiscrepancyDisposition::SyntheticOnly
+        );
         assert_eq!(report.model_form_validity, ModelFormValidity::Unknown);
         assert_eq!(report.adjusted_lower_bound_mwe, Some(100.5));
     }
@@ -1271,7 +1267,10 @@ mod tests {
             &applicability,
             Some(&parametric()),
         );
-        assert_eq!(report.disposition, ModelDiscrepancyDisposition::ApplicabilityUnknown);
+        assert_eq!(
+            report.disposition,
+            ModelDiscrepancyDisposition::ApplicabilityUnknown
+        );
         assert_eq!(report.adjusted_lower_bound_mwe, None);
     }
 
@@ -1287,10 +1286,15 @@ mod tests {
             &applicability,
             Some(&parametric()),
         );
-        assert_eq!(report.disposition, ModelDiscrepancyDisposition::NotEvaluable);
-        assert!(report
-            .diagnostics
-            .contains(&ModelDiscrepancyDiagnostic::ApplicabilityEvidenceNotIndependent));
+        assert_eq!(
+            report.disposition,
+            ModelDiscrepancyDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelDiscrepancyDiagnostic::ApplicabilityEvidenceNotIndependent)
+        );
     }
 
     #[test]
@@ -1303,7 +1307,10 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert_eq!(report.disposition, ModelDiscrepancyDisposition::InsufficientCalibration);
+        assert_eq!(
+            report.disposition,
+            ModelDiscrepancyDisposition::InsufficientCalibration
+        );
         assert_eq!(report.conformal_rank, Some(19));
         assert_eq!(report.discrepancy_bound_mwe, None);
     }
@@ -1341,8 +1348,14 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert_eq!(report.disposition, ModelDiscrepancyDisposition::MaterialDiscrepancy);
-        assert_eq!(report.model_form_validity, ModelFormValidity::MaterialDiscrepancy);
+        assert_eq!(
+            report.disposition,
+            ModelDiscrepancyDisposition::MaterialDiscrepancy
+        );
+        assert_eq!(
+            report.model_form_validity,
+            ModelFormValidity::MaterialDiscrepancy
+        );
         assert_eq!(report.adjusted_lower_bound_mwe, None);
     }
 
@@ -1358,8 +1371,15 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert_eq!(report.disposition, ModelDiscrepancyDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&ModelDiscrepancyDiagnostic::DuplicateEpisode));
+        assert_eq!(
+            report.disposition,
+            ModelDiscrepancyDisposition::NotEvaluable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelDiscrepancyDiagnostic::DuplicateEpisode)
+        );
     }
 
     #[test]
@@ -1374,7 +1394,11 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert!(report.diagnostics.contains(&ModelDiscrepancyDiagnostic::DuplicateCluster));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelDiscrepancyDiagnostic::DuplicateCluster)
+        );
     }
 
     #[test]
@@ -1389,9 +1413,11 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert!(report
-            .diagnostics
-            .contains(&ModelDiscrepancyDiagnostic::CalibrationExposureLeakage));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelDiscrepancyDiagnostic::CalibrationExposureLeakage)
+        );
     }
 
     #[test]
@@ -1406,9 +1432,11 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert!(report
-            .diagnostics
-            .contains(&ModelDiscrepancyDiagnostic::SyntheticAndMeasuredResidualMix));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelDiscrepancyDiagnostic::SyntheticAndMeasuredResidualMix)
+        );
     }
 
     #[test]
@@ -1422,9 +1450,11 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert!(report
-            .diagnostics
-            .contains(&ModelDiscrepancyDiagnostic::SolverRevisionMismatch));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelDiscrepancyDiagnostic::SolverRevisionMismatch)
+        );
     }
 
     #[test]
@@ -1439,9 +1469,11 @@ mod tests {
             &applicability,
             Some(&parametric()),
         );
-        assert!(report
-            .diagnostics
-            .contains(&ModelDiscrepancyDiagnostic::ApplicabilityOutputMismatch));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelDiscrepancyDiagnostic::ApplicabilityOutputMismatch)
+        );
     }
 
     #[test]
@@ -1456,9 +1488,11 @@ mod tests {
             &applicability(),
             Some(&parametric),
         );
-        assert!(report
-            .diagnostics
-            .contains(&ModelDiscrepancyDiagnostic::ParametricOutputMismatch));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelDiscrepancyDiagnostic::ParametricOutputMismatch)
+        );
     }
 
     #[test]
@@ -1473,9 +1507,11 @@ mod tests {
             &applicability(),
             Some(&parametric),
         );
-        assert!(report
-            .diagnostics
-            .contains(&ModelDiscrepancyDiagnostic::ParametricLowerBoundAbovePointEstimate));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelDiscrepancyDiagnostic::ParametricLowerBoundAbovePointEstimate)
+        );
     }
 
     #[test]
@@ -1500,7 +1536,10 @@ mod tests {
         );
         assert_eq!(first.discrepancy_bound_mwe, second.discrepancy_bound_mwe);
         assert_eq!(first.conformal_rank, second.conformal_rank);
-        assert_eq!(first.combined_coverage_floor_basis_points, second.combined_coverage_floor_basis_points);
+        assert_eq!(
+            first.combined_coverage_floor_basis_points,
+            second.combined_coverage_floor_basis_points
+        );
     }
 
     #[test]
@@ -1515,9 +1554,11 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert!(report
-            .diagnostics
-            .contains(&ModelDiscrepancyDiagnostic::ResidualGeometryOutsideDomain));
+        assert!(
+            report
+                .diagnostics
+                .contains(&ModelDiscrepancyDiagnostic::ResidualGeometryOutsideDomain)
+        );
     }
 
     #[test]
@@ -1530,7 +1571,10 @@ mod tests {
             &applicability(),
             None,
         );
-        assert_eq!(report.disposition, ModelDiscrepancyDisposition::NotEvaluable);
+        assert_eq!(
+            report.disposition,
+            ModelDiscrepancyDisposition::NotEvaluable
+        );
         assert_eq!(report.adjusted_lower_bound_mwe, None);
     }
 
@@ -1546,7 +1590,10 @@ mod tests {
             &applicability(),
             Some(&parametric()),
         );
-        assert_eq!(report.disposition, ModelDiscrepancyDisposition::QualifiedWithinDeclaredDomain);
+        assert_eq!(
+            report.disposition,
+            ModelDiscrepancyDisposition::QualifiedWithinDeclaredDomain
+        );
 
         profile.discrepancy_tolerance_inclusive = false;
         let report = evaluate(
