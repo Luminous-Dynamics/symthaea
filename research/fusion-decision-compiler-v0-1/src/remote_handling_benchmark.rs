@@ -250,7 +250,10 @@ pub fn summarize_remote_handling_benchmark(
         .iter()
         .filter(|trial| trial.status == TrialStatus::RightCensored)
         .count();
-    let safe_terminal = trials.iter().filter(|trial| trial.safe_terminal_state).count();
+    let safe_terminal = trials
+        .iter()
+        .filter(|trial| trial.safe_terminal_state)
+        .count();
     let unsafe_terminal = attempted.saturating_sub(safe_terminal);
 
     let completion_fraction = (attempted > 0).then_some(completed as f64 / attempted as f64);
@@ -266,10 +269,7 @@ pub fn summarize_remote_handling_benchmark(
         .iter()
         .filter_map(|trial| trial.measured_alignment_error_mm)
         .collect();
-    let maximum_alignment_error_mm = alignment_values
-        .iter()
-        .copied()
-        .reduce(f64::max);
+    let maximum_alignment_error_mm = alignment_values.iter().copied().reduce(f64::max);
     let alignment_tolerance_failures = alignment_values
         .iter()
         .filter(|value| **value > manifest.alignment_tolerance_mm)
@@ -294,10 +294,7 @@ pub fn summarize_remote_handling_benchmark(
     };
 
     let sum_u32 = |select: fn(&RemoteHandlingTrial) -> u32| -> u64 {
-        trials
-            .iter()
-            .map(|trial| u64::from(select(trial)))
-            .sum()
+        trials.iter().map(|trial| u64::from(select(trial))).sum()
     };
     let sum_operation = |select: fn(&OperationTrialEvent) -> u64| -> u64 {
         trials
@@ -317,12 +314,8 @@ pub fn summarize_remote_handling_benchmark(
     let quantile_upper = if sorted_durations.is_empty() {
         None
     } else {
-        upper_order_statistic_index(
-            sorted_durations.len(),
-            quantile,
-            confidence,
-        )
-        .map(|one_based_index| sorted_durations[one_based_index - 1])
+        upper_order_statistic_index(sorted_durations.len(), quantile, confidence)
+            .map(|one_based_index| sorted_durations[one_based_index - 1])
     };
 
     RemoteHandlingBenchmarkReport {
@@ -387,7 +380,10 @@ fn validate_manifest(manifest: &RemoteHandlingBenchmarkManifest) -> Vec<Benchmar
         diagnostics.push(BenchmarkDiagnostic::InvalidTaskScopeDigest);
     }
     if manifest.required_operation_ids.is_empty()
-        || manifest.required_operation_ids.iter().any(|id| id.trim().is_empty())
+        || manifest
+            .required_operation_ids
+            .iter()
+            .any(|id| id.trim().is_empty())
     {
         diagnostics.push(BenchmarkDiagnostic::EmptyRequiredOperation);
     }
@@ -534,7 +530,9 @@ fn validate_trials(
             }
         }
         if trial.status == TrialStatus::Completed
-            && !required.iter().all(|operation_id| seen_operations.contains(operation_id))
+            && !required
+                .iter()
+                .all(|operation_id| seen_operations.contains(operation_id))
         {
             diagnostics.push(BenchmarkDiagnostic::MissingCompletedOperation);
         }
@@ -634,12 +632,15 @@ fn log_sum_binomial(n: usize, p: f64, start: usize, end: usize) -> f64 {
     let log_q = (1.0 - p).ln();
     let mut logs = Vec::with_capacity(end - start + 1);
     for k in start..=end {
-        logs.push(
-            log_choose(k) + k as f64 * log_p + (n - k) as f64 * log_q,
-        );
+        logs.push(log_choose(k) + k as f64 * log_p + (n - k) as f64 * log_q);
     }
     let maximum = logs.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    maximum + logs.iter().map(|value| (value - maximum).exp()).sum::<f64>().ln()
+    maximum
+        + logs
+            .iter()
+            .map(|value| (value - maximum).exp())
+            .sum::<f64>()
+            .ln()
 }
 
 fn is_sha256(value: &str) -> bool {
@@ -670,7 +671,15 @@ mod tests {
             environment_profile_id: "dry-mockup-envelope-v1".to_string(),
             environment_profile_sha256: sha('e'),
             task_scope_sha256: sha('f'),
-            required_operation_ids: vec!["isolate".to_string(), "disconnect".to_string(), "extract".to_string(), "install".to_string(), "reconnect".to_string(), "requalify".to_string(), "restart".to_string()],
+            required_operation_ids: vec![
+                "isolate".to_string(),
+                "disconnect".to_string(),
+                "extract".to_string(),
+                "install".to_string(),
+                "reconnect".to_string(),
+                "requalify".to_string(),
+                "restart".to_string(),
+            ],
             operator_competency_stratum: "qualified-remote-handling-team-level-2".to_string(),
             clock_synchronization_ref: "ptp-clock-calibration-v1".to_string(),
             metrology_calibration_ref: "laser-tracker-calibration-v1".to_string(),
@@ -725,7 +734,11 @@ mod tests {
             attempt_duration_seconds: duration,
             status,
             safe_terminal_state: status != TrialStatus::Failed,
-            operation_events: if status == TrialStatus::Completed { operations } else { Vec::new() },
+            operation_events: if status == TrialStatus::Completed {
+                operations
+            } else {
+                Vec::new()
+            },
             measured_alignment_error_mm: Some(0.2),
             dropped_grasp_count: 0,
             collision_contact_alarm_count: 0,
@@ -737,21 +750,33 @@ mod tests {
 
     fn thirty_successful_trials() -> Vec<RemoteHandlingTrial> {
         (0..30)
-            .map(|index| trial(&format!("trial-{index:02}"), 600 + index as u64, TrialStatus::Completed))
+            .map(|index| {
+                trial(
+                    &format!("trial-{index:02}"),
+                    600 + index as u64,
+                    TrialStatus::Completed,
+                )
+            })
             .collect()
     }
 
     #[test]
     fn thirty_trials_support_distribution_free_p90_upper_bound() {
         let report = summarize_remote_handling_benchmark(&manifest(), &thirty_successful_trials());
-        assert_eq!(report.disposition, BenchmarkDisposition::ValidBenchmarkSummary);
+        assert_eq!(
+            report.disposition,
+            BenchmarkDisposition::ValidBenchmarkSummary
+        );
         assert_eq!(report.attempted_trials, 30);
         assert_eq!(report.completed_trials, 30);
         assert_eq!(report.completion_fraction, Some(1.0));
         assert!(report.completion_fraction_one_sided_lower_bound.unwrap() > 0.90);
         assert_eq!(report.completed_duration_p50_seconds, Some(614));
         assert_eq!(report.completed_duration_p90_seconds, Some(626));
-        assert_eq!(report.completion_time_quantile_upper_confidence_seconds, Some(629));
+        assert_eq!(
+            report.completion_time_quantile_upper_confidence_seconds,
+            Some(629)
+        );
     }
 
     #[test]
@@ -774,12 +799,24 @@ mod tests {
     #[test]
     fn small_sample_does_not_emit_p90_upper_confidence_bound() {
         let trials: Vec<_> = (0..8)
-            .map(|index| trial(&format!("small-{index}"), 100 + index, TrialStatus::Completed))
+            .map(|index| {
+                trial(
+                    &format!("small-{index}"),
+                    100 + index,
+                    TrialStatus::Completed,
+                )
+            })
             .collect();
         let report = summarize_remote_handling_benchmark(&manifest(), &trials);
-        assert_eq!(report.disposition, BenchmarkDisposition::ValidBenchmarkSummary);
+        assert_eq!(
+            report.disposition,
+            BenchmarkDisposition::ValidBenchmarkSummary
+        );
         assert_eq!(report.completed_duration_p90_seconds, Some(107));
-        assert_eq!(report.completion_time_quantile_upper_confidence_seconds, None);
+        assert_eq!(
+            report.completion_time_quantile_upper_confidence_seconds,
+            None
+        );
     }
 
     #[test]
@@ -788,7 +825,11 @@ mod tests {
         trials[0].geometry_sha256 = sha('9');
         let report = summarize_remote_handling_benchmark(&manifest(), &trials);
         assert_eq!(report.disposition, BenchmarkDisposition::NotEvaluable);
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::GeometryMismatch));
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::GeometryMismatch)
+        );
     }
 
     #[test]
@@ -796,7 +837,11 @@ mod tests {
         let mut trials = thirty_successful_trials();
         trials[1].raw_data_sha256 = trials[0].raw_data_sha256.clone();
         let report = summarize_remote_handling_benchmark(&manifest(), &trials);
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::ReusedRawArtifactDigest));
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::ReusedRawArtifactDigest)
+        );
     }
 
     #[test]
@@ -804,7 +849,11 @@ mod tests {
         let mut trials = thirty_successful_trials();
         trials[1].trial_id = trials[0].trial_id.clone();
         let report = summarize_remote_handling_benchmark(&manifest(), &trials);
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::DuplicateTrialIdentity));
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::DuplicateTrialIdentity)
+        );
     }
 
     #[test]
@@ -812,7 +861,11 @@ mod tests {
         let mut trials = thirty_successful_trials();
         trials[0].operation_events.pop();
         let report = summarize_remote_handling_benchmark(&manifest(), &trials);
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::MissingCompletedOperation));
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::MissingCompletedOperation)
+        );
     }
 
     #[test]
@@ -820,7 +873,11 @@ mod tests {
         let mut trials = thirty_successful_trials();
         trials[0].safe_terminal_state = false;
         let report = summarize_remote_handling_benchmark(&manifest(), &trials);
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::CompletedWithoutSafeTerminalState));
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::CompletedWithoutSafeTerminalState)
+        );
     }
 
     #[test]
@@ -829,8 +886,16 @@ mod tests {
         trials[0].profile_sha256 = sha('9');
         trials[1].procedure_sha256 = sha('8');
         let report = summarize_remote_handling_benchmark(&manifest(), &trials);
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::ProfileIdentityMismatch));
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::ProcedureDigestMismatch));
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::ProfileIdentityMismatch)
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::ProcedureDigestMismatch)
+        );
     }
 
     #[test]
@@ -838,7 +903,11 @@ mod tests {
         let mut trials = thirty_successful_trials();
         trials[0].evidence_class = BenchmarkEvidenceClass::KinematicSimulation;
         let report = summarize_remote_handling_benchmark(&manifest(), &trials);
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::EvidenceClassMismatch));
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::EvidenceClassMismatch)
+        );
     }
 
     #[test]
@@ -847,8 +916,16 @@ mod tests {
         trials[0].metrology_calibration_ref = None;
         trials[1].clock_synchronization_ref = "different-clock".to_string();
         let report = summarize_remote_handling_benchmark(&manifest(), &trials);
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::MissingMetrologyCalibration));
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::ClockSynchronizationMismatch));
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::MissingMetrologyCalibration)
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::ClockSynchronizationMismatch)
+        );
     }
 
     #[test]
@@ -899,6 +976,10 @@ mod tests {
         let mut trials = thirty_successful_trials();
         trials[0].operation_events[0].outcome = OperationTrialOutcome::Failed;
         let report = summarize_remote_handling_benchmark(&manifest(), &trials);
-        assert!(report.diagnostics.contains(&BenchmarkDiagnostic::FailedOperationInCompletedTrial));
+        assert!(
+            report
+                .diagnostics
+                .contains(&BenchmarkDiagnostic::FailedOperationInCompletedTrial)
+        );
     }
 }
