@@ -94,9 +94,9 @@
       "world_count_before": 4,
       "world_count_after": 3,
       "remaining_world_ids": [
-        "safe",
         "hazard-a",
-        "hazard-b"
+        "hazard-b",
+        "safe"
       ],
       "residual_risk_bps": 3334,
       "unsafe_probability_weight_bps": 3000,
@@ -241,10 +241,10 @@
       "world_count_before": 4,
       "world_count_after": 4,
       "remaining_world_ids": [
-        "safe",
         "hazard-a",
+        "hazard-ab",
         "hazard-b",
-        "hazard-ab"
+        "safe"
       ],
       "residual_risk_bps": 4000,
       "unsafe_probability_weight_bps": 4000,
@@ -288,10 +288,10 @@
       "world_count_before": 4,
       "world_count_after": 4,
       "remaining_world_ids": [
-        "safe",
         "hazard-a",
+        "hazard-ab",
         "hazard-b",
-        "hazard-ab"
+        "safe"
       ],
       "residual_risk_bps": 0,
       "unsafe_probability_weight_bps": 0,
@@ -332,10 +332,10 @@
       "world_count_before": 4,
       "world_count_after": 4,
       "remaining_world_ids": [
-        "safe",
         "hazard-a",
+        "hazard-ab",
         "hazard-b",
-        "hazard-ab"
+        "safe"
       ],
       "residual_risk_bps": 4000,
       "unsafe_probability_weight_bps": 4000,
@@ -457,8 +457,8 @@
       "world_count_before": 4,
       "world_count_after": 2,
       "remaining_world_ids": [
-        "safe",
-        "hazard-a"
+        "hazard-a",
+        "safe"
       ],
       "residual_risk_bps": 2000,
       "unsafe_probability_weight_bps": 1500,
@@ -525,10 +525,10 @@
       "world_count_before": 4,
       "world_count_after": 4,
       "remaining_world_ids": [
-        "safe",
         "hazard-a",
+        "hazard-ab",
         "hazard-b",
-        "hazard-ab"
+        "safe"
       ],
       "residual_risk_bps": 1000,
       "unsafe_probability_weight_bps": 1000,
@@ -569,10 +569,10 @@
       "world_count_before": 4,
       "world_count_after": 4,
       "remaining_world_ids": [
-        "safe",
         "hazard-a",
+        "hazard-ab",
         "hazard-b",
-        "hazard-ab"
+        "safe"
       ],
       "residual_risk_bps": 1000,
       "unsafe_probability_weight_bps": 1000,
@@ -613,8 +613,8 @@
       "world_count_before": 4,
       "world_count_after": 2,
       "remaining_world_ids": [
-        "safe",
-        "hazard-a"
+        "hazard-a",
+        "safe"
       ],
       "residual_risk_bps": 2000,
       "unsafe_probability_weight_bps": 1500,
@@ -670,10 +670,10 @@
       "world_count_before": 4,
       "world_count_after": 4,
       "remaining_world_ids": [
-        "safe",
         "hazard-a",
+        "hazard-ab",
         "hazard-b",
-        "hazard-ab"
+        "safe"
       ],
       "residual_risk_bps": 4000,
       "unsafe_probability_weight_bps": 4000,
