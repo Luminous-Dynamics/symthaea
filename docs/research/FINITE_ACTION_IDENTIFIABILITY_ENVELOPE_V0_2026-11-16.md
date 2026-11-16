@@ -21,16 +21,11 @@ This is a finite evaluator oracle, not a posterior sampler or an action-selectio
 
 Each action a has:
 - known positive Gaussian measurement standard deviation sigma_a;
-- positive cost per independent replicate c_a;
-- response quantization quantum q_a, used only for signature canonicalization.
+- positive cost per independent replicate c_a.
 
 Each mechanism m declares an evaluator-side mean mu_(m,a) for every action. Actions and mechanisms are canonicalized by their IDs before reporting.
 
-The response signature coordinate is:
-
-    s_(m,a) = round(mu_(m,a) / q_a)
-
-Mechanisms with identical signature vectors belong to the same finite-action equivalence class. q_a is a declared deterministic numerical-resolution contract; it is not a noise scale or a material-effect threshold. The quantization is intentionally a stable bucket relation (rather than a non-transitive pairwise “close enough” comparison). Changing q_a changes the declared equivalence relation and must therefore be fixed before evaluation.
+The response signature preserves exact finite IEEE-754 mean identity per action, canonicalizing +0 and -0 to the same representation. Any nonzero mean difference is a distinct mechanism alternative, however small relative to measurement noise. This avoids turning a practical detection-limit problem into a false claim of mathematical equivalence. The predicted means and canonical serialization are part of the evaluator input manifest.
 
 For a pair of mechanisms, a replication vector r_a yields simple Gaussian likelihood-ratio information:
 
@@ -65,7 +60,7 @@ The report includes class membership and multiplicity, irreducible equivalent-pa
 The Rust module provides:
 - strict finite/unique input validation;
 - canonical sorting independent of caller order;
-- per-action quantized response signatures;
+- exact per-action response signatures (signed zero canonicalized);
 - deterministic equivalence classes;
 - exact bounded enumeration for at most six actions, twelve mechanisms and sixteen total observations;
 - conservative family-wise pairwise information requirement;
@@ -80,7 +75,7 @@ Tests cover:
 - a multi-mechanism case where each action alone leaves an unresolved pair but the joint schedule separates all classes;
 - family-wise alpha tightening as class count increases;
 - order-independent deterministic reports;
-- numerical response quantization kept distinct from measurement noise;
+- a tiny nonzero mean difference stays a distinct, potentially underpowered alternative;
 - malformed/non-finite inputs fail closed.
 
 ## 5. What this does not establish
