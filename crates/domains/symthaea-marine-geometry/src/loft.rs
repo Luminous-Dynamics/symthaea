@@ -439,7 +439,10 @@ fn validate_section_family(artifact: &SectionFamilyArtifact) -> Result<usize, Ve
                 current[1] * next[2] - current[2] * next[1]
             })
             .sum();
-        let area_tolerance = coordinate_tolerance * coordinate_tolerance;
+        // Cross products have area units; use coordinate tolerance times
+        // the section length scale rather than squaring a length tolerance.
+        let section_scale = artifact.beam_m.max(artifact.draft_m).max(1.0);
+        let area_tolerance = coordinate_tolerance * section_scale;
         if !signed_area_twice.is_finite() || signed_area_twice >= -area_tolerance {
             violation(
                 &mut violations,
