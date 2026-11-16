@@ -910,3 +910,32 @@ Three 2026 published numerical studies establish a stronger flexibility baseline
 The new AMMONIA-SUPPLY-CHAIN-DYNAMIC-FLEX-001 target requires plant-level accepted NH3 from 10–120% load, up to 3%/min ramps, and year-long renewable-profile replay with full H2/N2 dynamics, storage, pressure/temperature fatigue, rejected batches and product contract. A fast plasma-source ramp alone is insufficient. Plasma gets no flexibility advantage unless it improves full-chain delivered service, storage/buffering, LCOA, emissions or lifecycle wear against the matched dynamic-Haber–Bosch strategies.
 
 The source register now preserves the methane PPH result and three dynamic Haber–Bosch comparison records separately, with six adversarial controls and two new benchmark targets.
+
+
+## 9.17 Hybrid plasma–thermal APPJ methane conversion — 2026-11-16
+
+Sabir et al., *Methane conversion by a plasma-assisted process: Role of hybrid plasma–thermal configurations in controlling conversion pathways*, International Journal of Hydrogen Energy 285 (2026), article 158179, DOI https://doi.org/10.1016/j.ijhydene.2026.158179.
+
+The paper studies thermally assisted atmospheric-pressure plasma jets combining methane cracking with non-oxidative methane coupling. The publisher abstract reports:
+- placing the plasma directly within the heated zone increases methane conversion by more than fivefold relative to the compared configuration;
+- the lowest reported carbon deposition is around 36% over the investigated temperature range;
+- the product slate includes H2, C2-C3 hydrocarbons and solid carbon;
+- recovered solid carbon exhibits turbostratic nanostructural features.
+
+This is a distinct architecture from the DBD + pulsed-resistive-heating + CO2-regeneration approach in Guo et al. (#12430). It is also distinct from the microwave reverse-vortex route and from conventional methane pyrolysis.
+
+### Evidence and benchmark boundaries
+
+- The >5× result is a **relative configuration gain**, not an absolute conversion percentage.
+- The ~36% value is a source-specific carbon-deposition measure. It is **not** feed-carbon recovery, collected solid mass or accepted carbon product yield.
+- The abstract does not establish complete grid-to-product energy, accepted H2 purity/pressure/rate, species-resolved C2-C3 output, or long-duration availability.
+- Turbostratic structure is a characterization result, not commercial-grade qualification or proven offtake.
+- The source-specific APPJ result must not be combined with the 27 kWh/kg H2 pure-methane point or 95% conversion / 100% selectivity diluted-feed point from the separate pulsed-heating paper.
+
+### New research programme
+
+The specific APPJ programme is tracked in [CH4-PLASMA-THERMAL-APPJ-001 #12451](https://github.com/Luminous-Dynamics/symthaea/issues/12451). It tests a matched factorial comparison of plasma off/on against thermal zone off/on, then separates plasma-outside-hot-zone from plasma-inside-hot-zone placement. This distinguishes spatial plasma–thermal synergy from simply adding heat or electrical power.
+
+The multi-product benchmark treats accepted H2, each C2-C3 species and solid carbon as different product streams. Full grid-side energy, mass closure, quench, separation, product quality, carbon morphology/grade, fouling and maintainability remain required before a process advantage can be claimed.
+
+The machine-readable case is `CH4-PLASMA-THERMAL-APPJ-2026`. Its source record preserves relative conversion, carbon deposition and turbostratic carbon characterization as distinct source claims; absolute conversion, carbon recovery, product rates and system energy remain unknown.
