@@ -168,6 +168,45 @@ pub struct CompletenessReport {
     pub late_breach_candidates_examined: usize,
 }
 
+/// A completeness report produced only after replaying the append-only
+/// progress/arrival history and verifying every derived index.
+///
+/// This certifies consistency of this in-memory ledger snapshot. It does not
+/// authenticate a physical source or prove that a source's progress claim is
+/// truthful; those require a separate source-attestation contract.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct VerifiedCompletenessReport {
+    report: CompletenessReport,
+    ledger_sha256: [u8; 32],
+    progress_revision_count: usize,
+    event_arrival_count: usize,
+    late_breach_count: usize,
+}
+
+impl VerifiedCompletenessReport {
+    /// The completeness result established by full history replay.
+    pub fn report(&self) -> &CompletenessReport {
+        &self.report
+    }
+
+    /// Digest of the exact append-only ledger state that was replay-verified.
+    pub fn ledger_sha256(&self) -> [u8; 32] {
+        self.ledger_sha256
+    }
+
+    pub fn progress_revision_count(&self) -> usize {
+        self.progress_revision_count
+    }
+
+    pub fn event_arrival_count(&self) -> usize {
+        self.event_arrival_count
+    }
+
+    pub fn late_breach_count(&self) -> usize {
+        self.late_breach_count
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum WatermarkError {
     ZeroSourceIdentity,
@@ -623,15 +662,22 @@ impl SourceWatermarkLedger {
         interval_start_us: i64,
         interval_end_exclusive_us: i64,
         known_at_us: i64,
-    ) -> Result<CompletenessReport, WatermarkError> {
+    ) -> Result<VerifiedCompletenessReport, WatermarkError> {
         self.verify_consistency()?;
-        self.completeness(
+        let report = self.completeness(
             entity_id,
             required_sources,
             interval_start_us,
             interval_end_exclusive_us,
             known_at_us,
-        )
+        )?;
+        Ok(VerifiedCompletenessReport {
+            report,
+            ledger_sha256: self.state_sha256(),
+            progress_revision_count: self.revisions.len(),
+            event_arrival_count: self.event_arrivals.len(),
+            late_breach_count: self.late_breaches.len(),
+        })
     }
 
     /// Observe the arrival of an event. On-time events are not stored here;
@@ -1000,8 +1046,12 @@ mod tests {
         let audited = ledger
             .completeness_verified(1, &[source(1), source(2)], 0, 100, 20)
             .unwrap();
-        assert_eq!(indexed, audited);
+        assert_eq!(indexed, *audited.report());
         assert_eq!(indexed.verdict, CompletenessVerdict::Contested);
+        assert_eq!(audited.ledger_sha256(), ledger.state_sha256());
+        assert_eq!(audited.progress_revision_count(), 2);
+        assert_eq!(audited.event_arrival_count(), 1);
+        assert_eq!(audited.late_breach_count(), 1);
     }
 
     #[test]
@@ -1074,9 +1124,11 @@ mod tests {
                         .completeness_verified(1, required, start, end, known_at)
                         .expect("full-history audit query");
                     assert_eq!(
-                        indexed, audited,
+                        indexed,
+                        *audited.report(),
                         "index/audit mismatch: required={required:?}, interval=[{start},{end}), known_at={known_at}"
                     );
+                    assert_eq!(audited.ledger_sha256(), ledger.state_sha256());
                 }
             }
         }
