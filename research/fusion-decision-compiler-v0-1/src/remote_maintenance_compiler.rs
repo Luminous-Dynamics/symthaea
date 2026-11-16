@@ -772,6 +772,14 @@ fn validate_interface_bindings(
         }) {
             diagnostics.push(DfrmDiagnostic::WrongReconnectAction);
         }
+        for operation in disconnect.into_iter().chain(reconnect) {
+            if !operation
+                .required_capabilities
+                .contains(&interface.remote_actuation_capability)
+            {
+                diagnostics.push(DfrmDiagnostic::ToolCapabilityMissing);
+            }
+        }
 
         let integrity = operations.get(binding.integrity_test_operation_id.as_str());
         if integrity.is_none() {
@@ -800,6 +808,15 @@ fn validate_interface_bindings(
         if !interfaces
             .get(binding.interface_id.as_str())
             .is_some_and(|interface| interface.is_assembly_side)
+        {
+            diagnostics.push(DfrmDiagnostic::UnknownBindingInterface);
+        }
+    }
+    for operation in &plan.operations {
+        if let Some(interface_id) = operation.interface_id.as_deref()
+            && !interfaces
+                .get(interface_id)
+                .is_some_and(|interface| interface.is_assembly_side)
         {
             diagnostics.push(DfrmDiagnostic::UnknownBindingInterface);
         }
