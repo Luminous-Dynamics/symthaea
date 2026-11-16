@@ -72,7 +72,6 @@ pub struct LoadingSweepReceipt {
     pub sweep_digest_blake3: String,
 }
 
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UprightMassBalanceRequest {
@@ -729,7 +728,6 @@ pub fn verify_loading_sweep_receipt(
     Ok(())
 }
 
-
 pub fn compute_upright_mass_balance_digest(
     receipt: &UprightMassBalanceReceipt,
 ) -> Result<String, serde_json::Error> {
@@ -814,9 +812,7 @@ pub fn solve_upright_mass_balance(
             "waterplane elevation tolerance must be finite and greater than zero metres",
         );
     }
-    if request.maximum_iterations == 0
-        || request.maximum_iterations > MAX_MASS_BALANCE_ITERATIONS
-    {
+    if request.maximum_iterations == 0 || request.maximum_iterations > MAX_MASS_BALANCE_ITERATIONS {
         push_issue(
             &mut issues,
             "iteration_limit",
@@ -842,12 +838,13 @@ pub fn solve_upright_mass_balance(
         return Err(issues);
     }
 
-    let source_digest = compute_full_envelope_spec_digest(&request.source_spec).map_err(|error| {
-        vec![SectionalReferenceIssue {
-            code: "source_spec_digest".into(),
-            detail: format!("could not serialize source full-envelope identity: {error}"),
-        }]
-    })?;
+    let source_digest =
+        compute_full_envelope_spec_digest(&request.source_spec).map_err(|error| {
+            vec![SectionalReferenceIssue {
+                code: "source_spec_digest".into(),
+                detail: format!("could not serialize source full-envelope identity: {error}"),
+            }]
+        })?;
 
     let loading_condition = |waterplane_z_m| LoadingCondition {
         condition_id: request.load_case_id.clone(),
@@ -1095,7 +1092,6 @@ mod tests {
         request
     }
 
-
     fn quadratic_beam_request(station_count: usize) -> SectionalReferenceRequest {
         assert!(station_count >= 2);
         let mut request = fixture_request();
@@ -1203,8 +1199,6 @@ mod tests {
             .unwrap()
     }
 
-
-
     fn mass_balance_fixture_request() -> UprightMassBalanceRequest {
         serde_json::from_str(include_str!(
             "../../../../docs/research/marine/fixtures/marine-upright-mass-balance-box-001.json"
@@ -1228,12 +1222,14 @@ mod tests {
         }
     }
 
-
     #[test]
     fn upright_mass_balance_json_fixture_solves_and_binds_the_exact_source() {
         let request = mass_balance_fixture_request();
         let receipt = solve_upright_mass_balance(&request).unwrap();
-        assert_eq!(receipt.source_spec_digest_blake3, compute_full_envelope_spec_digest(&request.source_spec).unwrap());
+        assert_eq!(
+            receipt.source_spec_digest_blake3,
+            compute_full_envelope_spec_digest(&request.source_spec).unwrap()
+        );
         assert!((receipt.equilibrium.waterplane_z_m).abs() < 1.0e-12);
         assert!((receipt.equilibrium.displaced_mass_tonnes - 12_300.0).abs() < 1.0e-8);
         verify_upright_mass_balance_receipt(&request, &receipt).unwrap();
@@ -1243,7 +1239,10 @@ mod tests {
     fn upright_mass_balance_solves_design_displacement_for_box_hull() {
         let request = box_mass_balance_request(12_300.0);
         let receipt = solve_upright_mass_balance(&request).unwrap();
-        assert_eq!(receipt.stop_reason, UprightMassBalanceStopReason::MassResidualWithinTolerance);
+        assert_eq!(
+            receipt.stop_reason,
+            UprightMassBalanceStopReason::MassResidualWithinTolerance
+        );
         assert!((receipt.equilibrium.waterplane_z_m - 0.0).abs() < 1.0e-12);
         assert!((receipt.equilibrium.displacement_volume_m3 - 12_000.0).abs() < 1.0e-8);
         assert!((receipt.equilibrium.displaced_mass_tonnes - 12_300.0).abs() < 1.0e-8);
@@ -1265,7 +1264,11 @@ mod tests {
     fn upright_mass_balance_rejects_unbracketed_target_mass() {
         let request = box_mass_balance_request(20_000.0);
         let errors = solve_upright_mass_balance(&request).unwrap_err();
-        assert!(errors.iter().any(|issue| issue.code == "mass_balance_not_bracketed"));
+        assert!(
+            errors
+                .iter()
+                .any(|issue| issue.code == "mass_balance_not_bracketed")
+        );
     }
 
     #[test]
@@ -1283,8 +1286,7 @@ mod tests {
         let request = box_mass_balance_request(12_300.0);
         let mut receipt = solve_upright_mass_balance(&request).unwrap();
         receipt.equilibrium.waterplane_z_m += 0.1;
-        receipt.receipt_digest_blake3 =
-            compute_upright_mass_balance_digest(&receipt).unwrap();
+        receipt.receipt_digest_blake3 = compute_upright_mass_balance_digest(&receipt).unwrap();
         assert!(verify_upright_mass_balance_receipt(&request, &receipt).is_err());
     }
 
@@ -1381,7 +1383,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn quadratic_beam_loading_converges_at_second_order_for_displacement() {
         let coarse = evaluate_loading_sweep(&quadratic_beam_request(3)).unwrap();
@@ -1413,15 +1414,12 @@ mod tests {
         let fine = evaluate_loading_sweep(&quadratic_beam_request(9)).unwrap();
         let exact_area_m2 = 5_200.0 / 3.0;
 
-        let coarse_error = (result_by_id(&coarse, "QUADRATIC-DESIGN-Z0").waterplane_area_m2
-            - exact_area_m2)
-            .abs();
-        let medium_error = (result_by_id(&medium, "QUADRATIC-DESIGN-Z0").waterplane_area_m2
-            - exact_area_m2)
-            .abs();
-        let fine_error = (result_by_id(&fine, "QUADRATIC-DESIGN-Z0").waterplane_area_m2
-            - exact_area_m2)
-            .abs();
+        let coarse_error =
+            (result_by_id(&coarse, "QUADRATIC-DESIGN-Z0").waterplane_area_m2 - exact_area_m2).abs();
+        let medium_error =
+            (result_by_id(&medium, "QUADRATIC-DESIGN-Z0").waterplane_area_m2 - exact_area_m2).abs();
+        let fine_error =
+            (result_by_id(&fine, "QUADRATIC-DESIGN-Z0").waterplane_area_m2 - exact_area_m2).abs();
 
         assert!((coarse_error - 100.0 / 3.0).abs() < 1.0e-9);
         assert!((medium_error - 25.0 / 3.0).abs() < 1.0e-9);
