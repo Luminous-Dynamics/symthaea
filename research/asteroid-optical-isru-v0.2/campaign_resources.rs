@@ -122,9 +122,6 @@ impl ResourceVector {
         Ok(())
     }
 
-    fn fits_within(&self, budget: &Self) -> bool {
-    }
-
     fn over_budget(&self, budget: &Self) -> Vec<&'static str> {
         let mut over = Vec::new();
         if self.rig_hours > budget.rig_hours {
@@ -246,9 +243,9 @@ pub fn assess_budget(
 /// every resource, with at least one strict improvement.
 pub fn dominates(lhs: &CampaignAction, rhs: &CampaignAction) -> bool {
     lhs.basis == rhs.basis
-        && lhs.decision_value + RESOURCE_TOLERANCE >= rhs.decision_value
+        && lhs.decision_value >= rhs.decision_value
         && lhs.resources.componentwise_le(&rhs.resources)
-        && (lhs.decision_value > rhs.decision_value + RESOURCE_TOLERANCE
+        && (lhs.decision_value > rhs.decision_value
             || lhs.resources.componentwise_strict(&rhs.resources))
 }
 
