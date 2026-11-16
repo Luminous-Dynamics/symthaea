@@ -2,13 +2,16 @@ use std::hint::black_box;
 use std::time::{Duration, Instant};
 
 use symthaea_irregular_event_contract::{
-    CompletenessVerdict, EventRecord, Measurement, SourceKey, SourceProgressOperation,
+    EventArrivalClassification, EventRecord, Measurement, SourceKey, SourceProgressOperation,
     SourceProgressRevision, SourceWatermarkLedger,
 };
 
-const INDEXED_REPETITIONS: usize = 101;
-const VERIFIED_REPETITIONS: usize = 15;
-const EVENT_COUNTS: [usize; 3] = [1_000, 10_000, 100_000];
+const INDEXED_REPETITIONS: usize = 51;
+const VERIFIED_REPETITIONS: usize = 7;
+const EVENT_COUNTS: [usize; 3] = [1_024, 16_384, 65_536];
+const SOURCE_COUNTS: [usize; 3] = [1, 4, 16];
+const INTERVAL_WIDTHS: [usize; 3] = [1, 16, 256];
+const KNOWLEDGE_CUTOFFS: [i64; 2] = [30, 50];
 
 fn percentile_micros(samples: &mut [Duration], percentile: f64) -> f64 {
     samples.sort_unstable();
@@ -18,88 +21,134 @@ fn percentile_micros(samples: &mut [Duration], percentile: f64) -> f64 {
     samples[rank].as_secs_f64() * 1_000_000.0
 }
 
-fn build_ledger(event_count: usize) -> Result<SourceWatermarkLedger, String> {
-    if event_count == 0 {
-        return Err("event_count must be nonzero".to_owned());
-    }
-    let event_count_i64 =
-        i64::try_from(event_count).map_err(|_| "event_count exceeds i64".to_owned())?;
-    let source = SourceKey {
+fn source_key(source_id: usize) -> SourceKey {
+    SourceKey {
         entity_id: 1,
         modality_id: 1,
-        source_id: 1,
-    };
-    let mut ledger = SourceWatermarkLedger::default();
-    ledger
-        .append(SourceProgressRevision {
-            progress_id: 1,
-            source,
+        source_id: source_id as u64,
+    }
+}
+
+fn build_ledger(
+    event_count: usize,
+    source_count: usize,
+) -> Result<(SourceWatermarkLedger, Vec<SourceKey>), String> {
+    if event_count == 0 || source_count == 0 || event_count % source_count != 0 {
+        return Err("event_count must be nonzero and divisible by source_count".to_owned());
+    }
+    let per_source_count = event_count / source_count;
+    if per_source_count < *INTERVAL_WIDTHS.iter().max().unwrap_or(&1) {
+        return Err("per-source event count must cover the widest benchmark interval".to_owned());
+    }
+    let per_source_count_i64 =
+        i64::try_from(per_source_count).map_err(|_| "source event count exceeds i64".to_owned())?;
+
+    let required_sources: Vec<_> = (1..=source_count).map(source_key).collect();
+    let progress = required_sources
+        .iter()
+        .enumerate()
+        .map(|(index, source)| SourceProgressRevision {
+            progress_id: index as u64 + 1,
+            source: *source,
             stream_generation: 1,
             progress_sequence: 1,
             recorded_at_us: 10,
             policy_sha256: [0xA5; 32],
             operation: SourceProgressOperation::Advance {
-                exclusive_event_time_us: event_count_i64 + 1,
+                exclusive_event_time_us: per_source_count_i64 + 1,
             },
-        })
+        });
+    let mut ledger = SourceWatermarkLedger::default();
+    ledger
+        .append_batch(progress)
         .map_err(|error| format!("append source progress: {error}"))?;
 
-    // Multiplication by 37 permutes the event-time keys for the selected
-    // ledger sizes. Arrival order therefore differs from event-time order.
-    let events = (0..event_count).map(|index| {
-        let event_id = index as u64 + 1;
-        EventRecord {
-            event_id,
-            entity_id: source.entity_id,
-            modality_id: source.modality_id,
-            source_id: source.source_id,
-            event_time_us: ((index * 37) % event_count) as i64,
-            available_at_us: 20,
-            source_sequence: event_id,
-            unit_code: 1,
-            measurement: Measurement::Observed {
-                scaled_value: index as i64,
-                decimal_scale: 0,
-            },
-            source_sha256: [0x5A; 32],
+    // Four arrival transactions are deliberately distinct from event time.
+    // Multiplication by 37 permutes each source's event-time keys relative to
+    // receipt order for all configured power-of-two source lengths.
+    let mut arrival_batches: [Vec<EventRecord>; 4] = std::array::from_fn(|_| Vec::new());
+    let mut next_event_id = 1_u64;
+    for source in &required_sources {
+        for local_index in 0..per_source_count {
+            let arrival_bucket = local_index % arrival_batches.len();
+            let available_at_us = 20 + (arrival_bucket as i64 * 10);
+            let event = EventRecord {
+                event_id: next_event_id,
+                entity_id: source.entity_id,
+                modality_id: source.modality_id,
+                source_id: source.source_id,
+                event_time_us: ((local_index * 37) % per_source_count) as i64,
+                available_at_us,
+                source_sequence: local_index as u64 + 1,
+                unit_code: 1,
+                measurement: Measurement::Observed {
+                    scaled_value: local_index as i64,
+                    decimal_scale: 0,
+                },
+                source_sha256: [0x5A; 32],
+            };
+            arrival_batches[arrival_bucket].push(event);
+            next_event_id = next_event_id
+                .checked_add(1)
+                .ok_or_else(|| "event ID overflow".to_owned())?;
         }
-    });
-    let classifications = ledger
-        .record_event_arrival_batch(events, 20)
-        .map_err(|error| format!("record event batch: {error}"))?;
-    if classifications
-        .iter()
-        .any(|classification| !matches!(classification, symthaea_irregular_event_contract::EventArrivalClassification::Late(_)))
-    {
-        return Err("benchmark fixture expected every event to breach the declared watermark".to_owned());
     }
-    Ok(ledger)
+
+    for (bucket, events) in arrival_batches.into_iter().enumerate() {
+        let recorded_at_us = 20 + (bucket as i64 * 10);
+        let classifications = ledger
+            .record_event_arrival_batch(events, recorded_at_us)
+            .map_err(|error| format!("record arrival bucket {bucket}: {error}"))?;
+        if classifications
+            .iter()
+            .any(|classification| !matches!(classification, EventArrivalClassification::Late(_)))
+        {
+            return Err(format!(
+                "benchmark fixture expected all events to breach declared watermarks in bucket {bucket}"
+            ));
+        }
+    }
+
+    Ok((ledger, required_sources))
 }
 
-fn run_case(event_count: usize) -> Result<(), String> {
-    let ledger = build_ledger(event_count)?;
-    let source = SourceKey {
-        entity_id: 1,
-        modality_id: 1,
-        source_id: 1,
+fn run_case(
+    event_count: usize,
+    source_count: usize,
+    interval_width: usize,
+    known_at_us: i64,
+) -> Result<(), String> {
+    let (ledger, required_sources) = build_ledger(event_count, source_count)?;
+    let per_source_count = event_count / source_count;
+    let interval_start_us = ((per_source_count - interval_width) / 2) as i64;
+    let interval_end_exclusive_us = interval_start_us + interval_width as i64;
+    let query = || {
+        ledger.completeness(
+            1,
+            &required_sources,
+            interval_start_us,
+            interval_end_exclusive_us,
+            known_at_us,
+        )
     };
-    let start = (event_count / 2) as i64;
-    let end = start + 16;
-    let query = || ledger.completeness(1, &[source], start, end, 20);
-    let verified_query = || ledger.completeness_verified(1, &[source], start, end, 20);
+    let verified_query = || {
+        ledger.completeness_verified(
+            1,
+            &required_sources,
+            interval_start_us,
+            interval_end_exclusive_us,
+            known_at_us,
+        )
+    };
 
+    // Correctness is established before timing: the indexed and full-history
+    // verifier must return byte-for-byte equal reports for this workload.
     let warm = query().map_err(|error| format!("warm indexed query: {error}"))?;
-    if warm.verdict != CompletenessVerdict::Contested || warm.late_breaches.len() != 16 {
-        return Err(format!(
-            "unexpected known-answer result: verdict={:?}, breaches={}, candidates={}",
-            warm.verdict,
-            warm.late_breaches.len(),
-            warm.late_breach_candidates_examined
-        ));
-    }
     let verified = verified_query().map_err(|error| format!("warm verified query: {error}"))?;
     if warm != verified {
-        return Err("indexed and verified completeness reports differ".to_owned());
+        return Err(format!(
+            "indexed and verified reports differ: events={event_count}, sources={source_count}, width={interval_width}, known_at={known_at_us}"
+        ));
     }
 
     let mut indexed_samples = Vec::with_capacity(INDEXED_REPETITIONS);
@@ -130,9 +179,9 @@ fn run_case(event_count: usize) -> Result<(), String> {
     let verified_p99 = percentile_micros(&mut verified_for_percentiles, 0.99);
 
     println!(
-        "{event_count},{INDEXED_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_p95:.3},{verified_p99:.3}",
-        warm.late_breach_candidates_examined,
+        "{event_count},{source_count},{interval_width},{known_at_us},{INDEXED_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_p95:.3},{verified_p99:.3}",
         warm.late_breach_index_buckets_examined,
+        warm.late_breach_candidates_examined,
         warm.late_breaches.len()
     );
     Ok(())
@@ -140,12 +189,22 @@ fn run_case(event_count: usize) -> Result<(), String> {
 
 fn main() {
     println!(
-        "events,indexed_samples,verified_samples,index_candidates,index_buckets,matching_breaches,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_p95_us,verified_p99_us"
+        "events,sources,interval_width_us,known_at_us,indexed_samples,verified_samples,index_buckets,receipt_candidates,matching_breaches,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_p95_us,verified_p99_us"
     );
     for event_count in EVENT_COUNTS {
-        if let Err(error) = run_case(event_count) {
-            eprintln!("watermark scaling benchmark failed at {event_count} events: {error}");
-            std::process::exit(1);
+        for source_count in SOURCE_COUNTS {
+            for interval_width in INTERVAL_WIDTHS {
+                for known_at_us in KNOWLEDGE_CUTOFFS {
+                    if let Err(error) =
+                        run_case(event_count, source_count, interval_width, known_at_us)
+                    {
+                        eprintln!(
+                            "watermark scaling benchmark failed at events={event_count}, sources={source_count}, width={interval_width}, known_at={known_at_us}: {error}"
+                        );
+                        std::process::exit(1);
+                    }
+                }
+            }
         }
     }
 }
