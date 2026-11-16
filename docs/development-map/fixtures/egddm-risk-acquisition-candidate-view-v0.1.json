@@ -1,0 +1,253 @@
+{
+  "scenario_id": "d6.15-sequential-risk-bounded-v0.1",
+  "decision_cutoff": "2026-11-16T10:00:00Z",
+  "budget_micros": 3000,
+  "actions": [
+    {
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0
+    },
+    {
+      "action_id": "inspect-readonly",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 0
+    },
+    {
+      "action_id": "bounded-probe",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 1200
+    }
+  ],
+  "options": [
+    {
+      "option_id": "cheap-signal",
+      "available_at": "2026-11-16T09:00:00Z",
+      "estimated_cost_upper_micros": 80
+    },
+    {
+      "option_id": "gate-a",
+      "available_at": "2026-11-16T09:00:00Z",
+      "estimated_cost_upper_micros": 700
+    },
+    {
+      "option_id": "gate-b",
+      "available_at": "2026-11-16T09:00:00Z",
+      "estimated_cost_upper_micros": 900
+    },
+    {
+      "option_id": "redundant-audit",
+      "available_at": "2026-11-16T09:00:00Z",
+      "estimated_cost_upper_micros": 2000
+    },
+    {
+      "option_id": "delayed-proof",
+      "available_at": "2026-11-16T10:05:00Z",
+      "estimated_cost_upper_micros": 500
+    }
+  ],
+  "traces": [
+    {
+      "trace_id": "risk-aware-minimal",
+      "acquisitions": [
+        {
+          "option_id": "gate-a",
+          "observed_value": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:51:00Z"
+        },
+        {
+          "option_id": "gate-b",
+          "observed_value": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:54:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "cheapest-first",
+      "acquisitions": [
+        {
+          "option_id": "cheap-signal",
+          "observed_value": "clear",
+          "mode": "cold",
+          "at": "2026-11-16T09:45:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "full-revalidation",
+      "acquisitions": [
+        {
+          "option_id": "gate-a",
+          "observed_value": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:31:00Z"
+        },
+        {
+          "option_id": "gate-b",
+          "observed_value": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:33:00Z"
+        },
+        {
+          "option_id": "cheap-signal",
+          "observed_value": "clear",
+          "mode": "cold",
+          "at": "2026-11-16T09:35:00Z"
+        },
+        {
+          "option_id": "redundant-audit",
+          "observed_value": "green",
+          "mode": "cold",
+          "at": "2026-11-16T09:37:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "always-act",
+      "acquisitions": [],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "always-abstain-positive-control",
+      "acquisitions": [],
+      "decision": {
+        "kind": "defer",
+        "action_id": "inspect-readonly",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "defer-critical",
+      "acquisitions": [],
+      "decision": {
+        "kind": "defer",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 4000
+      }
+    },
+    {
+      "trace_id": "repeat-check",
+      "acquisitions": [
+        {
+          "option_id": "gate-a",
+          "observed_value": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:21:00Z"
+        },
+        {
+          "option_id": "gate-a",
+          "observed_value": "pass",
+          "mode": "warm",
+          "at": "2026-11-16T09:22:00Z"
+        },
+        {
+          "option_id": "gate-b",
+          "observed_value": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:23:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "future-evidence",
+      "acquisitions": [
+        {
+          "option_id": "gate-a",
+          "observed_value": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:40:00Z"
+        },
+        {
+          "option_id": "delayed-proof",
+          "observed_value": "valid",
+          "mode": "cold",
+          "at": "2026-11-16T10:06:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "bounded-risk-act",
+      "acquisitions": [],
+      "decision": {
+        "kind": "act",
+        "action_id": "bounded-probe",
+        "claimed_residual_risk_bps": 1000
+      }
+    },
+    {
+      "trace_id": "bounded-risk-understated",
+      "acquisitions": [],
+      "decision": {
+        "kind": "act",
+        "action_id": "bounded-probe",
+        "claimed_residual_risk_bps": 500
+      }
+    },
+    {
+      "trace_id": "one-gate-only",
+      "acquisitions": [
+        {
+          "option_id": "gate-a",
+          "observed_value": "pass",
+          "mode": "cold",
+          "at": "2026-11-16T09:40:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    },
+    {
+      "trace_id": "irrelevant-check-only",
+      "acquisitions": [
+        {
+          "option_id": "redundant-audit",
+          "observed_value": "green",
+          "mode": "cold",
+          "at": "2026-11-16T09:40:00Z"
+        }
+      ],
+      "decision": {
+        "kind": "act",
+        "action_id": "release",
+        "claimed_residual_risk_bps": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,158 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-risk-acquisition-evaluator-oracle-v0.1.schema.json",
+  "title": "EGDDM D6.15 evaluator-oracle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "actual_world_id",
+    "decision_cutoff",
+    "budget_micros",
+    "actions",
+    "worlds",
+    "options"
+  ],
+  "properties": {
+    "actual_world_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "worlds": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "world_id",
+          "probability_bps",
+          "safe_actions",
+          "observations"
+        ],
+        "properties": {
+          "world_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "probability_bps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "safe_actions": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "observations": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "option_id",
+          "available_at",
+          "cost_samples_micros"
+        ],
+        "properties": {
+          "option_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "available_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cost_samples_micros": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cold",
+              "warm",
+              "retry"
+            ],
+            "properties": {
+              "cold": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "warm": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              },
+              "retry": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "decision_cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "budget_micros": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "irreversible",
+          "hard_gate",
+          "max_residual_risk_bps"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "irreversible": {
+            "type": "boolean"
+          },
+          "hard_gate": {
+            "type": "boolean"
+          },
+          "max_residual_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    }
+  }
+}

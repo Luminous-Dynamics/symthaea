@@ -1,0 +1,194 @@
+{
+  "actual_world_id": "safe",
+  "worlds": [
+    {
+      "world_id": "safe",
+      "probability_bps": 6000,
+      "safe_actions": [
+        "release",
+        "inspect-readonly",
+        "bounded-probe"
+      ],
+      "observations": {
+        "cheap-signal": "clear",
+        "gate-a": "pass",
+        "gate-b": "pass",
+        "redundant-audit": "green",
+        "delayed-proof": "valid"
+      }
+    },
+    {
+      "world_id": "hazard-a",
+      "probability_bps": 1500,
+      "safe_actions": [
+        "inspect-readonly",
+        "bounded-probe"
+      ],
+      "observations": {
+        "cheap-signal": "clear",
+        "gate-a": "pass",
+        "gate-b": "fail",
+        "redundant-audit": "green",
+        "delayed-proof": "valid"
+      }
+    },
+    {
+      "world_id": "hazard-b",
+      "probability_bps": 1500,
+      "safe_actions": [
+        "inspect-readonly",
+        "bounded-probe"
+      ],
+      "observations": {
+        "cheap-signal": "clear",
+        "gate-a": "fail",
+        "gate-b": "pass",
+        "redundant-audit": "green",
+        "delayed-proof": "valid"
+      }
+    },
+    {
+      "world_id": "hazard-ab",
+      "probability_bps": 1000,
+      "safe_actions": [
+        "inspect-readonly"
+      ],
+      "observations": {
+        "cheap-signal": "warning",
+        "gate-a": "fail",
+        "gate-b": "fail",
+        "redundant-audit": "green",
+        "delayed-proof": "valid"
+      }
+    }
+  ],
+  "options": [
+    {
+      "option_id": "cheap-signal",
+      "available_at": "2026-11-16T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          100,
+          120,
+          130
+        ],
+        "warm": [
+          20,
+          25,
+          30
+        ],
+        "retry": [
+          40,
+          45,
+          50
+        ]
+      }
+    },
+    {
+      "option_id": "gate-a",
+      "available_at": "2026-11-16T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          800,
+          900,
+          1000
+        ],
+        "warm": [
+          140,
+          160,
+          180
+        ],
+        "retry": [
+          250,
+          280,
+          300
+        ]
+      }
+    },
+    {
+      "option_id": "gate-b",
+      "available_at": "2026-11-16T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          900,
+          1000,
+          1100
+        ],
+        "warm": [
+          170,
+          190,
+          210
+        ],
+        "retry": [
+          300,
+          330,
+          350
+        ]
+      }
+    },
+    {
+      "option_id": "redundant-audit",
+      "available_at": "2026-11-16T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          2800,
+          3000,
+          3200
+        ],
+        "warm": [
+          500,
+          550,
+          600
+        ],
+        "retry": [
+          700,
+          750,
+          800
+        ]
+      }
+    },
+    {
+      "option_id": "delayed-proof",
+      "available_at": "2026-11-16T10:05:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          600,
+          650,
+          700
+        ],
+        "warm": [
+          100,
+          120,
+          140
+        ],
+        "retry": [
+          180,
+          200,
+          220
+        ]
+      }
+    }
+  ],
+  "decision_cutoff": "2026-11-16T10:00:00Z",
+  "budget_micros": 3000,
+  "actions": [
+    {
+      "action_id": "release",
+      "irreversible": true,
+      "hard_gate": true,
+      "max_residual_risk_bps": 0
+    },
+    {
+      "action_id": "inspect-readonly",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 0
+    },
+    {
+      "action_id": "bounded-probe",
+      "irreversible": false,
+      "hard_gate": false,
+      "max_residual_risk_bps": 1200
+    }
+  ]
+}

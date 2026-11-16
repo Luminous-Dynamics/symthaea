@@ -93,6 +93,13 @@ Full revalidation; trust/no revalidation; static dependency closure; count-only 
 
 These works are complementary. The defensible D6.15 contribution is the explicit coupling of evidence acquisition order, admissible-world reduction, action-specific risk envelopes, time cutoffs and independent cost distributions in one evaluator contract. This is a research hypothesis and design distinction, not evidence that D6.15 currently outperforms those systems.
 
+
+## Sealed-oracle execution boundary
+
+The evaluator CLI now takes two files: `risk-acquisition <candidate-view.json> <evaluator-oracle.json>`. The candidate process must receive only the candidate-view artifact. The oracle belongs in a separate evaluator-only filesystem/identity boundary and is joined only after the candidate trace is immutable. The public split fixture exists solely for deterministic unit tests; it is not a sealed challenge set. An actual benchmark run must mount the oracle after candidate execution, or evaluate remotely, and record that the candidate process could not read it.
+
+The public input contracts are also split into separate candidate-view and evaluator-oracle schemas. This is a first step toward blind evaluation, not a cryptographic sandbox or proof of custody. Repository co-location is not oracle secrecy. The execution orchestrator must enforce the boundary through distinct mounts, credentials and process/container identities, and capture a negative-control attempt to read the oracle path.
+
 ## Limits and next gates
 
 v0.1 is an evaluator prototype, not an autonomous planner. Candidate traces are supplied records; acquisitions are not executed. It assumes evaluator probability weights are admissible, does not infer calibrated harm probabilities, and does not model stochastic observations, check dependencies, correlated costs or adaptive policy optimality. Cost distributions are supplied fixture inputs, not fresh runner measurements. No production authority, cryptographic authentication, side-effect reconciliation, blinded trial, external adjudication or replication has been performed.

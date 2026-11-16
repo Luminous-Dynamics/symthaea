@@ -362,6 +362,17 @@ fn evaluate_trace(
     }))
 }
 
+pub fn evaluate_risk_acquisition_parts_json(candidate_raw: &str, oracle_raw: &str) -> Result<Value, String> {
+    let candidate: Value = serde_json::from_str(candidate_raw)
+        .map_err(|error| format!("invalid candidate-view JSON: {error}"))?;
+    let oracle: Value = serde_json::from_str(oracle_raw)
+        .map_err(|error| format!("invalid evaluator-oracle JSON: {error}"))?;
+    evaluate_risk_acquisition_json(&json!({
+        "candidate_view": candidate,
+        "oracle": oracle
+    }).to_string())
+}
+
 pub fn evaluate_risk_acquisition_json(raw: &str) -> Result<Value, String> {
     let bundle: Value = serde_json::from_str(raw).map_err(|error| format!("invalid JSON: {error}"))?;
     allowed_keys(&bundle, &["candidate_view", "oracle"], "bundle")?;
@@ -423,22 +434,28 @@ pub fn evaluate_risk_acquisition_json(raw: &str) -> Result<Value, String> {
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
-    if args.len()!=1 || args[0]=="--help" || args[0]=="-h" {
-        eprintln!("Usage: risk-acquisition <bundle.json>");
+    if args.len()!=2 || args[0]=="--help" || args[0]=="-h" {
+        eprintln!("Usage: risk-acquisition <candidate-view.json> <evaluator-oracle.json>");
+        eprintln!("The candidate receives only candidate-view.json; keep evaluator-oracle.json in a separate protected evaluator workspace.");
         eprintln!("Evaluator-only D6.15 sequential evidence-acquisition scorer.");
-        process::exit(if args.len()==1 {0} else {2});
+        process::exit(if args.len()==2 {0} else {2});
     }
-    let path=&args[0];
-    let input=match fs::read_to_string(path) {
+    let candidate_path=&args[0];
+    let oracle_path=&args[1];
+    let candidate=match fs::read_to_string(candidate_path) {
         Ok(text)=>text,
-        Err(error)=>{eprintln!("ERROR D6.15-IO-001 {path}: {error}");process::exit(2);}
+        Err(error)=>{eprintln!("ERROR D6.15-CANDIDATE-IO-001 {candidate_path}: {error}");process::exit(2);}
     };
-    match evaluate_risk_acquisition_json(&input) {
+    let oracle=match fs::read_to_string(oracle_path) {
+        Ok(text)=>text,
+        Err(error)=>{eprintln!("ERROR D6.15-ORACLE-IO-001 {oracle_path}: {error}");process::exit(2);}
+    };
+    match evaluate_risk_acquisition_parts_json(&candidate,&oracle) {
         Ok(report)=>match serde_json::to_string_pretty(&report) {
             Ok(output)=>println!("{output}"),
-            Err(error)=>{eprintln!("ERROR D6.15-JSON-001 {path}: {error}");process::exit(2);}
+            Err(error)=>{eprintln!("ERROR D6.15-JSON-001: {error}");process::exit(2);}
         },
-        Err(error)=>{eprintln!("ERROR D6.15-RISK-ACQUISITION-001 {path}: {error}");process::exit(1);}
+        Err(error)=>{eprintln!("ERROR D6.15-RISK-ACQUISITION-001: {error}");process::exit(1);}
     }
 }
 
@@ -446,11 +463,24 @@ fn main() {
 mod tests {
     use super::*;
     const FIXTURE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-risk-acquisition-v0.1.json");
+    const CANDIDATE_VIEW:&str=include_str!("../../../../docs/development-map/fixtures/egddm-risk-acquisition-candidate-view-v0.1.json");
+    const EVALUATOR_ORACLE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-risk-acquisition-oracle-v0.1.json");
     const EXPECTED:&str=include_str!("../../../../docs/development-map/fixtures/egddm-risk-acquisition-v0.1.expected.json");
     fn report()->Value { evaluate_risk_acquisition_json(FIXTURE).expect("D6.15 fixture evaluates") }
     fn trace(value:&Value,id:&str)->Value {
         value["traces"].as_array().unwrap().iter().find(|item|item["trace_id"]==id)
             .expect("trace exists").clone()
+    }
+    #[test] fn physically_separated_candidate_and_oracle_files_match_combined_known_answer() {
+        let separated=evaluate_risk_acquisition_parts_json(CANDIDATE_VIEW,EVALUATOR_ORACLE).expect("separated candidate/oracle fixtures");
+        let combined=report();
+        assert_eq!(separated,combined);
+    }
+    #[test] fn candidate_view_fixture_contains_no_evaluator_oracle_fields() {
+        let candidate:Value=serde_json::from_str(CANDIDATE_VIEW).expect("candidate fixture JSON");
+        assert!(candidate.get("actual_world_id").is_none());
+        assert!(candidate.get("worlds").is_none());
+        assert!(candidate.get("oracle").is_none());
     }
     #[test] fn fixture_matches_complete_known_answer_report() {
         let actual=report();let expected:Value=serde_json::from_str(EXPECTED).expect("expected JSON");assert_eq!(actual,expected);
