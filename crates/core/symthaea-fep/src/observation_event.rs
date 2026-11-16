@@ -918,7 +918,12 @@ mod tests {
     fn masked_belief_gradient_never_reads_absent_dimension_predictions() {
         let observation = event(vec![
             dimension("temperature", Some(0.5), Some(4.0), None),
-            dimension("pressure", None, None, Some(MissingnessReason::SensorUnavailable)),
+            dimension(
+                "pressure",
+                None,
+                None,
+                Some(MissingnessReason::SensorUnavailable),
+            ),
         ]);
         let first = observation
             .masked_belief_gradient(
@@ -943,7 +948,12 @@ mod tests {
     #[test]
     fn all_missing_gradient_is_zero_without_a_noise_independence_claim() {
         let mut observation = event(vec![
-            dimension("temperature", None, None, Some(MissingnessReason::NotSampled)),
+            dimension(
+                "temperature",
+                None,
+                None,
+                Some(MissingnessReason::NotSampled),
+            ),
             dimension("pressure", None, None, None),
         ]);
         observation.noise_model = ObservationNoiseModelV1::Unspecified;
