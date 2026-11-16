@@ -1680,11 +1680,7 @@ mod tests {
     #[test]
     fn explicit_asymmetric_transom_keel_identity_must_be_shared() {
         let mut spec = asymmetric_box_fixture(0.9);
-        spec.stations[0]
-            .port_profile
-            .as_mut()
-            .unwrap()[0]
-            .point_id = "PORT-SEPARATE-KEEL".into();
+        spec.stations[0].port_profile.as_mut().unwrap()[0].point_id = "PORT-SEPARATE-KEEL".into();
         assert_rejected(&spec, "port_starboard_correspondence");
     }
 
