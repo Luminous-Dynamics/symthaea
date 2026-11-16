@@ -343,11 +343,29 @@
   ],
   "execution": {
     "corpus_integrity": {
-      "status": "not_run",
-      "runtime": null
+      "status": "pass_local_mirror",
+      "runtime": "Node.js v22.16.0",
+      "vectors": 20,
+      "raw_fixture_bytes": 639,
+      "metamorphic_relations": 1,
+      "note": "Local mirror of the current manifest/raw fixtures; not a GitHub Actions or exact-branch CI result."
     },
     "rust_preflight": "not_run",
-    "javascript_parser_oracle": "not_run",
+    "javascript_parser_oracle": {
+      "status": "committed_artifact_syntax_checked_only",
+      "runtime": "V8 syntax-only parse after stripping Node module imports/shebang and substituting import.meta.url",
+      "local_prototype_run": {
+        "status": "pass_local_mirror",
+        "runtime": "Node.js v22.16.0",
+        "vectors": 20,
+        "parsed": 11,
+        "rejected": 9,
+        "span_checks": 3,
+        "canonical_checks": 4,
+        "note": "The local prototype is a sibling implementation, not byte-identical to the newly committed script. The committed script has not been runtime-executed against the repository fixtures."
+      },
+      "claim_ceiling": "No Rust agreement, full RFC 8785 conformance, source authenticity, proof soundness or production qualification."
+    },
     "independent_rust_parser": "not_run",
     "differential_fuzz": "not_run",
     "performance_benchmark": "not_run",
