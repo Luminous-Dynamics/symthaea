@@ -251,24 +251,42 @@
   "benchmark_protocol": {
     "executable": "research/irregular-event-contract/src/bin/watermark_scaling.rs",
     "event_counts": [
-      1000,
-      10000,
-      100000
+      4096,
+      16384,
+      65536
     ],
-    "indexed_query_repetitions": 101,
-    "verified_query_repetitions": 15,
+    "indexed_query_repetitions": 51,
+    "verified_query_repetitions": 7,
     "interval_width_us": 16,
     "event_time_order": "deterministic_permutation_relative_to_arrival_order",
     "outputs": [
+      "source_count",
+      "interval_width_us",
+      "known_at_us",
       "indexed_event_time_buckets_visited",
       "indexed_receipt_candidates_examined",
       "matching_breaches",
       "indexed_p50_p95_p99_us",
       "verified_p50_p95_p99_us"
     ],
-    "known_answer": "16 matching late breaches per query",
+    "known_answer": "indexed_and_verified_reports_must_match_for_every_workload_before_timing",
     "correctness_gate": "indexed_and_verified_reports_equal_before_timing",
     "measurement_boundary": "in_memory_release_build_cpu_time_only",
-    "energy_measurement": "not_measured"
+    "energy_measurement": "not_measured",
+    "source_counts": [
+      1,
+      4,
+      16
+    ],
+    "interval_widths_us": [
+      1,
+      16,
+      256
+    ],
+    "knowledge_cutoffs_us": [
+      30,
+      50
+    ],
+    "workload_combinations": 54
   }
 }
