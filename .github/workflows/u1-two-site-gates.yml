@@ -30,7 +30,7 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.96.0
+          toolchain: 1.100.0
           components: clippy, rustfmt
       - name: Check formatting
         run: rustfmt --edition 2024 --check crates/domains/symthaea-frontier-physics/src/u1_mps.rs
