@@ -36,7 +36,7 @@ Four hypotheses have intervals:
 - hazard B: 500–2,500 bps (nominal 1,500);
 - hazard A+B: 500–3,000 bps (nominal 1,000).
 
-The nominal vector sums to 10,000; total ambiguity width is 8,000 bps.
+The nominal vector sums to 10,000; total ambiguity width is 8,500 bps.
 
 Ten traces test:
 1. Nominal-only reversible probe: nominal risk 1,000 bps, worst-case risk 3,000 bps, so a 1,200-bps policy must reject the point-estimate decision.
