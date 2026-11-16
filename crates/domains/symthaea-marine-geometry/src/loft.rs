@@ -986,20 +986,33 @@ pub fn loft_waterplane_capped_hull(
     let mut waterplane_faces = Vec::with_capacity(waterplane_face_count);
 
     for station_index in 0..station_count - 1 {
+        let interval_enters_collapsed_stern =
+            station_index + 1 == station_count - 1 && stern_collapsed;
         for point_index in 0..point_count - 1 {
             let a = starboard[station_index][point_index];
             let b = starboard[station_index + 1][point_index];
             let c = starboard[station_index + 1][point_index + 1];
             let d = starboard[station_index][point_index + 1];
-            side_faces.push([a, b, c]);
-            side_faces.push([a, c, d]);
 
-            let a = port[station_index][point_index];
-            let b = port[station_index + 1][point_index];
-            let c = port[station_index + 1][point_index + 1];
-            let d = port[station_index][point_index + 1];
-            side_faces.push([a, c, b]);
-            side_faces.push([a, d, c]);
+            let port_a = port[station_index][point_index];
+            let port_b = port[station_index + 1][point_index];
+            let port_c = port[station_index + 1][point_index + 1];
+            let port_d = port[station_index][point_index + 1];
+
+            if interval_enters_collapsed_stern {
+                // At a collapsed right endpoint the port and starboard
+                // station columns share IDs. Flip both side-quad diagonals
+                // so their shared seam edge has exactly two incident faces.
+                side_faces.push([a, b, d]);
+                side_faces.push([b, c, d]);
+                side_faces.push([port_a, port_d, port_b]);
+                side_faces.push([port_d, port_c, port_b]);
+            } else {
+                side_faces.push([a, b, c]);
+                side_faces.push([a, c, d]);
+                side_faces.push([port_a, port_c, port_b]);
+                side_faces.push([port_a, port_d, port_c]);
+            }
         }
 
         let port_here = port[station_index][point_count - 1];
