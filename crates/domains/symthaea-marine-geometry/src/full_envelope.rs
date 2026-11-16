@@ -1782,6 +1782,62 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn bottom_segments_must_be_explicitly_labelled() {
+        let mut spec = box_fixture();
+        for point in &mut spec.stations[0].starboard_profile[..2] {
+            point.region_to_next = ProfileRegion::Topsides;
+        }
+        assert_rejected(&spec, "profile_bottom_region_missing");
+    }
+
+    #[test]
+    fn waterline_to_sheer_segment_must_be_topsides() {
+        let mut spec = box_fixture();
+        let waterline = spec.stations[0]
+            .starboard_profile
+            .iter_mut()
+            .find(|point| point.role == ProfilePointRole::Waterline)
+            .unwrap();
+        waterline.region_to_next = ProfileRegion::Bottom;
+        assert_rejected(&spec, "profile_topsides_region_missing");
+    }
+
+    #[test]
+    fn chine_inventory_must_match_profile_breaklines() {
+        let mut spec = box_fixture();
+        spec.stations[0].starboard_profile[1].role = ProfilePointRole::Chine;
+        assert_rejected(&spec, "chine_inventory_mismatch");
+
+        let mut spec = box_fixture();
+        spec.surface_inventory.push(SurfaceRegion::ChineBreaklines);
+        assert_rejected(&spec, "chine_inventory_mismatch");
+    }
+
+    #[test]
+    fn planar_deck_is_admitted_when_all_points_share_one_plane() {
+        let mut spec = box_fixture();
+        spec.deck_surface.construction = DeckConstruction::PlanarDeck;
+        for section in &mut spec.deck_surface.sections {
+            for point in &mut section.points {
+                point.z_m = -4.0;
+            }
+        }
+        let report = validate_full_envelope_spec(&spec);
+        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert!(report.issues.is_empty());
+    }
+
+    #[test]
+    fn crowned_deck_cannot_be_mislabelled_as_planar() {
+        let mut spec = box_fixture();
+        spec.deck_surface.construction = DeckConstruction::PlanarDeck;
+        let report = validate_full_envelope_spec(&spec);
+        assert_eq!(report.disposition, FullEnvelopeDisposition::Rejected);
+        assert!(report.issues.iter().any(|item| item.code == "planar_deck_non_coplanar"));
+    }
+
     #[test]
     fn duplicate_surface_region_is_rejected() {
         let mut spec = box_fixture();
