@@ -239,23 +239,23 @@ fn validate_schema(
         }
     }
 
-    if let Some(expected) = schema_object.get("const") {
-        if instance != expected {
-            errors.push(path_error(path, format!("expected const {expected}")));
-        }
+    if let Some(expected) = schema_object.get("const")
+        && instance != expected
+    {
+        errors.push(path_error(path, format!("expected const {expected}")));
     }
 
-    if let Some(values) = schema_object.get("enum").and_then(Value::as_array) {
-        if !values.iter().any(|expected| expected == instance) {
-            errors.push(path_error(path, "value is not in the declared enum"));
-        }
+    if let Some(values) = schema_object.get("enum").and_then(Value::as_array)
+        && !values.iter().any(|expected| expected == instance)
+    {
+        errors.push(path_error(path, "value is not in the declared enum"));
     }
 
-    if let Some(expected_type) = schema_object.get("type") {
-        if !schema_type_matches(instance, expected_type) {
-            errors.push(path_error(path, format!("type mismatch; expected {expected_type}")));
-            return;
-        }
+    if let Some(expected_type) = schema_object.get("type")
+        && !schema_type_matches(instance, expected_type)
+    {
+        errors.push(path_error(path, format!("type mismatch; expected {expected_type}")));
+        return;
     }
 
     if let Some(object) = instance.as_object() {
@@ -267,10 +267,10 @@ fn validate_schema(
             }
         }
 
-        if let Some(minimum) = schema_object.get("minProperties").and_then(Value::as_u64) {
-            if object.len() < minimum as usize {
-                errors.push(path_error(path, format!("requires at least {minimum} properties")));
-            }
+        if let Some(minimum) = schema_object.get("minProperties").and_then(Value::as_u64)
+            && object.len() < minimum as usize
+        {
+            errors.push(path_error(path, format!("requires at least {minimum} properties")));
         }
 
         let properties = schema_object
@@ -292,15 +292,15 @@ fn validate_schema(
     }
 
     if let Some(array) = instance.as_array() {
-        if let Some(minimum) = schema_object.get("minItems").and_then(Value::as_u64) {
-            if array.len() < minimum as usize {
-                errors.push(path_error(path, format!("requires at least {minimum} items")));
-            }
+        if let Some(minimum) = schema_object.get("minItems").and_then(Value::as_u64)
+            && array.len() < minimum as usize
+        {
+            errors.push(path_error(path, format!("requires at least {minimum} items")));
         }
-        if let Some(maximum) = schema_object.get("maxItems").and_then(Value::as_u64) {
-            if array.len() > maximum as usize {
-                errors.push(path_error(path, format!("allows at most {maximum} items")));
-            }
+        if let Some(maximum) = schema_object.get("maxItems").and_then(Value::as_u64)
+            && array.len() > maximum as usize
+        {
+            errors.push(path_error(path, format!("allows at most {maximum} items")));
         }
         if let Some(item_schema) = schema_object.get("items") {
             for (index, value) in array.iter().enumerate() {
@@ -310,10 +310,10 @@ fn validate_schema(
     }
 
     if let Some(string) = instance.as_str() {
-        if let Some(minimum) = schema_object.get("minLength").and_then(Value::as_u64) {
-            if string.chars().count() < minimum as usize {
-                errors.push(path_error(path, format!("requires at least {minimum} characters")));
-            }
+        if let Some(minimum) = schema_object.get("minLength").and_then(Value::as_u64)
+            && string.chars().count() < minimum as usize
+        {
+            errors.push(path_error(path, format!("requires at least {minimum} characters")));
         }
         if schema_object.get("pattern").and_then(Value::as_str)
             == Some("^TAC-[A-Z0-9-]+$")
