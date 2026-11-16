@@ -873,7 +873,7 @@ pub fn verify_loft_artifact_integrity(
         }
         if planar_stern {
             let stern_centre_index =
-                first_centre_index + u32::from(planar_bow);
+                first_centre_index + if planar_bow { 1_u32 } else { 0_u32 };
             let expected = expected_cap_faces(false, stern_centre_index);
             let range = artifact.stern_end_cap_face_range;
             let end = range.first_face.saturating_add(range.face_count);
@@ -896,8 +896,8 @@ pub fn verify_loft_artifact_integrity(
     let expected_waterplane_faces = station_count
         .checked_sub(1)
         .and_then(|count| count.checked_mul(2))
-        .and_then(|count| count.checked_sub(usize::from(bow_collapsed)))
-        .and_then(|count| count.checked_sub(usize::from(stern_collapsed)));
+        .and_then(|count| count.checked_sub(if bow_collapsed { 1_usize } else { 0_usize }))
+        .and_then(|count| count.checked_sub(if stern_collapsed { 1_usize } else { 0_usize }));
     let cap_faces_per_planar_end = point_count.checked_mul(2).and_then(|count| count.checked_sub(1));
     let expected_bow_cap_faces = if bow_collapsed { Some(0) } else { cap_faces_per_planar_end };
     let expected_stern_cap_faces = if stern_collapsed { Some(0) } else { cap_faces_per_planar_end };
@@ -998,7 +998,7 @@ pub fn loft_waterplane_capped_hull(
         };
         vertex_count = total;
     }
-    let planar_cap_count = usize::from(bow_planar) + usize::from(stern_planar);
+    let planar_cap_count = if bow_planar { 1_usize } else { 0_usize } + if stern_planar { 1_usize } else { 0_usize };
     let Some(vertex_count) = vertex_count
         .checked_add(planar_cap_count)
         .filter(|count| *count <= MAX_MESH_VERTICES)
@@ -1026,8 +1026,8 @@ pub fn loft_waterplane_capped_hull(
     };
     let waterplane_face_count = (station_count - 1)
         .checked_mul(2)
-        .and_then(|count| count.checked_sub(usize::from(bow_collapsed)))
-        .and_then(|count| count.checked_sub(usize::from(stern_collapsed)));
+        .and_then(|count| count.checked_sub(if bow_collapsed { 1_usize } else { 0_usize }))
+        .and_then(|count| count.checked_sub(if stern_collapsed { 1_usize } else { 0_usize }));
     let Some(waterplane_face_count) = waterplane_face_count else {
         return Err(vec![LoftViolation {
             code: "mesh_face_budget".into(),
