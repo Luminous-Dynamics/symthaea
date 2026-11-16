@@ -1427,6 +1427,8 @@ mod tests {
             let port_sheer = station.port_profile.as_ref().unwrap().last().unwrap();
             let deck_port = deck_section.points.first_mut().unwrap();
             deck_port.point_id = port_sheer.point_id.clone();
+            deck_port.y_m = port_sheer.y_m;
+            deck_port.z_m = port_sheer.z_m;
         }
         let report = validate_full_envelope_spec(&spec);
         assert_eq!(
@@ -1434,6 +1436,57 @@ mod tests {
             FullEnvelopeDisposition::ValidInputContract
         );
         assert!(report.issues.is_empty());
+    }
+
+
+    #[test]
+    fn explicit_asymmetric_waterline_does_not_require_equal_port_starboard_breadths() {
+        let mut spec = box_fixture();
+        spec.symmetry = SymmetryPolicy::ExplicitPortAndStarboard;
+        for station in &mut spec.stations {
+            let mut port = station.starboard_profile.clone();
+            for point in &mut port {
+                point.point_id = format!("PORT-{}", point.point_id);
+                point.y_m = -0.8 * point.y_m;
+            }
+            station.port_profile = Some(port);
+        }
+        for intersection in &mut spec.design_waterline.station_intersections {
+            intersection.port_source = WaterlinePortSource::ExplicitPortProfile;
+            intersection.port_point_id = Some(format!("PORT-{}", intersection.starboard_point_id));
+        }
+        for (station, deck_section) in spec
+            .stations
+            .iter()
+            .zip(spec.deck_surface.sections.iter_mut())
+        {
+            let port_sheer = station.port_profile.as_ref().unwrap().last().unwrap();
+            let deck_port = deck_section.points.first_mut().unwrap();
+            deck_port.point_id = port_sheer.point_id.clone();
+            deck_port.y_m = port_sheer.y_m;
+            deck_port.z_m = port_sheer.z_m;
+        }
+        let report = validate_full_envelope_spec(&spec);
+        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert!(report.issues.is_empty());
+        for intersection in &spec.design_waterline.station_intersections {
+            let station = spec
+                .stations
+                .iter()
+                .find(|item| item.station_id == intersection.station_id)
+                .unwrap();
+            let starboard = profile_point_by_id(
+                &station.starboard_profile,
+                &intersection.starboard_point_id,
+            )
+            .unwrap();
+            let port = profile_point_by_id(
+                station.port_profile.as_ref().unwrap(),
+                intersection.port_point_id.as_deref().unwrap(),
+            )
+            .unwrap();
+            assert_ne!(starboard.y_m.abs(), port.y_m.abs());
+        }
     }
 
     #[test]
