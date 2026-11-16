@@ -76,12 +76,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          rustup toolchain install 1.96.0 --profile minimal --component rustfmt --component clippy
-          rustup override set 1.96.0
+          rustup toolchain install 1.100.0 --profile minimal --component rustfmt --component clippy
+          rustup override set 1.100.0
           rustc --version
           cargo --version
-          rustc --version | grep -F 'rustc 1.96.0 '
-          cargo --version | grep -F 'cargo 1.96.0 '
+          rustc --version | grep -F 'rustc 1.100.0 '
+          cargo --version | grep -F 'cargo 1.100.0 '
 
       - name: Locked metadata
         run: cargo metadata --locked --no-deps --format-version 1 > /dev/null
