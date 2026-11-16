@@ -260,5 +260,28 @@
         "timezone": "UTC"
       }
     }
-  ]
+  ],
+  "trust": {
+    "profile": {
+      "owner": "synthetic-trust-profile-owner",
+      "profile_id": "synthetic-tlsn-delegated-notary-v1",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "session_witness_kind": "delegated_notary",
+    "session_witness_identity": "synthetic-notary-01",
+    "evidence_artifact_kinds": [
+      "signed_transcript_attestation"
+    ],
+    "verification_scope": "delegated_attestation_verifier",
+    "plaintext_visibility_profile": {
+      "owner": "synthetic-privacy-profile-owner",
+      "profile_id": "holder-side-response-plaintext-v1",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    "collusion_assumptions_profile": {
+      "owner": "synthetic-trust-profile-owner",
+      "profile_id": "notary-verifier-collusion-v1",
+      "profile_digest": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  }
 }
