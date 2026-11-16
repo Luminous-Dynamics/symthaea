@@ -1,0 +1,249 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-oracle-integrity-report-v0.1.schema.json",
+  "title": "EGDDM D6.12 oracle-integrity report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "oracle_case_count",
+    "traces",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string"
+    },
+    "adjudication_status": {
+      "type": "string"
+    },
+    "oracle_case_count": {
+      "type": "integer"
+    },
+    "claim_ceiling": {
+      "type": "string"
+    },
+    "traces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "cases",
+          "case_count",
+          "positive_control_count",
+          "negative_control_count",
+          "sham_control_count",
+          "fault_injection_case_count",
+          "false_accept_count",
+          "false_reject_count",
+          "unnecessary_abstention_count",
+          "total_fault_instances",
+          "detected_fault_instances",
+          "missed_fault_instances",
+          "false_alarm_fault_instances",
+          "false_integrity_valid_assertions",
+          "false_integrity_invalid_assertions",
+          "state_mutation_case_count",
+          "replay_disagreement_case_count",
+          "cache_mismatch_case_count",
+          "nondeterminism_case_count",
+          "observer_coverage_gap_case_count",
+          "verifier_false_positive_case_count",
+          "verifier_false_negative_case_count",
+          "candidate_state_drift_case_count"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "cases": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "case_id",
+                "control_role",
+                "expected_semantic_outcome",
+                "claimed_semantic_outcome",
+                "outcome_correct",
+                "false_accept",
+                "false_reject",
+                "unnecessary_abstention",
+                "native_verifier_outcome",
+                "actual_fault_classes",
+                "detected_fault_classes",
+                "missed_fault_classes",
+                "false_alarm_fault_classes",
+                "claimed_integrity_state",
+                "expected_integrity_state",
+                "integrity_claim_correct",
+                "false_integrity_valid_assertion",
+                "false_integrity_invalid_assertion"
+              ],
+              "properties": {
+                "case_id": {
+                  "type": "string"
+                },
+                "control_role": {
+                  "type": "string"
+                },
+                "expected_semantic_outcome": {
+                  "type": "string"
+                },
+                "claimed_semantic_outcome": {
+                  "type": "string"
+                },
+                "outcome_correct": {
+                  "type": "boolean"
+                },
+                "false_accept": {
+                  "type": "boolean"
+                },
+                "false_reject": {
+                  "type": "boolean"
+                },
+                "unnecessary_abstention": {
+                  "type": "boolean"
+                },
+                "native_verifier_outcome": {
+                  "type": "string"
+                },
+                "actual_fault_classes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "detected_fault_classes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "missed_fault_classes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "false_alarm_fault_classes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "claimed_integrity_state": {
+                  "type": "string"
+                },
+                "expected_integrity_state": {
+                  "type": "string"
+                },
+                "integrity_claim_correct": {
+                  "type": "boolean"
+                },
+                "false_integrity_valid_assertion": {
+                  "type": "boolean"
+                },
+                "false_integrity_invalid_assertion": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "case_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "positive_control_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "negative_control_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sham_control_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fault_injection_case_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_accept_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_reject_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "unnecessary_abstention_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "total_fault_instances": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "detected_fault_instances": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "missed_fault_instances": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_alarm_fault_instances": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_integrity_valid_assertions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "false_integrity_invalid_assertions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "state_mutation_case_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "replay_disagreement_case_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cache_mismatch_case_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "nondeterminism_case_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "observer_coverage_gap_case_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "verifier_false_positive_case_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "verifier_false_negative_case_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "candidate_state_drift_case_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  }
+}
