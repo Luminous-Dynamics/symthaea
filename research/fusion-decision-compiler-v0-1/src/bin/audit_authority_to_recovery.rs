@@ -27,6 +27,8 @@ fn main() {
     let channel = ActuatorChannelProfile {
         channel_id: "heating-power".to_string(),
         unit: "MW".to_string(),
+        authority_manifest_ref: "synthetic-authority-manifest-v1".to_string(),
+        authority_manifest_sha256: sha('9'),
         minimum_value: 0.0,
         maximum_value: 100.0,
         maximum_slew_per_second: 50.0,
