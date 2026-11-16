@@ -28,7 +28,10 @@ fn cli_solves_and_replays_mass_balance_receipt() {
     let report: serde_json::Value =
         serde_json::from_slice(&solved.stdout).expect("CLI must emit a JSON report");
     assert_eq!(report["status"], "solved");
-    assert_eq!(report["receipt"]["algorithm"], "upright-mass-balance-bisection-v2");
+    assert_eq!(
+        report["receipt"]["algorithm"],
+        "upright-mass-balance-bisection-v2"
+    );
     assert!(
         (report["receipt"]["equilibrium"]["displaced_mass_tonnes"]
             .as_f64()
