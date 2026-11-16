@@ -888,7 +888,7 @@ mod tests {
         assert_eq!(
             ledger.record_event_arrival(event, 20),
             Ok(EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark {
-                exclusive_watermark_us: 100,
+                progress: SourceProgressEvidence::from(progress(1, 1, 1, 1, 10, 100, false)),
             }))
         );
         let report = ledger.completeness(1, &[source(1)], 0, 100, 20).unwrap();
@@ -987,7 +987,7 @@ mod tests {
     }
 
     #[test]
-    fn on_time_arrival_is_single_use_and_cannot_be_reclassified_after_watermark_advance() {
+    fn unqualified_arrival_is_single_use_and_cannot_be_reclassified_after_watermark_advance() {
         let mut ledger = SourceWatermarkLedger::default();
         let original = event(1, 1, 50, 20);
         assert_eq!(
@@ -1018,7 +1018,7 @@ mod tests {
         let observed = event(1, 1, 50, 20);
         assert_eq!(
             ledger.record_event_arrival(observed, 20),
-            Ok(EventArrivalClassification::OnTime)
+            Ok(EventArrivalClassification::NoPriorProgress)
         );
         let before = ledger.state_sha256();
         assert_eq!(
@@ -1036,7 +1036,13 @@ mod tests {
             [event(1, 1, 10, 20), event(2, 1, 15, 20)],
             20,
         ).unwrap();
-        assert_eq!(results, vec![EventArrivalClassification::OnTime, EventArrivalClassification::OnTime]);
+        assert_eq!(
+            results,
+            vec![
+                EventArrivalClassification::NoPriorProgress,
+                EventArrivalClassification::NoPriorProgress,
+            ]
+        );
         assert_eq!(ledger.event_arrivals.len(), 2);
         assert_eq!(ledger.verify_consistency(), Ok(()));
     }
