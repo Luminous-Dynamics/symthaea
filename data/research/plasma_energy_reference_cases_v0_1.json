@@ -3751,7 +3751,7 @@
         {
           "metric": "ammonia_conversion",
           "value": 0.58,
-          "qualifier": "up to 58% reported in argon-diluted cases; source does not pair this maximum conversion with the peak H2 energy-yield condition",
+          "qualifier": "up to 58% reported in argon-diluted cases; source does not pair this maximum conversion with the peak H2 energy-yield condition, which occurs under a different operating condition",
           "unit": "fraction"
         },
         {
