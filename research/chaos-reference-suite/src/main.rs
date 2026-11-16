@@ -21,7 +21,7 @@ fn run() -> Result<(), String> {
     println!("fixture,regime,step,x,y,z");
 
     for id in FixtureId::ALL {
-        let samples = generate(id, sample_count, seed)?;
+        let samples = generate(id, sample_count, seed).map_err(|error| format!("{error:?}"))?;
         println!("# fixture_id={}", id.as_str());
         println!("# regime={}", id.regime());
         println!("# burn_in={}", id.burn_in());
