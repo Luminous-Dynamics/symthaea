@@ -1,0 +1,305 @@
+{
+  "schema_version": "0.1.0",
+  "dataset_id": "rea-planner-outcome-grader",
+  "status": "synthetic_development_only",
+  "access_policy": "grader_only_not_for_planner_input",
+  "not_human_adjudicated": true,
+  "cases": [
+    {
+      "case_id": "REA-POA-001",
+      "held_out_dgp_id": "omitted-dgp-rea-poa-001",
+      "held_out_dgp_not_supplied_to_planner": true,
+      "hidden_likelihoods": [
+        {
+          "experiment_id": "probe_many_functions",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.225,
+                0.55,
+                0.225
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.225,
+                0.225,
+                0.55
+              ]
+            }
+          ]
+        },
+        {
+          "experiment_id": "verify_deployment_manifest",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.225,
+                0.55,
+                0.225
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.225,
+                0.225,
+                0.55
+              ]
+            }
+          ]
+        }
+      ],
+      "realized_hypothesis_id": "hypothesis_a",
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": true,
+      "not_testable_reason": null
+    },
+    {
+      "case_id": "REA-POA-002",
+      "held_out_dgp_id": "omitted-dgp-rea-poa-002",
+      "held_out_dgp_not_supplied_to_planner": true,
+      "hidden_likelihoods": [
+        {
+          "experiment_id": "fetch_second_advisory_mirror",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                1
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "experiment_id": "reproduce_in_independent_lab",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.225,
+                0.55,
+                0.225
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.225,
+                0.225,
+                0.55
+              ]
+            }
+          ]
+        }
+      ],
+      "realized_hypothesis_id": "hypothesis_b",
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": true,
+      "not_testable_reason": null
+    },
+    {
+      "case_id": "REA-POA-004",
+      "held_out_dgp_id": "omitted-dgp-rea-poa-004",
+      "held_out_dgp_not_supplied_to_planner": true,
+      "hidden_likelihoods": [
+        {
+          "experiment_id": "trust_terminal_cursor",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                1
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "experiment_id": "reacquire_missing_page",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.225,
+                0.55,
+                0.225
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.225,
+                0.225,
+                0.55
+              ]
+            }
+          ]
+        }
+      ],
+      "realized_hypothesis_id": "hypothesis_a",
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": true,
+      "not_testable_reason": null
+    },
+    {
+      "case_id": "REA-POA-008",
+      "held_out_dgp_id": "omitted-dgp-rea-poa-008",
+      "held_out_dgp_not_supplied_to_planner": true,
+      "hidden_likelihoods": [
+        {
+          "experiment_id": "collect_more_cache_logs",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.45,
+                0.55
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.45,
+                0.55
+              ]
+            }
+          ]
+        },
+        {
+          "experiment_id": "controlled_cache_bypass",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.225,
+                0.55,
+                0.225
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.225,
+                0.225,
+                0.55
+              ]
+            }
+          ]
+        }
+      ],
+      "realized_hypothesis_id": "hypothesis_b",
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": true,
+      "not_testable_reason": null
+    },
+    {
+      "case_id": "REA-POA-013",
+      "held_out_dgp_id": "omitted-dgp-rea-poa-013",
+      "held_out_dgp_not_supplied_to_planner": true,
+      "hidden_likelihoods": [
+        {
+          "experiment_id": "unauthorized_production_probe",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.45,
+                0.55
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.45,
+                0.55
+              ]
+            }
+          ]
+        },
+        {
+          "experiment_id": "authorized_staging_reproduction",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.45,
+                0.55
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.45,
+                0.55
+              ]
+            }
+          ]
+        }
+      ],
+      "realized_hypothesis_id": "hypothesis_b",
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": true,
+      "not_testable_reason": null
+    },
+    {
+      "case_id": "REA-POA-012",
+      "held_out_dgp_id": "omitted-dgp-rea-poa-012",
+      "held_out_dgp_not_supplied_to_planner": true,
+      "hidden_likelihoods": [
+        {
+          "experiment_id": "run_one_short_session",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                1
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "experiment_id": "claim_absence_from_no_event",
+          "likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                1
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                1
+              ]
+            }
+          ]
+        }
+      ],
+      "realized_hypothesis_id": "hypothesis_a",
+      "outcome_oracle_policy": "Evaluate selected experiments under this held-out DGP only; never serialize these matrices into agent-visible input.",
+      "out_of_ensemble_testable": false,
+      "not_testable_reason": "All candidates in this negative-control case have a single declared outcome; no distinct categorical likelihood model can be represented without changing the source case contract."
+    }
+  ]
+}

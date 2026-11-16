@@ -1,0 +1,1591 @@
+{
+  "schema_version": "0.1.0",
+  "dataset_id": "rea-planner-input-manifest",
+  "status": "synthetic_development_only",
+  "source_policy": "synthetic_likelihoods_and_utilities",
+  "access_policy": "agent_visible_development_input_only",
+  "not_human_adjudicated": true,
+  "source_case_view_commit_sha": "b90997cf90d69fa11608a5c3e2013d7bfe5dfe7e",
+  "source_case_view_file_git_blob_sha1": "87209b50823e3b3757b111eaa83816fa1da62cad",
+  "cases": [
+    {
+      "case_id": "REA-POA-001",
+      "evidence": [
+        {
+          "evidence_id": "ev_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-001:root-a"
+        },
+        {
+          "evidence_id": "ev_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-001:root-b"
+        }
+      ],
+      "hypotheses": [
+        {
+          "id": "hypothesis_a",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "contradicting_evidence_ids": []
+        },
+        {
+          "id": "hypothesis_b",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ],
+          "contradicting_evidence_ids": []
+        }
+      ],
+      "candidates": [
+        {
+          "id": "probe_many_functions",
+          "outcomes": [
+            "function_a",
+            "function_b",
+            "no_match"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ReadOnlyObservation",
+          "declared_source_impact": "read_only",
+          "impact_mapping_note": "Direct mapping from the proof-obligation candidate contract.",
+          "estimated_time_seconds": 120,
+          "estimated_energy_joules": 12,
+          "estimated_risk": 0.01,
+          "cost_units": 4,
+          "description": "Run broad static probes across several candidate functions",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.94,
+                0.03,
+                0.03
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.03,
+                0.03,
+                0.94
+              ]
+            }
+          ]
+        },
+        {
+          "id": "verify_deployment_manifest",
+          "outcomes": [
+            "digest_match",
+            "digest_mismatch",
+            "manifest_unavailable"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ReadOnlyObservation",
+          "declared_source_impact": "read_only",
+          "impact_mapping_note": "Direct mapping from the proof-obligation candidate contract.",
+          "estimated_time_seconds": 30,
+          "estimated_energy_joules": 3,
+          "estimated_risk": 0.01,
+          "cost_units": 1,
+          "description": "Acquire and verify a device-bound deployment manifest",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.6,
+                0.2,
+                0.2
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.2,
+                0.2,
+                0.6
+              ]
+            }
+          ]
+        }
+      ],
+      "likelihood_scenarios": [
+        {
+          "scenario_id": "nominal",
+          "scenario_probability": 0.7,
+          "experiments": [
+            {
+              "experiment_id": "probe_many_functions",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.94,
+                    0.03,
+                    0.03
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.03,
+                    0.03,
+                    0.94
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "verify_deployment_manifest",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.6,
+                    0.2,
+                    0.2
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.2,
+                    0.2,
+                    0.6
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "likelihood_shift",
+          "scenario_probability": 0.3,
+          "experiments": [
+            {
+              "experiment_id": "probe_many_functions",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.94,
+                    0.03,
+                    0.03
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.03,
+                    0.03,
+                    0.94
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "verify_deployment_manifest",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.6,
+                    0.2,
+                    0.2
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.2,
+                    0.2,
+                    0.6
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "terminal_decisions": [
+        {
+          "id": "action_a",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 1
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0
+            }
+          ]
+        },
+        {
+          "id": "action_b",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 1
+            }
+          ]
+        },
+        {
+          "id": "defer",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0.25
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0.25
+            }
+          ]
+        }
+      ],
+      "point_eig_config": {
+        "max_time_seconds": 600,
+        "max_energy_joules": 1200,
+        "max_risk": 0.2,
+        "cost_weights": {
+          "time": 1,
+          "energy": 1,
+          "risk": 2
+        },
+        "max_target_impact": "TemporaryConfiguration",
+        "minimum_information_gain_bits": 0.000001
+      },
+      "robust_config": {
+        "ranking_policy": "LowerTailCvar",
+        "lower_tail_probability": 0.25,
+        "minimum_top1_stability": 0
+      },
+      "decision_config": {
+        "ranking_policy": "MinimaxRegret",
+        "minimum_decision_stability": 0,
+        "maximum_worst_case_regret": null,
+        "regret_penalty": 1,
+        "minimum_selection_value": 1e-9,
+        "max_policy_evaluations": 65536
+      },
+      "synthetic_likelihood_notice": "Priors, likelihoods and utilities are authored synthetic algorithm-contract parameters. They are not measured, empirically calibrated, independently elicited or generalizable capability evidence."
+    },
+    {
+      "case_id": "REA-POA-002",
+      "evidence": [
+        {
+          "evidence_id": "ev_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-002:root-a"
+        },
+        {
+          "evidence_id": "ev_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-002:root-b"
+        }
+      ],
+      "hypotheses": [
+        {
+          "id": "hypothesis_a",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+          ],
+          "contradicting_evidence_ids": []
+        },
+        {
+          "id": "hypothesis_b",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+          ],
+          "contradicting_evidence_ids": []
+        }
+      ],
+      "candidates": [
+        {
+          "id": "fetch_second_advisory_mirror",
+          "outcomes": [
+            "same_upstream_statement"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ReadOnlyObservation",
+          "declared_source_impact": "read_only",
+          "impact_mapping_note": "Direct mapping from the proof-obligation candidate contract.",
+          "estimated_time_seconds": 30,
+          "estimated_energy_joules": 3,
+          "estimated_risk": 0.01,
+          "cost_units": 1,
+          "description": "Fetch a second advisory mirror",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                1
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "id": "reproduce_in_independent_lab",
+          "outcomes": [
+            "reproduced",
+            "not_reproduced",
+            "inconclusive"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ReadOnlyObservation",
+          "declared_source_impact": "isolated_test",
+          "impact_mapping_note": "Mapped to read-only planner impact because the test target is a disposable isolated fixture, not production.",
+          "estimated_time_seconds": 150,
+          "estimated_energy_joules": 15,
+          "estimated_risk": 0.01,
+          "cost_units": 5,
+          "description": "Run an isolated, independently instrumented reproduction",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.8,
+                0.09999999999999998,
+                0.09999999999999998
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.09999999999999998,
+                0.09999999999999998,
+                0.8
+              ]
+            }
+          ]
+        }
+      ],
+      "likelihood_scenarios": [
+        {
+          "scenario_id": "nominal",
+          "scenario_probability": 0.7,
+          "experiments": [
+            {
+              "experiment_id": "fetch_second_advisory_mirror",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "reproduce_in_independent_lab",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.8,
+                    0.09999999999999998,
+                    0.09999999999999998
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.09999999999999998,
+                    0.09999999999999998,
+                    0.8
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "likelihood_shift",
+          "scenario_probability": 0.3,
+          "experiments": [
+            {
+              "experiment_id": "fetch_second_advisory_mirror",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "reproduce_in_independent_lab",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.15,
+                    0.15,
+                    0.7
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.7,
+                    0.15,
+                    0.15
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "terminal_decisions": [
+        {
+          "id": "action_a",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 1
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0
+            }
+          ]
+        },
+        {
+          "id": "action_b",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 1
+            }
+          ]
+        },
+        {
+          "id": "defer",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0.25
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0.25
+            }
+          ]
+        }
+      ],
+      "point_eig_config": {
+        "max_time_seconds": 600,
+        "max_energy_joules": 1200,
+        "max_risk": 0.2,
+        "cost_weights": {
+          "time": 1,
+          "energy": 1,
+          "risk": 2
+        },
+        "max_target_impact": "TemporaryConfiguration",
+        "minimum_information_gain_bits": 0.000001
+      },
+      "robust_config": {
+        "ranking_policy": "LowerTailCvar",
+        "lower_tail_probability": 0.25,
+        "minimum_top1_stability": 0
+      },
+      "decision_config": {
+        "ranking_policy": "MinimaxRegret",
+        "minimum_decision_stability": 0,
+        "maximum_worst_case_regret": null,
+        "regret_penalty": 1,
+        "minimum_selection_value": 1e-9,
+        "max_policy_evaluations": 65536
+      },
+      "synthetic_likelihood_notice": "Priors, likelihoods and utilities are authored synthetic algorithm-contract parameters. They are not measured, empirically calibrated, independently elicited or generalizable capability evidence."
+    },
+    {
+      "case_id": "REA-POA-004",
+      "evidence": [
+        {
+          "evidence_id": "ev_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-004:root-a"
+        },
+        {
+          "evidence_id": "ev_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-004:root-b"
+        }
+      ],
+      "hypotheses": [
+        {
+          "id": "hypothesis_a",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+          ],
+          "contradicting_evidence_ids": []
+        },
+        {
+          "id": "hypothesis_b",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+          ],
+          "contradicting_evidence_ids": []
+        }
+      ],
+      "candidates": [
+        {
+          "id": "trust_terminal_cursor",
+          "outcomes": [
+            "provider_says_complete"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ReadOnlyObservation",
+          "declared_source_impact": "read_only",
+          "impact_mapping_note": "Direct mapping from the proof-obligation candidate contract.",
+          "estimated_time_seconds": 15,
+          "estimated_energy_joules": 1.5,
+          "estimated_risk": 0.01,
+          "cost_units": 0.5,
+          "description": "Accept the provider's terminal cursor and all_pages_seen flag",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                1
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "id": "reacquire_missing_page",
+          "outcomes": [
+            "page_reconciled",
+            "page_unavailable",
+            "page_conflicts"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ReadOnlyObservation",
+          "declared_source_impact": "read_only",
+          "impact_mapping_note": "Direct mapping from the proof-obligation candidate contract.",
+          "estimated_time_seconds": 60,
+          "estimated_energy_joules": 6,
+          "estimated_risk": 0.01,
+          "cost_units": 2,
+          "description": "Reacquire page 2 and verify page-chain continuity",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.8,
+                0.09999999999999998,
+                0.09999999999999998
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.09999999999999998,
+                0.09999999999999998,
+                0.8
+              ]
+            }
+          ]
+        }
+      ],
+      "likelihood_scenarios": [
+        {
+          "scenario_id": "nominal",
+          "scenario_probability": 0.7,
+          "experiments": [
+            {
+              "experiment_id": "trust_terminal_cursor",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "reacquire_missing_page",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.8,
+                    0.09999999999999998,
+                    0.09999999999999998
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.09999999999999998,
+                    0.09999999999999998,
+                    0.8
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "likelihood_shift",
+          "scenario_probability": 0.3,
+          "experiments": [
+            {
+              "experiment_id": "trust_terminal_cursor",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "reacquire_missing_page",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.15,
+                    0.15,
+                    0.7
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.7,
+                    0.15,
+                    0.15
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "terminal_decisions": [
+        {
+          "id": "action_a",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 1
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0
+            }
+          ]
+        },
+        {
+          "id": "action_b",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 1
+            }
+          ]
+        },
+        {
+          "id": "defer",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0.25
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0.25
+            }
+          ]
+        }
+      ],
+      "point_eig_config": {
+        "max_time_seconds": 600,
+        "max_energy_joules": 1200,
+        "max_risk": 0.2,
+        "cost_weights": {
+          "time": 1,
+          "energy": 1,
+          "risk": 2
+        },
+        "max_target_impact": "TemporaryConfiguration",
+        "minimum_information_gain_bits": 0.000001
+      },
+      "robust_config": {
+        "ranking_policy": "LowerTailCvar",
+        "lower_tail_probability": 0.25,
+        "minimum_top1_stability": 0
+      },
+      "decision_config": {
+        "ranking_policy": "MinimaxRegret",
+        "minimum_decision_stability": 0,
+        "maximum_worst_case_regret": null,
+        "regret_penalty": 1,
+        "minimum_selection_value": 1e-9,
+        "max_policy_evaluations": 65536
+      },
+      "synthetic_likelihood_notice": "Priors, likelihoods and utilities are authored synthetic algorithm-contract parameters. They are not measured, empirically calibrated, independently elicited or generalizable capability evidence."
+    },
+    {
+      "case_id": "REA-POA-008",
+      "evidence": [
+        {
+          "evidence_id": "ev_1111111111111111111111111111111111111111111111111111111111111111",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-008:root-a"
+        },
+        {
+          "evidence_id": "ev_2222222222222222222222222222222222222222222222222222222222222222",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-008:root-b"
+        }
+      ],
+      "hypotheses": [
+        {
+          "id": "hypothesis_a",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_1111111111111111111111111111111111111111111111111111111111111111"
+          ],
+          "contradicting_evidence_ids": []
+        },
+        {
+          "id": "hypothesis_b",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_2222222222222222222222222222222222222222222222222222222222222222"
+          ],
+          "contradicting_evidence_ids": []
+        }
+      ],
+      "candidates": [
+        {
+          "id": "collect_more_cache_logs",
+          "outcomes": [
+            "many_cache_events",
+            "few_cache_events"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ReadOnlyObservation",
+          "declared_source_impact": "read_only",
+          "impact_mapping_note": "Direct mapping from the proof-obligation candidate contract.",
+          "estimated_time_seconds": 60,
+          "estimated_energy_joules": 6,
+          "estimated_risk": 0.01,
+          "cost_units": 2,
+          "description": "Collect more logs from the same cache subsystem and session",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.9,
+                0.1
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.1,
+                0.9
+              ]
+            }
+          ]
+        },
+        {
+          "id": "controlled_cache_bypass",
+          "outcomes": [
+            "mismatch_disappears",
+            "mismatch_persists",
+            "intervention_invalid"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "TemporaryConfiguration",
+          "declared_source_impact": "temporary_configuration",
+          "impact_mapping_note": "Direct mapping from the proof-obligation candidate contract.",
+          "estimated_time_seconds": 90,
+          "estimated_energy_joules": 9,
+          "estimated_risk": 0.03,
+          "cost_units": 3,
+          "description": "Perform an authorized reversible cache-bypass comparison",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.65,
+                0.2,
+                0.15
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.15,
+                0.2,
+                0.65
+              ]
+            }
+          ]
+        }
+      ],
+      "likelihood_scenarios": [
+        {
+          "scenario_id": "nominal",
+          "scenario_probability": 0.7,
+          "experiments": [
+            {
+              "experiment_id": "collect_more_cache_logs",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.9,
+                    0.1
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.1,
+                    0.9
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "controlled_cache_bypass",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.65,
+                    0.2,
+                    0.15
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.15,
+                    0.2,
+                    0.65
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "likelihood_shift",
+          "scenario_probability": 0.3,
+          "experiments": [
+            {
+              "experiment_id": "collect_more_cache_logs",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.9,
+                    0.1
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.1,
+                    0.9
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "controlled_cache_bypass",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.65,
+                    0.2,
+                    0.15
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.15,
+                    0.2,
+                    0.65
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "terminal_decisions": [
+        {
+          "id": "action_a",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 1
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0
+            }
+          ]
+        },
+        {
+          "id": "action_b",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 1
+            }
+          ]
+        },
+        {
+          "id": "defer",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0.25
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0.25
+            }
+          ]
+        }
+      ],
+      "point_eig_config": {
+        "max_time_seconds": 600,
+        "max_energy_joules": 1200,
+        "max_risk": 0.2,
+        "cost_weights": {
+          "time": 1,
+          "energy": 1,
+          "risk": 2
+        },
+        "max_target_impact": "TemporaryConfiguration",
+        "minimum_information_gain_bits": 0.000001
+      },
+      "robust_config": {
+        "ranking_policy": "LowerTailCvar",
+        "lower_tail_probability": 0.25,
+        "minimum_top1_stability": 0
+      },
+      "decision_config": {
+        "ranking_policy": "MinimaxRegret",
+        "minimum_decision_stability": 0,
+        "maximum_worst_case_regret": null,
+        "regret_penalty": 1,
+        "minimum_selection_value": 1e-9,
+        "max_policy_evaluations": 65536
+      },
+      "synthetic_likelihood_notice": "Priors, likelihoods and utilities are authored synthetic algorithm-contract parameters. They are not measured, empirically calibrated, independently elicited or generalizable capability evidence."
+    },
+    {
+      "case_id": "REA-POA-013",
+      "evidence": [
+        {
+          "evidence_id": "ev_3333333333333333333333333333333333333333333333333333333333333333",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-013:root-a"
+        },
+        {
+          "evidence_id": "ev_4444444444444444444444444444444444444444444444444444444444444444",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-013:root-b"
+        }
+      ],
+      "hypotheses": [
+        {
+          "id": "hypothesis_a",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_3333333333333333333333333333333333333333333333333333333333333333"
+          ],
+          "contradicting_evidence_ids": []
+        },
+        {
+          "id": "hypothesis_b",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_4444444444444444444444444444444444444444444444444444444444444444"
+          ],
+          "contradicting_evidence_ids": []
+        }
+      ],
+      "candidates": [
+        {
+          "id": "unauthorized_production_probe",
+          "outcomes": [
+            "recovered",
+            "not_recovered"
+          ],
+          "authorization": "Denied",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ServiceRestart",
+          "declared_source_impact": "service_restart",
+          "impact_mapping_note": "Direct mapping from the proof-obligation candidate contract.",
+          "estimated_time_seconds": 30,
+          "estimated_energy_joules": 3,
+          "estimated_risk": 0.15,
+          "cost_units": 1,
+          "description": "Restart a production service without authorization",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.98,
+                0.02
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.02,
+                0.98
+              ]
+            }
+          ]
+        },
+        {
+          "id": "authorized_staging_reproduction",
+          "outcomes": [
+            "reproduced",
+            "not_reproduced"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ReadOnlyObservation",
+          "declared_source_impact": "isolated_test",
+          "impact_mapping_note": "Mapped to read-only planner impact because the test target is a disposable isolated fixture, not production.",
+          "estimated_time_seconds": 90,
+          "estimated_energy_joules": 9,
+          "estimated_risk": 0.01,
+          "cost_units": 3,
+          "description": "Reproduce the fault in an authorized staging environment",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                0.65,
+                0.35
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                0.35,
+                0.65
+              ]
+            }
+          ]
+        }
+      ],
+      "likelihood_scenarios": [
+        {
+          "scenario_id": "nominal",
+          "scenario_probability": 0.7,
+          "experiments": [
+            {
+              "experiment_id": "unauthorized_production_probe",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.98,
+                    0.02
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.02,
+                    0.98
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "authorized_staging_reproduction",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.65,
+                    0.35
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.35,
+                    0.65
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "likelihood_shift",
+          "scenario_probability": 0.3,
+          "experiments": [
+            {
+              "experiment_id": "unauthorized_production_probe",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.98,
+                    0.02
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.02,
+                    0.98
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "authorized_staging_reproduction",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    0.65,
+                    0.35
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    0.35,
+                    0.65
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "terminal_decisions": [
+        {
+          "id": "action_a",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 1
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0
+            }
+          ]
+        },
+        {
+          "id": "action_b",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 1
+            }
+          ]
+        },
+        {
+          "id": "defer",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0.25
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0.25
+            }
+          ]
+        }
+      ],
+      "point_eig_config": {
+        "max_time_seconds": 600,
+        "max_energy_joules": 1200,
+        "max_risk": 0.2,
+        "cost_weights": {
+          "time": 1,
+          "energy": 1,
+          "risk": 2
+        },
+        "max_target_impact": "TemporaryConfiguration",
+        "minimum_information_gain_bits": 0.000001
+      },
+      "robust_config": {
+        "ranking_policy": "LowerTailCvar",
+        "lower_tail_probability": 0.25,
+        "minimum_top1_stability": 0
+      },
+      "decision_config": {
+        "ranking_policy": "MinimaxRegret",
+        "minimum_decision_stability": 0,
+        "maximum_worst_case_regret": null,
+        "regret_penalty": 1,
+        "minimum_selection_value": 1e-9,
+        "max_policy_evaluations": 65536
+      },
+      "synthetic_likelihood_notice": "Priors, likelihoods and utilities are authored synthetic algorithm-contract parameters. They are not measured, empirically calibrated, independently elicited or generalizable capability evidence."
+    },
+    {
+      "case_id": "REA-POA-012",
+      "evidence": [
+        {
+          "evidence_id": "ev_5555555555555555555555555555555555555555555555555555555555555555",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-012:root-a"
+        },
+        {
+          "evidence_id": "ev_6666666666666666666666666666666666666666666666666666666666666666",
+          "origin": "IndependentObservation",
+          "parent_evidence_ids": [],
+          "fixture_source_family_id": "synthetic:REA-POA-012:root-b"
+        }
+      ],
+      "hypotheses": [
+        {
+          "id": "hypothesis_a",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_5555555555555555555555555555555555555555555555555555555555555555"
+          ],
+          "contradicting_evidence_ids": []
+        },
+        {
+          "id": "hypothesis_b",
+          "prior_probability": 0.5,
+          "supporting_evidence_ids": [
+            "ev_6666666666666666666666666666666666666666666666666666666666666666"
+          ],
+          "contradicting_evidence_ids": []
+        }
+      ],
+      "candidates": [
+        {
+          "id": "run_one_short_session",
+          "outcomes": [
+            "no_network_event"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ReadOnlyObservation",
+          "declared_source_impact": "isolated_test",
+          "impact_mapping_note": "Mapped to read-only planner impact because the test target is a disposable isolated fixture, not production.",
+          "estimated_time_seconds": 30,
+          "estimated_energy_joules": 3,
+          "estimated_risk": 0.01,
+          "cost_units": 1,
+          "description": "Run one short observed application session",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                1
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "id": "claim_absence_from_no_event",
+          "outcomes": [
+            "none_seen"
+          ],
+          "authorization": "Authorized",
+          "reversible": true,
+          "destructive": false,
+          "target_impact": "ReadOnlyObservation",
+          "declared_source_impact": "read_only",
+          "impact_mapping_note": "Direct mapping from the proof-obligation candidate contract.",
+          "estimated_time_seconds": 7.5,
+          "estimated_energy_joules": 0.75,
+          "estimated_risk": 0.01,
+          "cost_units": 0.25,
+          "description": "Promote no observed event to a universal absence claim",
+          "point_likelihoods": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "outcome_probabilities": [
+                1
+              ]
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "outcome_probabilities": [
+                1
+              ]
+            }
+          ]
+        }
+      ],
+      "likelihood_scenarios": [
+        {
+          "scenario_id": "nominal",
+          "scenario_probability": 0.7,
+          "experiments": [
+            {
+              "experiment_id": "run_one_short_session",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "claim_absence_from_no_event",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "scenario_id": "likelihood_shift",
+          "scenario_probability": 0.3,
+          "experiments": [
+            {
+              "experiment_id": "run_one_short_session",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                }
+              ]
+            },
+            {
+              "experiment_id": "claim_absence_from_no_event",
+              "likelihoods": [
+                {
+                  "hypothesis_id": "hypothesis_a",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                },
+                {
+                  "hypothesis_id": "hypothesis_b",
+                  "outcome_probabilities": [
+                    1
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "terminal_decisions": [
+        {
+          "id": "action_a",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 1
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0
+            }
+          ]
+        },
+        {
+          "id": "action_b",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 1
+            }
+          ]
+        },
+        {
+          "id": "defer",
+          "utilities": [
+            {
+              "hypothesis_id": "hypothesis_a",
+              "utility": 0.25
+            },
+            {
+              "hypothesis_id": "hypothesis_b",
+              "utility": 0.25
+            }
+          ]
+        }
+      ],
+      "point_eig_config": {
+        "max_time_seconds": 600,
+        "max_energy_joules": 1200,
+        "max_risk": 0.2,
+        "cost_weights": {
+          "time": 1,
+          "energy": 1,
+          "risk": 2
+        },
+        "max_target_impact": "TemporaryConfiguration",
+        "minimum_information_gain_bits": 0.000001
+      },
+      "robust_config": {
+        "ranking_policy": "LowerTailCvar",
+        "lower_tail_probability": 0.25,
+        "minimum_top1_stability": 0
+      },
+      "decision_config": {
+        "ranking_policy": "MinimaxRegret",
+        "minimum_decision_stability": 0,
+        "maximum_worst_case_regret": null,
+        "regret_penalty": 1,
+        "minimum_selection_value": 1e-9,
+        "max_policy_evaluations": 65536
+      },
+      "synthetic_likelihood_notice": "Priors, likelihoods and utilities are authored synthetic algorithm-contract parameters. They are not measured, empirically calibrated, independently elicited or generalizable capability evidence."
+    }
+  ]
+}

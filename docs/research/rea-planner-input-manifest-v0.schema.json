@@ -1,0 +1,552 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/research/rea-planner-input-manifest-v0.schema.json",
+  "title": "REA planner input manifest v0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "dataset_id",
+    "status",
+    "source_policy",
+    "access_policy",
+    "not_human_adjudicated",
+    "source_case_view_commit_sha",
+    "source_case_view_file_git_blob_sha1",
+    "cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "dataset_id": {
+      "const": "rea-planner-input-manifest"
+    },
+    "status": {
+      "const": "synthetic_development_only"
+    },
+    "source_policy": {
+      "const": "synthetic_likelihoods_and_utilities"
+    },
+    "access_policy": {
+      "const": "agent_visible_development_input_only"
+    },
+    "not_human_adjudicated": {
+      "const": true
+    },
+    "source_case_view_commit_sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "source_case_view_file_git_blob_sha1": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/case"
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "evidence_id",
+        "origin",
+        "parent_evidence_ids",
+        "fixture_source_family_id"
+      ],
+      "properties": {
+        "evidence_id": {
+          "type": "string",
+          "pattern": "^ev_[a-f0-9]{64}$"
+        },
+        "origin": {
+          "enum": [
+            "IndependentObservation",
+            "IndependentDerivation",
+            "ModelGenerated",
+            "Synthetic",
+            "ExternalReference"
+          ]
+        },
+        "parent_evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^ev_[a-f0-9]{64}$"
+          },
+          "uniqueItems": true
+        },
+        "fixture_source_family_id": {
+          "type": "string",
+          "minLength": 3
+        }
+      }
+    },
+    "hypothesis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "prior_probability",
+        "supporting_evidence_ids",
+        "contradicting_evidence_ids"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "prior_probability": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "supporting_evidence_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^ev_[a-f0-9]{64}$"
+          },
+          "uniqueItems": true
+        },
+        "contradicting_evidence_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^ev_[a-f0-9]{64}$"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "outcomes",
+        "authorization",
+        "reversible",
+        "destructive",
+        "target_impact",
+        "declared_source_impact",
+        "impact_mapping_note",
+        "estimated_time_seconds",
+        "estimated_energy_joules",
+        "estimated_risk",
+        "cost_units",
+        "description",
+        "point_likelihoods"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcomes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "authorization": {
+          "enum": [
+            "Unknown",
+            "Denied",
+            "Authorized"
+          ]
+        },
+        "reversible": {
+          "type": "boolean"
+        },
+        "destructive": {
+          "type": "boolean"
+        },
+        "target_impact": {
+          "enum": [
+            "ReadOnlyObservation",
+            "TemporaryConfiguration",
+            "ServiceRestart",
+            "DataMutation",
+            "PhysicalActuation"
+          ]
+        },
+        "declared_source_impact": {
+          "enum": [
+            "read_only",
+            "temporary_configuration",
+            "service_restart",
+            "data_mutation",
+            "physical_actuation",
+            "isolated_test"
+          ]
+        },
+        "impact_mapping_note": {
+          "type": "string",
+          "minLength": 8
+        },
+        "estimated_time_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "estimated_energy_joules": {
+          "type": "number",
+          "minimum": 0
+        },
+        "estimated_risk": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "cost_units": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "description": {
+          "type": "string",
+          "minLength": 5
+        },
+        "point_likelihoods": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hypothesis_id",
+              "outcome_probabilities"
+            ],
+            "properties": {
+              "hypothesis_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "outcome_probabilities": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "scenario_probability",
+        "experiments"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario_probability": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "experiments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "experiment_id",
+              "likelihoods"
+            ],
+            "properties": {
+              "experiment_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "likelihoods": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "hypothesis_id",
+                    "outcome_probabilities"
+                  ],
+                  "properties": {
+                    "hypothesis_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "outcome_probabilities": {
+                      "type": "array",
+                      "minItems": 1,
+                      "items": {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "utilities"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "utilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "hypothesis_id",
+              "utility"
+            ],
+            "properties": {
+              "hypothesis_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "utility": {
+                "type": "number"
+              }
+            }
+          }
+        }
+      }
+    },
+    "baseConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "max_time_seconds",
+        "max_energy_joules",
+        "max_risk",
+        "cost_weights",
+        "max_target_impact",
+        "minimum_information_gain_bits"
+      ],
+      "properties": {
+        "max_time_seconds": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_energy_joules": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "max_risk": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "cost_weights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "time",
+            "energy",
+            "risk"
+          ],
+          "properties": {
+            "time": {
+              "type": "number",
+              "minimum": 0
+            },
+            "energy": {
+              "type": "number",
+              "minimum": 0
+            },
+            "risk": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        },
+        "max_target_impact": {
+          "enum": [
+            "ReadOnlyObservation",
+            "TemporaryConfiguration",
+            "ServiceRestart",
+            "DataMutation",
+            "PhysicalActuation"
+          ]
+        },
+        "minimum_information_gain_bits": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "case": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "evidence",
+        "hypotheses",
+        "candidates",
+        "likelihood_scenarios",
+        "terminal_decisions",
+        "point_eig_config",
+        "robust_config",
+        "decision_config",
+        "synthetic_likelihood_notice"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^REA-POA-[0-9]{3}$"
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        },
+        "hypotheses": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/hypothesis"
+          }
+        },
+        "candidates": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/candidate"
+          }
+        },
+        "likelihood_scenarios": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/scenario"
+          }
+        },
+        "terminal_decisions": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/decision"
+          }
+        },
+        "point_eig_config": {
+          "$ref": "#/$defs/baseConfig"
+        },
+        "robust_config": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ranking_policy",
+            "lower_tail_probability",
+            "minimum_top1_stability"
+          ],
+          "properties": {
+            "ranking_policy": {
+              "enum": [
+                "ExpectedInformationGain",
+                "WorstCaseInformationGain",
+                "LowerTailCvar"
+              ]
+            },
+            "lower_tail_probability": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 1
+            },
+            "minimum_top1_stability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          }
+        },
+        "decision_config": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ranking_policy",
+            "minimum_decision_stability",
+            "maximum_worst_case_regret",
+            "regret_penalty",
+            "minimum_selection_value",
+            "max_policy_evaluations"
+          ],
+          "properties": {
+            "ranking_policy": {
+              "enum": [
+                "ExpectedEvsi",
+                "WorstCaseEvsi",
+                "LowerTailCvarEvsi",
+                "ExpectedEvsiMinusWorstCaseRegret",
+                "MinimaxRegret"
+              ]
+            },
+            "minimum_decision_stability": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "maximum_worst_case_regret": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "regret_penalty": {
+              "type": "number",
+              "minimum": 0
+            },
+            "minimum_selection_value": {
+              "type": "number",
+              "minimum": 0
+            },
+            "max_policy_evaluations": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        },
+        "synthetic_likelihood_notice": {
+          "type": "string",
+          "minLength": 40
+        }
+      }
+    }
+  }
+}
