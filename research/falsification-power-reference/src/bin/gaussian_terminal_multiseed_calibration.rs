@@ -138,9 +138,7 @@ fn wilson_95(successes: u64, trials: u64) -> (f64, f64) {
     let z2 = WILSON_Z_95 * WILSON_Z_95;
     let denominator = 1.0 + z2 / n;
     let center = (p + z2 / (2.0 * n)) / denominator;
-    let half = WILSON_Z_95
-        * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt()
-        / denominator;
+    let half = WILSON_Z_95 * (p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt() / denominator;
     ((center - half).max(0.0), (center + half).min(1.0))
 }
 
@@ -180,9 +178,7 @@ fn run_seed(
 ) -> Result<SeedResult, Box<dyn Error>> {
     let mut counts = Counts::new();
     for path in 0..PATHS_PER_ROOT_SEED {
-        let seed = root_seed
-            ^ scenario.seed_offset()
-            ^ path.wrapping_mul(PATH_SEED_MULTIPLIER);
+        let seed = root_seed ^ scenario.seed_offset() ^ path.wrapping_mul(PATH_SEED_MULTIPLIER);
         let mut observation_rng = SplitMix64::new(seed);
         let mut observations = Vec::with_capacity(HORIZON);
         let mut induced_stops = vec![None; STOP_THRESHOLDS.len()];
@@ -202,9 +198,7 @@ fn run_seed(
 
         let terminal = design.evaluate_prefix(&observations)?;
         let terminal_np_reject = terminal.conditional_rejection_probability >= 0.5;
-        if terminal.conditional_rejection_probability
-            != if terminal_np_reject { 1.0 } else { 0.0 }
-        {
+        if terminal.conditional_rejection_probability != if terminal_np_reject { 1.0 } else { 0.0 } {
             counts.terminal_induced_mismatches += 1;
         }
         if terminal_np_reject {
@@ -254,11 +248,7 @@ fn seed_json(result: &SeedResult, analytic_power: f64) -> String {
     )
 }
 
-fn scenario_json(
-    scenario: Scenario,
-    results: &[SeedResult],
-    analytic_power: f64,
-) -> String {
+fn scenario_json(scenario: Scenario, results: &[SeedResult], analytic_power: f64) -> String {
     let mut pooled = Counts::new();
     for result in results {
         pooled.merge(&result.counts);
@@ -354,11 +344,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         design.total_information(),
         design.terminal_power(),
         scenario_json(Scenario::Null, &null, design.terminal_power()),
-        scenario_json(
-            Scenario::Alternative,
-            &alternative,
-            design.terminal_power()
-        )
+        scenario_json(Scenario::Alternative, &alternative, design.terminal_power())
     );
     Ok(())
 }
@@ -382,9 +368,12 @@ mod tests {
 
     #[test]
     fn analytic_terminal_power_matches_frozen_known_answer() {
-        let design =
-            GaussianTerminalInducedTest::new(ALPHA, vec![DISCREPANCY; HORIZON], vec![SIGMA; HORIZON])
-                .unwrap();
+        let design = GaussianTerminalInducedTest::new(
+            ALPHA,
+            vec![DISCREPANCY; HORIZON],
+            vec![SIGMA; HORIZON],
+        )
+        .unwrap();
         assert!((design.total_information() - 6.05).abs() < 1.0e-12);
         assert!((design.terminal_power() - 0.792_412_72).abs() < 1.0e-7);
     }
