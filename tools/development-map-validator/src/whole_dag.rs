@@ -513,8 +513,10 @@ fn score_trace(
         let expected = truth.expected_state.clone();
         let correct = claim.claimed_relation == expected;
         let false_concurrency = claim.claimed_relation == "concurrent" && expected != "concurrent";
+        // A causal assertion is supported only if it is entailed by every
+        // admissible world, not merely possible in one of them.
         let unsupported_causal = ["before", "after"].contains(&claim.claimed_relation.as_str())
-            && !truth.possible_relations.contains(&claim.claimed_relation);
+            && expected != claim.claimed_relation;
         let unnecessary_abstention = claim.claimed_relation == "underdetermined"
             && ["before", "after", "concurrent"].contains(&expected.as_str());
         let missed_compromise = expected == "compromised" && claim.claimed_relation != "compromised";
@@ -750,6 +752,27 @@ mod tests {
         assert_eq!(ef.possible_relations, vec!["before".to_owned()]);
         assert_eq!(ef.expected_state, "before");
         assert!(ef.correct);
+    }
+
+    #[test]
+    fn merely_possible_causal_relation_is_still_unsupported_as_an_assertion() {
+        let mut value = fixture_value();
+        let t = value["candidate_traces"].as_array_mut().expect("traces")
+            .iter_mut().find(|trace| trace["trace_id"] == "world-consistent-agent")
+            .expect("trace");
+        let claim = t["relation_claims"].as_array_mut().expect("claims")
+            .iter_mut().find(|claim| claim["left_event_id"] == "A" && claim["right_event_id"] == "B")
+            .expect("A/B claim");
+        claim["claimed_relation"] = json!("before");
+        let report = report_for(&value);
+        let scored = trace(&report, "world-consistent-agent");
+        let pair = scored.pair_outcomes.iter().find(|pair| {
+            pair.left_event_id == "A" && pair.right_event_id == "B"
+        }).expect("A/B pair");
+        assert!(pair.individually_plausible);
+        assert!(!pair.correct);
+        assert!(pair.unsupported_causal_claim);
+        assert_eq!(scored.unsupported_causal_claim_count, 1);
     }
 
     #[test]
