@@ -17,7 +17,7 @@ struct CandidateOption { available_at: DateTime<FixedOffset>, estimate_upper: u6
 struct OracleOption { available_at: DateTime<FixedOffset>, costs: BTreeMap<String, Vec<u64>> }
 #[derive(Clone)]
 struct World { probability_bps: u64, safe_actions: BTreeSet<String>, observations: BTreeMap<String, String> }
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 struct ActionPolicy { irreversible: bool, hard_gate: bool, max_residual_risk_bps: u64 }
 
 fn object<'a>(value: &'a Value, label: &str) -> Result<&'a serde_json::Map<String, Value>, String> {
@@ -115,13 +115,13 @@ fn parse_oracle_options(value: &Value, candidate: &BTreeMap<String, CandidateOpt
     if output.len() != candidate.len() { return Err("candidate and oracle option sets must match exactly".to_owned()); }
     Ok(output)
 }
-fn parse_actions(value: &Value) -> Result<BTreeMap<String, ActionPolicy>, String> {
-    let items = required_value(value, "actions", "candidate_view")?.as_array()
-        .ok_or("candidate_view.actions must be an array")?;
-    if items.is_empty() { return Err("candidate_view.actions must not be empty".to_owned()); }
+fn parse_action_policies(value: &Value, root: &str) -> Result<BTreeMap<String, ActionPolicy>, String> {
+    let items = required_value(value, "actions", root)?.as_array()
+        .ok_or_else(|| format!("{root}.actions must be an array"))?;
+    if items.is_empty() { return Err(format!("{root}.actions must not be empty")); }
     let mut output = BTreeMap::new();
     for (index, item) in items.iter().enumerate() {
-        let label = format!("candidate_view.actions[{index}]");
+        let label = format!("{root}.actions[{index}]");
         allowed_keys(item, &["action_id", "irreversible", "hard_gate", "max_residual_risk_bps"], &label)?;
         let id = required_str(item, "action_id", &label)?;
         let irreversible = required_bool(item, "irreversible", &label)?;
@@ -244,6 +244,7 @@ fn evaluate_trace(
 
     let mut remaining: Vec<&World> = worlds.values().collect();
     let mut uses: BTreeMap<String, usize> = BTreeMap::new();
+    let mut previous_acquisition_at: Option<DateTime<FixedOffset>> = None;
     let mut step_reports = Vec::new();
     let mut total_cost = 0u64;
     let mut redundant = 0usize;
@@ -261,6 +262,10 @@ fn evaluate_trace(
         let mode = required_str(step, "mode", &step_label)?;
         if !["cold", "warm", "retry"].contains(&mode.as_str()) { return Err(format!("{step_label}.mode must be cold, warm, or retry")); }
         let at = parse_time(step, "at", &step_label)?;
+        if previous_acquisition_at.as_ref().is_some_and(|previous| &at < previous) {
+            return Err(format!("{step_label}.at must be nondecreasing across sequential acquisitions"));
+        }
+        previous_acquisition_at = Some(at.clone());
         let visible = candidate_options.get(&option_id).ok_or_else(|| format!("{step_label} references unknown option {option_id:?}"))?;
         let oracle = oracle_options.get(&option_id).ok_or_else(|| format!("oracle cost for {option_id:?} is missing"))?;
         let previous_uses = *uses.get(&option_id).unwrap_or(&0);
@@ -363,14 +368,26 @@ pub fn evaluate_risk_acquisition_json(raw: &str) -> Result<Value, String> {
     let candidate = required_value(&bundle, "candidate_view", "bundle")?;
     let oracle = required_value(&bundle, "oracle", "bundle")?;
     allowed_keys(candidate, &["scenario_id", "decision_cutoff", "budget_micros", "actions", "options", "traces"], "candidate_view")?;
-    allowed_keys(oracle, &["actual_world_id", "worlds", "options"], "oracle")?;
+    allowed_keys(oracle, &["actual_world_id", "decision_cutoff", "budget_micros", "actions", "worlds", "options"], "oracle")?;
     let scenario_id = required_str(candidate, "scenario_id", "candidate_view")?;
     let cutoff = parse_time(candidate, "decision_cutoff", "candidate_view")?;
+    let oracle_cutoff = parse_time(oracle, "decision_cutoff", "oracle")?;
+    if cutoff != oracle_cutoff {
+        return Err("candidate decision cutoff differs from evaluator-authoritative cutoff".to_owned());
+    }
     let budget_micros = required_u64(candidate, "budget_micros", "candidate_view")?;
+    let oracle_budget_micros = required_u64(oracle, "budget_micros", "oracle")?;
+    if budget_micros != oracle_budget_micros {
+        return Err("candidate budget differs from evaluator-authoritative budget".to_owned());
+    }
     let candidate_options = parse_candidate_options(candidate)?;
     let option_ids: BTreeSet<String> = candidate_options.keys().cloned().collect();
     let oracle_options = parse_oracle_options(oracle, &candidate_options)?;
-    let actions = parse_actions(candidate)?;
+    let actions = parse_action_policies(candidate, "candidate_view")?;
+    let authoritative_actions = parse_action_policies(oracle, "oracle")?;
+    if actions != authoritative_actions {
+        return Err("candidate action policies differ from evaluator-authoritative action policies".to_owned());
+    }
     let action_ids: BTreeSet<String> = actions.keys().cloned().collect();
     let (worlds, actual_world_id) = parse_worlds(oracle, &option_ids, &action_ids)?;
     let traces = required_value(candidate, "traces", "candidate_view")?.as_array()
