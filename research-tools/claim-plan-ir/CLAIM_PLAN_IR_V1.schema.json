@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research-tools/claim-plan-ir/CLAIM_PLAN_IR_V1.schema.json",
   "title": "Symthaea Claim Plan IR v1",
-  "description": "Verifier-authorized plan envelope. This schema validates structure only; it does not authenticate evidence, verify a proof, or grant authority. Privacy profile references bind cumulative-disclosure, presentation-linkability, proof-shape, adaptive-query, budget-enforcement, status-lookup and observer-metadata contracts owned by their named systems. Canonicalization is an explicit required field; raw JSON duplicate-name detection and I-JSON/JCS numeric admission must occur before canonical serialization. A plan may bind multiple typed fields from the same authenticated HTTP response; the predicate AST refers to exact field IDs, and freshness predicates anchor to the verifier request issue time. The nested field interpretation schema explicitly enumerates value type, unit, currency, scale, timezone and conversion-profile identity. Verifier request issued_at and expires_at use fixed-width UTC seconds to make lifetime ordering deterministic in the v1 preflight.",
+  "description": "Verifier-authorized plan envelope. This schema validates structure only; it does not authenticate evidence, verify a proof, or grant authority. Privacy profile references bind cumulative-disclosure, presentation-linkability, proof-shape, adaptive-query, budget-enforcement, status-lookup and observer-metadata contracts owned by their named systems. Canonicalization is an explicit required field; raw JSON duplicate-name detection and I-JSON/JCS numeric admission must occur before canonical serialization. A plan may bind multiple typed fields from the same authenticated HTTP response; the predicate AST refers to exact field IDs, and freshness predicates anchor to the verifier request issue time. The nested field interpretation schema explicitly enumerates value type, unit, currency, scale, timezone and conversion-profile identity. Verifier request issued_at and expires_at use fixed-width UTC seconds to make lifetime ordering deterministic in the v1 preflight. The required trust block distinguishes session witness identity, evidence artifact kinds, post-session verification scope, plaintext visibility and collusion assumptions. It prevents a portable proof claim from being inferred solely from the presence of a ZK proof.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -16,6 +16,7 @@
     "request",
     "uniqueness",
     "privacy",
+    "trust",
     "proof",
     "dependencies"
   ],
@@ -544,6 +545,69 @@
         "$ref": "#/$defs/field_binding"
       },
       "description": "All selected fields must be opened from the same authenticated response ordinal under this source profile. Field IDs are unique within the plan (checked by semantic preflight)."
+    },
+    "trust": {
+      "type": "object",
+      "description": "Explicit source-witness, evidence-transferability and trust-root profile. A ZK proof does not remove the trust required to witness the TLS session.",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "session_witness_kind",
+        "session_witness_identity",
+        "evidence_artifact_kinds",
+        "verification_scope",
+        "plaintext_visibility_profile",
+        "collusion_assumptions_profile"
+      ],
+      "properties": {
+        "profile": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "session_witness_kind": {
+          "enum": [
+            "direct_verifier",
+            "proxy_verifier",
+            "delegated_notary",
+            "protocol_attestor",
+            "tee_attestor"
+          ]
+        },
+        "session_witness_identity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "evidence_artifact_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "verified_live_session",
+              "signed_transcript_attestation",
+              "signed_value_commitment",
+              "transparent_zk_proof",
+              "tee_quote",
+              "state_root_signature",
+              "membership_or_consistency_proof"
+            ]
+          }
+        },
+        "verification_scope": {
+          "enum": [
+            "same_session_participant",
+            "delegated_attestation_verifier",
+            "public_cryptographic_verifier",
+            "tcb_attestation_verifier"
+          ]
+        },
+        "plaintext_visibility_profile": {
+          "$ref": "#/$defs/profile_reference"
+        },
+        "collusion_assumptions_profile": {
+          "$ref": "#/$defs/profile_reference"
+        }
+      }
     }
   },
   "$defs": {
