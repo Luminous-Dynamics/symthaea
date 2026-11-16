@@ -889,9 +889,9 @@ mod tests {
     }
 
     #[test]
-    fn p90_order_statistic_bound_needs_about_thirty_successful_repeats() {
-        assert_eq!(upper_order_statistic_index(30, 0.90, 0.95), Some(30));
-        assert_eq!(upper_order_statistic_index(29, 0.90, 0.95), None);
+    fn p90_order_statistic_bound_has_exact_28_vs_29_trial_boundary() {
+        assert_eq!(upper_order_statistic_index(29, 0.90, 0.95), Some(29));
+        assert_eq!(upper_order_statistic_index(28, 0.90, 0.95), None);
     }
 
     #[test]
