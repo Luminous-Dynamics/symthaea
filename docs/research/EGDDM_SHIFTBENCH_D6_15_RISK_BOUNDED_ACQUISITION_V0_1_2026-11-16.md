@@ -18,6 +18,8 @@ D6.15 distinguishes a critical irreversible action from a reversible low-impact 
 
 The standalone Rust binary \`risk-acquisition\` consumes candidate-visible decision cutoffs, budgets, action policies, query availability, cost estimates and candidate acquisition traces, plus evaluator-only known-answer worlds, safety labels, option outcomes, actual world and cold/warm/retry cost samples.
 
+Candidate-visible action policies, budget and decision cutoff are checked against separate evaluator-authoritative copies; candidate input cannot relax a critical gate, inflate its budget or move the evidence cutoff. Acquisition timestamps must be nondecreasing, so an out-of-order trace is rejected.
+
 It rejects incomplete/unknown-cost records; charges nearest-rank p95 of evaluator-supplied samples; applies only observations available by both decision cutoff and source availability; rejects observations inconsistent with the actual world; recomputes residual risk after every accepted acquisition; enforces all-worlds-safe hard gates for irreversible actions; separately scores bounded-risk reversible actions; and detects duplicate checks, cost-estimate undercoverage, budget overruns and future evidence.
 
 The tool exhaustively enumerates up to 20 eligible options to compute a **fixed-outcome minimal-sufficient acquisition-set lower bound** for the known-answer actual world. This is not a globally optimal adaptive policy: v0.1 has no stochastic transitions or cross-option cost interactions.
