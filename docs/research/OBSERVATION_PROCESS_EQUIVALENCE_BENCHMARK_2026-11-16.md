@@ -60,15 +60,31 @@ This control is designed to catch entropy-only samplers that pay to learn about 
 
 When the reference sensor is unavailable, no diagnosis is returned. The failed request is not converted into a measurement, and no realized information is credited. Later versions should additionally bind the consumed action/resource budget and failure receipt.
 
+## Noisy paired-world extension
+
+The fixture now also includes a two-hypothesis noisy control. Under both the physical-hazard and sensor-offset mechanisms, the passive primary sensor has the same likelihood for every observation: for example, P(low | hazard) = P(low | offset) = 0.2 and P(high | hazard) = P(high | offset) = 0.8. Therefore passive observations leave the prior at 0.5 and yield exactly zero EIG, even after repeated samples.
+
+A permitted independent reference probe is imperfect but informative:
+
+- P(hot reading | physical hazard) = 0.9.
+- P(hot reading | sensor-offset world) = 0.1.
+
+With equal priors, the posterior becomes 0.9 after a hot reading and 0.1 after a cool reading. The expected information gain is `1 - H_b(0.1)`, approximately 0.531 bits. Under the existing asymmetric task loss table, prior Bayes risk is 1.0, expected post-probe risk is 0.6, and decision EVSI is 0.4 loss units. A probe cost of 0.25 is justified in this finite model; a cost of 0.5 is not. This explicitly demonstrates why a policy must not treat EIG as interchangeable with downstream decision value.
+
+The probabilities and risk values are exact synthetic fixture inputs, not empirical sensor calibration or a deployment policy.
+
 ## Test inventory
 
-The initial Rust integration test has five deterministic cases:
+The Rust integration test now has eight deterministic and exact-probability cases:
 
 1. Passive observations cannot identify opposite physical mechanisms.
 2. Independent reference probe has positive decision value.
 3. Mask-only policy information has zero value for an unchanged decision.
 4. Unavailable reference probe yields no realized information.
 5. Candidate-visible observation records are separate from evaluator-only latent truth.
+6. Identical passive likelihoods leave a noisy world posterior unchanged.
+7. A noisy independent reference probe has exact EIG and decision-EVSI values.
+8. A probe whose cost exceeds its EVSI is not justified.
 
 Command: `rustc --edition=2024 --test crates/core/symthaea-fep/tests/observation_process_equivalence.rs -o /tmp/observation-process-equivalence-tests && /tmp/observation-process-equivalence-tests --nocapture`.
 
