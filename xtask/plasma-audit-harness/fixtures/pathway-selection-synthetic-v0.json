@@ -1,0 +1,88 @@
+{
+  "schema_version": "luminous.plasma-pathway-decision.v0",
+  "decision_id": "SYNTHETIC-PAIRED-PATHWAY-DEMO-001",
+  "evidence_class": "SYNTHETIC",
+  "seed": 20261116,
+  "draws": 10000,
+  "min_feasibility": 0.99,
+  "groups": [
+    {
+      "group_id": "SYNTHETIC-NH3-CRACKING",
+      "service_status": "MATCHED",
+      "functional_unit": "1 kg accepted H2 at 200 bar",
+      "product_contract": "SYNTHETIC-H2-999-PURITY-200BAR",
+      "feedstock": "SYNTHETIC-PURE-NH3-FEED-01",
+      "boundary": "SYNTHETIC-GRID-TO-ACCEPTED-H2",
+      "currency": "USD_2026",
+      "credit_policy": "NO_CREDIT",
+      "routes": [
+        {
+          "route_id": "SYNTHETIC-PLASMA-MW",
+          "technology": "PLASMA",
+          "evidence_class": "SYNTHETIC",
+          "functional_unit": "1 kg accepted H2 at 200 bar",
+          "product_contract": "SYNTHETIC-H2-999-PURITY-200BAR",
+          "feedstock": "SYNTHETIC-PURE-NH3-FEED-01",
+          "boundary": "SYNTHETIC-GRID-TO-ACCEPTED-H2",
+          "currency": "USD_2026",
+          "credit_policy": "NO_CREDIT",
+          "metrics": [
+            {"id":"cost","unit":"USD_2026/kg_accepted_H2","low":3.8,"mode":4.2,"high":5.3,"pairing":"COMMON_EXOGENOUS","key":"electricity-price-scenario"},
+            {"id":"grid_energy","unit":"kWh/kg_accepted_H2","low":28.0,"mode":31.0,"high":37.0,"pairing":"COMMON_EXOGENOUS","key":"electricity-price-scenario"},
+            {"id":"ghg","unit":"kgCO2e/kg_accepted_H2","low":2.8,"mode":3.2,"high":4.2,"pairing":"COMMON_EXOGENOUS","key":"grid-carbon-intensity-scenario"},
+            {"id":"purity","unit":"fraction","low":0.9992,"mode":0.9997,"high":0.99995,"pairing":"ROUTE_SPECIFIC","key":"purity-residual"},
+            {"id":"recovery","unit":"fraction","low":0.985,"mode":0.990,"high":0.997,"pairing":"ROUTE_SPECIFIC","key":"recovery-residual"}
+          ],
+          "constraints": [
+            {"metric":"purity","op":"MIN","threshold":0.999},
+            {"metric":"recovery","op":"MIN","threshold":0.98}
+          ]
+        },
+        {
+          "route_id": "SYNTHETIC-THERMAL-CATALYTIC",
+          "technology": "NON_PLASMA_THERMAL_CATALYTIC",
+          "evidence_class": "SYNTHETIC",
+          "functional_unit": "1 kg accepted H2 at 200 bar",
+          "product_contract": "SYNTHETIC-H2-999-PURITY-200BAR",
+          "feedstock": "SYNTHETIC-PURE-NH3-FEED-01",
+          "boundary": "SYNTHETIC-GRID-TO-ACCEPTED-H2",
+          "currency": "USD_2026",
+          "credit_policy": "NO_CREDIT",
+          "metrics": [
+            {"id":"cost","unit":"USD_2026/kg_accepted_H2","low":4.1,"mode":4.6,"high":5.4,"pairing":"COMMON_EXOGENOUS","key":"electricity-price-scenario"},
+            {"id":"grid_energy","unit":"kWh/kg_accepted_H2","low":34.0,"mode":38.0,"high":46.0,"pairing":"COMMON_EXOGENOUS","key":"electricity-price-scenario"},
+            {"id":"ghg","unit":"kgCO2e/kg_accepted_H2","low":2.6,"mode":3.0,"high":4.0,"pairing":"COMMON_EXOGENOUS","key":"grid-carbon-intensity-scenario"},
+            {"id":"purity","unit":"fraction","low":0.9995,"mode":0.9998,"high":0.99995,"pairing":"ROUTE_SPECIFIC","key":"purity-residual"},
+            {"id":"recovery","unit":"fraction","low":0.990,"mode":0.994,"high":0.998,"pairing":"ROUTE_SPECIFIC","key":"recovery-residual"}
+          ],
+          "constraints": [
+            {"metric":"purity","op":"MIN","threshold":0.999},
+            {"metric":"recovery","op":"MIN","threshold":0.98}
+          ]
+        },
+        {
+          "route_id": "SYNTHETIC-SHOCK-WAVE",
+          "technology": "NON_PLASMA_SHOCK_WAVE",
+          "evidence_class": "SYNTHETIC",
+          "functional_unit": "1 kg accepted H2 at 200 bar",
+          "product_contract": "SYNTHETIC-H2-999-PURITY-200BAR",
+          "feedstock": "SYNTHETIC-PURE-NH3-FEED-01",
+          "boundary": "SYNTHETIC-GRID-TO-ACCEPTED-H2",
+          "currency": "USD_2026",
+          "credit_policy": "NO_CREDIT",
+          "metrics": [
+            {"id":"cost","unit":"USD_2026/kg_accepted_H2","low":3.5,"mode":4.0,"high":5.8,"pairing":"COMMON_EXOGENOUS","key":"electricity-price-scenario"},
+            {"id":"grid_energy","unit":"kWh/kg_accepted_H2","low":32.0,"mode":36.0,"high":49.0,"pairing":"COMMON_EXOGENOUS","key":"electricity-price-scenario"},
+            {"id":"ghg","unit":"kgCO2e/kg_accepted_H2","low":2.7,"mode":3.1,"high":4.3,"pairing":"COMMON_EXOGENOUS","key":"grid-carbon-intensity-scenario"},
+            {"id":"purity","unit":"fraction","low":0.9991,"mode":0.9996,"high":0.9999,"pairing":"ROUTE_SPECIFIC","key":"purity-residual"},
+            {"id":"recovery","unit":"fraction","low":0.982,"mode":0.988,"high":0.996,"pairing":"ROUTE_SPECIFIC","key":"recovery-residual"}
+          ],
+          "constraints": [
+            {"metric":"purity","op":"MIN","threshold":0.999},
+            {"metric":"recovery","op":"MIN","threshold":0.98}
+          ]
+        }
+      ]
+    }
+  ]
+}
