@@ -2308,12 +2308,12 @@
       "expected_disposition": "REJECT_METRIC_SEMANTICS_MISMATCH"
     },
     {
-      "control_id": "NC-031",
+      "control_id": "NC-075",
       "condition": "Count all theoretical solid carbon from methane pyrolysis as saleable carbon black without measured grade, purity, morphology, ash, qualification, collected yield and offtake.",
       "expected_disposition": "REJECT_UNQUALIFIED_COPRODUCT_CREDIT"
     },
     {
-      "control_id": "NC-032",
+      "control_id": "NC-076",
       "condition": "Use the arc-plasma TEA's 32 kWh/kg H2 with on-site power generation as directly equivalent to 39 kWh/kg H2 without on-site power generation or to a purchased-grid reactor-only meter.",
       "expected_disposition": "NOT_COMPARABLE_POWER_BOUNDARY_MISMATCH"
     },
@@ -2413,32 +2413,32 @@
       "expected_disposition": "REJECT_REPLICATE_COVERAGE_OVERGENERALIZATION"
     },
     {
-      "control_id": "NC-069",
+      "control_id": "NC-077",
       "condition": "Compare the gas-liquid plasma tandem's reported 1,161 kWh/kg NH3 directly with the SOEC-Haber-Bosch model's 8.14 kWh/kg NH3 and declare a 142.6x deficit or superiority without reconciling product purity, feed preparation, auxiliaries, desalination, storage and exact meter boundaries.",
       "expected_disposition": "NOT_COMPARABLE_BOUNDARY_RECONCILIATION_REQUIRED"
     },
     {
-      "control_id": "NC-070",
+      "control_id": "NC-078",
       "condition": "Treat the existing >=3 g NH3/kWh research threshold as commercial parity with integrated SOEC-Haber-Bosch; 3 g/kWh is only 333.3 kWh/kg and is not comparable to the 8.14 kWh/kg modeled integrated plant.",
       "expected_disposition": "REJECT_INSUFFICIENT_COMPETITIVENESS_THRESHOLD"
     },
     {
-      "control_id": "NC-071",
+      "control_id": "NC-079",
       "condition": "Compare the JACS area-normalized 7.7 nmol/s/cm2 ammonia rate directly with the gas-liquid system's 150.2 umol/h absolute rate without declaring geometric catalyst area, active area and identical product measurement boundary.",
       "expected_disposition": "NOT_COMPARABLE_AREA_BASIS_MISMATCH"
     },
     {
-      "control_id": "NC-072",
+      "control_id": "NC-080",
       "condition": "Treat the IEA's 2.22 GJ/t NH3 Haber-Bosch-plus-ASU electricity assumption as total ammonia production energy while ignoring the separately stated 0.18 t H2/t NH3 feed and H2-generation energy.",
       "expected_disposition": "REJECT_COMPONENT_BOUNDARY_PROMOTED_TO_FULL_CHAIN"
     },
     {
-      "control_id": "NC-073",
+      "control_id": "NC-081",
       "condition": "Treat the offshore SOEC-Haber-Bosch model's 8.14 kWh/kg NH3 as including offshore wind generation, electrical/hydrogen storage, ammonia storage and downstream transport despite those being outside the stated plant analysis.",
       "expected_disposition": "REJECT_SCOPE_PROMOTION"
     },
     {
-      "control_id": "NC-074",
+      "control_id": "NC-082",
       "condition": "Treat electrochemical Faradaic efficiency, isotope attribution, plasma vibrational temperature or an area-normalized NH3 rate as a substitute for complete grid-to-accepted-NH3 plant energy.",
       "expected_disposition": "REJECT_COMPONENT_METRIC_AS_PLANT_PERFORMANCE"
     }
