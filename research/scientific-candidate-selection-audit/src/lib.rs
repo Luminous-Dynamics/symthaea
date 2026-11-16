@@ -485,12 +485,12 @@ pub fn validate_selector_packet(packet: &SelectorPacket) -> Result<(), Selection
                 candidate.candidate_id.clone(),
             ));
         }
-        if let Some(digest) = &candidate.canonical_model_sha256 {
-            if !valid_sha256(digest) {
-                return Err(SelectionAuditError::InvalidModelDigest {
-                    candidate_id: candidate.candidate_id.clone(),
-                });
-            }
+        if let Some(digest) = &candidate.canonical_model_sha256
+            && !valid_sha256(digest)
+        {
+            return Err(SelectionAuditError::InvalidModelDigest {
+                candidate_id: candidate.candidate_id.clone(),
+            });
         }
         for value in [
             candidate.development.predictive_score,
@@ -778,19 +778,18 @@ pub fn audit_submission(
         .and_then(|id| by_id.get(id).copied());
 
     let mut dominators = Vec::new();
-    if let Some(submitted) = submitted_outcome {
-        if submitted.status == EvaluatorStatus::Scored {
-            for candidate in &packet.candidates {
-                if Some(candidate.candidate_id.as_str()) == submitted_id.as_deref() {
-                    continue;
-                }
-                if let Some(other) = by_id.get(candidate.candidate_id.as_str()) {
-                    if other.status == EvaluatorStatus::Scored
-                        && dominates(other, submitted, packet.metric_mask)
-                    {
-                        dominators.push(candidate.candidate_id.clone());
-                    }
-                }
+    if let Some(submitted) = submitted_outcome
+        && submitted.status == EvaluatorStatus::Scored
+    {
+        for candidate in &packet.candidates {
+            if Some(candidate.candidate_id.as_str()) == submitted_id.as_deref() {
+                continue;
+            }
+            if let Some(other) = by_id.get(candidate.candidate_id.as_str())
+                && other.status == EvaluatorStatus::Scored
+                && dominates(other, submitted, packet.metric_mask)
+            {
+                dominators.push(candidate.candidate_id.clone());
             }
         }
     }
