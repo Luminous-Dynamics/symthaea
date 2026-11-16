@@ -160,7 +160,7 @@ The terminal NP method is an evaluator oracle because it knows the correct discr
 
 ## Finite-action mechanism separation oracle
 
-The mechanism_separation module computes quantized action-response equivalence classes for a finite mechanism set, then exhaustively searches bounded replicate vectors for the minimum-cost schedule that separates all distinct classes under a conservative Bonferroni family-wise Gaussian LR requirement across every cross-class mechanism pair.
+The mechanism_separation module computes exact finite action-response equivalence classes (canonicalizing signed zero only) for a finite mechanism set, then exhaustively searches bounded replicate vectors for the minimum-cost schedule that separates all distinct classes under a conservative Bonferroni family-wise Gaussian LR requirement across every cross-class mechanism pair.
 
 - Frozen action inputs carry known sigma, replicate cost and a separate exact response signature for numerical signature buckets.
 - Mechanisms in one signature class remain set-valued; no number of repeats of the declared actions can distinguish them under this evaluator contract.
