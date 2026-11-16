@@ -2504,8 +2504,8 @@ mod tests {
         let plasma_summary = audit_source_value(&plasma, "plasma-source-cases").unwrap();
         let hts_summary = audit_source_value(&hts, "hts-source-cases").unwrap();
 
-        assert_eq!(plasma_summary.case_count, 48);
-        assert_eq!(plasma_summary.negative_control_count, 82);
+        assert_eq!(plasma_summary.case_count, 49);
+        assert_eq!(plasma_summary.negative_control_count, 88);
         assert_eq!(plasma_summary.benchmark_target_count, 9);
         let plasma_case_ids: BTreeSet<_> = plasma
             .get("cases")
