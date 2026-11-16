@@ -289,6 +289,11 @@ pub fn evaluate_decision_value_of_information(
                 .iter()
                 .map(|scenario_id| scenarios[scenario_id].probability_weight)
                 .sum::<f64>();
+            // Zero-probability signals carry no posterior mass and are not
+            // evaluated. Their scenarios still require a complete signal map.
+            if signal_probability <= 0.0 {
+                continue;
+            }
 
             let mut conditional_values = BTreeMap::new();
             for alternative_id in &alternatives {
@@ -484,7 +489,7 @@ fn validate_plan(plan: &DecisionValuePlan) -> Vec<DecisionVoIDiagnostic> {
         if !scenario_ids.insert(scenario.scenario_id.as_str()) {
             diagnostics.push(DecisionVoIDiagnostic::DuplicateScenarioIdentity);
         }
-        if !scenario.probability_weight.is_finite() || scenario.probability_weight <= 0.0 {
+        if !scenario.probability_weight.is_finite() || scenario.probability_weight < 0.0 {
             diagnostics.push(DecisionVoIDiagnostic::InvalidScenarioWeight);
         }
         if scenario.weight_evidence_ref.trim().is_empty() {
@@ -1057,6 +1062,31 @@ mod tests {
         assert!(report
             .diagnostics
             .contains(&DecisionVoIDiagnostic::EmptySignalEvidence));
+    }
+
+    #[test]
+    fn zero_weight_scenario_is_allowed_but_zero_probability_signal_is_omitted() {
+        let mut input = plan();
+        input.scenarios[3].probability_weight = 0.0;
+        input.scenarios[0].probability_weight = 1.0 / 3.0;
+        input.scenarios[1].probability_weight = 1.0 / 3.0;
+        input.scenarios[2].probability_weight = 1.0 / 3.0;
+        for experiment in &mut input.experiments {
+            // All signals that only contain s4 have zero probability mass.
+            // The other signal outcomes remain fully mapped and admissible.
+            if experiment.experiment_id == "e3-overpriced-perfect-test" {
+                experiment.signal_map.retain(|signal| signal.scenario_id != "s4");
+            }
+        }
+        // Keep s4 in the complete mapping: zero mass is not missing evidence.
+        let report = evaluate_decision_value_of_information(&input);
+        assert_eq!(report.disposition, DecisionVoIDisposition::SyntheticOnly);
+        let perfect = report
+            .experiments
+            .iter()
+            .find(|item| item.experiment_id == "e3-overpriced-perfect-test")
+            .unwrap();
+        assert!(perfect.signals.iter().all(|signal| signal.signal_probability > 0.0));
     }
 
     #[test]
