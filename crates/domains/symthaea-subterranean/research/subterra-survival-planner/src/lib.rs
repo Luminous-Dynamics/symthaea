@@ -32,7 +32,7 @@ pub struct MissionDecision {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OutcomeKind {
-    /// A verified observation is returned to the planner; more sensing may follow.
+    /// An observation outcome is admitted by the caller; evidence / receipt verification is external.
     Observation,
     /// The robot safely retreats; no further observation in this mission branch.
     SafeRetreat,
@@ -40,8 +40,9 @@ pub enum OutcomeKind {
     MissionInterrupted,
     /// The robot is lost; no future observations or data return are assumed.
     RobotLost,
-    /// Communications are lost, but local evidence is retained for
-    /// store-and-forward recovery. This branch ends the current survey sequence.
+    /// Communications are lost. Use this only when an external record verifies
+    /// local evidence retention for store-and-forward; otherwise encode the data
+    /// loss in a different terminal outcome and its supplied loss vector.
     RelayLostStoreAndForward,
 }
 
