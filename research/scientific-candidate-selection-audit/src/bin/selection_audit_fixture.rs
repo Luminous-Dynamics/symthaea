@@ -75,6 +75,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         task_id: "scilaws-real-candidate-selection-fixture".to_owned(),
         candidate_pool_sha256: POOL_SHA.to_owned(),
         metric_mask: MetricMask::REAL_FIT_AND_VALIDITY,
+        cost_unit_id: "fixture_cost_units".to_owned(),
+        budget_limit_cost_units: 5.0,
         permitted_evidence: vec![PermittedEvidence {
             evidence_id: "development-fold-01".to_owned(),
             sha256: EVIDENCE_SHA.to_owned(),
