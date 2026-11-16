@@ -26,6 +26,14 @@ A missing sample can be informative about a sampling policy, source outage, cens
 
 The event envelope is a data contract. It does not assert a causal interpretation for missingness.
 
+A useful formal starting point is a coupled but non-collapsed model:
+
+- World dynamics: \(x_{t+\Delta t} \sim p_\theta(x_{t+\Delta t} \mid x_t, a_t, \Delta t)\).
+- Measurement values: \(y_{i,t} \sim p_\phi(y_{i,t} \mid x_t, s_i, c_i)\) for dimensions actually measured.
+- Observation process: \(m_{i,t} \sim p_\psi(m_{i,t} \mid x_t, \pi_i, h_i, q_i)\), where \(\pi_i\) is the declared sampling policy, \(h_i\) source health, and \(q_i\) delivery/quality state.
+
+The joint model may factor as \(p(y,m\mid x,\pi,h,q)=p(y\mid x,m=1,s,c)\,p(m\mid x,\pi,h,q)\) only under an explicitly declared measurement contract. In MCAR/MAR cases, the observation process may not depend on the latent value after conditioning on known covariates; in MNAR cases it may. The system must not select one assumption silently. If the sampling policy and source-health variables are unobserved and correlate with the physical process, the two mechanisms may be observationally non-identifiable from a single stream. Multiple independent sensors, metadata, controlled schedule changes or interventions may be necessary to distinguish them.
+
 ### 2. Make event time, delivery time, and computation time distinct
 
 Use three separate clocks:
@@ -147,7 +155,7 @@ Report p50/p95/p99 latency, peak RSS, allocations, memory traffic, CPU/GPU time,
 Use a tiered comparator set:
 - Simple controls: persistence, seasonal naive, tuned EMA, linear/AR models.
 - Classical incomplete-data/state-space methods: Kalman/extended Kalman/ensemble filters where assumptions fit, Gaussian processes, and masked likelihood baselines.
-- Irregular-time neural models: GRU-D, ODE-RNN, Latent ODE, Neural CDE, and the published ISHN/NIALIM family.
+- Irregular-time models: Time-IMM/IMM-TSF, APN/TAPA, KAFNet, GRU-D, ODE-RNN, Latent ODE, Neural CDE, ISHN and NIALIM/DFA-CfN/PRDFA-CfN. Reuse #9700's exact adapters and task-specific protocols; do not collapse distinct benchmark scores into one leaderboard.
 - Foundation models: Chronos-2, Toto 2.0, TimesFM 3.0 where licence permits, plus TimesFM 2.5 for a permissively licensed historical comparison.
 - System ablations: value-only HDC-LTC, event-aware HDC-LTC, FEP-only, HDC-LTC+FEP, active discrimination, and specialist-arbitrated complete system.
 
