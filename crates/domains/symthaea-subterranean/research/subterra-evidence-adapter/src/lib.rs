@@ -56,10 +56,7 @@ pub enum ClaimState {
 
 impl ClaimState {
     const fn requires_evidence(self) -> bool {
-        matches!(
-            self,
-            Self::GeophysicallySupported | Self::DirectlyObservedConnected
-        )
+        !matches!(self, Self::Unknown)
     }
 }
 
@@ -103,7 +100,10 @@ pub enum ConnectivityState {
 
 impl ConnectivityState {
     const fn requires_evidence(self) -> bool {
-        !matches!(self, Self::Unknown)
+        matches!(
+            self,
+            Self::GeophysicallySupported | Self::DirectlyObservedConnected
+        )
     }
 }
 
