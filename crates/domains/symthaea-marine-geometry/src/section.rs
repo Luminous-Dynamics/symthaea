@@ -930,6 +930,60 @@ mod tests {
         assert!(error.iter().any(|item| item.code == "section_point_budget"));
     }
 
+
+    #[test]
+    fn section_family_manifest_binds_longitudinal_end_conditions() {
+        let mut artifact = generate_section_artifact(&valid_spec()).unwrap();
+        verify_section_family_artifact_integrity(&artifact).unwrap();
+        artifact.longitudinal_end_conditions.bow =
+            LongitudinalEndCondition::CollapsedCentreline;
+        let errors = verify_section_family_artifact_integrity(&artifact).unwrap_err();
+        assert!(errors.iter().any(|item| item.code == "section_family_manifest_digest"));
+    }
+
+    #[test]
+    fn section_family_manifest_binds_dimensions_and_coordinate_frame() {
+        let mut artifact = generate_section_artifact(&valid_spec()).unwrap();
+        artifact.beam_m += 0.1;
+        let errors = verify_section_family_artifact_integrity(&artifact).unwrap_err();
+        assert!(errors.iter().any(|item| item.code == "section_family_manifest_digest"));
+    }
+
+    #[test]
+    fn legacy_v1_planar_section_specs_remain_supported() {
+        let mut spec = valid_spec();
+        spec.schema_version = 1;
+        spec.longitudinal_end_conditions = LongitudinalEndConditions::default();
+        assert!(generate_section_artifact(&spec).is_ok());
+    }
+
+    #[test]
+    fn non_planar_end_conditions_require_spec_schema_v2() {
+        let mut spec = valid_spec();
+        spec.longitudinal_end_conditions.bow =
+            LongitudinalEndCondition::CollapsedCentreline;
+        spec.stations[0].half_breadth_fraction = 0.0;
+        assert!(validate_section_spec(&spec)
+            .unwrap_err()
+            .iter()
+            .any(|item| item.code == "end_conditions_require_schema_v2"));
+    }
+
+    #[test]
+    fn collapsed_bow_requires_exact_zero_breadth() {
+        let mut spec = valid_spec();
+        spec.schema_version = 2;
+        spec.longitudinal_end_conditions.bow =
+            LongitudinalEndCondition::CollapsedCentreline;
+        spec.stations[0].half_breadth_fraction = 0.0;
+        let artifact = generate_section_artifact(&spec).unwrap();
+        assert!(verify_section_family_artifact_integrity(&artifact).is_ok());
+        assert!(artifact.sections[0]
+            .keel_to_sheer_m
+            .iter()
+            .all(|point| point[1] == 0.0));
+    }
+
     #[test]
     fn generation_is_deterministic_for_identical_specification() {
         let spec = valid_spec();
