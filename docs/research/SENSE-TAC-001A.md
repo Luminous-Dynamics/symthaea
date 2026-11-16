@@ -149,6 +149,7 @@ Official catalogue: https://www.bipm.org/en/committees/jc/jcgm/publications/
 
 ### Cross-project owner integration (no duplicate ontologies)
 
+- **Symtropy PR #4743 — PHRI-CONTINUOUS-COUPLING-001:** provides the existing standalone flat 32×32 calibrated normal-pressure field reducer (integrated normal force, thresholded area and centre of pressure). It rejects incomplete/saturated fields and is not a live sensor, shear/slip estimator, curved-surface or multi-tile implementation. Reuse it as the existing normal-pressure reference primitive; do not fork or duplicate it.
 - **Symtropy #4753 — PHRI-TAC-PHANTOM-001:** owns the non-human tactile calibration phantom, physical fixture/reference geometry, reference instrument setup and phantom measurement campaign.
 - **Symtropy #4754 — PHRI-QUAL-BENCH-001:** owns the matched physical-interaction/tactile-coupling comparative benchmark and its scorecards. This Symthaea campaign contributes sensor co-design arms and must not duplicate pHRI controller/passivity or human-agency benchmark semantics.
 - **Symtropy #4790 — PHRI-CONTACT-EXPOSURE-001:** owns phantom material-stack/contact-exposure characterization. Its non-human pressure/deformation results do not establish human injury, comfort, consent or safety thresholds.
