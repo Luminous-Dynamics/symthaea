@@ -9,7 +9,7 @@
 //! of statistical independence. Undeclared common causes remain undetected;
 //! group IDs are caller assertions and are not authenticated here.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DataSplit {
@@ -18,7 +18,8 @@ pub enum DataSplit {
     Evaluation,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SharedCauseKind {
     InstrumentCalibration,
     EnvironmentalEpisode,
@@ -75,6 +76,342 @@ pub struct LineageCase {
 pub struct LineageDataset {
     pub dataset_id: String,
     pub cases: Vec<LineageCase>,
+}
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ObservationArtifactKind {
+    RawAcquisition,
+    DerivedProduct,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ManifestSharedCauseGroup {
+    pub kind: SharedCauseKind,
+    pub group_id: String,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObservationLineageRecord {
+    pub record_id: String,
+    pub site_id: String,
+    pub observation_id: String,
+    /// Exact union of all contributing physical acquisition IDs.
+    pub acquisition_lineage_ids: Vec<String>,
+    pub artifact_kind: ObservationArtifactKind,
+    pub source_record_ids: Vec<String>,
+    pub shared_cause_groups: Vec<ManifestSharedCauseGroup>,
+    pub provenance_ref: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ObservationLineageManifest {
+    pub schema_version: String,
+    pub manifest_id: String,
+    pub dataset_id: String,
+    pub records: Vec<ObservationLineageRecord>,
+    pub notes: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ManifestError {
+    InvalidJson(String),
+    UnsupportedSchemaVersion(String),
+    EmptyManifestId,
+    EmptyDatasetId,
+    EmptyManifestRecords,
+    EmptyRecordField { record_id: String, field: &'static str },
+    DuplicateRecordId(String),
+    DuplicateSourceRecord { record_id: String, source_record_id: String },
+    DuplicateAcquisitionLineage { record_id: String, acquisition_lineage_id: String },
+    DuplicateSharedCauseGroup {
+        record_id: String,
+        kind: SharedCauseKind,
+        group_id: String,
+    },
+    RawAcquisitionHasSources(String),
+    RawAcquisitionMustNameExactlyOne(String),
+    DerivedProductHasNoSources(String),
+    UnknownSourceRecord { record_id: String, source_record_id: String },
+    SourceGraphCycle,
+    DerivedAcquisitionLineageMismatch(String),
+    MissingSplitAssignment(String),
+    UnknownSplitAssignment(String),
+    SplitAudit(AuditError),
+}
+
+impl std::fmt::Display for ManifestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+
+impl std::error::Error for ManifestError {}
+
+pub fn parse_lineage_manifest(input: &str) -> Result<ObservationLineageManifest, ManifestError> {
+    let manifest: ObservationLineageManifest =
+        serde_json::from_str(input).map_err(|error| ManifestError::InvalidJson(error.to_string()))?;
+    manifest.validate()?;
+    Ok(manifest)
+}
+
+impl ObservationLineageManifest {
+    /// Validate the typed v0.1 sidecar, including graph constraints that JSON
+    /// Schema cannot express: source references, acyclicity and exact inherited
+    /// acquisition lineage for every derived product.
+    pub fn validate(&self) -> Result<(), ManifestError> {
+        if self.schema_version != "0.1" {
+            return Err(ManifestError::UnsupportedSchemaVersion(
+                self.schema_version.clone(),
+            ));
+        }
+        if !nonempty(&self.manifest_id) {
+            return Err(ManifestError::EmptyManifestId);
+        }
+        if !nonempty(&self.dataset_id) {
+            return Err(ManifestError::EmptyDatasetId);
+        }
+        if self.records.is_empty() {
+            return Err(ManifestError::EmptyManifestRecords);
+        }
+
+        let mut records_by_id = BTreeMap::<&str, &ObservationLineageRecord>::new();
+        for record in &self.records {
+            for (value, field) in [
+                (record.record_id.as_str(), "record_id"),
+                (record.site_id.as_str(), "site_id"),
+                (record.observation_id.as_str(), "observation_id"),
+                (record.provenance_ref.as_str(), "provenance_ref"),
+            ] {
+                if !nonempty(value) {
+                    return Err(ManifestError::EmptyRecordField {
+                        record_id: record.record_id.clone(),
+                        field,
+                    });
+                }
+            }
+
+            if !records_by_id.insert(record.record_id.as_str(), record).is_none() {
+                return Err(ManifestError::DuplicateRecordId(record.record_id.clone()));
+            }
+            if record.acquisition_lineage_ids.is_empty() {
+                return Err(ManifestError::EmptyRecordField {
+                    record_id: record.record_id.clone(),
+                    field: "acquisition_lineage_ids",
+                });
+            }
+
+            let mut acquisition_ids = BTreeSet::new();
+            for acquisition_id in &record.acquisition_lineage_ids {
+                if !nonempty(acquisition_id) {
+                    return Err(ManifestError::EmptyRecordField {
+                        record_id: record.record_id.clone(),
+                        field: "acquisition_lineage_id",
+                    });
+                }
+                if !acquisition_ids.insert(acquisition_id.as_str()) {
+                    return Err(ManifestError::DuplicateAcquisitionLineage {
+                        record_id: record.record_id.clone(),
+                        acquisition_lineage_id: acquisition_id.clone(),
+                    });
+                }
+            }
+
+            let mut source_ids = BTreeSet::new();
+            for source_id in &record.source_record_ids {
+                if !nonempty(source_id) {
+                    return Err(ManifestError::EmptyRecordField {
+                        record_id: record.record_id.clone(),
+                        field: "source_record_id",
+                    });
+                }
+                if !source_ids.insert(source_id.as_str()) {
+                    return Err(ManifestError::DuplicateSourceRecord {
+                        record_id: record.record_id.clone(),
+                        source_record_id: source_id.clone(),
+                    });
+                }
+            }
+
+            let mut cause_ids = BTreeSet::new();
+            for cause in &record.shared_cause_groups {
+                if !nonempty(&cause.group_id) {
+                    return Err(ManifestError::EmptyRecordField {
+                        record_id: record.record_id.clone(),
+                        field: "shared_cause_group_id",
+                    });
+                }
+                if !cause_ids.insert((cause.kind, cause.group_id.as_str())) {
+                    return Err(ManifestError::DuplicateSharedCauseGroup {
+                        record_id: record.record_id.clone(),
+                        kind: cause.kind,
+                        group_id: cause.group_id.clone(),
+                    });
+                }
+            }
+
+            match record.artifact_kind {
+                ObservationArtifactKind::RawAcquisition => {
+                    if !record.source_record_ids.is_empty() {
+                        return Err(ManifestError::RawAcquisitionHasSources(
+                            record.record_id.clone(),
+                        ));
+                    }
+                    if record.acquisition_lineage_ids.len() != 1 {
+                        return Err(ManifestError::RawAcquisitionMustNameExactlyOne(
+                            record.record_id.clone(),
+                        ));
+                    }
+                }
+                ObservationArtifactKind::DerivedProduct => {
+                    if record.source_record_ids.is_empty() {
+                        return Err(ManifestError::DerivedProductHasNoSources(
+                            record.record_id.clone(),
+                        ));
+                    }
+                }
+            }
+        }
+
+        let mut indegree = self
+            .records
+            .iter()
+            .map(|record| (record.record_id.as_str(), 0usize))
+            .collect::<BTreeMap<_, _>>();
+        let mut children = BTreeMap::<&str, Vec<&str>>::new();
+
+        for record in &self.records {
+            for source_id in &record.source_record_ids {
+                if !records_by_id.contains_key(source_id.as_str()) {
+                    return Err(ManifestError::UnknownSourceRecord {
+                        record_id: record.record_id.clone(),
+                        source_record_id: source_id.clone(),
+                    });
+                }
+                *indegree
+                    .get_mut(record.record_id.as_str())
+                    .ok_or(ManifestError::SourceGraphCycle)? += 1;
+                children
+                    .entry(source_id.as_str())
+                    .or_default()
+                    .push(record.record_id.as_str());
+            }
+        }
+
+        let mut ready = indegree
+            .iter()
+            .filter_map(|(record_id, degree)| (*degree == 0).then_some(*record_id))
+            .collect::<VecDeque<_>>();
+        let mut visited_count = 0usize;
+        while let Some(record_id) = ready.pop_front() {
+            visited_count += 1;
+            if let Some(descendants) = children.get(record_id) {
+                for child_id in descendants {
+                    let child_degree = indegree
+                        .get_mut(child_id)
+                        .ok_or(ManifestError::SourceGraphCycle)?;
+                    *child_degree = child_degree.saturating_sub(1);
+                    if *child_degree == 0 {
+                        ready.push_back(child_id);
+                    }
+                }
+            }
+        }
+        if visited_count != self.records.len() {
+            return Err(ManifestError::SourceGraphCycle);
+        }
+
+        for record in &self.records {
+            if record.artifact_kind == ObservationArtifactKind::DerivedProduct {
+                let expected_acquisitions = record
+                    .source_record_ids
+                    .iter()
+                    .filter_map(|source_id| records_by_id.get(source_id.as_str()))
+                    .flat_map(|source| source.acquisition_lineage_ids.iter().map(String::as_str))
+                    .collect::<BTreeSet<_>>();
+                let declared_acquisitions = record
+                    .acquisition_lineage_ids
+                    .iter()
+                    .map(String::as_str)
+                    .collect::<BTreeSet<_>>();
+                if expected_acquisitions != declared_acquisitions {
+                    return Err(ManifestError::DerivedAcquisitionLineageMismatch(
+                        record.record_id.clone(),
+                    ));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Convert the producer-side manifest to split-audit rows. Split
+    /// assignments are deliberately supplied by the evaluation protocol, not
+    /// embedded in Symtropy's physical evidence record.
+    pub fn to_lineage_dataset(
+        &self,
+        split_by_record_id: &BTreeMap<String, DataSplit>,
+    ) -> Result<LineageDataset, ManifestError> {
+        self.validate()?;
+        let known_record_ids = self
+            .records
+            .iter()
+            .map(|record| record.record_id.as_str())
+            .collect::<BTreeSet<_>>();
+
+        for record in &self.records {
+            if !split_by_record_id.contains_key(&record.record_id) {
+                return Err(ManifestError::MissingSplitAssignment(
+                    record.record_id.clone(),
+                ));
+            }
+        }
+        for record_id in split_by_record_id.keys() {
+            if !known_record_ids.contains(record_id.as_str()) {
+                return Err(ManifestError::UnknownSplitAssignment(
+                    record_id.clone(),
+                ));
+            }
+        }
+
+        let cases = self
+            .records
+            .iter()
+            .map(|record| LineageCase {
+                case_id: record.record_id.clone(),
+                site_id: record.site_id.clone(),
+                acquisition_lineage_ids: record.acquisition_lineage_ids.clone(),
+                split: split_by_record_id[&record.record_id],
+                shared_causes: record
+                    .shared_cause_groups
+                    .iter()
+                    .map(|cause| SharedCauseGroup {
+                        kind: cause.kind,
+                        group_id: cause.group_id.clone(),
+                    })
+                    .collect(),
+            })
+            .collect();
+
+        Ok(LineageDataset {
+            dataset_id: self.dataset_id.clone(),
+            cases,
+        })
+    }
+
+    pub fn audit_with_splits(
+        &self,
+        split_by_record_id: &BTreeMap<String, DataSplit>,
+    ) -> Result<DependencyAuditReport, ManifestError> {
+        self.to_lineage_dataset(split_by_record_id)?
+            .audit()
+            .map_err(ManifestError::SplitAudit)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1055,6 +1392,200 @@ mod tests {
                 first_split: DataSplit::Training,
                 conflicting_split: DataSplit::Evaluation,
             })
+        );
+    }
+
+    const SYMTROPY_LINEAGE_FIXTURE: &str =
+        include_str!("../fixtures/symtropy-observation-lineage-synthetic.json");
+
+    fn fixture_manifest() -> ObservationLineageManifest {
+        parse_lineage_manifest(SYMTROPY_LINEAGE_FIXTURE).unwrap()
+    }
+
+    fn fixture_splits(manifest: &ObservationLineageManifest) -> BTreeMap<String, DataSplit> {
+        manifest.records.iter().map(|record| {
+            let split = if record.site_id == "synthetic-site-c" {
+                DataSplit::Evaluation
+            } else {
+                DataSplit::Training
+            };
+            (record.record_id.clone(), split)
+        }).collect()
+    }
+
+    #[test]
+    fn symtropy_lineage_fixture_parses_and_audits_transitively() {
+        let manifest = fixture_manifest();
+        assert_eq!(manifest.records.len(), 6);
+        let report = manifest.audit_with_splits(&fixture_splits(&manifest)).unwrap();
+        assert_eq!(report.total_cases, 6);
+        assert_eq!(report.unique_sites, 3);
+        assert_eq!(report.unique_acquisitions, 4);
+        assert_eq!(report.dependency_component_count, 2);
+        assert_eq!(report.singleton_component_count, 1);
+        assert_eq!(report.largest_component_case_count, 5);
+    }
+
+    #[test]
+    fn manifest_split_map_must_cover_exactly_every_record() {
+        let manifest = fixture_manifest();
+        let mut splits = fixture_splits(&manifest);
+        splits.remove("record-site-a-raw-01");
+        assert_eq!(
+            manifest.to_lineage_dataset(&splits),
+            Err(ManifestError::MissingSplitAssignment("record-site-a-raw-01".into()))
+        );
+
+        let mut splits = fixture_splits(&manifest);
+        splits.insert("not-a-record".into(), DataSplit::Training);
+        assert_eq!(
+            manifest.to_lineage_dataset(&splits),
+            Err(ManifestError::UnknownSplitAssignment("not-a-record".into()))
+        );
+    }
+
+    #[test]
+    fn declared_common_cause_cannot_cross_training_and_evaluation() {
+        let manifest = fixture_manifest();
+        let mut splits = fixture_splits(&manifest);
+        splits.insert("record-site-b-raw-01".into(), DataSplit::Evaluation);
+        assert!(matches!(
+            manifest.audit_with_splits(&splits),
+            Err(ManifestError::SplitAudit(
+                AuditError::DependencyGroupCrossesSplits {
+                    kind: DependencyKind::InstrumentCalibration,
+                    ..
+                }
+            ))
+        ));
+    }
+
+    #[test]
+    fn source_records_must_exist() {
+        let mut manifest = fixture_manifest();
+        manifest.records
+            .iter_mut()
+            .find(|record| record.record_id == "record-site-a-mesh-01")
+            .unwrap()
+            .source_record_ids[0] = "missing-parent".into();
+        assert!(matches!(
+            manifest.validate(),
+            Err(ManifestError::UnknownSourceRecord {
+                record_id,
+                source_record_id
+            }) if record_id == "record-site-a-mesh-01" && source_record_id == "missing-parent"
+        ));
+    }
+
+    #[test]
+    fn source_graph_must_be_acyclic() {
+        let mut manifest = fixture_manifest();
+        let raw = manifest.records[0].clone();
+        manifest.records[0].artifact_kind = ObservationArtifactKind::DerivedProduct;
+        manifest.records[0].source_record_ids = vec![manifest.records[2].record_id.clone()];
+        manifest.records[0].acquisition_lineage_ids = vec!["acquisition-a-01".into()];
+        manifest.records[2].source_record_ids.push(raw.record_id);
+        assert_eq!(manifest.validate(), Err(ManifestError::SourceGraphCycle));
+    }
+
+    #[test]
+    fn derived_product_must_preserve_exact_union_of_parent_acquisitions() {
+        let mut manifest = fixture_manifest();
+        let fused = manifest.records
+            .iter_mut()
+            .find(|record| record.record_id == "record-site-a-features-01")
+            .unwrap();
+        fused.acquisition_lineage_ids = vec!["acquisition-a-01".into()];
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::DerivedAcquisitionLineageMismatch(
+                "record-site-a-features-01".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn raw_and_derived_record_shapes_are_checked() {
+        let mut manifest = fixture_manifest();
+        manifest.records[0].source_record_ids.push("anything".into());
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::RawAcquisitionHasSources(
+                "record-site-a-raw-01".into()
+            ))
+        );
+
+        let mut manifest = fixture_manifest();
+        manifest.records
+            .iter_mut()
+            .find(|record| record.record_id == "record-site-a-mesh-01")
+            .unwrap()
+            .source_record_ids
+            .clear();
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::DerivedProductHasNoSources(
+                "record-site-a-mesh-01".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn malformed_json_and_unknown_fields_are_rejected() {
+        assert!(matches!(
+            parse_lineage_manifest("{"),
+            Err(ManifestError::InvalidJson(_))
+        ));
+        let json = SYMTROPY_LINEAGE_FIXTURE.replace(
+            "\"schema_version\": \"0.1\"",
+            "\"schema_version\": \"0.1\",\n  \"unreviewed_extra\": true"
+        );
+        assert!(matches!(
+            parse_lineage_manifest(&json),
+            Err(ManifestError::InvalidJson(_))
+        ));
+    }
+
+    #[test]
+    fn duplicate_record_ids_are_rejected() {
+        let mut manifest = fixture_manifest();
+        manifest.records[1].record_id = manifest.records[0].record_id.clone();
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::DuplicateRecordId(
+                "record-site-a-raw-01".into()
+            ))
+        );
+    }
+
+    #[test]
+    fn duplicate_acquisition_and_shared_cause_memberships_are_rejected() {
+        let mut manifest = fixture_manifest();
+        manifest.records[0].acquisition_lineage_ids
+            .push("acquisition-a-01".into());
+        assert!(matches!(
+            manifest.validate(),
+            Err(ManifestError::DuplicateAcquisitionLineage { .. })
+        ));
+
+        let mut manifest = fixture_manifest();
+        let cause = manifest.records[0].shared_cause_groups[0].clone();
+        manifest.records[0].shared_cause_groups.push(cause);
+        assert!(matches!(
+            manifest.validate(),
+            Err(ManifestError::DuplicateSharedCauseGroup { .. })
+        ));
+    }
+
+    #[test]
+    fn raw_acquisition_must_name_one_physical_acquisition() {
+        let mut manifest = fixture_manifest();
+        manifest.records[0].acquisition_lineage_ids.push("extra-acq".into());
+        assert_eq!(
+            manifest.validate(),
+            Err(ManifestError::RawAcquisitionMustNameExactlyOne(
+                "record-site-a-raw-01".into()
+            ))
         );
     }
 

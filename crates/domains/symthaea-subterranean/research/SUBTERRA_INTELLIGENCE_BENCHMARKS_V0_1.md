@@ -360,3 +360,19 @@ A new paired percentile bootstrap consumes one aggregate baseline/candidate scor
 | NumericalIntegrityBench | NaN, infinity, duplicate component IDs and excessive/insufficient replicates fail closed | Zero silently accepted invalid inputs |
 
 This interval routine is not an independence oracle. It assumes the supplied dependency components are appropriate resampling units and does not correct for undeclared dependence, selection bias or temporal/geological nonstationarity. It does not convert a few caves into a large effective sample.
+
+
+## 15. Executable producer/consumer lineage-contract benchmarks
+
+The dependence auditor now consumes the Symtropy observation-lineage JSON with strict typed deserialization and semantic graph checks.
+
+| Benchmark | Property | Proposed gate |
+|---|---|---|
+| LineageManifestParseBench | Exact v0.1 manifest decodes; unknown fields fail closed | 100% frozen positive fixtures accepted; all strict-schema negative fixtures rejected |
+| SourceReferenceBench | Every derived source ID resolves | Zero dangling references |
+| DerivationDAGBench | Processing/source graph is acyclic | Zero cycles |
+| AcquisitionAncestryBench | Derived record's acquisition set equals the union of its parent sets | Zero dropped or invented ancestry |
+| SplitMapCompletenessBench | Evaluator assigns exactly one split per manifest record | Zero missing or unknown split keys |
+| CrossRepoContractBench | Symtropy fixture parses to expected transitive dependency components in Symthaea | Exact group/component counts and frozen fixture IDs |
+
+The typed consumer still does not join observation IDs against their parent site-evidence JSON record, authenticate opaque provenance references, or establish completeness of declared common causes. Those are the next adapter-level gates.

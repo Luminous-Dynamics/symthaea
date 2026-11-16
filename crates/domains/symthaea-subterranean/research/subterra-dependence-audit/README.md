@@ -6,6 +6,12 @@ A small, standalone Rust reference for hierarchy-aware dataset split auditing.
 
 A new filename, case ID, reconstructed mesh or extracted feature vector does not create a new independent physical observation. Rows sharing a site, physical acquisition or declared common cause must stay within one Training, Calibration or Evaluation partition.
 
+## Producer/consumer integration
+
+The package consumes the versioned Symtropy observation-lineage manifest using strict Serde JSON deserialization. It validates unique record identity, source references, derivation-graph acyclicity, raw-versus-derived record shape, and exact inherited acquisition-lineage sets. Split assignments are supplied separately by the evaluator, converted to the existing audit types, and then checked for transitive leakage.
+
+The copied synthetic fixture is pinned to Symtropy branch `research/geobio-foundry-v0.2`, commit `2ca4a4897480ce3849be72cb2bdca975390471d4`, fixture blob `348f4e8e3f4e817f033ea6cc89d43bb24a07c2f3`; the matching producer schema blob is `06c7dcb36975fbedc4810f121e84a670768dc5e0`.
+
 ## Contract
 
 - Automatically groups records by site and every physical acquisition lineage contributing to a record.
@@ -35,4 +41,4 @@ The crate also includes a deterministic paired percentile bootstrap over one alr
 
 For loss metrics, a negative candidate-minus-baseline interval favors the candidate. This is not proof of statistical independence: component grouping quality and the sampling frame remain assumptions. With fewer than 20–30 genuinely distinct components, treat interval estimates as exploratory and publish the component count prominently. The bootstrap does not correct selection bias, nonstationarity or missing common causes.
 
-There are 28 authored tests in this package after the bootstrap addition.
+There are 38 authored tests in this package after manifest-consumer integration.

@@ -100,7 +100,17 @@ The implementation requires at least 20 dependency components and 200 resamples,
 
 This is a small-sample descriptive mechanism, not a universal confidence guarantee. Prefer 20–30 or more genuinely distinct components where feasible, and publish the component count. It does not repair selection bias, nonstationarity, incorrect grouping or undeclared confounders. It must not be described as an iid-row bootstrap.
 
-## 8. Implementation status and limits
+## 8. Symtropy manifest consumer
+
+The auditor now consumes the Symtropy v0.1 observation-lineage JSON sidecar through strict typed deserialization. Its semantic validator rejects duplicate record IDs, duplicate acquisition/group memberships, dangling source IDs, source-graph cycles, raw records with parent sources, derived records without parents, and derived products whose acquisition set is not exactly the union of the parent acquisition sets.
+
+The evaluator supplies a separate `record_id → split` map. The converter requires exactly one split assignment for every record and no unknown assignment keys, then turns source records into the same LineageDataset types used by the typed API. This keeps physical evidence producers from asserting their own evaluation partitions.
+
+A six-record fixture is mirrored from Symtropy commit `2ca4a4897480ce3849be72cb2bdca975390471d4` (fixture blob `348f4e8e3f4e817f033ea6cc89d43bb24a07c2f3`; schema blob `06c7dcb36975fbedc4810f121e84a670768dc5e0`). The fixture demonstrates two raw acquisitions fused into one derived product, plus a shared calibration/environment episode across sites. The tests verify the expected 5-record common-cause component and a separate evaluation singleton.
+
+The consumer validates only the sidecar's internal derivation metadata. It does not yet cross-check that every `observation_id` exists exactly once in the corresponding Symtropy site-evidence record, authenticate provenance references, or prove the declared common-cause groups are complete.
+
+## 9. Implementation status and limits
 
 Standalone package:
 `subterra-dependence-audit/`
@@ -109,6 +119,6 @@ Standalone package:
 - Transitive dependency components.
 - Fail-closed split-crossing checks.
 - Exact component/group counts and maximum component size.
-- 28 authored tests, including 10 paired cluster-bootstrap cases and 3 multi-acquisition lineage cases.
+- 38 authored tests, including 10 paired cluster-bootstrap cases, 3 multi-acquisition grouping cases and 10 strict JSON-manifest consumer cases.
 
 The package is AUTHORED, not compiled or executed in the current environment. It does not estimate correlations or effective sample size, detect undeclared causes, authenticate IDs, or integrate with the likelihood fitter. Those are follow-on work, not implied capabilities.
