@@ -15,6 +15,7 @@ pub enum NetExportBoundMethod {
     JointCovarianceContrast,
     SimultaneousComponentIntervals,
     DirectNetOutputInterval,
+    ParametricPlusModelFormDiscrepancy,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -325,7 +326,8 @@ pub fn evaluate_robust_net_export(
         | NetExportBoundMethod::SimultaneousComponentIntervals => {
             &["P_e_gross", "P_recirc_var", "P_recirc_fix"]
         }
-        NetExportBoundMethod::DirectNetOutputInterval => &["P_elec"],
+        NetExportBoundMethod::DirectNetOutputInterval
+        | NetExportBoundMethod::ParametricPlusModelFormDiscrepancy => &["P_elec"],
     };
     if receipt.method_variable_order
         != expected_method_order
@@ -399,6 +401,24 @@ pub fn evaluate_robust_net_export(
                 diagnostics.push(RobustNetExportDiagnostic::UnexpectedMethodReceipt);
             }
         }
+        NetExportBoundMethod::ParametricPlusModelFormDiscrepancy => {
+            if receipt.model_form_validity != ModelFormValidity::WithinDeclaredDomain
+                || receipt.model_form_evidence_ref.trim().is_empty()
+                || !is_sha256(&receipt.model_form_evidence_sha256)
+            {
+                diagnostics.push(RobustNetExportDiagnostic::InvalidModelFormEvidence);
+            }
+            if receipt.covariance_receipt_ref.is_some()
+                || receipt.simultaneous_allocation_ref.is_some()
+                || receipt.direct_net_analysis_ref.is_some()
+                || receipt.covariance_receipt_sha256.is_some()
+                || receipt.covariance_run_id.is_some()
+                || receipt.covariance_output_sha256.is_some()
+                || !receipt.covariance_variable_order.is_empty()
+            {
+                diagnostics.push(RobustNetExportDiagnostic::UnexpectedMethodReceipt);
+            }
+        }
     }
 
     let point_value = point.unwrap_or(f64::NAN);
@@ -417,6 +437,9 @@ pub fn evaluate_robust_net_export(
     }
     if let Some(reference) = &receipt.direct_net_analysis_ref {
         evidence_refs.push(reference.clone());
+    }
+    if !receipt.model_form_evidence_ref.trim().is_empty() {
+        evidence_refs.push(receipt.model_form_evidence_ref.clone());
     }
 
     if !diagnostics.is_empty() {
