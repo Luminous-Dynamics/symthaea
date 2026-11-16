@@ -799,8 +799,7 @@ mod tests {
                 SymFpProfileV1::paper_degree_6(),
             )
             .unwrap();
-            let matched =
-                classify_rank_template(&receipt, &CRYSTALLOGRAPHIC_TEMPLATES_V1).unwrap();
+            let matched = classify_rank_template(&receipt, &CRYSTALLOGRAPHIC_TEMPLATES_V1).unwrap();
             assert_eq!(matched.minimum_l1_distance, 0);
             assert_eq!(matched.matched_schoenflies.len(), 2);
         }
@@ -1011,7 +1010,11 @@ mod tests {
         let profile = SymFpProfileV1::default();
         let first = one_sided_jacobi_svd(2, 3, &matrix, profile).unwrap();
         let second = one_sided_jacobi_svd(2, 3, &scaled, profile).unwrap();
-        for (left, right) in first.singular_values.iter().zip(second.singular_values.iter()) {
+        for (left, right) in first
+            .singular_values
+            .iter()
+            .zip(second.singular_values.iter())
+        {
             close(*right, *left * 7.0, 1.0e-11);
         }
     }
