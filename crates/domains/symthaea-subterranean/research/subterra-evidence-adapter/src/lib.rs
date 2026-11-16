@@ -448,10 +448,13 @@ impl SiteEvidenceRecord {
             {
                 issues.push(SiteIssue::DemonstratedAccessMissingEgress);
             }
+            if self.accessibility.evidence_refs.is_empty() {
+                issues.push(SiteIssue::DemonstratedAccessMissingEvidence);
+            }
             inspect_refs(
                 &self.accessibility.evidence_refs,
                 "accessibility",
-                true,
+                false,
                 &mut issues,
             );
         } else {
