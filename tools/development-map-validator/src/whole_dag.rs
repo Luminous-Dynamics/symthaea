@@ -860,6 +860,51 @@ mod tests {
     }
 
     #[test]
+    fn positive_order_remains_identifiable_under_compromised_boundary() {
+        let mut value = fixture_value();
+        value["candidate_view"]["observation_boundary_state"] = json!("compromised");
+        value["gold_overlay"]["adjudicated_observation_boundary_state"] = json!("compromised");
+        let t = value["candidate_traces"].as_array_mut().expect("traces")
+            .iter_mut().find(|trace| trace["trace_id"] == "world-consistent-agent")
+            .expect("trace");
+        t["observation_boundary_claim"] = json!("compromised");
+        for claim in t["relation_claims"].as_array_mut().expect("claims") {
+            if claim["left_event_id"] == "E" && claim["right_event_id"] == "F" {
+                claim["claimed_relation"] = json!("before");
+            } else {
+                claim["claimed_relation"] = json!("compromised");
+            }
+        }
+        let report = report_for(&value);
+        let scored = trace(&report, "world-consistent-agent");
+        let ef = scored.pair_outcomes.iter().find(|pair| {
+            pair.left_event_id == "E" && pair.right_event_id == "F"
+        }).expect("E/F pair");
+        assert_eq!(ef.expected_state, "before");
+        assert!(ef.correct);
+        assert_eq!(scored.missed_compromise_count, 0);
+    }
+
+    #[test]
+    fn detects_unsupported_compromised_claim_on_healthy_boundary() {
+        let mut value = fixture_value();
+        let t = value["candidate_traces"].as_array_mut().expect("traces")
+            .iter_mut().find(|trace| trace["trace_id"] == "world-consistent-agent")
+            .expect("trace");
+        let claim = t["relation_claims"].as_array_mut().expect("claims")
+            .iter_mut().find(|claim| claim["left_event_id"] == "A" && claim["right_event_id"] == "B")
+            .expect("A/B claim");
+        claim["claimed_relation"] = json!("compromised");
+        let report = report_for(&value);
+        let scored = trace(&report, "world-consistent-agent");
+        let pair = scored.pair_outcomes.iter().find(|pair| {
+            pair.left_event_id == "A" && pair.right_event_id == "B"
+        }).expect("A/B pair");
+        assert!(pair.unsupported_compromise_claim);
+        assert_eq!(scored.unsupported_compromise_claim_count, 1);
+    }
+
+    #[test]
     fn reports_wrong_observation_boundary_claim() {
         let mut value = fixture_value();
         value["candidate_traces"][0]["observation_boundary_claim"] = json!("incomplete");
