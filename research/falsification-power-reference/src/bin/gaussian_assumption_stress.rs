@@ -80,19 +80,19 @@ impl NoiseRegime {
             Self::MatchedIidGaussian => "Independent Gaussian residuals with known constant sigma.",
             Self::StationaryAr1 => {
                 "Stationary Gaussian AR(1) residuals with known generator rho but a test that assumes independence."
-            },
+            }
             Self::StandardizedStudentT5 => {
                 "Independent Student-t(5) residuals scaled to unit variance."
-            },
+            }
             Self::SmoothHeteroscedastic => {
                 "Independent Gaussian errors with a smooth variance ramp and mean variance sigma squared."
-            },
+            }
             Self::AbruptVarianceShift => {
                 "Independent Gaussian errors with a low-variance first regime and high-variance second regime; average variance is sigma squared."
-            },
+            }
             Self::SparseContamination => {
                 "Independent Gaussian scale mixture with two-percent gross-error component and unit marginal variance."
-            },
+            }
         }
     }
 
