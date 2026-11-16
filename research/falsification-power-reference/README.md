@@ -82,7 +82,7 @@ The per-step sigma_t is committed before the observation. The convenience constr
 
 The reported anytime p-value uses the running maximum e-value: min(1, exp(-max_log_e_value)). It does not reset when later evidence moves against an alternative. Updates retain alpha, the committed discrepancy, sigma_t, observation/decision identities, component weights and the running-max evidence needed for independent replay.
 
-This is valid under a simple conditional Gaussian null with known, positive sigma_t committed predictably with the discrepancy before each observation. It therefore supports known action-dependent measurement variance. It is not automatically valid for unknown or estimated variance, composite nulls, serial dependence not captured by the conditional model, post-hoc alternative selection or physical trajectories. The commit/observe API enforces local call order but cannot prove absence of out-of-band leakage.
+This is valid under a simple conditional Gaussian null with known, positive sigma_t and known predictable conditional mean mu_t committed with the discrepancy before each observation. It therefore supports correctly specified state/AR-dependent innovations and action-dependent measurement variance. It is not automatically valid for unknown or estimated conditional mean/variance, a misspecified state model, composite nulls, post-hoc alternative selection or physical trajectories. The commit/observe API enforces local call order but cannot prove absence of out-of-band leakage.
 
 See docs/research/SEQUENTIAL_FALSIFICATION_EPROCESS_V0_2026-11-15.md for assumptions, equations, benchmark controls and the distinction from SLICE and terminal-test induction.
 
@@ -101,3 +101,25 @@ It reports, separately for a fixed-known-variance null, a predictable adaptive-v
 - undetected path count.
 
 The focused GitHub workflow runs this binary and uploads the JSON, source commit identity and SHA-256 receipt. The fixed synthetic campaign uses 20,000 paths and 100 looks per scenario. Its checks are smoke gates for this exact generator: null e-process rates <=6%, and the adaptive-null naive repeated-look rate >10%. These are not universal statistical guarantees, a 5% calibration proof, confidence intervals across generator families, or physical validation. The naive repeated fixed-time test is deliberately invalid under optional stopping and is included only as a negative control.
+
+
+## Predictable conditional-innovation extension
+
+The sequential API also supports a known predictable conditional null:
+
+    Y_t | F_(t-1), A_t ~ Normal(mu_t, sigma_t^2)
+
+The evaluator commits mu_t, sigma_t and the alternative discrepancy d_t before the observation. The log likelihood-ratio increment is:
+
+    d_t * (Y_t - mu_t) / sigma_t^2 - d_t^2 / (2 * sigma_t^2)
+
+The legacy commit_prediction and commit_prediction_with_sigma methods remain zero-conditional-mean wrappers. New methods commit_prediction_with_conditional_gaussian and commit_predictions_with_conditional_gaussian record the nonzero null mean explicitly. Update receipts preserve it for replay.
+
+A known AR(1) baseline with known rho is an example: mu_t = rho * Y_(t-1). The guarantee follows from the conditional Gaussian likelihood, not from pretending the observations are marginally independent. Unknown/estimated rho, latent-state uncertainty, a misspecified conditional model, non-Gaussian innovations and unmodelled regime changes remain outside this v0 contract.
+
+The new conditional_innovation_calibration binary runs 20,000 paths at 100 looks for:
+- an AR(1) predictable conditional null with rho=0.65;
+- a declared conditional mean-shift alternative;
+- a deliberately misspecified zero-mean e-process on the same null paths.
+
+The focused workflow requires the correct conditional monitor's null crossing rate to remain <=6%, the zero-mean misspecification control to exceed 10%, and the conditional alternative detection rate to exceed 50%. These are smoke gates for the frozen generator, not universal guarantees or physical validation.
