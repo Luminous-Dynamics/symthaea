@@ -257,7 +257,7 @@ The adapter-level profile summary reports observed-only length-weighted dimensio
 
 ### Current status
 
-The standalone site/network/profile adapter and source fixtures are AUTHORED. Fixture JSON syntax has been checked. The 25 adapter test cases are AUTHORED but not compiled or executed. No JSON Schema meta-validation, Rust test execution, CI qualification, robot-in-the-loop or analogue result is claimed for this adapter increment.
+The standalone site/network/profile adapter, science-return lifecycle and pinned upstream schema manifest are AUTHORED. Fixture and manifest JSON syntax has been checked. The 27 site/network/profile adapter cases are AUTHORED but not compiled or executed; the additional 10 science-return lifecycle cases are listed separately in Section 11. No JSON Schema meta-validation, Rust test execution, CI qualification, robot-in-the-loop or analogue result is claimed for this adapter increment.
 
 
 ## 11. Science-return lifecycle benchmark
