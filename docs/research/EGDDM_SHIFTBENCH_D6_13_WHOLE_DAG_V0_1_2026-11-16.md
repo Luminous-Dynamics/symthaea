@@ -43,8 +43,8 @@ No scalar accuracy score can hide a jointly impossible claim set, a false concur
 Six events produce 15 unordered pairs. Two evaluator-only worlds contain opposite A/B/C chains while preserving E→F. The six A/B/C-to-E/F/Z pairs are constrained unordered; the trusted E→F relation must hold in both worlds.
 
 Three candidate traces:
-- **world-consistent-agent:** correctly abstains on the three contingent A/B/C pair relations, recovers E→F, and asserts the twelve certified concurrent pairs. One admissible world satisfies all determinate claims.
-- **jointly-impossible-cycle:** claims A→B, C→A, and B→C. Each relation appears in at least one world, but their conjunction forms a cycle and matches zero complete worlds. It also uses event Z before Z's availability.
+- **world-consistent-agent:** correctly abstains on the three contingent A/B/C pair relations, recovers E→F, and asserts the twelve certified concurrent pairs. Both admissible worlds satisfy all determinate claims.
+- **jointly-impossible-cycle:** claims A→B, C→A, and B→C. Each relation appears in at least one world, but their conjunction forms a cycle and matches zero complete worlds. All three causal claims are individually plausible but unsupported as unconditional statements because none is entailed across all worlds. It also uses event Z before Z's availability.
 - **always-abstain:** correctly abstains on the three ambiguous pairs but unnecessarily abstains on the twelve identifiable relations.
 
 These are synthetic fixture calculations, not agent trials, external causal adjudication or performance claims.
