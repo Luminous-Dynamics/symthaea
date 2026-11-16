@@ -48,6 +48,11 @@
       "path": "negative/expiry_not_after_issued_at.json",
       "expected": "reject-semantic-preflight",
       "reason": "A verifier challenge must expire strictly after its issue time; zero or negative validity windows are invalid."
+    },
+    {
+      "path": "negative/trust_scope_overclaim.json",
+      "expected": "reject-semantic-preflight",
+      "reason": "A delegated TLSNotary notary attestation is not a self-contained public proof; its verification scope must retain the delegated notary trust assumption."
     }
   ],
   "nonclaims": [
