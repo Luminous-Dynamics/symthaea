@@ -589,6 +589,76 @@ impl EmpiricalLikelihoodTable {
         })
     }
 
+    fn validate_internal(&self) -> Result<(), CalibrationError> {
+        if !nonempty(&self.dataset_id)
+            || !self.training_split_only
+            || self.estimator_id != "dirichlet-categorical-v0.1"
+            || !self.dirichlet_alpha.is_finite()
+            || self.dirichlet_alpha <= 0.0
+            || self.minimum_training_sites == 0
+            || self.hypothesis_ids.is_empty()
+            || !self.hypothesis_ids.iter().any(|id| id == UNKNOWN_HYPOTHESIS_ID)
+            || self.action_ids.is_empty()
+            || self.action_ids.len() != self.action_modalities.len()
+            || self.cells.len() != self.action_ids.len() * self.hypothesis_ids.len()
+        {
+            return Err(CalibrationError::InvalidLikelihoodTable);
+        }
+
+        let mut action_ids = BTreeSet::new();
+        for (action_id, modality) in self.action_ids.iter().zip(&self.action_modalities) {
+            if !nonempty(action_id)
+                || !nonempty(modality.1.as_str())
+                || &modality.0 != action_id
+                || !action_ids.insert(action_id.as_str())
+            {
+                return Err(CalibrationError::InvalidLikelihoodTable);
+            }
+        }
+
+        let mut cell_keys = BTreeSet::new();
+        for action_id in &self.action_ids {
+            let mut action_outcomes: Option<&[String]> = None;
+            for hypothesis_id in &self.hypothesis_ids {
+                let cell = self
+                    .cell(action_id, hypothesis_id)
+                    .ok_or(CalibrationError::InvalidLikelihoodTable)?;
+                if !cell_keys.insert((cell.action_id.as_str(), cell.hypothesis_id.as_str()))
+                    || cell.outcome_ids.is_empty()
+                    || cell.outcome_ids.iter().any(|id| !nonempty(id))
+                {
+                    return Err(CalibrationError::InvalidLikelihoodTable);
+                }
+                match action_outcomes {
+                    Some(expected) if expected != cell.outcome_ids.as_slice() => {
+                        return Err(CalibrationError::InvalidLikelihoodTable);
+                    }
+                    None => action_outcomes = Some(&cell.outcome_ids),
+                    _ => {}
+                }
+
+                match &cell.probabilities {
+                    Some(probabilities) => {
+                        let sum = probabilities.iter().sum::<f64>();
+                        if probabilities.len() != cell.outcome_ids.len()
+                            || probabilities.iter().any(|p| {
+                                !p.is_finite() || *p < 0.0 || *p > 1.0
+                            })
+                            || !sum.is_finite()
+                            || (sum - 1.0).abs() > 1.0e-9
+                            || cell.training_sample_count < self.minimum_training_sites
+                        {
+                            return Err(CalibrationError::InvalidLikelihoodTable);
+                        }
+                    }
+                    None if cell.training_sample_count < self.minimum_training_sites => {}
+                    None => return Err(CalibrationError::InvalidLikelihoodTable),
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Build the one-step EVSI input without inventing priors, losses, resource
     /// costs or permission. The caller supplies those independently. Every
     /// action/hypothesis likelihood cell must have sufficient Training support.
@@ -598,6 +668,7 @@ impl EmpiricalLikelihoodTable {
         decisions: Vec<PlannerMissionDecision>,
         action_policies: Vec<MeasurementActionPolicy>,
     ) -> Result<PlanningProblem, CalibrationError> {
+        self.validate_internal()?;
         let supplied_hypothesis_ids = hypotheses
             .iter()
             .map(|hypothesis| hypothesis.id.clone())
@@ -605,9 +676,10 @@ impl EmpiricalLikelihoodTable {
         if supplied_hypothesis_ids != self.hypothesis_ids {
             return Err(CalibrationError::PlannerHypothesisOrderMismatch);
         }
-        if decisions
-            .iter()
-            .any(|decision| decision.loss_by_hypothesis.len() != hypotheses.len())
+        if decisions.is_empty()
+            || decisions
+                .iter()
+                .any(|decision| decision.loss_by_hypothesis.len() != hypotheses.len())
         {
             return Err(CalibrationError::PlannerDecisionDimensionMismatch);
         }
@@ -756,16 +828,16 @@ mod tests {
             }],
             cases: vec![
                 case("t1", "site-t1", "gpr-survey-01", "tunnel", "signal", DataSplit::Training),
-                case("t2", "site-t2", "gpr", "tunnel", "signal", DataSplit::Training),
-                case("t3", "site-t3", "gpr", "tunnel", "no_signal", DataSplit::Training),
-                case("c1", "site-c1", "gpr", "collapse", "no_signal", DataSplit::Training),
-                case("c2", "site-c2", "gpr", "collapse", "no_signal", DataSplit::Training),
-                case("u1", "site-u1", "gpr", "unknown", "signal", DataSplit::Training),
-                case("u2", "site-u2", "gpr", "unknown", "no_signal", DataSplit::Training),
-                case("cal1", "site-cal1", "gpr", "tunnel", "signal", DataSplit::Calibration),
-                case("cal2", "site-cal2", "gpr", "collapse", "no_signal", DataSplit::Calibration),
-                case("eval1", "site-eval1", "gpr", "tunnel", "signal", DataSplit::Evaluation),
-                case("eval2", "site-eval2", "gpr", "collapse", "no_signal", DataSplit::Evaluation),
+                case("t2", "site-t2", "gpr-survey-01", "tunnel", "signal", DataSplit::Training),
+                case("t3", "site-t3", "gpr-survey-01", "tunnel", "no_signal", DataSplit::Training),
+                case("c1", "site-c1", "gpr-survey-01", "collapse", "no_signal", DataSplit::Training),
+                case("c2", "site-c2", "gpr-survey-01", "collapse", "no_signal", DataSplit::Training),
+                case("u1", "site-u1", "gpr-survey-01", "unknown", "signal", DataSplit::Training),
+                case("u2", "site-u2", "gpr-survey-01", "unknown", "no_signal", DataSplit::Training),
+                case("cal1", "site-cal1", "gpr-survey-01", "tunnel", "signal", DataSplit::Calibration),
+                case("cal2", "site-cal2", "gpr-survey-01", "collapse", "no_signal", DataSplit::Calibration),
+                case("eval1", "site-eval1", "gpr-survey-01", "tunnel", "signal", DataSplit::Evaluation),
+                case("eval2", "site-eval2", "gpr-survey-01", "collapse", "no_signal", DataSplit::Evaluation),
             ],
         }
     }
@@ -786,7 +858,7 @@ mod tests {
         data.cases.push(case(
             "leak",
             "site-t1",
-            "gpr",
+            "gpr-survey-01",
             "tunnel",
             "signal",
             DataSplit::Evaluation,
@@ -821,7 +893,7 @@ mod tests {
             data.validate(),
             Err(CalibrationError::DuplicateSiteAction {
                 site_id: "site-t1".into(),
-                action_id: "gpr".into()
+                action_id: "gpr-survey-01".into()
             })
         );
     }
@@ -840,7 +912,7 @@ mod tests {
     fn dirichlet_likelihoods_use_training_split_only() {
         let data = dataset();
         let table = data.fit_likelihoods(0.5, 3).unwrap();
-        let tunnel = table.cell("gpr", "tunnel").unwrap();
+        let tunnel = table.cell("gpr-survey-01", "tunnel").unwrap();
         assert_eq!(tunnel.training_sample_count, 3);
         let probabilities = tunnel.probabilities.as_ref().unwrap();
         assert!((probabilities[0] - 0.625).abs() < 1.0e-12);
@@ -856,7 +928,7 @@ mod tests {
                 || case.split != DataSplit::Training
         });
         let table = data.fit_likelihoods(0.5, 2).unwrap();
-        let unknown = table.cell("gpr", "unknown").unwrap();
+        let unknown = table.cell("gpr-survey-01", "unknown").unwrap();
         assert_eq!(unknown.training_sample_count, 0);
         assert!(unknown.probabilities.is_none());
     }
@@ -881,7 +953,7 @@ mod tests {
         data.cases.push(case(
             "eval-unknown",
             "site-eval-unknown",
-            "gpr",
+            "gpr-survey-01",
             "unknown",
             "no_signal",
             DataSplit::Evaluation,
@@ -926,7 +998,7 @@ mod tests {
 
     fn planner_policy(allowed: bool) -> MeasurementActionPolicy {
         MeasurementActionPolicy {
-            action_id: "gpr".into(),
+            action_id: "gpr-survey-01".into(),
             resource_cost: ResourceCost {
                 energy_j: 100.0,
                 duration_s: 10.0,
@@ -949,6 +1021,7 @@ mod tests {
             )
             .unwrap();
         assert!(problem.validate().is_ok());
+        assert_eq!(problem.actions[0].modality, "ground_penetrating_radar");
         let signal = problem.actions[0]
             .outcomes
             .iter()
@@ -984,7 +1057,7 @@ mod tests {
                 vec![planner_policy(true)],
             ),
             Err(CalibrationError::InsufficientLikelihoodSupport {
-                action_id: "gpr".into(),
+                action_id: "gpr-survey-01".into(),
                 hypothesis_id: "unknown".into(),
                 training_sample_count: 1,
             })
@@ -1028,7 +1101,7 @@ mod tests {
         table
             .cells
             .iter_mut()
-            .find(|cell| cell.action_id == "gpr" && cell.hypothesis_id == "tunnel")
+            .find(|cell| cell.action_id == "gpr-survey-01" && cell.hypothesis_id == "tunnel")
             .unwrap()
             .probabilities
             .as_mut()
