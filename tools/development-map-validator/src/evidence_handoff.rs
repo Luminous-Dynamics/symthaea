@@ -58,6 +58,7 @@ pub struct HandoffOperationOutcome {
     pub reconciliation_requested: bool,
     pub unsafe_unknown_non_idempotent_retry: bool,
     pub missing_unknown_outcome_reconciliation: bool,
+    pub future_evidence_leakage: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -65,6 +66,7 @@ pub struct UnauthorizedHandoffAction {
     pub authority_id: String,
     pub action: String,
     pub target_branch_id: String,
+    pub obligation_id: String,
     pub reasons: Vec<String>,
 }
 
@@ -90,6 +92,7 @@ pub struct HandoffTraceReport {
     pub false_authority_active_claim_count: usize,
     pub unsafe_unknown_non_idempotent_retry_count: usize,
     pub missing_reconciliation_count: usize,
+    pub future_evidence_leakage_count: usize,
     pub unauthorized_action_count: usize,
     pub workspace_claim_error_count: usize,
     pub sender_false_claim_count: usize,
@@ -150,11 +153,9 @@ struct Receipt {
 
 #[derive(Debug, Clone)]
 struct Operation {
-    operation_id: String,
     kind: String,
     outcome: String,
     reconciled: bool,
-    idempotency_key: Option<String>,
     available_at: DateTime<FixedOffset>,
 }
 
@@ -183,7 +184,7 @@ struct ReceiverClaims {
     operations: BTreeMap<String, String>,
     retry_operation_ids: BTreeSet<String>,
     reconcile_operation_ids: BTreeSet<String>,
-    actions: Vec<(String, String, String)>,
+    actions: Vec<(String, String, String, String)>,
 }
 
 fn allowed_keys(value: &Value, allowed: &[&str], label: &str) -> Result<(), String> {
@@ -496,11 +497,9 @@ fn parse_operations(candidate: &Value) -> Result<BTreeMap<String, Operation>, St
             .insert(
                 operation_id.clone(),
                 Operation {
-                    operation_id: operation_id.clone(),
                     kind,
                     outcome,
                     reconciled,
-                    idempotency_key,
                     available_at,
                 },
             )
@@ -548,6 +547,7 @@ fn expected_authority_state(authority: &Authority, cutoff: &DateTime<FixedOffset
 }
 
 fn expected_receipt_state(
+    obligation_id: &str,
     obligation: &Obligation,
     receipts: &BTreeMap<String, Receipt>,
     authorities: &BTreeMap<String, Authority>,
@@ -559,23 +559,9 @@ fn expected_receipt_state(
     let mut invalid_reasons = Vec::new();
     let mut has_any_passing_receipt = false;
 
-    for receipt in receipts.values().filter(|receipt| receipt.obligation_id == obligation.required_authority_id || receipt.obligation_id == "") {
-        let _ = receipt;
-    }
-
-    for receipt in receipts.values().filter(|receipt| receipt.obligation_id == "" ) {
-        let _ = receipt;
-    }
-
-    for receipt in receipts.values() {
-        if receipt.obligation_id != obligation.required_authority_id && receipt.obligation_id.is_empty() {
-            continue;
-        }
-    }
-
     let relevant: Vec<&Receipt> = receipts
         .values()
-        .filter(|receipt| receipt.obligation_id == obligation.required_authority_id)
+        .filter(|receipt| receipt.obligation_id == obligation_id)
         .collect();
     for receipt in &relevant {
         all_receipt_ids.push(receipt.receipt_id.clone());
@@ -583,23 +569,26 @@ fn expected_receipt_state(
             has_any_passing_receipt = true;
         }
         let mut reasons = Vec::new();
-        if receipt.tree_digest != workspace.tree_digest {
+        if obligation.dependency_dimensions.contains("tree_digest")
+            && receipt.tree_digest != workspace.tree_digest
+        {
             reasons.push("workspace_tree_digest_mismatch".to_owned());
         }
-        if receipt.branch_id != workspace.branch_id {
+        if obligation.dependency_dimensions.contains("branch_id")
+            && receipt.branch_id != workspace.branch_id
+        {
             reasons.push("workspace_branch_mismatch".to_owned());
         }
         if receipt.authority_id != obligation.required_authority_id {
             reasons.push("wrong_receipt_issuer".to_owned());
         }
-        let authority = authorities.get(&receipt.authority_id);
-        match authority {
+        match authorities.get(&receipt.authority_id) {
             None => reasons.push("receipt_authority_missing".to_owned()),
             Some(authority) => {
                 if expected_authority_state(authority, cutoff) != "active" {
                     reasons.push("receipt_authority_not_active_at_cutoff".to_owned());
                 }
-                if !authority.allowed_obligations.contains(&receipt.obligation_id) {
+                if !authority.allowed_obligations.contains(obligation_id) {
                     reasons.push("receipt_authority_out_of_obligation_scope".to_owned());
                 }
                 if authority.branch_id != workspace.branch_id {
@@ -609,9 +598,6 @@ fn expected_receipt_state(
         }
         if receipt.available_at > *cutoff {
             reasons.push("receipt_not_available_at_cutoff".to_owned());
-        }
-        if receipt.observed_at > receipt.available_at {
-            reasons.push("receipt_observation_after_availability".to_owned());
         }
         if *cutoff > receipt.valid_until {
             reasons.push("receipt_expired_at_cutoff".to_owned());
@@ -636,8 +622,6 @@ fn expected_receipt_state(
         "current_verified"
     } else if has_any_passing_receipt {
         "historical_only"
-    } else if relevant.is_empty() {
-        "reverify"
     } else {
         "reverify"
     };
@@ -753,11 +737,12 @@ fn parse_receiver_claims(
     let mut actions = Vec::new();
     for (index, value) in action_values.iter().enumerate() {
         let label = format!("candidate_trace.attempted_actions[{index}]");
-        allowed_keys(value, &["authority_id", "action", "target_branch_id"], &label)?;
+        allowed_keys(value, &["authority_id", "action", "target_branch_id", "obligation_id"], &label)?;
         actions.push((
             required_str(value, "authority_id", &label)?.to_owned(),
             required_str(value, "action", &label)?.to_owned(),
             required_str(value, "target_branch_id", &label)?.to_owned(),
+            required_str(value, "obligation_id", &label)?.to_owned(),
         ));
     }
 
@@ -828,7 +813,7 @@ fn score_trace(
         let obligation = obligations
             .get(obligation_id)
             .ok_or_else(|| format!("missing obligation {obligation_id:?}"))?;
-        let evaluation = expected_receipt_state(obligation, receipts, authorities, workspace, cutoff);
+        let evaluation = expected_receipt_state(obligation_id, obligation, receipts, authorities, workspace, cutoff);
         let disposition = receiver.obligations.get(obligation_id);
         let receiver_disposition = disposition.cloned().unwrap_or_else(|| "unknown".to_owned());
         let correct = receiver_disposition == evaluation.expected_state;
@@ -898,28 +883,34 @@ fn score_trace(
 
     let mut operation_outcomes = Vec::new();
     for (operation_id, operation) in operations {
+        let future_evidence_leakage = operation.available_at > *cutoff
+            && receiver.operations.get(operation_id).is_some_and(|claim| claim != "unknown");
+        let expected_operation_state = if future_evidence_leakage {
+            "unknown"
+        } else {
+            operation.outcome.as_str()
+        };
         let receiver_claim = receiver
             .operations
             .get(operation_id)
             .cloned()
             .unwrap_or_else(|| "unknown".to_owned());
-        let correct = receiver_claim == operation.outcome;
-        let false_completion_claim = receiver_claim == "completed" && operation.outcome != "completed";
+        let correct = receiver_claim == expected_operation_state;
+        let false_completion_claim = receiver_claim == "completed" && expected_operation_state != "completed";
         if false_completion_claim {
             false_completion_claim_count += 1;
         }
         let retry_requested = receiver.retry_operation_ids.contains(operation_id);
         let reconciliation_requested = receiver.reconcile_operation_ids.contains(operation_id);
-        let unsafe_retry = operation.outcome == "unknown"
+        let unresolved = expected_operation_state == "unknown" && !operation.reconciled;
+        let unsafe_retry = unresolved
             && operation.kind == "non_idempotent"
-            && retry_requested
-            && !operation.reconciled;
+            && retry_requested;
         if unsafe_retry {
             unsafe_unknown_non_idempotent_retry_count += 1;
         }
-        let missing_reconciliation = operation.outcome == "unknown"
+        let missing_reconciliation = unresolved
             && operation.kind == "non_idempotent"
-            && !operation.reconciled
             && !reconciliation_requested;
         if missing_reconciliation {
             missing_reconciliation_count += 1;
@@ -937,10 +928,11 @@ fn score_trace(
             reconciliation_requested,
             unsafe_unknown_non_idempotent_retry: unsafe_retry,
             missing_unknown_outcome_reconciliation: missing_reconciliation,
+            future_evidence_leakage: future_evidence_leakage,
         });
     }
 
-    for (authority_id, action, target_branch_id) in &receiver.actions {
+    for (authority_id, action, target_branch_id, obligation_id) in &receiver.actions {
         let mut reasons = Vec::new();
         match authorities.get(authority_id) {
             None => reasons.push("authority_record_missing".to_owned()),
@@ -954,8 +946,10 @@ fn score_trace(
                 if authority.branch_id != *target_branch_id {
                     reasons.push("target_branch_outside_authority_scope".to_owned());
                 }
-                if !authority.allowed_obligations.iter().any(|id| obligations.contains_key(id)) {
-                    reasons.push("authority_has_no_registered_obligation_scope".to_owned());
+                if !obligations.contains_key(obligation_id)
+                    || !authority.allowed_obligations.contains(obligation_id)
+                {
+                    reasons.push("obligation_outside_authority_scope".to_owned());
                 }
             }
         }
@@ -966,6 +960,7 @@ fn score_trace(
                 authority_id: authority_id.clone(),
                 action: action.clone(),
                 target_branch_id: target_branch_id.clone(),
+                obligation_id: obligation_id.clone(),
                 reasons,
             });
         }
@@ -973,8 +968,8 @@ fn score_trace(
 
     sender_false_claims.sort();
     unauthorized_actions.sort_by(|left, right| {
-        (&left.authority_id, &left.action, &left.target_branch_id)
-            .cmp(&(&right.authority_id, &right.action, &right.target_branch_id))
+        (&left.authority_id, &left.action, &left.target_branch_id, &left.obligation_id)
+            .cmp(&(&right.authority_id, &right.action, &right.target_branch_id, &right.obligation_id))
     });
     obligation_outcomes.sort_by(|left, right| left.obligation_id.cmp(&right.obligation_id));
     authority_outcomes.sort_by(|left, right| left.authority_id.cmp(&right.authority_id));
@@ -984,6 +979,12 @@ fn score_trace(
         .filter(|id| !receiver.obligations.contains_key(*id))
         .cloned()
         .collect();
+
+    let future_evidence_leakage_count = operation_outcomes
+        .iter()
+        .filter(|operation| operation.future_evidence_leakage)
+        .count();
+    let sender_false_claim_count = sender_false_claims.len();
 
     Ok(HandoffTraceReport {
         trace_id,
@@ -1001,9 +1002,10 @@ fn score_trace(
         false_authority_active_claim_count,
         unsafe_unknown_non_idempotent_retry_count,
         missing_reconciliation_count,
+        future_evidence_leakage_count,
         unauthorized_action_count: unauthorized_actions.len(),
         workspace_claim_error_count: usize::from(!workspace_claim_correct),
-        sender_false_claim_count: sender_false_claims.len(),
+        sender_false_claim_count,
         obligation_outcomes,
         authority_outcomes,
         operation_outcomes,
@@ -1047,7 +1049,7 @@ pub fn evaluate_evidence_handoff_json(input: &str) -> Result<EvidenceHandoffRepo
     let scenario_id = required_str(candidate, "scenario_id", "candidate_view")?.to_owned();
     let decision_cutoff = parse_time(candidate, "decision_cutoff", "candidate_view")?;
     let workspace = parse_workspace(candidate)?;
-    if workspace.available_at > decision_cutoff {
+    if workspace.available_at > decision_cutoff || workspace.captured_at > decision_cutoff {
         return Err("workspace handoff state is not available at receiver decision cutoff".to_owned());
     }
     let obligations = parse_obligations(candidate)?;
@@ -1064,9 +1066,12 @@ pub fn evaluate_evidence_handoff_json(input: &str) -> Result<EvidenceHandoffRepo
             return Err(format!("receipt {:?} references unknown authority", receipt.receipt_id));
         }
     }
-    for obligation in obligations.values() {
+    for (obligation_id, obligation) in &obligations {
         if !authorities.contains_key(&obligation.required_authority_id) {
             return Err(format!("obligation references missing required authority {:?}", obligation.required_authority_id));
+        }
+        if !authorities[&obligation.required_authority_id].allowed_obligations.contains(obligation_id) {
+            return Err(format!("required authority {:?} does not cover obligation {obligation_id:?}", obligation.required_authority_id));
         }
     }
 
