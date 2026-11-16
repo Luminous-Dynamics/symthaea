@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 //! Emit the exact adaptive depth-two industrial diagnosis policy tree.
 
+use industrial_diagnosis_voi::evaluate_case;
 use industrial_diagnosis_voi::reference_case;
 use industrial_diagnosis_voi::reference_measurements;
 use industrial_diagnosis_voi::sequential::{evaluate_depth_two, MeasurementOutcome};
@@ -24,14 +25,31 @@ fn main() {
         fmt(result.no_test_total_loss),
         fmt(result.no_test_total_loss)
     );
-    println!(
-        "GREEDY_ONE_STEP\t{}\t{}\t-\t-\t-\t-\t{}\t{}\t-\t1.000000",
-        case.case_id,
-        result.greedy_one_step_measurement_id.unwrap_or("NO_TEST"),
-        fmt(result.greedy_one_step_total_loss - result.no_test_total_loss
-            + result.no_test_total_loss),
-        fmt(result.greedy_one_step_total_loss)
-    );
+    let one_step = evaluate_case(&case, &measurements)
+        .expect("frozen one-step comparison must be valid");
+    if let Some(measurement_id) = result.greedy_one_step_measurement_id {
+        let evaluation = one_step
+            .measurements
+            .iter()
+            .find(|item| item.measurement_id == measurement_id)
+            .expect("selected greedy measurement must have an evaluation");
+        println!(
+            "GREEDY_ONE_STEP\t{}\t{}\t-\t-\t-\t{}\t{}\t{}\t-\t1.000000",
+            case.case_id,
+            measurement_id,
+            fmt(evaluation.expected_posterior_loss.unwrap()),
+            fmt(evaluation.measurement_cost.unwrap()),
+            fmt(result.greedy_one_step_total_loss)
+        );
+    } else {
+        println!(
+            "GREEDY_ONE_STEP\t{}\tNO_TEST\t-\t-\t{}\t{}\t0.000000\t{}\t-\t1.000000",
+            case.case_id,
+            result.no_test_decision.decision_id,
+            fmt(result.no_test_total_loss),
+            fmt(result.no_test_total_loss)
+        );
+    }
 
     match result.adaptive_depth_two {
         Some(policy) => {
