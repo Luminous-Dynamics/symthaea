@@ -1,0 +1,504 @@
+{
+  "scenario_id": "d6.11-observation-identifiability-v0.1",
+  "adjudication_status": "synthetic_known_answer_not_independently_adjudicated",
+  "event_count": 12,
+  "boundary_count": 5,
+  "pair_count": 6,
+  "traces": [
+    {
+      "trace_id": "adversarial-closed-world",
+      "boundary_outcomes": [
+        {
+          "producer_id": "stream-a",
+          "expected_state": "complete",
+          "claimed_state": "complete",
+          "correct": true,
+          "missing_sequence_numbers": [],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        },
+        {
+          "producer_id": "stream-b",
+          "expected_state": "complete",
+          "claimed_state": "complete",
+          "correct": true,
+          "missing_sequence_numbers": [],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        },
+        {
+          "producer_id": "stream-comp",
+          "expected_state": "compromised",
+          "claimed_state": "unknown",
+          "correct": false,
+          "missing_sequence_numbers": [
+            2
+          ],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        },
+        {
+          "producer_id": "stream-gap",
+          "expected_state": "gap",
+          "claimed_state": "complete",
+          "correct": false,
+          "missing_sequence_numbers": [
+            2
+          ],
+          "false_completeness_claim": true,
+          "false_incompleteness_claim": false
+        },
+        {
+          "producer_id": "stream-late",
+          "expected_state": "unknown",
+          "claimed_state": "complete",
+          "correct": false,
+          "missing_sequence_numbers": [],
+          "false_completeness_claim": true,
+          "false_incompleteness_claim": false
+        }
+      ],
+      "pair_outcomes": [
+        {
+          "pair_id": "certified-concurrent",
+          "expected_state": "concurrent",
+          "admissible_relations": [
+            "concurrent"
+          ],
+          "claimed_relation": "concurrent",
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "compromised-stream",
+          "expected_state": "compromised",
+          "admissible_relations": [
+            "after",
+            "before",
+            "concurrent"
+          ],
+          "claimed_relation": "before",
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": true,
+          "unnecessary_abstention": false,
+          "missed_compromise": true,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": true
+        },
+        {
+          "pair_id": "gap-ambiguous",
+          "expected_state": "underdetermined",
+          "admissible_relations": [
+            "before",
+            "concurrent"
+          ],
+          "claimed_relation": "concurrent",
+          "correct": false,
+          "false_concurrency": true,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": true
+        },
+        {
+          "pair_id": "late-ambiguous",
+          "expected_state": "underdetermined",
+          "admissible_relations": [
+            "after",
+            "before"
+          ],
+          "claimed_relation": "before",
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": true,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [
+            "late-arriving-event"
+          ],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "ordered-positive",
+          "expected_state": "before",
+          "admissible_relations": [
+            "before"
+          ],
+          "claimed_relation": "underdetermined",
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "redacted-metadata-order",
+          "expected_state": "before",
+          "admissible_relations": [
+            "before"
+          ],
+          "claimed_relation": "underdetermined",
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        }
+      ],
+      "identifiable_pair_count": 3,
+      "correctly_identified_pair_count": 1,
+      "underdetermined_pair_count": 2,
+      "correctly_abstained_pair_count": 0,
+      "compromised_pair_count": 1,
+      "correctly_detected_compromised_pair_count": 0,
+      "false_concurrency_claim_count": 1,
+      "unsupported_causal_claim_count": 2,
+      "unnecessary_abstention_count": 2,
+      "missed_compromise_count": 1,
+      "false_completeness_claim_count": 2,
+      "false_incompleteness_claim_count": 0,
+      "future_evidence_leakage_count": 1,
+      "critical_unsupported_claim_count": 2
+    },
+    {
+      "trace_id": "always-abstain",
+      "boundary_outcomes": [
+        {
+          "producer_id": "stream-a",
+          "expected_state": "complete",
+          "claimed_state": "unknown",
+          "correct": false,
+          "missing_sequence_numbers": [],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": true
+        },
+        {
+          "producer_id": "stream-b",
+          "expected_state": "complete",
+          "claimed_state": "unknown",
+          "correct": false,
+          "missing_sequence_numbers": [],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": true
+        },
+        {
+          "producer_id": "stream-comp",
+          "expected_state": "compromised",
+          "claimed_state": "unknown",
+          "correct": false,
+          "missing_sequence_numbers": [
+            2
+          ],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        },
+        {
+          "producer_id": "stream-gap",
+          "expected_state": "gap",
+          "claimed_state": "unknown",
+          "correct": false,
+          "missing_sequence_numbers": [
+            2
+          ],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        },
+        {
+          "producer_id": "stream-late",
+          "expected_state": "unknown",
+          "claimed_state": "unknown",
+          "correct": true,
+          "missing_sequence_numbers": [],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        }
+      ],
+      "pair_outcomes": [
+        {
+          "pair_id": "certified-concurrent",
+          "expected_state": "concurrent",
+          "admissible_relations": [
+            "concurrent"
+          ],
+          "claimed_relation": "underdetermined",
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "compromised-stream",
+          "expected_state": "compromised",
+          "admissible_relations": [
+            "after",
+            "before",
+            "concurrent"
+          ],
+          "claimed_relation": "underdetermined",
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": true,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "gap-ambiguous",
+          "expected_state": "underdetermined",
+          "admissible_relations": [
+            "before",
+            "concurrent"
+          ],
+          "claimed_relation": "underdetermined",
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "late-ambiguous",
+          "expected_state": "underdetermined",
+          "admissible_relations": [
+            "after",
+            "before"
+          ],
+          "claimed_relation": "underdetermined",
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "ordered-positive",
+          "expected_state": "before",
+          "admissible_relations": [
+            "before"
+          ],
+          "claimed_relation": "underdetermined",
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "redacted-metadata-order",
+          "expected_state": "before",
+          "admissible_relations": [
+            "before"
+          ],
+          "claimed_relation": "underdetermined",
+          "correct": false,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": true,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        }
+      ],
+      "identifiable_pair_count": 3,
+      "correctly_identified_pair_count": 0,
+      "underdetermined_pair_count": 2,
+      "correctly_abstained_pair_count": 2,
+      "compromised_pair_count": 1,
+      "correctly_detected_compromised_pair_count": 0,
+      "false_concurrency_claim_count": 0,
+      "unsupported_causal_claim_count": 0,
+      "unnecessary_abstention_count": 3,
+      "missed_compromise_count": 1,
+      "false_completeness_claim_count": 0,
+      "false_incompleteness_claim_count": 2,
+      "future_evidence_leakage_count": 0,
+      "critical_unsupported_claim_count": 0
+    },
+    {
+      "trace_id": "calibrated-agent",
+      "boundary_outcomes": [
+        {
+          "producer_id": "stream-a",
+          "expected_state": "complete",
+          "claimed_state": "complete",
+          "correct": true,
+          "missing_sequence_numbers": [],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        },
+        {
+          "producer_id": "stream-b",
+          "expected_state": "complete",
+          "claimed_state": "complete",
+          "correct": true,
+          "missing_sequence_numbers": [],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        },
+        {
+          "producer_id": "stream-comp",
+          "expected_state": "compromised",
+          "claimed_state": "compromised",
+          "correct": true,
+          "missing_sequence_numbers": [
+            2
+          ],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        },
+        {
+          "producer_id": "stream-gap",
+          "expected_state": "gap",
+          "claimed_state": "gap",
+          "correct": true,
+          "missing_sequence_numbers": [
+            2
+          ],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        },
+        {
+          "producer_id": "stream-late",
+          "expected_state": "unknown",
+          "claimed_state": "unknown",
+          "correct": true,
+          "missing_sequence_numbers": [],
+          "false_completeness_claim": false,
+          "false_incompleteness_claim": false
+        }
+      ],
+      "pair_outcomes": [
+        {
+          "pair_id": "certified-concurrent",
+          "expected_state": "concurrent",
+          "admissible_relations": [
+            "concurrent"
+          ],
+          "claimed_relation": "concurrent",
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "compromised-stream",
+          "expected_state": "compromised",
+          "admissible_relations": [
+            "after",
+            "before",
+            "concurrent"
+          ],
+          "claimed_relation": "compromised",
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "gap-ambiguous",
+          "expected_state": "underdetermined",
+          "admissible_relations": [
+            "before",
+            "concurrent"
+          ],
+          "claimed_relation": "underdetermined",
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "late-ambiguous",
+          "expected_state": "underdetermined",
+          "admissible_relations": [
+            "after",
+            "before"
+          ],
+          "claimed_relation": "underdetermined",
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "ordered-positive",
+          "expected_state": "before",
+          "admissible_relations": [
+            "before"
+          ],
+          "claimed_relation": "before",
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        },
+        {
+          "pair_id": "redacted-metadata-order",
+          "expected_state": "before",
+          "admissible_relations": [
+            "before"
+          ],
+          "claimed_relation": "before",
+          "correct": true,
+          "false_concurrency": false,
+          "unsupported_causal_claim": false,
+          "unnecessary_abstention": false,
+          "missed_compromise": false,
+          "future_evidence_event_ids": [],
+          "critical_unsupported_claim": false
+        }
+      ],
+      "identifiable_pair_count": 3,
+      "correctly_identified_pair_count": 3,
+      "underdetermined_pair_count": 2,
+      "correctly_abstained_pair_count": 2,
+      "compromised_pair_count": 1,
+      "correctly_detected_compromised_pair_count": 1,
+      "false_concurrency_claim_count": 0,
+      "unsupported_causal_claim_count": 0,
+      "unnecessary_abstention_count": 0,
+      "missed_compromise_count": 0,
+      "false_completeness_claim_count": 0,
+      "false_incompleteness_claim_count": 0,
+      "future_evidence_leakage_count": 0,
+      "critical_unsupported_claim_count": 0
+    }
+  ],
+  "claim_ceiling": "Synthetic known-answer evaluation of causal identifiability under declared observation boundaries and finite admissible histories. Does not authenticate real attestations, prove observation-universe completeness, establish universal causal reconstruction, or measure agent performance."
+}

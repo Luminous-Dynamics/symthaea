@@ -14,6 +14,7 @@ pub mod selective_revalidation;
 pub mod multi_shift_sequence;
 pub mod exploit_migration;
 pub mod partial_order;
+pub mod identifiability;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 

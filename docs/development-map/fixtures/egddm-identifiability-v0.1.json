@@ -1,0 +1,518 @@
+{
+  "bundle_id": "egddm-d6.11-identifiability-v0.1",
+  "bundle_visibility": "evaluator_only_never_candidate_visible",
+  "candidate_view": {
+    "scenario_id": "d6.11-observation-identifiability-v0.1",
+    "events": [
+      {
+        "event_id": "order-left",
+        "producer_id": "stream-a",
+        "sequence_number": 1,
+        "event_time": "2026-11-16T00:01:00Z",
+        "available_at": "2026-11-16T00:01:00Z"
+      },
+      {
+        "event_id": "order-right",
+        "producer_id": "stream-a",
+        "sequence_number": 2,
+        "event_time": "2026-11-16T00:02:00Z",
+        "available_at": "2026-11-16T00:02:00Z"
+      },
+      {
+        "event_id": "concurrent-a",
+        "producer_id": "stream-a",
+        "sequence_number": 3,
+        "event_time": "2026-11-16T00:15:00Z",
+        "available_at": "2026-11-16T00:15:00Z"
+      },
+      {
+        "event_id": "concurrent-b",
+        "producer_id": "stream-b",
+        "sequence_number": 1,
+        "event_time": "2026-11-16T00:15:00Z",
+        "available_at": "2026-11-16T00:15:00Z"
+      },
+      {
+        "event_id": "gap-left",
+        "producer_id": "stream-gap",
+        "sequence_number": 1,
+        "event_time": "2026-11-16T00:16:00Z",
+        "available_at": "2026-11-16T00:16:00Z"
+      },
+      {
+        "event_id": "gap-right",
+        "producer_id": "stream-b",
+        "sequence_number": 2,
+        "event_time": "2026-11-16T00:17:00Z",
+        "available_at": "2026-11-16T00:17:00Z"
+      },
+      {
+        "event_id": "late-left",
+        "producer_id": "stream-late",
+        "sequence_number": 1,
+        "event_time": "2026-11-16T00:20:00Z",
+        "available_at": "2026-11-16T00:20:00Z"
+      },
+      {
+        "event_id": "late-arriving-event",
+        "producer_id": "stream-b",
+        "sequence_number": 3,
+        "event_time": "2026-11-16T00:25:00Z",
+        "available_at": "2026-11-16T03:00:00Z"
+      },
+      {
+        "event_id": "compromised-a",
+        "producer_id": "stream-comp",
+        "sequence_number": 1,
+        "event_time": "2026-11-16T00:10:00Z",
+        "available_at": "2026-11-16T00:10:00Z"
+      },
+      {
+        "event_id": "compromised-b",
+        "producer_id": "stream-b",
+        "sequence_number": 4,
+        "event_time": "2026-11-16T00:12:00Z",
+        "available_at": "2026-11-16T00:12:00Z"
+      },
+      {
+        "event_id": "redacted-left",
+        "producer_id": "stream-a",
+        "sequence_number": 4,
+        "event_time": "2026-11-16T00:30:00Z",
+        "available_at": "2026-11-16T00:30:00Z"
+      },
+      {
+        "event_id": "redacted-right",
+        "producer_id": "stream-a",
+        "sequence_number": 5,
+        "event_time": "2026-11-16T00:31:00Z",
+        "available_at": "2026-11-16T00:31:00Z"
+      }
+    ],
+    "observation_boundaries": [
+      {
+        "producer_id": "stream-a",
+        "expected_sequence_numbers": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "observed_sequence_numbers": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "attested_complete": true,
+        "signature_status": "valid",
+        "issuer_key_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observer_identity_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      {
+        "producer_id": "stream-b",
+        "expected_sequence_numbers": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "observed_sequence_numbers": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "attested_complete": true,
+        "signature_status": "valid",
+        "issuer_key_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "observer_identity_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      {
+        "producer_id": "stream-gap",
+        "expected_sequence_numbers": [
+          1,
+          2,
+          3,
+          4
+        ],
+        "observed_sequence_numbers": [
+          1,
+          3,
+          4
+        ],
+        "attested_complete": true,
+        "signature_status": "valid",
+        "issuer_key_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "observer_identity_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      },
+      {
+        "producer_id": "stream-late",
+        "expected_sequence_numbers": [],
+        "observed_sequence_numbers": [
+          1
+        ],
+        "attested_complete": false,
+        "signature_status": "unknown",
+        "issuer_key_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "observer_identity_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      {
+        "producer_id": "stream-comp",
+        "expected_sequence_numbers": [
+          1,
+          2,
+          3
+        ],
+        "observed_sequence_numbers": [
+          1,
+          3
+        ],
+        "attested_complete": true,
+        "signature_status": "invalid",
+        "issuer_key_digest": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "observer_identity_digest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    ],
+    "pair_tasks": [
+      {
+        "pair_id": "ordered-positive",
+        "left_event_id": "order-left",
+        "right_event_id": "order-right",
+        "relevant_producers": [
+          "stream-a"
+        ],
+        "decision_cutoff": "2026-11-16T01:00:00Z",
+        "critical": false
+      },
+      {
+        "pair_id": "certified-concurrent",
+        "left_event_id": "concurrent-a",
+        "right_event_id": "concurrent-b",
+        "relevant_producers": [
+          "stream-a",
+          "stream-b"
+        ],
+        "decision_cutoff": "2026-11-16T01:00:00Z",
+        "critical": false
+      },
+      {
+        "pair_id": "gap-ambiguous",
+        "left_event_id": "gap-left",
+        "right_event_id": "gap-right",
+        "relevant_producers": [
+          "stream-gap",
+          "stream-b"
+        ],
+        "decision_cutoff": "2026-11-16T01:00:00Z",
+        "critical": true
+      },
+      {
+        "pair_id": "late-ambiguous",
+        "left_event_id": "late-left",
+        "right_event_id": "late-arriving-event",
+        "relevant_producers": [
+          "stream-late",
+          "stream-b"
+        ],
+        "decision_cutoff": "2026-11-16T02:00:00Z",
+        "critical": false
+      },
+      {
+        "pair_id": "compromised-stream",
+        "left_event_id": "compromised-a",
+        "right_event_id": "compromised-b",
+        "relevant_producers": [
+          "stream-comp",
+          "stream-b"
+        ],
+        "decision_cutoff": "2026-11-16T02:00:00Z",
+        "critical": true
+      },
+      {
+        "pair_id": "redacted-metadata-order",
+        "left_event_id": "redacted-left",
+        "right_event_id": "redacted-right",
+        "relevant_producers": [
+          "stream-a"
+        ],
+        "decision_cutoff": "2026-11-16T01:00:00Z",
+        "critical": false
+      }
+    ]
+  },
+  "gold_overlay": {
+    "adjudication_status": "synthetic_known_answer_not_independently_adjudicated",
+    "boundary_truths": [
+      {
+        "producer_id": "stream-a",
+        "expected_state": "complete"
+      },
+      {
+        "producer_id": "stream-b",
+        "expected_state": "complete"
+      },
+      {
+        "producer_id": "stream-gap",
+        "expected_state": "gap"
+      },
+      {
+        "producer_id": "stream-late",
+        "expected_state": "unknown"
+      },
+      {
+        "producer_id": "stream-comp",
+        "expected_state": "compromised"
+      }
+    ],
+    "pair_truths": [
+      {
+        "pair_id": "ordered-positive",
+        "admissible_relations": [
+          "before"
+        ]
+      },
+      {
+        "pair_id": "certified-concurrent",
+        "admissible_relations": [
+          "concurrent"
+        ]
+      },
+      {
+        "pair_id": "gap-ambiguous",
+        "admissible_relations": [
+          "before",
+          "concurrent"
+        ]
+      },
+      {
+        "pair_id": "late-ambiguous",
+        "admissible_relations": [
+          "before",
+          "after"
+        ]
+      },
+      {
+        "pair_id": "compromised-stream",
+        "admissible_relations": [
+          "before",
+          "after",
+          "concurrent"
+        ]
+      },
+      {
+        "pair_id": "redacted-metadata-order",
+        "admissible_relations": [
+          "before"
+        ]
+      }
+    ]
+  },
+  "candidate_traces": [
+    {
+      "trace_id": "calibrated-agent",
+      "boundary_claims": [
+        {
+          "producer_id": "stream-a",
+          "claimed_state": "complete"
+        },
+        {
+          "producer_id": "stream-b",
+          "claimed_state": "complete"
+        },
+        {
+          "producer_id": "stream-gap",
+          "claimed_state": "gap"
+        },
+        {
+          "producer_id": "stream-late",
+          "claimed_state": "unknown"
+        },
+        {
+          "producer_id": "stream-comp",
+          "claimed_state": "compromised"
+        }
+      ],
+      "pair_claims": [
+        {
+          "pair_id": "ordered-positive",
+          "claimed_relation": "before",
+          "evidence_event_ids": [
+            "order-left",
+            "order-right"
+          ]
+        },
+        {
+          "pair_id": "certified-concurrent",
+          "claimed_relation": "concurrent",
+          "evidence_event_ids": [
+            "concurrent-a",
+            "concurrent-b"
+          ]
+        },
+        {
+          "pair_id": "gap-ambiguous",
+          "claimed_relation": "underdetermined",
+          "evidence_event_ids": [
+            "gap-left",
+            "gap-right"
+          ]
+        },
+        {
+          "pair_id": "late-ambiguous",
+          "claimed_relation": "underdetermined",
+          "evidence_event_ids": [
+            "late-left"
+          ]
+        },
+        {
+          "pair_id": "compromised-stream",
+          "claimed_relation": "compromised",
+          "evidence_event_ids": [
+            "compromised-a"
+          ]
+        },
+        {
+          "pair_id": "redacted-metadata-order",
+          "claimed_relation": "before",
+          "evidence_event_ids": [
+            "redacted-left",
+            "redacted-right"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "adversarial-closed-world",
+      "boundary_claims": [
+        {
+          "producer_id": "stream-a",
+          "claimed_state": "complete"
+        },
+        {
+          "producer_id": "stream-b",
+          "claimed_state": "complete"
+        },
+        {
+          "producer_id": "stream-gap",
+          "claimed_state": "complete"
+        },
+        {
+          "producer_id": "stream-late",
+          "claimed_state": "complete"
+        },
+        {
+          "producer_id": "stream-comp",
+          "claimed_state": "unknown"
+        }
+      ],
+      "pair_claims": [
+        {
+          "pair_id": "ordered-positive",
+          "claimed_relation": "underdetermined",
+          "evidence_event_ids": [
+            "order-left"
+          ]
+        },
+        {
+          "pair_id": "certified-concurrent",
+          "claimed_relation": "concurrent",
+          "evidence_event_ids": [
+            "concurrent-a",
+            "concurrent-b"
+          ]
+        },
+        {
+          "pair_id": "gap-ambiguous",
+          "claimed_relation": "concurrent",
+          "evidence_event_ids": [
+            "gap-left",
+            "gap-right"
+          ]
+        },
+        {
+          "pair_id": "late-ambiguous",
+          "claimed_relation": "before",
+          "evidence_event_ids": [
+            "late-left",
+            "late-arriving-event"
+          ]
+        },
+        {
+          "pair_id": "compromised-stream",
+          "claimed_relation": "before",
+          "evidence_event_ids": [
+            "compromised-a",
+            "compromised-b"
+          ]
+        },
+        {
+          "pair_id": "redacted-metadata-order",
+          "claimed_relation": "underdetermined",
+          "evidence_event_ids": [
+            "redacted-left"
+          ]
+        }
+      ]
+    },
+    {
+      "trace_id": "always-abstain",
+      "boundary_claims": [
+        {
+          "producer_id": "stream-a",
+          "claimed_state": "unknown"
+        },
+        {
+          "producer_id": "stream-b",
+          "claimed_state": "unknown"
+        },
+        {
+          "producer_id": "stream-gap",
+          "claimed_state": "unknown"
+        },
+        {
+          "producer_id": "stream-late",
+          "claimed_state": "unknown"
+        },
+        {
+          "producer_id": "stream-comp",
+          "claimed_state": "unknown"
+        }
+      ],
+      "pair_claims": [
+        {
+          "pair_id": "ordered-positive",
+          "claimed_relation": "underdetermined",
+          "evidence_event_ids": []
+        },
+        {
+          "pair_id": "certified-concurrent",
+          "claimed_relation": "underdetermined",
+          "evidence_event_ids": []
+        },
+        {
+          "pair_id": "gap-ambiguous",
+          "claimed_relation": "underdetermined",
+          "evidence_event_ids": []
+        },
+        {
+          "pair_id": "late-ambiguous",
+          "claimed_relation": "underdetermined",
+          "evidence_event_ids": []
+        },
+        {
+          "pair_id": "compromised-stream",
+          "claimed_relation": "underdetermined",
+          "evidence_event_ids": []
+        },
+        {
+          "pair_id": "redacted-metadata-order",
+          "claimed_relation": "underdetermined",
+          "evidence_event_ids": []
+        }
+      ]
+    }
+  ]
+}
