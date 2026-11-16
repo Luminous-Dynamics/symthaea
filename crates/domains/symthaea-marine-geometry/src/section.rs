@@ -991,6 +991,37 @@ mod tests {
             .any(|item| item.code == "end_conditions_require_schema_v2"));
     }
 
+
+    #[test]
+    fn legacy_v1_json_without_end_condition_field_defaults_to_planar() {
+        let spec = valid_spec();
+        let mut legacy = serde_json::to_value(&spec).unwrap();
+        legacy
+            .as_object_mut()
+            .unwrap()
+            .remove("longitudinal_end_conditions");
+        let parsed: SectionHullSpec = serde_json::from_value(legacy).unwrap();
+        assert_eq!(
+            parsed.longitudinal_end_conditions,
+            LongitudinalEndConditions::default()
+        );
+        assert!(generate_section_artifact(&parsed).is_ok());
+    }
+
+    #[test]
+    fn legacy_v1_section_artifact_parses_but_is_not_v2_admissible() {
+        let artifact = generate_section_artifact(&valid_spec()).unwrap();
+        let mut legacy = serde_json::to_value(&artifact).unwrap();
+        let object = legacy.as_object_mut().unwrap();
+        object.insert("artifact_schema_version".into(), serde_json::json!(1));
+        object.remove("section_family_manifest_digest_blake3");
+        let parsed: SectionFamilyArtifact = serde_json::from_value(legacy).unwrap();
+        let errors = verify_section_family_artifact_integrity(&parsed).unwrap_err();
+        assert!(errors
+            .iter()
+            .any(|item| item.code == "artifact_schema_version"));
+    }
+
     #[test]
     fn collapsed_bow_requires_exact_zero_breadth() {
         let mut spec = valid_spec();
