@@ -15,12 +15,14 @@ The EVSI and robust-EVSI planners accept caller-supplied values of P(outcome | h
 - The fit uses only the Training split. Calibration and Evaluation cases do not affect counts or likelihoods.
 - A symmetric Dirichlet prior with caller-declared alpha smooths categorical outcome counts.
 - A minimum independent training-site count gates whether a likelihood cell is emitted. Under-supported cells carry no probabilities.
+- The table is immutable through the public API and includes the ordered action IDs, sensor modalities and hypothesis IDs.
+- A conversion helper builds a one-step EVSI problem only when every hypothesis/action cell is supported and the caller supplies matching priors, decision losses, resource costs and external gate decisions.
 - Calibration and Evaluation splits are scored separately using multiclass Brier score and negative log-likelihood (NLL), both proper scoring rules.
 - The Evaluation split cannot be used to fit the model, and the Training split cannot be passed to the holdout scorer.
 
 ## Important limitations
 
-- The estimator is a simple categorical frequency model with Dirichlet smoothing; it is not a neural calibration method, causal sensor model, hierarchical Bayesian model, conformal predictor or guarantee under distribution shift.
+- The estimator is a simple categorical frequency model with Dirichlet smoothing; it is not a neural calibration method, causal sensor model, hierarchical Bayesian model, conformal predictor or guarantee under distribution shift. The EVSI conversion is a type adapter, not a claim that the empirical probabilities are calibrated or fit for a particular mission.
 - It does not infer priors, mission losses, decision costs or action admissibility.
 - It does not authenticate reference labels or observation evidence; all references are opaque identifiers.
 - It assumes one independent case per site/action and unique acquisition-lineage IDs. More complex repeated-measurement or cross-sensor dependence requires a richer joint model, not duplicate rows.
@@ -35,10 +37,10 @@ cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterr
 cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-likelihood-calibration/Cargo.toml --all-targets -- -D warnings
 ~~~
 
-This is a standalone nested Cargo workspace and is not included in the production Symthaea workspace.
+This is a standalone nested Cargo workspace and is not included in the production Symthaea workspace. Its only dependency is the adjacent subterra-voi-reference package.
 
 ## Evidence state
 
-- Data contract, empirical estimator and 14 unit-test cases: AUTHORED.
+- Data contract, empirical estimator and 19 unit-test cases: AUTHORED.
 - Rust formatting, compilation, tests and Clippy: NOT EXECUTED in the current authoring environment (no cargo/rustc/rustfmt).
 - Calibration quality, site transfer, robot-in-the-loop, cave analogue, flight and planetary validation: NOT PERFORMED.
