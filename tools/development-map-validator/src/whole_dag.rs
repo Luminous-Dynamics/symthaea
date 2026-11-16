@@ -301,16 +301,23 @@ fn expected_state(
     possible_relations: &BTreeSet<String>,
     boundary_state: &str,
 ) -> String {
-    if boundary_state == "compromised" {
-        return "compromised".to_owned();
-    }
     if possible_relations.len() != 1 {
-        return "underdetermined".to_owned();
+        return if boundary_state == "compromised" {
+            "compromised".to_owned()
+        } else {
+            "underdetermined".to_owned()
+        };
     }
     let relation = possible_relations.iter().next().cloned().unwrap_or_default();
     if relation == "concurrent" && boundary_state != "complete" {
-        return "underdetermined".to_owned();
+        return if boundary_state == "compromised" {
+            "compromised".to_owned()
+        } else {
+            "underdetermined".to_owned()
+        };
     }
+    // A compromised observer does not erase a positive relation that is
+    // independently entailed by every admissible whole-graph completion.
     relation
 }
 
@@ -492,11 +499,7 @@ fn score_trace(
             individually_plausible_claim_count += 1;
         }
 
-        let expected = if boundary_claim == "compromised" {
-            "compromised".to_owned()
-        } else {
-            truth.expected_state.clone()
-        };
+        let expected = truth.expected_state.clone();
         let correct = claim.claimed_relation == expected;
         let false_concurrency = claim.claimed_relation == "concurrent" && expected != "concurrent";
         let unsupported_causal = ["before", "after"].contains(&claim.claimed_relation.as_str())
