@@ -179,7 +179,7 @@ Hosted execution previously reached whole-crate compilation and exposed errors t
 
 The source watermark adversarial evaluation fixture is
 `crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json`.
-It pins 19 deterministic scenario families and separates false-complete rate
+It pins 20 deterministic scenario families and separates false-complete rate
 (the primary safety metric) from false-incomplete rate/completeness lag. All
 qualification thresholds are targets, not measured results.
 
@@ -204,3 +204,15 @@ verified reports before timing. The benchmark is diagnostic, not a physical
 energy measurement; runner CPU model, toolchain, release profile and exact
 source/fixture hashes must accompany each artifact. The latest run has not
 completed; no latency advantage is asserted yet.
+
+
+## Current foundation-model comparator snapshot
+
+The versioned comparator observations are stored at
+`crates/domains/symthaea-capability-closure/fixtures/tsfm_comparator_snapshot_v0.1.json`.
+The snapshot keeps FEV-Bench win rate distinct from MASE skill, GIFT-Eval CRPS
+and MASE distinct from BOOM telemetry CRPS, and PMLR energy-study observations
+separate from leaderboard accuracy. It preserves the H2O site / GitHub README
+FEV-Bench disagreement and the 15 Nov 2026 TSFM.ai MASE-skill snapshot.
+The comparator registry hashes this fixture in the exact-head workflow.
+No model checkpoint or external baseline has been reproduced.
