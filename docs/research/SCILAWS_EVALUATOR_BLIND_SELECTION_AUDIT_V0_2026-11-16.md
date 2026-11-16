@@ -4,7 +4,7 @@
 **Parent:** [#11201 — SciLaws-Bench adapter](https://github.com/Luminous-Dynamics/symthaea/issues/11201)  
 **Work item:** [#12489 — evaluator-blind candidate selection](https://github.com/Luminous-Dynamics/symthaea/issues/12489)  
 **Implementation:** [PR #12492](https://github.com/Luminous-Dynamics/symthaea/pull/12492)  
-**Status:** draft implementation; exact-head Rust verification pending
+**Status:** draft implementation; isolated exact-source harness is being qualified
 
 ## 1. Research problem
 
@@ -188,15 +188,20 @@ External foundation models can contribute candidate generation and method propos
 
 ## 8. Verification status and next work
 
-PR #12492 is a draft and its exact-head workflow is being corrected after repository-wide rustfmt differences were found in unrelated existing files. The workflow is scoped to the new module, then runs focused tests and strict Clippy. No Rust pass is claimed until the exact current PR head passes.
+The full `symthaea-architecture-engineering` package test command on the stacked branch currently fails in unrelated modules (including event_tape, synthetic_search, analytical_benchmark and direction_board), before isolating the SciLaws module. The branch also has a Cargo lock-resolution mismatch when this package test is run with `--locked`. Those are repository/base-branch issues, not evidence that this module passes or fails.
 
-No SciLaws dataset has been imported. No official SciLaws run or leaderboard result has been reproduced. The immediate next increments are:
-1. pass exact-head format/tests/Clippy for the standalone Real audit;
-2. add fixture-based JSON examples for the live/evaluator packet boundary;
-3. connect the frozen live packet to the existing candidate/anytime history pipeline;
-4. add a separate Parallel S_S audit contract without mixing score spaces;
-5. pin the Hugging Face dataset revision and legally eligible task subset;
-6. run matched candidate generation/selection arms, then request official evaluator scoring.
+To avoid changing unrelated modules or weakening workspace gates, PR #12492 now has an isolated harness at `research/scilaws-candidate-selection-audit-harness`. Its `src/lib.rs` imports the exact two repository sources by path:
+- `crates/domains/symthaea-architecture-engineering/src/pareto_objectives.rs`;
+- `crates/domains/symthaea-architecture-engineering/src/scilaws_candidate_selection.rs`.
+
+This does not copy or fork the implementations. The harness has its own pinned `Cargo.lock`, Rust 1.96 format/test/Clippy gates, and is deliberately narrower than a whole-package/workspace claim. Its exact-head workflow has passed once before the latest lockfile pin and fixture-cleanup commits; the current exact head is being requalified with `--locked` enabled for both tests and Clippy. Until the latest head passes, do not claim current-head qualification.
+
+No SciLaws dataset has been imported. No official SciLaws run or leaderboard result has been reproduced. The next increments are:
+1. pass the newest exact-head isolated harness with locked dependencies;
+2. connect the frozen live packet to the existing candidate/anytime history pipeline;
+3. implement the separate Parallel S_S audit under #12522 without mixing score spaces;
+4. pin the Hugging Face dataset revision and review per-task licenses;
+5. run matched candidate-generation/selection arms on frozen candidate pools, then request official evaluator scoring.
 
 ## 9. Claim ceiling
 
