@@ -755,6 +755,18 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         if case_id == "CO2-COUNTERFLOW-ARC-EXPERIMENT-2026" {
             validate_co2_counterflow_operating_points(case, display_name)?;
         }
+        if case_id == "NH3-PLASMA-SYNTHESIS-ROUTES-TEA-2026" {
+            validate_nh3_synthesis_routes_case(case, display_name)?;
+        }
+        if case_id == "CO2-DBD-ML-358-DATASET-2026" {
+            validate_co2_dbd_ml_case(case, display_name)?;
+        }
+        if case_id == "CO2-RWGS-GLIDING-ARC-2026" {
+            validate_co2_rwgs_operating_points(case, display_name)?;
+        }
+        if case_id == "CO2-CYCLIC-REFORMING-GASIFICATION-2026" {
+            validate_co2_crg_operating_points(case, display_name)?;
+        }
 
         if case_id == "NH3-CRACK-MW-ATM-MECHANISM-2026" {
             validate_nh3_operating_points(case, display_name)?;
@@ -934,6 +946,9 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         }
         if check_id == "NH3-PLASMA-TO-SOEC-HB-ENERGY-GAP-2026" {
             validate_nh3_synthesis_energy_gap_check(check, root, display_name)?;
+        }
+        if check_id == "NH3-PLASMA-SYNTHESIS-RECIPROCAL-YIELD-2026" {
+            validate_nh3_synthesis_energy_reciprocal_check(check, root, display_name)?;
         }
     }
 
@@ -1688,6 +1703,326 @@ fn validate_ch4_thermal_appj_case(case: &Value, display_name: &str) -> Result<()
     Ok(())
 }
 
+fn validate_nh3_synthesis_routes_case(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: modeled plasma ammonia synthesis route comparison");
+    let configuration = case
+        .get("configuration")
+        .with_context(|| format!("{context}: configuration is missing"))?;
+    ensure!(
+        required_f64(configuration, "nominal_plant_capacity_tonne_nh3_per_day", &context)? == 1.0,
+        "{context}: source comparison must preserve the 1 tonne/day modeled plant basis"
+    );
+    ensure!(
+        close_f64(
+            required_f64(configuration, "accepted_product_purity_weight_fraction", &context)?,
+            0.98
+        ),
+        "{context}: source comparison must preserve the 98 wt% NH3 product basis"
+    );
+    let points = case
+        .get("operating_points")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: operating_points are missing"))?;
+    ensure!(
+        points.len() == 3,
+        "{context}: expected three distinct modeled synthesis routes"
+    );
+    let mut ids = BTreeSet::new();
+    for point in points {
+        let id = point
+            .get("operating_point_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{context}: operating point has no identity"))?;
+        ensure!(
+            ids.insert(id.to_owned()),
+            "{context}: duplicate synthesis route identity {id}"
+        );
+    }
+    for (id, route, expected_energy) in [
+        ("NH3-SYN-RGA-NORR-2026", "RGA_NORR", 84.0),
+        ("NH3-SYN-RGA-LNT-2026", "RGA_LNT", 154.0),
+        ("NH3-SYN-DIRECT-DBD-2026", "DIRECT_DBD", 435.0),
+    ] {
+        let point = points
+            .iter()
+            .find(|point| point.get("operating_point_id").and_then(Value::as_str) == Some(id))
+            .with_context(|| format!("{context}: missing route {id}"))?;
+        ensure!(
+            point.get("route").and_then(Value::as_str) == Some(route),
+            "{context}: route {id} has a mismatched route label"
+        );
+        ensure!(
+            close_f64(
+                required_f64(point, "specific_energy_kWh_per_kg_nh3", &context)?,
+                expected_energy
+            ),
+            "{context}: route {id} specific energy does not match its source point"
+        );
+    }
+    let norr = points
+        .iter()
+        .find(|point| point.get("operating_point_id").and_then(Value::as_str) == Some("NH3-SYN-RGA-NORR-2026"))
+        .expect("validated above");
+    ensure!(
+        close_f64(
+            required_f64(norr, "plasma_share_of_total_energy_fraction", &context)?,
+            0.68
+        ),
+        "{context}: RGA-NORR plasma share must remain 68% of total modeled energy"
+    );
+    ensure!(
+        close_f64(
+            case_observation_value(case, "green_haber_bosch_small_scale_reference_specific_energy")
+                .unwrap_or(f64::NAN),
+            11.5
+        ),
+        "{context}: green Haber-Bosch comparator must remain 11.5 kWh/kg NH3"
+    );
+    ensure!(
+        case.get("luminous_reproduction").and_then(Value::as_bool) == Some(false),
+        "{context}: modeled process results cannot be promoted to Luminous reproduction"
+    );
+    Ok(())
+}
+
+fn validate_co2_dbd_ml_case(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: DBD CO2 grouped ML source benchmark");
+    let dataset = case
+        .get("dataset")
+        .with_context(|| format!("{context}: dataset metadata is missing"))?;
+    ensure!(
+        required_f64(dataset, "data_point_count", &context)? == 358.0,
+        "{context}: source dataset must retain its 358 data points"
+    );
+    ensure!(
+        required_f64(dataset, "feature_count", &context)? == 6.0,
+        "{context}: source model must retain its six reported features"
+    );
+    ensure!(
+        dataset.get("split_protocol").and_then(Value::as_str)
+            == Some("publication-wise grouped five-fold cross-validation"),
+        "{context}: source validation must retain publication-wise grouped folds"
+    );
+    let features = dataset
+        .get("features")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: feature list is missing"))?;
+    ensure!(
+        features.len() == 6,
+        "{context}: feature list must contain exactly six declared features"
+    );
+    let best_fold = case_observation_value(case, "best_fold_grouped_cross_validation_r2")
+        .unwrap_or(f64::NAN);
+    let prospective = case_observation_value(case, "prospective_unseen_data_r2")
+        .unwrap_or(f64::NAN);
+    ensure!(
+        close_f64(best_fold, 0.791),
+        "{context}: best-fold grouped-CV R2 must remain source-pinned at 0.791"
+    );
+    ensure!(
+        close_f64(prospective, 0.92),
+        "{context}: prospective in-domain R2 must remain source-pinned at 0.92"
+    );
+    ensure!(
+        case.get("comparison_status").and_then(Value::as_str)
+            == Some("PUBLISHED_GROUPED_DATA_MODEL_WITH_DOMAIN_LIMITED_PROSPECTIVE_VALIDATION"),
+        "{context}: prospective validation must retain its domain-limited claim ceiling"
+    );
+    ensure!(
+        case.get("luminous_reproduction").and_then(Value::as_bool) == Some(false),
+        "{context}: published DBD model cannot be promoted to Luminous reproduction"
+    );
+    Ok(())
+}
+
+fn validate_co2_rwgs_operating_points(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: gliding-arc RWGS operating-point pairing");
+    let points = case
+        .get("operating_points")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: operating_points are missing"))?;
+    ensure!(
+        points.len() == 2,
+        "{context}: expected separate H2-rich and stoichiometric operating points"
+    );
+    let mut ids = BTreeSet::new();
+    for point in points {
+        let id = point
+            .get("operating_point_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{context}: operating point has no identity"))?;
+        ensure!(ids.insert(id.to_owned()), "{context}: duplicate operating point {id}");
+    }
+    let h2_rich = points
+        .iter()
+        .find(|point| point.get("operating_point_id").and_then(Value::as_str) == Some("RWGS-H2-RICH-2026"))
+        .with_context(|| format!("{context}: H2-rich point is missing"))?;
+    let stoich = points
+        .iter()
+        .find(|point| point.get("operating_point_id").and_then(Value::as_str) == Some("RWGS-STOICHIOMETRIC-2026"))
+        .with_context(|| format!("{context}: stoichiometric point is missing"))?;
+    ensure!(
+        required_f64(h2_rich, "h2_to_co2_feed_ratio", &context)? == 4.0,
+        "{context}: high-conversion point must preserve H2:CO2=4"
+    );
+    ensure!(
+        close_f64(required_f64(h2_rich, "co2_conversion_fraction", &context)?, 0.93),
+        "{context}: H2-rich point must preserve approximately 93% conversion"
+    );
+    ensure!(
+        close_f64(required_f64(h2_rich, "co_selectivity_fraction", &context)?, 1.0),
+        "{context}: H2-rich point must preserve 100% CO selectivity"
+    );
+    ensure!(
+        h2_rich.get("specific_energy_cost_kj_per_mol_co").is_none(),
+        "{context}: do not borrow stoichiometric specific energy into the H2-rich point"
+    );
+    ensure!(
+        required_f64(stoich, "h2_to_co2_feed_ratio", &context)? == 1.0,
+        "{context}: stoichiometric point must preserve H2:CO2=1"
+    );
+    ensure!(
+        close_f64(required_f64(stoich, "co2_conversion_fraction", &context)?, 0.68),
+        "{context}: stoichiometric point must preserve approximately 68% conversion"
+    );
+    ensure!(
+        close_f64(required_f64(stoich, "co_selectivity_fraction", &context)?, 1.0),
+        "{context}: stoichiometric point must preserve 100% CO selectivity"
+    );
+    ensure!(
+        close_f64(required_f64(stoich, "specific_energy_cost_kj_per_mol_co", &context)?, 277.0),
+        "{context}: stoichiometric energy cost must preserve the 277 kJ/mol abstract value"
+    );
+    let discrepancies = case
+        .get("source_text_discrepancies")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: source text discrepancy record is required"))?;
+    let discrepancy = discrepancies.iter().find(|item| {
+        item.get("field").and_then(Value::as_str)
+            == Some("minimum_specific_energy_cost_kj_per_mol_co")
+    }).with_context(|| format!("{context}: 264/277 kJ/mol discrepancy is not recorded"))?;
+    let values = discrepancy
+        .get("reported_values")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: discrepancy values are missing"))?;
+    ensure!(
+        values.iter().any(|value| value.as_f64() == Some(264.0))
+            && values.iter().any(|value| value.as_f64() == Some(277.0)),
+        "{context}: both 264 and 277 kJ/mol source values must remain visible"
+    );
+    ensure!(
+        discrepancy.get("resolution").and_then(Value::as_str)
+            .is_some_and(|value| value.contains("UNRESOLVED")),
+        "{context}: 264/277 discrepancy must remain unresolved until source artifact review"
+    );
+    Ok(())
+}
+
+fn validate_co2_crg_operating_points(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: cyclic reforming-gasification phase identity");
+    let configuration = case
+        .get("configuration")
+        .with_context(|| format!("{context}: configuration is missing"))?;
+    ensure!(
+        configuration.get("energy_basis").and_then(Value::as_str) == Some("plasma-deposited power, not full wall-plug/grid input"),
+        "{context}: deposited power must not be relabelled as grid-side power"
+    );
+    let modes = configuration
+        .get("operation_modes")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: operation_modes are missing"))?;
+    ensure!(
+        modes.iter().any(|value| value.as_str() == Some("discontinuous"))
+            && modes.iter().any(|value| value.as_str() == Some("continuous")),
+        "{context}: continuous and discontinuous operation must remain separate"
+    );
+    let points = case
+        .get("operating_points")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: operating_points are missing"))?;
+    ensure!(points.len() == 2, "{context}: expected separate DRM and methane-pyrolysis modes");
+    let mut ids = BTreeSet::new();
+    for point in points {
+        let id = point
+            .get("operating_point_id")
+            .and_then(Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .with_context(|| format!("{context}: operating point has no identity"))?;
+        ensure!(ids.insert(id.to_owned()), "{context}: duplicate operating point {id}");
+    }
+    let drm = points
+        .iter()
+        .find(|point| point.get("operating_point_id").and_then(Value::as_str) == Some("CRG-DISCONTINUOUS-DRM-2026"))
+        .with_context(|| format!("{context}: discontinuous DRM point is missing"))?;
+    let continuous = points
+        .iter()
+        .find(|point| point.get("operating_point_id").and_then(Value::as_str) == Some("CRG-CONTINUOUS-CH4-PYROLYSIS-2026"))
+        .with_context(|| format!("{context}: continuous methane-pyrolysis point is missing"))?;
+    ensure!(
+        close_f64(required_f64(drm, "h2_to_co_ratio", &context)?, 1.7),
+        "{context}: discontinuous DRM H2/CO ratio must remain 1.7"
+    );
+    ensure!(
+        close_f64(required_f64(continuous, "methane_conversion_fraction", &context)?, 0.60),
+        "{context}: continuous methane conversion must remain about 60%"
+    );
+    ensure!(
+        close_f64(required_f64(continuous, "maximum_oxygen_concentration_after_three_passes_vol_percent", &context)?, 0.5),
+        "{context}: maximum oxygen concentration after three passes must remain 0.5 vol%"
+    );
+    Ok(())
+}
+
+fn validate_nh3_synthesis_energy_reciprocal_check(
+    check: &Value,
+    root: &Value,
+    display_name: &str,
+) -> Result<()> {
+    let context = format!("{display_name}: ammonia synthesis reciprocal-energy check");
+    ensure!(
+        check.get("source_case_id").and_then(Value::as_str)
+            == Some("NH3-PLASMA-SYNTHESIS-ROUTES-TEA-2026"),
+        "{context}: source_case_id must identify the three-route synthesis TEA"
+    );
+    let cases = root
+        .get("cases")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: cases array is missing"))?;
+    let source = cases
+        .iter()
+        .find(|case| case.get("case_id").and_then(Value::as_str) == Some("NH3-PLASMA-SYNTHESIS-ROUTES-TEA-2026"))
+        .with_context(|| format!("{context}: NH3 synthesis source case is missing"))?;
+    validate_nh3_synthesis_routes_case(source, display_name)?;
+
+    let inputs = check
+        .get("inputs")
+        .with_context(|| format!("{context}: inputs are missing"))?;
+    let derivation = check
+        .get("derivation")
+        .with_context(|| format!("{context}: derivation is missing"))?;
+    let route_values = [
+        ("rga_norr_specific_energy_kWh_per_kg_NH3", "rga_norr_energy_yield_g_NH3_per_kWh", 84.0),
+        ("rga_lnt_specific_energy_kWh_per_kg_NH3", "rga_lnt_energy_yield_g_NH3_per_kWh", 154.0),
+        ("direct_dbd_specific_energy_kWh_per_kg_NH3", "direct_dbd_energy_yield_g_NH3_per_kWh", 435.0),
+        ("small_scale_green_hb_reference_kWh_per_kg_NH3", "green_hb_energy_yield_g_NH3_per_kWh", 11.5),
+    ];
+    for (input_key, derived_key, expected_specific_energy) in route_values {
+        let specific_energy = required_f64(inputs, input_key, &context)?;
+        ensure!(
+            close_f64(specific_energy, expected_specific_energy),
+            "{context}: {input_key} does not match its source-pinned process point"
+        );
+        let derived = required_f64(derivation, derived_key, &context)?;
+        ensure!(
+            close_f64(derived, 1000.0 / specific_energy),
+            "{context}: {derived_key} must equal 1000 / source kWh per kg NH3"
+        );
+    }
+    Ok(())
+}
+
 fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()> {
     let context = format!("{display_name}: NH3 microwave operating-point pairing");
     let points = case
@@ -2262,6 +2597,131 @@ fn validate_nh3_n2_vibrational_transfer_case(case: &Value, display_name: &str) -
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn frozen_source_manifest() -> Value {
+        serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        ))
+        .expect("frozen plasma source manifest must parse")
+    }
+
+    fn frozen_case(case_id: &str) -> Value {
+        frozen_source_manifest()["cases"]
+            .as_array()
+            .expect("cases array")
+            .iter()
+            .find(|case| case.get("case_id").and_then(Value::as_str) == Some(case_id))
+            .expect("registered case exists")
+            .clone()
+    }
+
+    #[test]
+    fn source_manifest_accepts_new_nh3_synthesis_and_co2_cases() {
+        let source = frozen_source_manifest();
+        let summary = audit_source_value(&source, "frozen-plasma-energy.json").unwrap();
+        assert_eq!(summary.case_count, 53);
+        assert_eq!(summary.benchmark_target_count, 12);
+        assert!(source["cases"].as_array().unwrap().iter().any(|case|
+            case.get("case_id").and_then(Value::as_str) == Some("CO2-CYCLIC-REFORMING-GASIFICATION-2026")
+        ));
+    }
+
+    #[test]
+    fn ammonia_synthesis_three_route_source_case_is_point_separated() {
+        let source = frozen_source_manifest();
+        let case = source["cases"].as_array().unwrap().iter().find(|case|
+            case.get("case_id").and_then(Value::as_str) == Some("NH3-PLASMA-SYNTHESIS-ROUTES-TEA-2026")
+        ).unwrap();
+        validate_nh3_synthesis_routes_case(case, "nh3-routes.json").unwrap();
+    }
+
+    #[test]
+    fn ammonia_synthesis_rejects_energy_borrowed_between_routes() {
+        let mut case = frozen_case("NH3-PLASMA-SYNTHESIS-ROUTES-TEA-2026");
+        case["operating_points"][0]["specific_energy_kWh_per_kg_nh3"] = serde_json::json!(11.5);
+        let error = validate_nh3_synthesis_routes_case(&case, "nh3-routes.json").unwrap_err();
+        assert!(error.to_string().contains("source point"));
+    }
+
+    #[test]
+    fn co2_dbd_ml_source_retains_grouped_dataset_scope() {
+        let case = frozen_case("CO2-DBD-ML-358-DATASET-2026");
+        validate_co2_dbd_ml_case(&case, "co2-dbd.json").unwrap();
+    }
+
+    #[test]
+    fn co2_dbd_ml_rejects_random_row_split() {
+        let mut case = frozen_case("CO2-DBD-ML-358-DATASET-2026");
+        case["dataset"]["split_protocol"] = serde_json::json!("random row split");
+        let error = validate_co2_dbd_ml_case(&case, "co2-dbd.json").unwrap_err();
+        assert!(error.to_string().contains("publication-wise grouped"));
+    }
+
+    #[test]
+    fn co2_dbd_ml_rejects_prospective_score_promoted_to_cross_domain_transfer() {
+        let mut case = frozen_case("CO2-DBD-ML-358-DATASET-2026");
+        case["comparison_status"] = serde_json::json!("CROSS_REACTOR_VALIDATED");
+        let error = validate_co2_dbd_ml_case(&case, "co2-dbd.json").unwrap_err();
+        assert!(error.to_string().contains("domain-limited"));
+    }
+
+    #[test]
+    fn rwgs_preserves_h2_rich_and_stoichiometric_points_separately() {
+        let case = frozen_case("CO2-RWGS-GLIDING-ARC-2026");
+        validate_co2_rwgs_operating_points(&case, "rwgs.json").unwrap();
+    }
+
+    #[test]
+    fn rwgs_rejects_energy_cost_borrowed_into_h2_rich_point() {
+        let mut case = frozen_case("CO2-RWGS-GLIDING-ARC-2026");
+        case["operating_points"][0]["specific_energy_cost_kj_per_mol_co"] = serde_json::json!(277.0);
+        let error = validate_co2_rwgs_operating_points(&case, "rwgs.json").unwrap_err();
+        assert!(error.to_string().contains("do not borrow stoichiometric"));
+    }
+
+    #[test]
+    fn rwgs_rejects_silently_resolved_264_277_source_discrepancy() {
+        let mut case = frozen_case("CO2-RWGS-GLIDING-ARC-2026");
+        case["source_text_discrepancies"][0]["resolution"] = serde_json::json!("RESOLVED");
+        let error = validate_co2_rwgs_operating_points(&case, "rwgs.json").unwrap_err();
+        assert!(error.to_string().contains("must remain unresolved"));
+    }
+
+    #[test]
+    fn cyclic_reforming_requires_deposited_power_boundary() {
+        let case = frozen_case("CO2-CYCLIC-REFORMING-GASIFICATION-2026");
+        validate_co2_crg_operating_points(&case, "crg.json").unwrap();
+    }
+
+    #[test]
+    fn cyclic_reforming_rejects_plasma_deposited_power_as_grid_energy() {
+        let mut case = frozen_case("CO2-CYCLIC-REFORMING-GASIFICATION-2026");
+        case["configuration"]["energy_basis"] = serde_json::json!("grid-side power");
+        let error = validate_co2_crg_operating_points(&case, "crg.json").unwrap_err();
+        assert!(error.to_string().contains("must not be relabelled"));
+    }
+
+    #[test]
+    fn nh3_synthesis_reciprocal_yield_derivation_is_arithmetic_only() {
+        let source = frozen_source_manifest();
+        let check = source["derived_reference_checks"].as_array().unwrap().iter().find(|check|
+            check.get("check_id").and_then(Value::as_str)
+                == Some("NH3-PLASMA-SYNTHESIS-RECIPROCAL-YIELD-2026")
+        ).unwrap();
+        validate_nh3_synthesis_energy_reciprocal_check(check, &source, "nh3-energy.json").unwrap();
+    }
+
+    #[test]
+    fn nh3_synthesis_reciprocal_yield_rejects_wrong_value() {
+        let mut source = frozen_source_manifest();
+        let check = source["derived_reference_checks"].as_array_mut().unwrap().iter_mut().find(|check|
+            check.get("check_id").and_then(Value::as_str)
+                == Some("NH3-PLASMA-SYNTHESIS-RECIPROCAL-YIELD-2026")
+        ).unwrap();
+        check["derivation"]["rga_norr_energy_yield_g_NH3_per_kWh"] = serde_json::json!(99.0);
+        let error = validate_nh3_synthesis_energy_reciprocal_check(check, &source, "nh3-energy.json").unwrap_err();
+        assert!(error.to_string().contains("must equal 1000 / source"));
+    }
 
     fn base_scenario() -> ThermalScenario {
         ThermalScenario {
