@@ -59,8 +59,10 @@ jobs:
           rustfmt --version
           cargo clippy --version
 
-      - name: Check formatting for the changed watermark module
-        run: rustfmt --edition 2024 --check research/irregular-event-contract/src/watermarks.rs
+      - name: Check formatting for changed Rust modules and benchmark
+        run: |
+          rustfmt --edition 2024 --check research/irregular-event-contract/src/watermarks.rs
+          rustfmt --edition 2024 --check research/irregular-event-contract/src/bin/watermark_scaling.rs
 
       - name: Resolve and materialize exact dependency lock
         run: cargo generate-lockfile --manifest-path research/irregular-event-contract/Cargo.toml
@@ -74,6 +76,15 @@ jobs:
             --manifest-path research/irregular-event-contract/Cargo.toml \
             --locked --all-targets -- --nocapture \
             2>&1 | tee validation-artifacts/cargo-test.log
+
+      - name: Run deterministic indexed-versus-verified scaling benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo run --release \
+            --manifest-path research/irregular-event-contract/Cargo.toml \
+            --bin watermark_scaling \
+            | tee validation-artifacts/watermark-scaling.csv
 
       - name: Run Clippy across all targets
         run: cargo clippy --manifest-path research/irregular-event-contract/Cargo.toml --locked --all-targets -- -D warnings
