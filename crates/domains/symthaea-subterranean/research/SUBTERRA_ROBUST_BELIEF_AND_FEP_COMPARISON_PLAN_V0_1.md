@@ -176,6 +176,10 @@ Proposed invariant: **widening the declared model-uncertainty set may increase a
 6. Add a matched FEP-vs-EVSI experimental harness using the existing FEP implementation without motor-path wiring.
 7. Only after the reference suite qualifies should Symtropy scenario replay and real cave datasets feed the model ensemble.
 
-## 9. Evidence ceiling
+## 9. Initial implementation status and evidence ceiling
 
-This document is a research proposal. It does not implement robust Bayesian inference, calibrated sensor likelihoods, distributionally robust optimization, CVaR, factor graphs, source authentication or FEP action integration. The existing EVSI and survival planners remain mathematical reference source, authored but not yet compiled or executed. No claim of robust risk control, SOTA superiority, robot safety, analogue performance or planetary competence is made.
+A first finite-model robust EVSI wrapper has now been authored in `subterra-robust-voi`. It evaluates the one-step EVSI reference across a finite declared set of prior / likelihood models, rejects schema drift, excludes actions denied or over-budget in any supplied model, and ranks actions by worst-case net EVSI over that finite set. It contains 10 authored Rust unit tests and depends only on the adjacent local reference crate.
+
+This is not a general robust Bayesian filter, not proof that the true physical model is included in the supplied finite set, and not a robust survival-tree optimizer. Calibrated likelihoods, uncertainty-set construction, distributionally robust optimization, CVaR, factor graphs, automatic sensor-lineage dependence, source authentication and FEP action integration remain unimplemented. The three Rust packages are authored but have not been compiled or executed in the current authoring environment.
+
+No claim of universal robust risk control, SOTA superiority, robot safety, analogue performance or planetary competence is made.
