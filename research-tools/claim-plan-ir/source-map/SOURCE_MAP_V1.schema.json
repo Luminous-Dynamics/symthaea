@@ -1,0 +1,488 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/cpir/source-map-v1.schema.json",
+  "title": "CPIR Source Coordinate and Transformation Map v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "profile_id",
+    "bundle_id",
+    "session_binding",
+    "representations",
+    "transformations",
+    "field_selection",
+    "typed_conversion",
+    "predicate_binding"
+  ],
+  "properties": {
+    "profile_id": {
+      "const": "luminous.cpir.source-map.v1"
+    },
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "session_binding": {
+      "$ref": "#/$defs/sessionBinding"
+    },
+    "representations": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "$ref": "#/$defs/representation"
+      }
+    },
+    "transformations": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/transformation"
+      }
+    },
+    "field_selection": {
+      "$ref": "#/$defs/fieldSelection"
+    },
+    "typed_conversion": {
+      "$ref": "#/$defs/typedConversion"
+    },
+    "predicate_binding": {
+      "$ref": "#/$defs/predicateBinding"
+    },
+    "source_map_artifacts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/sourceMapArtifact"
+      }
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "byteSpan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "coordinate_space",
+        "representation_id",
+        "start_byte",
+        "end_byte"
+      ],
+      "properties": {
+        "coordinate_space": {
+          "type": "string",
+          "enum": [
+            "tlsn_transcript_plaintext_bytes",
+            "http_message_bytes",
+            "http_transfer_decoded_body_bytes",
+            "http_content_decoded_body_bytes",
+            "json_source_utf8_bytes",
+            "json_raw_value_token_bytes",
+            "jcs_canonical_json_bytes",
+            "typed_value_encoding_bytes",
+            "predicate_input_bytes"
+          ]
+        },
+        "representation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "start_byte": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "end_byte": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "sessionBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_protocol",
+        "session_id",
+        "server_identity_digest",
+        "request_binding_digest",
+        "response_ordinal",
+        "direction",
+        "commitment_id"
+      ],
+      "properties": {
+        "source_protocol": {
+          "type": "string",
+          "enum": [
+            "tlsnotary",
+            "deco",
+            "other_profiled"
+          ]
+        },
+        "session_id": {
+          "$ref": "#/$defs/id"
+        },
+        "server_identity_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "request_binding_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "response_ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "server_to_client",
+            "client_to_server"
+          ]
+        },
+        "commitment_id": {
+          "$ref": "#/$defs/id"
+        },
+        "upstream_profile_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "representation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "representation_id",
+        "coordinate_space",
+        "sha256",
+        "byte_length",
+        "producer_stage_id",
+        "profile_id",
+        "profile_digest",
+        "implementation_id",
+        "parent_representation_ids"
+      ],
+      "properties": {
+        "representation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "coordinate_space": {
+          "type": "string",
+          "enum": [
+            "tlsn_transcript_plaintext_bytes",
+            "http_message_bytes",
+            "http_transfer_decoded_body_bytes",
+            "http_content_decoded_body_bytes",
+            "json_source_utf8_bytes",
+            "json_raw_value_token_bytes",
+            "jcs_canonical_json_bytes",
+            "typed_value_encoding_bytes",
+            "predicate_input_bytes"
+          ]
+        },
+        "sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "byte_length": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "media_type": {
+          "type": "string"
+        },
+        "content_encoding": {
+          "type": "string"
+        },
+        "producer_stage_id": {
+          "$ref": "#/$defs/id"
+        },
+        "profile_id": {
+          "$ref": "#/$defs/id"
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "implementation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "parent_representation_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/id"
+          }
+        }
+      }
+    },
+    "transformation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage_id",
+        "ordinal",
+        "operation",
+        "profile_id",
+        "profile_digest",
+        "implementation_id",
+        "input_representation_id",
+        "output_representation_id",
+        "input_sha256",
+        "output_sha256",
+        "mapping_mode",
+        "parameters_digest",
+        "resource_limits"
+      ],
+      "properties": {
+        "stage_id": {
+          "$ref": "#/$defs/id"
+        },
+        "ordinal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "operation": {
+          "type": "string",
+          "enum": [
+            "tlsn_opening_verify",
+            "http_message_extract",
+            "http_transfer_decode",
+            "http_content_decode",
+            "utf8_validate",
+            "json_admit",
+            "json_pointer_select",
+            "jcs_canonicalize",
+            "typed_convert",
+            "predicate_encode"
+          ]
+        },
+        "profile_id": {
+          "$ref": "#/$defs/id"
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "implementation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "input_representation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "output_representation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "output_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "mapping_mode": {
+          "type": "string",
+          "enum": [
+            "identity",
+            "range_map",
+            "derived_whole_input",
+            "semantic_node_map",
+            "none"
+          ]
+        },
+        "source_map_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "parameters_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "resource_limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "max_input_bytes",
+            "max_output_bytes",
+            "max_expansion_ratio",
+            "max_depth"
+          ],
+          "properties": {
+            "max_input_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_output_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_expansion_ratio": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "max_depth": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_cpu_ms": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "max_memory_bytes": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "fieldSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "json_pointer",
+        "source_representation_id",
+        "source_span",
+        "raw_token_sha256",
+        "source_node_id",
+        "parser_profile_digest"
+      ],
+      "properties": {
+        "json_pointer": {
+          "type": "string"
+        },
+        "source_representation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "source_span": {
+          "$ref": "#/$defs/byteSpan"
+        },
+        "raw_token_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "canonical_node_id": {
+          "$ref": "#/$defs/id"
+        },
+        "parser_profile_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "schema_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "typedConversion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "conversion_profile_id",
+        "conversion_profile_digest",
+        "input_raw_token_sha256",
+        "typed_value_encoding_digest",
+        "type_id"
+      ],
+      "properties": {
+        "conversion_profile_id": {
+          "$ref": "#/$defs/id"
+        },
+        "conversion_profile_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "input_raw_token_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "typed_value_encoding_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "type_id": {
+          "$ref": "#/$defs/id"
+        },
+        "unit_table_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "currency_table_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "time_profile_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "predicateBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "program_digest",
+        "public_input_digest",
+        "audience_digest",
+        "purpose_digest",
+        "request_challenge_digest",
+        "uniqueness_scope_digest"
+      ],
+      "properties": {
+        "program_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "public_input_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "audience_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "purpose_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "request_challenge_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "uniqueness_scope_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "sourceMapArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifact_id",
+        "mapping_mode",
+        "input_representation_id",
+        "output_representation_id",
+        "input_sha256",
+        "output_sha256",
+        "map_sha256",
+        "profile_digest"
+      ],
+      "properties": {
+        "artifact_id": {
+          "$ref": "#/$defs/id"
+        },
+        "mapping_mode": {
+          "type": "string",
+          "enum": [
+            "range_map",
+            "semantic_node_map"
+          ]
+        },
+        "input_representation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "output_representation_id": {
+          "$ref": "#/$defs/id"
+        },
+        "input_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "output_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "map_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "profile_digest": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  }
+}
