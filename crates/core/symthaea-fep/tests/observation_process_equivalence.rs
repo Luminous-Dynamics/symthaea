@@ -168,6 +168,74 @@ fn realized_reference_diagnosis(probe: Option<&CandidateObservation>) -> Option<
 }
 
 #[test]
+fn identical_passive_likelihoods_leave_noisy_world_posterior_unchanged() {
+    // Both physical mechanisms yield the same distribution for the primary
+    // sensor, not merely the same single realised trace.
+    let prior = PRIOR_HAZARD_PROBABILITY;
+    let posterior_after_low = posterior_hazard_probability(prior, 0.2, 0.2);
+    let posterior_after_high = posterior_hazard_probability(prior, 0.8, 0.8);
+
+    assert!((posterior_after_low - prior).abs() < 1e-12);
+    assert!((posterior_after_high - prior).abs() < 1e-12);
+    assert_eq!(
+        binary_entropy_bits(prior) - binary_entropy_bits(posterior_after_low),
+        0.0
+    );
+}
+
+#[test]
+fn noisy_reference_probe_separates_eig_from_decision_evsi() {
+    let prior = PRIOR_HAZARD_PROBABILITY;
+    let probability_hot_if_hazard: f64 = 0.9;
+    let probability_hot_if_sensor_offset: f64 = 0.1;
+    let posterior_after_hot = posterior_hazard_probability(
+        prior,
+        probability_hot_if_hazard,
+        probability_hot_if_sensor_offset,
+    );
+    let posterior_after_cool = posterior_hazard_probability(
+        prior,
+        1.0 - probability_hot_if_hazard,
+        1.0 - probability_hot_if_sensor_offset,
+    );
+
+    assert!((posterior_after_hot - 0.9).abs() < 1e-12);
+    assert!((posterior_after_cool - 0.1).abs() < 1e-12);
+
+    let eig_bits = binary_entropy_bits(prior)
+        - 0.5 * binary_entropy_bits(posterior_after_hot)
+        - 0.5 * binary_entropy_bits(posterior_after_cool);
+    assert!((eig_bits - (1.0 - binary_entropy_bits(0.1))).abs() < 1e-12);
+    assert!(eig_bits > 0.5);
+
+    let prior_risk = optimal_prior_decision_risk(prior);
+    let expected_post_probe_risk = 0.5 * optimal_prior_decision_risk(posterior_after_hot)
+        + 0.5 * optimal_prior_decision_risk(posterior_after_cool);
+    let evsi = prior_risk - expected_post_probe_risk;
+
+    assert!((prior_risk - 1.0).abs() < 1e-12);
+    assert!((expected_post_probe_risk - 0.6).abs() < 1e-12);
+    assert!((evsi - 0.4).abs() < 1e-12);
+    // The probe has useful information, but much less task value than EIG.
+    assert!(evsi < eig_bits);
+}
+
+#[test]
+fn noisy_probe_is_rejected_when_its_cost_exceeds_evsi() {
+    let posterior_after_hot = posterior_hazard_probability(0.5, 0.9, 0.1);
+    let posterior_after_cool = posterior_hazard_probability(0.5, 0.1, 0.9);
+    let prior_risk = optimal_prior_decision_risk(0.5);
+    let expected_post_probe_risk = 0.5 * optimal_prior_decision_risk(posterior_after_hot)
+        + 0.5 * optimal_prior_decision_risk(posterior_after_cool);
+    let evsi = prior_risk - expected_post_probe_risk;
+
+    let low_cost_net_value = evsi - 0.25;
+    let high_cost_net_value = evsi - 0.5;
+    assert!(low_cost_net_value > 0.0);
+    assert!(high_cost_net_value < 0.0);
+}
+
+#[test]
 fn passive_observations_cannot_identify_opposite_physical_mechanisms() {
     let physically_hot = LatentWorld {
         physical_temperature: 10.0,
