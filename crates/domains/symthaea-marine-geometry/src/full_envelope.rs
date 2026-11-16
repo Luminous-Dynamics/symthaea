@@ -757,15 +757,31 @@ fn validate_waterline(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIssu
                     );
                     continue;
                 };
+                let pointed_end = (spec
+                    .stations
+                    .first()
+                    .is_some_and(|first| station.station_id == first.station_id)
+                    && spec.end_conditions.bow == HullEndCondition::PointedStem)
+                    || (spec
+                        .stations
+                        .last()
+                        .is_some_and(|last| station.station_id == last.station_id)
+                        && spec.end_conditions.stern == HullEndCondition::PointedStem);
+                let port_coordinate_invalid = if pointed_end {
+                    !close(port_point.y_m, 0.0)
+                        || port_point.point_id != starboard_point.point_id
+                } else {
+                    port_point.y_m >= -COORDINATE_TOLERANCE_M
+                };
                 if port_point.role != ProfilePointRole::Waterline
                     || !close(port_point.z_m, 0.0)
-                    || port_point.y_m >= -COORDINATE_TOLERANCE_M
+                    || port_coordinate_invalid
                 {
                     reject(
                         issues,
                         "waterline_port_semantics",
                         format!(
-                            "station {} explicit port reference must be a negative-y waterline point on z=0",
+                            "station {} explicit port reference must satisfy its pointed/transom waterline identity and coordinate semantics",
                             station.station_id
                         ),
                     );
