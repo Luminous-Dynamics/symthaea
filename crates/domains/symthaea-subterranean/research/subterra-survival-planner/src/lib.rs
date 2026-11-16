@@ -121,17 +121,6 @@ impl ResourceCost {
         Ok(sum)
     }
 
-    fn scaled(self, factor: f64) -> Result<Self, PlanningError> {
-        let scaled = Self {
-            energy_j: self.energy_j * factor,
-            duration_s: self.duration_s * factor,
-            data_bytes: self.data_bytes * factor,
-            exposure_units: self.exposure_units * factor,
-        };
-        scaled.validate()?;
-        Ok(scaled)
-    }
-
     fn weighted(self, prices: CostPrices) -> Result<f64, PlanningError> {
         let value = self.energy_j * prices.energy_per_j
             + self.duration_s * prices.time_per_s
