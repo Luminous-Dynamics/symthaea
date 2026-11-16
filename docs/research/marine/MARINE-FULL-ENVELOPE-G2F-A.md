@@ -658,3 +658,41 @@ The falsifiable competitive hypothesis is:
 **At the same compute and specialist-evaluation budget, the evidence-carrying pipeline produces more independently validated Pareto improvements, with lower false-feasible rate and lower cost to confirmed frontier, than reproduced generative and latent-space optimization baselines.**
 
 If the matched experiment does not support this, we must report that result rather than assert superiority.
+
+
+## 15. Generative-hull metric failure modes to reproduce explicitly
+
+A closer read of the 14 September 2026 GAN/VAE-PCT paper exposes a useful falsification target: its CAD-to-CAD distribution comparison found a systematic underestimation of the midship-section coefficient `C_M`. That bias propagates to an upward shift in prismatic coefficient `C_P` and, to a smaller extent, volumetric prismatic coefficient `C_{VP}`; a mild upward tendency in VCB/T is also observed. The authors identify this as a future area for their representation/encoding scheme.
+
+The benchmark must therefore not declare a generator strong just because its Chamfer distance and sample-distribution metrics look good. A model can reproduce plausible geometry while biasing quantities directly connected to displacement distribution and hydrostatics.
+
+Add these scorecard requirements:
+- report the full distribution, bias, variance and tail error for `C_B`, `C_M`, `C_P`, `C_{WP}`, `C_{VP}`, LCB/L, VCB/T, LCF/L and wetted surface area, with exact formula/normalization and reference data;
+- add a coefficient-specific calibration plot and standardized residual per hull family;
+- stratify errors by bow/stern type, midship fullness, bulb/skeg/twin-skeg class, and parent-hull family;
+- include an explicit `C_M` underestimation negative control and track its propagation to `C_P`, `C_{VP}` and VCB/T;
+- preserve the paper's five discrete generation metrics (Noise Score, Diversity Score, JSD, MMD, Coverage) and include 1-NNA as an additional metric where its definition can be reproduced;
+- record the VAE-PCT decoder patch-size effect separately (the paper identifies patch-wise correlated errors and proposes revisiting patch size 12); and
+- compare both discrete point-cloud output and post-fairing B-spline CAD output. The pull-back stage is part of the CAD-to-CAD system and cannot be hidden as a post-processing detail.
+
+The source study's training hull databases comprise 7,795 barge-type hulls and 8,498 containership hulls. It evaluates synthetic generated hulls and pulls discrete model output back to smooth `C^2` B-spline surfaces using curve fairing and lofting. These are two bounded single-type datasets; do not treat them as a representative random sample of the global fleet.
+
+### Raster2Hull numeric reproduction boundary
+
+The 31 July 2026 Raster2Hull paper reports a synthetic 5,000-pair ShipPlan dataset and a template-deformation point-cloud network. Its reported GA-only reconstruction metrics include:
+- global Chamfer distance: 0.499 ± 0.182 × 10³;
+- global F-score @1%: 46.45% ± 8.05%;
+- bow sectional F-score @1%: 58.28% ± 14.94%; and
+- stern sectional F-score @1%: 60.94% ± 12.36%.
+
+For lines-plan reconstruction the paper reports an overall F-score @1% of 50.94% ± 10.54%. Preserve the paper's exact normalization and distance units; do not compare these figures to differently normalized point clouds.
+
+These are synthetic held-out split results. The authors explicitly state the model is not evaluated on heavily degraded real archive scans and that the generated point clouds are intended for macro-level spatial estimation, not perfectly watertight CAD. Our benchmark must therefore have three separate gates:
+1. reproduce synthetic benchmark results;
+2. evaluate clean and degraded real archival drawings with explicit uncertainty/abstention; and
+3. compare against paired surveyed/as-built 3D ground truth before claiming real-vessel reconstruction accuracy.
+
+Primary sources:
+- GAN/VAE-PCT study: https://www.mdpi.com/2077-1312/14/18/1707
+- Raster2Hull IEEE Access paper: https://xplorestaging.ieee.org/document/11630600
+- Raster2Hull source/data named by the authors: https://github.com/dinceruur/raster2Hull
