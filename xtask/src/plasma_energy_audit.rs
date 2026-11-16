@@ -771,6 +771,16 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         if case_id == "NH3-CRACK-MW-ATM-MECHANISM-2026" {
             validate_nh3_operating_points(case, display_name)?;
         }
+        if case_id.starts_with("NH3-") && (
+            case_id == "NH3-PLASMA-DUAL-MEMBRANE-PEDMADS-2025"
+                || case_id == "NH3-CATALYTIC-MEMBRANE-30BAR-MODEL-2026"
+                || case_id == "NH3-EC-MEA-CRACKER-NTU-2026"
+                || case_id == "NH3-PACKED-BED-MEMBRANE-OPTIMIZATION-2026"
+                || case_id == "NH3-PROCESS-INTENSIFICATION-REACTOR-REVIEW-2026"
+                || case_id == "NH3-DECOMPOSITION-SYSTEM-MODELING-GAPS-REVIEW-2026"
+        ) {
+            validate_nh3_integrated_source_case(case, case_id, display_name)?;
+        }
         if case_id == "NH3-CRACK-MW-RESONATOR-DYNAMIC-2026" {
             validate_nh3_crack_dynamic_response_case(case, display_name)?;
         }
@@ -2390,6 +2400,180 @@ fn validate_nh3_operating_points(case: &Value, display_name: &str) -> Result<()>
         }),
         "{context}: abstract/conclusion 150 g/h pairing discrepancy must remain explicit and unresolved"
     );
+    Ok(())
+}
+
+fn validate_nh3_integrated_source_case(
+    case: &Value,
+    case_id: &str,
+    display_name: &str,
+) -> Result<()> {
+    let context = format!("{display_name}: integrated NH3 source qualification {case_id}");
+    ensure!(
+        case.get("luminous_reproduction").and_then(Value::as_bool) == Some(false),
+        "{context}: source case must preserve luminous_reproduction=false"
+    );
+
+    match case_id {
+        "NH3-PLASMA-DUAL-MEMBRANE-PEDMADS-2025" => {
+            let configuration = case.get("configuration")
+                .with_context(|| format!("{context}: configuration is missing"))?;
+            ensure!(
+                required_f64(configuration, "reactor_temperature_c", &context)? == 400.0
+                    && required_f64(configuration, "cascade_stages", &context)? == 5.0,
+                "{context}: PEDMADS reactor temperature and five-stage cascade must remain paired"
+            );
+            ensure!(
+                configuration.get("hydrogen_membrane").and_then(Value::as_str)
+                    == Some("1.8 um Pd membrane"),
+                "{context}: 1.8 um Pd hydrogen membrane identity must remain explicit"
+            );
+            for (metric, expected) in [
+                ("hydrogen_space_time_yield", 1567.0),
+                ("ammonia_effluent_concentration_upper_bound", 4.0),
+                ("ammonia_removal_efficiency", 87.0),
+                ("levelized_cost_of_hydrogen", 0.92),
+            ] {
+                let actual = case_observation_value(case, metric)
+                    .with_context(|| format!("{context}: source observation {metric} is missing"))?;
+                ensure!(
+                    close_f64(actual, expected),
+                    "{context}: source observation {metric} must retain its source-specific value"
+                );
+            }
+            let boundary = case.get("system_boundary")
+                .with_context(|| format!("{context}: system_boundary is missing"))?;
+            ensure!(
+                boundary.get("accepted_h2_purity_qualified").and_then(Value::as_bool) == Some(false)
+                    && boundary.get("full_grid_to_accepted_h2_energy_measured").and_then(Value::as_bool) == Some(false)
+                    && boundary.get("lcoh_is_modelled").and_then(Value::as_bool) == Some(true),
+                "{context}: source must distinguish effluent NH3, accepted H2 purity, full-chain energy and modeled LCOH"
+            );
+            let guards = case.get("claim_guards")
+                .with_context(|| format!("{context}: claim_guards are missing"))?;
+            ensure!(
+                guards.get("effluent_nh3_below_4_percent_is_not_accepted_h2_purity").and_then(Value::as_bool) == Some(true)
+                    && guards.get("source_lcoh_is_not_realized_market_price").and_then(Value::as_bool) == Some(true),
+                "{context}: effluent and modeled-cost claim ceilings must remain explicit"
+            );
+        }
+        "NH3-CATALYTIC-MEMBRANE-30BAR-MODEL-2026" => {
+            let points = case.get("operating_points").and_then(Value::as_array)
+                .with_context(|| format!("{context}: operating_points are missing"))?;
+            ensure!(points.len() == 2, "{context}: exactly two membrane operating points are required");
+            let base = points.iter().find(|point|
+                point.get("operating_point_id").and_then(Value::as_str)
+                    == Some("CATALYTIC-MEMBRANE-BASE-550C-30BAR-1BAR")
+            ).with_context(|| format!("{context}: base membrane operating point is missing"))?;
+            let intensified = points.iter().find(|point|
+                point.get("operating_point_id").and_then(Value::as_str)
+                    == Some("CATALYTIC-MEMBRANE-5BAR-PERMEATE-PLUS50AREA")
+            ).with_context(|| format!("{context}: 5 bar permeate operating point is missing"))?;
+            ensure!(
+                required_f64(base, "temperature_c", &context)? == 550.0
+                    && required_f64(base, "retentate_pressure_bar", &context)? == 30.0
+                    && required_f64(base, "permeate_pressure_bar", &context)? == 1.0
+                    && close_f64(required_f64(base, "overall_energy_efficiency_fraction", &context)?, 0.854)
+                    && close_f64(required_f64(base, "overall_exergy_efficiency_fraction", &context)?, 0.858),
+                "{context}: 85.4% energy / 85.8% exergy base case must retain its 550 C / 30 bar / 1 bar boundary"
+            );
+            ensure!(
+                required_f64(intensified, "temperature_c", &context)? == 550.0
+                    && required_f64(intensified, "retentate_pressure_bar", &context)? == 30.0
+                    && required_f64(intensified, "permeate_pressure_bar", &context)? == 5.0
+                    && close_f64(required_f64(intensified, "membrane_area_increase_fraction", &context)?, 0.5)
+                    && close_f64(required_f64(intensified, "overall_energy_efficiency_fraction", &context)?, 0.875),
+                "{context}: 87.5% intensified point must retain 5 bar permeate and 50% more membrane area"
+            );
+            ensure!(
+                base.get("compression_to_30_bar_included").and_then(Value::as_bool) == Some(true)
+                    && intensified.get("compression_to_30_bar_included").and_then(Value::as_bool) == Some(true),
+                "{context}: 30 bar hydrogen compression boundary must remain explicit"
+            );
+            ensure!(
+                case.get("comparison_status").and_then(Value::as_str)
+                    == Some("PUBLISHED_PROCESS_MODEL_NOT_PHYSICAL_PLANT_DEMONSTRATION"),
+                "{context}: modeled efficiency must not be promoted to physical plant performance"
+            );
+        }
+        "NH3-EC-MEA-CRACKER-NTU-2026" => {
+            let modes = case.get("operating_modes").and_then(Value::as_array)
+                .with_context(|| format!("{context}: operating_modes are missing"))?;
+            ensure!(modes.len() == 2, "{context}: high-throughput and low-energy modes must remain separate");
+            let throughput = modes.iter().find(|mode|
+                mode.get("mode_id").and_then(Value::as_str) == Some("MEA-HIGH-THROUGHPUT-80C")
+            ).with_context(|| format!("{context}: high-throughput MEA mode is missing"))?;
+            let low_energy = modes.iter().find(|mode|
+                mode.get("mode_id").and_then(Value::as_str) == Some("MEA-LOW-ENERGY-POWER-OUTPUT-80C")
+            ).with_context(|| format!("{context}: low-energy MEA mode is missing"))?;
+            ensure!(
+                close_f64(required_f64(throughput, "current_density_a_per_cm2", &context)?, 0.47)
+                    && close_f64(required_f64(throughput, "voltage_v", &context)?, 0.35)
+                    && close_f64(required_f64(throughput, "h2_areal_rate_mmol_per_cm2_h", &context)?, 17.5)
+                    && close_f64(required_f64(throughput, "specific_energy_kwh_per_kg_h2", &context)?, 9.38),
+                "{context}: high-throughput MEA mode must preserve 0.47 A/cm2, 0.35 V, areal rate and 9.38 kWh/kg"
+            );
+            ensure!(
+                close_f64(required_f64(low_energy, "current_density_a_per_cm2", &context)?, 0.10)
+                    && close_f64(required_f64(low_energy, "voltage_v", &context)?, 0.076)
+                    && close_f64(required_f64(low_energy, "specific_energy_kwh_per_kg_h2", &context)?, 2.03)
+                    && close_f64(required_f64(low_energy, "maximum_electrical_output_mw_per_cm2", &context)?, 5.9),
+                "{context}: low-energy/power-output MEA mode must preserve its separate 0.10 A/cm2 / 76 mV operating point"
+            );
+            ensure!(
+                case.get("system_boundary").and_then(|value| value.get("full_balance_of_plant_energy")).and_then(Value::as_bool) == Some(false),
+                "{context}: cell-specific energy must not be promoted to full balance-of-plant energy"
+            );
+        }
+        "NH3-PACKED-BED-MEMBRANE-OPTIMIZATION-2026" => {
+            for (metric, expected) in [
+                ("predicted_ammonia_conversion", 0.98),
+                ("predicted_hydrogen_recovery", 0.98),
+                ("predicted_h2_recovery_rate", 0.207),
+                ("ann_surrogate_r_squared", 0.99),
+                ("ann_surrogate_evaluation_time", 0.027),
+            ] {
+                let observation = case.get("observations").and_then(Value::as_array)
+                    .and_then(|items| items.iter().find(|item|
+                        item.get("metric").and_then(Value::as_str) == Some(metric)
+                    )).with_context(|| format!("{context}: observation {metric} is missing"))?;
+                ensure!(
+                    close_f64(required_f64(observation, "value", &context)?, expected),
+                    "{context}: model observation {metric} must retain its source-specific value"
+                );
+                ensure!(
+                    observation.get("evidence_class").and_then(Value::as_str)
+                        .is_some_and(|class| class.starts_with("MODEL_")),
+                    "{context}: {metric} must remain explicitly classified as model evidence"
+                );
+            }
+            ensure!(
+                case.get("system_boundary").and_then(|value| value.get("physical_reactor_validation")).and_then(Value::as_bool) == Some(false)
+                    && case.get("system_boundary").and_then(|value| value.get("external_holdout_transfer_demonstrated")).and_then(Value::as_bool) == Some(false),
+                "{context}: ANN fit and predicted conversion must not imply physical validation or external transfer"
+            );
+        }
+        "NH3-PROCESS-INTENSIFICATION-REACTOR-REVIEW-2026" => {
+            ensure!(
+                case.get("comparison_status").and_then(Value::as_str)
+                    == Some("PEER_REVIEWED_TECHNOLOGY_SYNTHESIS_NOT_ONE_MATCHED_PERFORMANCE_POINT")
+                    && case.get("reviewed_pathways").and_then(Value::as_array).is_some_and(|items| items.len() >= 4)
+                    && case.get("reviewed_reactor_architectures").and_then(Value::as_array).is_some_and(|items| items.len() >= 2),
+                "{context}: review findings must remain a multi-route synthesis, not one matched performance point"
+            );
+        }
+        "NH3-DECOMPOSITION-SYSTEM-MODELING-GAPS-REVIEW-2026" => {
+            ensure!(
+                case.get("comparison_status").and_then(Value::as_str)
+                    == Some("PUBLISHED_MODELING_REVIEW_NOT_PHYSICAL_PERFORMANCE_RESULT")
+                    && case.get("reported_modeling_gaps").and_then(Value::as_array).is_some_and(|items| items.len() >= 3)
+                    && case.get("recommended_modeling_priorities").and_then(Value::as_array).is_some_and(|items| items.len() >= 3),
+                "{context}: modeling-gap review must remain a review, not a physical performance result"
+            );
+        }
+        _ => {}
+    }
+
     Ok(())
 }
 
@@ -4779,6 +4963,101 @@ mod tests {
                 .to_string()
                 .contains("must include a NO_CREDIT scenario")
         );
+    }
+
+    fn registered_nh3_integrated_case_manifest(case_id: &str) -> Value {
+        let registered: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        ))
+        .expect("frozen plasma source register parses");
+        let case = registered["cases"]
+            .as_array()
+            .expect("cases array exists")
+            .iter()
+            .find(|item| item["case_id"] == case_id)
+            .expect("registered source case exists")
+            .clone();
+        let evidence_class = case["evidence_class"].as_str().unwrap().to_owned();
+        serde_json::json!({
+            "programme": "PLASMA-ENERGY-001",
+            "claim_ceiling": "SOURCE_REGISTER_ONLY",
+            "evidence_classes": [evidence_class],
+            "cases": [case],
+            "negative_controls": [{
+                "control_id": "NC-INTEGRATED-NH3-TEST",
+                "expected_disposition": "BLOCKED"
+            }]
+        })
+    }
+
+    #[test]
+    fn integrated_nh3_source_cases_pass_their_scoped_metadata_audits() {
+        for case_id in [
+            "NH3-PLASMA-DUAL-MEMBRANE-PEDMADS-2025",
+            "NH3-CATALYTIC-MEMBRANE-30BAR-MODEL-2026",
+            "NH3-EC-MEA-CRACKER-NTU-2026",
+            "NH3-PACKED-BED-MEMBRANE-OPTIMIZATION-2026",
+            "NH3-PROCESS-INTENSIFICATION-REACTOR-REVIEW-2026",
+            "NH3-DECOMPOSITION-SYSTEM-MODELING-GAPS-REVIEW-2026",
+        ] {
+            let summary = audit_source_value(
+                &registered_nh3_integrated_case_manifest(case_id),
+                "integrated-nh3.json",
+            ).unwrap();
+            assert_eq!(summary.case_count, 1);
+        }
+    }
+
+    #[test]
+    fn integrated_nh3_target_references_only_registered_source_cases() {
+        let registered: Value = serde_json::from_str(include_str!(
+            "../../data/research/plasma_energy_reference_cases_v0_1.json"
+        )).unwrap();
+        let target = registered["benchmark_targets"]
+            .as_array().unwrap()
+            .iter()
+            .find(|item| item["target_id"] == "NH3-INTEGRATED-DELIVERED-H2-PARETO-001")
+            .unwrap();
+        let comparators = target["comparator_case_ids"].as_array().unwrap();
+        assert!(comparators.iter().all(|id| registered["cases"].as_array().unwrap().iter().any(
+            |case| case["case_id"] == *id
+        )));
+    }
+
+    #[test]
+    fn integrated_nh3_pedmads_effluent_cannot_be_promoted_to_product_purity() {
+        let mut manifest = registered_nh3_integrated_case_manifest("NH3-PLASMA-DUAL-MEMBRANE-PEDMADS-2025");
+        manifest["cases"][0]["system_boundary"]["accepted_h2_purity_qualified"] =
+            serde_json::json!(true);
+        let error = audit_source_value(&manifest, "integrated-nh3.json").unwrap_err();
+        assert!(error.to_string().contains("accepted H2 purity"));
+    }
+
+    #[test]
+    fn integrated_nh3_membrane_operating_points_cannot_be_cross_paired() {
+        let mut manifest = registered_nh3_integrated_case_manifest("NH3-CATALYTIC-MEMBRANE-30BAR-MODEL-2026");
+        manifest["cases"][0]["operating_points"][1]["permeate_pressure_bar"] =
+            serde_json::json!(1.0);
+        let error = audit_source_value(&manifest, "integrated-nh3.json").unwrap_err();
+        assert!(error.to_string().contains("87.5% intensified point"));
+    }
+
+    #[test]
+    fn integrated_nh3_mea_modes_cannot_be_cross_paired() {
+        let mut manifest = registered_nh3_integrated_case_manifest("NH3-EC-MEA-CRACKER-NTU-2026");
+        manifest["cases"][0]["operating_modes"][1]["current_density_a_per_cm2"] =
+            serde_json::json!(0.47);
+        let error = audit_source_value(&manifest, "integrated-nh3.json").unwrap_err();
+        assert!(error.to_string().contains("low-energy MEA mode"));
+    }
+
+    #[test]
+    fn integrated_nh3_membrane_ann_fit_cannot_be_promoted_to_physical_accuracy() {
+        let mut manifest = registered_nh3_integrated_case_manifest("NH3-PACKED-BED-MEMBRANE-OPTIMIZATION-2026");
+        manifest["cases"][0]["system_boundary"]["physical_reactor_validation"] =
+            serde_json::json!(true);
+        let error = audit_source_value(&manifest, "integrated-nh3.json").unwrap_err();
+        assert!(error.to_string().contains("physical validation or external transfer"));
     }
 
     #[test]
