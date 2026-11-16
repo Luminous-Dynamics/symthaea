@@ -9,6 +9,7 @@ use std::collections::{BTreeSet, VecDeque};
 pub mod cross_solver_comparison;
 pub mod evidence_dependence;
 pub mod plant_service_gate;
+pub mod remote_maintenance_compiler;
 pub mod screening_funnel;
 pub mod validation_domain;
 
