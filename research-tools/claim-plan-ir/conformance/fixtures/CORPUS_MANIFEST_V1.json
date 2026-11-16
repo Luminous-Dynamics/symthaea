@@ -1,18 +1,27 @@
 {
+  "schema_version": 1,
   "profile_id": "luminous.cpir.parser-oracle.v1",
-  "corpus_id": "luminous.cpir.parser-oracle.seeds.v1",
-  "status": "research_seed_not_executed",
+  "corpus_id": "luminous.cpir.parser-oracle.adversarial.v1",
+  "status": "research_seed_not_differentially_executed",
+  "fixture_path_base": "conformance_directory",
+  "raw_lines_format": "One raw fixture per LF-delimited line. The LF delimiter is not part of a fixture's authenticated source bytes; line_number is one-based.",
+  "hash_algorithm": "SHA-256",
+  "offset_convention": "Zero-based half-open byte offsets in the exact UTF-8 raw JSON fixture; not Unicode code-point, UTF-16 or canonical-JSON offsets.",
   "vectors": [
     {
       "id": "dup-decoded-name-001",
       "file": "fixtures/duplicate_decoded_name_001.raw.json",
+      "byte_length": 18,
+      "sha256": "c95ba945b310a34906bbfc28ce1346b87741d5a2b3066d1d3ecfa0acbd86392c",
       "class": "duplicate_member_after_json_string_escape_decoding",
       "expected_disposition": "reject_before_ordinary_object_construction",
-      "rationale": "The two member names decode to the same Unicode scalar sequence: a."
+      "rationale": "The two object member names decode to the same Unicode scalar sequence: a."
     },
     {
       "id": "unicode-normalization-distinct-001",
       "file": "fixtures/unicode_normalization_distinct_001.raw.json",
+      "byte_length": 16,
+      "sha256": "f126472a603049b5f986bb8f35ba8b5fbace9e37c2d5b2abf5ad131a166835b6",
       "class": "unicode_normalization_non_equivalence",
       "expected_disposition": "preserve_distinct_member_names",
       "rationale": "Precomposed U+00E9 and U+0065 U+0301 remain distinct; no Unicode normalization is applied."
@@ -20,17 +29,320 @@
     {
       "id": "jcs-utf16-order-001",
       "file": "fixtures/jcs_utf16_order_001.raw.json",
+      "byte_length": 18,
+      "sha256": "871954531859c7572c6279f90eb83a594ddc3a289e8bdc28d2a84ffb8c1a1703",
       "class": "rfc8785_utf16_property_order",
       "expected_disposition": "accept_for_canonicalization_test",
       "expected_canonical_json": "{\"😀\":2,\"\":1}",
-      "rationale": "U+1F600 sorts before U+E000 by UTF-16 code units because its leading surrogate D83D is less than E000."
+      "rationale": "U+1F600 sorts before U+E000 by UTF-16 code units."
+    },
+    {
+      "id": "dup-nested-001",
+      "line_number": 1,
+      "class": "nested_duplicate_after_escape_decoding",
+      "expected_disposition": "reject_before_ordinary_object_construction",
+      "rationale": "Duplicate detection must recurse into nested objects.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 28,
+      "sha256": "5aeebfcd239b691beca7772ca8cefdf16d0c57935a651365b14e6a7a5218c713"
+    },
+    {
+      "id": "dup-array-object-001",
+      "line_number": 2,
+      "class": "duplicate_inside_object_nested_in_array",
+      "expected_disposition": "reject_before_ordinary_object_construction",
+      "rationale": "Array traversal must not bypass object duplicate detection.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 15,
+      "sha256": "5d01d21c323476b72ae19c3d918d96deead22a34ae33dd92246313c3f106a2e7"
+    },
+    {
+      "id": "numeric-safe-boundaries-001",
+      "line_number": 3,
+      "class": "i_json_safe_integer_boundaries",
+      "expected_disposition": "accept_exact_integer_boundaries",
+      "selected_values": {
+        "/minimum": "-9007199254740991",
+        "/maximum": "9007199254740991"
+      },
+      "rationale": "Both endpoints are exactly representable in the I-JSON safe-integer interval.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 56,
+      "sha256": "68454632ac1365e1fff45aa9b11aa116ac96169821ff4650fddaa92e45609841"
+    },
+    {
+      "id": "numeric-unsafe-positive-001",
+      "line_number": 4,
+      "class": "i_json_unsafe_integer",
+      "expected_disposition": "reject_unsafe_integer",
+      "rationale": "9007199254740992 lies outside the exact I-JSON integer range.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 27,
+      "sha256": "a2102c7fa09a83bf190218094fc70210b6ae22b18f2669457afe43fd8d00f107"
+    },
+    {
+      "id": "numeric-negative-zero-001",
+      "line_number": 5,
+      "class": "negative_zero_lexical_alias",
+      "expected_disposition": "reject_under_cpir_integer_lexical_profile",
+      "rationale": "The proposed CPIR integer-token profile rejects negative-zero spelling rather than allowing a parser to collapse it to zero.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 13,
+      "sha256": "e777cd62f2e79273c696585cd243a2b9b145aa635b0f665011fe46928fae9e23"
+    },
+    {
+      "id": "numeric-decimal-exponent-001",
+      "line_number": 6,
+      "class": "decimal_and_exponent_numeric_tokens",
+      "expected_disposition": "reject_under_cpir_integer_lexical_profile",
+      "rationale": "Decimal-point and exponent-form source tokens require an explicit string-plus-conversion profile.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 30,
+      "sha256": "d5df4ed3d18371291df98fb44ff39f42dde92c214777b4cce9e1ca3d945056c5"
+    },
+    {
+      "id": "unpaired-surrogate-001",
+      "line_number": 7,
+      "class": "unpaired_utf16_surrogate_escape",
+      "expected_disposition": "reject_non_scalar_unicode_string",
+      "rationale": "A lone high-surrogate escape must not be replaced or accepted as a Unicode scalar value.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 18,
+      "sha256": "c3c0f6e73919dc685c0a333f2160a12cbc94663790ff525abd109f1ceedcf00b"
+    },
+    {
+      "id": "pointer-span-001",
+      "line_number": 8,
+      "class": "json_pointer_escape_and_utf8_source_span",
+      "expected_disposition": "accept_with_exact_raw_json_byte_spans",
+      "selections": [
+        {
+          "pointer": "/a~1b/~0key",
+          "coordinate_space": "raw_json_utf8_bytes",
+          "start_byte": 15,
+          "end_byte": 16,
+          "expected_raw_token": "7",
+          "expected_typed_value": 7
+        },
+        {
+          "pointer": "/~01",
+          "coordinate_space": "raw_json_utf8_bytes",
+          "start_byte": 23,
+          "end_byte": 24,
+          "expected_raw_token": "8",
+          "expected_typed_value": 8
+        },
+        {
+          "pointer": "/items/0/v",
+          "coordinate_space": "raw_json_utf8_bytes",
+          "start_byte": 39,
+          "end_byte": 44,
+          "expected_raw_token": "\"€\"",
+          "expected_typed_value": "€"
+        }
+      ],
+      "rationale": "Offsets are zero-based half-open UTF-8 byte offsets. RFC 6901 decoding of ~01 yields ~1, not /.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 47,
+      "sha256": "a61d63645e8600c0581555915cf01e95d2c69e885a199c59d9f9aadde6d3e5a5"
+    },
+    {
+      "id": "pointer-invalid-escape-001",
+      "line_number": 9,
+      "class": "invalid_json_pointer_escape",
+      "expected_disposition": "document_admitted_pointer_rejected",
+      "selection": {
+        "pointer": "/a~2b",
+        "expected": "reject_invalid_pointer"
+      },
+      "rationale": "RFC 6901 permits only ~0 and ~1 escapes; the source JSON document is valid.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 10,
+      "sha256": "caf52f0946096f04ecb60f86278494fbb65c2b331df05e33e8618e9fe8ca236c"
+    },
+    {
+      "id": "presence-states-001",
+      "line_number": 10,
+      "class": "absent_null_empty_zero_empty_array",
+      "expected_disposition": "accept_preserving_distinct_states",
+      "selection_cases": [
+        {
+          "pointer": "/absent",
+          "expected": "not_found"
+        },
+        {
+          "pointer": "/null_value",
+          "expected": "present_null"
+        },
+        {
+          "pointer": "/empty",
+          "expected": "present_empty_string"
+        },
+        {
+          "pointer": "/zero",
+          "expected": "present_zero"
+        },
+        {
+          "pointer": "/empty_array",
+          "expected": "present_empty_array"
+        }
+      ],
+      "rationale": "Missing, null, empty string, zero and empty array must remain distinct.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 56,
+      "sha256": "ec8058af8fc7c850680e9f5d2c5c747109a342aeeee782f16e46a39eec1abe4d"
+    },
+    {
+      "id": "trailing-data-001",
+      "line_number": 11,
+      "class": "multiple_top_level_json_values",
+      "expected_disposition": "reject_trailing_non_whitespace",
+      "rationale": "Only one JSON value followed by optional JSON whitespace is admitted.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 15,
+      "sha256": "06ee4f46aabaffab87c4ee1df86b65c154b5c82f86a347cf3375df71005c0d64"
+    },
+    {
+      "id": "invalid-escape-001",
+      "line_number": 12,
+      "class": "malformed_json_string_escape",
+      "expected_disposition": "reject_malformed_escape",
+      "rationale": "The backslash-x escape is not a JSON string escape.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 12,
+      "sha256": "532f522eafbb3a7c29447524a217600b8ef748eaaba989da531030d68dd8a642"
+    },
+    {
+      "id": "currency-minor-units-001",
+      "line_number": 13,
+      "class": "exact_decimal_currency_conversion",
+      "expected_disposition": "qualify_only_with_pinned_iso4217_profile",
+      "conversion": {
+        "source_amount": "123.45",
+        "currency": "ZAR",
+        "expected_minor_units": "12345",
+        "minor_unit_exponent": 2,
+        "rounding": "reject_excess_precision",
+        "profile_dependency": "ISO 4217 snapshot with explicit version and digest required"
+      },
+      "rationale": "A decimal amount is carried as a string; conversion must use a pinned currency-scale table and integer arithmetic, not binary floating point.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 36,
+      "sha256": "bcd38094f9460044365bf69bb0d7ef34b64e082ef335fc015f1ead38a125db40"
+    },
+    {
+      "id": "timestamp-offset-equivalent-001",
+      "line_number": 14,
+      "class": "rfc3339_offset_equivalence",
+      "expected_disposition": "accept_equal_instants_under_pinned_time_profile",
+      "conversion": {
+        "left": "2026-11-16T09:30:00+02:00",
+        "right": "2026-11-16T07:30:00Z",
+        "expected_same_instant": true,
+        "expected_utc": "2026-11-16T07:30:00Z",
+        "profile_dependency": "RFC 3339 parser/conversion profile must be pinned"
+      },
+      "rationale": "Both strings represent the same instant when the numeric offset is applied.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 66,
+      "sha256": "132894ecbbf0079c0f50f3fb0a1a02f80fd55237b36781affa93dfe2a72bc95c"
+    },
+    {
+      "id": "timestamp-unknown-offset-001",
+      "line_number": 15,
+      "class": "rfc3339_unknown_local_offset",
+      "expected_disposition": "preserve_unknown_offset_not_equal_to_known_utc",
+      "conversion": {
+        "unknown": "2026-11-16T07:30:00-00:00",
+        "known": "2026-11-16T07:30:00Z",
+        "expected_same_instant": false,
+        "expected_offset_state": "unknown_local_offset",
+        "profile_dependency": "RFC 3339 section 4.3 semantics must be preserved"
+      },
+      "rationale": "-00:00 denotes an unknown local offset, not a known UTC offset.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 70,
+      "sha256": "cbee7314c58c92fe5f7c310860018d0daf3ca02b560698fc7d8612e09d984a04"
+    },
+    {
+      "id": "jcs-order-a-001",
+      "line_number": 16,
+      "class": "jcs_member_order_variant_a",
+      "expected_disposition": "accept_for_canonicalization_test",
+      "expected_canonical_json": "{\"a\":1,\"b\":2}",
+      "equivalent_group": "jcs-order-whitespace-001",
+      "rationale": "The first source uses a different object-member order.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 13,
+      "sha256": "3fb75453225c732a76b7899ea2096dda1455189c89817239732182f73fe5a09f"
+    },
+    {
+      "id": "jcs-order-b-001",
+      "line_number": 17,
+      "class": "jcs_member_order_whitespace_variant_b",
+      "expected_disposition": "accept_for_canonicalization_test",
+      "expected_canonical_json": "{\"a\":1,\"b\":2}",
+      "equivalent_group": "jcs-order-whitespace-001",
+      "rationale": "Whitespace and member-order variation preserve expected JCS output but not raw-source identity.",
+      "file": "fixtures/ADVERSARIAL_RAW_V1.raw-lines",
+      "byte_length": 20,
+      "sha256": "f58febeb7b3c10e65745cdaaf0bd64fe9d4851e3c724f4b91f2169f2d059d87e"
+    }
+  ],
+  "relations": [
+    {
+      "id": "jcs-order-whitespace-001",
+      "kind": "same_expected_jcs_bytes_different_raw_source",
+      "vector_ids": [
+        "jcs-order-a-001",
+        "jcs-order-b-001"
+      ],
+      "expected_canonical_json": "{\"a\":1,\"b\":2}",
+      "raw_source_digests_must_differ": true
+    }
+  ],
+  "standards": [
+    {
+      "id": "RFC-8259",
+      "url": "https://www.rfc-editor.org/rfc/rfc8259.html",
+      "scope": "JSON syntax and duplicate-name interoperability warning"
+    },
+    {
+      "id": "RFC-7493",
+      "url": "https://www.rfc-editor.org/rfc/rfc7493.html",
+      "scope": "I-JSON duplicate-name and exact-integer constraints"
+    },
+    {
+      "id": "RFC-8785",
+      "url": "https://www.rfc-editor.org/rfc/rfc8785.html",
+      "scope": "JCS canonical output and UTF-16 property ordering"
+    },
+    {
+      "id": "RFC-6901",
+      "url": "https://www.rfc-editor.org/rfc/rfc6901.html",
+      "scope": "JSON Pointer escape and evaluation rules"
+    },
+    {
+      "id": "RFC-3339",
+      "url": "https://www.rfc-editor.org/rfc/rfc3339.html",
+      "scope": "timestamp offsets including unknown local offset"
+    },
+    {
+      "id": "ISO-4217",
+      "url": "https://www.iso.org/iso-4217-currency-codes.html",
+      "scope": "currency codes and minor-unit relationships; a dated table snapshot must be pinned by the conversion profile"
     }
   ],
   "execution": {
+    "corpus_integrity": {
+      "status": "not_run",
+      "runtime": null
+    },
     "rust_preflight": "not_run",
-    "javascript_oracle": "not_run",
+    "javascript_parser_oracle": "not_run",
     "independent_rust_parser": "not_run",
-    "fuzz_campaign": "not_run",
-    "performance_benchmark": "not_run"
+    "differential_fuzz": "not_run",
+    "performance_benchmark": "not_run",
+    "tls_session_or_proof": "not_run"
   }
 }
