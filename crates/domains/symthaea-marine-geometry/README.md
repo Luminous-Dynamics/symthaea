@@ -4,7 +4,7 @@ Deterministic candidate manifests and a deliberately narrow Rust geometry-admiss
 
 ## G2a section-family generator
 
-A separate implementation increment is under development on branch `research/marine-section-generator-g2a-20261115` for issue #12338. It accepts bounded, normalized keel-to-sheer half-section control polylines at strictly ordered x/L stations and deterministically samples physical starboard-side sections in metres. The section-family artifact carries separate BLAKE3 digests for the normalized source specification and generated sample coordinates, along with dimensions and frame metadata. The input is bounded to 512 stations, 128 controls per station, 64 subdivisions per segment, and 1,000,000 output points. It is a parametric section baseline, not a completed hull loft, watertight vessel surface, spline fairing or validated naval-architecture generator.
+A separate implementation increment is under development on branch `research/marine-section-generator-g2a-20261115` for issue #12338. It accepts bounded, normalized keel-to-sheer half-section control polylines at strictly ordered x/L stations and deterministically samples physical starboard-side sections in metres. The section-family artifact carries separate BLAKE3 digests for the normalized source specification, generated sample coordinates, and a family manifest that binds dimensions, frame metadata and longitudinal end-condition semantics. The input is bounded to 512 stations, 128 controls per station, 64 subdivisions per segment, and 1,000,000 output points. It is a parametric section baseline, not a completed hull loft, watertight vessel surface, spline fairing or validated naval-architecture generator.
 
 ## G2b waterplane-capped surface loft
 
@@ -17,6 +17,20 @@ The waterplane cap is not a deck surface or a freeboard model. This output is a 
 A separate CLI accepts a request containing `section_family` and `profile`:
 
     cargo run --locked -p symthaea-marine-geometry --bin marine-waterplane-loft -- loft-request.json --output /tmp/lofted-displacement.json
+
+## G2e explicit pointed bow/stern closure
+
+The next loft increment is tracked by [MARINE-END-CLOSURE-001 #12385](https://github.com/Luminous-Dynamics/symthaea/issues/12385) on branch `research/marine-pointed-end-closure-g2e-20261115`.
+
+Section specification schema v1 remains accepted for legacy planar-bow/planar-stern inputs. Schema v2 adds independent bow and stern end conditions:
+- `planar-end-cap`: positive-breadth terminal section closed with an explicit semantic cap fan;
+- `collapsed-centreline`: exact zero half-breadth at the endpoint; the port and starboard sample columns share vertex IDs and no planar end-cap fan is created.
+
+The G2b loft artifact is version 2. It binds both closure modes, station/point counts and separate bow/stern cap-face ranges into the manifest digest. The section-family artifact is version 2 and has a second family-manifest digest that binds source/sample digests, dimensions, coordinate frame and end-condition semantics. Older v1 section-family and v1 loft artifacts remain parseable where fields default, but fail the v2 admission verifier until regenerated; no silent semantic migration is performed.
+
+Pointed-end waterplane closure emits one triangle where a station collapses to the centreline, rather than two triangles containing a degenerate quad. The two longitudinal end conditions are independent: pointed bow/planar stern, planar bow/pointed stern, both pointed, or both planar. Two-station both-pointed hulls, collapsed interior stations and non-zero transverse samples at a collapsed end are rejected.
+
+The current profile still requires convex sections and identical point counts. G2e is still a closed displacement-volume geometry; it is not a full external hull, deck/freeboard, transom/stem fairness, CAD B-rep, CFD or vessel approval.
 
 ## Research benchmark protocol
 
