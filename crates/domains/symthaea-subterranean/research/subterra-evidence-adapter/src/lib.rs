@@ -12,6 +12,8 @@
 //! - grant sample, biological, engineering or actuator authority;
 //! - validate planetary coordinate transforms, SLAM, geomechanics or safety.
 
+pub mod profile;
+
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use serde::{Deserialize, Serialize};
