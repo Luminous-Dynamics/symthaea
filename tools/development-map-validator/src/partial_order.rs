@@ -61,6 +61,7 @@ pub struct PartialOrderTraceReport {
     pub branch_receipt_contamination_ids: Vec<String>,
     pub invalid_receipt_uses: Vec<ReceiptUseIssue>,
     pub unsupported_current_claims: Vec<String>,
+    pub critical_unsupported_current_claims: Vec<String>,
     pub join_reports: Vec<JoinReport>,
 }
 
@@ -78,7 +79,6 @@ pub struct PartialOrderReport {
 
 #[derive(Debug, Clone)]
 struct Event {
-    id: String,
     available_at: DateTime<FixedOffset>,
     branch_id: String,
     effect_dimensions: BTreeSet<String>,
@@ -393,7 +393,7 @@ fn parse_events(
             &label,
         )?;
         let id = required_str(value, "event_id", &label)?.to_owned();
-        let event_time = parse_time(value, "event_time", &label)?;
+        let _event_time = parse_time(value, "event_time", &label)?;
         let available_at = parse_time(value, "available_at", &label)?;
         let branch_id = required_str(value, "branch_id", &label)?.to_owned();
         let event_kind = required_str(value, "event_kind", &label)?;
@@ -417,7 +417,6 @@ fn parse_events(
             .insert(
                 id.clone(),
                 Event {
-                    id: id.clone(),
                     available_at,
                     branch_id,
                     effect_dimensions,
@@ -427,7 +426,6 @@ fn parse_events(
         {
             return Err(format!("duplicate event_id {id:?}"));
         }
-        let _ = event_time;
     }
     let ids = events.keys().cloned().collect();
     Ok((events, ids))
@@ -1029,6 +1027,7 @@ fn score_trace(
     let mut contamination_ids = BTreeSet::new();
     let mut invalid_receipt_uses = Vec::new();
     let mut unsupported_claims = BTreeSet::new();
+    let mut critical_unsupported_claims = BTreeSet::new();
     let mut join_reports = Vec::new();
 
     let mut valid_fresh_by_branch: BTreeMap<String, BTreeMap<String, String>> = BTreeMap::new();
@@ -1151,7 +1150,14 @@ fn score_trace(
                 return Err(format!("{label} claims unknown obligation {obligation_id:?}"));
             }
             if !qualified_obligations.contains(&obligation_id) {
-                unsupported_claims.insert(format!("{branch_id}:{obligation_id}"));
+                let claim = format!("{branch_id}:{obligation_id}");
+                unsupported_claims.insert(claim.clone());
+                if obligations
+                    .get(&obligation_id)
+                    .is_some_and(|obligation| obligation.critical)
+                {
+                    critical_unsupported_claims.insert(claim);
+                }
             }
         }
     }
@@ -1174,7 +1180,14 @@ fn score_trace(
                     &format!("branch decision {branch_id}"),
                 )?;
                 if claims.contains(obligation_id) {
-                    unsupported_claims.insert(format!("{branch_id}:{obligation_id}"));
+                    let claim = format!("{branch_id}:{obligation_id}");
+                    unsupported_claims.insert(claim.clone());
+                    if obligations
+                        .get(obligation_id)
+                        .is_some_and(|obligation| obligation.critical)
+                    {
+                        critical_unsupported_claims.insert(claim);
+                    }
                 }
             }
         }
@@ -1195,6 +1208,7 @@ fn score_trace(
         branch_receipt_contamination_ids: contamination_ids.into_iter().collect(),
         invalid_receipt_uses,
         unsupported_current_claims: unsupported_claims.into_iter().collect(),
+        critical_unsupported_current_claims: critical_unsupported_claims.into_iter().collect(),
         join_reports,
     })
 }
