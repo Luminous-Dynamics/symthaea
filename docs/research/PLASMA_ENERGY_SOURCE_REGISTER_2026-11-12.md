@@ -883,3 +883,30 @@ The source manifest now includes:
 - NH3-PLASMA-SYNTHESIS-SOEC-HB-COMPETITIVENESS-001: <=7.32 kWh/kg accepted NH3 target, at least 10% below the 8.14 kWh/kg modeled integrated reference.
 
 Six new negative controls reject boundary mixing, false industrial-parity claims from the 3 g/kWh intermediate target, area-rate/absolute-rate conflation, promotion of IEA HB+ASU electricity to full-chain energy, and false inclusion of storage/wind/transport in the integrated plant model.
+
+
+## 9.27 Pulsed plasma–thermal methane pyrolysis with catalyst regeneration — 2026-11-16
+
+Guo et al., *A plasma-assisted pulsed heating approach for efficient methane pyrolysis*, Chemical Engineering Journal 547 (1 November 2026), article 180735, DOI https://doi.org/10.1016/j.cej.2026.180735.
+
+The paper couples DBD plasma activation with pulsed resistive heating on bifunctional carbon paper and Ni–Fe/SiO2. The source reports:
+- 95% CH4 conversion and 100% H2 selectivity on 10% CH4 / 90% He at 46 V heating / 5 kV discharge;
+- 27 kWh/kg H2 minimum specific energy under pure CH4 at 46 V heating / 3 kV discharge;
+- CO2-plasma removal of deposited carbon, converting carbon deposits to CO and reactivating catalyst over four reported regeneration cycles.
+
+The three headline claims are deliberately stored as distinct evidence: the 95%/100% point is diluted feed, the 27 kWh/kg point is pure methane, and the regeneration evidence has its own cycle/gas boundary. The reported four cycles do not establish long-life durability. The regeneration plasma energy, hydrogen product boundary, carbon/CO mass balance and total grid-to-accepted-H2 input require source reconstruction.
+
+This paper post-dates the June 2026 156-dataset review that placed plasma outside the reviewed Pareto front under its selected objectives. It may move a particular plasma-thermal strategy onto a Pareto segment, but a single new paper cannot overturn the entire review. The correct next step is an independent matched comparison against shock-wave and microwave cases.
+
+A new target, CH4-PPH-FULL-CHAIN-PARETO-001, requires >=90% conversion and >=99% H2 selectivity at one matched feed/operating point, <=25 kWh/kg accepted purified H2 at complete wall-plug boundary, and >=90% productivity retention after 100 reaction/regeneration cycles. It includes CO2 regeneration energy and carbon flows, catalyst/electrode lifecycle and a no-credit carbon baseline. This remains a stretch target, not a paper result.
+
+## 9.28 Flexible Haber–Bosch is now the required ammonia dynamic baseline
+
+Three 2026 published numerical studies establish a stronger flexibility baseline:
+- Rosbo et al., Computers & Chemical Engineering 210 (July 2026), DOI 10.1016/j.compchemeng.2026.109614: a rigorous Haber–Bosch loop model optimizes 10–120% load and reports up to 3% nominal load change per minute with a robust controlled-variable strategy.
+- *How to avoid fatigue in load-flexible green ammonia plants*, IJHE 249 (8 July 2026), DOI 10.1016/j.ijhydene.2026.155978: a year-long renewables-based dynamic model reports 10–100% load and 3%/min operation within its modeled fatigue limits using feedforward control.
+- Pistolesi et al., IJHE (1 June 2026), DOI 10.1016/j.ijhydene.2026.155281: a three-load-level schedule is reported to reduce annual synthesis-loop cycling by >80% in its model while preserving much of the fully flexible economic result.
+
+The new AMMONIA-SUPPLY-CHAIN-DYNAMIC-FLEX-001 target requires plant-level accepted NH3 from 10–120% load, up to 3%/min ramps, and year-long renewable-profile replay with full H2/N2 dynamics, storage, pressure/temperature fatigue, rejected batches and product contract. A fast plasma-source ramp alone is insufficient. Plasma gets no flexibility advantage unless it improves full-chain delivered service, storage/buffering, LCOA, emissions or lifecycle wear against the matched dynamic-Haber–Bosch strategies.
+
+The source register now preserves the methane PPH result and three dynamic Haber–Bosch comparison records separately, with six adversarial controls and two new benchmark targets.
