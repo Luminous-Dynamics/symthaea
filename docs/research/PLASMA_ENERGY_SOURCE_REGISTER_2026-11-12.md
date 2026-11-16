@@ -854,3 +854,32 @@ The absolute 150.2 μmol/h rate is not directly comparable with the JACS 7.7 nmo
 The publisher identifies numerical data for Figures 1–5 and supplementary figures, Ansys Fluent H5 CFD input cases, and supplementary Tables S5–S7 covering economic assumptions and separate NTP/ERR energy inputs. Triplicate independent measurements are reported for selected figures; other results are single-run data. This provides a concrete source-reconstruction path, with repeatability limits preserved.
 
 The benchmark should independently reconstruct the combined NTP+ERR energy denominator, then extend the boundary to accepted NH3 product recovery. Do not borrow the JACS area-normalized product metric, Faradaic efficiency or N2(v) mechanism into this different reactor.
+
+
+## 9.26 Full-chain ammonia competitiveness: integrated SOEC–Haber–Bosch baseline — 2026-11-16
+
+Díaz-Motta et al., *Modeling and performance analysis of an integrated SOEC-Haber-Bosch system for offshore ammonia production*, International Journal of Hydrogen Energy 236 (22 May 2026), DOI https://doi.org/10.1016/j.ijhydene.2026.155184, provides a stronger incumbent reference.
+
+The published steady-state plant model reports 3,037 t NH3/day at 1,030.2 MW total input, with 943.8 MW SOEC, 67.6 MW Haber–Bosch and 18.8 MW air separation. It reports 8.14 kWh/kg NH3 and 63% LHV-NH3 efficiency. This is a modeled plant, not a commissioned plant. Its stated analysis excludes offshore wind farm, electrical/hydrogen storage, ammonia storage and downstream transport. The paper discusses seawater desalination/MVC; its treatment in the headline power total needs reconciliation before treating it as a universal plant-gate baseline.
+
+The IEA *Global Hydrogen Review 2026: Assumptions Annex* separately reports 2.22 GJ/t NH3 electricity for Haber–Bosch including ASU and 0.18 t H2/t NH3 consumption. That is a component baseline only: hydrogen-production energy and electrolysis plant CAPEX are outside this HB+ASU figure. It must not be presented as total ammonia energy.
+
+### The actual competitiveness gap
+
+The gas–liquid plasma-electrocatalytic tandem study (Zhu et al., AIChE Journal 72(8), e70407, DOI 10.1002/aic.70407) reports 1,161 kWh/kg NH3, equivalent by reciprocal arithmetic to about 0.861 g NH3/kWh. The separate SOEC–HB model reports 8.14 kWh/kg NH3, equivalent to 122.85 g/kWh. The source metrics have different system boundaries and **are not a matched comparison**, but they expose the scale of the challenge: their reported energy intensities differ by roughly 142.6x.
+
+The earlier >=3 g NH3/kWh research target is an intermediate demonstrator target, not industrial parity. It corresponds to 333.3 kWh/kg NH3, still about 41x the 8.14 kWh/kg integrated reference. The new competitiveness target is at least 10% better than the 8.14 kWh/kg modeled reference, i.e. <=7.32 kWh/kg accepted NH3, after matching NH3 purity/pressure, hydrogen generation, nitrogen supply, plant auxiliaries, water/desalination, availability and all declared exclusions. This is a stretch research target, not an achieved result.
+
+### Area-scale implication
+
+The JACS 2026 source's area-normalized experimental rate of 7.7 nmol NH3 s-1 cm-2 corresponds by unit conversion to approximately 0.1133 kg NH3/m2/day. A purely geometric extrapolation gives about 8,826 m2 active area for 1 tonne/day at that rate. This is not a scalability prediction: packing, current distribution, mass transfer, catalyst loading, degradation, downtime and balance-of-plant are omitted.
+
+### New source controls and derived check
+
+The source manifest now includes:
+- NH3-SOEC-HB-OFFSHORE-2026: full integrated model baseline;
+- NH3-IEA-HB-ASU-2026: IEA component electricity and H2-feed baseline;
+- NH3-PLASMA-TO-SOEC-HB-ENERGY-GAP-2026: derived source-metric and geometric area arithmetic, with explicit NOT_COMPARABLE boundary status;
+- NH3-PLASMA-SYNTHESIS-SOEC-HB-COMPETITIVENESS-001: <=7.32 kWh/kg accepted NH3 target, at least 10% below the 8.14 kWh/kg modeled integrated reference.
+
+Six new negative controls reject boundary mixing, false industrial-parity claims from the 3 g/kWh intermediate target, area-rate/absolute-rate conflation, promotion of IEA HB+ASU electricity to full-chain energy, and false inclusion of storage/wind/transport in the integrated plant model.
