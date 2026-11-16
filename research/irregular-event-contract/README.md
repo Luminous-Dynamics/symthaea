@@ -206,3 +206,35 @@ No model checkpoint or external baseline has been reproduced.
 
 
 The breach index is keyed by source identity, event time and receipt/knowledge time. A historical `known_at` query prunes future receipts inside the ordered range lookup instead of visiting them and filtering afterward. A regression checks zero candidates before the first breach, one candidate at the first receipt and three after all receipts, with full replay/index parity.
+
+
+## Clock-domain qualification
+
+`src/clock.rs` adds an uncertainty-bounded calibration boundary between
+source-local clocks and a declared reference clock. A microsecond is a unit,
+not proof that two devices share an epoch or oscillator. Each calibration
+declares source/reference domains, an inclusive source-time validity range,
+anchor coordinates, offset-error interval, maximum drift in ppb, a
+knowledge-time record timestamp, and a policy digest.
+
+Mapping returns an interval, not a point. Drift uncertainty expands outward
+with a ceiling operation. The conservative exclusive watermark is the
+earliest possible mapped endpoint; the optimistic upper endpoint is
+diagnostic only. Multiple sources can be combined only after they have been
+mapped into the same reference domain, using the minimum earliest endpoint.
+A future-known, expired, mismatched-domain, invalid, or overflowing
+calibration fails closed.
+
+The mapped-time and conservative-watermark result types have private fields,
+so callers cannot fabricate a mapped bound through a struct literal. Ten
+deterministic unit tests cover offset intervals, outward drift rounding,
+knowledge-time visibility, validity expiry, domain mismatch, mixed-domain
+aggregation, empty source sets, and overflow.
+
+This is an upstream conversion contract, not yet an automatic integration
+inside `SourceWatermarkLedger`: the current v0.1 ledger still requires event
+and watermark timestamps to be supplied in one common reference coordinate.
+The calibration digest is not a source signature and does not authenticate
+the calibration provider. A governed calibration registry, signature
+verification, key revocation, and durable calibration history remain future
+qualification work.
