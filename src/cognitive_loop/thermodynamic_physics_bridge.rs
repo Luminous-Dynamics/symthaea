@@ -2,68 +2,79 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 
-//! Thermodynamic Physics Bridge: Maps classical thermodynamic concepts
-//! into cognitive operations within the consciousness loop.
+//! Thermodynamic analogies and model diagnostics for the cognitive loop.
 //!
-//! Bridges the gap between symthaea-core's physics encodings (ThermoEncoder,
-//! Maxwell's Demon, Landauer limit, Carnot efficiency, fluctuation theorem,
-//! Onsager coefficients) and the live cognitive cycle.
+//! This module maps selected cognitive telemetry into quantities inspired by
+//! statistical mechanics and thermodynamics. It currently computes heuristic
+//! proxies in effective or dimensionless units; it does not simulate a
+//! physical heat engine, perform a measured bit-erasure protocol, or estimate
+//! Onsager response coefficients from conjugate flux/force perturbations.
 //!
-//! # Concepts Mapped
+//! # Claim boundary
 //!
-//! | Physics | Cognition | Mechanism |
-//! |---------|-----------|-----------|
-//! | Maxwell's Demon | Attention | Selective info extraction costs energy |
-//! | Landauer Limit | Memory consolidation | Minimum energy to write memory |
-//! | Carnot Efficiency | Consciousness efficiency | Work output / energy input |
-//! | Fluctuation Theorem | Spontaneous insight | Rare entropy-decreasing events |
-//! | Onsager Coefficients | Cross-coupling health | Transport symmetry = integration |
+//! - Attention and prediction-error signals are not measurements of physical
+//!   memory erasure. Their information-theoretic values are model proxies.
+//! - The "Carnot" and "actual efficiency" fields are normalized cognitive
+//!   diagnostics, not heat-engine efficiencies.
+//! - Insight probability is a heuristic mapping, not a fluctuation-theorem
+//!   path-probability ratio.
+//! - The current covariance-symmetry diagnostic is not an Onsager reciprocity
+//!   test: covariance is symmetric by construction.
+//! - The current work statistic is not a Jarzynski work ensemble. A physical
+//!   free-energy estimate requires a defined protocol and forward/reverse work
+//!   trajectories under the equality's assumptions.
+//! - The "epistemic W2" value is currently a scalar prediction-error proxy,
+//!   not a Wasserstein distance between probability distributions.
 //!
-//! # Science
-//!
-//! - Landauer (1961) — information erasure has minimum thermodynamic cost
-//! - Szilard (1929) — Maxwell's demon extracts work from information
-//! - Carnot (1824) — maximum heat engine efficiency
-//! - Jarzynski (1997) — rare fluctuations carry free energy information
-//! - Onsager (1931) — reciprocal relations in near-equilibrium transport
+//! Keep these exploratory signals separate from physical measurements,
+//! calibrated implementation costs, and validated thermodynamic laws. Stronger
+//! interpretations are tracked in
+//! [PHYS-THERMO-COMPUTING-001](https://github.com/Luminous-Dynamics/symthaea/issues/10428).
 
 use serde::{Deserialize, Serialize};
 
 use super::thresholds;
 
-/// Thermodynamic physics bridge: computes physics-derived cognitive metrics each cycle.
+/// Cognitive thermodynamic-analogy diagnostics. These values are heuristic
+/// model outputs unless a field explicitly documents a measured physical input.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Maxwell's Demon as Attention
     // ═══════════════════════════════════════════════════════════════════════
-    /// Bits of information gathered by attention this cycle.
+    /// Attention-information proxy derived from cognitive telemetry; not a
+    /// measured count of physical bit erasures.
     pub attention_demon_bits: f64,
-    /// Work extracted by attention (information → action) in effective joules.
+    /// Heuristic information-to-action score in model units; not measured work.
     pub attention_work: f64,
-    /// Landauer cost of erasing attention memory (effective joules).
+    /// Landauer-inspired model cost from the attention-information proxy.
+    /// No physical memory reset operation is measured by this field.
     pub attention_erasure_cost: f64,
 
     // ═══════════════════════════════════════════════════════════════════════
     // Landauer Limit for Memory
     // ═══════════════════════════════════════════════════════════════════════
-    /// Minimum energy to consolidate memory this cycle (effective joules).
+    /// Prediction-error-derived memory-consolidation proxy in effective units.
+    /// This is not a Landauer lower bound for a measured erasure operation.
     pub memory_landauer_cost: f64,
 
     // ═══════════════════════════════════════════════════════════════════════
     // Carnot Efficiency
     // ═══════════════════════════════════════════════════════════════════════
-    /// Theoretical maximum efficiency (1 - T_cold/T_hot).
+    /// Carnot-shaped normalization computed from configured effective
+    /// temperatures; not a physical heat-engine bound for this cognitive loop.
     pub carnot_efficiency: f64,
-    /// Actual consciousness efficiency (useful work / total energy).
+    /// Normalized cognitive diagnostic; numerator and denominator are not
+    /// measured heat-engine work and heat flows.
     pub actual_efficiency: f64,
-    /// Ratio actual/Carnot — performance relative to theoretical max.
+    /// Ratio of two model diagnostics; not a thermodynamic efficiency ratio.
     pub efficiency_ratio: f64,
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Fluctuation Theorem for Insight
+    // Heuristic insight score
     // ═══════════════════════════════════════════════════════════════════════
-    /// Probability of spontaneous insight (rare entropy-decreasing event).
+    /// Heuristic insight score derived from order/entropy proxies; not a
+    /// probability obtained from a fluctuation-theorem path ensemble.
     pub insight_probability: f64,
     /// Whether an insight event was detected this cycle.
     pub insight_detected: bool,
@@ -71,32 +82,37 @@ pub struct ThermodynamicPhysicsBridge {
     // ═══════════════════════════════════════════════════════════════════════
     // Onsager Cross-Coupling Health
     // ═══════════════════════════════════════════════════════════════════════
-    /// Onsager symmetry measure (0 = perfectly symmetric, higher = asymmetric).
-    /// Lower is better — symmetric transport indicates well-integrated consciousness.
+    /// Legacy covariance-symmetry diagnostic. The current implementation
+    /// subtracts a covariance matrix from its transpose; that is zero up to
+    /// floating-point roundoff by construction. It does not estimate Onsager
+    /// reciprocity or measure integration; retained for compatibility.
     pub onsager_asymmetry: f64,
 
-    /// Rolling history for Onsager computation (last N cycles of [entropy, energy, info, coherence]).
+    /// Rolling cognitive telemetry used by the legacy covariance-symmetry
+    /// diagnostic; these are not conjugate thermodynamic flux/force pairs.
     #[serde(skip)]
     history: std::collections::VecDeque<[f64; 4]>,
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Nonequilibrium Physics (Phase 6)
+    // Cognitive thermodynamic-analogy diagnostics (Phase 6)
     // ═══════════════════════════════════════════════════════════════════════
-    /// Rolling work samples for Jarzynski free energy estimation.
+    /// Rolling model-derived "work" proxies. These are not work measurements
+    /// from a defined nonequilibrium protocol and must not be treated as a
+    /// Jarzynski estimator.
     #[serde(skip)]
     pub(crate) work_samples: std::collections::VecDeque<f64>,
 
-    /// Jarzynski free energy estimate ΔF (from nonequilibrium work).
-    /// Science: Jarzynski (1997) — ⟨exp(-W/k_BT)⟩ = exp(-ΔF/k_BT).
+    /// Legacy exponential-work proxy, not a validated Jarzynski free-energy
+    /// estimate: its inputs are not sampled protocol work trajectories.
     pub jarzynski_free_energy: f64,
 
-    /// Divergence between Jarzynski estimate and HFE total free energy.
-    /// High divergence indicates model inaccuracy.
+    /// Difference between two model diagnostics. It is not a comparison
+    /// between independently valid thermodynamic and variational free energies.
     pub jarzynski_hfe_divergence: f64,
 
-    /// Whether Prigogine minimum entropy production was violated this cycle.
-    /// In LinearNonEquilibrium regime, entropy production should decrease toward steady state.
-    /// Science: Prigogine (1947) — steady states minimize entropy production.
+    /// Heuristic trend flag for the configured LinearNonEquilibrium regime.
+    /// It does not establish violation of Prigogine's minimum entropy production
+    /// principle, which has restricted near-equilibrium assumptions.
     pub prigogine_violated: bool,
 
     /// Previous entropy production rate (for Prigogine trend detection).
@@ -116,27 +132,29 @@ pub struct ThermodynamicPhysicsBridge {
     pub england_exploration_boost: bool,
 
     // ═══════════════════════════════════════════════════════════════════════
-    // Epistemic Free Energy (arXiv 2601.17607)
+    // Epistemic model diagnostics (feature-gated)
     // ═══════════════════════════════════════════════════════════════════════
-    /// Epistemic free energy: F = E[loss] - T*H[beliefs].
-    /// Positive = beliefs are costly relative to entropy; negative = beliefs are cheap.
-    /// Science: Thermodynamic Theory of Learning (Still et al., arXiv 2601.17607).
+    /// Heuristic epistemic score formed from scalar prediction error and
+    /// entropy-production proxies. It is not a measured thermodynamic free
+    /// energy or a validated result of the cited learning theory.
     #[cfg(feature = "epistemic")]
     pub epistemic_free_energy: f64,
 
-    /// Epistemic speed limit violation: ESL = W2^2 / (T * sigma).
-    /// >1.0 means beliefs moved faster than thermodynamically permitted — suspicious.
-    /// Science: T * sigma >= W_2(q_0, q_1)^2 (arXiv 2601.17607).
+    /// Heuristic ratio using a scalar prediction-error proxy in place of W2.
+    /// Values above 1 are internal diagnostic thresholds, not proof of a
+    /// physical thermodynamic speed-limit violation. The cited learning theory
+    /// motivates a future distribution-based test but is not validated by this
+    /// scalar implementation.
     #[cfg(feature = "epistemic")]
     pub epistemic_speed_limit_violation: f64,
 
-    /// Wasserstein-2 proxy: how far beliefs moved this cycle (|belief_delta|).
+    /// Absolute scalar prediction-error change; not a Wasserstein-2 distance
+    /// unless replaced by a distribution-to-distribution transport calculation.
     #[cfg(feature = "epistemic")]
     pub belief_wasserstein_distance: f64,
 
-    /// Total energy budget available per cycle (effective joules).
-    /// Constrains how many epistemic operations (claim validations, memory writes)
-    /// can be performed. Default 1.0 (arbitrary units).
+    /// Abstract per-cycle model budget (default 1.0 arbitrary units). It is
+    /// not an SI joule budget until a calibrated mapping is supplied.
     #[cfg(feature = "epistemic")]
     pub total_energy_budget: f64,
 }
@@ -179,7 +197,8 @@ impl Default for ThermodynamicPhysicsBridge {
 }
 
 impl ThermodynamicPhysicsBridge {
-    /// Compute all physics bridge metrics for this cycle.
+    /// Compute cognitive diagnostics inspired by thermodynamic concepts.
+    /// Most fields are model proxies in effective units, not physical observables.
     ///
     /// Called after all three thermodynamic modules have written to the unified state.
     pub(crate) fn compute(
@@ -199,9 +218,9 @@ impl ThermodynamicPhysicsBridge {
         // ═══════════════════════════════════════════════════════════════════
         // Maxwell's Demon as Attention (Szilard 1929)
         // ═══════════════════════════════════════════════════════════════════
-        // Attention selectively focuses on information = demon gathering bits.
-        // Each bit gathered can extract k_B_eff * T * ln(2) work.
-        // Erasing that information costs the same (Landauer 1961).
+        // Model heuristic: scale the attention-information proxy into an
+        // effective work/erasure-cost diagnostic. No physical memory-erasure
+        // protocol or work extraction is represented here.
         let k_eff = thresholds::K_CONSCIOUSNESS_BOLTZMANN;
         let t_eff = effective_temperature.max(0.01); // Avoid division by zero
         let ln2 = std::f64::consts::LN_2;
@@ -212,16 +231,16 @@ impl ThermodynamicPhysicsBridge {
         self.attention_erasure_cost = self.attention_demon_bits * k_eff * t_eff * ln2;
 
         // ═══════════════════════════════════════════════════════════════════
-        // Landauer Limit for Memory (Landauer 1961)
+        // Landauer-inspired memory-cost proxy
         // ═══════════════════════════════════════════════════════════════════
-        // Memory consolidation writes bits. Minimum cost = bits * k_B_eff * T * ln(2).
-        // Use prediction_error as proxy for bits needing consolidation
-        // (high error = more to learn = more bits to write).
+        // Model heuristic: prediction error is mapped to a nominal
+        // information quantity. This is not a measured bit count, memory reset,
+        // or Landauer lower-bound calculation for the implementation.
         let bits_to_consolidate = prediction_error.abs() as f64 * 10.0; // Scale factor
         self.memory_landauer_cost = bits_to_consolidate * k_eff * t_eff * ln2;
 
         // ═══════════════════════════════════════════════════════════════════
-        // Carnot Efficiency (Carnot 1824)
+        // Carnot-shaped effective-temperature normalization (model proxy)
         // ═══════════════════════════════════════════════════════════════════
         let t_cold = thresholds::THERMO_CARNOT_T_COLD;
         self.carnot_efficiency = if t_eff > t_cold {
@@ -230,7 +249,8 @@ impl ThermodynamicPhysicsBridge {
             0.0
         };
 
-        // Actual efficiency: useful work (order × info) / total energy
+        // Normalized cognitive diagnostic: order × information proxy divided
+        // by a scaled energy input. Neither term is a measured engine work/heat.
         let useful_work = order_parameter * information_processed;
         self.actual_efficiency = if energy_per_cycle > 0.0 {
             (useful_work / (energy_per_cycle * 1e15)).clamp(0.0, 1.0) // Scale to [0,1]
@@ -245,23 +265,25 @@ impl ThermodynamicPhysicsBridge {
         };
 
         // ═══════════════════════════════════════════════════════════════════
-        // Fluctuation Theorem for Insight (Jarzynski 1997)
+        // Heuristic insight score (not a fluctuation-theorem estimator)
         // ═══════════════════════════════════════════════════════════════════
-        // Rare entropy-decreasing events = spontaneous insight.
-        // P(insight) = exp(-|delta_entropy|) for negative entropy fluctuations.
+        // Map an order-change / entropy-production proxy to a bounded score.
+        // No forward/reverse path probabilities or stochastic entropy
+        // production are sampled by this heuristic.
         let order_delta = order_parameter - prev_order_parameter;
         let entropy_decrease = if entropy_production_rate < -0.01 {
             entropy_production_rate.abs()
         } else if order_delta > 0.1 {
-            // Sudden order increase = entropy-decreasing event
+            // Sudden increase in the configured order proxy; this is not
+            // an independently measured entropy decrease.
             order_delta
         } else {
             0.0
         };
 
-        // Use temperature alone as fluctuation scale (not k_eff, which scales energy).
-        // The Boltzmann factor exp(-ΔS/(k_B T)) in consciousness space uses T directly
-        // since entropy_decrease is already in dimensionless consciousness units.
+        // The exponent uses the configured dimensionless model scale. It is
+        // not a physical Boltzmann factor unless entropy and temperature are
+        // calibrated to compatible physical units.
         self.insight_probability = if entropy_decrease > 0.0 {
             (-entropy_decrease / t_eff).exp()
         } else {
@@ -272,9 +294,9 @@ impl ThermodynamicPhysicsBridge {
             self.insight_probability > thresholds::THERMO_INSIGHT_PROBABILITY_THRESHOLD;
 
         // ═══════════════════════════════════════════════════════════════════
-        // Onsager Cross-Coupling Health (Onsager 1931)
+        // Legacy covariance-symmetry diagnostic (not Onsager reciprocity)
         // ═══════════════════════════════════════════════════════════════════
-        // Track 4 thermodynamic forces over time, compute transport matrix symmetry.
+        // These four telemetry channels are not conjugate flux/force pairs.
         let sample = [
             entropy_production_rate,
             energy_per_cycle,
@@ -287,15 +309,15 @@ impl ThermodynamicPhysicsBridge {
         }
 
         if self.history.len() >= 3 {
-            self.onsager_asymmetry = self.compute_onsager_asymmetry();
+            self.onsager_asymmetry = self.compute_covariance_symmetry_residual();
         }
 
         // ═══════════════════════════════════════════════════════════════════
         // Phase 6: Nonequilibrium Physics Integration
         // ═══════════════════════════════════════════════════════════════════
 
-        // 6a. Jarzynski free energy estimation from work samples
-        // Science: Jarzynski (1997) — ⟨exp(-W/k_BT)⟩ = exp(-ΔF/k_BT)
+        // 6a. Legacy exponential-work proxy. The samples below are constructed
+        // from cognitive telemetry, not measured work along a defined protocol.
         let work = energy_per_cycle - (energy_per_cycle * self.actual_efficiency);
         if work.is_finite() {
             self.work_samples.push_back(work);
@@ -318,9 +340,9 @@ impl ThermodynamicPhysicsBridge {
             self.jarzynski_hfe_divergence = (self.jarzynski_free_energy - hfe_total).abs();
         }
 
-        // 6c. Prigogine minimum entropy production principle
-        // Science: Prigogine (1947) — in LinearNonEquilibrium, steady state minimizes σ.
-        // Violation: entropy production increasing when it should be decreasing.
+        // 6c. Heuristic entropy-production trend flag for the configured regime.
+        // A rising proxy is not by itself a violation of the restricted
+        // near-equilibrium minimum-entropy-production result.
         use crate::consciousness::dissipative_consciousness::ThermodynamicRegime;
         self.prigogine_violated = matches!(regime, ThermodynamicRegime::LinearNonEquilibrium)
             && entropy_production_rate > self.prev_entropy_production + 0.01
@@ -367,25 +389,13 @@ impl ThermodynamicPhysicsBridge {
         }
     }
 
-    /// Compute epistemic thermodynamic metrics for this cycle.
+    /// Compute heuristic epistemic diagnostics for this cycle.
     ///
-    /// # Arguments
-    /// - `effective_temperature` — system effective temperature (k_B_eff units)
-    /// - `entropy_production` — entropy production rate this cycle
-    /// - `belief_delta` — how far beliefs moved this cycle (Wasserstein-2 proxy)
-    ///
-    /// # Science
-    ///
-    /// The Thermodynamic Theory of Learning (arXiv 2601.17607) establishes that
-    /// learning has an intrinsic thermodynamic cost. The Epistemic Speed Limit
-    /// (ESL) bounds how fast beliefs can change:
-    ///
-    ///   T * sigma >= W_2(q_0, q_1)^2
-    ///
-    /// where T is temperature, sigma is entropy production, and W_2 is the
-    /// Wasserstein-2 distance between consecutive belief distributions.
-    /// Violation (ESL > 1.0) indicates beliefs changed faster than
-    /// thermodynamically permitted — a red flag for hallucination or instability.
+    /// The current inputs are effective model scales and a scalar prediction-error
+    /// displacement. This calculation does not compute a Wasserstein-2 distance
+    /// between belief distributions, estimate trajectory entropy production, or
+    /// test a physical thermodynamic speed limit. It is retained as a cognitive
+    /// heuristic pending a distribution-based, dimensionally specified estimator.
     #[cfg(feature = "epistemic")]
     pub(crate) fn compute_epistemic_thermodynamics(
         &mut self,
@@ -396,44 +406,43 @@ impl ThermodynamicPhysicsBridge {
         let t_eff = effective_temperature.max(0.01);
         let sigma = entropy_production.max(0.001);
 
-        // F = E[loss] - T * H[beliefs]
-        // We use |belief_delta| as proxy for expected loss and sigma as proxy for
-        // belief entropy (higher entropy production ≈ higher belief entropy).
+        // Heuristic score: scalar prediction-error displacement minus a
+        // configured temperature-scaled entropy-production proxy. This is not
+        // a distributional free-energy calculation.
         self.epistemic_free_energy = belief_delta.abs() - t_eff * sigma;
 
-        // W_2 proxy: absolute belief displacement
+        // Legacy scalar displacement proxy; no probability distributions or
+        // transport plan are computed, so this value is not Wasserstein-2.
         self.belief_wasserstein_distance = belief_delta.abs();
 
-        // ESL violation = W_2^2 / (T * sigma)
-        // >1.0 means beliefs moved faster than the thermodynamic bound allows
+        // Heuristic ratio: scalar displacement proxy squared divided by the
+        // configured temperature/entropy-production scale. Crossing 1.0 only
+        // crosses an internal diagnostic threshold, not a physical bound.
         self.epistemic_speed_limit_violation =
             self.belief_wasserstein_distance.powi(2) / (t_eff * sigma);
     }
 
-    /// Compute the maximum number of knowledge claims that can be validated
-    /// this cycle given the available energy budget.
+    /// Estimate the number of claim-validation model operations allowed by
+    /// the abstract per-cycle budget.
     ///
-    /// Available energy = total budget - memory Landauer cost - attention erasure cost.
-    /// Each claim validation costs approximately one Landauer bit erasure at the
-    /// current effective temperature: k_B_eff * T * ln(2).
+    /// This subtracts the current attention/memory cost proxies and divides by a
+    /// configured per-claim model cost. The budget and costs are effective model
+    /// units, not joules, and this is not a Landauer-derived physical throughput
+    /// bound. Actual work/energy measurement and logical bit-erasure accounting
+    /// are separate requirements.
     ///
-    /// Returns 0 when energy is exhausted or temperature is negligible.
-    ///
-    /// # Science
-    ///
-    /// Landauer (1961) — each irreversible bit operation (claim evaluation)
-    /// dissipates at least k_B * T * ln(2) energy. This bounds epistemic
-    /// throughput by thermodynamic cost.
+    /// Returns zero when the abstract budget is exhausted or the configured
+    /// model cost is non-positive.
     #[cfg(feature = "epistemic")]
     pub fn epistemic_energy_budget(&self) -> usize {
         let available =
             (self.total_energy_budget - self.memory_landauer_cost - self.attention_erasure_cost)
                 .max(0.0);
-        // Cost per claim = k_B_eff * T_eff * ln(2)
+        // Configured model cost per claim proxy = k_eff * T_eff * ln(2).
         let k_eff = thresholds::K_CONSCIOUSNESS_BOLTZMANN;
-        // Use Carnot T_cold as floor to avoid division issues when actual_efficiency is 0
+        // Use the reference effective-temperature scale as a floor.
         let t_eff = if self.carnot_efficiency > 0.01 {
-            // Recover T_hot from Carnot: η = 1 - T_cold/T_hot → T_hot = T_cold / (1 - η)
+            // Recover the configured effective scale from the normalization.
             thresholds::THERMO_CARNOT_T_COLD / (1.0 - self.carnot_efficiency)
         } else {
             thresholds::THERMO_CARNOT_T_COLD
@@ -446,9 +455,12 @@ impl ThermodynamicPhysicsBridge {
         (available / cost_per_claim).floor() as usize
     }
 
-    /// Compute Onsager reciprocal relation asymmetry from transport history.
-    /// Returns max |L_ij - L_ji| across all pairs.
-    fn compute_onsager_asymmetry(&self) -> f64 {
+    /// Legacy covariance transpose-difference diagnostic.
+    ///
+    /// The covariance matrix C_ij = mean((x_i - mean_i)(x_j - mean_j)) is
+    /// symmetric by construction, so max |C_ij - C_ji| is zero apart from
+    /// floating-point roundoff. This cannot test Onsager reciprocity.
+    fn compute_covariance_symmetry_residual(&self) -> f64 {
         let n = self.history.len();
         if n < 2 {
             return 1.0;
@@ -465,7 +477,7 @@ impl ThermodynamicPhysicsBridge {
             *m /= n as f64;
         }
 
-        // Compute covariance matrix (proxy for Onsager L_ij)
+        // Compute the covariance of cognitive telemetry channels.
         let mut cov = [[0.0f64; 4]; 4];
         for s in &self.history {
             for i in 0..4 {
@@ -538,12 +550,12 @@ mod tests {
             0.5,   // hfe_total
             &default_regime(),
         );
-        // Demon gathers bits = sensitivity × info
+        // Attention-information proxy = sensitivity × modeled information.
         assert!((b.attention_demon_bits - 80.0).abs() < 0.01);
-        // Erasure cost ≥ work extracted (Landauer bound)
+        // Configured erasure-cost proxy >= heuristic work proxy by policy.
         assert!(b.attention_erasure_cost >= b.attention_work);
-        // Work = bits × k × T × ln2 × efficiency (THERMO_ATTENTION_DEMON_EFFICIENCY)
-        // Erasure = bits × k × T × ln2
+        // This ratio checks the configured model policy; neither field is a
+        // measurement of physical work or measured bit-erasure heat.
         let ratio = b.attention_work / b.attention_erasure_cost;
         let expected = thresholds::THERMO_ATTENTION_DEMON_EFFICIENCY;
         assert!(
@@ -553,7 +565,7 @@ mod tests {
     }
 
     #[test]
-    fn test_landauer_cost_positive() {
+    fn test_memory_cost_proxy_positive() {
         let mut b = make_bridge();
         b.compute(
             0.5,
@@ -573,9 +585,9 @@ mod tests {
     }
 
     #[test]
-    fn test_carnot_efficiency_bounded() {
+    fn test_effective_temperature_normalization_bounded() {
         let mut b = make_bridge();
-        // High temperature → high Carnot efficiency
+        // Larger configured effective-temperature scale raises the normalization.
         b.compute(
             0.5,
             50.0,
@@ -591,7 +603,7 @@ mod tests {
         );
         assert!(b.carnot_efficiency > 0.0);
         assert!(b.carnot_efficiency < 1.0);
-        // T_hot=1.0, T_cold=THERMO_CARNOT_T_COLD → η = 1 - T_cold/1.0
+        // Reference effective scale: eta_proxy = 1 - T_cold / T_eff.
         let t_cold = thresholds::THERMO_CARNOT_T_COLD;
         let expected = 1.0 - t_cold / 1.0;
         assert!(
@@ -601,7 +613,7 @@ mod tests {
         );
 
         // Low temperature → low efficiency
-        // T_hot=0.25+, T_cold=THERMO_CARNOT_T_COLD → approaches 0
+        // Smaller configured effective-temperature scale approaches zero normalization.
         b.compute(
             0.5,
             50.0,
@@ -615,10 +627,10 @@ mod tests {
             0.5,
             &default_regime(),
         );
-        // With T_hot=0.25 < T_cold=0.3, Carnot = 0.0 (can't extract work)
+        // With effective T below the reference scale, the normalization is zero.
         assert!(
             b.carnot_efficiency < 0.01,
-            "expected ~0 with T_hot < T_cold, got {}",
+            "expected ~0 below the effective reference scale, got {}",
             b.carnot_efficiency,
         );
     }
@@ -626,9 +638,9 @@ mod tests {
     #[test]
     fn test_insight_detection() {
         let mut b = make_bridge();
-        // Moderate order increase (0.3 → 0.45) = entropy-decreasing event
-        // order_delta = 0.15 > 0.1 threshold, t_eff = 0.5
-        // P(insight) = exp(-0.15 / 0.5) = exp(-0.3) ≈ 0.741 > THRESHOLD (0.7)
+        // A moderate order-proxy increase crosses the heuristic event threshold.
+        // The returned score is deterministic model arithmetic, not a sampled
+        // fluctuation-theorem probability.
         b.compute(
             0.5,
             50.0,
@@ -653,7 +665,7 @@ mod tests {
     }
 
     #[test]
-    fn test_onsager_symmetry() {
+    fn test_covariance_symmetry_residual_is_near_zero() {
         let mut b = make_bridge();
         // Feed identical samples → perfectly symmetric → asymmetry ≈ 0
         for _ in 0..5 {
@@ -698,7 +710,7 @@ mod tests {
             "expected ESL 5.0, got {}",
             b.epistemic_speed_limit_violation
         );
-        // ESL > 1.0 → beliefs moved too fast
+        // Ratio > 1.0 crosses the configured heuristic threshold.
         assert!(b.epistemic_speed_limit_violation > 1.0);
     }
 
@@ -707,24 +719,24 @@ mod tests {
     fn test_epistemic_speed_limit_respects_temperature() {
         let mut b = make_bridge();
 
-        // High temperature + high entropy production → ESL low (thermodynamically affordable)
+        // Larger model scales lower this heuristic ratio.
         b.compute_epistemic_thermodynamics(2.0, 1.0, 0.3);
         let esl_hot = b.epistemic_speed_limit_violation;
         // ESL = 0.3^2 / (2.0 * 1.0) = 0.09 / 2.0 = 0.045
         assert!(
             esl_hot < 1.0,
-            "hot system should allow fast belief change, got ESL={esl_hot}"
+            "larger model scales should lower the heuristic ratio, got {esl_hot}"
         );
 
-        // Low temperature + low entropy production → ESL high (thermodynamically expensive)
+        // Smaller model scales raise this heuristic ratio.
         b.compute_epistemic_thermodynamics(0.05, 0.01, 0.3);
         let esl_cold = b.epistemic_speed_limit_violation;
         // ESL = 0.09 / (0.05 * 0.01) = 0.09 / 0.0005 = 180.0
         assert!(
             esl_cold > 1.0,
-            "cold system should flag fast belief change, got ESL={esl_cold}"
+            "smaller model scales should raise the heuristic ratio, got {esl_cold}"
         );
-        assert!(esl_cold > esl_hot, "cold ESL should exceed hot ESL");
+        assert!(esl_cold > esl_hot, "the small-scale heuristic ratio should exceed the large-scale ratio");
 
         // Zero belief delta → ESL = 0
         b.compute_epistemic_thermodynamics(0.5, 0.1, 0.0);
@@ -785,7 +797,7 @@ mod tests {
     #[test]
     fn test_epistemic_energy_budget() {
         let mut b = make_bridge();
-        // After compute, memory_landauer_cost and attention_erasure_cost are populated
+        // After compute, the information-cost proxy fields are populated.
         b.compute(
             0.5,
             50.0,
