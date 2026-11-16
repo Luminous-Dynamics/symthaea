@@ -11,7 +11,7 @@ Symthaea should stop treating a time-series input as only a vector of values. Th
 
 This is a system-level research opportunity, not a claim that a new encoder will automatically outperform a foundation model. The differentiator to test is whether Symthaea can maintain calibrated beliefs over both the physical process and the process that generated observations, identify competing explanations, and acquire the next observation that most reduces decision-relevant uncertainty.
 
-The first Rust increment adds `ObservationEventV1` plus an independent normalized diagonal-Gaussian likelihood oracle. It deliberately does **not** adapt the event to the legacy dense `Observation` or route it through `ActiveInferenceAgent::perceive`. That path currently increments a call counter, reads dense zipped values, and does not implement per-dimension masked likelihood semantics. A lossy adapter would create the appearance of support without satisfying the contract.
+The first Rust increment adds `ObservationEventV1` plus an independent normalized diagonal-Gaussian likelihood oracle. It records source health and derives delivery age only when capture and arrival timestamps share a clock domain; it never subtracts incomparable clocks. It deliberately does **not** adapt the event to the legacy dense `Observation` or route it through `ActiveInferenceAgent::perceive`. That path currently increments a call counter, reads dense zipped values, and does not implement per-dimension masked likelihood semantics. A lossy adapter would create the appearance of support without satisfying the contract.
 
 ## Paradigm shifts worth pursuing
 
@@ -163,7 +163,7 @@ Do not claim a generic SOTA victory from a single dataset, one seed, or a vendor
 
 ## Immediate implementation sequence
 
-1. **O0 — event contract:** add a versioned event type with source, modality, variable identity/unit, capture and arrival clocks, sampling-policy/calibration IDs, optional per-dimension inverse variance, and explicit missing values. Complete in this branch.
+1. **O0 — event contract:** add a versioned event type with source health, source, modality, variable identity/unit, capture and arrival clocks, sampling-policy/calibration IDs, optional per-dimension inverse variance, and explicit missing values. Complete in this branch.
 2. **O1 — masked likelihood:** integrate the event view into the existing FEP path. Masked dimensions must be absent from residuals, free energy, gradients, precision updates and model learning. Preserve legacy parity for fully observed inputs.
 3. **O2 — time-aware state propagation:** only after the FEP state transition model exposes a qualified duration-aware propagation contract. Reject unsupported clock/time inputs before mutation.
 4. **O3 — observation-process memory:** bind value, mask, age, source, modality and sampling-policy identity into separate but composable HDC representations; test independent value and mask contributions.
