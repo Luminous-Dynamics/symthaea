@@ -335,6 +335,7 @@ pub enum SiteIssue {
     EmptyObservationField(&'static str),
     NoObservations,
     AuthorizedActivityMissingBasis,
+    AuthorizedActivityWithoutProtectionAuthorization,
     RestrictedSiteHasDeclaredAuthorizedActivity,
 }
 
@@ -581,6 +582,14 @@ impl SiteEvidenceRecord {
             false,
             &mut issues,
         );
+
+        if any_activity_authorized
+            && !self.body.is_earth()
+            && self.preservation.planetary_protection_state
+                != PlanetaryProtectionState::AuthorizedForDeclaredActivity
+        {
+            issues.push(SiteIssue::AuthorizedActivityWithoutProtectionAuthorization);
+        }
 
         // A declared non-Earth permission is preserved as source data. The
         // converted belief input always marks planetary-protection review as
@@ -1298,6 +1307,19 @@ mod tests {
             intake_site_json(&invalid),
             Err(SiteIntakeError::Json(_))
         ));
+    }
+
+    #[test]
+    fn non_earth_activity_declaration_requires_protection_state() {
+        let mut record: SiteEvidenceRecord =
+            serde_json::from_str(SITE_FIXTURE).expect("fixture JSON");
+        record.preservation.sampling_permission =
+            ActivityPermission::AuthorizedForDeclaredActivity;
+        record.preservation.basis_refs = vec!["declared-review-reference".into()];
+        assert!(record
+            .validate()
+            .unwrap_err()
+            .contains(&SiteIssue::AuthorizedActivityWithoutProtectionAuthorization));
     }
 
     #[test]
