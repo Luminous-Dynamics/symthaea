@@ -4,6 +4,7 @@ This directory contains a dependency-free reference implementation of two real t
 
 - `design_generators.rs` — seeded Latin-hypercube sampling (LHS) and the standard unscrambled 2D Sobol sequence.
 - The generators are deliberately independent of the Symthaea selector and of every hidden evaluation world. They produce candidate coordinates only.
+- `fixtures/design-generators-reference-v0.1.csv` freezes 16 LHS and 16 Sobol rows for exact deterministic-output comparison.
 
 ## Why this is separate
 
@@ -61,7 +62,7 @@ The caller must record any subsequent physical-unit mapping, feasibility filteri
 - Canonical first eight 2D Sobol coordinates.
 - Uniqueness and bounds for 1,024 Sobol points.
 - Zero sample-count and zero LHS-seed rejection.
-- Stable CSV output and explicit absence of a Sobol seed.
+- Stable CSV output, exact match to the frozen 32-row reference fixture and explicit absence of a Sobol seed.
 
 ## Claim ceiling
 
