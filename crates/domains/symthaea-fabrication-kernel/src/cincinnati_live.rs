@@ -185,27 +185,34 @@ impl CincinnatiMonitor {
         }
     }
 
-    /// Ingest a sensor reading: update stats, check for anomaly, store in history.
+    /// Ingest a sensor reading using prequential anomaly evaluation.
+    ///
+    /// The reading is evaluated against statistics accumulated from *prior*
+    /// accepted observations. An anomalous reading is retained in history and
+    /// counted, but it does not train the Welford statistics or EMA baseline.
+    /// A legitimate process/configuration change therefore requires an
+    /// explicit baseline requalification rather than silently normalizing a
+    /// persistent fault.
     ///
     /// Returns `Some(AnomalyAlert)` if the reading is anomalous, `None` otherwise.
     pub fn ingest_reading(&mut self, reading: SensorReading) -> Option<AnomalyAlert> {
-        // Update online statistics.
-        let stats = self
-            .channel_stats
-            .entry(reading.channel.clone())
-            .or_default();
-        stats.update(reading.value);
-
-        // Update EMA baseline.
-        self.update_baseline(&reading.channel, reading.value);
-
-        // Detect anomaly.
+        // Evaluate before updating any reference state: a sample must not
+        // influence the baseline against which that same sample is judged.
         let alert = self.detect_anomaly(&reading);
+
         if alert.is_some() {
             self.anomaly_count += 1;
+        } else {
+            // Only observations accepted by the current baseline policy may
+            // update the reference population.
+            self.channel_stats
+                .entry(reading.channel.clone())
+                .or_default()
+                .update(reading.value);
+            self.update_baseline(&reading.channel, reading.value);
         }
 
-        // Store in history (ring buffer).
+        // Preserve every observed sample for audit/replay, including anomalies.
         self.history.push_back(reading);
         if self.history.len() > HISTORY_CAP {
             self.history.pop_front();
@@ -421,6 +428,55 @@ mod tests {
         assert_eq!(alert.anomaly_type, AnomalyType::TemperatureSpike);
         assert!(alert.z_score > 3.0, "z_score should exceed threshold");
         assert!(alert.severity > 0.0, "severity should be positive");
+    }
+
+    #[test]
+    fn anomalous_observation_does_not_contaminate_baseline() {
+        let mut monitor = CincinnatiMonitor::new(default_config());
+        feed_stable(&mut monitor, "temperature_nozzle", 210.0, 20);
+
+        let before_stats = monitor.channel_stats["temperature_nozzle"].clone();
+        let before_baseline = monitor.baselines["temperature_nozzle"];
+        let before_anomaly_count = monitor.anomaly_count();
+
+        let alert = monitor.ingest_reading(make_reading("temperature_nozzle", 500.0, 5000));
+        assert!(alert.is_some(), "extreme sample should be evaluated against prior accepted data");
+
+        let after_stats = &monitor.channel_stats["temperature_nozzle"];
+        assert_eq!(after_stats.count, before_stats.count);
+        assert_eq!(after_stats.mean, before_stats.mean);
+        assert_eq!(after_stats.m2, before_stats.m2);
+        assert_eq!(monitor.baselines["temperature_nozzle"], before_baseline);
+        assert_eq!(monitor.anomaly_count(), before_anomaly_count + 1);
+        assert_eq!(monitor.history_len(), 21, "anomalous sample remains in the audit history");
+
+        let accepted = monitor.ingest_reading(make_reading("temperature_nozzle", 210.020, 5100));
+        assert!(accepted.is_none(), "an in-envelope sample should remain admissible");
+        assert_eq!(monitor.channel_stats["temperature_nozzle"].count, before_stats.count + 1);
+    }
+
+    #[test]
+    fn repeated_outliers_cannot_train_their_own_baseline() {
+        let mut monitor = CincinnatiMonitor::new(default_config());
+        feed_stable(&mut monitor, "temperature_nozzle", 210.0, 20);
+        let before = monitor.channel_stats["temperature_nozzle"].clone();
+        let baseline = monitor.baselines["temperature_nozzle"];
+
+        for (index, value) in [500.0, 501.0, 499.0, 502.0].into_iter().enumerate() {
+            let alert = monitor.ingest_reading(make_reading(
+                "temperature_nozzle",
+                value,
+                5000 + index as u64 * 100,
+            ));
+            assert!(alert.is_some(), "outlier {value} must not become normal by repetition");
+        }
+
+        let after = &monitor.channel_stats["temperature_nozzle"];
+        assert_eq!(after.count, before.count);
+        assert_eq!(after.mean, before.mean);
+        assert_eq!(after.m2, before.m2);
+        assert_eq!(monitor.baselines["temperature_nozzle"], baseline);
+        assert_eq!(monitor.anomaly_count(), 4);
     }
 
     #[test]
