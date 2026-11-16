@@ -29,8 +29,7 @@ impl MetricMask {
     pub const NUMERIC_FIT: Self = Self(METRIC_NUMERIC_FIT);
     pub const SCIENTIFIC_VALIDITY: Self = Self(METRIC_SCIENTIFIC_VALIDITY);
     pub const STRUCTURE_RECOVERY: Self = Self(METRIC_STRUCTURE_RECOVERY);
-    pub const REAL_FIT_AND_VALIDITY: Self =
-        Self(METRIC_NUMERIC_FIT | METRIC_SCIENTIFIC_VALIDITY);
+    pub const REAL_FIT_AND_VALIDITY: Self = Self(METRIC_NUMERIC_FIT | METRIC_SCIENTIFIC_VALIDITY);
     pub const PARALLEL_FIT_AND_STRUCTURE: Self =
         Self(METRIC_NUMERIC_FIT | METRIC_STRUCTURE_RECOVERY);
     pub const ALL: Self = Self(KNOWN_METRIC_BITS);
@@ -140,10 +139,7 @@ pub struct SelectionObservation {
 
 pub trait CandidateSelectionPolicy {
     fn policy_id(&self) -> &str;
-    fn select(
-        &self,
-        packet: &SelectorPacket,
-    ) -> Result<SelectionObservation, SelectionAuditError>;
+    fn select(&self, packet: &SelectorPacket) -> Result<SelectionObservation, SelectionAuditError>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -204,10 +200,8 @@ pub struct EvaluatorMetrics {
 impl EvaluatorMetrics {
     fn matches_mask(self, mask: MetricMask) -> bool {
         self.numeric_fit.is_some() == mask.contains(METRIC_NUMERIC_FIT)
-            && self.scientific_validity.is_some()
-                == mask.contains(METRIC_SCIENTIFIC_VALIDITY)
-            && self.structure_recovery.is_some()
-                == mask.contains(METRIC_STRUCTURE_RECOVERY)
+            && self.scientific_validity.is_some() == mask.contains(METRIC_SCIENTIFIC_VALIDITY)
+            && self.structure_recovery.is_some() == mask.contains(METRIC_STRUCTURE_RECOVERY)
     }
 
     fn values(self, mask: MetricMask) -> Vec<f64> {
@@ -227,14 +221,8 @@ impl EvaluatorMetrics {
     fn maxima(left: Self, right: Self) -> Self {
         Self {
             numeric_fit: max_option(left.numeric_fit, right.numeric_fit),
-            scientific_validity: max_option(
-                left.scientific_validity,
-                right.scientific_validity,
-            ),
-            structure_recovery: max_option(
-                left.structure_recovery,
-                right.structure_recovery,
-            ),
+            scientific_validity: max_option(left.scientific_validity, right.scientific_validity),
+            structure_recovery: max_option(left.structure_recovery, right.structure_recovery),
         }
     }
 
@@ -245,10 +233,7 @@ impl EvaluatorMetrics {
                 best.scientific_validity,
                 submitted.scientific_validity,
             ),
-            structure_recovery: difference(
-                best.structure_recovery,
-                submitted.structure_recovery,
-            ),
+            structure_recovery: difference(best.structure_recovery, submitted.structure_recovery),
         }
     }
 }
@@ -336,13 +321,19 @@ impl fmt::Display for SelectionAuditError {
             Self::EmptyPolicyId => write!(f, "policy ID must not be empty"),
             Self::EmptyCandidatePool => write!(f, "candidate pool must not be empty"),
             Self::InvalidCandidatePoolDigest => {
-                write!(f, "candidate-pool digest must be 64 lowercase hexadecimal characters")
+                write!(
+                    f,
+                    "candidate-pool digest must be 64 lowercase hexadecimal characters"
+                )
             }
             Self::InvalidArtifactDigest { evidence_id } => {
                 write!(f, "evidence {evidence_id} has an invalid SHA-256 digest")
             }
             Self::InvalidModelDigest { candidate_id } => {
-                write!(f, "candidate {candidate_id} has an invalid model SHA-256 digest")
+                write!(
+                    f,
+                    "candidate {candidate_id} has an invalid model SHA-256 digest"
+                )
             }
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate ID: {id}"),
             Self::EmptyCandidateId => write!(f, "candidate ID must not be empty"),
@@ -356,7 +347,10 @@ impl fmt::Display for SelectionAuditError {
             }
             Self::TraceTaskMismatch => write!(f, "selector trace task ID does not match packet"),
             Self::TracePoolDigestMismatch => {
-                write!(f, "selector trace candidate-pool digest does not match frozen pool")
+                write!(
+                    f,
+                    "selector trace candidate-pool digest does not match frozen pool"
+                )
             }
             Self::InvalidCost => write!(f, "all-in selector cost must be finite and nonnegative"),
             Self::EmptyAbstentionReason => write!(f, "abstention reason must not be empty"),
@@ -382,16 +376,25 @@ impl fmt::Display for SelectionAuditError {
                 write!(f, "candidate {candidate_id} has an undeclared metric")
             }
             Self::NonFiniteMetric { candidate_id } => {
-                write!(f, "candidate {candidate_id} has a non-finite evaluator metric")
+                write!(
+                    f,
+                    "candidate {candidate_id} has a non-finite evaluator metric"
+                )
             }
             Self::MetricOutOfRange { candidate_id } => {
-                write!(f, "candidate {candidate_id} evaluator metric is outside [0, 100]")
+                write!(
+                    f,
+                    "candidate {candidate_id} evaluator metric is outside [0, 100]"
+                )
             }
             Self::InvalidMetricMask(bits) => {
                 write!(f, "invalid evaluator metric mask: {bits:#05b}")
             }
             Self::MetricsOnUnscoredOutcome { candidate_id } => {
-                write!(f, "unscored outcome for {candidate_id} contains evaluator metrics")
+                write!(
+                    f,
+                    "unscored outcome for {candidate_id} contains evaluator metrics"
+                )
             }
             Self::QualifiedUnscoredOutcome { candidate_id } => {
                 write!(f, "unscored outcome for {candidate_id} cannot be Qualified")
@@ -531,9 +534,7 @@ pub fn validate_selector_packet(packet: &SelectorPacket) -> Result<(), Selection
                 ));
             }
             if !evidence_ids.contains(evidence_id.as_str()) {
-                return Err(SelectionAuditError::UnknownEvidenceId(
-                    evidence_id.clone(),
-                ));
+                return Err(SelectionAuditError::UnknownEvidenceId(evidence_id.clone()));
             }
         }
     }
@@ -571,9 +572,7 @@ pub fn validate_selection_trace(
             ));
         }
         if !allowed.contains(evidence_id.as_str()) {
-            return Err(SelectionAuditError::UnknownEvidenceId(
-                evidence_id.clone(),
-            ));
+            return Err(SelectionAuditError::UnknownEvidenceId(evidence_id.clone()));
         }
     }
 
@@ -614,11 +613,7 @@ fn admissibility_rank(value: EvaluatorAdmissibility) -> u8 {
     }
 }
 
-fn dominates(
-    left: &EvaluatorOutcome,
-    right: &EvaluatorOutcome,
-    mask: MetricMask,
-) -> bool {
+fn dominates(left: &EvaluatorOutcome, right: &EvaluatorOutcome, mask: MetricMask) -> bool {
     if left.status != EvaluatorStatus::Scored
         || right.status != EvaluatorStatus::Scored
         || !left.metrics.matches_mask(mask)
@@ -645,9 +640,7 @@ fn dominates(
     strictly_better
 }
 
-fn duplicate_semantic_groups(
-    candidates: &[SelectorCandidate],
-) -> Vec<Vec<String>> {
+fn duplicate_semantic_groups(candidates: &[SelectorCandidate]) -> Vec<Vec<String>> {
     let mut by_digest: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for candidate in candidates {
         if let Some(digest) = &candidate.canonical_model_sha256 {
@@ -695,11 +688,7 @@ pub fn audit_submission(
         }
         match outcome.status {
             EvaluatorStatus::Scored => {
-                validate_metric_values(
-                    &outcome.candidate_id,
-                    outcome.metrics,
-                    packet.metric_mask,
-                )?;
+                validate_metric_values(&outcome.candidate_id, outcome.metrics, packet.metric_mask)?;
             }
             _ => {
                 if !all_metrics_absent(outcome.metrics) {
@@ -994,16 +983,11 @@ impl CandidateSelectionAudit {
 mod tests {
     use super::*;
 
-    const POOL_SHA: &str =
-        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    const MODEL_A: &str =
-        "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    const MODEL_B: &str =
-        "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-    const MODEL_C: &str =
-        "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
-    const EVIDENCE_SHA: &str =
-        "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
+    const POOL_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    const MODEL_A: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    const MODEL_B: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+    const MODEL_C: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    const EVIDENCE_SHA: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
     fn candidate(id: &str, digest: &str) -> SelectorCandidate {
         SelectorCandidate {
@@ -1098,9 +1082,12 @@ mod tests {
             selected: "a".to_owned(),
         };
         let trace = run_selector(&policy, &packet).unwrap();
-        assert_eq!(trace.decision, SelectionDecision::Select {
-            candidate_id: "a".to_owned()
-        });
+        assert_eq!(
+            trace.decision,
+            SelectionDecision::Select {
+                candidate_id: "a".to_owned()
+            }
+        );
         assert_eq!(trace.consumed_evidence_ids, vec!["dev-fold-1"]);
     }
 
@@ -1110,7 +1097,9 @@ mod tests {
         let mut frozen = trace(SelectionDecision::Select {
             candidate_id: "a".to_owned(),
         });
-        frozen.consumed_evidence_ids.push("heldout-test-sv".to_owned());
+        frozen
+            .consumed_evidence_ids
+            .push("heldout-test-sv".to_owned());
         assert_eq!(
             validate_selection_trace(&packet, &frozen),
             Err(SelectionAuditError::UnknownEvidenceId(
@@ -1147,7 +1136,10 @@ mod tests {
         assert_eq!(report.submitted_is_strictly_dominated, Some(true));
         assert_eq!(report.submitted_dominator_ids, vec!["b"]);
         assert_eq!(report.qualified_pareto_frontier_ids, vec!["b", "c"]);
-        assert_eq!(report.metric_regret.regret_by_metric.unwrap().numeric_fit, Some(10.0));
+        assert_eq!(
+            report.metric_regret.regret_by_metric.unwrap().numeric_fit,
+            Some(10.0)
+        );
         assert_eq!(
             report
                 .metric_regret
@@ -1248,7 +1240,10 @@ mod tests {
         ];
         let report = audit_submission(&packet, &frozen, &outcomes).unwrap();
         assert_eq!(report.attempted_candidates, 4);
-        assert_eq!(report.semantic_duplicate_groups, vec![vec!["a".to_owned(), "a-copy".to_owned()]]);
+        assert_eq!(
+            report.semantic_duplicate_groups,
+            vec![vec!["a".to_owned(), "a-copy".to_owned()]]
+        );
     }
 
     #[test]
@@ -1268,7 +1263,10 @@ mod tests {
         ];
         let report = audit_submission(&packet, &frozen, &outcomes).unwrap();
         assert!(report.submitted_candidate_id.is_none());
-        assert_eq!(report.abstention_reason.as_deref(), Some("no candidate passed declared pre-submission admissibility"));
+        assert_eq!(
+            report.abstention_reason.as_deref(),
+            Some("no candidate passed declared pre-submission admissibility")
+        );
         assert!(report.metric_regret.regret_by_metric.is_none());
     }
 
@@ -1280,7 +1278,10 @@ mod tests {
             candidate_id: "a".to_owned(),
         });
         let bad = vec![real_outcome(
-            "a", 70.0, 80.0, EvaluatorAdmissibility::Qualified,
+            "a",
+            70.0,
+            80.0,
+            EvaluatorAdmissibility::Qualified,
         )];
         assert!(matches!(
             audit_submission(&packet, &frozen, &bad),
@@ -1301,14 +1302,18 @@ mod tests {
         ];
         assert_eq!(
             audit_submission(&packet, &frozen, &duplicate),
-            Err(SelectionAuditError::DuplicateEvaluatorOutcome("a".to_owned()))
+            Err(SelectionAuditError::DuplicateEvaluatorOutcome(
+                "a".to_owned()
+            ))
         );
         let unknown = vec![real_outcome(
             "outside-pool", 70.0, 80.0, EvaluatorAdmissibility::Qualified,
         )];
         assert_eq!(
             audit_submission(&packet, &frozen, &unknown),
-            Err(SelectionAuditError::UnknownEvaluatorCandidate("outside-pool".to_owned()))
+            Err(SelectionAuditError::UnknownEvaluatorCandidate(
+                "outside-pool".to_owned()
+            ))
         );
     }
 
@@ -1318,9 +1323,12 @@ mod tests {
         let frozen = trace(SelectionDecision::Select {
             candidate_id: "a".to_owned(),
         });
-        let bad = vec![
-            real_outcome("a", f64::NAN, 80.0, EvaluatorAdmissibility::Qualified),
-        ];
+        let bad = vec![real_outcome(
+            "a",
+            f64::NAN,
+            80.0,
+            EvaluatorAdmissibility::Qualified,
+        )];
         assert!(matches!(
             audit_submission(&packet, &frozen, &bad),
             Err(SelectionAuditError::NonFiniteMetric { .. })
@@ -1330,14 +1338,18 @@ mod tests {
         not_ready.candidates[0].state = CandidateState::TimedOut;
         assert_eq!(
             validate_selection_trace(&not_ready, &frozen),
-            Err(SelectionAuditError::SelectedCandidateUnavailable("a".to_owned()))
+            Err(SelectionAuditError::SelectedCandidateUnavailable(
+                "a".to_owned()
+            ))
         );
 
         let mut ineligible = packet.clone();
         ineligible.candidates[0].eligibility = DevelopmentEligibility::Unresolved;
         assert_eq!(
             validate_selection_trace(&ineligible, &frozen),
-            Err(SelectionAuditError::SelectedCandidateIneligible("a".to_owned()))
+            Err(SelectionAuditError::SelectedCandidateIneligible(
+                "a".to_owned()
+            ))
         );
     }
 
@@ -1352,7 +1364,9 @@ mod tests {
             real_outcome("b", 75.0, 90.0, EvaluatorAdmissibility::Qualified),
             real_outcome("c", 80.0, 82.0, EvaluatorAdmissibility::Qualified),
         ];
-        let json = audit_submission(&packet, &frozen, &outcomes).unwrap().to_json();
+        let json = audit_submission(&packet, &frozen, &outcomes)
+            .unwrap()
+            .to_json();
         assert!(json.contains("\"attempted_candidates\":3"));
         assert!(json.contains("\"submitted_is_strictly_dominated\":true"));
         assert!(json.contains("\"numeric_fit\":10.00000000"));
