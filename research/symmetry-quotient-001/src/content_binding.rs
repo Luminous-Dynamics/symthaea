@@ -388,7 +388,12 @@ mod tests {
     fn fixture() -> (SearchProblemV1, FiniteActionV1) {
         let problem = SearchProblemV1 {
             problem_id: "bound-c2-fixture-v1".to_owned(),
-            candidate_ids: vec!["A0".to_owned(), "A1".to_owned(), "B0".to_owned(), "B1".to_owned()],
+            candidate_ids: vec![
+                "A0".to_owned(),
+                "A1".to_owned(),
+                "B0".to_owned(),
+                "B1".to_owned(),
+            ],
             semantics: vec![
                 semantics(10, 2, "boundary-a", "output-a"),
                 semantics(10, 2, "boundary-a", "output-a"),
@@ -459,8 +464,7 @@ mod tests {
     #[test]
     fn bound_package_verifies_after_digests_and_independent_replay() {
         let (problem, action, certificate, package) = authorized_fixture();
-        let receipt =
-            verify_bound_certificate(&problem, &action, &certificate, &package).unwrap();
+        let receipt = verify_bound_certificate(&problem, &action, &certificate, &package).unwrap();
         assert_eq!(receipt.problem_id, problem.problem_id);
         assert_eq!(receipt.candidate_count, 4);
     }
@@ -469,26 +473,20 @@ mod tests {
     fn changed_boundary_and_output_semantics_are_rejected_by_problem_digest() {
         let (_problem, action, certificate, package) = authorized_fixture();
         let mut changed_boundary = fixture().0;
-        changed_boundary.semantics[0].boundary_condition_id.push_str("-changed");
+        changed_boundary.semantics[0]
+            .boundary_condition_id
+            .push_str("-changed");
         assert_eq!(
-            verify_bound_certificate(
-                &changed_boundary,
-                &action,
-                &certificate,
-                &package
-            ),
+            verify_bound_certificate(&changed_boundary, &action, &certificate, &package),
             Err(ContentBindingErrorV1::ProblemDigestMismatch)
         );
 
         let mut changed_output = fixture().0;
-        changed_output.semantics[0].output_equivalence_id.push_str("-changed");
+        changed_output.semantics[0]
+            .output_equivalence_id
+            .push_str("-changed");
         assert_eq!(
-            verify_bound_certificate(
-                &changed_output,
-                &action,
-                &certificate,
-                &package
-            ),
+            verify_bound_certificate(&changed_output, &action, &certificate, &package),
             Err(ContentBindingErrorV1::ProblemDigestMismatch)
         );
     }
