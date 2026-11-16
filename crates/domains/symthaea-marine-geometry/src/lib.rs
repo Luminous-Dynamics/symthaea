@@ -5,6 +5,7 @@
 //! not a CAD kernel, hydrostatics solver, self-intersection detector, DFM
 //! checker, CFD solver, or vessel-approval system.
 
+pub mod full_envelope;
 pub mod loft;
 pub mod section;
 
