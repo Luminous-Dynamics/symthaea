@@ -819,7 +819,10 @@ mod tests {
         let two = evaluate_loading_sweep(&tapered_request_with_station_count(2)).unwrap();
         let three = evaluate_loading_sweep(&tapered_request_with_station_count(3)).unwrap();
         let five = evaluate_loading_sweep(&tapered_request_with_station_count(5)).unwrap();
-        assert_ne!(two.source_spec_digest_blake3, five.source_spec_digest_blake3);
+        assert_ne!(
+            two.source_spec_digest_blake3,
+            five.source_spec_digest_blake3
+        );
 
         for condition_id in [
             "TAPER-OVERLOAD-Z-NEG2",
