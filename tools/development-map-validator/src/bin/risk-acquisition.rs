@@ -471,7 +471,7 @@ mod tests {
     #[test] fn impossible_observation_cannot_empty_world_set() {
         let mut value:Value=serde_json::from_str(FIXTURE).unwrap();value["candidate_view"]["traces"][0]["acquisitions"][0]["observed_value"]=json!("forged");
         let result=evaluate_risk_acquisition_json(&value.to_string()).unwrap();let altered=trace(&result,"risk-aware-minimal");
-        assert_eq!(altered["false_observation_count"],1);assert_eq!(altered["world_count_after"],4);assert_eq!(altered["all_remaining_worlds_safe"],false);
+        assert_eq!(altered["false_observation_count"],1);assert_eq!(altered["acquisition_steps"][0]["worlds_after"],4);assert_eq!(altered["world_count_after"],2);assert_eq!(altered["all_remaining_worlds_safe"],false);
     }
     #[test] fn unknown_nested_fields_fail_closed() {
         let mut value:Value=serde_json::from_str(FIXTURE).unwrap();value["candidate_view"]["options"][0]["trust_me"]=json!(true);
@@ -484,6 +484,15 @@ mod tests {
     #[test] fn unknown_cost_is_not_treated_as_zero() {
         let mut value:Value=serde_json::from_str(FIXTURE).unwrap();value["oracle"]["options"][0]["cost_samples_micros"]["retry"]=json!([]);
         let error=evaluate_risk_acquisition_json(&value.to_string()).unwrap_err();assert!(error.contains("must not be empty"));
+    }
+    #[test] fn one_gate_and_irrelevant_query_do_not_remove_all_critical_worlds() {
+        let value=report();
+        let single=trace(&value,"one-gate-only");
+        assert_eq!(single["residual_risk_bps"],2000);
+        assert_eq!(single["unsupported_action"],true);
+        let irrelevant=trace(&value,"irrelevant-check-only");
+        assert_eq!(irrelevant["residual_risk_bps"],4000);
+        assert_eq!(irrelevant["unsupported_action"],true);
     }
     #[test] fn hard_gate_cannot_be_softened_by_nonzero_risk_allowance() {
         let mut value:Value=serde_json::from_str(FIXTURE).unwrap();value["candidate_view"]["actions"][0]["max_residual_risk_bps"]=json!(1);
