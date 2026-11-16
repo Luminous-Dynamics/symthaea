@@ -341,7 +341,7 @@ A 2026 *Earth and Planetary Science Letters* short communication documents perfo
 
 ### Current authored state
 
-- `subterra-dependence-audit/`: 28 authored tests, including 10 paired component-bootstrap tests and 3 multi-acquisition lineage tests.
+- `subterra-dependence-audit/`: 39 authored tests, including 10 paired component-bootstrap tests, 3 multi-acquisition lineage tests and 11 JSON manifest-consumer tests.
 - Six standalone packages are now listed in the verification script.
 - This package is a raw-manifest preflight only. It does not rewrite the current likelihood-calibration dataset or claim integrated hierarchical estimation.
 - Rust formatting, compilation, tests and Clippy remain unexecuted until the six-package script runs on a Rust-equipped environment.

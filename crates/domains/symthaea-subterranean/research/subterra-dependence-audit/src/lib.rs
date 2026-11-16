@@ -196,7 +196,7 @@ impl ObservationLineageManifest {
                 }
             }
 
-            if !records_by_id.insert(record.record_id.as_str(), record).is_none() {
+            if records_by_id.insert(record.record_id.as_str(), record).is_some() {
                 return Err(ManifestError::DuplicateRecordId(record.record_id.clone()));
             }
             if record.acquisition_lineage_ids.is_empty() {
