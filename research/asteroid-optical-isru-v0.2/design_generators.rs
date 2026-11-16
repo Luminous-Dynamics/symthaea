@@ -316,15 +316,12 @@ mod tests {
     }
 
     #[test]
-    fn csv_is_stable_and_keeps_sobol_seed_absent() {
-        let mut first = Vec::new();
-        let mut second = Vec::new();
-        emit_csv(&mut first, 8, 42).unwrap();
-        emit_csv(&mut second, 8, 42).unwrap();
-        assert_eq!(first, second);
+    fn csv_matches_the_frozen_lhs_and_sobol_reference_fixture() {
+        const REFERENCE_CSV: &str =
+            include_str!("fixtures/design-generators-reference-v0.1.csv");
+        let mut output = Vec::new();
+        emit_csv(&mut output, 16, 0x4953_5255_444f_4531).unwrap();
 
-        let output = String::from_utf8(first).unwrap();
-        assert!(output.starts_with("algorithm,index,x,y,seed\n"));
-        assert!(output.contains("sobol_2d,0,0.00000000000000000,0.00000000000000000,none"));
+        assert_eq!(String::from_utf8(output).unwrap(), REFERENCE_CSV);
     }
 }
