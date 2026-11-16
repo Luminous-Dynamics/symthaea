@@ -323,15 +323,16 @@ fn robust_upper_risk_bps(
     let (lh, uh) = sum_bounds(intervals, hazards);
     let (lg, ug) = sum_bounds(intervals, &safe_survivors);
     let (lo, uo) = sum_bounds(intervals, &excluded);
-    if uh == 0 {
-        return Ok(0);
-    }
     // Enforce total probability = 10000 by intersecting h+s with the
-    // residual mass that excluded hypotheses can absorb.
+    // residual mass that excluded hypotheses can absorb. Check support before
+    // the zero-hazard shortcut: impossible evidence is never zero risk.
     let minimum_survivor_mass = (lh + lg).max(10_000u64.saturating_sub(uo));
     let maximum_survivor_mass = (uh + ug).min(10_000u64.saturating_sub(lo));
     if maximum_survivor_mass == 0 || minimum_survivor_mass > maximum_survivor_mass {
         return Err("surviving evidence set has no feasible positive prior mass".to_owned());
+    }
+    if uh == 0 {
+        return Ok(0);
     }
 
     let mut vertices: BTreeSet<(u64, u64)> = BTreeSet::new();
@@ -795,6 +796,17 @@ mod tests {
         ]);
         let survivors = BTreeSet::from(["hazard".to_owned(), "safe".to_owned()]);
         let hazards = BTreeSet::from(["hazard".to_owned()]);
+        assert!(robust_upper_risk_bps(&intervals, &survivors, &hazards).is_err());
+    }
+
+    #[test]
+    fn safe_only_but_zero_probability_evidence_support_is_rejected() {
+        let intervals = BTreeMap::from([
+            ("safe".to_owned(), Interval { lower: 0, upper: 5000, nominal: 0 }),
+            ("outside".to_owned(), Interval { lower: 10_000, upper: 10_000, nominal: 10_000 }),
+        ]);
+        let survivors = BTreeSet::from(["safe".to_owned()]);
+        let hazards = BTreeSet::new();
         assert!(robust_upper_risk_bps(&intervals, &survivors, &hazards).is_err());
     }
 
