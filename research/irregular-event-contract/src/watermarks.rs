@@ -76,13 +76,37 @@ pub struct SourceProgressRevision {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SourceProgressEvidence {
+    /// Exact source progress record that supports this conclusion.
+    pub progress_id: u64,
+    pub source: SourceKey,
+    pub stream_generation: u64,
+    pub progress_sequence: u64,
+    pub recorded_at_us: i64,
+    pub policy_sha256: [u8; 32],
+    pub exclusive_watermark_us: i64,
+    pub terminal: bool,
+}
+
+impl From<SourceProgressRevision> for SourceProgressEvidence {
+    fn from(revision: SourceProgressRevision) -> Self {
+        Self {
+            progress_id: revision.progress_id,
+            source: revision.source,
+            stream_generation: revision.stream_generation,
+            progress_sequence: revision.progress_sequence,
+            recorded_at_us: revision.recorded_at_us,
+            policy_sha256: revision.policy_sha256,
+            exclusive_watermark_us: revision.operation.exclusive_bound(),
+            terminal: revision.operation.is_terminal(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LateEventKind {
-    BelowExclusiveWatermark {
-        exclusive_watermark_us: i64,
-    },
-    AfterEndOfStream {
-        final_exclusive_watermark_us: i64,
-    },
+    BelowExclusiveWatermark { progress: SourceProgressEvidence },
+    AfterEndOfStream { progress: SourceProgressEvidence },
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -101,6 +125,10 @@ pub struct EventArrivalReceipt {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum EventArrivalClassification {
+    /// No source progress claim was visible when the event arrived. This is
+    /// neither a late-event breach nor proof that the event was on time.
+    NoPriorProgress,
+    /// A visible source watermark does not rule this event out as on time.
     OnTime,
     Late(LateEventKind),
 }
@@ -108,13 +136,8 @@ pub enum EventArrivalClassification {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SourceCompleteness {
     NoProgress,
-    Incomplete {
-        exclusive_watermark_us: i64,
-    },
-    Complete {
-        exclusive_watermark_us: Option<i64>,
-        terminal: bool,
-    },
+    Incomplete { evidence: SourceProgressEvidence },
+    Complete { evidence: SourceProgressEvidence },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -233,6 +256,19 @@ pub struct SourceWatermarkLedger {
     event_arrivals: Vec<EventArrivalReceipt>,
     seen_event_ids: BTreeSet<u64>,
     late_breaches: Vec<LateEventBreach>,
+}
+
+fn hash_progress_evidence(hasher: &mut Sha256, evidence: SourceProgressEvidence) {
+    hasher.update(evidence.progress_id.to_le_bytes());
+    hasher.update(evidence.source.entity_id.to_le_bytes());
+    hasher.update(evidence.source.modality_id.to_le_bytes());
+    hasher.update(evidence.source.source_id.to_le_bytes());
+    hasher.update(evidence.stream_generation.to_le_bytes());
+    hasher.update(evidence.progress_sequence.to_le_bytes());
+    hasher.update(evidence.recorded_at_us.to_le_bytes());
+    hasher.update(evidence.policy_sha256);
+    hasher.update(evidence.exclusive_watermark_us.to_le_bytes());
+    hasher.update([u8::from(evidence.terminal)]);
 }
 
 impl SourceWatermarkLedger {
@@ -442,16 +478,12 @@ impl SourceWatermarkLedger {
                 }
                 Some(progress) => {
                     let bound = progress.operation.exclusive_bound();
+                    let evidence = SourceProgressEvidence::from(*progress);
                     if progress.operation.is_terminal() || bound >= interval_end_exclusive_us {
-                        SourceCompleteness::Complete {
-                            exclusive_watermark_us: Some(bound),
-                            terminal: progress.operation.is_terminal(),
-                        }
+                        SourceCompleteness::Complete { evidence }
                     } else {
                         blocked_sources.push(*source);
-                        SourceCompleteness::Incomplete {
-                            exclusive_watermark_us: bound,
-                        }
+                        SourceCompleteness::Incomplete { evidence }
                     }
                 }
             };
@@ -567,22 +599,23 @@ impl SourceWatermarkLedger {
             source_id: event.source_id,
         };
         let classification = match self.latest_before(source, recorded_at_us, false) {
-            None => EventArrivalClassification::OnTime,
-            Some(progress) => match progress.operation {
-                SourceProgressOperation::EndOfStream { final_exclusive_event_time_us } => {
-                    EventArrivalClassification::Late(LateEventKind::AfterEndOfStream {
-                        final_exclusive_watermark_us: final_exclusive_event_time_us,
-                    })
+            None => EventArrivalClassification::NoPriorProgress,
+            Some(progress) => {
+                let evidence = SourceProgressEvidence::from(*progress);
+                match progress.operation {
+                    SourceProgressOperation::EndOfStream { .. } => {
+                        EventArrivalClassification::Late(LateEventKind::AfterEndOfStream { evidence })
+                    }
+                    SourceProgressOperation::Advance { exclusive_event_time_us }
+                        if event.event_time_us < exclusive_event_time_us =>
+                    {
+                        EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark {
+                            progress: evidence,
+                        })
+                    }
+                    SourceProgressOperation::Advance { .. } => EventArrivalClassification::OnTime,
                 }
-                SourceProgressOperation::Advance { exclusive_event_time_us }
-                    if event.event_time_us < exclusive_event_time_us =>
-                {
-                    EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark {
-                        exclusive_watermark_us: exclusive_event_time_us,
-                    })
-                }
-                SourceProgressOperation::Advance { .. } => EventArrivalClassification::OnTime,
-            },
+            }
         };
 
         self.seen_event_ids.insert(event.event_id);
@@ -681,14 +714,15 @@ impl SourceWatermarkLedger {
             hasher.update(receipt.recorded_at_us.to_le_bytes());
             super::hash_event_record(&mut hasher, &receipt.event);
             match receipt.classification {
-                EventArrivalClassification::OnTime => hasher.update([0]),
-                EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark { exclusive_watermark_us }) => {
-                    hasher.update([1]);
-                    hasher.update(exclusive_watermark_us.to_le_bytes());
-                }
-                EventArrivalClassification::Late(LateEventKind::AfterEndOfStream { final_exclusive_watermark_us }) => {
+                EventArrivalClassification::NoPriorProgress => hasher.update([0]),
+                EventArrivalClassification::OnTime => hasher.update([1]),
+                EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark { progress }) => {
                     hasher.update([2]);
-                    hasher.update(final_exclusive_watermark_us.to_le_bytes());
+                    hash_progress_evidence(&mut hasher, progress);
+                }
+                EventArrivalClassification::Late(LateEventKind::AfterEndOfStream { progress }) => {
+                    hasher.update([3]);
+                    hash_progress_evidence(&mut hasher, progress);
                 }
             }
         }
@@ -745,6 +779,64 @@ mod tests {
             measurement: Measurement::Observed { scaled_value: 1, decimal_scale: 0 },
             source_sha256: [event_id as u8; 32],
         }
+    }
+
+    #[test]
+    fn completeness_report_binds_the_exact_progress_record_and_policy() {
+        let mut ledger = SourceWatermarkLedger::default();
+        let revision = progress(41, 1, 3, 7, 25, 100, false);
+        ledger.append(revision).unwrap();
+
+        let report = ledger.completeness(1, &[source(1)], 0, 100, 25).unwrap();
+        assert_eq!(report.verdict, CompletenessVerdict::Complete);
+        assert_eq!(
+            report.sources[0].status,
+            SourceCompleteness::Complete {
+                evidence: SourceProgressEvidence::from(revision),
+            }
+        );
+    }
+
+    #[test]
+    fn arrival_without_visible_progress_is_unqualified_not_on_time() {
+        let mut ledger = SourceWatermarkLedger::default();
+        assert_eq!(
+            ledger.record_event_arrival(event(1, 1, 50, 20), 20),
+            Ok(EventArrivalClassification::NoPriorProgress)
+        );
+        assert!(ledger.late_breaches().is_empty());
+    }
+
+    #[test]
+    fn on_time_arrival_is_qualified_by_the_visible_watermark() {
+        let mut ledger = SourceWatermarkLedger::default();
+        ledger.append(progress(1, 1, 1, 1, 10, 50, false)).unwrap();
+        assert_eq!(
+            ledger.record_event_arrival(event(2, 1, 50, 20), 20),
+            Ok(EventArrivalClassification::OnTime)
+        );
+    }
+
+    #[test]
+    fn late_breach_binds_the_exact_policy_revision_that_qualified_it() {
+        let mut ledger = SourceWatermarkLedger::default();
+        let mut revision = progress(41, 1, 3, 7, 10, 100, false);
+        revision.policy_sha256 = [9; 32];
+        ledger.append(revision).unwrap();
+        let classification = ledger
+            .record_event_arrival(event(1, 1, 50, 20), 20)
+            .unwrap();
+
+        assert_eq!(
+            classification,
+            EventArrivalClassification::Late(LateEventKind::BelowExclusiveWatermark {
+                progress: SourceProgressEvidence::from(revision),
+            })
+        );
+        assert_eq!(ledger.late_breaches()[0].kind, match classification {
+            EventArrivalClassification::Late(kind) => kind,
+            _ => unreachable!(),
+        });
     }
 
     #[test]
@@ -822,8 +914,7 @@ mod tests {
         let report = ledger.completeness(1, &[source(1)], 1_000, 2_000, 10).unwrap();
         assert_eq!(report.verdict, CompletenessVerdict::Complete);
         assert_eq!(report.sources[0].status, SourceCompleteness::Complete {
-            exclusive_watermark_us: Some(50),
-            terminal: true,
+            evidence: SourceProgressEvidence::from(progress(1, 1, 1, 1, 10, 50, true)),
         });
     }
 
@@ -901,7 +992,7 @@ mod tests {
         let original = event(1, 1, 50, 20);
         assert_eq!(
             ledger.record_event_arrival(original, 20),
-            Ok(EventArrivalClassification::OnTime)
+            Ok(EventArrivalClassification::NoPriorProgress)
         );
         ledger.append(progress(1, 1, 1, 1, 30, 100, false)).unwrap();
         assert_eq!(
