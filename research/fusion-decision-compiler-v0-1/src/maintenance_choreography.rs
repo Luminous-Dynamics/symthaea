@@ -278,12 +278,12 @@ pub fn generate_maintenance_schedule(
             .unwrap_or(plan.campaign_start_second);
         let start = earliest_resource_start(task, predecessor_finish, &scheduled, &resources)
             .map_err(|diagnostic| {
-            vec![error(
-                diagnostic,
-                &task.task_id,
-                "no feasible resource allocation found",
-            )]
-        })?;
+                vec![error(
+                    diagnostic,
+                    &task.task_id,
+                    "no feasible resource allocation found",
+                )]
+            })?;
         let end = start.checked_add(task.duration_seconds).ok_or_else(|| {
             vec![error(
                 ScheduleDiagnostic::ScheduleDurationMismatch,
