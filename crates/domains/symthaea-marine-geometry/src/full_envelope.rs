@@ -612,16 +612,16 @@ fn validate_end_condition(
                     format!("{end_name} pointed-stem profile must collapse exactly to y=0"),
                 );
             }
-            if let Some(port) = station.port_profile.as_ref() {
-                if port.iter().any(|point| !close(point.y_m, 0.0)) {
-                    reject(
-                        issues,
-                        "pointed_port_end_not_collapsed",
-                        format!(
-                            "{end_name} pointed-stem port profile must collapse exactly to y=0"
-                        ),
-                    );
-                }
+            if let Some(port) = station.port_profile.as_ref()
+                && port.iter().any(|point| !close(point.y_m, 0.0))
+            {
+                reject(
+                    issues,
+                    "pointed_port_end_not_collapsed",
+                    format!(
+                        "{end_name} pointed-stem port profile must collapse exactly to y=0"
+                    ),
+                );
             }
         }
         HullEndCondition::Transom => {
