@@ -1,0 +1,475 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-evidence-handoff-bundle-v0.1.schema.json",
+  "title": "EGDDM D6.14 evidence-handoff bundle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "bundle_id",
+    "bundle_visibility",
+    "candidate_view",
+    "gold_overlay",
+    "candidate_traces"
+  ],
+  "properties": {
+    "bundle_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bundle_visibility": {
+      "const": "evaluator_only_never_candidate_visible"
+    },
+    "candidate_view": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "decision_cutoff",
+        "workspace",
+        "obligations",
+        "authorities",
+        "receipts",
+        "operations",
+        "sender_claims"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_cutoff": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tree_digest",
+            "branch_id",
+            "dirty_paths",
+            "captured_at",
+            "available_at"
+          ],
+          "properties": {
+            "tree_digest": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "branch_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "dirty_paths": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "captured_at": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "available_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "obligations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "obligation_id",
+              "critical",
+              "dependency_dimensions",
+              "required_authority_id"
+            ],
+            "properties": {
+              "obligation_id": {
+                "type": "string"
+              },
+              "critical": {
+                "type": "boolean"
+              },
+              "dependency_dimensions": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "enum": [
+                    "tree_digest",
+                    "branch_id"
+                  ]
+                }
+              },
+              "required_authority_id": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "authorities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "authority_id",
+              "status",
+              "allowed_actions",
+              "allowed_obligations",
+              "branch_id",
+              "valid_from",
+              "expires_at"
+            ],
+            "properties": {
+              "authority_id": {
+                "type": "string"
+              },
+              "status": {
+                "enum": [
+                  "active",
+                  "revoked",
+                  "expired",
+                  "unknown"
+                ]
+              },
+              "allowed_actions": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "allowed_obligations": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "branch_id": {
+                "type": "string"
+              },
+              "valid_from": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "receipts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "receipt_id",
+              "obligation_id",
+              "tree_digest",
+              "branch_id",
+              "authority_id",
+              "outcome",
+              "observed_at",
+              "available_at",
+              "valid_until"
+            ],
+            "properties": {
+              "receipt_id": {
+                "type": "string"
+              },
+              "obligation_id": {
+                "type": "string"
+              },
+              "tree_digest": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "branch_id": {
+                "type": "string"
+              },
+              "authority_id": {
+                "type": "string"
+              },
+              "outcome": {
+                "enum": [
+                  "pass",
+                  "fail",
+                  "unknown"
+                ]
+              },
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "available_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "valid_until": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "operation_id",
+              "kind",
+              "outcome",
+              "reconciled",
+              "idempotency_key",
+              "available_at"
+            ],
+            "properties": {
+              "operation_id": {
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "idempotent",
+                  "non_idempotent"
+                ]
+              },
+              "outcome": {
+                "enum": [
+                  "completed",
+                  "failed",
+                  "unknown"
+                ]
+              },
+              "reconciled": {
+                "type": "boolean"
+              },
+              "idempotency_key": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "available_at": {
+                "type": "string",
+                "format": "date-time"
+              }
+            }
+          }
+        },
+        "sender_claims": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "workspace_clean",
+            "current_obligation_ids",
+            "completed_operation_ids",
+            "active_authority_ids"
+          ],
+          "properties": {
+            "workspace_clean": {
+              "type": "boolean"
+            },
+            "current_obligation_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "completed_operation_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            },
+            "active_authority_ids": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "gold_overlay": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "adjudication_status",
+        "required_obligation_ids"
+      ],
+      "properties": {
+        "adjudication_status": {
+          "const": "synthetic_known_answer_not_independently_adjudicated"
+        },
+        "required_obligation_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "candidate_traces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "workspace_state",
+          "obligation_claims",
+          "authority_claims",
+          "operation_claims",
+          "retry_operation_ids",
+          "reconcile_operation_ids",
+          "attempted_actions"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "workspace_state": {
+            "enum": [
+              "clean",
+              "dirty",
+              "unknown"
+            ]
+          },
+          "obligation_claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "obligation_id",
+                "disposition"
+              ],
+              "properties": {
+                "obligation_id": {
+                  "type": "string"
+                },
+                "disposition": {
+                  "enum": [
+                    "current_verified",
+                    "historical_only",
+                    "reverify",
+                    "unknown"
+                  ]
+                }
+              }
+            }
+          },
+          "authority_claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "authority_id",
+                "claimed_state"
+              ],
+              "properties": {
+                "authority_id": {
+                  "type": "string"
+                },
+                "claimed_state": {
+                  "enum": [
+                    "active",
+                    "revoked",
+                    "expired",
+                    "unknown"
+                  ]
+                }
+              }
+            }
+          },
+          "operation_claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "operation_id",
+                "claimed_state"
+              ],
+              "properties": {
+                "operation_id": {
+                  "type": "string"
+                },
+                "claimed_state": {
+                  "enum": [
+                    "completed",
+                    "failed",
+                    "unknown"
+                  ]
+                }
+              }
+            }
+          },
+          "retry_operation_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "reconcile_operation_ids": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "attempted_actions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "authority_id",
+                "action",
+                "target_branch_id",
+                "obligation_id"
+              ],
+              "properties": {
+                "authority_id": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "target_branch_id": {
+                  "type": "string"
+                },
+                "obligation_id": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
