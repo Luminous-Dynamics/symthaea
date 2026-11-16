@@ -31,7 +31,6 @@ const ROOT_SEEDS: [u64; 5] = [
 ];
 const PATH_SEED_MULTIPLIER: u64 = 0xd6e8_feb8_6659_fd93;
 const WILSON_Z_95: f64 = 1.959_963_984_540_054;
-const Z_CRITICAL_ONE_SIDED_05: f64 = 1.644_853_626_951_472_2;
 
 #[derive(Debug, Clone, Copy)]
 enum Scenario {
@@ -229,7 +228,7 @@ fn run_seed(
     Ok(SeedResult { root_seed, counts })
 }
 
-fn seed_json(result: &SeedResult) -> String {
+fn seed_json(result: &SeedResult, analytic_power: f64) -> String {
     let paths = PATHS_PER_ROOT_SEED;
     let (low, high) = wilson_95(result.counts.terminal_np_rejections, paths);
     format!(
@@ -249,6 +248,7 @@ fn seed_json(result: &SeedResult) -> String {
         result.counts.terminal_np_rejections as f64 / paths as f64,
         low,
         high,
+        analytic_power,
         policy_json(&result.counts, paths),
         result.counts.terminal_induced_mismatches
     )
@@ -265,7 +265,11 @@ fn scenario_json(
     }
     let total_paths = PATHS_PER_ROOT_SEED * results.len() as u64;
     let (terminal_low, terminal_high) = wilson_95(pooled.terminal_np_rejections, total_paths);
-    let per_seed = results.iter().map(seed_json).collect::<Vec<_>>().join(",");
+    let per_seed = results
+        .iter()
+        .map(|result| seed_json(result, analytic_power))
+        .collect::<Vec<_>>()
+        .join(",");
     format!(
         concat!(
             "{{",
@@ -275,6 +279,7 @@ fn scenario_json(
             "\"horizon\":{},",
             "\"terminal_np_rejection_rate\":{:.8},",
             "\"terminal_np_wilson95\":[{:.8},{:.8}],",
+            "\"analytic_terminal_np_power\":{:.8},",
             "\"induced_stop_policies\":[{}],",
             "\"terminal_induced_mismatches\":{},",
             "\"per_seed\":[{}]",
