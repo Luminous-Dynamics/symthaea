@@ -1,0 +1,17 @@
+[package]
+name = "subterra-robust-voi-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Finite model-ensemble robust EVSI selection reference for Subterra"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+subterra-voi-reference = { path = "../subterra-voi-kernel" }
+
+# Standalone research crate; only depends on the adjacent Luminous reference crate.
+[workspace]
