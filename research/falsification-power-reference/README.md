@@ -179,3 +179,16 @@ Exact head `eadfdca561b50fda49ba5f61591e08071aaf9b04` passed format, all-target 
 - zero terminal-induced mismatches across 200,000 paths.
 
 The five-seed output retains every per-seed record and is source/report-digest bound. This remains a fixed Gaussian simulation calibration, not a general sequential-test or physical-validation claim. Details and digests are in `docs/research/GAUSSIAN_TERMINAL_MULTISEED_CALIBRATION_V0_2026-11-16.md` and workflow https://github.com/Luminous-Dynamics/symthaea/actions/runs/43849094332.
+
+
+## Gaussian assumption-stress campaign
+
+Run the fixed terminal-test assumption map:
+
+    cargo run --locked --manifest-path research/falsification-power-reference/Cargo.toml --bin gaussian_assumption_stress
+
+The binary holds the fixed iid-Gaussian test unchanged and measures its terminal rejection rate under matched iid Gaussian, stationary AR(1), variance-standardized Student-t(5), smooth heteroscedasticity, abrupt variance-regime shift and sparse gross contamination. Only the iid Gaussian positive control is labelled IN_CONTRACT. Every other stress row is labelled OUT_OF_CONTRACT regardless of its empirical rate.
+
+Five frozen root seeds × 10,000 paths per seed × two paired scenarios are reported per regime, with Wilson intervals, residual moments and lag-one autocorrelation. This is an assumption-failure map for a fixed terminal test, not a robust replacement method or an extension of the Gaussian theorem.
+
+See docs/research/GAUSSIAN_ASSUMPTION_STRESS_V0_2026-11-16.md and Symthaea issue #12540.
