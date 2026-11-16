@@ -415,7 +415,8 @@ impl SearchState<'_> {
 /// size. Search is exhaustive for at most six actions, twelve mechanisms and
 /// sixteen total replicates.
 ///
-/// For K equivalence classes, pairwise alpha is familywise_alpha / choose(K,2).
+/// Pairwise alpha is family-wise alpha divided by the number of cross-class
+/// mechanism pairs (all mechanism pairs minus irreducible within-class pairs).
 /// Under the simple known-variance Gaussian pairwise model, power is
 /// Phi(sqrt(information) - Phi_inverse(1-alpha_pair)), with information
 /// sum_a r[a] * delta[a]^2 / sigma[a]^2.
