@@ -117,7 +117,7 @@ The canonical G2f-a schema and fixture are:
 - `docs/research/marine/fixtures/marine-full-envelope-pointed-bow-asymmetric-001.json` (pointed bow with shared stem IDs and asymmetric midbody)
 - `docs/research/marine/MARINE-FULL-ENVELOPE-G2F-A.md`
 
-Symmetric port geometry must be explicitly declared as derived by reflection; asymmetric geometry must supply a separate port profile. The deck is a separate surface definition. Pointed bow/stern sections may collapse to one deck crown point; they may not be forced into a rectangular deck section.
+Symmetric port geometry must be explicitly declared as derived by reflection; asymmetric geometry must supply a separate port profile. At ordinary asymmetric stations the keel is one shared centreline vertex with the same point identity and coordinates on the port/starboard profiles; the remaining profile points retain distinct identities. At a pointed end, all corresponding profile points share identities and collapse to y=0. The deck is a separate surface definition. Pointed bow/stern sections may collapse to one deck crown point; they may not be forced into a rectangular deck section.
 
 For the synthetic prismatic fixture, the analytical displacement below z=0 is 12,000 m³ and the external envelope including its declared triangular deck crown is 20,500 m³. These are fixture values, not measurements or mesh-generator results.
 
@@ -160,3 +160,5 @@ The method uses the source's station spacing and a piecewise-linear longitudinal
 ### Supported and unsupported scope
 
 G2f-a2 supports upright horizontal waterplanes intersecting the station profiles between keel and sheer. It explicitly rejects planes above the sheer rather than inventing deck/flooding geometry. It does not implement trim, heel, hydrostatic equilibrium, free-surface corrections, GZ curves, intact/damage stability criteria, appendage volume, slamming, seakeeping, resistance, propulsion or CFD. It does not generate a loading-specific displacement mesh. Those remain separate geometry, hydrostatics and validation increments.
+
+The sectional-reference CLI also has an end-to-end integration test suite covering both the prismatic box and tapered hull fixtures, digest-bound output, rejection of non-positive density, and help/scope text. Run the focused package verification as described in the marine benchmark protocol; the current draft PR's exact-head focused result is linked from issue #12434.
