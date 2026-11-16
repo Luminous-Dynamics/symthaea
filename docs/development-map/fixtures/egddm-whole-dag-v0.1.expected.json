@@ -454,7 +454,7 @@
           "individually_plausible": true,
           "correct": false,
           "false_concurrency": false,
-          "unsupported_causal_claim": false,
+          "unsupported_causal_claim": true,
           "unnecessary_abstention": false,
           "future_evidence_event_ids": [
             "Z"
@@ -484,7 +484,7 @@
           "individually_plausible": true,
           "correct": false,
           "false_concurrency": false,
-          "unsupported_causal_claim": false,
+          "unsupported_causal_claim": true,
           "unnecessary_abstention": false,
           "future_evidence_event_ids": [],
           "world_relations": [
@@ -593,7 +593,7 @@
           "individually_plausible": true,
           "correct": false,
           "false_concurrency": false,
-          "unsupported_causal_claim": false,
+          "unsupported_causal_claim": true,
           "unnecessary_abstention": false,
           "future_evidence_event_ids": [],
           "world_relations": [
@@ -859,7 +859,7 @@
       "jointly_consistent_world_count": 0,
       "jointly_impossible_claim_set": true,
       "false_concurrency_claim_count": 0,
-      "unsupported_causal_claim_count": 0,
+      "unsupported_causal_claim_count": 3,
       "unnecessary_abstention_count": 0,
       "future_evidence_leakage_count": 1,
       "critical_unsupported_claim_count": 3,
