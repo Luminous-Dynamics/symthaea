@@ -1285,7 +1285,7 @@ mod tests {
             "test-stand-case",
             "test-stand-operating-point",
             &format!("test-stand-dataset-{index}"),
-            'z',
+            '9',
             &format!("test-stand-episode-{index}"),
         );
         let holdout_observation = observation(
@@ -1351,14 +1351,14 @@ mod tests {
             model_run: ModelRunIdentity {
                 run_id: format!("model-run-{index}"),
                 model_revision: "transport-model-r17".to_string(),
-                input_sha256: sha(char::from(b'g' + index as u8)),
-                output_sha256: sha(char::from(b'j' + index as u8)),
+                input_sha256: sha(char::from(b'0' + index as u8)),
+                output_sha256: sha(char::from(b'7' + index as u8)),
                 run_receipt_ref: format!("model-run-receipt-{index}"),
             },
             predictions: vec![PredictedObservable {
                 observable_id: "net-heat-flux".to_string(),
                 model_run_id: format!("model-run-{index}"),
-                model_output_sha256: sha(char::from(b'j' + index as u8)),
+                model_output_sha256: sha(char::from(b'7' + index as u8)),
                 interval_method_ref: "synthetic-empirical-quantile-band-v1".to_string(),
                 interval_assumption_ref: "synthetic-known-answer-fixture-v1".to_string(),
                 unit_ref: "MW/m2".to_string(),
