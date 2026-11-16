@@ -955,6 +955,35 @@ mod tests {
     }
 
     #[test]
+    fn masked_belief_gradient_rejects_empty_matrix_and_non_finite_terms() {
+        let observation = event(vec![dimension("temperature", Some(0.5), Some(4.0), None)]);
+        let predicted = prediction(&[("temperature", Some(0.25))]);
+
+        assert_eq!(
+            observation.masked_belief_gradient(&predicted, &[], 1.0),
+            Err(ObservationEventError::EmptyLikelihoodMatrix)
+        );
+
+        let extreme_precision =
+            event(vec![dimension("temperature", Some(0.5), Some(1.0e308), None)]);
+        assert_eq!(
+            extreme_precision.masked_belief_gradient(&predicted, &[vec![1.0]], 1.0),
+            Err(ObservationEventError::NonFiniteWeightedResidual { index: 0 })
+        );
+
+        let extreme_coefficient =
+            event(vec![dimension("temperature", Some(0.5), Some(1.0e10), None)]);
+        assert_eq!(
+            extreme_coefficient.masked_belief_gradient(
+                &predicted,
+                &[vec![1.0e308]],
+                1.0,
+            ),
+            Err(ObservationEventError::NonFiniteBeliefGradient { row: 0 })
+        );
+    }
+
+    #[test]
     fn invalid_prediction_and_fallback_precision_are_rejected_for_observed_dims() {
         let observation = event(vec![dimension("temperature", Some(0.5), None, None)]);
         assert_eq!(
