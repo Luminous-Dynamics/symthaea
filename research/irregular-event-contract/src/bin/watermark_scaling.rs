@@ -11,7 +11,10 @@ const VERIFIED_REPETITIONS: usize = 7;
 const EVENT_COUNTS: [usize; 3] = [4_096, 16_384, 65_536];
 const SOURCE_COUNTS: [usize; 3] = [1, 4, 16];
 const INTERVAL_WIDTHS: [usize; 3] = [1, 16, 256];
-const KNOWLEDGE_CUTOFFS: [i64; 2] = [30, 50];
+const PROGRESS_RECORDED_AT_US: i64 = 1_000_000;
+const FIRST_ARRIVAL_AT_US: i64 = 2_000_000;
+const ARRIVAL_STEP_US: i64 = 1_000_000;
+const KNOWLEDGE_CUTOFFS: [i64; 2] = [3_000_000, 5_000_000];
 
 fn percentile_micros(samples: &mut [Duration], percentile: f64) -> f64 {
     samples.sort_unstable();
@@ -52,7 +55,7 @@ fn build_ledger(
             source: *source,
             stream_generation: 1,
             progress_sequence: 1,
-            recorded_at_us: 10,
+            recorded_at_us: PROGRESS_RECORDED_AT_US,
             policy_sha256: [0xA5; 32],
             operation: SourceProgressOperation::Advance {
                 exclusive_event_time_us: per_source_count_i64 + 1,
@@ -71,7 +74,8 @@ fn build_ledger(
     for source in &required_sources {
         for local_index in 0..per_source_count {
             let arrival_bucket = local_index % arrival_batches.len();
-            let available_at_us = 20 + (arrival_bucket as i64 * 10);
+            let available_at_us =
+                FIRST_ARRIVAL_AT_US + (arrival_bucket as i64 * ARRIVAL_STEP_US);
             let event = EventRecord {
                 event_id: next_event_id,
                 entity_id: source.entity_id,
@@ -95,7 +99,8 @@ fn build_ledger(
     }
 
     for (bucket, events) in arrival_batches.into_iter().enumerate() {
-        let recorded_at_us = 20 + (bucket as i64 * 10);
+        let recorded_at_us =
+            FIRST_ARRIVAL_AT_US + (bucket as i64 * ARRIVAL_STEP_US);
         let classifications = ledger
             .record_event_arrival_batch(events, recorded_at_us)
             .map_err(|error| format!("record arrival bucket {bucket}: {error}"))?;
