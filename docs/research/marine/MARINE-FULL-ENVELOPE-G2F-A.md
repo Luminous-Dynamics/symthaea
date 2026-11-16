@@ -440,3 +440,94 @@ It establishes numerical quadrature behavior for a known analytic longitudinal s
 For real vessels, publish the original station data, sampling policy and a nested-resolution comparison from the same frozen CAD/survey source. Compare displacement, waterplane area, LCB/LCF, VCB and sectional-area curve changes; record the denominator when a reference value approaches zero. Only call a result converged when the refinement residual is below a predeclared tolerance and remains stable over at least two consecutive refinements.
 
 The sectional reference CLI now has `--verify <receipt.json>`. That mode re-evaluates the exact input request, compares the complete receipt and returns a typed integrity rejection on mismatch. It verifies reproducibility of this particular algorithm/request; it is not an independent implementation. The separately authored sectional method remains independent from the G2c polyhedral mesh integration path.
+
+
+## 18. Upright mass-balance solver and industrial comparison (G2f-a5)
+
+### Implemented research increment
+
+`sectional_reference.rs` now includes `solve_upright_mass_balance` and `verify_upright_mass_balance_receipt`, plus the `marine-upright-mass-balance` CLI.
+
+The request explicitly binds:
+- full-envelope source spec and its BLAKE3 digest;
+- target vessel mass in tonnes;
+- explicit water density in kg/m³;
+- shallow and deep waterplane elevations in the source z-down frame;
+- mass and plane tolerances;
+- bounded bisection iteration count.
+
+Before solving, it checks source-contract validity, bracket ordering, endpoint waterplane support, positive density/tolerances, and monotonic displacement (shallower plane must not displace less mass than deeper plane). Unbracketed targets and exhausted iteration budgets are rejected. The receipt binds the initial/final bracket, selected waterplane, derived sectional properties, mass residual, iteration count and stop reason. The verifier recomputes the exact request.
+
+### Analytical known answers
+
+For the 100 m × 20 m prismatic box hull at 1,025 kg/m³:
+- target mass 12,300 t → displacement 12,000 m³ → waterplane z=0 m;
+- target mass 10,250 t → displacement 10,000 m³ → waterplane z=1 m.
+
+The first case solves at the first bisection midpoint; the second at the second midpoint. An out-of-bracket mass, zero density, invalid tolerance or iteration budget is rejected. The JSON fixture is tested directly.
+
+### Industrial capability boundary
+
+These are not empty-market capabilities. Commercial naval-architecture products already cover much more than the current G2f-a reference:
+- Bentley Maxsurf documents trimmed NURBS hull modelling, fairing, curvature analysis, point-data fitting, transformation to target hydrostatics, and downstream stability analysis including intact/damaged conditions, load cases and strength-related calculations. <https://www.bentley.com/en/products/maxsurf/>
+- Orca3D Advanced Hydrostatics & Stability documents compartments, fixed/fluid loads, loading cases, free-surface effects, equilibrium flotation, stability curves and criteria evaluation. It describes three-dimensional volume integration from the surface model. <https://orca3d.com/pages/advanced-hydrostatics-stability>
+- NAPA documents hydrostatics, capacity and loading conditions, intact/damage stability and statutory/rule-compliance workflows. <https://www.napa.fi/software-and-services/ship-design/hydrostatics-and-stability/>
+
+Therefore, we must **not** claim that the G2f sectional reference or upright mass-balance solver matches those packages in scope or replaces them. Its present role is a transparent, independently testable reference and evidence-carrying adapter.
+
+### Where the competitive opportunity actually is
+
+The 2026 generative-design literature already has:
+1. GAN and VAE-PCT hull generation, a CAD pull-back step to B-spline surfaces, 8,000 processed generated CAD hulls, NS/DS/JSD/MMD/COV evaluation, nine nondimensional coefficients and an early-stage resistance estimate. <https://www.mdpi.com/2077-1312/14/18/1707>
+2. Representation-aware conditional multimodal autoencoding across surface point clouds, waterline sections and buttock curves, coupled to conditional latent diffusion. The reported experiments use a synthetic hull dataset and claim coherent controllable hull generation. <https://www.mdpi.com/2077-1312/14/7/642>
+
+Simply claiming a multimodal latent representation or diffusion model would therefore not distinguish our work. Nor would claiming that we invented CAD-to-CAD hull generation.
+
+The potential differentiation is a complete **design-to-decision evidence chain**:
+- source drawing/survey/CAD provenance and rights status;
+- reconstruction alternatives and uncertainty, rather than one falsely exact fitted surface;
+- persistent identities across sections, point clouds, surfaces and CAD exchange;
+- one external-envelope revision producing many loading-specific displacement and condition artifacts;
+- independent sectional and polyhedral hydrostatics, followed by qualified commercial/open solver comparison;
+- cross-kernel AP242 geometry *and semantic* recovery;
+- cost-aware high-fidelity/physical experiment selection;
+- robust mission-level selection in which non-compensable safety/service constraints cannot be offset by a weighted score.
+
+This is a hypothesis to test, not a proven superiority claim.
+
+### Fair benchmark plan against SOTA and industry
+
+| Comparator | What we must reproduce or measure | Our proposed competitive outcome |
+|---|---|---|
+| 2026 GAN / VAE-PCT | NS, DS, JSD, MMD, COV; same data splits and normalization; CAD pull-back success; geometry coefficient distribution | Higher valid CAD recovery and engineering-feasible sample fraction without losing diversity/coverage |
+| 2026 multimodal autoencoder + latent diffusion | Point clouds, waterlines and buttocks; shared-latent cross-modal reconstruction; controllability by principal dimensions/form coefficients | Better exact identity, seam and hydrostatic consistency after CAD round-trip and loading derivation |
+| Maxsurf | Surface fit/fairing, target-hydrostatics matching, intact/damage load-case outputs where licensed test cases are available | Independent reproducibility, source-to-result traceability and cross-tool evidence preservation—not solver breadth |
+| Orca3D | Surface-volume hydrostatics, equilibrium, tank/free-surface and load-case comparison where the same supported cases can be constructed | Exact geometry/configuration binding and independent cross-implementation receipts—not a claim to its stability capability |
+| NAPA | Hydrostatics, loading/capacity and rule workflows where reference cases/data are available | Evidence provenance, rights-aware historical reconstruction and multi-tool reproducibility—not a claim to statutory approval |
+| ITTC CFD/EFD | Series 60 and published benchmark database cases, mesh/grid verification and uncertainty per observable | No CFD-performance claim until each observable is independently validated within declared combined uncertainty |
+
+Primary V&V baselines:
+- ITTC 7.5-03-01-01 Revision 05 (2024), *Uncertainty Analysis in CFD Verification and Validation*: https://www.ittc.info/media/11950/75-03-01-01.pdf
+- ITTC 7.5-03-02-01 Revision 02 (2024), *Uncertainty Analysis in CFD, Examples for Resistance and Flow*: https://ittc.info/media/11954/75-03-02-01.pdf
+- ITTC 7.5-03-02-02 Revision 03 (2024), *Benchmark Database for CFD Validation for Resistance and Propulsion*: https://www.ittc.info/media/11956/75-03-02-02.pdf
+- CAx-IF current recommended-practice index and revision archive for persistent IDs, AP242 validation properties, assemblies and STEP/QIF trace cases: https://www.mbx-if.org/home/cax/recpractices/ and https://www.mbx-if.org/home/cax/recpractices/archive/
+
+### Benchmark targets to aim for
+
+These are programme targets, not measured achievements:
+- **100%** of accepted geometry/physics receipts bind exact source/configuration, algorithm, units/frame, solver version or method, assumptions and input/output digests.
+- **0** false-feasible geometry or unsupported-feature promotions; unsupported profile regions remain INCOMPLETE.
+- **0** silent unit, coordinate-frame, symmetry, topology or surface-healing operations.
+- **100%** exact analytical agreement on frozen box/prism fixtures within predeclared tolerances.
+- Demonstrated second-order station convergence on smooth quadratic sectional properties; for actual hulls, two consecutive refinements below a frozen observable-specific tolerance.
+- **100%** of derived loading artifacts identify one source-envelope revision, waterplane and density.
+- Cross-kernel STEP AP242 round-trip: independently re-import, compare exact or tolerance-bounded geometry, persistent IDs, semantic face regions, product structure and validation properties.
+- On matched held-out hull families, lower invalid/unsupported sample rate and higher valid-CAD recovery than reproduced GAN/VAE-PCT/latent-diffusion baselines at equal compute.
+- On matched high-fidelity budgets, higher independently validated Pareto improvement per solver-hour/test-dollar than conventional parameterized, evolutionary, and surrogate-assisted baselines.
+- For physical-performance claims, no candidate wins on low-fidelity or generated labels alone; report false-feasible rate, calibration/coverage, rank reversal, validated regret and cost to confirmed frontier.
+
+### What must not be claimed
+
+A valid full-envelope input contract is not a valid hull surface. A closed displacement volume is not a full external hull. A mass-balanced upright waterplane is not a trim/heel equilibrium. Hydrostatics is not stability approval. A correct CAD export header is not a valid B-rep. A low CFD residual is not experimental validation. A Pareto point is not a safe, class-approved or seaworthy vessel.
+
+The first competitive milestone should be a reproducible, rights-cleared public benchmark in which an external evaluator can regenerate the geometry, independently recover the CAD, recompute multi-waterline properties, and inspect every provenance/uncertainty boundary without trusting Symthaea's own generator or solver.
