@@ -479,14 +479,18 @@ fn validate_profile(
             reject(
                 issues,
                 "profile_bottom_region_missing",
-                format!("station {station_id} must explicitly label at least one keel-to-waterline segment as bottom"),
+                format!(
+                    "station {station_id} must explicitly label at least one keel-to-waterline segment as bottom"
+                ),
             );
         }
         if waterline.region_to_next != ProfileRegion::Topsides {
             reject(
                 issues,
                 "profile_topsides_region_missing",
-                format!("station {station_id} waterline-to-sheer segment must be explicitly labelled as topsides"),
+                format!(
+                    "station {station_id} waterline-to-sheer segment must be explicitly labelled as topsides"
+                ),
             );
         }
     }
@@ -1043,7 +1047,9 @@ fn validate_planar_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIs
             point[1] - origin[1],
             point[2] - origin[2],
         ];
-        delta.iter().any(|value| value.abs() > COORDINATE_TOLERANCE_M)
+        delta
+            .iter()
+            .any(|value| value.abs() > COORDINATE_TOLERANCE_M)
     }) else {
         reject(
             issues,
@@ -1068,9 +1074,12 @@ fn validate_planar_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIs
             axis_a[2] * axis_b[0] - axis_a[0] * axis_b[2],
             axis_a[0] * axis_b[1] - axis_a[1] * axis_b[0],
         ];
-        let norm = candidate.iter().map(|value| value * value).sum::<f64>().sqrt();
-        (norm > COORDINATE_TOLERANCE_M * COORDINATE_TOLERANCE_M)
-            .then_some(candidate)
+        let norm = candidate
+            .iter()
+            .map(|value| value * value)
+            .sum::<f64>()
+            .sqrt();
+        (norm > COORDINATE_TOLERANCE_M * COORDINATE_TOLERANCE_M).then_some(candidate)
     }) else {
         reject(
             issues,
@@ -1086,10 +1095,7 @@ fn validate_planar_deck(spec: &FullEnvelopeSpec, issues: &mut Vec<FullEnvelopeIs
             point[1] - origin[1],
             point[2] - origin[2],
         ];
-        let distance = (normal[0] * delta[0]
-            + normal[1] * delta[1]
-            + normal[2] * delta[2])
-            .abs()
+        let distance = (normal[0] * delta[0] + normal[1] * delta[1] + normal[2] * delta[2]).abs()
             / normal_length;
         if distance > COORDINATE_TOLERANCE_M {
             reject(
@@ -1782,7 +1788,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn bottom_segments_must_be_explicitly_labelled() {
         let mut spec = box_fixture();
@@ -1825,7 +1830,10 @@ mod tests {
             }
         }
         let report = validate_full_envelope_spec(&spec);
-        assert_eq!(report.disposition, FullEnvelopeDisposition::ValidInputContract);
+        assert_eq!(
+            report.disposition,
+            FullEnvelopeDisposition::ValidInputContract
+        );
         assert!(report.issues.is_empty());
     }
 
@@ -1835,7 +1843,12 @@ mod tests {
         spec.deck_surface.construction = DeckConstruction::PlanarDeck;
         let report = validate_full_envelope_spec(&spec);
         assert_eq!(report.disposition, FullEnvelopeDisposition::Rejected);
-        assert!(report.issues.iter().any(|item| item.code == "planar_deck_non_coplanar"));
+        assert!(
+            report
+                .issues
+                .iter()
+                .any(|item| item.code == "planar_deck_non_coplanar")
+        );
     }
 
     #[test]
