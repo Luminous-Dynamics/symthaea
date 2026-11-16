@@ -409,3 +409,52 @@ These checks improve event-log coherence but do not establish clock synchronizat
 
 
 The fixed-width whole-second timestamp representation imposes a minimum declared absolute uncertainty of 1,000 ms, including timestamp quantization. A future sub-second timestamp format must be versioned and tested separately before permitting smaller clock bounds.
+
+
+## 18. Competitive evaluation: robotics performance versus scientific intelligence
+
+The benchmark must compare systems at the layer they actually implement. Subterra is not currently a robot platform, localization system or cave-SLAM implementation.
+
+### DARPA Subterranean Challenge
+
+DARPA's official challenge objective was to search for, detect and report artifacts with spatial references. A report scored when artifact type was correct and the location was within 5 metres; teams were also limited in the number of reports to discourage false positives, and the scoring rewarded finding more artifacts in less time. This is a useful baseline for search, detection, localization and reporting throughput, but it does not score geological-hypothesis calibration, source dependence, experiment value, preservation, custody or scientific admission.
+
+Reference: https://www.darpa.mil/research/programs/darpa-subterranean-challenge
+
+### SKiD-SLAM (2026)
+
+SKiD-SLAM is a current high-quality mapping baseline: its 2026 field report describes distributed multi-robot LiDAR SLAM, including a three-rover Majang lava-tube cave deployment under a 250 kbps inter-robot budget. Its system addresses inter-robot place recognition, relative pose estimation and distributed trajectory fusion. Code and field data are publicly linked by the authors.
+
+References: https://doi.org/10.1109/TFR.2026.3721725 and https://sparolab.github.io/research/skid_slam/
+
+Subterra's first comparison should use SKiD-SLAM maps/poses as a frozen perception backbone wherever licensing and data access permit. The planner must not change SLAM inputs, map quality, localization or robot trajectories between policy baselines. Compare only the evidence-selection, decision and return layer.
+
+### Active-perception evaluation
+
+The October 2026 active-visual-perception review argues that an active sensing result must connect task evidence need, sensing action, predicted observation value, executed acquisition, subsequent state update and downstream task outcome. It explicitly separates improvements in acquired evidence from task utility and from motion, compute, communication, energy, time and safety cost.
+
+Reference: https://doi.org/10.3390/s26206544
+
+### What Subterra must demonstrate
+
+| Evaluation layer | Strong baseline | Subterra's measurable contribution |
+|---|---|---|
+| Search/detection/localization | DARPA SubT scoring and standard detection/localization metrics | Do not claim superiority; consume these outputs with uncertainty and evidence lineage |
+| Mapping/localization | SKiD-SLAM and matched SLAM backbones | Hold map/pose outputs constant; no SLAM superiority claim |
+| Exploration policy | Random, frontier, coverage, entropy, information-gain-per-cost, risk-aware frontier | Lower downstream decision regret at identical eligible action set and mission budget |
+| Measurement selection | Fixed expert priority and one-step entropy/EVSI | More independently supported, decision-relevant evidence acquired and returned |
+| Multi-step mission | Fixed-horizon, survival-unaware active perception and risk-aware exploration | Preserve more future sensing opportunities without exceeding the same hard risk and resource limits |
+| Evidence lineage | Row-random/site-only split and raw evidence counts | Common-cause component isolation, fused-acquisition ancestry and one-to-one observation-return receipts |
+| Scientific outcome | Detection count, map coverage or command success | Verified, delivered and independently admitted science records; command/acquisition is not a completed scientific result |
+
+### Preregistered experiment
+
+1. Freeze one mapping/localization backbone and the same candidate map, ground truth, sensors, action set and site split for every policy.
+2. Run random/fixed-priority/frontier/entropy/information-gain/risk-aware/EVSI/survival-conditioned policies under equal energy, time, data and communication budgets.
+3. Score evidence quality, calibration, downstream decision loss/regret, source independence, return/admission, and all acquisition costs separately.
+4. Use site/acquisition/common-cause dependency components as the evaluation unit; never use random rows as the qualifying result.
+5. Publish coverage and abstention. A method cannot claim a better outcome by dropping unsupported cases or relaxing risk/preservation gates.
+
+Proposed targets remain research targets, not current results: at least 20% lower preregistered decision regret than the strongest matched baseline; at least 15% more independently supported, decision-relevant observations returned at equal expected resource use; zero dependency split leakage; zero unauthorized proposals crossing external gates; zero hard budget/risk-ceiling violations. These targets require independent validation and confidence intervals over enough genuinely distinct sites/components.
+
+A result that improves mapping but not scientific decision quality belongs to the mapping benchmark. A result that improves decision quality but loses the evidence on return does not count as a successful scientific return.
