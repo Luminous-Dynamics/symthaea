@@ -939,3 +939,48 @@ The specific APPJ programme is tracked in [CH4-PLASMA-THERMAL-APPJ-001 #12451](h
 The multi-product benchmark treats accepted H2, each C2-C3 species and solid carbon as different product streams. Full grid-side energy, mass closure, quench, separation, product quality, carbon morphology/grade, fouling and maintainability remain required before a process advantage can be claimed.
 
 The machine-readable case is `CH4-PLASMA-THERMAL-APPJ-2026`. Its source record preserves relative conversion, carbon deposition and turbostratic carbon characterization as distinct source claims; absolute conversion, carbon recovery, product rates and system energy remain unknown.
+
+
+## 9.17 New CO2 and ammonia process frontier — 2026-11-16
+
+### Small-scale plasma ammonia synthesis process TEA
+
+Masouleh et al., *Beyond Haber-Bosch: Plasma-driven electrification as the next frontier in ammonia synthesis directly from air and water?*, Chemical Engineering Research and Design 234 (October 2026), DOI https://doi.org/10.1016/j.cherd.2026.09.031.
+
+The Aspen Plus V12.1 / MATLAB process comparison models three 1 tonne/day, 98 wt% NH3 pathways:
+- RGA-NORR: 84 kWh/kg NH3, plasma generation ~68% of route energy;
+- RGA-LNT: 154 kWh/kg NH3;
+- direct DBD: 435 kWh/kg NH3.
+
+The study-selected small-scale green Haber-Bosch comparator is approximately 11.5 kWh/kg NH3. The source reports modeled ammonia costs spanning roughly USD 18,000–98,000 per tonne depending on scenario. These are process model results, not measured plant performance. The process routes are separate and the plasma options remain far from the selected green-HB energy comparator.
+
+### CO2 DBD data/model benchmark
+
+Li et al., *Machine learning to predict plasma-based CO2 conversion in dielectric barrier discharge reactors*, Green Chemistry 28 (2026), DOI https://doi.org/10.1039/D6GC01077F.
+
+The published corpus has 358 literature observations from 2010–2025 and six reported model descriptors. The study reports a best-fold R2 of 0.791 under publication-grouped five-fold validation and a prospective in-domain R2 of 0.92. The prospective result is explicitly bounded to the explored domain; it does not establish transfer across reactor families, labs, pressure regimes or plasma chemistry. Our benchmark therefore uses leave-one-publication-out and leave-one-reactor-configuration-out splits, prediction-interval coverage, worst-group error and applicability-domain coverage rather than random row splits.
+
+### Warm-plasma RWGS benchmark
+
+Bang et al., *Energy-efficient reverse water gas shift reaction in a gliding arc plasmatron*, Chemical Engineering Journal (2026), DOI https://doi.org/10.1016/j.cej.2026.181398.
+
+Two operating points must remain separate:
+- H2:CO2 = 4: approximately 93% CO2 conversion and 100% CO selectivity.
+- H2:CO2 = 1: approximately 68% conversion, close to the thermodynamic-equilibrium condition, with 277 kJ/mol CO reported in the abstract at 2.3 kJ/L SEI.
+
+The article highlights also contain 264 kJ/mol CO. This source discrepancy remains unresolved and blocks exact point-estimate ranking pending review of the article's table/figure. The reported energy metric is not automatically a full grid-to-accepted-syngas plant boundary.
+
+### Cyclic carbon reforming-gasification
+
+O'Modhrain and Bogaerts, *Plasma-based cyclic reforming-gasification for improved CO2 conversion with CH4 pyrolysis and dry reforming of CH4*, Journal of CO2 Utilization 112 (October 2026), DOI https://doi.org/10.1016/j.jcou.2026.103570.
+
+This paper studies carbon formation through DRM or methane pyrolysis and subsequent oxidation/gasification using a CO2-plasma effluent. Continuous methane pyrolysis reports ~60% conversion and solid carbon/H2 products; discontinuous DRM reports tuneable syngas around H2/CO=1.7. O2 falls to a maximum reported 0.5 vol% after three gasification passes. The headline energy values use plasma-deposited power, not grid-side input. A carbon-use loop is promising, but not yet a complete lifecycle carbon balance or plant-level efficiency claim.
+
+### New benchmark targets
+
+The machine-readable register adds:
+- CO2 DBD: mean leave-one-publication-out R2 >= 0.80, 90% prediction interval coverage >= 90%, and declared applicability-domain coverage >= 80%, followed by sealed prospective reactor validation.
+- RWGS: preserve the H2-rich and stoichiometric points separately and resolve the 264/277 kJ/mol source discrepancy before point ranking.
+- Cyclic carbon utilization: 100 physical cycles, >=95% uncertainty-aware carbon inventory closure and >=90% accepted syngas productivity retention, with all grid-side auxiliaries and every failed cycle counted.
+
+The register now contains **47 source cases, 92 negative controls, 6 derived checks and 12 benchmark targets**. All Luminous reproduction flags remain false.
