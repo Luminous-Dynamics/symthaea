@@ -1299,9 +1299,18 @@ mod tests {
         let first_receipt = solve_upright_mass_balance(&first_request).unwrap();
         assert_eq!(first_receipt.receipt_schema_version, 2);
         assert_eq!(first_receipt.algorithm, UPRIGHT_MASS_BALANCE_ALGORITHM);
-        assert_eq!(first_receipt.mass_tolerance_tonnes, first_request.mass_tolerance_tonnes);
-        assert_eq!(first_receipt.plane_tolerance_m, first_request.plane_tolerance_m);
-        assert_eq!(first_receipt.maximum_iterations_limit, first_request.maximum_iterations);
+        assert_eq!(
+            first_receipt.mass_tolerance_tonnes,
+            first_request.mass_tolerance_tonnes
+        );
+        assert_eq!(
+            first_receipt.plane_tolerance_m,
+            first_request.plane_tolerance_m
+        );
+        assert_eq!(
+            first_receipt.maximum_iterations_limit,
+            first_request.maximum_iterations
+        );
 
         first_request.maximum_iterations = 32;
         let second_receipt = solve_upright_mass_balance(&first_request).unwrap();
