@@ -12,7 +12,7 @@ A greedy measurement selector can overvalue an action that is informative now bu
 - Every continuation receives the remaining resource budget on that branch.
 - The planner can stop at any node and select the best current mission decision.
 - Mission-interruption and robot-loss probabilities are constrained by separate hard ceilings.
-- Search expansion has an explicit upper bound and deterministic action ordering.
+- Search expansion has an explicit upper bound and deterministic action ordering. The reference caps horizon depth at 16, actions at 32 and outcomes per action at 16.
 
 ## Relation to the one-step EVSI reference
 
@@ -39,7 +39,7 @@ This crate has its own Cargo workspace and does not join or alter the production
 
 ## Evidence state
 
-- Source and 10 unit-test cases: AUTHORED.
+- Source and 11 unit-test cases: AUTHORED.
 - Mathematical policy-tree sanity check: independently recalculated with a separate arithmetic model; not a Rust execution.
 - Rust formatting, compile, tests and Clippy: NOT EXECUTED in the current authoring environment (no cargo/rustc present).
 - CI: NOT CHECKED; any skipped job is not a pass.
