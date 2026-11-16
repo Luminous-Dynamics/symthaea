@@ -504,3 +504,59 @@ References:
 - Modular discrete mechanical metamaterials (IJMS, 2026): https://doi.org/10.1016/j.ijmecsci.2026.111915
 - NASA ARMADAS: https://www.nasa.gov/automated-reconfigurable-mission-adaptive-digital-assembly-systems-armadas/
 - NASA modular in-space truss technology: https://technology.nasa.gov/patent/LAR-TOPS-359
+
+
+
+## Applied multiscale systems: free-flow modular structural grammars — 2026-11-16
+
+Symthaea should understand FFMFS as an applied multiscale-structure research domain. It should not treat generated geometry or HDC similarity as mechanical evidence.
+
+### Design representation
+
+Represent a candidate structurally as a typed, hierarchical graph:
+- module/bay identity and generation level;
+- member role, length class, orientation and section/material tag;
+- connector family, port orientation, tolerance and interface fit;
+- triangular face / multi-point attachment topology;
+- assembly parent, sequence, tool/grasp access and service ports;
+- environmental/pressure boundary, utility and occupant-authored infill as separate layers;
+- evidence links to geometry digest, solver assumptions, manufacturing process, inspection and coupon tests.
+
+HDC/VSA may encode and retrieve these structures, but the authoritative representation remains the typed graph and its verified constraints. Explore GHRR/non-commutative binding for ordered assembly and graph composition only as a comparative representation experiment.
+
+### Scientific guardrails
+
+- Connected graph, high cycle rank or visually complex morphology does not prove kinematic rigidity.
+- Face-attached tetrahedral cells are a candidate ideal pin-jointed rigid-module grammar: child cells attach through three shared non-collinear vertices. This removes a one-point hinge in the ideal bar model, but not real joint compliance, local stress, buckling, fatigue or manufacturing defects.
+- Structural claims must come from Symtropy's qualified analysis and physical evidence, not from HDC retrieval, fractal dimension or shape aesthetics.
+- Fractal geometry requires a statistically supported scaling regime over a stated interval. Recursive generation alone is not enough.
+- Preserve the distinction between primary structure, services, pressure/environmental boundary, secondary support and expressive infill.
+
+### Required competitive baselines
+
+Commercial tools already cover sophisticated implicit modeling, lattice generation, topology optimization and analysis:
+- nTop: implicit geometry, graph/TPMS/stochastic lattices, multi-objective topology optimization, structural/thermal analysis and CAD/CAE/AM integration.
+- Autodesk Fusion: generative design with manufacturing constraints such as additive, milling, 2-axis cutting and casting.
+- Altair Inspire: structural topology/topography/gauge optimization, FEA, motion and additive manufacturing analysis.
+- Materialise 3-matic/Magics: lattice and conformal mesh design, data optimization and AM preparation.
+- NASA ARMADAS and JPL modular truss projects: reusable voxel and self-aligning truss module assembly, including robot construction.
+
+Symthaea should not claim that its HDC generator beats these systems at generic lattice generation. The research hypothesis is whether a typed multiscale grammar plus interface reasoning, assembly planning, evidence links and occupant-controlled infill gives better system-level results.
+
+### Symthaea tasks
+
+1. Compare HRR/FHRR/MAP/BSC/TPR and GHRR for module/connector graph composition and ordered assembly reasoning.
+2. Compare parametric grammars, conventional graph search/evolutionary methods, topology optimization and Bayesian/surrogate-assisted design.
+3. Generate diverse Pareto candidates and expose constraint conflicts rather than returning one opaque optimum.
+4. Use uncertainty-aware active learning to select Symtropy simulations and physical coupons.
+5. Hold out entire topology families, connector families, load-case families and manufacturing process families to prevent leakage.
+6. Keep accessibility, egress, service access, acoustic/sensory choices, privacy, cultural expression and occupant agency as explicit design requirements.
+
+### Current research/engineering links
+
+- Symtropy programme: https://github.com/Luminous-Dynamics/symtropy/blob/main/docs/FREEFLOW_MODULAR_FRACTAL_STRUCTURES.md
+- Geometry and module grammar: https://github.com/Luminous-Dynamics/symtropy/tree/research/freeflow-modular-fractal-v0/research/freeflow-structure-lab
+- Linear-elastic truss reference evaluator: https://github.com/Luminous-Dynamics/symtropy/tree/research/freeflow-modular-fractal-v0/research/truss-fem-lab
+- Symthaea research issue: https://github.com/Luminous-Dynamics/symthaea/issues/12519
+
+**Evidence boundary:** Symthaea proposes and reasons over candidate grammars; Symtropy evaluates declared physical/structural models; physical coupons and applicable independent engineering qualification determine whether a result can be used in real structures.
