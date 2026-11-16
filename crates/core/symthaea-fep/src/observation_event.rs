@@ -965,7 +965,7 @@ mod tests {
         );
 
         let extreme_precision =
-            event(vec![dimension("temperature", Some(0.5), Some(1.0e308), None)]);
+            event(vec![dimension("temperature", Some(10.5), Some(1.0e308), None)]);
         assert_eq!(
             extreme_precision.masked_belief_gradient(&predicted, &[vec![1.0]], 1.0),
             Err(ObservationEventError::NonFiniteWeightedResidual { index: 0 })
