@@ -816,6 +816,61 @@ mod tests {
     }
 
     #[test]
+    fn nonfinite_conditional_mean_fails_before_mutating_pending_state() {
+        let mut process = PredictableGaussianEProcess::new(0.5, 0.05).unwrap();
+        assert_eq!(
+            process.commit_prediction_with_conditional_gaussian(
+                "obs-1",
+                "sha256:decision-1",
+                0.2,
+                f64::NAN,
+                0.5,
+            ),
+            Err(SequentialError::NonFiniteConditionalMean)
+        );
+        assert!(!process.has_pending_prediction());
+        assert_eq!(process.observations, 0);
+    }
+
+    #[test]
+    fn fixed_mixture_uses_and_reports_predictable_conditional_mean() {
+        let mut mixture = PredictableGaussianMixture::new(
+            0.5,
+            0.05,
+            vec![
+                WeightedAlternative {
+                    id: "positive".to_owned(),
+                    weight: 0.5,
+                },
+                WeightedAlternative {
+                    id: "negative".to_owned(),
+                    weight: 0.5,
+                },
+            ],
+        )
+        .unwrap();
+        mixture
+            .commit_predictions_with_conditional_gaussian(
+                "obs-1",
+                "sha256:decision-1",
+                &[0.2, -0.2],
+                0.5,
+                0.5,
+            )
+            .unwrap();
+        let result = mixture.observe("obs-1", "sha256:decision-1", 0.7).unwrap();
+        assert_eq!(result.null_conditional_mean, 0.5);
+        assert_eq!(result.sigma, 0.5);
+        assert_eq!(result.components[0].expected_residual, 0.2);
+        assert_eq!(result.components[1].expected_residual, -0.2);
+        let positive_log_e = 0.08;
+        let negative_log_e = -0.24;
+        let expected_mix =
+            (0.5_f64 * positive_log_e.exp() + 0.5_f64 * negative_log_e.exp()).ln();
+        assert!((result.log_e_value - expected_mix).abs() < 1.0e-12);
+    }
+
+    #[test]
     fn predictable_per_observation_sigma_is_used_in_the_likelihood_ratio() {
         let mut process = PredictableGaussianEProcess::new(0.15, 0.05).unwrap();
         process
