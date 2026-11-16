@@ -987,7 +987,12 @@
         "calibration_ref": "cal-a",
         "installation_ref": "mount-a",
         "firmware_generation": "fw-a",
-        "representation_id": "raw"
+        "representation_id": "raw",
+        "replay_context": {
+          "previous_sequence": 20,
+          "previous_payload_identity": "payload-identical-020",
+          "expected_relation": "same_payload"
+        }
       },
       "evaluator_only": {
         "physical_truth": {
@@ -1036,7 +1041,12 @@
         "calibration_ref": "cal-a",
         "installation_ref": "mount-a",
         "firmware_generation": "fw-a",
-        "representation_id": "raw"
+        "representation_id": "raw",
+        "replay_context": {
+          "previous_sequence": 21,
+          "previous_payload_identity": "payload-021a",
+          "expected_relation": "different_payload"
+        }
       },
       "evaluator_only": {
         "physical_truth": {
@@ -1482,7 +1492,13 @@
         "calibration_ref": "cal-a",
         "installation_ref": "mount-a",
         "firmware_generation": "fw-a",
-        "representation_id": "hdc-vector-collision-7"
+        "representation_id": "hdc-vector-collision-7",
+        "representation_comparison": {
+          "comparison_trace_ref": "trace-b",
+          "comparison_normal_raw": 0.32,
+          "comparison_shear_raw": 0.1,
+          "comparison_representation_id": "hdc-vector-collision-7"
+        }
       },
       "evaluator_only": {
         "physical_truth": {
