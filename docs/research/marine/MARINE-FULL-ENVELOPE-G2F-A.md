@@ -333,3 +333,19 @@ This reference composes with:
 - [MARINE-HYDRODYNAMIC-VALIDATION-001 #11442](https://github.com/Luminous-Dynamics/symthaea/issues/11442) for specialist solver V&V.
 
 It is a geometry-derived reference and evidence adapter, not a new hydrostatic stability package, experiment selector or CFD implementation.
+
+
+## 13. G2f-a2b — tapered-hull analytical and station-refinement fixture (16 Nov 2026)
+
+A second known-answer input is `marine-full-envelope-tapered-loading-sweep-001.json`. Unlike the box fixture, it is non-prismatic: length 100 m, full beam increases linearly from 10 m to 20 m from bow to stern, draft 6 m, freeboard 4 m, transom ends, and symmetric sections. It uses the same explicit density of 1,025 kg/m³ and upright horizontal waterplanes z=-2, 0 and +2 m.
+
+Analytical results:
+| Waterplane z | Displacement | Waterplane area | TPC | LCB / LCF | VCB |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| -2 m | 12,000 m³ | 1,500 m² | 15.375 t/cm | 55.5556 m | 2 m |
+| 0 m | 9,000 m³ | 1,500 m² | 15.375 t/cm | 55.5556 m | 3 m |
+| +2 m | 6,000 m³ | 1,500 m² | 15.375 t/cm | 55.5556 m | 4 m |
+
+TCB is zero by symmetry. Design-waterplane displaced mass is 9,225 tonnes.
+
+A second unit test refines this same linear taper from 2 to 3 to 5 longitudinal stations. Because section area and waterline breadth are linear in x for this controlled fixture, the piecewise-linear integration should preserve displacement, waterplane area, LCB and VCB within a frozen 1e-9 absolute test tolerance. The source-spec digest must differ after refinement even though the physical numeric answers remain the same. This is a test of deterministic identity and integration invariance for a known linear case; it is not evidence that arbitrary curved hulls have converged. For curved/nonlinear stations, perform systematic refinement studies and report the change in each observable instead of assuming linear interpolation is exact.
