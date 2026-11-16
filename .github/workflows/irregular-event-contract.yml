@@ -1,0 +1,108 @@
+name: Irregular Event Contract Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - research/joint-temporal-resource-control-20261101
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - ".github/workflows/irregular-event-contract.yml"
+      - "research/irregular-event-contract/**"
+      - "docs/research/IRREGULAR_EVENT_AVAILABILITY_CONTRACT_V0_1.md"
+      - "docs/research/REAL_IRREGULAR_TIME_SERIES_BENCHMARK_MATRIX_V0_1.md"
+      - "crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json"
+  push:
+    branches:
+      - research/real-irregular-benchmark-adapters-20261101
+    paths:
+      - ".github/workflows/irregular-event-contract.yml"
+      - "research/irregular-event-contract/**"
+      - "docs/research/IRREGULAR_EVENT_AVAILABILITY_CONTRACT_V0_1.md"
+      - "docs/research/REAL_IRREGULAR_TIME_SERIES_BENCHMARK_MATRIX_V0_1.md"
+      - "crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: irregular-event-contract-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: Format, compile, test and lint standalone irregular-event contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Record toolchain identity
+        run: |
+          set -euo pipefail
+          rustc --version
+          cargo --version
+          rustfmt --version
+          cargo clippy --version
+
+      - name: Check formatting for the entire standalone crate
+        run: cargo fmt --manifest-path research/irregular-event-contract/Cargo.toml -- --check
+
+      - name: Resolve and materialize exact dependency lock
+        run: cargo generate-lockfile --manifest-path research/irregular-event-contract/Cargo.toml
+
+      - name: Compile and execute all crate tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p validation-artifacts
+          cargo test \
+            --manifest-path research/irregular-event-contract/Cargo.toml \
+            --locked --all-targets -- --nocapture \
+            2>&1 | tee validation-artifacts/cargo-test.log
+
+      - name: Run Clippy across all targets
+        run: cargo clippy --manifest-path research/irregular-event-contract/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Record exact source, fixture and dependency identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            echo "source_sha=$(git rev-parse HEAD)"
+            echo "crate_manifest_sha256=$(sha256sum research/irregular-event-contract/Cargo.toml | cut -d ' ' -f 1)"
+            echo "event_source_sha256=$(sha256sum research/irregular-event-contract/src/lib.rs | cut -d ' ' -f 1)"
+            echo "watermark_source_sha256=$(sha256sum research/irregular-event-contract/src/watermarks.rs | cut -d ' ' -f 1)"
+            echo "split_source_sha256=$(sha256sum research/irregular-event-contract/src/splits.rs | cut -d ' ' -f 1)"
+            echo "scaler_source_sha256=$(sha256sum research/irregular-event-contract/src/scaler.rs | cut -d ' ' -f 1)"
+            echo "time_imm_source_sha256=$(sha256sum research/irregular-event-contract/src/time_imm.rs | cut -d ' ' -f 1)"
+            echo "watermark_fixture_sha256=$(sha256sum crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json | cut -d ' ' -f 1)"
+            echo "resolved_lock_sha256=$(sha256sum research/irregular-event-contract/Cargo.lock | cut -d ' ' -f 1)"
+            echo
+            cargo tree --manifest-path research/irregular-event-contract/Cargo.toml --locked
+          } | tee validation-artifacts/source-receipt.txt
+
+      - name: Preserve test log and exact dependency lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: irregular-event-contract-${{ github.sha }}
+          path: |
+            research/irregular-event-contract/Cargo.lock
+            validation-artifacts/
+          if-no-files-found: warn
+          retention-days: 30
