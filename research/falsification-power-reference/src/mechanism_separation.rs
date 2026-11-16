@@ -17,16 +17,13 @@ use super::{normal_quantile, one_sided_power};
 pub const MAX_ACTIONS: usize = 6;
 pub const MAX_MECHANISMS: usize = 12;
 pub const MAX_TOTAL_OBSERVATIONS: usize = 16;
-const MAX_EXACT_SIGNATURE_BUCKET: f64 = 9_007_199_254_740_991.0;
 
-/// Frozen action with known Gaussian noise, positive per-replicate cost and
-/// evaluator-side response-signature quantum.
+/// Frozen action with known Gaussian noise and positive per-replicate cost.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MeasurementAction {
     pub id: String,
     pub sigma: f64,
     pub cost: f64,
-    pub response_quantum: f64,
 }
 
 /// Expected observable means in the same action order as the input actions.
@@ -110,9 +107,6 @@ pub enum SeparationError {
     InvalidCost {
         action_id: String,
     },
-    InvalidResponseQuantum {
-        action_id: String,
-    },
     InvalidAlpha,
     InvalidTargetPower,
     MechanismActionCountMismatch {
@@ -121,10 +115,6 @@ pub enum SeparationError {
         actual: usize,
     },
     NonFiniteMean {
-        mechanism_id: String,
-        action_id: String,
-    },
-    SignatureBucketOutOfRange {
         mechanism_id: String,
         action_id: String,
     },
@@ -158,10 +148,6 @@ impl fmt::Display for SeparationError {
             Self::InvalidCost { action_id } => {
                 write!(f, "cost for action {action_id} must be finite and positive")
             }
-            Self::InvalidResponseQuantum { action_id } => write!(
-                f,
-                "response quantum for action {action_id} must be finite and positive"
-            ),
             Self::InvalidAlpha => {
                 write!(f, "family-wise alpha or adjusted pairwise alpha is invalid")
             }
@@ -184,13 +170,6 @@ impl fmt::Display for SeparationError {
                 f,
                 "mechanism {mechanism_id} has a non-finite mean for action {action_id}"
             ),
-            Self::SignatureBucketOutOfRange {
-                mechanism_id,
-                action_id,
-            } => write!(
-                f,
-                "response signature bucket is outside exact integer range for mechanism {mechanism_id}, action {action_id}"
-            ),
             Self::NumericalOverflow => {
                 write!(f, "information or measurement-cost calculation overflowed")
             }
@@ -203,7 +182,7 @@ impl Error for SeparationError {}
 struct CanonicalMechanism {
     id: String,
     means: Vec<f64>,
-    signature: Vec<i64>,
+    signature: Vec<u64>,
     class_index: usize,
 }
 
@@ -219,7 +198,7 @@ struct SearchCandidate {
 fn canonical_signature(
     mechanism: &CandidateMechanism,
     actions: &[MeasurementAction],
-) -> Result<Vec<i64>, SeparationError> {
+) -> Result<Vec<u64>, SeparationError> {
     let mut signature = Vec::with_capacity(actions.len());
     for (action, mean) in actions.iter().zip(mechanism.expected_means.iter().copied()) {
         if !mean.is_finite() {
@@ -228,15 +207,9 @@ fn canonical_signature(
                 action_id: action.id.clone(),
             });
         }
-        // Quantization is a numerical signature contract, independent of sigma.
-        let scaled = mean / action.response_quantum;
-        if !scaled.is_finite() || scaled.abs() > MAX_EXACT_SIGNATURE_BUCKET {
-            return Err(SeparationError::SignatureBucketOutOfRange {
-                mechanism_id: mechanism.id.clone(),
-                action_id: action.id.clone(),
-            });
-        }
-        signature.push(scaled.round() as i64);
+        // Canonicalize signed zero; otherwise preserve exact IEEE-754 identity.
+        // Any nonzero mean difference remains a distinct statistical alternative.
+        signature.push(if mean == 0.0 { 0 } else { mean.to_bits() });
     }
     Ok(signature)
 }
@@ -294,11 +267,6 @@ fn validate_and_canonicalize(
         }
         if !action.cost.is_finite() || action.cost <= 0.0 {
             return Err(SeparationError::InvalidCost {
-                action_id: action.id.clone(),
-            });
-        }
-        if !action.response_quantum.is_finite() || action.response_quantum <= 0.0 {
-            return Err(SeparationError::InvalidResponseQuantum {
                 action_id: action.id.clone(),
             });
         }
@@ -552,10 +520,9 @@ impl SearchState<'_> {
 /// Compute action-space equivalence and the minimum-cost bounded
 /// replication schedule for separating all non-equivalent mechanisms.
 ///
-/// Response equivalence uses a deterministic per-action quantized signature:
-/// round(expected_mean / response_quantum). This is a declared numerical
-/// signature contract, separate from measurement sigma and practical effect
-/// size. Search is exhaustive for at most six actions, twelve mechanisms and
+/// Response equivalence preserves exact finite IEEE-754 mean identity with
+/// signed zero canonicalized. Any nonzero mean difference remains a distinct
+/// alternative, however small relative to the measurement noise. Search is exhaustive for at most six actions, twelve mechanisms and
 /// sixteen total replicates.
 ///
 /// Pairwise alpha is family-wise alpha divided by the number of cross-class
@@ -685,12 +652,11 @@ pub fn compute_identifiability_envelope(
 mod tests {
     use super::*;
 
-    fn action(id: &str, sigma: f64, cost: f64, quantum: f64) -> MeasurementAction {
+    fn action(id: &str, sigma: f64, cost: f64) -> MeasurementAction {
         MeasurementAction {
             id: id.into(),
             sigma,
             cost,
-            response_quantum: quantum,
         }
     }
     fn mechanism(id: &str, means: &[f64]) -> CandidateMechanism {
@@ -704,8 +670,8 @@ mod tests {
     fn action_space_aliases_remain_one_equivalence_class() {
         let report = compute_identifiability_envelope(
             vec![
-                action("x", 0.1, 1.0, 1.0e-12),
-                action("y", 0.2, 1.0, 1.0e-12),
+                action("x", 0.1, 1.0),
+                action("y", 0.2, 1.0),
             ],
             vec![
                 mechanism("m-a", &[1.0, 2.0]),
@@ -734,7 +700,7 @@ mod tests {
     #[test]
     fn two_mechanisms_have_hand_calculable_minimum_replicate_count() {
         let report = compute_identifiability_envelope(
-            vec![action("probe", 1.0, 1.0, 1.0e-12)],
+            vec![action("probe", 1.0, 1.0)],
             vec![mechanism("low", &[0.0]), mechanism("high", &[1.0])],
             0.05,
             0.80,
@@ -751,7 +717,7 @@ mod tests {
     #[test]
     fn insufficient_budget_is_not_misreported_as_equivalence() {
         let report = compute_identifiability_envelope(
-            vec![action("probe", 1.0, 1.0, 1.0e-12)],
+            vec![action("probe", 1.0, 1.0)],
             vec![mechanism("low", &[0.0]), mechanism("high", &[1.0])],
             0.05,
             0.80,
@@ -770,7 +736,7 @@ mod tests {
     #[test]
     fn complementary_action_splits_a_narrow_design_alias() {
         let narrow = compute_identifiability_envelope(
-            vec![action("along-diagonal", 0.1, 1.0, 1.0e-12)],
+            vec![action("along-diagonal", 0.1, 1.0)],
             vec![
                 mechanism("additive", &[1.0]),
                 mechanism("interaction", &[1.0]),
@@ -782,8 +748,8 @@ mod tests {
         .unwrap();
         let expanded = compute_identifiability_envelope(
             vec![
-                action("along-diagonal", 0.1, 1.0, 1.0e-12),
-                action("off-diagonal", 0.1, 1.0, 1.0e-12),
+                action("along-diagonal", 0.1, 1.0),
+                action("off-diagonal", 0.1, 1.0),
             ],
             vec![
                 mechanism("additive", &[1.0, 1.0]),
@@ -812,8 +778,8 @@ mod tests {
     fn precise_expensive_action_can_beat_cheap_noisy_action() {
         let report = compute_identifiability_envelope(
             vec![
-                action("cheap-noisy", 2.0, 1.0, 1.0e-12),
-                action("precise-expensive", 0.5, 3.0, 1.0e-12),
+                action("cheap-noisy", 2.0, 1.0),
+                action("precise-expensive", 0.5, 3.0),
             ],
             vec![mechanism("a", &[0.0, 0.0]), mechanism("b", &[1.0, 1.0])],
             0.05,
@@ -832,8 +798,8 @@ mod tests {
     fn joint_schedule_separates_multiple_classes_that_no_single_action_can_resolve() {
         let report = compute_identifiability_envelope(
             vec![
-                action("first", 0.5, 1.0, 1.0e-12),
-                action("second", 0.5, 1.0, 1.0e-12),
+                action("first", 0.5, 1.0),
+                action("second", 0.5, 1.0),
             ],
             vec![
                 mechanism("a", &[0.0, 0.0]),
@@ -854,7 +820,7 @@ mod tests {
 
     #[test]
     fn familywise_alpha_tightens_as_class_count_grows() {
-        let actions = vec![action("probe", 1.0, 1.0, 1.0e-12)];
+        let actions = vec![action("probe", 1.0, 1.0)];
         let two = compute_identifiability_envelope(
             actions.clone(),
             vec![mechanism("a", &[0.0]), mechanism("b", &[1.0])],
@@ -882,7 +848,7 @@ mod tests {
     #[test]
     fn bonferroni_counts_cross_class_mechanism_pairs_not_only_class_pairs() {
         let report = compute_identifiability_envelope(
-            vec![action("probe", 1.0, 1.0, 1.0e-12)],
+            vec![action("probe", 1.0, 1.0)],
             vec![
                 mechanism("a1", &[0.0]),
                 mechanism("a2", &[0.0]),
@@ -904,8 +870,8 @@ mod tests {
     fn report_is_invariant_to_input_order() {
         let first = compute_identifiability_envelope(
             vec![
-                action("b", 0.5, 2.0, 1.0e-12),
-                action("a", 1.0, 1.0, 1.0e-12),
+                action("b", 0.5, 2.0),
+                action("a", 1.0, 1.0),
             ],
             vec![
                 mechanism("z", &[1.0, 2.0]),
@@ -919,8 +885,8 @@ mod tests {
         .unwrap();
         let replay = compute_identifiability_envelope(
             vec![
-                action("a", 1.0, 1.0, 1.0e-12),
-                action("b", 0.5, 2.0, 1.0e-12),
+                action("a", 1.0, 1.0),
+                action("b", 0.5, 2.0),
             ],
             vec![
                 mechanism("a", &[0.0, 0.0]),
@@ -938,28 +904,18 @@ mod tests {
     }
 
     #[test]
-    fn response_quantization_is_separate_from_measurement_noise() {
-        let merged = compute_identifiability_envelope(
-            vec![action("probe", 0.001, 1.0, 0.1)],
-            vec![mechanism("a", &[1.01]), mechanism("b", &[1.02])],
+    fn tiny_nonzero_mean_difference_is_distinct_but_may_be_underpowered() {
+        let report = compute_identifiability_envelope(
+            vec![action("probe", 1.0, 1.0)],
+            vec![mechanism("a", &[1.0]), mechanism("b", &[1.0 + 1.0e-10])],
             0.05,
             0.80,
             16,
         )
         .unwrap();
-        let split = compute_identifiability_envelope(
-            vec![action("probe", 0.001, 1.0, 0.001)],
-            vec![mechanism("a", &[1.01]), mechanism("b", &[1.02])],
-            0.05,
-            0.80,
-            16,
-        )
-        .unwrap();
-        assert_eq!(
-            merged.disposition,
-            SeparationDisposition::SingleEquivalenceClass
-        );
-        assert_eq!(split.equivalence_class_count, 2);
+        assert_eq!(report.equivalence_class_count, 2);
+        assert_eq!(report.disposition, SeparationDisposition::BudgetInsufficient);
+        assert!(report.worst_pair.unwrap().power < 0.80);
     }
 
     #[test]
@@ -971,7 +927,7 @@ mod tests {
         );
         assert_eq!(
             compute_identifiability_envelope(
-                vec![action("x", 0.0, 1.0, 1.0)],
+                vec![action("x", 0.0, 1.0)],
                 vec![mechanism("a", &[0.0])],
                 0.05,
                 0.80,
@@ -984,7 +940,7 @@ mod tests {
         );
         assert!(matches!(
             compute_identifiability_envelope(
-                vec![action("x", 1.0, 1.0, 1.0)],
+                vec![action("x", 1.0, 1.0)],
                 vec![mechanism("a", &[f64::NAN])],
                 0.05,
                 0.80,
@@ -994,7 +950,7 @@ mod tests {
         ));
         assert_eq!(
             compute_identifiability_envelope(
-                vec![action("x", 1.0, 1.0, 1.0)],
+                vec![action("x", 1.0, 1.0)],
                 vec![mechanism("a", &[0.0]), mechanism("a", &[1.0])],
                 0.05,
                 0.80,
@@ -1005,7 +961,7 @@ mod tests {
         );
         assert!(matches!(
             compute_identifiability_envelope(
-                vec![action("x", 1.0, 1.0, 1.0)],
+                vec![action("x", 1.0, 1.0)],
                 vec![mechanism("a", &[0.0])],
                 0.05,
                 0.80,
