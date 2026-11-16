@@ -647,7 +647,10 @@ pub fn verify_loft_artifact_integrity(
         == LongitudinalEndCondition::CollapsedCentreline;
     let point_count = artifact.section_point_count;
     let station_count = artifact.station_count;
-    if point_count < 2 || station_count < 2
+    if point_count < 2
+        || point_count > MAX_SECTION_POINTS
+        || station_count < 2
+        || station_count > MAX_STATIONS
         || (station_count == 2 && bow_collapsed && stern_collapsed)
     {
         violation(
@@ -790,9 +793,9 @@ pub fn verify_loft_artifact_integrity(
     if artifact.bow_end_cap_face_range.first_face != artifact.end_cap_face_range.first_face
         || expected_bow_range_end != Some(artifact.stern_end_cap_face_range.first_face)
         || expected_stern_range_end != end_cap_end
-        || artifact.end_cap_face_range.face_count
-            != artifact.bow_end_cap_face_range.face_count
-                + artifact.stern_end_cap_face_range.face_count
+        || artifact.bow_end_cap_face_range.face_count
+            .checked_add(artifact.stern_end_cap_face_range.face_count)
+            != Some(artifact.end_cap_face_range.face_count)
     {
         violation(
             &mut violations,
