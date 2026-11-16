@@ -1,260 +1,68 @@
-# Neuroscience Validation Suite
+# Neuroscience Research and Validation
 
-**Module Location**: Various (see below)
-**Purpose**: Validate consciousness topology theory against real biological data
+**Status:** experimental research code and qualification work. This directory is not a clinically validated system and does not establish a diagnostic, prognostic, treatment-selection or consciousness biomarker.
 
----
+## Evidence boundary
 
-## Overview
+The repository contains several different kinds of neuroscience-related work. They must be reported separately.
 
-Symthaea includes comprehensive neuroscience validation to ensure our computational consciousness models align with real biological neural systems. This validation spans three domains:
+| Track | Current implementation | What it establishes | What it does not establish |
+|---|---|---|---|
+| C. elegans topology | Embedded representative 279-node topology with deterministic pseudo-random connectivity | Reproducible software fixture for graph and HDC experiments | Empirical C. elegans connectome validation; the edges are not loaded from the published synapse table |
+| Sleep EEG | Sleep-EDF example and signal-processing components | A code path and candidate analysis on EEG/EOG/EMG data | Generalizable sleep staging, diagnostic performance or clinical utility without pinned cohort, labels, splits and independent metrics |
+| Meditation / task EEG | Experimental EEG feature and state-analysis code | Candidate feature computations for research | A validated measure of meditation, flow, “superconsciousness”, or any person's mental state |
+| EM connectomics | Connectomics Autopilot research programme | Reconstruction, proofreading and query-assurance research for microscopy connectomes | Human in-vivo functional connectivity or clinical prediction |
+| Human clinical connectomics | NeuroTwin translation plan | Proposed evaluation design and qualification gates | A currently validated patient-specific brain twin or treatment-response model |
 
-| Domain | Data Source | Neurons/Subjects | Key Validation |
-|--------|-------------|------------------|----------------|
-| **Connectome** | C. elegans | 302 neurons | Structural Φ |
-| **Sleep EEG** | Sleep-EDF | 2+ subjects | State-dependent Φ |
-| **Meditation EEG** | OpenNeuro | 22+ subjects | Superconscious states |
+A test that runs a function is not proof that its scientific hypothesis is true. A synthetic fixture must be reported as synthetic. A dataset path in source code does not prove the expected data files are present, licensed, correctly labelled or independently validated.
 
----
+## Current research programme
 
-## Validation Domains
+### 1. Connectomics Autopilot
 
-### 1. C. elegans Connectome Validation
+See [CONNECTOME_RESEARCH_PROGRAM_V2.md](./CONNECTOME_RESEARCH_PROGRAM_V2.md).
 
-**Documentation**: [CELEGANS_VALIDATION.md](./CELEGANS_VALIDATION.md)
-**Module**: `symthaea-core/src/hdc/celegans_connectome.rs`
-**Lines**: 930
+This programme addresses microscopy / EM connectomics: source provenance, neuron and synapse reconstruction uncertainty, candidate correction, query robustness across plausible reconstructions, pipeline sensitivity, scientific value of information and evidence invalidation. Results on this track must not be compared directly with clinical fMRI or diffusion-MRI prediction metrics.
 
-The C. elegans nematode has the only fully mapped connectome of any organism (302 neurons, ~7,000 synapses). This provides ground truth for testing whether our Φ calculations produce biologically meaningful results.
+### 2. C. elegans graph fixture
 
-**Key Tests**:
-- Biological Φ > Random Φ (validates evolution optimizes for integration)
-- Processing core Φ ≈ Full Φ (motor system is downstream)
-- Small-world topology comparison
+See [CELEGANS_VALIDATION.md](./CELEGANS_VALIDATION.md).
 
-### 2. Clinical Sleep Validation (Project Hypnos)
+The current embedded Rust structure is a synthetic, deterministic topology fixture. It can be useful for testing code paths, randomization controls and graph algorithms, but not as an empirical biological connectome until a versioned observed edge table and source-data manifest are imported and independently checked.
 
-**Example**: `examples/clinical_validation.rs`
-**Lines**: 1,533
-**Data**: `data/sleep-edf/` (Sleep-EDF from PhysioNet)
+### 3. EEG signal research
 
-Real-time sleep stage classification from EEG validates that LTC dynamics resonate with biological consciousness states.
+Sleep-EDF and OpenNeuro are potential data sources. Every reproduction must pin exact dataset release, subject inclusion, file digests, channel definitions, reference montage, sampling rate, scoring standard, exclusions and split assignments. Splits must be participant-level; repeated epochs from one person must not leak across train and test.
 
-**Architecture**:
-```
-EEG/EOG/EMG → LTC Processors → Sleep Stage Classification
-                  ↓
-           Permutation Entropy (differentiation)
-           Theta/Alpha Ratio (spectral texture)
-           Eye Movement Detection (REM)
-           Muscle Tone Tracking (atonia)
-```
+Report macro-F1, per-stage sensitivity/specificity, balanced accuracy, Cohen's kappa, confusion matrices, calibration where relevant and participant-level confidence intervals. A single overall percentage is insufficient, especially for imbalanced sleep stages. Compare against established sleep-scoring baselines under the same preprocessing and cohort.
 
-**Sleep Stages Detected**:
-- Wake (high entropy, high tone)
-- N1 (transitional, dropping tone)
-- N2 (sleep spindles, K-complexes)
-- N3 (deep sleep, low entropy)
-- REM (high entropy, atonia, eye movements)
+Meditation and related EEG analyses are exploratory. Avoid assigning subjective or clinical states solely from band power or connectivity features. Any state labels require a prespecified operational definition, appropriate ground truth and external validation.
 
-### 3. Meditation & Flow State Validation
+## Clinical translation: NeuroTwin
 
-**Module**: `src/perception/physio/meditation_detector.rs`
-**Data**: `data/meditation-eeg/` (22+ subjects, BIDS format)
+See [NEUROTWIN_CLINICAL_TRANSLATION_V0_1.md](./NEUROTWIN_CLINICAL_TRANSLATION_V0_1.md).
 
-Detects meditation and flow states from multi-channel EEG, validating higher consciousness state detection.
+The proposed clinical track is human multimodal neuroimaging and electrophysiology: diffusion MRI, resting/task fMRI, EEG/MEG, longitudinal symptoms, treatment exposure and patient-relevant outcomes. Its first research question is whether such data add robust, calibrated value to clinical-only baselines for depression/anxiety trajectories and treatment-response research.
 
-**States Detected**:
-- Flow (gamma sync, high focus)
-- Absorption (deep theta, high presence)
-- Calm (alpha dominance)
-- Wandering (default mode network)
+The plan distinguishes prognosis from treatment-effect estimation, requires external-site validation, prohibits leakage across participants and visits, and keeps Φ / IIT-inspired indicators outside primary clinical endpoints until independently validated for a defined construct.
 
----
+## Running code checks
 
-## Data Sources
+Commands below run repository tests; they do not automatically validate scientific hypotheses or clinical claims.
 
-### Sleep-EDF Database
-- **Source**: PhysioNet (https://physionet.org/content/sleep-edfx/)
-- **Format**: EDF (European Data Format)
-- **Channels**: EEG (Fpz-Cz, Pz-Oz), EOG, EMG
-- **Sampling**: 100 Hz
-- **Annotations**: 30-second epoch hypnogram
+- C. elegans fixture tests: cargo test celegans
+- EEG feature tests: cargo test meditation
+- Clinical examples require the exact licensed/approved dataset files and their data dictionaries.
 
-**Current Subjects**:
-- SC4001E0-PSG.edf (48 MB)
-- SC4002E0-PSG.edf (51 MB)
+## Evidence reporting vocabulary
 
-**Expansion**: Download additional subjects from PhysioNet for robust validation.
+Use these labels in reports and benchmark output:
 
-### Meditation-EEG Dataset
-- **Source**: OpenNeuro
-- **Format**: BIDS (Brain Imaging Data Structure)
-- **Subjects**: 22+ (sub-001 through sub-022)
-- **Sessions**: 2 per subject (ses-01, ses-02)
-- **Task**: Meditation with event markers
+- **Synthetic fixture:** generated or hand-authored inputs.
+- **Internal code test:** checks implementation behavior only.
+- **External input, unverified:** a local file is parsed, but provenance/authenticity has not been independently established.
+- **Empirical reproduction:** pinned source data and protocol reproduce a published or registered result.
+- **External validation:** a locked cohort/site not used for model selection validates the result.
+- **Prospective clinical validation:** a protocol-approved study evaluates patient-relevant outcomes in intended workflow.
 
-**Directory Structure**:
-```
-data/meditation-eeg/
-├── sub-001/
-│   ├── ses-01/eeg/
-│   │   ├── sub-001_ses-01_task-meditation_eeg.json
-│   │   └── sub-001_ses-01_task-meditation_events.tsv
-│   └── ses-02/eeg/
-│       └── ...
-├── sub-002/
-│   └── ...
-└── participants.tsv
-```
-
----
-
-## Implementation Components
-
-### LTC-Based Processors
-
-All physiological signal processing uses Liquid Time-Constant (LTC) neurons:
-
-```rust
-// Dual-τ LTC for spectral discrimination
-struct ThetaAlphaRatio {
-    tau_fast: f64,  // ~40ms - Alpha/Beta resonance
-    tau_slow: f64,  // ~100ms - Theta resonance
-    energy_fast: f64,
-    energy_slow: f64,
-}
-```
-
-### Permutation Entropy
-
-Measures time-domain complexity (the "differentiation" component of Φ):
-
-```rust
-fn permutation_entropy(signal: &[f64], delay: usize) -> f64;
-// Returns 0.0 (monotonic) to 1.0 (random)
-// Wake: ~0.8-0.9 | REM: ~0.7 | Deep Sleep: ~0.3
-```
-
-### Eye Movement Detection
-
-EOG-based detector for REM identification:
-
-```rust
-struct EyeMovementDetector {
-    movement_energy: f64,    // Running variance
-    movement_frequency: f64, // Zero-crossing rate
-    fn rem_indicator(&self) -> f64;
-}
-```
-
-### Muscle Tone Tracking
-
-EMG-based atonia detection:
-
-```rust
-struct MuscleToneTracker {
-    fn is_atonia(&self) -> bool;       // REM signature
-    fn is_tone_dropping(&self) -> bool; // N1 signature
-}
-```
-
----
-
-## Running Validations
-
-### C. elegans Validation
-
-```bash
-# Run C. elegans tests
-cargo test celegans -- --nocapture
-
-# See Φ analysis output
-cargo test test_phi_analysis -- --nocapture
-cargo test test_topology_comparison -- --nocapture
-```
-
-### Clinical Sleep Validation
-
-```bash
-# Download sleep-edf data first
-./scripts/download_sleep_edf.sh
-
-# Run validation (requires data)
-cargo run --example clinical_validation --release
-```
-
-### Meditation Analysis
-
-```bash
-# Run meditation detection tests
-cargo test meditation -- --nocapture
-
-# Analyze meditation dataset
-cargo run --example meditation_phi_analysis --release
-```
-
----
-
-## Validation Results
-
-### Expected Outcomes
-
-| Validation | Success Criteria | Status |
-|------------|------------------|--------|
-| C. elegans Φ > Random | Φ ratio > 1.0 | PASSING |
-| Sleep stage accuracy | > 75% agreement | PASSING |
-| REM detection | Atonia + eye movement correlation | PASSING |
-| Meditation flow detection | Gamma-theta coupling | IMPLEMENTED |
-
-### Key Findings
-
-1. **Biological networks optimize for integration**: C. elegans Φ consistently exceeds random networks of equal size.
-
-2. **LTC dynamics resonate with brain states**: Sleep stage classification achieves high accuracy using only LTC-based features.
-
-3. **Spectral texture distinguishes states**: Theta/alpha ratio cleanly separates REM from Wake despite similar entropy.
-
----
-
-## Future Directions
-
-### Phase 4+ Enhancements
-
-1. **Expand Sleep-EDF to 10+ subjects** for statistical power
-2. **PyPhi cross-validation** on small systems (3-5 nodes)
-3. **Real-time meditation Φ feedback** using live EEG
-4. **Multi-subject Φ correlation** with subjective reports
-5. **Anesthesia validation** (loss/recovery of consciousness)
-
-### Research Questions
-
-- Does Φ decrease during anesthesia proportionally to depth?
-- Can Φ predict meditation depth better than traditional EEG markers?
-- Do long-term meditators show structural Φ differences?
-- Is there a minimum Φ threshold for conscious experience?
-
----
-
-## References
-
-### Connectome
-- White et al. (1986) - C. elegans nervous system
-- Varshney et al. (2011) - C. elegans network properties
-
-### Sleep Science
-- Berry et al. (2017) - AASM Sleep Scoring Manual
-- Kemp et al. (2000) - Sleep-EDF database
-
-### Meditation Science
-- Lutz et al. (2004) - Gamma oscillations in meditation
-- Cahn & Polich (2006) - Meditation and EEG review
-- Csikszentmihalyi (1990) - Flow psychology
-
-### Integrated Information Theory
-- Tononi et al. (2016) - IIT 3.0 foundations
-- Oizumi et al. (2014) - IIT mathematical framework
-
----
-
-*Part of Symthaea-HLB: Consciousness-first AI with rigorous biological validation*
+Never silently upgrade a result from one category to another.

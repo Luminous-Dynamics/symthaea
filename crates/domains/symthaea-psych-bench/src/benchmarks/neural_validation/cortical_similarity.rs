@@ -3,14 +3,15 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Cortical Activation Similarity Benchmark
 //!
-//! Compares Symthaea's simulated per-region activation patterns against
-//! externally predicted fMRI activations (e.g., from Meta FAIR's TRIBE v2).
+//! Compares simulated per-region activation patterns against local activation
+//! vectors. Inputs are provenance-unverified JSON unless independently qualified;
+//! an absent input directory uses explicitly labelled synthetic fixtures.
 //!
 //! # Benchmark variants
 //!
 //! - **CorticalSimilarityBenchmark** — Static activation comparison (cosine, Pearson, Spearman)
 //! - **TemporalDynamicsBenchmark** — HRF-convolved timeseries comparison (item #4)
-//! - **BidirectionalValidationBenchmark** — Feed Broca output back through TRIBE v2 (item #7)
+//! - **BidirectionalValidationBenchmark** — Compare internal states with a local synthetic surrogate
 //! - **SubstrateComparisonBenchmark** — Compare TRIBE v2 correlation across substrates (item #8)
 //!
 //! # References
@@ -22,7 +23,7 @@
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::{BenchmarkProvenance, PsychBenchmark};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use symthaea_core::hdc::cortical_activation::{
     ActivationSource, CorticalActivationMap, CorticalActivationTimeseries,
@@ -30,11 +31,41 @@ use symthaea_core::hdc::cortical_activation::{
 use symthaea_core::hdc::hemodynamic::{HrfConfig, convolve_timeseries};
 use symthaea_core::hdc::substrate_independence::CorticalRegion;
 
-/// A single TRIBE v2 prediction loaded from JSON.
+/// A single activation vector loaded from local JSON.
 #[derive(Debug, Clone)]
 struct TribePrediction {
     stimulus_id: String,
     activations: HashMap<CorticalRegion, f32>,
+}
+
+/// Provenance class for activation vectors supplied to this benchmark.
+///
+/// Local JSON is not source-authenticated by this loader. It must not be
+/// described as measured TRIBE v2 output without a separate provenance audit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PredictionSource {
+    SyntheticFallback,
+    ExternalJsonUnverified,
+}
+
+impl PredictionSource {
+    fn label(self) -> &'static str {
+        match self {
+            Self::SyntheticFallback => "synthetic_fallback",
+            Self::ExternalJsonUnverified => "external_json_unverified",
+        }
+    }
+
+    fn note(self) -> &'static str {
+        match self {
+            Self::SyntheticFallback => {
+                "DATA SOURCE: deterministic synthetic fixture; not empirical fMRI or TRIBE data."
+            }
+            Self::ExternalJsonUnverified => {
+                "DATA SOURCE: local JSON activation vectors parsed successfully; source identity and empirical authenticity are not verified by this loader."
+            }
+        }
+    }
 }
 
 // ============================================================================
@@ -50,7 +81,7 @@ impl PsychBenchmark for CorticalSimilarityBenchmark {
     }
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
-        let predictions = load_or_generate_predictions(config);
+        let (predictions, prediction_source) = load_or_generate_predictions(config);
         let n_stimuli = predictions.len();
 
         let mut cosine_values = Vec::new();
@@ -112,15 +143,15 @@ impl PsychBenchmark for CorticalSimilarityBenchmark {
 
         BenchmarkResult {
             benchmark: self.name().to_string(),
-            config_label: Some("tribe_v2_comparison".to_string()),
+            config_label: Some(format!("cortical_similarity::{}", prediction_source.label())),
             metrics,
             elapsed_ms: elapsed,
             conditions: n_stimuli,
             trials_per_condition: 1,
             trial_trace: Vec::new(),
             notes: vec![
-                "Compares simulated 12-region activations against TRIBE v2 fMRI predictions"
-                    .to_string(),
+                "Compares local simulated 12-region activations against supplied activation vectors; source authenticity is not established by this harness.".to_string(),
+                prediction_source.note().to_string(),
                 format!(
                     "Mean Pearson r = {:.4} (bootstrap 95% CI)",
                     mean_f64(&pearson_values)
@@ -248,15 +279,15 @@ impl PsychBenchmark for TemporalDynamicsBenchmark {
 
         BenchmarkResult {
             benchmark: self.name().to_string(),
-            config_label: Some("hrf_temporal_dynamics".to_string()),
+            config_label: Some("hrf_temporal_dynamics::synthetic_fixture".to_string()),
             metrics,
             elapsed_ms: elapsed,
             conditions: 1,
             trials_per_condition: n_cycles,
             trial_trace: Vec::new(),
             notes: vec![
-                "HRF-convolved timeseries: 31Hz → 0.5Hz BOLD".to_string(),
-                "Visual flash at 1-2s, auditory at 3-4s".to_string(),
+                "SYNTHETIC: simulated 31Hz regional activity convolved with a canonical HRF and downsampled; not measured human BOLD.".to_string(),
+                "Synthetic visual and auditory events are software fixtures, not an empirical fMRI protocol.".to_string(),
             ],
         }
     }
@@ -351,15 +382,14 @@ impl PsychBenchmark for BidirectionalValidationBenchmark {
 
         BenchmarkResult {
             benchmark: self.name().to_string(),
-            config_label: Some("bidirectional_validation".to_string()),
+            config_label: Some("bidirectional_validation::synthetic_surrogate".to_string()),
             metrics,
             elapsed_ms: elapsed,
             conditions: output_types.len(),
             trials_per_condition: 1,
             trial_trace: Vec::new(),
             notes: vec![
-                "Tests: does Symthaea's brain state match what TRIBE v2 predicts for its own output?"
-                    .to_string(),
+                "SYNTHETIC SURROGATE: compares internal state with a local hand-coded text-conditioned activation function; it does not run Meta TRIBE v2 or validate human brain responses.".to_string(),
                 format!(
                     "Mean consistency = {:.4}",
                     mean_f64(&consistency_scores)
@@ -378,7 +408,7 @@ impl PsychBenchmark for BidirectionalValidationBenchmark {
     fn provenance(&self) -> Option<BenchmarkProvenance> {
         Some(BenchmarkProvenance {
             paradigm: "Bidirectional brain-output consistency (closed-loop validation)",
-            citation: "TRIBE v2 (Meta FAIR, 2026)",
+            citation: "TRIBE v2 (Meta FAIR, 2026; candidate reference comparator only — local input authenticity is not verified here)",
             year: 2026,
             doi: None,
         })
@@ -400,7 +430,7 @@ impl PsychBenchmark for SubstrateComparisonBenchmark {
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
-        let predictions = load_or_generate_predictions(config);
+        let (predictions, prediction_source) = load_or_generate_predictions(config);
 
         // Substrate profiles: biological should score highest since TRIBE v2 was
         // trained on human (biological) fMRI data.
@@ -446,15 +476,15 @@ impl PsychBenchmark for SubstrateComparisonBenchmark {
 
         BenchmarkResult {
             benchmark: self.name().to_string(),
-            config_label: Some("substrate_comparison".to_string()),
+            config_label: Some(format!("substrate_comparison::{}", prediction_source.label())),
             metrics,
             elapsed_ms: elapsed,
             conditions: substrates.len(),
             trials_per_condition: predictions.len(),
             trial_trace: Vec::new(),
             notes: vec![
-                "Compares TRIBE v2 correlation under different substrate profiles".to_string(),
-                "Biological should correlate highest (trained on human fMRI)".to_string(),
+                "Compares hand-authored substrate profiles against supplied activation vectors; this is not a biological-substrate experiment.".to_string(),
+                prediction_source.note().to_string(),
             ],
         }
     }
@@ -531,7 +561,7 @@ impl PsychBenchmark for ParcellationRobustnessBenchmark {
         use symthaea_core::hdc::glasser_parcellation::AtlasType;
 
         let start = std::time::Instant::now();
-        let predictions = load_or_generate_predictions(config);
+        let (predictions, prediction_source) = load_or_generate_predictions(config);
         let mut metrics = BTreeMap::new();
 
         // For each atlas, compute mean Pearson r across stimuli.
@@ -562,15 +592,15 @@ impl PsychBenchmark for ParcellationRobustnessBenchmark {
 
         BenchmarkResult {
             benchmark: self.name().to_string(),
-            config_label: Some("parcellation_robustness".to_string()),
+            config_label: Some(format!("parcellation_robustness::{}", prediction_source.label())),
             metrics,
             elapsed_ms: elapsed,
             conditions: AtlasType::ALL.len(),
             trials_per_condition: predictions.len(),
             trial_trace: Vec::new(),
             notes: vec![
-                "Tests whether TRIBE v2 correlation is robust across atlas choices".to_string(),
-                "Atlas-invariant results strengthen paper claims".to_string(),
+                "Tests atlas transformations against supplied activation vectors; this is not a clinical or empirical atlas-invariance claim.".to_string(),
+                prediction_source.note().to_string(),
             ],
         }
     }
@@ -705,7 +735,7 @@ impl PsychBenchmark for EegValidationBenchmark {
         use symthaea_core::hdc::cortical_activation::{EegBand, activations_to_eeg};
 
         let start = std::time::Instant::now();
-        let predictions = load_or_generate_predictions(config);
+        let (predictions, prediction_source) = load_or_generate_predictions(config);
 
         let mut band_correlations: HashMap<String, Vec<f64>> = HashMap::new();
 
@@ -754,15 +784,15 @@ impl PsychBenchmark for EegValidationBenchmark {
 
         BenchmarkResult {
             benchmark: self.name().to_string(),
-            config_label: Some("eeg_validation".to_string()),
+            config_label: Some(format!("eeg_validation::{}", prediction_source.label())),
             metrics,
             elapsed_ms: elapsed,
             conditions: predictions.len(),
             trials_per_condition: 1,
             trial_trace: Vec::new(),
             notes: vec![
-                "EEG power spectrum comparison: alpha ERD + gamma ERS patterns".to_string(),
-                format!("Bands: delta/theta/alpha/beta/gamma × 12 regions"),
+                "Derived EEG-like patterns from activation vectors; these are not measured EEG recordings.".to_string(),
+                prediction_source.note().to_string(),
             ],
         }
     }
@@ -799,7 +829,7 @@ impl PsychBenchmark for HybridSubstrateBenchmark {
 
     fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
         let start = std::time::Instant::now();
-        let predictions = load_or_generate_predictions(config);
+        let (predictions, prediction_source) = load_or_generate_predictions(config);
 
         // Define hybrid configurations.
         let configs_list: Vec<(&str, HashMap<CorticalRegion, f32>)> = vec![
@@ -842,16 +872,15 @@ impl PsychBenchmark for HybridSubstrateBenchmark {
 
         BenchmarkResult {
             benchmark: self.name().to_string(),
-            config_label: Some("hybrid_substrate".to_string()),
+            config_label: Some(format!("hybrid_substrate::{}", prediction_source.label())),
             metrics,
             elapsed_ms: elapsed,
             conditions: configs_list.len(),
             trials_per_condition: predictions.len(),
             trial_trace: Vec::new(),
             notes: vec![
-                "Per-region substrate assignment: find optimal hybrid configuration".to_string(),
-                "Optimal: bio Emotional/Social + silicon Prefrontal/Exec + quantum Integration"
-                    .to_string(),
+                "Heuristic comparison of hand-authored per-region substrate profiles; no optimal biological substrate is established.".to_string(),
+                prediction_source.note().to_string(),
             ],
         }
     }
@@ -1002,30 +1031,60 @@ fn simulate_tribe_prediction_for_text(
     activations
 }
 
-fn load_or_generate_predictions(config: &BenchmarkConfig) -> Vec<TribePrediction> {
+fn load_or_generate_predictions(
+    config: &BenchmarkConfig,
+) -> (Vec<TribePrediction>, PredictionSource) {
     let data_dir = std::path::Path::new("data/tribe-v2-stimuli");
     if data_dir.exists() {
-        if let Ok(predictions) = load_predictions_from_dir(data_dir) {
-            if !predictions.is_empty() {
-                return predictions;
-            }
+        let predictions = load_predictions_from_dir(data_dir).unwrap_or_else(|error| {
+            panic!(
+                "Refusing to fall back to synthetic activations because {} exists but could not be loaded: {error}",
+                data_dir.display()
+            )
+        });
+        if predictions.is_empty() {
+            panic!(
+                "Refusing to fall back to synthetic activations because {} exists but contains no valid JSON prediction files",
+                data_dir.display()
+            );
         }
+        (predictions, PredictionSource::ExternalJsonUnverified)
+    } else {
+        (
+            generate_mock_predictions(config),
+            PredictionSource::SyntheticFallback,
+        )
     }
-    generate_mock_predictions(config)
 }
 
 fn load_predictions_from_dir(
     dir: &std::path::Path,
 ) -> Result<Vec<TribePrediction>, Box<dyn std::error::Error>> {
     let mut predictions = Vec::new();
+    let mut seen_ids = BTreeSet::new();
     for entry in std::fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
-        if path.extension().map_or(false, |e| e == "json") {
+        if path.extension().map_or(false, |extension| extension == "json") {
             let contents = std::fs::read_to_string(&path)?;
-            if let Ok(pred) = parse_tribe_json(&contents) {
-                predictions.push(pred);
+            let prediction = parse_tribe_json(&contents).map_err(|error| {
+                std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!("invalid prediction file {}: {error}", path.display()),
+                )
+            })?;
+            if !seen_ids.insert(prediction.stimulus_id.clone()) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "duplicate stimulus_id {:?} in {}",
+                        prediction.stimulus_id,
+                        path.display()
+                    ),
+                )
+                .into());
             }
+            predictions.push(prediction);
         }
     }
     predictions.sort_by(|a, b| a.stimulus_id.cmp(&b.stimulus_id));
@@ -1034,20 +1093,32 @@ fn load_predictions_from_dir(
 
 fn parse_tribe_json(json_str: &str) -> Result<TribePrediction, Box<dyn std::error::Error>> {
     let value: serde_json::Value = serde_json::from_str(json_str)?;
-    let stimulus_id = value["stimulus_id"]
-        .as_str()
-        .unwrap_or("unknown")
+    let invalid = |message: String| {
+        std::io::Error::new(std::io::ErrorKind::InvalidData, message)
+    };
+    let stimulus_id = value
+        .get("stimulus_id")
+        .and_then(serde_json::Value::as_str)
+        .filter(|id| !id.trim().is_empty())
+        .ok_or_else(|| invalid("missing or empty stimulus_id".to_string()))?
         .to_string();
-    let region_obj = value["region_activations"]
-        .as_object()
-        .ok_or("missing region_activations")?;
+    let region_obj = value
+        .get("region_activations")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| invalid("missing region_activations object".to_string()))?;
 
     let mut activations = HashMap::new();
     for region in CorticalRegion::ALL {
         let key = region.as_str();
-        if let Some(v) = region_obj.get(key).and_then(|v| v.as_f64()) {
-            activations.insert(region, v as f32);
+        let value = region_obj
+            .get(key)
+            .and_then(serde_json::Value::as_f64)
+            .ok_or_else(|| invalid(format!("missing or non-numeric activation for region {key}")))?;
+        let activation = value as f32;
+        if !value.is_finite() || !activation.is_finite() {
+            return Err(invalid(format!("non-finite activation for region {key}")).into());
         }
+        activations.insert(region, activation);
     }
 
     Ok(TribePrediction {
@@ -1115,6 +1186,53 @@ fn mean_f64(vals: &[f64]) -> f64 {
 mod tests {
     use super::*;
     use crate::harness::config::BenchmarkConfig;
+
+    #[test]
+    fn test_prediction_source_labels_are_explicit() {
+        assert_eq!(
+            PredictionSource::SyntheticFallback.label(),
+            "synthetic_fallback"
+        );
+        assert!(PredictionSource::SyntheticFallback.note().contains("not empirical"));
+        assert_eq!(
+            PredictionSource::ExternalJsonUnverified.label(),
+            "external_json_unverified"
+        );
+    }
+
+    #[test]
+    fn test_parse_tribe_json_rejects_missing_stimulus_id() {
+        let json = r#"{ "region_activations": {} }"#;
+        assert!(parse_tribe_json(json).is_err());
+    }
+
+    #[test]
+    fn test_parse_tribe_json_rejects_incomplete_region_vector() {
+        let json = r#"{ "stimulus_id": "incomplete", "region_activations": { "Visual": 0.5 } }"#;
+        assert!(parse_tribe_json(json).is_err());
+    }
+
+    #[test]
+    fn test_loader_fails_closed_on_malformed_json() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before Unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "symthaea-neurotwin-loader-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&dir).expect("create temporary test directory");
+        let bad_file = dir.join("bad.json");
+        std::fs::write(&bad_file, "{ definitely not JSON")
+            .expect("write malformed fixture");
+
+        let result = load_predictions_from_dir(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+        assert!(result.is_err(), "malformed input must not be silently skipped");
+    }
 
     #[test]
     fn test_cortical_similarity_runs() {
