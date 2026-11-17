@@ -81,6 +81,8 @@ Source pages:
 
 Reported leading partners for HS 8481 were China (US$141.873m), Germany (US$88.141m), United States (US$60.380m), Italy (US$28.287m) and United Kingdom (US$14.984m). For HS 841391: China (US$32.031m), United States (US$13.292m), Germany (US$11.506m), India (US$10.812m) and United Kingdom (US$6.230m).
 
+By declared trade value, these top-five partner countries represent approximately **68.6% of HS 8481** and **62.7% of HS 841391**; China alone represents approximately 29.2% and 27.2%, respectively. These are **country-of-origin/partner concentration indicators for broad HS categories**, not firm-level supplier concentration, local supplier gaps or a qualified-source risk measure. They are screening prompts for a more granular, source-reconciled supply-dependency study.
+
 **Classification warning:** These are broad HS6 lines. Before business-case use, retrieve the correct current SARS tariff lines, review tariff/nomenclature revisions, confirm product scope and quantity units, and reconcile WITS/UN Comtrade values with SARS commodity statistics. Do not add these two categories together or translate their total import values into a local factory's potential revenue.
 
 Official SARS source:
