@@ -19,7 +19,7 @@ The audit:
 1. Parses and meta-validates the declared JSON Schema Draft 2020-12 contract.
 2. Refuses `$ref`, `$dynamicRef` and `$recursiveRef` so the schema cannot cause external or indirect schema resolution.
 3. Validates the registry instance against the committed schema.
-4. Enforces unique candidate/source identifiers and closed source references.
+4. Enforces unique candidate/source identifiers, requires a DOI or arXiv identifier for every source, and verifies closed source references.
 5. Keeps measured transitions, ML predictions, and first-principles calculated Tc values in three separate channels: `tc_observations`, `tc_prediction`, and `tc_calculations`. A material may legitimately have both an experimental Tc observation and a calculated Tc estimate, but the two are never merged.
 6. Requires actinide-bearing candidates to carry an explicit computational-only or exclusion gate.
 7. Emits deterministic SHA-256 digests and record counts in a JSON receipt.
