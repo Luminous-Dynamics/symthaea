@@ -1,0 +1,17 @@
+[package]
+name = "symmetry-active-experiment-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact finite minimax experiment selection for symmetry hypotheses"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "decision_tree_probe"
+path = "examples/decision_tree_probe.rs"
+
+[workspace]
