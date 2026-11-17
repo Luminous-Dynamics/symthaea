@@ -68,6 +68,7 @@ fn parse_cost_samples(value: &Value, label: &str) -> Result<BTreeMap<String, Vec
         let values = required_value(value, mode, label)?.as_array()
             .ok_or_else(|| format!("{label}.{mode} must be an array"))?;
         if values.is_empty() { return Err(format!("{label}.{mode} is empty; unknown cost is not zero")); }
+        if values.len() > 1_000 { return Err(format!("{label}.{mode} exceeds the 1000-sample cap")); }
         let mut parsed = Vec::new();
         for (index, item) in values.iter().enumerate() {
             parsed.push(item.as_u64().filter(|n| *n > 0)
