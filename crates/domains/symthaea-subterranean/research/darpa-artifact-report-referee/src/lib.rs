@@ -25,10 +25,7 @@ impl Vec3 {
     }
 
     fn validate(self) -> Result<(), RefereeError> {
-        if [self.x, self.y, self.z]
-            .into_iter()
-            .all(f64::is_finite)
-        {
+        if [self.x, self.y, self.z].into_iter().all(f64::is_finite) {
             Ok(())
         } else {
             Err(RefereeError::NonFiniteCoordinate)
@@ -88,9 +85,7 @@ pub struct ReportProfile {
 impl ReportProfile {
     pub fn validate(self) -> Result<Self, RefereeError> {
         validate_identifier(&self.coordinate_frame_id, "profile.coordinate_frame_id")?;
-        if !self.localization_tolerance_m.is_finite()
-            || self.localization_tolerance_m < 0.0
-        {
+        if !self.localization_tolerance_m.is_finite() || self.localization_tolerance_m < 0.0 {
             return Err(RefereeError::InvalidLocalizationTolerance);
         }
         Ok(self)
@@ -179,16 +174,46 @@ pub fn darpa_final_2021_crosswalk_v0_1() -> ArtifactTypeCrosswalk {
     ArtifactTypeCrosswalk {
         version: "darpa-finals-artifact-strings-2021-04-01-v0.1".into(),
         mappings: vec![
-            ArtifactTypeAlias { source_type: "survivor".into(), official_report_string: "Survivor".into() },
-            ArtifactTypeAlias { source_type: "cellphone".into(), official_report_string: "Cell Phone".into() },
-            ArtifactTypeAlias { source_type: "backpack".into(), official_report_string: "Backpack".into() },
-            ArtifactTypeAlias { source_type: "drill".into(), official_report_string: "Drill".into() },
-            ArtifactTypeAlias { source_type: "fireextinguisher".into(), official_report_string: "Fire Extinguisher".into() },
-            ArtifactTypeAlias { source_type: "gas".into(), official_report_string: "Gas".into() },
-            ArtifactTypeAlias { source_type: "vent".into(), official_report_string: "Vent".into() },
-            ArtifactTypeAlias { source_type: "helmet".into(), official_report_string: "Helmet".into() },
-            ArtifactTypeAlias { source_type: "rope".into(), official_report_string: "Rope".into() },
-            ArtifactTypeAlias { source_type: "cube".into(), official_report_string: "Cube".into() },
+            ArtifactTypeAlias {
+                source_type: "survivor".into(),
+                official_report_string: "Survivor".into(),
+            },
+            ArtifactTypeAlias {
+                source_type: "cellphone".into(),
+                official_report_string: "Cell Phone".into(),
+            },
+            ArtifactTypeAlias {
+                source_type: "backpack".into(),
+                official_report_string: "Backpack".into(),
+            },
+            ArtifactTypeAlias {
+                source_type: "drill".into(),
+                official_report_string: "Drill".into(),
+            },
+            ArtifactTypeAlias {
+                source_type: "fireextinguisher".into(),
+                official_report_string: "Fire Extinguisher".into(),
+            },
+            ArtifactTypeAlias {
+                source_type: "gas".into(),
+                official_report_string: "Gas".into(),
+            },
+            ArtifactTypeAlias {
+                source_type: "vent".into(),
+                official_report_string: "Vent".into(),
+            },
+            ArtifactTypeAlias {
+                source_type: "helmet".into(),
+                official_report_string: "Helmet".into(),
+            },
+            ArtifactTypeAlias {
+                source_type: "rope".into(),
+                official_report_string: "Rope".into(),
+            },
+            ArtifactTypeAlias {
+                source_type: "cube".into(),
+                official_report_string: "Cube".into(),
+            },
         ],
     }
 }
@@ -305,12 +330,13 @@ pub fn parse_ground_truth_tsv(
 
         let mut coordinates = [0.0; 3];
         for (column, value) in fields[1..4].iter().enumerate() {
-            let coordinate = value.parse::<f64>().map_err(|_| {
-                GroundTruthParseError::InvalidCoordinate {
-                    line: line_number,
-                    column: column + 1,
-                }
-            })?;
+            let coordinate =
+                value
+                    .parse::<f64>()
+                    .map_err(|_| GroundTruthParseError::InvalidCoordinate {
+                        line: line_number,
+                        column: column + 1,
+                    })?;
             if !coordinate.is_finite() {
                 return Err(GroundTruthParseError::NonFiniteCoordinate {
                     line: line_number,
@@ -369,7 +395,10 @@ fn validate_inputs(
     let mut truth_ids = BTreeSet::new();
     for artifact in ground_truth {
         validate_identifier(&artifact.id, "ground_truth.id")?;
-        validate_identifier(&artifact.coordinate_frame_id, "ground_truth.coordinate_frame_id")?;
+        validate_identifier(
+            &artifact.coordinate_frame_id,
+            "ground_truth.coordinate_frame_id",
+        )?;
         if artifact.coordinate_frame_id != profile.coordinate_frame_id {
             return Err(RefereeError::CoordinateFrameMismatch {
                 record_id: artifact.id.clone(),
@@ -387,7 +416,10 @@ fn validate_inputs(
     let mut report_ids = BTreeSet::new();
     for report in reports {
         validate_identifier(&report.id, "candidate_report.id")?;
-        validate_identifier(&report.coordinate_frame_id, "candidate_report.coordinate_frame_id")?;
+        validate_identifier(
+            &report.coordinate_frame_id,
+            "candidate_report.coordinate_frame_id",
+        )?;
         if report.coordinate_frame_id != profile.coordinate_frame_id {
             return Err(RefereeError::CoordinateFrameMismatch {
                 record_id: report.id.clone(),
@@ -398,9 +430,7 @@ fn validate_inputs(
         validate_type_label(&report.source_type)?;
         report.position.validate()?;
         if !report_ids.insert(report.id.as_str()) {
-            return Err(RefereeError::DuplicateCandidateReportId(
-                report.id.clone(),
-            ));
+            return Err(RefereeError::DuplicateCandidateReportId(report.id.clone()));
         }
     }
     Ok(())
@@ -414,8 +444,7 @@ fn select_reports<'a>(
 ) -> (Vec<&'a CandidateReport>, Vec<String>) {
     let mut ordered = reports.iter().collect::<Vec<_>>();
     ordered.sort_by(|left, right| {
-        left
-            .submission_sequence
+        left.submission_sequence
             .cmp(&right.submission_sequence)
             .then_with(|| left.id.cmp(&right.id))
     });
@@ -471,8 +500,7 @@ pub fn evaluate_reports(
     profile: ReportProfile,
 ) -> Result<EvaluationReport, RefereeError> {
     validate_inputs(ground_truth, reports, profile)?;
-    let (selected, budget_excluded_report_ids) =
-        select_reports(reports, profile.maximum_reports);
+    let (selected, budget_excluded_report_ids) = select_reports(reports, profile.maximum_reports);
 
     // Sort source records by stable ID so input-order permutation does not
     // change adjacency, assignments or normalized reports.
@@ -551,10 +579,7 @@ pub fn evaluate_reports(
 
     let mut class_counts = BTreeMap::<String, (usize, usize, usize)>::new();
     for truth in &ordered_truth {
-        class_counts
-            .entry(truth.source_type.clone())
-            .or_default()
-            .0 += 1;
+        class_counts.entry(truth.source_type.clone()).or_default().0 += 1;
     }
     for report in &selected {
         class_counts
@@ -569,16 +594,18 @@ pub fn evaluate_reports(
     }
     let per_class = class_counts
         .into_iter()
-        .map(|(source_type, (ground_truth_count, selected_report_count, true_positive))| {
-            PerClassMetrics {
-                source_type,
-                ground_truth_count,
-                selected_report_count,
-                true_positive,
-                false_positive: selected_report_count - true_positive,
-                false_negative: ground_truth_count - true_positive,
-            }
-        })
+        .map(
+            |(source_type, (ground_truth_count, selected_report_count, true_positive))| {
+                PerClassMetrics {
+                    source_type,
+                    ground_truth_count,
+                    selected_report_count,
+                    true_positive,
+                    false_positive: selected_report_count - true_positive,
+                    false_negative: ground_truth_count - true_positive,
+                }
+            },
+        )
         .collect();
 
     Ok(EvaluationReport {
@@ -685,8 +712,7 @@ pub fn evaluate_systems_final_stream(
         });
     }
 
-    let source_to_official =
-        validate_type_crosswalk(&profile.type_crosswalk, ground_truth)?;
+    let source_to_official = validate_type_crosswalk(&profile.type_crosswalk, ground_truth)?;
     let report_limit = profile.round.maximum_reports();
     let scoring_profile = ReportProfile {
         coordinate_frame_id: profile.coordinate_frame_id.clone(),
@@ -694,8 +720,7 @@ pub fn evaluate_systems_final_stream(
         localization_tolerance_m: 5.0,
     };
     validate_inputs(ground_truth, reports, scoring_profile)?;
-    let (selected, budget_rejected_report_ids) =
-        select_reports(reports, Some(report_limit));
+    let (selected, budget_rejected_report_ids) = select_reports(reports, Some(report_limit));
 
     let mut ordered_truth = ground_truth.iter().collect::<Vec<_>>();
     ordered_truth.sort_by(|left, right| left.id.cmp(&right.id));
@@ -711,9 +736,7 @@ pub fn evaluate_systems_final_stream(
         for (truth_index, truth) in ordered_truth.iter().enumerate() {
             let official_type = source_to_official
                 .get(&truth.source_type)
-                .ok_or_else(|| {
-                    RefereeError::MissingSourceTypeMapping(truth.source_type.clone())
-                })?;
+                .ok_or_else(|| RefereeError::MissingSourceTypeMapping(truth.source_type.clone()))?;
             if already_reported[truth_index] || report.source_type != *official_type {
                 continue;
             }
@@ -725,8 +748,7 @@ pub fn evaluate_systems_final_stream(
                 None => true,
                 Some((best_index, best_error)) => {
                     error < best_error
-                        || (error == best_error
-                            && truth.id < ordered_truth[best_index].id)
+                        || (error == best_error && truth.id < ordered_truth[best_index].id)
                 }
             };
             if should_replace {
@@ -824,7 +846,6 @@ mod tests {
         }
     }
 
-
     fn preliminary_truth() -> Vec<GroundTruthArtifact> {
         (0..20)
             .map(|index| {
@@ -883,7 +904,10 @@ mod tests {
     #[test]
     fn darpa_crosswalk_preserves_exact_official_report_strings() {
         let crosswalk = darpa_final_2021_crosswalk_v0_1();
-        assert_eq!(crosswalk.version, "darpa-finals-artifact-strings-2021-04-01-v0.1");
+        assert_eq!(
+            crosswalk.version,
+            "darpa-finals-artifact-strings-2021-04-01-v0.1"
+        );
         let cellphone = crosswalk
             .mappings
             .iter()
@@ -918,7 +942,10 @@ mod tests {
         .unwrap();
         assert_eq!(result.report_limit, 25);
         assert_eq!(result.score_points, 1);
-        assert_eq!(result.invalid_report_ids, vec!["r1-wrong-class", "r3-duplicate"]);
+        assert_eq!(
+            result.invalid_report_ids,
+            vec!["r1-wrong-class", "r3-duplicate"]
+        );
         assert_eq!(result.invalid_report_count, 2);
         assert_eq!(result.false_negative_count, 19);
     }
@@ -1111,7 +1138,11 @@ mod tests {
         let mut reports = vec![report("r1", "vent", 0.0, 0.0, 0.0, 1)];
         reports.push(report("r1", "vent", 0.1, 0.0, 0.0, 1));
         assert!(matches!(
-            evaluate_reports(&[truth("g1", "vent", 0.0, 0.0, 0.0)], &reports, profile(5.0, None)),
+            evaluate_reports(
+                &[truth("g1", "vent", 0.0, 0.0, 0.0)],
+                &reports,
+                profile(5.0, None)
+            ),
             Err(RefereeError::DuplicateCandidateReportId(_))
         ));
     }
