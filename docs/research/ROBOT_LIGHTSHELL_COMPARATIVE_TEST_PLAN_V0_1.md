@@ -277,3 +277,13 @@ Reference: https://www.nature.com/articles/s41528-026-00538-4
 This is a process comparator for manufacturable sensor panels, not evidence that the same method is suitable for industrial robot garments. Evaluate process capability, textile compatibility, repairability, connector life and calibration retention before adoption.
 
 **Sensor claim boundary:** all literature values are paper-specific. The first Lightshell pilot should use robot-only sensor calibration and physical reference instruments. It should not ingest human tactile data, assume human/robot signal equivalence, or feed textile sensor output directly into a safety or motion-authority path.
+
+
+### Sensor placement: task value before taxel count
+
+Two additional 2026 studies should inform [LIGHTSHELL-SENSOR-FABRIC-001 #12704](https://github.com/Luminous-Dynamics/symthaea/issues/12704):
+
+- **Tactile Genesis** (21 June 2026) provides large-scale tactile simulation with configurable taxel placement and noise. Its reported robot-hand studies find sensor placement can dominate sensor type; whole-hand coverage improves on fingertip-only for its tasks, and approximately 200 taxels across the hand sufficed under those evaluation conditions. It also identifies per-taxel force/torque as useful. This is not a full-body Lightshell sizing result. https://arxiv.org/abs/2606.22332
+- **Which Taxels, Not How Many** (7 November 2026) reports that contact-informed taxel placement can match a much larger uniform array under its controlled in-palm rotation and grasping tasks; rarely contacted sites add little. https://arxiv.org/abs/2611.10647
+
+Therefore compare **uniform low-density**, **task/contact-informed**, **joint/edge/service-zone targeted**, and **sensor-free** constructions. Measure observability at the task-relevant contact zones and downstream task performance rather than using taxel count or spatial resolution as the sole objective. No sensor distribution is fixed until the robot's tasks, expected contacts, mounting, calibration and failure modes are frozen.
