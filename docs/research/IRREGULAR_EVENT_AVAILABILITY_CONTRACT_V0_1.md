@@ -302,6 +302,40 @@ authority. A governed, append-only calibration registry, signed calibration
 receipts, key revocation/rotation and end-to-end clock provenance are future
 qualification steps. This contract does not claim physical clock truth.
 
+### 12.1 Uncertainty-aware event versus watermark ordering
+
+The clock module exposes `compare_event_time_to_exclusive_watermark`.
+It compares a mapped event-time uncertainty interval against a mapped
+exclusive-watermark uncertainty interval in one declared reference domain,
+and returns a non-forgeable comparison receipt that retains both mapped
+values and their calibration identities/digests.
+
+Ordering is deliberately three-valued:
+
+- `DefinitelyLate` only when the latest possible event time is strictly
+  earlier than the earliest possible watermark.
+- `DefinitelyNotLate` only when the earliest possible event time is at
+  or after the latest possible watermark.
+- `Ambiguous` when the intervals overlap and do not establish an ordering.
+
+For an event and watermark in the same source clock and exact calibration
+revision, the mapper's monotonicity preserves source-local ordering directly.
+This preserves the exclusive-boundary rule: an event exactly at the
+watermark is not late. Across different source clocks or calibration
+revisions, overlapping mapped intervals remain ambiguous; callers must not
+use interval midpoints, optimistic endpoints or a guessed total order.
+
+This is a pure comparison contract. It is not yet an automatic adapter inside
+`SourceWatermarkLedger`; the latter still consumes timestamps in one common
+reference coordinate. Integration must preserve ambiguous comparisons as a
+distinct contested/unqualified outcome and bind both calibration digests into
+the durable arrival receipt. The calibration digest is still a content digest,
+not an authenticated source signature.
+
+The clock module now has 17 authored tests, including same-revision equality,
+strict lateness, cross-revision interval overlap and wrong-reference-domain
+rejection. These tests are authored, not yet reported as executed.
+
 ## 13. Current external comparator snapshot
 
 The model-to-benchmark observations are pinned separately in
