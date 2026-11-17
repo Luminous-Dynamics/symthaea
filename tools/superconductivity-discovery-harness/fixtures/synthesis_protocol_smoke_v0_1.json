@@ -146,7 +146,7 @@
     {
       "outcome_id": "fixture-outcome-1",
       "run_id": "fixture-run-1",
-      "sample_id": "fixture-hg1223-sample",
+      "sample_id": "fixture-hg1223-s4",
       "realized_phases": [
         {
           "phase_id": "fixture-retained-phase",
