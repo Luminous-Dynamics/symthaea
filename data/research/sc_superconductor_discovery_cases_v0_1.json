@@ -160,6 +160,81 @@
       },
       "paper_status": "arXiv preprint; not independently reproduced by Symthaea",
       "primary_claim_boundary": "20,354 extracted/curated observations across eight measured superconducting parameters for 6,793 materials. Extraction validation R2=0.96 against NIMS on 2,439 overlapping materials. Reported composition-only prediction is in-family and fails leave-one-family-out for cuprate/iron-based systems; not evidence of novel-family extrapolation. Data access, license, released schema/checkpoints and exact split still require independent audit."
+    },
+    {
+      "source_id": "guided_mat_diffusion_2026",
+      "doi": "10.1038/s41524-026-02117-7",
+      "url": "https://doi.org/10.1038/s41524-026-02117-7",
+      "published": "2026-05-28",
+      "source_type": "peer_reviewed_computational_generation_and_experimental_follow_up",
+      "title": "Guided diffusion for the discovery of new superconductors",
+      "repository": "https://github.com/paprakash/GuidedMatDiffusion",
+      "repository_revision": "to_be_pinned",
+      "dataset": "https://huggingface.co/datasets/paprakash/GuidedMatDiffusion_data",
+      "checkpoint": "https://huggingface.co/paprakash/GuidedMatDiffusion_model",
+      "reported_pipeline": {
+        "generated": 200000,
+        "unique_candidates": 34027,
+        "dft_tc_above_5k": 773,
+        "experimental_attempts": 18,
+        "attempts_with_signal_above_4_2k": 9
+      },
+      "primary_claim_boundary": "773 is a DFT-computed candidate count, not experimental validation. Nine of 18 synthesis attempts showed some signal >4.2 K; intended ordered structures often did not form. Separate signal, target phase, phase purity and bulk confirmation.",
+      "license_status": "GitHub repository README declares MIT; verify exact license files for data, checkpoints and upstream Alexandria / fine-tune datasets separately."
+    },
+    {
+      "source_id": "elementsclaw_2026",
+      "doi": "10.48550/arXiv.2604.23758",
+      "arxiv_id": "2604.23758v3",
+      "url": "https://arxiv.org/abs/2604.23758v3",
+      "published": "2026-05-04",
+      "source_type": "preprint_agentic_large_atomic_and_language_model_discovery",
+      "title": "Agentic Fusion of Large Atomic and Language Models to Accelerate Superconductor Discovery",
+      "repository_or_project": "https://developer.damo-academy.com/material",
+      "reported_pipeline": {
+        "rediscovered_superconductors": 66,
+        "screened_equilibrium_crystals": 2400000,
+        "high_confidence_candidates": 68000,
+        "gpu_hours": 28,
+        "claimed_new_experimental_materials": 4
+      },
+      "reported_new_materials": [
+        {
+          "formula": "Zr3ScRe8",
+          "reported_tc_k": 6.5
+        },
+        {
+          "formula": "HfZrRe4",
+          "reported_tc_k": 5.9
+        },
+        {
+          "formula": "Zr4VRe7",
+          "reported_tc_k": 3.5
+        },
+        {
+          "formula": "Hf21Re25",
+          "reported_tc_k": 2.5
+        }
+      ],
+      "primary_claim_boundary": "All pipeline and experimental values are preprint claims; candidate IDs, specimens, raw data, exact model releases, source deduplication and independent experimental evidence must be audited. LLM incremental value requires matched ablation against the LAM alone.",
+      "license_status": "paper and project-page data/model terms require separate review."
+    },
+    {
+      "source_id": "nemad_llm_superconductor_2026",
+      "doi": "10.1016/j.jmmm.2026.174189",
+      "arxiv_id": "2512.10847",
+      "url": "https://doi.org/10.1016/j.jmmm.2026.174189",
+      "published": "2026-08-15",
+      "source_type": "peer_reviewed_experimental_database_and_llm_prediction_workflow",
+      "title": "Large language models for superconductor discovery",
+      "repository": "https://github.com/sumanitani/LLM_for_Superconductors",
+      "repository_revision": "71ec1b961a6231b21c6745b63dc8f774cd7ecbed",
+      "database": "https://www.nemad.org",
+      "model_hub": "https://huggingface.co/sumanitani",
+      "reported_record_count_abstract": 78203,
+      "reported_record_count_methods": 78204,
+      "reported_unique_compositions": 19058,
+      "primary_claim_boundary": "Literature-extracted experimental and non-superconductor records with multiple LLM tasks. GNoME Tc>10 K candidates remain predictions. The exact count, row provenance, data license and train/test split require reconciliation."
     }
   ],
   "candidate_records": [
@@ -505,6 +580,50 @@
       },
       "metric_interpretation": "paper-reported extraction validation against NIMS/Roberts and composition model metrics; AutoSuperCon source data not independently ingested; family extrapolation fails",
       "local_reproducibility_status": "not_reproduced; data release/license/schema/source spans and exact model splits to be audited in #12642"
+    },
+    {
+      "catalog_id": "GuidedMatDiffusion-2026",
+      "source_ids": [
+        "guided_mat_diffusion_2026"
+      ],
+      "reported_record_count": 200000,
+      "reported_metric": {
+        "unique_generated_candidates": 34027,
+        "dft_tc_gt_5k": 773,
+        "dfT_hit_rate_percent": 2.27,
+        "experimental_attempts": 18,
+        "attempts_with_any_signal_gt_4_2k": 9
+      },
+      "metric_interpretation": "paper-reported generative and DFT screening throughput. 9/18 is any signal, not target phase or bulk superconductivity.",
+      "local_reproducibility_status": "not_reproduced; exact commit/checkpoints/all generated and rejected IDs and experiment dossiers tracked in #12646"
+    },
+    {
+      "catalog_id": "ElementsClaw-2026",
+      "source_ids": [
+        "elementsclaw_2026"
+      ],
+      "reported_record_count": 2400000,
+      "reported_metric": {
+        "high_confidence_screened_candidates": 68000,
+        "gpu_hours": 28,
+        "rediscovered_superconductors": 66,
+        "claimed_experimental_new_materials": 4
+      },
+      "metric_interpretation": "preprint-reported LAM+LLM agent screen and experimental follow-ups; contribution of LLM and independent verification not yet reproduced.",
+      "local_reproducibility_status": "not_reproduced; model artifacts, candidate lists, database snapshot, ablations and experiment dossiers tracked in #12647"
+    },
+    {
+      "catalog_id": "NEMAD-Superconductor-LLM-2026",
+      "source_ids": [
+        "nemad_llm_superconductor_2026"
+      ],
+      "reported_record_count": 78203,
+      "reported_metric": {
+        "unique_compositions": 19058,
+        "novel_inverse_design_fraction_percent": 28
+      },
+      "metric_interpretation": "paper-reported literature database and LLM baselines; 28% novel relative to training set only. Record count is inconsistent between abstract/method text.",
+      "local_reproducibility_status": "not_reproduced; data release/rights, record count, checkpoint revisions and split manifests tracked in #12648"
     }
   ],
   "required_future_fields": [
