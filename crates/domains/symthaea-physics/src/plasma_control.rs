@@ -24,9 +24,9 @@
 //! 
 //! | Threshold | Value | Meaning |
 //! |-----------|-------|---------|
-//! | Stable    | ≥0.6  | Normal operation, maintain state |
-//! | Warning   | 0.4-0.6 | Elevated risk, consider power reduction |
-//! | Critical  | 0.25-0.4 | Imminent disruption, soft landing |
+//! | Stable    | ≥0.6  | Lowest Phi-proxy category |
+//! | Warning   | 0.4-0.6 | Elevated Phi-proxy category |
+//! | Critical  | 0.25-0.4 | Higher Phi-proxy category |
 //! | Emergency | <0.25 | Prototype emergency-category label; not a shutdown command |
 //!
 //! ## Internal FEP command-category mapping
@@ -176,6 +176,7 @@ pub enum TrendDirection {
 
 /// Control actions for plasma stabilization
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// Abstract simulator action label. Variants are not physical actuator commands.
 pub enum PlasmaControlAction {
     /// Normal operation - maintain current state
     MaintainState,
