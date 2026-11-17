@@ -744,11 +744,11 @@ mod tests {
         let mut first = scheduler();
         let mut second = scheduler();
         let p = proposal(
-                    "job-1",
-                    "candidate-1",
-                    "reactor",
-                    resources(1.0, 100.0, 10.0),
-                );
+            "job-1",
+            "candidate-1",
+            "reactor",
+            resources(1.0, 100.0, 10.0),
+        );
         first
             .launch_job(p.clone(), policy, ObjectiveSense::Maximize, 10, 10)
             .unwrap();
@@ -869,11 +869,11 @@ mod tests {
     fn duplicate_inflight_candidate_is_rejected_unless_replicate_is_distinct() {
         let mut value = scheduler();
         let first = proposal(
-                    "job-1",
-                    "candidate-1",
-                    "reactor",
-                    resources(1.0, 100.0, 10.0),
-                );
+            "job-1",
+            "candidate-1",
+            "reactor",
+            resources(1.0, 100.0, 10.0),
+        );
         value
             .launch_job(
                 first.clone(),
@@ -900,11 +900,11 @@ mod tests {
         ));
 
         let mut replicate = proposal(
-                    "job-3",
-                    "candidate-1",
-                    "spectrometer",
-                    resources(1.0, 100.0, 10.0),
-                );
+            "job-3",
+            "candidate-1",
+            "spectrometer",
+            resources(1.0, 100.0, 10.0),
+        );
         replicate.candidate.replicate_id = Some("replicate-2".to_string());
         value
             .launch_job(
