@@ -2,7 +2,7 @@ use scientific_candidate_selection_audit::{
     CandidateSelectionPolicy, CandidateState, DevelopmentEligibility, DevelopmentMetrics,
     EvaluatorAdmissibility, EvaluatorMetrics, EvaluatorOutcome, EvaluatorStatus, EvidenceStage,
     MetricMask, PermittedEvidence, SelectionAuditError, SelectionDecision, SelectionObservation,
-    SelectorCandidate, SelectorPacket, audit_submission, run_selector,
+    SelectorCandidate, SelectorPacket, SelectorView, audit_submission, run_selector,
 };
 
 const POOL_SHA: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
@@ -15,7 +15,7 @@ impl CandidateSelectionPolicy for DevelopmentSelector {
         "development-score-v0"
     }
 
-    fn select(&self, packet: &SelectorPacket) -> Result<SelectionObservation, SelectionAuditError> {
+    fn select(&self, packet: &SelectorView) -> Result<SelectionObservation, SelectionAuditError> {
         // Deliberately simple reference selector for the audit fixture.
         // It reads only development evidence and does not receive the
         // evaluator outcomes supplied later to audit_submission.
