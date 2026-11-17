@@ -38,7 +38,35 @@
       "minItems": 1,
       "maxItems": 16,
       "items": {
-        "$ref": "https://luminousdynamics.io/schemas/egddm-noisy-channel-candidate-v0.1.schema.json#/properties/actions/items"
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "read_only",
+          "irreversible",
+          "hard_gate",
+          "max_residual_risk_bps"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "read_only": {
+            "type": "boolean"
+          },
+          "irreversible": {
+            "type": "boolean"
+          },
+          "hard_gate": {
+            "type": "boolean"
+          },
+          "max_residual_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
       }
     },
     "hypothesis_bounds": {
