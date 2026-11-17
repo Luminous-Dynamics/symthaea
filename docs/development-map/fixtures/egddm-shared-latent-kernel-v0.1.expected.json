@@ -333,5 +333,37 @@
       "frechet_upper_bps": 6000
     }
   ],
+  "risk_queries": [
+    {
+      "query_id": "pass-pass-release",
+      "action_id": "release",
+      "safe_hypotheses": [
+        "safe-world"
+      ],
+      "observed_outcomes": {
+        "gate-a": "pass",
+        "gate-b": "pass"
+      },
+      "support_lower_bps": 3500,
+      "nominal_posterior_risk_bps": 3750,
+      "shared_latent_worst_case_posterior_risk_bps": 3778,
+      "rectangular_hull_worst_case_posterior_risk_bps": 4359,
+      "rectangular_excess_risk_bps": 581,
+      "per_hypothesis_likelihood_bounds": [
+        {
+          "hypothesis_id": "common-cause-hazard",
+          "lower": 2600,
+          "nominal": 3000,
+          "upper": 3400
+        },
+        {
+          "hypothesis_id": "safe-world",
+          "lower": 4400,
+          "nominal": 5000,
+          "upper": 5600
+        }
+      ]
+    }
+  ],
   "claim_ceiling": "Validates an evaluator-owned shared latent-weight credal simplex and exact conditional joint outcome distributions for every hypothesis/latent-state pair. It derives cross-hypothesis coupled marginal and pairwise event intervals and checks candidate channel consistency. It does not estimate latent weights from real measurements, prove latent-state completeness, optimize adaptive policies, validate drift, authenticate the evaluator's oracle, or authorize actions."
 }
