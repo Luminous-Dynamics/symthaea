@@ -284,8 +284,7 @@ fn solve_mask(
         let mut worst_child_cost = 0_u64;
         let mut all_branches_solvable = true;
         for child_mask in partitions.values() {
-            let Some(child_choice) =
-                solve_mask(problem, *child_mask, budget, memo, work_units)?
+            let Some(child_choice) = solve_mask(problem, *child_mask, budget, memo, work_units)?
             else {
                 all_branches_solvable = false;
                 break;
@@ -378,7 +377,10 @@ fn count_nodes(node: &PlanNodeV1) -> usize {
     match &node.disposition {
         PlanDispositionV1::Identified { .. } => 1,
         PlanDispositionV1::Probe { branches, .. } => {
-            1 + branches.iter().map(|branch| count_nodes(&branch.child)).sum::<usize>()
+            1 + branches
+                .iter()
+                .map(|branch| count_nodes(&branch.child))
+                .sum::<usize>()
         }
     }
 }
@@ -493,7 +495,10 @@ pub fn choose_greedy_worst_case_probe(
             probe_index,
             probe_id: probe.probe_id.clone(),
             worst_case_remaining_hypotheses: largest,
-            outcome_entropy_bits: outcome_entropy(&partitions, hypotheses_mask.count_ones() as usize),
+            outcome_entropy_bits: outcome_entropy(
+                &partitions,
+                hypotheses_mask.count_ones() as usize,
+            ),
             cost: probe.cost,
         };
         let is_better = match &best {
@@ -618,10 +623,7 @@ mod tests {
         QualificationBudgetV1::default()
     }
 
-    fn exhaustive_cost(
-        problem: &ActiveExperimentProblemV1,
-        mask: u64,
-    ) -> Option<u64> {
+    fn exhaustive_cost(problem: &ActiveExperimentProblemV1, mask: u64) -> Option<u64> {
         if mask.count_ones() <= 1 {
             return Some(0);
         }
@@ -679,9 +681,7 @@ mod tests {
         let problem = fixture();
         let certificate = compile_active_experiment(&problem, budget()).unwrap();
         let PlanDispositionV1::Probe {
-            probe_id,
-            branches,
-            ..
+            probe_id, branches, ..
         } = &certificate.root.disposition
         else {
             panic!("root must select a probe");
@@ -728,7 +728,10 @@ mod tests {
     #[test]
     fn no_discriminating_admissible_probe_fails_closed() {
         let mut problem = fixture();
-        problem.probes.iter_mut().for_each(|probe| probe.admissible = false);
+        problem
+            .probes
+            .iter_mut()
+            .for_each(|probe| probe.admissible = false);
         assert_eq!(
             compile_active_experiment(&problem, budget()),
             Err(ExperimentErrorV1::NoCompleteDiscriminationPolicy)
