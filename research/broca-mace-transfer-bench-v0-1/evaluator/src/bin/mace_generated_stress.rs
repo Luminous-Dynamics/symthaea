@@ -523,7 +523,7 @@ fn session_c_control() -> Vec<(Policy, Option<Action>, Option<Action>, bool)> {
 fn report(cases: &[Case]) {
     let clusters = cluster_means(Policy::NoMemory, cases).len();
     let families: BTreeSet<&str> = cases.iter().map(|item| item.family).collect();
-    println!("MACE generated-world stress benchmark v0.2");
+    println!("MACE generated-world stress benchmark v0.3");
     println!(
         "clusters={}, scenarios={}, families={}",
         clusters,
@@ -551,25 +551,29 @@ fn report(cases: &[Case]) {
             score.unsupported_a
         );
     }
-    println!("qualified_policy_by_scenario_family");
-    println!("family,count,accuracy_pct,mean_utility,mean_regret,unsupported_A");
+    println!("policy_by_scenario_family");
+    println!("policy,family,count,accuracy_pct,mean_utility,mean_regret,unsupported_A");
     let mut groups: BTreeMap<&str, Vec<&Case>> = BTreeMap::new();
     for item in cases {
         groups.entry(item.family).or_default().push(item);
     }
-    for (family, items) in groups {
-        let family_cases: Vec<Case> = items.iter().map(|item| (*item).clone()).collect();
-        let score = evaluate(Policy::CausalQualified, &family_cases);
-        let n = f64::from(score.count.max(1));
-        println!(
-            "{},{},{:.2},{:.4},{:.4},{}",
-            family,
-            score.count,
-            100.0 * f64::from(score.correct) / n,
-            score.utility_sum / n,
-            score.regret_sum / n,
-            score.unsupported_a
-        );
+    for policy in [Policy::CausalQualified, Policy::InvariantTransport] {
+        for (family, items) in &groups {
+            let family_cases: Vec<Case> =
+                items.iter().map(|item| (**item).clone()).collect();
+            let score = evaluate(policy, &family_cases);
+            let n = f64::from(score.count.max(1));
+            println!(
+                "{},{},{},{:.2},{:.4},{:.4},{}",
+                policy.name(),
+                family,
+                score.count,
+                100.0 * f64::from(score.correct) / n,
+                score.utility_sum / n,
+                score.regret_sum / n,
+                score.unsupported_a
+            );
+        }
     }
 
     println!(
