@@ -45,5 +45,5 @@ jobs:
           Draft202012Validator.check_schema(schema)
           Draft202012Validator(schema).validate(manifest)
           PY
-      - name: Validate exact fixture group/actions and polynomial stabilizers
-        run: python3 -I research/symmetry-discovery-benchmark-001/validate_cases.py
+      - name: Validate exact group axioms, point stabilizers and polynomial invariance
+        run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
