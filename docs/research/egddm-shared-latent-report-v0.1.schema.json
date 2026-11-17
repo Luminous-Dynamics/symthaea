@@ -1,0 +1,411 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-shared-latent-report-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.2.3 shared-latent joint-kernel validation report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "decision_cutoff",
+    "coupling_model",
+    "hypothesis_count",
+    "latent_state_count",
+    "option_count",
+    "conditional_kernel_count",
+    "conditional_joint_row_count",
+    "marginal_check_count",
+    "pairwise_joint_check_count",
+    "kernel_provenance",
+    "marginal_checks",
+    "pairwise_joint_checks",
+    "claim_ceiling",
+    "risk_queries"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adjudication_status": {
+      "const": "shared_latent_joint_kernel_validation"
+    },
+    "decision_cutoff": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "coupling_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "scope",
+        "latent_weights"
+      ],
+      "properties": {
+        "kind": {
+          "const": "one_shared_latent_weight_credal_simplex"
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 1
+        },
+        "latent_weights": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "latent_state_id",
+              "lower_probability_bps",
+              "nominal_probability_bps",
+              "upper_probability_bps"
+            ],
+            "properties": {
+              "latent_state_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "lower_probability_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "nominal_probability_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "upper_probability_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            }
+          }
+        }
+      }
+    },
+    "hypothesis_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 32
+    },
+    "latent_state_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "option_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6
+    },
+    "conditional_kernel_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 256
+    },
+    "conditional_joint_row_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "marginal_check_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "pairwise_joint_check_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "kernel_provenance": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "latent_state_id",
+          "kernel_id",
+          "authority",
+          "joint_row_count"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string"
+          },
+          "latent_state_id": {
+            "type": "string"
+          },
+          "kernel_id": {
+            "type": "string"
+          },
+          "authority": {
+            "type": "string"
+          },
+          "joint_row_count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    "marginal_checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "option_id",
+          "factor_id",
+          "outcome",
+          "conditional_probabilities_by_latent_state",
+          "shared_latent_marginal_lower_bps",
+          "shared_latent_marginal_nominal_bps",
+          "shared_latent_marginal_upper_bps",
+          "registered_channel_lower_bps",
+          "registered_channel_nominal_bps",
+          "registered_channel_upper_bps"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string"
+          },
+          "option_id": {
+            "type": "string"
+          },
+          "factor_id": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string"
+          },
+          "conditional_probabilities_by_latent_state": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "latent_state_id",
+                "probability_bps"
+              ],
+              "properties": {
+                "latent_state_id": {
+                  "type": "string"
+                },
+                "probability_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
+              }
+            }
+          },
+          "shared_latent_marginal_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "shared_latent_marginal_nominal_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "shared_latent_marginal_upper_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "registered_channel_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "registered_channel_nominal_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "registered_channel_upper_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "pairwise_joint_checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "left_option_id",
+          "left_outcome",
+          "right_option_id",
+          "right_outcome",
+          "joint_lower_bps",
+          "joint_nominal_bps",
+          "joint_upper_bps",
+          "frechet_lower_bps",
+          "frechet_upper_bps"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string"
+          },
+          "left_option_id": {
+            "type": "string"
+          },
+          "left_outcome": {
+            "type": "string"
+          },
+          "right_option_id": {
+            "type": "string"
+          },
+          "right_outcome": {
+            "type": "string"
+          },
+          "joint_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "joint_nominal_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "joint_upper_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "frechet_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "frechet_upper_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "risk_queries": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "query_id",
+          "action_id",
+          "safe_hypotheses",
+          "observed_outcomes",
+          "support_lower_bps",
+          "nominal_posterior_risk_bps",
+          "shared_latent_worst_case_posterior_risk_bps",
+          "rectangular_hull_worst_case_posterior_risk_bps",
+          "rectangular_excess_risk_bps",
+          "per_hypothesis_likelihood_bounds"
+        ],
+        "properties": {
+          "query_id": {
+            "type": "string"
+          },
+          "action_id": {
+            "type": "string"
+          },
+          "safe_hypotheses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_outcomes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "support_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "nominal_posterior_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "shared_latent_worst_case_posterior_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rectangular_hull_worst_case_posterior_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rectangular_excess_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "per_hypothesis_likelihood_bounds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "hypothesis_id",
+                "lower",
+                "nominal",
+                "upper"
+              ],
+              "properties": {
+                "hypothesis_id": {
+                  "type": "string"
+                },
+                "lower": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "nominal": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "upper": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

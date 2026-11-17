@@ -1,0 +1,298 @@
+{
+  "candidate_view": {
+    "scenario_id": "d6-17-2-2-3-shared-latent-common-cause-v0.1",
+    "decision_cutoff": "2026-11-17T10:00:00Z",
+    "options": [
+      {
+        "option_id": "gate-a",
+        "factor_id": "gate-a-factor"
+      },
+      {
+        "option_id": "gate-b",
+        "factor_id": "gate-b-factor"
+      }
+    ],
+    "factors": [
+      {
+        "factor_id": "gate-a-factor",
+        "likelihoods": [
+          {
+            "hypothesis_id": "safe-world",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 5000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5500
+              },
+              "fail": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 5000,
+                "nominal_likelihood_bps": 4500
+              }
+            }
+          },
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 3600,
+                "upper_likelihood_bps": 4400,
+                "nominal_likelihood_bps": 4000
+              },
+              "fail": {
+                "lower_likelihood_bps": 5600,
+                "upper_likelihood_bps": 6400,
+                "nominal_likelihood_bps": 6000
+              }
+            }
+          }
+        ]
+      },
+      {
+        "factor_id": "gate-b-factor",
+        "likelihoods": [
+          {
+            "hypothesis_id": "safe-world",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 5000,
+                "upper_likelihood_bps": 6000,
+                "nominal_likelihood_bps": 5500
+              },
+              "fail": {
+                "lower_likelihood_bps": 4000,
+                "upper_likelihood_bps": 5000,
+                "nominal_likelihood_bps": 4500
+              }
+            }
+          },
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 3600,
+                "upper_likelihood_bps": 4400,
+                "nominal_likelihood_bps": 4000
+              },
+              "fail": {
+                "lower_likelihood_bps": 5600,
+                "upper_likelihood_bps": 6400,
+                "nominal_likelihood_bps": 6000
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "oracle": {
+    "decision_cutoff": "2026-11-17T10:00:00Z",
+    "latent_states": [
+      {
+        "latent_state_id": "latent-z0",
+        "lower_probability_bps": 4000,
+        "upper_probability_bps": 6000,
+        "nominal_probability_bps": 5000,
+        "authority": "independent-common-cause-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null
+      },
+      {
+        "latent_state_id": "latent-z1",
+        "lower_probability_bps": 4000,
+        "upper_probability_bps": 6000,
+        "nominal_probability_bps": 5000,
+        "authority": "independent-common-cause-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null
+      }
+    ],
+    "conditional_kernels": [
+      {
+        "hypothesis_id": "safe-world",
+        "latent_state_id": "latent-z0",
+        "kernel_id": "safe-world-latent-z0-v1",
+        "authority": "independent-common-cause-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "joint_outcomes": [
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "pass"
+            },
+            "probability_bps": 2000
+          },
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "fail"
+            },
+            "probability_bps": 1000
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "pass"
+            },
+            "probability_bps": 1000
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "fail"
+            },
+            "probability_bps": 6000
+          }
+        ]
+      },
+      {
+        "hypothesis_id": "safe-world",
+        "latent_state_id": "latent-z1",
+        "kernel_id": "safe-world-latent-z1-v1",
+        "authority": "independent-common-cause-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "joint_outcomes": [
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "pass"
+            },
+            "probability_bps": 8000
+          },
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "fail"
+            },
+            "probability_bps": 0
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "pass"
+            },
+            "probability_bps": 0
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "fail"
+            },
+            "probability_bps": 2000
+          }
+        ]
+      },
+      {
+        "hypothesis_id": "common-cause-hazard",
+        "latent_state_id": "latent-z0",
+        "kernel_id": "common-cause-hazard-latent-z0-v1",
+        "authority": "independent-common-cause-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "joint_outcomes": [
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "pass"
+            },
+            "probability_bps": 1000
+          },
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "fail"
+            },
+            "probability_bps": 1000
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "pass"
+            },
+            "probability_bps": 1000
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "fail"
+            },
+            "probability_bps": 7000
+          }
+        ]
+      },
+      {
+        "hypothesis_id": "common-cause-hazard",
+        "latent_state_id": "latent-z1",
+        "kernel_id": "common-cause-hazard-latent-z1-v1",
+        "authority": "independent-common-cause-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "joint_outcomes": [
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "pass"
+            },
+            "probability_bps": 5000
+          },
+          {
+            "outcomes": {
+              "gate-a": "pass",
+              "gate-b": "fail"
+            },
+            "probability_bps": 1000
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "pass"
+            },
+            "probability_bps": 1000
+          },
+          {
+            "outcomes": {
+              "gate-a": "fail",
+              "gate-b": "fail"
+            },
+            "probability_bps": 3000
+          }
+        ]
+      }
+    ],
+    "risk_queries": [
+      {
+        "query_id": "pass-pass-release",
+        "action_id": "release",
+        "safe_hypotheses": [
+          "safe-world"
+        ],
+        "prior_bounds": [
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "lower_probability_bps": 5000,
+            "upper_probability_bps": 5000,
+            "nominal_probability_bps": 5000
+          },
+          {
+            "hypothesis_id": "safe-world",
+            "lower_probability_bps": 5000,
+            "upper_probability_bps": 5000,
+            "nominal_probability_bps": 5000
+          }
+        ],
+        "observed_outcomes": {
+          "gate-a": "pass",
+          "gate-b": "pass"
+        }
+      }
+    ]
+  }
+}
