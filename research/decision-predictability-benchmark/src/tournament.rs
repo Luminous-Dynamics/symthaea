@@ -480,12 +480,9 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
                     delay_spacing,
                     ridge_penalty,
                 };
-                if let Some(score) = validation_score_ngrc(
-                    config,
-                    training,
-                    validation,
-                    validation_scale,
-                ) {
+                if let Some(score) =
+                    validation_score_ngrc(config, training, validation, validation_scale)
+                {
                     eligible_ngrc.push((config, score));
                 }
             }
@@ -1014,8 +1011,10 @@ mod tests {
             })
         };
 
-        let first_selection = selected(&first_output).expect("NG-RC must have an eligible configuration");
-        let second_selection = selected(&second_output).expect("NG-RC must have an eligible configuration");
+        let first_selection =
+            selected(&first_output).expect("NG-RC must have an eligible configuration");
+        let second_selection =
+            selected(&second_output).expect("NG-RC must have an eligible configuration");
         assert_eq!(first_selection, second_selection);
     }
 
