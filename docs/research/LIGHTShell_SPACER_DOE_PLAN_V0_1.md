@@ -199,3 +199,38 @@ The seed manifest remains `proposed`: no machine, sample, material lot, instrume
 ## 9. Claim boundary
 
 This protocol does not establish an impact protection rating, human-contact safety, PPE compliance, robot collision safety, washability, flame resistance, ingress protection or integrated robot qualification. It only defines a proposed research campaign.
+
+## 10. Executable matrix admission
+
+The Lightshell-specific structural validator is implemented in:
+`crates/domains/symthaea-engineering/src/lightshell_spacer_doe.rs`
+
+It is exposed as:
+`symthaea_engineering::lightshell_spacer_doe::parse_and_validate`
+
+Example:
+```rust
+use symthaea_engineering::lightshell_spacer_doe::parse_and_validate;
+
+let report = parse_and_validate(manifest_json)?;
+if !report.is_valid() || !report.matrix_complete {
+    return Err("Lightshell spacer DoE matrix rejected".into());
+}
+```
+
+The validator checks:
+- all five named controls exist and have unique identities;
+- required inlay, spacer-frequency and transition-geometry factor definitions exist;
+- the 12 screening cells cover every inlay architecture × spacer-frequency combination once;
+- screen-stage transition geometry is not applicable for no-inlay/float and fixed at two needles for both square-wave families;
+- six transition-refinement cells cover both square-wave families × one/two/three needle spacing;
+- transition-refinement frequency remains fixed at the reference level;
+- candidate identities are unique and candidate values are declared by their factor levels;
+- destructive testing is allocated to separate specimens;
+- preregistration requires qualified process capability, a fixed randomization seed, blocking variables and a confirmatory holdout;
+- the proposed seed cannot claim material lots or process revisions.
+
+Eight Rust unit tests are authored, including mutations that deliberately reintroduce factor confounding, remove a matrix cell, duplicate a candidate, omit a factor or assign material/process evidence to the proposed fixture. These tests are not yet executed. Focused command:
+`cargo test -p symthaea-engineering lightshell_spacer_doe -- --nocapture`
+
+This is not a general DOE engine or a statistical analysis engine. It validates the Lightshell v0.1 experiment-design contract and delegates design generation, randomization, inference and active experiment choice to the existing SCI-EXP/MAT-ACTIVE/MAT-UQ/TEXTILE-INVERSE-DESIGN owners.
