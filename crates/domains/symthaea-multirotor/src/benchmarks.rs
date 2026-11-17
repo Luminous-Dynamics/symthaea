@@ -70,9 +70,10 @@ impl Default for WindBenchmarkConfig {
 /// Results from a wind gust benchmark run.
 #[derive(Debug, Clone)]
 pub struct WindBenchmarkResult {
-    /// Metrics without FEP modulation (frozen agent).
+    /// Mean position error for the HDC controller without FEP modulation.
+    /// This arm still trains against the declared PD target; it is not a frozen controller.
     pub baseline_metrics: Vec<f64>,
-    /// Metrics with full FEP modulation.
+    /// Mean position error for the HDC controller with FEP modulation.
     pub fep_metrics: Vec<f64>,
     /// Steps to recover within 5cm after each gust (FEP).
     pub recovery_steps: Vec<usize>,
@@ -147,7 +148,8 @@ fn apply_active_gusts(
 
 /// Run the wind gust robustness benchmark with the default (Simple) backend.
 ///
-/// Compares a "frozen" baseline (no FEP modulation) against full Active Inference.
+/// Compares the HDC controller without FEP modulation against its FEP-modulated arm.
+/// Both arms retain their declared training behavior; this is not a PX4/ArduPilot baseline.
 pub fn run_wind_benchmark(config: &WindBenchmarkConfig) -> WindBenchmarkResult {
     run_wind_benchmark_with_backend(config, &PhysicsBackend::Simple)
 }
@@ -202,7 +204,7 @@ pub fn run_wind_benchmark_with_backend(
             physics.reset_with_perturbation(0.1, 0.1, episode_seed);
             let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.flight_config.num_levels);
             let mut controller = FlightController::new(&genesis, &config.flight_config);
-            let frozen_result = FlightFepResult::default();
+            let unmodulated_result = FlightFepResult::default();
             let mut total_err = 0.0;
 
             for step in 0..config.flight_config.steps_per_episode {
@@ -224,7 +226,7 @@ pub fn run_wind_benchmark_with_backend(
                 if step % config.flight_config.train_every == 0 {
                     let target = pd_baseline(&state, &setpoint, &pd_gains);
                     let lr =
-                        config.flight_config.learning_rate * frozen_result.learning_rate_factor;
+                        config.flight_config.learning_rate * unmodulated_result.learning_rate_factor;
                     controller.train_step(&sensor_hv, &target, dt as f32, Some(lr));
                 }
             }
