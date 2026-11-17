@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "dataset_id": "synthetic-informative-missingness-not-measured",
+  "scenario_id": "observed-case-ranking-reversal",
+  "comparison_track": "delayed-observed-outcome",
+  "evaluation_horizon_tick": 64,
+  "candidate": {
+    "name": "candidate-benefit-gated",
+    "eligible_count": 10,
+    "observed_losses": [
+      0.1,
+      0.1
+    ],
+    "delayed_pending_count": 0,
+    "right_censored_count": 0,
+    "declared_missing_count": 8,
+    "unknown_count": 0
+  },
+  "reference": {
+    "name": "reference-detector-triggered",
+    "eligible_count": 10,
+    "observed_losses": [
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3,
+      0.3
+    ],
+    "delayed_pending_count": 0,
+    "right_censored_count": 0,
+    "declared_missing_count": 0,
+    "unknown_count": 0
+  },
+  "sensitivity_grid": {
+    "candidate_deltas": [
+      -0.1,
+      0,
+      0.25,
+      0.75
+    ],
+    "reference_deltas": [
+      -0.2,
+      0,
+      0.2,
+      0.6
+    ]
+  }
+}

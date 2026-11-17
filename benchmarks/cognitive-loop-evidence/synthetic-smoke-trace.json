@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "stream_id": "synthetic-smoke-fixture-not-measured",
+  "detector_id": "fixed-threshold",
+  "repository_head_sha": "0000000000000000000000000000000000000000",
+  "configuration_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "seed": 17,
+  "stream_length_cycles": 200,
+  "valid_observations": 190,
+  "max_detection_delay_cycles": 10,
+  "drift_events": [
+    {
+      "id": "abrupt-1",
+      "start_cycle": 80,
+      "end_cycle": 80
+    },
+    {
+      "id": "gradual-1",
+      "start_cycle": 130,
+      "end_cycle": 150
+    }
+  ],
+  "detections": [
+    {
+      "cycle_index": 20,
+      "evidence_valid": true
+    },
+    {
+      "cycle_index": 85,
+      "evidence_valid": true
+    },
+    {
+      "cycle_index": 138,
+      "evidence_valid": true
+    }
+  ],
+  "detector_version": "synthetic-fixture-1",
+  "comparison_track": "valid-pe-only",
+  "label_delay_cycles": 0
+}
