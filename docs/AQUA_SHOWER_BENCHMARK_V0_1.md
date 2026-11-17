@@ -93,7 +93,6 @@ For EPA WaterSense comparability, obtain and follow the applicable test method a
 - spray coverage using the chosen repeatable method;
 - spray force / impact distribution using the chosen repeatable method;
 - spray temperature drop at a declared bather-plane distance and ambient condition (Consumer Reports describes a container positioned 18 inches from the showerhead);
-- spray temperature drop at a declared bather-plane distance and ambient condition (Consumer Reports describes a container placed 18 inches from the head);
 - outlet temperature stability and overshoot;
 - flow variation under the declared pressure envelope;
 - noise and vibration;
