@@ -15,8 +15,8 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
     if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
         return Err(format!("schema must declare {DIALECT}"));
     }
-    let validator = validator_for(&schema)
-        .map_err(|error| format!("schema compilation failed: {error}"))?;
+    let validator =
+        validator_for(&schema).map_err(|error| format!("schema compilation failed: {error}"))?;
 
     let fixture_sources = fixture
         .get("fixture_source_ids")
@@ -56,7 +56,9 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
         }
 
         if event.get("fixture_only").and_then(Value::as_bool) != Some(true) {
-            return Err(format!("{context}: only synthetic fixture records are admitted here"));
+            return Err(format!(
+                "{context}: only synthetic fixture records are admitted here"
+            ));
         }
 
         let observation_id = event
@@ -91,15 +93,15 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             "row_or_record_id",
         ];
         if !locator_fields.iter().any(|field| {
-            locator
-                .get(*field)
-                .is_some_and(|value| match value {
-                    Value::String(text) => !text.trim().is_empty(),
-                    Value::Number(number) => number.as_u64().is_some_and(|n| n > 0),
-                    _ => false,
-                })
+            locator.get(*field).is_some_and(|value| match value {
+                Value::String(text) => !text.trim().is_empty(),
+                Value::Number(number) => number.as_u64().is_some_and(|n| n > 0),
+                _ => false,
+            })
         }) {
-            return Err(format!("{observation_id}: source locator must identify page, section, table, figure, supplement or source row"));
+            return Err(format!(
+                "{observation_id}: source locator must identify page, section, table, figure, supplement or source row"
+            ));
         }
 
         let assertion = event
@@ -120,9 +122,7 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             .get("property_code")
             .and_then(Value::as_str)
             .ok_or_else(|| format!("{observation_id}: missing property_code"))?;
-        let criterion = assertion
-            .get("tc_criterion")
-            .and_then(Value::as_str);
+        let criterion = assertion.get("tc_criterion").and_then(Value::as_str);
 
         match origin {
             "observed" => {
@@ -140,37 +140,45 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                     let window = assertion
                         .get("tested_window")
                         .and_then(Value::as_object)
-                        .ok_or_else(|| format!("{observation_id}: non-detection requires tested_window"))?;
+                        .ok_or_else(|| {
+                            format!("{observation_id}: non-detection requires tested_window")
+                        })?;
                     let min = window
                         .get("temperature_min_k")
                         .and_then(Value::as_f64)
-                        .ok_or_else(|| format!("{observation_id}: missing tested minimum temperature"))?;
+                        .ok_or_else(|| {
+                            format!("{observation_id}: missing tested minimum temperature")
+                        })?;
                     let max = window
                         .get("temperature_max_k")
                         .and_then(Value::as_f64)
-                        .ok_or_else(|| format!("{observation_id}: missing tested maximum temperature"))?;
+                        .ok_or_else(|| {
+                            format!("{observation_id}: missing tested maximum temperature")
+                        })?;
                     if max < min {
-                        return Err(format!("{observation_id}: tested temperature window is inverted"));
+                        return Err(format!(
+                            "{observation_id}: tested temperature window is inverted"
+                        ));
                     }
                 } else if detection == "detected" {
                     if !value.is_number() {
-                        return Err(format!("{observation_id}: detected assertion requires numeric value"));
+                        return Err(format!(
+                            "{observation_id}: detected assertion requires numeric value"
+                        ));
                     }
                     if assertion.get("tested_window").is_some_and(|v| !v.is_null()) {
-                        return Err(format!("{observation_id}: tested_window is reserved for non-detections"));
+                        return Err(format!(
+                            "{observation_id}: tested_window is reserved for non-detections"
+                        ));
                     }
                 }
 
-                if property == "Tc"
-                    && criterion.is_none_or(|value| value == "not_applicable")
-                {
+                if property == "Tc" && criterion.is_none_or(|value| value == "not_applicable") {
                     return Err(format!(
                         "{observation_id}: observed Tc requires a meaningful measurement criterion"
                     ));
                 }
-                if property == "Tc"
-                    && value.as_f64().is_some_and(|measurement| measurement < 0.0)
-                {
+                if property == "Tc" && value.as_f64().is_some_and(|measurement| measurement < 0.0) {
                     return Err(format!("{observation_id}: observed Tc cannot be negative"));
                 }
             }
@@ -181,14 +189,18 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                     ));
                 }
                 if !value.is_number() {
-                    return Err(format!("{observation_id}: {origin} assertion requires a numeric value"));
+                    return Err(format!(
+                        "{observation_id}: {origin} assertion requires a numeric value"
+                    ));
                 }
                 let model_id = assertion
                     .get("model_id")
                     .and_then(Value::as_str)
                     .filter(|value| !value.trim().is_empty());
                 if model_id.is_none() {
-                    return Err(format!("{observation_id}: {origin} assertion requires model_id"));
+                    return Err(format!(
+                        "{observation_id}: {origin} assertion requires model_id"
+                    ));
                 }
                 if property == "Tc" && criterion.is_some_and(|c| c != "not_applicable") {
                     return Err(format!(
@@ -198,10 +210,14 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             }
             "inferred" => {
                 if detection != "not_applicable" {
-                    return Err(format!("{observation_id}: inferred assertions cannot claim a measured detection"));
+                    return Err(format!(
+                        "{observation_id}: inferred assertions cannot claim a measured detection"
+                    ));
                 }
                 if !value.is_number() && !value.is_null() {
-                    return Err(format!("{observation_id}: inferred value must be numeric or null"));
+                    return Err(format!(
+                        "{observation_id}: inferred value must be numeric or null"
+                    ));
                 }
             }
             other => return Err(format!("{observation_id}: unsupported origin {other}")),
@@ -227,7 +243,9 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             }
             "applied" => {
                 if !pressure_value.as_f64().is_some_and(|value| value > 0.0) {
-                    return Err(format!("{observation_id}: applied pressure requires value > 0 GPa"));
+                    return Err(format!(
+                        "{observation_id}: applied pressure requires value > 0 GPa"
+                    ));
                 }
             }
             "unknown" | "chemical" => {
