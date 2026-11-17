@@ -183,7 +183,10 @@
                       }
                     },
                     "coefficient": {
-                      "type": "number"
+                      "type": "number",
+                      "not": {
+                        "const": 0
+                      }
                     }
                   }
                 }
