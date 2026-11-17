@@ -72,3 +72,10 @@ The room-mode contract records the required evidence and return-to-ready state f
 - Independent laboratory/exposure specialists decide biological endpoints, sampling media, detection limits, methods and acceptance criteria. Aqua must not convert internal process signals or visual clarity into a hygiene pass.
 - Symtropy #2152/#4978 remain resource closure and deterministic water-service accounting owners; all cleaning/purge resource burden is included through owner-native receipts.
 
+
+
+## Washstation benchmark protocol
+
+- Symthaea [AQUA-WASHSTATION-BENCHMARK-001](https://github.com/Luminous-Dynamics/symthaea/blob/research/aqua-competitor-ledger-v0.1-20261117/docs/AQUA_WASHSTATION_BENCHMARK_V0_1.md) defines separate bath, bidet and basin task comparators and evidence boundaries.
+- EPA WaterSense published private-lavatory reference is 1.5 gpm max at 60 psi / 414 kPa and 0.8 gpm min at 20 psi / 138 kPa. The draft 1.2 gpm v2.0 revision is not approved: EPA paused work in February 2025.
+- ASME A112.4.2-2021 / CSA B45.16:21 supplies relevant bidet backflow, temperature, spray-pressure, lifecycle and self-clean test references; local applicability remains for qualified South African review.
