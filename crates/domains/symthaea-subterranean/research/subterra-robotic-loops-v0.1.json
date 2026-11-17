@@ -1,0 +1,468 @@
+{
+  "schema": "subterra.robotic-loops",
+  "schema_version": 1,
+  "status": "research_design_only",
+  "created_on": "2026-11-17",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12612",
+  "composed_work": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/12606",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/12609",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/12569"
+  ],
+  "invariant": "A physical mutation is complete only after its intended postcondition is independently observed and accepted against a still-valid work package. An ambiguous outcome blocks further mutation until reconciled.",
+  "loops": [
+    {
+      "id": "L0",
+      "name": "local_reflex_and_safety",
+      "trigger": "fastest_platform_local_control_cycle_and_hazard_events",
+      "owner": [
+        "symtropy_plant_boundary",
+        "symthaea_deterministic_safety"
+      ],
+      "inputs": [
+        "fresh_local_state",
+        "hazard_assessment",
+        "actuator_feedback",
+        "validated_safety_envelope"
+      ],
+      "outputs": [
+        "continue",
+        "constrain",
+        "hold",
+        "isolate",
+        "retreat",
+        "emergency_response"
+      ],
+      "authority": {
+        "may_preempt_work": true,
+        "may_expand_work_scope": false,
+        "may_authorize_mutation": false
+      },
+      "failure_disposition": "fail_closed_local_hold_or_predeclared_safe_response",
+      "timing_contract": "declare_and_measure_platform_specific_deadline_and_wcet"
+    },
+    {
+      "id": "L1",
+      "name": "state_and_observability",
+      "trigger": "sensor_frame_motion_map_change_uncertainty_or_inspection_demand",
+      "owner": [
+        "symtropy_sensor_geometry",
+        "symthaea_belief_and_active_sensing"
+      ],
+      "inputs": [
+        "timestamped_sensor_observations",
+        "calibration",
+        "coordinate_frames",
+        "asset_and_geology_hypotheses"
+      ],
+      "outputs": [
+        "observed_state",
+        "inferred_state",
+        "occluded_regions",
+        "unknown_regions",
+        "observation_quality",
+        "next_observation_request"
+      ],
+      "authority": {
+        "may_request_sensing": true,
+        "may_mark_unobserved_space_clear": false,
+        "may_authorize_mutation": false
+      },
+      "failure_disposition": "abstain_and_preserve_unknown",
+      "timing_contract": "event_driven_with_declared_observation_freshness_and_deadline"
+    },
+    {
+      "id": "L2",
+      "name": "mission_and_resource_admission",
+      "trigger": "work_completion_resource_update_topology_change_or_replanning_deadline",
+      "owner": [
+        "symthaea_mission_executive",
+        "symthaea_logistics"
+      ],
+      "inputs": [
+        "approved_work_orders",
+        "capability_profiles",
+        "hazard_state",
+        "routes",
+        "resource_envelopes",
+        "maintenance_state"
+      ],
+      "outputs": [
+        "admissible_work_selection",
+        "route_and_return_reserve",
+        "resource_envelope",
+        "blocked_work_reason"
+      ],
+      "authority": {
+        "may_select_approved_work": true,
+        "may_change_design": false,
+        "may_override_safety": false
+      },
+      "failure_disposition": "block_work_or_hold",
+      "timing_contract": "bounded_replanning_deadline_and_freshness_revision"
+    },
+    {
+      "id": "L3",
+      "name": "bounded_physical_intervention",
+      "trigger": "one_authorized_operation_attempt",
+      "owner": [
+        "machine_specific_controller",
+        "versioned_capability_adapter"
+      ],
+      "inputs": [
+        "immutable_work_package",
+        "current_preflight",
+        "valid_authority",
+        "safety_envelope",
+        "resource_budget"
+      ],
+      "outputs": [
+        "command_receipt",
+        "actuator_telemetry",
+        "physical_delta_observation_reference",
+        "attempt_state"
+      ],
+      "authority": {
+        "may_mutate_within_package": true,
+        "may_self_approve_design_change": false,
+        "may_close_without_independent_verification": false
+      },
+      "failure_disposition": "outcome_unknown_locks_affected_scope_until_reconciliation",
+      "timing_contract": "per_operation_deadline_with_attempt_id_and_idempotency_key"
+    },
+    {
+      "id": "L4",
+      "name": "independent_postcondition_verification",
+      "trigger": "consequential_mutation_or_declared_inspection_gate",
+      "owner": [
+        "independent_verifier"
+      ],
+      "inputs": [
+        "approved_specification",
+        "qualified_post_action_observations",
+        "calibration_and_frame_lineage",
+        "coverage"
+      ],
+      "outputs": [
+        "accepted",
+        "rejected",
+        "insufficient_evidence"
+      ],
+      "authority": {
+        "may_accept_or_reject_declared_postconditions": true,
+        "may_command_robot": false,
+        "may_rewrite_design": false
+      },
+      "failure_disposition": "insufficient_evidence_never_passes",
+      "independence": "no_planner_private_state_or_candidate_access_to_sealed_synthetic_ground_truth; evaluate_shared_sensor_and_pipeline_common_causes",
+      "timing_contract": "postcondition_deadline_declared_per_operation_criticality"
+    },
+    {
+      "id": "L5",
+      "name": "fleet_coordination_and_recovery",
+      "trigger": "assignment_handoff_link_degradation_robot_fault_reboot_or_partition",
+      "owner": [
+        "symthaea_team_and_relay",
+        "mycelix_identity_provenance_and_leases"
+      ],
+      "inputs": [
+        "capability_profiles",
+        "lease_generation",
+        "event_sequence",
+        "evidence_digests",
+        "unresolved_operation_locks"
+      ],
+      "outputs": [
+        "capability_matched_assignment",
+        "handoff_receipt",
+        "recovery_plan",
+        "partition_status"
+      ],
+      "authority": {
+        "may_coordinate_approved_work": true,
+        "may_override_local_safety": false,
+        "may_invent_authority": false
+      },
+      "failure_disposition": "preserve_local_safety_and_prevent_duplicate_execution",
+      "timing_contract": "event_driven_with_lease_expiry_and_reconciliation_deadline"
+    }
+  ],
+  "asset_lifecycle_cycle": [
+    "inspect",
+    "classify_condition_with_uncertainty",
+    "engineering_or_owner_disposition",
+    "authorize_maintenance",
+    "bounded_intervention",
+    "independent_postcondition_verification",
+    "monitor_recurrence"
+  ],
+  "operation_attempt": {
+    "required_bindings": [
+      "work_package_id",
+      "work_package_revision",
+      "design_digest",
+      "coordinate_frame_digest",
+      "operation_type",
+      "allowed_state_delta",
+      "robot_capability_profile_digest",
+      "tool_profile_digest",
+      "calibration_revision",
+      "authority_evidence_digest",
+      "resource_envelope",
+      "attempt_id",
+      "idempotency_key",
+      "monotonic_event_sequence"
+    ],
+    "states": [
+      "approved",
+      "preflight_accepted",
+      "command_issued",
+      "acknowledged",
+      "actuation_observed",
+      "physical_delta_observed",
+      "independent_verification",
+      "accepted",
+      "rejected",
+      "insufficient",
+      "outcome_unknown",
+      "reconciled_not_executed",
+      "reconciled_executed_awaiting_inspection",
+      "closed",
+      "rework_review"
+    ],
+    "transitions": [
+      [
+        "approved",
+        "preflight_accepted"
+      ],
+      [
+        "preflight_accepted",
+        "command_issued"
+      ],
+      [
+        "command_issued",
+        "acknowledged"
+      ],
+      [
+        "command_issued",
+        "outcome_unknown"
+      ],
+      [
+        "acknowledged",
+        "actuation_observed"
+      ],
+      [
+        "acknowledged",
+        "outcome_unknown"
+      ],
+      [
+        "actuation_observed",
+        "physical_delta_observed"
+      ],
+      [
+        "actuation_observed",
+        "outcome_unknown"
+      ],
+      [
+        "physical_delta_observed",
+        "independent_verification"
+      ],
+      [
+        "independent_verification",
+        "accepted"
+      ],
+      [
+        "independent_verification",
+        "rejected"
+      ],
+      [
+        "independent_verification",
+        "insufficient"
+      ],
+      [
+        "accepted",
+        "closed"
+      ],
+      [
+        "rejected",
+        "rework_review"
+      ],
+      [
+        "insufficient",
+        "outcome_unknown"
+      ],
+      [
+        "outcome_unknown",
+        "reconciled_not_executed"
+      ],
+      [
+        "outcome_unknown",
+        "reconciled_executed_awaiting_inspection"
+      ],
+      [
+        "reconciled_executed_awaiting_inspection",
+        "physical_delta_observed"
+      ],
+      [
+        "reconciled_not_executed",
+        "preflight_accepted"
+      ]
+    ],
+    "safety_invariants": [
+      "acknowledgement_is_not_actuation",
+      "actuator_telemetry_is_not_physical_postcondition",
+      "physical_observation_is_not_structural_acceptance",
+      "insufficient_evidence_never_closes_work",
+      "unresolved_outcome_blocks_new_mutation_in_affected_scope",
+      "retry_requires_new_attempt_id_and_current_preflight",
+      "rework_requires_valid_authority",
+      "no_unknown_or_occluded_region_is_silently_marked_clear"
+    ]
+  },
+  "robot_roles": [
+    {
+      "id": "scout_survey",
+      "morphology_neutral": true,
+      "purpose": [
+        "reconnaissance",
+        "mapping",
+        "environmental_sensing",
+        "route_assessment"
+      ],
+      "may_certify_structural_or_utility_condition": false
+    },
+    {
+      "id": "asset_inspector",
+      "morphology_neutral": true,
+      "purpose": [
+        "pipe_cable_support_inspection",
+        "drawpoint_observation",
+        "multimodal_close_range_sensing"
+      ],
+      "may_dislodge_or_intervene_without_separate_authority": false
+    },
+    {
+      "id": "intervention_platform",
+      "morphology_neutral": true,
+      "purpose": [
+        "bounded_excavation",
+        "support_installation",
+        "lining",
+        "repair",
+        "material_placement"
+      ],
+      "may_self_approve_design_or_closeout": false
+    },
+    {
+      "id": "relay_guardian",
+      "morphology_neutral": true,
+      "purpose": [
+        "communications_relay",
+        "localization_anchor",
+        "environmental_monitoring"
+      ],
+      "may_expand_mission_scope": false
+    },
+    {
+      "id": "verification_platform",
+      "morphology_neutral": true,
+      "purpose": [
+        "independent_metrology",
+        "post_action_scanning",
+        "acceptance_evidence"
+      ],
+      "may_command_intervention": false
+    }
+  ],
+  "benchmark_tracks": [
+    {
+      "id": "B1",
+      "name": "observability",
+      "issue": 12609,
+      "report_separately": [
+        "defect_recall_at_fixed_false_alarm",
+        "3d_localization_error",
+        "coverage",
+        "unknown_fraction",
+        "calibration",
+        "energy",
+        "inspection_time"
+      ]
+    },
+    {
+      "id": "B2",
+      "name": "intervention",
+      "issue": 12606,
+      "report_separately": [
+        "as_built_tolerance_error",
+        "installation_completeness",
+        "false_acceptance",
+        "resource_reconciliation",
+        "rework"
+      ]
+    },
+    {
+      "id": "B3",
+      "name": "independent_verification",
+      "report_separately": [
+        "false_accept_rate",
+        "detection_sensitivity",
+        "coverage",
+        "verifier_latency",
+        "independence_audit"
+      ]
+    },
+    {
+      "id": "B4",
+      "name": "robustness_and_recovery",
+      "issue": 12569,
+      "report_separately": [
+        "worst_model_violations",
+        "recovery_time",
+        "safe_hold_retreat",
+        "unresolved_work_duration",
+        "evidence_retention"
+      ]
+    },
+    {
+      "id": "B5",
+      "name": "fleet_mission",
+      "report_separately": [
+        "accepted_work_per_robot_hour",
+        "energy",
+        "inspection_completeness",
+        "task_regret",
+        "recovery",
+        "evidence_continuity"
+      ]
+    },
+    {
+      "id": "B6",
+      "name": "integrated_closeout",
+      "report_separately": [
+        "accepted_as_built_output",
+        "mission_cost",
+        "rework",
+        "inspection_effort",
+        "hazard_exposure",
+        "closeout_latency"
+      ]
+    }
+  ],
+  "qualification_stages": [
+    "synthetic_reference_with_sealed_ground_truth",
+    "software_in_the_loop_and_hardware_in_the_loop",
+    "instrumented_bounded_test_cell_with_independent_metrology",
+    "supervised_site_pilot_with_owner_authority_and_specialist_signoff"
+  ],
+  "claim_ceiling": "Research design only. Synthetic results do not establish mine safety, geotechnical adequacy, structural integrity, equipment certification, field productivity, regulatory compliance or permission to intervene.",
+  "references": [
+    "https://www.darpa.mil/research/programs/darpa-subterranean-challenge",
+    "https://www.mining.sandvik/en/news-and-media/news-archive/2026/05/sandvik-launches-automine-aura-a-first-of-its-kind-automation-platform-for-the-future-of-mining/",
+    "https://www.komatsu.jp/en/newsroom/2026/20260731",
+    "https://www.nature.com/articles/s41598-026-65759-z",
+    "https://www.frontiersin.org/journals/built-environment/articles/10.3389/fbuil.2026.2017682/abstract",
+    "https://www.iso.org/standard/86749.html",
+    "https://www.iso.org/cms/%20render/live/en/sites/isoorg/contents/data/standard/07/61/76126.html"
+  ]
+}
