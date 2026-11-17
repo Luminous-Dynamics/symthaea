@@ -7,6 +7,7 @@
   "required": [
     "scenario_id",
     "adjudication_status",
+    "ambiguity_model",
     "billing_currency",
     "world_count",
     "joint_row_count",
@@ -406,6 +407,23 @@
     "claim_ceiling": {
       "type": "string",
       "minLength": 1
+    },
+    "ambiguity_model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cross_hypothesis_kernel_shape",
+        "assumption"
+      ],
+      "properties": {
+        "cross_hypothesis_kernel_shape": {
+          "const": "independent_per_hypothesis_product_set"
+        },
+        "assumption": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   }
 }
