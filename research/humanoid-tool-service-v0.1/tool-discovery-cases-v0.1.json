@@ -1,0 +1,1599 @@
+{
+  "schema_version": "0.1.0",
+  "programme_id": "HUM-TOOL-DISCOVERY-001",
+  "evidence_class": "synthetic_protocol_fixture",
+  "status": "protocol_only_not_executed",
+  "source_subject": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "parent_issue": 12657,
+    "child_issue": 12701,
+    "branch": "research/humanoid-tool-service-v0-1"
+  },
+  "generator_contract": {
+    "family_count": 6,
+    "case_count": 24,
+    "variants_per_family": 4,
+    "allowed_probe_families": [
+      "inspect",
+      "bounded_static_contact",
+      "reversible_translation",
+      "reversible_rotation",
+      "instrumented_fit_check",
+      "ask_human_context"
+    ],
+    "forbidden_probe_families": [
+      "destructive_test",
+      "high_force",
+      "powered_tool_activation",
+      "mains_voltage",
+      "hazardous_material",
+      "human_contact",
+      "unbounded_impulse"
+    ],
+    "oracle_separation": "The evaluator retains hidden_oracle and expected_success_condition. Policy context receives only visible_candidate_observation and declared probe budget. Never mount or expose this full file to the candidate agent.",
+    "note": "All geometries, tasks and parameter ranges are invented synthetic protocol fixtures; no measured tools or physical safety limits are represented."
+  },
+  "families": [
+    {
+      "family_id": "LEVER",
+      "name": "lever",
+      "affordances": [
+        "push",
+        "lift",
+        "extend_reach"
+      ],
+      "probe_envelope": "bounded static contact and reversible translation against an instrumented test block"
+    },
+    {
+      "family_id": "HOOK",
+      "name": "hook",
+      "affordances": [
+        "hook",
+        "pull",
+        "retrieve"
+      ],
+      "probe_envelope": "low-force reversible engagement with a standardized ring fixture"
+    },
+    {
+      "family_id": "WEDGE",
+      "name": "wedge",
+      "affordances": [
+        "wedge",
+        "separate",
+        "spread"
+      ],
+      "probe_envelope": "reversible insertion into an instrumented polymer split-block"
+    },
+    {
+      "family_id": "DRIVER",
+      "name": "rotary_driver",
+      "affordances": [
+        "rotate",
+        "engage_fastener",
+        "apply_bounded_torque"
+      ],
+      "probe_envelope": "static low-torque fit-check with instrumented captive fastener"
+    },
+    {
+      "family_id": "CLAMP",
+      "name": "clamp",
+      "affordances": [
+        "grip",
+        "hold",
+        "fixture"
+      ],
+      "probe_envelope": "bounded closure onto a force-instrumented compliant coupon"
+    },
+    {
+      "family_id": "MALLET",
+      "name": "mallet",
+      "affordances": [
+        "impact",
+        "tap",
+        "seat_component"
+      ],
+      "probe_envelope": "instrumented low-energy tap on a replaceable polymer test coupon"
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "ATD-LEVER-DEVELOPMENT_SEEN",
+      "family_id": "LEVER",
+      "tool_instance_id": "tool-lever-development-seen-v1",
+      "split": "development",
+      "visible_candidate_observation": {
+        "description": "Synthetic lever profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "rigid_handle_with_working_end",
+          "handle_length_visible": true,
+          "working_end_visible": true
+        },
+        "language_label": "lever",
+        "instruction": "Move a constrained 0.35 kg inert block over a 0.12 m ledge using a low-energy lever contact",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "lever",
+        "available_affordances": [
+          "push",
+          "lift",
+          "extend_reach"
+        ],
+        "physical_parameter_ranges": {
+          "working_length_m": {
+            "min": 0.18,
+            "max": 0.55
+          },
+          "centre_of_mass_fraction": {
+            "min": 0.25,
+            "max": 0.75
+          },
+          "contact_stiffness_n_per_m": {
+            "min": 300,
+            "max": 1200
+          },
+          "surface_friction": {
+            "min": 0.2,
+            "max": 0.8
+          }
+        },
+        "target_task": "Move a constrained 0.35 kg inert block over a 0.12 m ledge using a low-energy lever contact",
+        "expected_success_condition": "block_crosses_ledge_without_exceeding_declared_contact_force_or_fixture_energy_limit",
+        "safe_probe": "bounded static contact and reversible translation against an instrumented test block"
+      },
+      "interaction_budget": {
+        "max_active_probes": 5,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "LEVER-PAIR-DEV",
+      "oracle_seed": 41000
+    },
+    {
+      "case_id": "ATD-LEVER-HELDOUT_SAME_FAMILY",
+      "family_id": "LEVER",
+      "tool_instance_id": "tool-lever-heldout-same-family-v1",
+      "split": "confirmatory_same_family",
+      "visible_candidate_observation": {
+        "description": "Synthetic lever profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "rigid_handle_with_working_end",
+          "handle_length_visible": true,
+          "working_end_visible": true
+        },
+        "language_label": "lever",
+        "instruction": "Move a constrained 0.35 kg inert block over a 0.12 m ledge using a low-energy lever contact",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "lever",
+        "available_affordances": [
+          "push",
+          "lift",
+          "extend_reach"
+        ],
+        "physical_parameter_ranges": {
+          "working_length_m": {
+            "min": 0.18,
+            "max": 0.55
+          },
+          "centre_of_mass_fraction": {
+            "min": 0.25,
+            "max": 0.75
+          },
+          "contact_stiffness_n_per_m": {
+            "min": 300,
+            "max": 1200
+          },
+          "surface_friction": {
+            "min": 0.2,
+            "max": 0.8
+          }
+        },
+        "target_task": "Move a constrained 0.35 kg inert block over a 0.12 m ledge using a low-energy lever contact",
+        "expected_success_condition": "block_crosses_ledge_without_exceeding_declared_contact_force_or_fixture_energy_limit",
+        "safe_probe": "bounded static contact and reversible translation against an instrumented test block"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "LEVER-PAIR-HELDOUT",
+      "oracle_seed": 41001
+    },
+    {
+      "case_id": "ATD-LEVER-HELDOUT_TASK_TRANSFER",
+      "family_id": "LEVER",
+      "tool_instance_id": "tool-lever-heldout-task-transfer-v1",
+      "split": "confirmatory_transfer",
+      "visible_candidate_observation": {
+        "description": "Synthetic lever profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "rigid_handle_with_working_end",
+          "handle_length_visible": true,
+          "working_end_visible": true
+        },
+        "language_label": "lever",
+        "instruction": "Move a constrained 0.35 kg inert block over a 0.12 m ledge using a low-energy lever contact",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "lever",
+        "available_affordances": [
+          "push",
+          "lift",
+          "extend_reach"
+        ],
+        "physical_parameter_ranges": {
+          "working_length_m": {
+            "min": 0.18,
+            "max": 0.55
+          },
+          "centre_of_mass_fraction": {
+            "min": 0.25,
+            "max": 0.75
+          },
+          "contact_stiffness_n_per_m": {
+            "min": 300,
+            "max": 1200
+          },
+          "surface_friction": {
+            "min": 0.2,
+            "max": 0.8
+          }
+        },
+        "target_task": "Move a constrained 0.35 kg inert block over a 0.12 m ledge using a low-energy lever contact",
+        "expected_success_condition": "block_crosses_ledge_without_exceeding_declared_contact_force_or_fixture_energy_limit",
+        "safe_probe": "bounded static contact and reversible translation against an instrumented test block"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "LEVER-PAIR-TRANSFER",
+      "oracle_seed": 41002
+    },
+    {
+      "case_id": "ATD-LEVER-VISUAL_DECOY",
+      "family_id": "LEVER",
+      "tool_instance_id": "tool-lever-visual-decoy-v1",
+      "split": "negative_control",
+      "visible_candidate_observation": {
+        "description": "Synthetic lever profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "rigid_handle_with_working_end",
+          "handle_length_visible": true,
+          "working_end_visible": true
+        },
+        "language_label": "visually similar lever-like object",
+        "instruction": "Move a constrained 0.35 kg inert block over a 0.12 m ledge using a low-energy lever contact",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "lever",
+        "available_affordances": [],
+        "physical_parameter_ranges": {
+          "working_length_m": {
+            "min": 0.18,
+            "max": 0.55
+          },
+          "centre_of_mass_fraction": {
+            "min": 0.25,
+            "max": 0.75
+          },
+          "contact_stiffness_n_per_m": {
+            "min": 300,
+            "max": 1200
+          },
+          "surface_friction": {
+            "min": 0.2,
+            "max": 0.8
+          }
+        },
+        "target_task": "Move a constrained 0.35 kg inert block over a 0.12 m ledge using a low-energy lever contact",
+        "expected_success_condition": "tool_is_functionally_incompatible_and_correct_action_is_abstain_or_select_alternative",
+        "safe_probe": "bounded static contact and reversible translation against an instrumented test block"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "reject_as_incompatible_or_abstain",
+      "paired_counterfactual_group": "LEVER-PAIR-DECOY",
+      "oracle_seed": 41003
+    },
+    {
+      "case_id": "ATD-HOOK-DEVELOPMENT_SEEN",
+      "family_id": "HOOK",
+      "tool_instance_id": "tool-hook-development-seen-v1",
+      "split": "development",
+      "visible_candidate_observation": {
+        "description": "Synthetic hook profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "rigid_handle_with_curved_tip",
+          "tip_curve_visible": true,
+          "throat_opening_visible": true
+        },
+        "language_label": "hook",
+        "instruction": "Retrieve a 0.20 kg inert ring-shaped object through a 0.25 m test channel",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "hook",
+        "available_affordances": [
+          "hook",
+          "pull",
+          "retrieve"
+        ],
+        "physical_parameter_ranges": {
+          "throat_width_m": {
+            "min": 0.008,
+            "max": 0.045
+          },
+          "tip_radius_m": {
+            "min": 0.002,
+            "max": 0.018
+          },
+          "contact_friction": {
+            "min": 0.15,
+            "max": 0.75
+          },
+          "handle_compliance_n_per_m": {
+            "min": 500,
+            "max": 3000
+          }
+        },
+        "target_task": "Retrieve a 0.20 kg inert ring-shaped object through a 0.25 m test channel",
+        "expected_success_condition": "ring_passes_channel_boundary_without_slip_or_channel_collision",
+        "safe_probe": "low-force reversible engagement with a standardized ring fixture"
+      },
+      "interaction_budget": {
+        "max_active_probes": 5,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "HOOK-PAIR-DEV",
+      "oracle_seed": 41004
+    },
+    {
+      "case_id": "ATD-HOOK-HELDOUT_SAME_FAMILY",
+      "family_id": "HOOK",
+      "tool_instance_id": "tool-hook-heldout-same-family-v1",
+      "split": "confirmatory_same_family",
+      "visible_candidate_observation": {
+        "description": "Synthetic hook profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "rigid_handle_with_curved_tip",
+          "tip_curve_visible": true,
+          "throat_opening_visible": true
+        },
+        "language_label": "hook",
+        "instruction": "Retrieve a 0.20 kg inert ring-shaped object through a 0.25 m test channel",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "hook",
+        "available_affordances": [
+          "hook",
+          "pull",
+          "retrieve"
+        ],
+        "physical_parameter_ranges": {
+          "throat_width_m": {
+            "min": 0.008,
+            "max": 0.045
+          },
+          "tip_radius_m": {
+            "min": 0.002,
+            "max": 0.018
+          },
+          "contact_friction": {
+            "min": 0.15,
+            "max": 0.75
+          },
+          "handle_compliance_n_per_m": {
+            "min": 500,
+            "max": 3000
+          }
+        },
+        "target_task": "Retrieve a 0.20 kg inert ring-shaped object through a 0.25 m test channel",
+        "expected_success_condition": "ring_passes_channel_boundary_without_slip_or_channel_collision",
+        "safe_probe": "low-force reversible engagement with a standardized ring fixture"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "HOOK-PAIR-HELDOUT",
+      "oracle_seed": 41005
+    },
+    {
+      "case_id": "ATD-HOOK-HELDOUT_TASK_TRANSFER",
+      "family_id": "HOOK",
+      "tool_instance_id": "tool-hook-heldout-task-transfer-v1",
+      "split": "confirmatory_transfer",
+      "visible_candidate_observation": {
+        "description": "Synthetic hook profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "rigid_handle_with_curved_tip",
+          "tip_curve_visible": true,
+          "throat_opening_visible": true
+        },
+        "language_label": "hook",
+        "instruction": "Retrieve a 0.20 kg inert ring-shaped object through a 0.25 m test channel",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "hook",
+        "available_affordances": [
+          "hook",
+          "pull",
+          "retrieve"
+        ],
+        "physical_parameter_ranges": {
+          "throat_width_m": {
+            "min": 0.008,
+            "max": 0.045
+          },
+          "tip_radius_m": {
+            "min": 0.002,
+            "max": 0.018
+          },
+          "contact_friction": {
+            "min": 0.15,
+            "max": 0.75
+          },
+          "handle_compliance_n_per_m": {
+            "min": 500,
+            "max": 3000
+          }
+        },
+        "target_task": "Retrieve a 0.20 kg inert ring-shaped object through a 0.25 m test channel",
+        "expected_success_condition": "ring_passes_channel_boundary_without_slip_or_channel_collision",
+        "safe_probe": "low-force reversible engagement with a standardized ring fixture"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "HOOK-PAIR-TRANSFER",
+      "oracle_seed": 41006
+    },
+    {
+      "case_id": "ATD-HOOK-VISUAL_DECOY",
+      "family_id": "HOOK",
+      "tool_instance_id": "tool-hook-visual-decoy-v1",
+      "split": "negative_control",
+      "visible_candidate_observation": {
+        "description": "Synthetic hook profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "rigid_handle_with_curved_tip",
+          "tip_curve_visible": true,
+          "throat_opening_visible": true
+        },
+        "language_label": "visually similar hook-like object",
+        "instruction": "Retrieve a 0.20 kg inert ring-shaped object through a 0.25 m test channel",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "hook",
+        "available_affordances": [],
+        "physical_parameter_ranges": {
+          "throat_width_m": {
+            "min": 0.008,
+            "max": 0.045
+          },
+          "tip_radius_m": {
+            "min": 0.002,
+            "max": 0.018
+          },
+          "contact_friction": {
+            "min": 0.15,
+            "max": 0.75
+          },
+          "handle_compliance_n_per_m": {
+            "min": 500,
+            "max": 3000
+          }
+        },
+        "target_task": "Retrieve a 0.20 kg inert ring-shaped object through a 0.25 m test channel",
+        "expected_success_condition": "tool_is_functionally_incompatible_and_correct_action_is_abstain_or_select_alternative",
+        "safe_probe": "low-force reversible engagement with a standardized ring fixture"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "reject_as_incompatible_or_abstain",
+      "paired_counterfactual_group": "HOOK-PAIR-DECOY",
+      "oracle_seed": 41007
+    },
+    {
+      "case_id": "ATD-WEDGE-DEVELOPMENT_SEEN",
+      "family_id": "WEDGE",
+      "tool_instance_id": "tool-wedge-development-seen-v1",
+      "split": "development",
+      "visible_candidate_observation": {
+        "description": "Synthetic wedge profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "tapered_working_end_with_handle",
+          "taper_visible": true,
+          "tip_width_visible": true
+        },
+        "language_label": "wedge",
+        "instruction": "Separate two unpowered polymer blocks by 12 mm within a low-force fixture",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "wedge",
+        "available_affordances": [
+          "wedge",
+          "separate",
+          "spread"
+        ],
+        "physical_parameter_ranges": {
+          "tip_angle_deg": {
+            "min": 8,
+            "max": 35
+          },
+          "surface_friction": {
+            "min": 0.1,
+            "max": 0.85
+          },
+          "tip_edge_radius_m": {
+            "min": 0.0005,
+            "max": 0.006
+          },
+          "shaft_stiffness_n_per_m": {
+            "min": 800,
+            "max": 5000
+          }
+        },
+        "target_task": "Separate two unpowered polymer blocks by 12 mm within a low-force fixture",
+        "expected_success_condition": "gap_reaches_0.012_m_without_exceeding_force_limit_or_damaging_fixture",
+        "safe_probe": "reversible insertion into an instrumented polymer split-block"
+      },
+      "interaction_budget": {
+        "max_active_probes": 5,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "WEDGE-PAIR-DEV",
+      "oracle_seed": 41008
+    },
+    {
+      "case_id": "ATD-WEDGE-HELDOUT_SAME_FAMILY",
+      "family_id": "WEDGE",
+      "tool_instance_id": "tool-wedge-heldout-same-family-v1",
+      "split": "confirmatory_same_family",
+      "visible_candidate_observation": {
+        "description": "Synthetic wedge profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "tapered_working_end_with_handle",
+          "taper_visible": true,
+          "tip_width_visible": true
+        },
+        "language_label": "wedge",
+        "instruction": "Separate two unpowered polymer blocks by 12 mm within a low-force fixture",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "wedge",
+        "available_affordances": [
+          "wedge",
+          "separate",
+          "spread"
+        ],
+        "physical_parameter_ranges": {
+          "tip_angle_deg": {
+            "min": 8,
+            "max": 35
+          },
+          "surface_friction": {
+            "min": 0.1,
+            "max": 0.85
+          },
+          "tip_edge_radius_m": {
+            "min": 0.0005,
+            "max": 0.006
+          },
+          "shaft_stiffness_n_per_m": {
+            "min": 800,
+            "max": 5000
+          }
+        },
+        "target_task": "Separate two unpowered polymer blocks by 12 mm within a low-force fixture",
+        "expected_success_condition": "gap_reaches_0.012_m_without_exceeding_force_limit_or_damaging_fixture",
+        "safe_probe": "reversible insertion into an instrumented polymer split-block"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "WEDGE-PAIR-HELDOUT",
+      "oracle_seed": 41009
+    },
+    {
+      "case_id": "ATD-WEDGE-HELDOUT_TASK_TRANSFER",
+      "family_id": "WEDGE",
+      "tool_instance_id": "tool-wedge-heldout-task-transfer-v1",
+      "split": "confirmatory_transfer",
+      "visible_candidate_observation": {
+        "description": "Synthetic wedge profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "tapered_working_end_with_handle",
+          "taper_visible": true,
+          "tip_width_visible": true
+        },
+        "language_label": "wedge",
+        "instruction": "Separate two unpowered polymer blocks by 12 mm within a low-force fixture",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "wedge",
+        "available_affordances": [
+          "wedge",
+          "separate",
+          "spread"
+        ],
+        "physical_parameter_ranges": {
+          "tip_angle_deg": {
+            "min": 8,
+            "max": 35
+          },
+          "surface_friction": {
+            "min": 0.1,
+            "max": 0.85
+          },
+          "tip_edge_radius_m": {
+            "min": 0.0005,
+            "max": 0.006
+          },
+          "shaft_stiffness_n_per_m": {
+            "min": 800,
+            "max": 5000
+          }
+        },
+        "target_task": "Separate two unpowered polymer blocks by 12 mm within a low-force fixture",
+        "expected_success_condition": "gap_reaches_0.012_m_without_exceeding_force_limit_or_damaging_fixture",
+        "safe_probe": "reversible insertion into an instrumented polymer split-block"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "WEDGE-PAIR-TRANSFER",
+      "oracle_seed": 41010
+    },
+    {
+      "case_id": "ATD-WEDGE-VISUAL_DECOY",
+      "family_id": "WEDGE",
+      "tool_instance_id": "tool-wedge-visual-decoy-v1",
+      "split": "negative_control",
+      "visible_candidate_observation": {
+        "description": "Synthetic wedge profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "tapered_working_end_with_handle",
+          "taper_visible": true,
+          "tip_width_visible": true
+        },
+        "language_label": "visually similar wedge-like object",
+        "instruction": "Separate two unpowered polymer blocks by 12 mm within a low-force fixture",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "wedge",
+        "available_affordances": [],
+        "physical_parameter_ranges": {
+          "tip_angle_deg": {
+            "min": 8,
+            "max": 35
+          },
+          "surface_friction": {
+            "min": 0.1,
+            "max": 0.85
+          },
+          "tip_edge_radius_m": {
+            "min": 0.0005,
+            "max": 0.006
+          },
+          "shaft_stiffness_n_per_m": {
+            "min": 800,
+            "max": 5000
+          }
+        },
+        "target_task": "Separate two unpowered polymer blocks by 12 mm within a low-force fixture",
+        "expected_success_condition": "tool_is_functionally_incompatible_and_correct_action_is_abstain_or_select_alternative",
+        "safe_probe": "reversible insertion into an instrumented polymer split-block"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "reject_as_incompatible_or_abstain",
+      "paired_counterfactual_group": "WEDGE-PAIR-DECOY",
+      "oracle_seed": 41011
+    },
+    {
+      "case_id": "ATD-DRIVER-DEVELOPMENT_SEEN",
+      "family_id": "DRIVER",
+      "tool_instance_id": "tool-driver-development-seen-v1",
+      "split": "development",
+      "visible_candidate_observation": {
+        "description": "Synthetic rotary_driver profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "handle_with_exchangeable_bit",
+          "bit_profile_visible": true,
+          "shaft_axis_visible": true
+        },
+        "language_label": "rotary_driver",
+        "instruction": "Turn a captive low-torque test fastener through 90 degrees using the matching interface",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "rotary_driver",
+        "available_affordances": [
+          "rotate",
+          "engage_fastener",
+          "apply_bounded_torque"
+        ],
+        "physical_parameter_ranges": {
+          "bit_profile_id": {
+            "enum": [
+              "PHILLIPS_1",
+              "SLOT_3MM",
+              "HEX_3MM",
+              "TORX_10"
+            ]
+          },
+          "maximum_safe_torque_nm": {
+            "min": 0.08,
+            "max": 0.35
+          },
+          "shaft_compliance_nm_per_rad": {
+            "min": 0.1,
+            "max": 0.8
+          },
+          "interface_wear_fraction": {
+            "min": 0,
+            "max": 0.6
+          }
+        },
+        "target_task": "Turn a captive low-torque test fastener through 90 degrees using the matching interface",
+        "expected_success_condition": "fastener_rotates_90_deg_without_cam_out_or_exceeding_torque_limit",
+        "safe_probe": "static low-torque fit-check with instrumented captive fastener"
+      },
+      "interaction_budget": {
+        "max_active_probes": 5,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "DRIVER-PAIR-DEV",
+      "oracle_seed": 41012
+    },
+    {
+      "case_id": "ATD-DRIVER-HELDOUT_SAME_FAMILY",
+      "family_id": "DRIVER",
+      "tool_instance_id": "tool-driver-heldout-same-family-v1",
+      "split": "confirmatory_same_family",
+      "visible_candidate_observation": {
+        "description": "Synthetic rotary_driver profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "handle_with_exchangeable_bit",
+          "bit_profile_visible": true,
+          "shaft_axis_visible": true
+        },
+        "language_label": "rotary_driver",
+        "instruction": "Turn a captive low-torque test fastener through 90 degrees using the matching interface",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "rotary_driver",
+        "available_affordances": [
+          "rotate",
+          "engage_fastener",
+          "apply_bounded_torque"
+        ],
+        "physical_parameter_ranges": {
+          "bit_profile_id": {
+            "enum": [
+              "PHILLIPS_1",
+              "SLOT_3MM",
+              "HEX_3MM",
+              "TORX_10"
+            ]
+          },
+          "maximum_safe_torque_nm": {
+            "min": 0.08,
+            "max": 0.35
+          },
+          "shaft_compliance_nm_per_rad": {
+            "min": 0.1,
+            "max": 0.8
+          },
+          "interface_wear_fraction": {
+            "min": 0,
+            "max": 0.6
+          }
+        },
+        "target_task": "Turn a captive low-torque test fastener through 90 degrees using the matching interface",
+        "expected_success_condition": "fastener_rotates_90_deg_without_cam_out_or_exceeding_torque_limit",
+        "safe_probe": "static low-torque fit-check with instrumented captive fastener"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "DRIVER-PAIR-HELDOUT",
+      "oracle_seed": 41013
+    },
+    {
+      "case_id": "ATD-DRIVER-HELDOUT_TASK_TRANSFER",
+      "family_id": "DRIVER",
+      "tool_instance_id": "tool-driver-heldout-task-transfer-v1",
+      "split": "confirmatory_transfer",
+      "visible_candidate_observation": {
+        "description": "Synthetic rotary_driver profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "handle_with_exchangeable_bit",
+          "bit_profile_visible": true,
+          "shaft_axis_visible": true
+        },
+        "language_label": "rotary_driver",
+        "instruction": "Turn a captive low-torque test fastener through 90 degrees using the matching interface",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "rotary_driver",
+        "available_affordances": [
+          "rotate",
+          "engage_fastener",
+          "apply_bounded_torque"
+        ],
+        "physical_parameter_ranges": {
+          "bit_profile_id": {
+            "enum": [
+              "PHILLIPS_1",
+              "SLOT_3MM",
+              "HEX_3MM",
+              "TORX_10"
+            ]
+          },
+          "maximum_safe_torque_nm": {
+            "min": 0.08,
+            "max": 0.35
+          },
+          "shaft_compliance_nm_per_rad": {
+            "min": 0.1,
+            "max": 0.8
+          },
+          "interface_wear_fraction": {
+            "min": 0,
+            "max": 0.6
+          }
+        },
+        "target_task": "Turn a captive low-torque test fastener through 90 degrees using the matching interface",
+        "expected_success_condition": "fastener_rotates_90_deg_without_cam_out_or_exceeding_torque_limit",
+        "safe_probe": "static low-torque fit-check with instrumented captive fastener"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "DRIVER-PAIR-TRANSFER",
+      "oracle_seed": 41014
+    },
+    {
+      "case_id": "ATD-DRIVER-VISUAL_DECOY",
+      "family_id": "DRIVER",
+      "tool_instance_id": "tool-driver-visual-decoy-v1",
+      "split": "negative_control",
+      "visible_candidate_observation": {
+        "description": "Synthetic rotary_driver profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "handle_with_exchangeable_bit",
+          "bit_profile_visible": true,
+          "shaft_axis_visible": true
+        },
+        "language_label": "visually similar rotary_driver-like object",
+        "instruction": "Turn a captive low-torque test fastener through 90 degrees using the matching interface",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "rotary_driver",
+        "available_affordances": [],
+        "physical_parameter_ranges": {
+          "bit_profile_id": {
+            "enum": [
+              "PHILLIPS_1",
+              "SLOT_3MM",
+              "HEX_3MM",
+              "TORX_10"
+            ]
+          },
+          "maximum_safe_torque_nm": {
+            "min": 0.08,
+            "max": 0.35
+          },
+          "shaft_compliance_nm_per_rad": {
+            "min": 0.1,
+            "max": 0.8
+          },
+          "interface_wear_fraction": {
+            "min": 0,
+            "max": 0.6
+          }
+        },
+        "target_task": "Turn a captive low-torque test fastener through 90 degrees using the matching interface",
+        "expected_success_condition": "tool_is_functionally_incompatible_and_correct_action_is_abstain_or_select_alternative",
+        "safe_probe": "static low-torque fit-check with instrumented captive fastener"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "reject_as_incompatible_or_abstain",
+      "paired_counterfactual_group": "DRIVER-PAIR-DECOY",
+      "oracle_seed": 41015
+    },
+    {
+      "case_id": "ATD-CLAMP-DEVELOPMENT_SEEN",
+      "family_id": "CLAMP",
+      "tool_instance_id": "tool-clamp-development-seen-v1",
+      "split": "development",
+      "visible_candidate_observation": {
+        "description": "Synthetic clamp profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "two_jaw_reversible_fixture",
+          "jaw_range_visible": true,
+          "handle_visible": true
+        },
+        "language_label": "clamp",
+        "instruction": "Hold a 0.25 kg inert workpiece stationary through a 10 second inspection interval",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "clamp",
+        "available_affordances": [
+          "grip",
+          "hold",
+          "fixture"
+        ],
+        "physical_parameter_ranges": {
+          "maximum_safe_clamp_force_n": {
+            "min": 8,
+            "max": 35
+          },
+          "jaw_compliance_n_per_m": {
+            "min": 1000,
+            "max": 9000
+          },
+          "pad_friction": {
+            "min": 0.15,
+            "max": 0.9
+          },
+          "jaw_parallelism_error_deg": {
+            "min": 0,
+            "max": 4
+          }
+        },
+        "target_task": "Hold a 0.25 kg inert workpiece stationary through a 10 second inspection interval",
+        "expected_success_condition": "workpiece_displacement_under_2_mm_for_10_s_without_crushing_or_slipping",
+        "safe_probe": "bounded closure onto a force-instrumented compliant coupon"
+      },
+      "interaction_budget": {
+        "max_active_probes": 5,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "CLAMP-PAIR-DEV",
+      "oracle_seed": 41016
+    },
+    {
+      "case_id": "ATD-CLAMP-HELDOUT_SAME_FAMILY",
+      "family_id": "CLAMP",
+      "tool_instance_id": "tool-clamp-heldout-same-family-v1",
+      "split": "confirmatory_same_family",
+      "visible_candidate_observation": {
+        "description": "Synthetic clamp profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "two_jaw_reversible_fixture",
+          "jaw_range_visible": true,
+          "handle_visible": true
+        },
+        "language_label": "clamp",
+        "instruction": "Hold a 0.25 kg inert workpiece stationary through a 10 second inspection interval",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "clamp",
+        "available_affordances": [
+          "grip",
+          "hold",
+          "fixture"
+        ],
+        "physical_parameter_ranges": {
+          "maximum_safe_clamp_force_n": {
+            "min": 8,
+            "max": 35
+          },
+          "jaw_compliance_n_per_m": {
+            "min": 1000,
+            "max": 9000
+          },
+          "pad_friction": {
+            "min": 0.15,
+            "max": 0.9
+          },
+          "jaw_parallelism_error_deg": {
+            "min": 0,
+            "max": 4
+          }
+        },
+        "target_task": "Hold a 0.25 kg inert workpiece stationary through a 10 second inspection interval",
+        "expected_success_condition": "workpiece_displacement_under_2_mm_for_10_s_without_crushing_or_slipping",
+        "safe_probe": "bounded closure onto a force-instrumented compliant coupon"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "CLAMP-PAIR-HELDOUT",
+      "oracle_seed": 41017
+    },
+    {
+      "case_id": "ATD-CLAMP-HELDOUT_TASK_TRANSFER",
+      "family_id": "CLAMP",
+      "tool_instance_id": "tool-clamp-heldout-task-transfer-v1",
+      "split": "confirmatory_transfer",
+      "visible_candidate_observation": {
+        "description": "Synthetic clamp profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "two_jaw_reversible_fixture",
+          "jaw_range_visible": true,
+          "handle_visible": true
+        },
+        "language_label": "clamp",
+        "instruction": "Hold a 0.25 kg inert workpiece stationary through a 10 second inspection interval",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "clamp",
+        "available_affordances": [
+          "grip",
+          "hold",
+          "fixture"
+        ],
+        "physical_parameter_ranges": {
+          "maximum_safe_clamp_force_n": {
+            "min": 8,
+            "max": 35
+          },
+          "jaw_compliance_n_per_m": {
+            "min": 1000,
+            "max": 9000
+          },
+          "pad_friction": {
+            "min": 0.15,
+            "max": 0.9
+          },
+          "jaw_parallelism_error_deg": {
+            "min": 0,
+            "max": 4
+          }
+        },
+        "target_task": "Hold a 0.25 kg inert workpiece stationary through a 10 second inspection interval",
+        "expected_success_condition": "workpiece_displacement_under_2_mm_for_10_s_without_crushing_or_slipping",
+        "safe_probe": "bounded closure onto a force-instrumented compliant coupon"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "CLAMP-PAIR-TRANSFER",
+      "oracle_seed": 41018
+    },
+    {
+      "case_id": "ATD-CLAMP-VISUAL_DECOY",
+      "family_id": "CLAMP",
+      "tool_instance_id": "tool-clamp-visual-decoy-v1",
+      "split": "negative_control",
+      "visible_candidate_observation": {
+        "description": "Synthetic clamp profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "two_jaw_reversible_fixture",
+          "jaw_range_visible": true,
+          "handle_visible": true
+        },
+        "language_label": "visually similar clamp-like object",
+        "instruction": "Hold a 0.25 kg inert workpiece stationary through a 10 second inspection interval",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "clamp",
+        "available_affordances": [],
+        "physical_parameter_ranges": {
+          "maximum_safe_clamp_force_n": {
+            "min": 8,
+            "max": 35
+          },
+          "jaw_compliance_n_per_m": {
+            "min": 1000,
+            "max": 9000
+          },
+          "pad_friction": {
+            "min": 0.15,
+            "max": 0.9
+          },
+          "jaw_parallelism_error_deg": {
+            "min": 0,
+            "max": 4
+          }
+        },
+        "target_task": "Hold a 0.25 kg inert workpiece stationary through a 10 second inspection interval",
+        "expected_success_condition": "tool_is_functionally_incompatible_and_correct_action_is_abstain_or_select_alternative",
+        "safe_probe": "bounded closure onto a force-instrumented compliant coupon"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "reject_as_incompatible_or_abstain",
+      "paired_counterfactual_group": "CLAMP-PAIR-DECOY",
+      "oracle_seed": 41019
+    },
+    {
+      "case_id": "ATD-MALLET-DEVELOPMENT_SEEN",
+      "family_id": "MALLET",
+      "tool_instance_id": "tool-mallet-development-seen-v1",
+      "split": "development",
+      "visible_candidate_observation": {
+        "description": "Synthetic mallet profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "handle_with_blunt_head",
+          "head_geometry_visible": true,
+          "handle_length_visible": true
+        },
+        "language_label": "mallet",
+        "instruction": "Seat a low-mass polymer peg 5 mm into an instrumented compliant fixture",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "mallet",
+        "available_affordances": [
+          "impact",
+          "tap",
+          "seat_component"
+        ],
+        "physical_parameter_ranges": {
+          "head_mass_kg": {
+            "min": 0.08,
+            "max": 0.32
+          },
+          "head_compliance_n_s_per_m": {
+            "min": 20,
+            "max": 180
+          },
+          "rebound_coefficient": {
+            "min": 0.05,
+            "max": 0.65
+          },
+          "maximum_fixture_impulse_ns": {
+            "min": 0.08,
+            "max": 0.35
+          }
+        },
+        "target_task": "Seat a low-mass polymer peg 5 mm into an instrumented compliant fixture",
+        "expected_success_condition": "peg_insertion_5_mm_within_impulse_and_fixture_damage_limits",
+        "safe_probe": "instrumented low-energy tap on a replaceable polymer test coupon"
+      },
+      "interaction_budget": {
+        "max_active_probes": 5,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "MALLET-PAIR-DEV",
+      "oracle_seed": 41020
+    },
+    {
+      "case_id": "ATD-MALLET-HELDOUT_SAME_FAMILY",
+      "family_id": "MALLET",
+      "tool_instance_id": "tool-mallet-heldout-same-family-v1",
+      "split": "confirmatory_same_family",
+      "visible_candidate_observation": {
+        "description": "Synthetic mallet profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "handle_with_blunt_head",
+          "head_geometry_visible": true,
+          "handle_length_visible": true
+        },
+        "language_label": "mallet",
+        "instruction": "Seat a low-mass polymer peg 5 mm into an instrumented compliant fixture",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "mallet",
+        "available_affordances": [
+          "impact",
+          "tap",
+          "seat_component"
+        ],
+        "physical_parameter_ranges": {
+          "head_mass_kg": {
+            "min": 0.08,
+            "max": 0.32
+          },
+          "head_compliance_n_s_per_m": {
+            "min": 20,
+            "max": 180
+          },
+          "rebound_coefficient": {
+            "min": 0.05,
+            "max": 0.65
+          },
+          "maximum_fixture_impulse_ns": {
+            "min": 0.08,
+            "max": 0.35
+          }
+        },
+        "target_task": "Seat a low-mass polymer peg 5 mm into an instrumented compliant fixture",
+        "expected_success_condition": "peg_insertion_5_mm_within_impulse_and_fixture_damage_limits",
+        "safe_probe": "instrumented low-energy tap on a replaceable polymer test coupon"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "MALLET-PAIR-HELDOUT",
+      "oracle_seed": 41021
+    },
+    {
+      "case_id": "ATD-MALLET-HELDOUT_TASK_TRANSFER",
+      "family_id": "MALLET",
+      "tool_instance_id": "tool-mallet-heldout-task-transfer-v1",
+      "split": "confirmatory_transfer",
+      "visible_candidate_observation": {
+        "description": "Synthetic mallet profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "handle_with_blunt_head",
+          "head_geometry_visible": true,
+          "handle_length_visible": true
+        },
+        "language_label": "mallet",
+        "instruction": "Seat a low-mass polymer peg 5 mm into an instrumented compliant fixture",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "mallet",
+        "available_affordances": [
+          "impact",
+          "tap",
+          "seat_component"
+        ],
+        "physical_parameter_ranges": {
+          "head_mass_kg": {
+            "min": 0.08,
+            "max": 0.32
+          },
+          "head_compliance_n_s_per_m": {
+            "min": 20,
+            "max": 180
+          },
+          "rebound_coefficient": {
+            "min": 0.05,
+            "max": 0.65
+          },
+          "maximum_fixture_impulse_ns": {
+            "min": 0.08,
+            "max": 0.35
+          }
+        },
+        "target_task": "Seat a low-mass polymer peg 5 mm into an instrumented compliant fixture",
+        "expected_success_condition": "peg_insertion_5_mm_within_impulse_and_fixture_damage_limits",
+        "safe_probe": "instrumented low-energy tap on a replaceable polymer test coupon"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "identify_function_and_complete_bounded_task",
+      "paired_counterfactual_group": "MALLET-PAIR-TRANSFER",
+      "oracle_seed": 41022
+    },
+    {
+      "case_id": "ATD-MALLET-VISUAL_DECOY",
+      "family_id": "MALLET",
+      "tool_instance_id": "tool-mallet-visual-decoy-v1",
+      "split": "negative_control",
+      "visible_candidate_observation": {
+        "description": "Synthetic mallet profile; geometry and working interface are observable, but hidden physical parameters are not disclosed.",
+        "shape_profile": {
+          "shape": "handle_with_blunt_head",
+          "head_geometry_visible": true,
+          "handle_length_visible": true
+        },
+        "language_label": "visually similar mallet-like object",
+        "instruction": "Seat a low-mass polymer peg 5 mm into an instrumented compliant fixture",
+        "candidate_must_not_receive": [
+          "hidden_oracle",
+          "hidden_parameters",
+          "expected_success_condition",
+          "split_label",
+          "variant_id"
+        ]
+      },
+      "hidden_oracle": {
+        "tool_family": "mallet",
+        "available_affordances": [],
+        "physical_parameter_ranges": {
+          "head_mass_kg": {
+            "min": 0.08,
+            "max": 0.32
+          },
+          "head_compliance_n_s_per_m": {
+            "min": 20,
+            "max": 180
+          },
+          "rebound_coefficient": {
+            "min": 0.05,
+            "max": 0.65
+          },
+          "maximum_fixture_impulse_ns": {
+            "min": 0.08,
+            "max": 0.35
+          }
+        },
+        "target_task": "Seat a low-mass polymer peg 5 mm into an instrumented compliant fixture",
+        "expected_success_condition": "tool_is_functionally_incompatible_and_correct_action_is_abstain_or_select_alternative",
+        "safe_probe": "instrumented low-energy tap on a replaceable polymer test coupon"
+      },
+      "interaction_budget": {
+        "max_active_probes": 3,
+        "max_plan_revisions": 8,
+        "hard_stop_on_force_or_energy_envelope_breach": true,
+        "no_destructive_probe": true,
+        "no_live_human_contact": true
+      },
+      "expected_disposition": "reject_as_incompatible_or_abstain",
+      "paired_counterfactual_group": "MALLET-PAIR-DECOY",
+      "oracle_seed": 41023
+    }
+  ],
+  "metrics": [
+    "heldout_same_family_success",
+    "heldout_task_transfer_success",
+    "visual_decoy_rejection",
+    "property_estimation_error_and_calibration",
+    "information_gain_per_probe",
+    "probe_cost_and_wall_clock",
+    "safe_abstention",
+    "contact_force_and_fixture_energy",
+    "negative_transfer_to_previous_tool_families",
+    "independent_task_postcondition"
+  ],
+  "claim_ceiling": {
+    "synthetic_contract_only": true,
+    "physical_tool_properties_established": false,
+    "material_strength_established": false,
+    "safe_load_established": false,
+    "physical_tool_competence_established": false
+  }
+}
