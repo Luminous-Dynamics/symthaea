@@ -538,6 +538,19 @@ mod tests{
  #[test]fn candidate_cannot_change_world_probability_bounds(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["hypothesis_bounds"][0]["upper_probability_bps"]=json!(9999);assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("differ from evaluator-authoritative"));}
  #[test]fn missing_observation_branch_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["policy_tree"]["nodes"][0]["branches"].as_object_mut().unwrap().remove("fail");assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("cover every factor outcome"));}
  #[test]fn repeated_option_on_a_path_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["policy_tree"]["nodes"][1]["option_id"]=json!("gate-a");assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("repeats option"));}
+ #[test]fn more_than_one_global_safe_defer_action_is_rejected(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  let extra=json!({"action_id":"inspect-second","irreversible":false,"hard_gate":false,"max_residual_risk_bps":0});
+  b["candidate_view"]["actions"].as_array_mut().unwrap().push(extra.clone());
+  b["oracle"]["actions"].as_array_mut().unwrap().push(extra);
+  for world in b["oracle"]["worlds"].as_array_mut().unwrap(){
+   world["safe_actions"].as_array_mut().unwrap().push(json!("inspect-second"));
+  }
+  for row in b["oracle"]["hypothesis_safety"].as_array_mut().unwrap(){
+   row["safe_actions"].as_array_mut().unwrap().push(json!("inspect-second"));
+  }
+  assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("exactly one evaluator-safe read-only defer action"));
+ }
  #[test]fn oracle_cost_options_must_match_candidate_ids_exactly(){
   let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
   b["oracle"]["cost_options"][1]["option_id"]=json!("gate-a");
