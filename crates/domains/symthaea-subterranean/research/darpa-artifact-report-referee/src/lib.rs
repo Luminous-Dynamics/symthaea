@@ -253,6 +253,7 @@ pub enum RefereeError {
     IdentifierTooLong(&'static str),
     DuplicateGroundTruthId(String),
     DuplicateCandidateReportId(String),
+    DuplicateSubmissionSequence(u64),
     EmptyTypeLabel,
     TypeLabelTooLong,
     NonFiniteCoordinate,
@@ -414,8 +415,14 @@ fn validate_inputs(
     }
 
     let mut report_ids = BTreeSet::new();
+    let mut submission_sequences = BTreeSet::new();
     for report in reports {
         validate_identifier(&report.id, "candidate_report.id")?;
+        if !submission_sequences.insert(report.submission_sequence) {
+            return Err(RefereeError::DuplicateSubmissionSequence(
+                report.submission_sequence,
+            ));
+        }
         validate_identifier(
             &report.coordinate_frame_id,
             "candidate_report.coordinate_frame_id",
@@ -1136,7 +1143,7 @@ mod tests {
         ));
 
         let mut reports = vec![report("r1", "vent", 0.0, 0.0, 0.0, 1)];
-        reports.push(report("r1", "vent", 0.1, 0.0, 0.0, 1));
+        reports.push(report("r1", "vent", 0.1, 0.0, 0.0, 2));
         assert!(matches!(
             evaluate_reports(
                 &[truth("g1", "vent", 0.0, 0.0, 0.0)],
@@ -1145,6 +1152,19 @@ mod tests {
             ),
             Err(RefereeError::DuplicateCandidateReportId(_))
         ));
+    }
+
+    #[test]
+    fn duplicate_submission_sequence_is_rejected() {
+        let gt = vec![truth("g1", "vent", 0.0, 0.0, 0.0)];
+        let reports = vec![
+            report("r1", "vent", 0.0, 0.0, 0.0, 7),
+            report("r2", "vent", 0.0, 0.0, 0.0, 7),
+        ];
+        assert_eq!(
+            evaluate_reports(&gt, &reports, profile(5.0, None)),
+            Err(RefereeError::DuplicateSubmissionSequence(7))
+        );
     }
 
     #[test]
