@@ -92,7 +92,10 @@ impl std::fmt::Display for DecisionHorizonError {
             Self::NonFiniteValue(name) => write!(formatter, "{name} must be finite"),
             Self::NegativeValue(name) => write!(formatter, "{name} must be non-negative"),
             Self::ProbabilityOutOfRange(name) => {
-                write!(formatter, "{name} must be in the required probability range")
+                write!(
+                    formatter,
+                    "{name} must be in the required probability range"
+                )
             }
             Self::NonIncreasingHorizon => {
                 write!(formatter, "decision horizons must be strictly increasing")
@@ -104,9 +107,7 @@ impl std::fmt::Display for DecisionHorizonError {
 
 impl std::error::Error for DecisionHorizonError {}
 
-fn validate_thresholds(
-    thresholds: DecisionHorizonThresholds,
-) -> Result<(), DecisionHorizonError> {
+fn validate_thresholds(thresholds: DecisionHorizonThresholds) -> Result<(), DecisionHorizonError> {
     if !thresholds.maximum_regret.is_finite() {
         return Err(DecisionHorizonError::NonFiniteValue("maximum regret"));
     }
@@ -163,14 +164,10 @@ pub fn decision_relevant_predictability_horizon(
             return Err(DecisionHorizonError::NonIncreasingHorizon);
         }
         if !sample.regret_upper_bound.is_finite() {
-            return Err(DecisionHorizonError::NonFiniteValue(
-                "regret upper bound",
-            ));
+            return Err(DecisionHorizonError::NonFiniteValue("regret upper bound"));
         }
         if sample.regret_upper_bound < 0.0 {
-            return Err(DecisionHorizonError::NegativeValue(
-                "regret upper bound",
-            ));
+            return Err(DecisionHorizonError::NegativeValue("regret upper bound"));
         }
         if !sample.critical_risk_upper_bound.is_finite()
             || !(0.0..=1.0).contains(&sample.critical_risk_upper_bound)
@@ -211,10 +208,9 @@ pub fn decision_relevant_predictability_horizon(
                 accepted_horizon = sample.horizon;
                 qualifying_sample_count += 1;
                 minimum_confidence = Some(
-                    minimum_confidence
-                        .map_or(sample.simultaneous_confidence_level, |current| {
-                            current.min(sample.simultaneous_confidence_level)
-                        }),
+                    minimum_confidence.map_or(sample.simultaneous_confidence_level, |current| {
+                        current.min(sample.simultaneous_confidence_level)
+                    }),
                 );
             }
         }
@@ -338,7 +334,13 @@ mod tests {
     fn rejects_invalid_probability_and_loss_bounds() {
         assert_eq!(
             decision_relevant_predictability_horizon(
-                &[sample(1.0, -0.1, 0.001, 0.95, BoundQualification::Qualified)],
+                &[sample(
+                    1.0,
+                    -0.1,
+                    0.001,
+                    0.95,
+                    BoundQualification::Qualified
+                )],
                 LIMITS
             ),
             Err(DecisionHorizonError::NegativeValue("regret upper bound"))
@@ -363,7 +365,13 @@ mod tests {
         };
         assert_eq!(
             decision_relevant_predictability_horizon(
-                &[sample(1.0, 0.01, 0.001, 0.95, BoundQualification::Qualified)],
+                &[sample(
+                    1.0,
+                    0.01,
+                    0.001,
+                    0.95,
+                    BoundQualification::Qualified
+                )],
                 invalid
             ),
             Err(DecisionHorizonError::InvalidThreshold(
@@ -374,13 +382,7 @@ mod tests {
 
     #[test]
     fn reports_no_horizon_when_first_sample_is_not_admissible() {
-        let samples = [sample(
-            1.0,
-            0.2,
-            0.02,
-            0.95,
-            BoundQualification::Qualified,
-        )];
+        let samples = [sample(1.0, 0.2, 0.02, 0.95, BoundQualification::Qualified)];
         let result = decision_relevant_predictability_horizon(&samples, LIMITS).unwrap();
         assert_eq!(result.horizon, 0.0);
         assert_eq!(result.qualifying_sample_count, 0);
