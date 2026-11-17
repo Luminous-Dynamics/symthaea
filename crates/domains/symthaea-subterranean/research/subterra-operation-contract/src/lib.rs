@@ -64,9 +64,27 @@ pub struct OperationSpec {
     pub executor_sensor_chain_id: u64,
     /// Declared common-cause domains for the executor's sensing/evidence path.
     pub executor_common_cause_domains: Vec<u64>,
+    /// Exact source dependency graph used by the reviewed common-cause assessment.
+    pub common_cause_graph_digest: EvidenceDigest,
+    /// Exact canonical fault-domain/correlation profile used by the assessment.
+    pub common_cause_profile_digest: EvidenceDigest,
+    /// Exact external assessment receipt bound to this operation specification.
+    pub common_cause_assessment_digest: EvidenceDigest,
+    /// Completeness claim from the source assessment; not authenticated here.
+    pub common_cause_inventory_completeness: DependencyInventoryCompleteness,
     /// Required fraction of the declared inspection surface/volume, in 0..=1000.
     pub required_coverage_per_mille: u16,
     pub expires_at_step: u64,
+}
+
+/// Declared completeness of the dependency inventory behind an independence
+/// assessment. This enum records a source-system disposition; it does not
+/// authenticate the source or prove absence of unknown common causes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DependencyInventoryCompleteness {
+    CompleteWithinDeclaredScope,
+    Incomplete,
+    Unknown,
 }
 
 impl OperationSpec {
@@ -87,6 +105,9 @@ impl OperationSpec {
             || self.executor_id == 0
             || self.executor_sensor_chain_id == 0
             || self.executor_common_cause_domains.is_empty()
+            || !self.common_cause_graph_digest.is_present()
+            || !self.common_cause_profile_digest.is_present()
+            || !self.common_cause_assessment_digest.is_present()
             || self.required_coverage_per_mille == 0
             || self.required_coverage_per_mille > 1000
             || self.expires_at_step < now_step
@@ -300,6 +321,8 @@ pub enum VerificationIssue {
     CommonCauseOverlap,
     InvalidCommonCauseDeclaration,
     MissingIndependenceAssessment,
+    IndependenceAssessmentMismatch,
+    IncompleteCommonCauseInventory,
     PhysicalDeltaMismatch,
 }
 
@@ -323,6 +346,13 @@ impl VerificationReceipt {
         }
         if !self.common_cause_assessment_digest.is_present() {
             issues.push(VerificationIssue::MissingIndependenceAssessment);
+        } else if self.common_cause_assessment_digest != spec.common_cause_assessment_digest {
+            issues.push(VerificationIssue::IndependenceAssessmentMismatch);
+        }
+        if spec.common_cause_inventory_completeness
+            != DependencyInventoryCompleteness::CompleteWithinDeclaredScope
+        {
+            issues.push(VerificationIssue::IncompleteCommonCauseInventory);
         }
         if self.physical_delta_digest != physical_delta.digest {
             issues.push(VerificationIssue::PhysicalDeltaMismatch);
@@ -902,6 +932,11 @@ mod tests {
             executor_id: 100,
             executor_sensor_chain_id: 200,
             executor_common_cause_domains: vec![1, 2],
+            common_cause_graph_digest: digest(26),
+            common_cause_profile_digest: digest(27),
+            common_cause_assessment_digest: digest(25),
+            common_cause_inventory_completeness:
+                DependencyInventoryCompleteness::CompleteWithinDeclaredScope,
             required_coverage_per_mille: 950,
             expires_at_step: 100,
         }
@@ -1017,7 +1052,7 @@ mod tests {
             coverage_per_mille: 1000,
             unobserved_required_regions: 0,
             common_cause_domains: vec![3, 4],
-            common_cause_assessment_digest: digest(19),
+            common_cause_assessment_digest: digest(25),
             physical_delta_digest: digest(13),
             postconditions_passed: true,
             digest: digest(14),
@@ -1695,6 +1730,92 @@ mod tests {
             }
             other => panic!("expected CommandIssued in history, found {other:?}"),
         }
+    }
+
+    #[test]
+    fn verifier_receipt_must_bind_the_exact_common_cause_assessment() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        start_verification(&mut registry);
+        let mut receipt = verification();
+        receipt.common_cause_assessment_digest = digest(99);
+        assert_eq!(
+            registry
+                .append(
+                    AttemptId(11),
+                    event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
+                )
+                .unwrap(),
+            AttemptState::InsufficientEvidence
+        );
+        assert!(
+            registry
+                .attempt(AttemptId(11))
+                .unwrap()
+                .last_verification()
+                .unwrap()
+                .issues
+                .contains(&VerificationIssue::IndependenceAssessmentMismatch)
+        );
+    }
+
+    #[test]
+    fn incomplete_common_cause_inventory_cannot_support_acceptance() {
+        let mut operation_spec = spec();
+        operation_spec.common_cause_inventory_completeness =
+            DependencyInventoryCompleteness::Incomplete;
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(operation_spec, 1).unwrap();
+        start_verification(&mut registry);
+        assert_eq!(
+            registry
+                .append(
+                    AttemptId(11),
+                    event(
+                        6,
+                        7,
+                        OperationEvent::VerificationSubmitted {
+                            receipt: verification(),
+                        },
+                    ),
+                )
+                .unwrap(),
+            AttemptState::InsufficientEvidence
+        );
+        assert!(
+            registry
+                .attempt(AttemptId(11))
+                .unwrap()
+                .last_verification()
+                .unwrap()
+                .issues
+                .contains(&VerificationIssue::IncompleteCommonCauseInventory)
+        );
+    }
+
+    #[test]
+    fn unknown_common_cause_inventory_cannot_support_acceptance() {
+        let mut operation_spec = spec();
+        operation_spec.common_cause_inventory_completeness =
+            DependencyInventoryCompleteness::Unknown;
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(operation_spec, 1).unwrap();
+        start_verification(&mut registry);
+        assert_eq!(
+            registry
+                .append(
+                    AttemptId(11),
+                    event(
+                        6,
+                        7,
+                        OperationEvent::VerificationSubmitted {
+                            receipt: verification(),
+                        },
+                    ),
+                )
+                .unwrap(),
+            AttemptState::InsufficientEvidence
+        );
     }
 
     #[test]
