@@ -149,8 +149,8 @@ pub struct DepositionEvent {
 #[derive(Clone, Debug, PartialEq)]
 pub struct OpticalHealthReading {
     pub reading_id: String,
-    pub source_reference_power_w: f64,
-    pub process_channel_power_w: f64,
+    pub source_reference_power_w: [f64; BAND_COUNT],
+    pub process_channel_power_w: [f64; BAND_COUNT],
     /// Ratio-normalized process-path transmission relative to the clean
     /// baseline, indexed by SpectralBand.
     pub normalized_process_transmission: [f64; BAND_COUNT],
@@ -217,6 +217,8 @@ pub enum OpticalHealthError {
     InvalidOpticalModel(&'static str),
     InvalidNoise,
     InvalidThreshold(&'static str),
+    InvalidReading(&'static str),
+    StaleReading,
     InvalidCleaningProtocol(&'static str),
     DuplicateDepositionEvent(String),
     TimeWentBackwards,
@@ -339,7 +341,6 @@ impl OpticalHealthModel {
         self.last_event_time_seconds = event.recorded_at_seconds;
         self.seen_deposition_events
             .insert(event.event_id, event.recorded_at_seconds);
-        self.requalification_required = false;
         Ok(())
     }
 
@@ -367,25 +368,36 @@ impl OpticalHealthModel {
             return Err(OpticalHealthError::TimeWentBackwards);
         }
 
-        let source_reference = self.source_power_w
-            * (1.0 + deterministic_noise(seed ^ 0x1111, self.sensor_noise_stddev));
-        let process_clean_throughput =
-            self.source_power_w * self.process_transmission()[SpectralBand::Visible.index()];
-        let process_channel = process_clean_throughput
-            * (1.0 + deterministic_noise(seed ^ 0x2222, self.sensor_noise_stddev));
-        let normalized_scale = process_channel / source_reference;
+        let process_truth = self.process_transmission();
+        let witness_truth = self.witness_transmission();
+        let mut source_reference = [0.0; BAND_COUNT];
+        let mut process_channel = [0.0; BAND_COUNT];
+        let mut normalized_process_transmission = [0.0; BAND_COUNT];
+        let mut witness_transmission = [0.0; BAND_COUNT];
 
-        let process_transmission = self
-            .process_transmission()
-            .map(|transmission| {
-                (transmission / self.clean_baseline_transmission[SpectralBand::Visible.index()])
-                    * normalized_scale
-                    / self.process_transmission()[SpectralBand::Visible.index()]
-            });
+        for band in 0..BAND_COUNT {
+            let band_seed = seed ^ ((band as u64 + 1) * 0x9e37_79b9);
+            source_reference[band] = self.source_power_w
+                * (1.0 + deterministic_noise(
+                    band_seed ^ 0x1111,
+                    self.sensor_noise_stddev,
+                ));
+            process_channel[band] = self.source_power_w
+                * process_truth[band]
+                * (1.0 + deterministic_noise(
+                    band_seed ^ 0x2222,
+                    self.sensor_noise_stddev,
+                ));
+            normalized_process_transmission[band] =
+                (process_channel[band] / source_reference[band])
+                    / self.clean_baseline_transmission[band];
+            witness_transmission[band] = witness_truth[band]
+                * (1.0 + deterministic_noise(
+                    band_seed ^ 0x3333,
+                    self.sensor_noise_stddev,
+                ));
+        }
 
-        let witness_transmission = self.witness_transmission().map(|transmission| {
-            transmission * (1.0 + deterministic_noise(seed ^ 0x3333, self.sensor_noise_stddev))
-        });
         let qcm_mass = self.qcm.total_loading_ug_cm2()
             * (1.0 + deterministic_noise(seed ^ 0x4444, self.sensor_noise_stddev));
 
@@ -393,7 +405,7 @@ impl OpticalHealthModel {
             reading_id: reading_id.to_string(),
             source_reference_power_w: source_reference,
             process_channel_power_w: process_channel,
-            normalized_process_transmission: process_transmission,
+            normalized_process_transmission,
             witness_transmission,
             qcm_areal_mass_ug_cm2: qcm_mass.max(0.0),
             observed_at_seconds,
@@ -406,6 +418,10 @@ impl OpticalHealthModel {
         reading: &OpticalHealthReading,
         thresholds: &OpticalHealthThresholds,
     ) -> Result<HealthAction, OpticalHealthError> {
+        validate_reading(reading)?;
+        if reading.observed_at_seconds < self.last_event_time_seconds {
+            return Err(OpticalHealthError::StaleReading);
+        }
         if thresholds
             .minimum_process_transmission
             .iter()
@@ -522,6 +538,10 @@ impl OpticalHealthModel {
         if !self.requalification_required {
             return Err(OpticalHealthError::RequalificationNotDue);
         }
+        validate_reading(reading)?;
+        if reading.observed_at_seconds < self.last_event_time_seconds {
+            return Err(OpticalHealthError::StaleReading);
+        }
         let action = self.decide_ignoring_qualification(reading, thresholds)?;
         if action != HealthAction::Continue {
             return Err(OpticalHealthError::RequalificationFailed);
@@ -536,16 +556,12 @@ impl OpticalHealthModel {
         reading: &OpticalHealthReading,
         thresholds: &OpticalHealthThresholds,
     ) -> Result<HealthAction, OpticalHealthError> {
-        let was_qualified = self.qualified;
-        let was_due = self.requalification_required;
         // Evaluate the same thresholds while temporarily treating the state
-        // as qualified; no external observer can access intermediate state.
+        // as qualified. The original model is never mutated by this check.
         let mut clone = self.clone();
         clone.qualified = true;
         clone.requalification_required = false;
-        let result = clone.decide(reading, thresholds);
-        let _ = (was_qualified, was_due);
-        result
+        clone.decide(reading, thresholds)
     }
 
     pub fn process_transmission(&self) -> [f64; BAND_COUNT] {
@@ -573,6 +589,25 @@ impl OpticalHealthModel {
     pub fn source_power_w(&self) -> f64 {
         self.source_power_w
     }
+}
+
+fn validate_reading(reading: &OpticalHealthReading) -> Result<(), OpticalHealthError> {
+    if reading.reading_id.trim().is_empty() {
+        return Err(OpticalHealthError::EmptyIdentity("reading_id"));
+    }
+    if !reading.simulation_only {
+        return Err(OpticalHealthError::InvalidReading("not_simulation_only"));
+    }
+    if reading.source_reference_power_w.iter().any(|value| !value.is_finite() || *value <= 0.0)
+        || reading.process_channel_power_w.iter().any(|value| !value.is_finite() || *value < 0.0)
+        || reading.normalized_process_transmission.iter().any(|value| !value.is_finite() || *value < 0.0)
+        || reading.witness_transmission.iter().any(|value| !value.is_finite() || *value < 0.0)
+        || !reading.qcm_areal_mass_ug_cm2.is_finite()
+        || reading.qcm_areal_mass_ug_cm2 < 0.0
+    {
+        return Err(OpticalHealthError::InvalidReading("non_finite_or_negative_value"));
+    }
+    Ok(())
 }
 
 fn add_scaled_loading(target: &mut [f64; SPECIES_COUNT], flux: [f64; SPECIES_COUNT], factor: f64) {
@@ -729,7 +764,7 @@ mod tests {
                     < 0.01
             );
         }
-        assert!(after.source_reference_power_w < before.source_reference_power_w);
+        assert!(after.source_reference_power_w[0] < before.source_reference_power_w[0]);
     }
 
     #[test]
