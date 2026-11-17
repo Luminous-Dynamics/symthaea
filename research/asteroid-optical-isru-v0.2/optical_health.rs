@@ -43,6 +43,14 @@ pub enum ContaminantSpecies {
 }
 
 impl ContaminantSpecies {
+    fn index(self) -> usize {
+        match self {
+            Self::OrganicFilm => 0,
+            Self::VolatileSalt => 1,
+            Self::MineralDust => 2,
+        }
+    }
+
     const ALL: [Self; SPECIES_COUNT] = [Self::OrganicFilm, Self::VolatileSalt, Self::MineralDust];
 }
 
