@@ -250,7 +250,7 @@
         "policy_feasible",
         "action_coverage_nominal_bps",
         "unnecessary_abstention_nominal_bps",
-        "actual_unsafe_world_count",
+        "unsafe_world_action_count",
         "robust_risk_violation_leaf_count",
         "over_budget_leaf_count",
         "worst_case_path_cost_bound_micros",
@@ -273,10 +273,6 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 10000
-        },
-        "actual_unsafe_world_count": {
-          "type": "integer",
-          "minimum": 0
         },
         "robust_risk_violation_leaf_count": {
           "type": "integer",
@@ -387,6 +383,10 @@
               }
             }
           }
+        },
+        "unsafe_world_action_count": {
+          "type": "integer",
+          "minimum": 0
         }
       }
     }
