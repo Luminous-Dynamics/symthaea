@@ -141,7 +141,9 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
                 .filter(|text| !text.trim().is_empty())
                 .ok_or_else(|| format!("{step_id}: outputs must contain non-empty strings"))?;
             if !available_artifacts.insert(output.to_owned()) {
-                return Err(format!("{step_id}: duplicate or reused output artifact {output}"));
+                return Err(format!(
+                    "{step_id}: duplicate or reused output artifact {output}"
+                ));
             }
         }
 
@@ -177,7 +179,9 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
                 return Err(format!("{run_id}: duplicate execution of step {step_id}"));
             }
             if !planned_by_id.contains_key(step_id) {
-                return Err(format!("{run_id}: execution references unknown planned step {step_id}"));
+                return Err(format!(
+                    "{run_id}: execution references unknown planned step {step_id}"
+                ));
             }
 
             let execution_state = nonempty_text(step, "execution_state")?;
@@ -217,9 +221,9 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
                             "{run_id}/{step_id}: sensor_verified requires at least one actual value"
                         ));
                     }
-                    let evidence = actual_evidence
-                        .as_object()
-                        .ok_or_else(|| format!("{run_id}/{step_id}: sensor_verified requires actual_evidence"))?;
+                    let evidence = actual_evidence.as_object().ok_or_else(|| {
+                        format!("{run_id}/{step_id}: sensor_verified requires actual_evidence")
+                    })?;
                     let evidence_kind = evidence
                         .get("evidence_kind")
                         .and_then(Value::as_str)
@@ -233,7 +237,9 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
                         .get("source_id")
                         .and_then(Value::as_str)
                         .filter(|text| !text.trim().is_empty())
-                        .ok_or_else(|| format!("{run_id}/{step_id}: actual evidence requires source_id"))?;
+                        .ok_or_else(|| {
+                            format!("{run_id}/{step_id}: actual evidence requires source_id")
+                        })?;
                     if !source_ids.contains(source_id) {
                         return Err(format!(
                             "{run_id}/{step_id}: unresolved actual evidence source {source_id}"
@@ -268,15 +274,23 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
                         ));
                     }
                 }
-                other => return Err(format!("{run_id}/{step_id}: unsupported execution state {other}")),
+                other => {
+                    return Err(format!(
+                        "{run_id}/{step_id}: unsupported execution state {other}"
+                    ));
+                }
             }
         }
 
         if run_status == "completed" && run_has_failure {
-            return Err(format!("{run_id}: completed run contains failed/aborted steps"));
+            return Err(format!(
+                "{run_id}: completed run contains failed/aborted steps"
+            ));
         }
         if matches!(run_status, "failed" | "aborted") && !run_has_failure {
-            return Err(format!("{run_id}: failed/aborted run must preserve a failed/aborted step"));
+            return Err(format!(
+                "{run_id}: failed/aborted run must preserve a failed/aborted step"
+            ));
         }
     }
 
@@ -294,7 +308,9 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
         }
         let run_id = nonempty_text(outcome, "run_id")?;
         if !run_ids.contains(run_id) {
-            return Err(format!("{outcome_id}: outcome references unknown run {run_id}"));
+            return Err(format!(
+                "{outcome_id}: outcome references unknown run {run_id}"
+            ));
         }
 
         let phases = outcome
