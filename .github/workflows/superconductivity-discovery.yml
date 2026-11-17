@@ -1,0 +1,53 @@
+name: Superconductivity Discovery Registry Contract
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/superconductivity-discovery-harness/**"
+      - "data/research/sc_superconductor_discovery_cases_v0_1.json"
+      - "data/schemas/superconductivity_discovery_case_v0_1.schema.json"
+      - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
+      - ".github/workflows/superconductivity-discovery.yml"
+  pull_request:
+    paths:
+      - "tools/superconductivity-discovery-harness/**"
+      - "data/research/sc_superconductor_discovery_cases_v0_1.json"
+      - "data/schemas/superconductivity_discovery_case_v0_1.schema.json"
+      - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
+      - ".github/workflows/superconductivity-discovery.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: superconductivity-discovery-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  registry-contract:
+    name: Registry schema and evidence semantics
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+          # Keep this focused harness independent of the root workspace.
+      - name: Test registry auditor and negative controls
+        run: cargo test --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit
+
+      - name: Run exact-input registry audit
+        run: |
+          cargo run --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- \
+            --schema data/schemas/superconductivity_discovery_case_v0_1.schema.json \
+            --instance data/research/sc_superconductor_discovery_cases_v0_1.json \
+            --out "$RUNNER_TEMP/sc-discovery-registry-receipt.json"
+          cat "$RUNNER_TEMP/sc-discovery-registry-receipt.json"
+
+      - name: Clippy isolated auditor
+        run: cargo clippy --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- -D warnings
