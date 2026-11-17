@@ -244,8 +244,10 @@ Report, separately:
 | Sandvik AutoMine / AutoMine Aura | Commercial underground equipment automation, remote supervision, 3-D perception and productivity | Independent as-built verification for arbitrary third-party work packages | Compete on evidence-backed physical outcomes and cross-vendor closeout, not generic autonomy |
 | Komatsu + AIM + Smart Construction | Autonomous bulldozer/excavator workflows tied to construction planning and terrain data | Independent verification semantics across geotechnical/asset constraints | Add typed tolerances, measurement lineage, unresolved outcomes and independent acceptance |
 | 2026 charging-aware mine inspection study | Two-stage task allocation/path planning with road and charging factors; simulation reports 7.20–11.16% lower objective cost versus selected heuristics | Physical deployment, defect calibration, intervention correctness or evidence integrity | Reproduce the objective and scenario first; then evaluate value-of-verification and robust recovery |
-| 2025 gecko-inspired cable inspection robot study | Quadruped cable inspection concept and image-based defect detection | Broad mine-wide asset qualification or independent installation acceptance | Compare matched sensor/defect tasks; add explicit coverage, unknowns and cross-modal corroboration |
-| 2026 underground mine infrastructure review | Identifies pipe/cable inspection and drawpoint hang-up volumetric assessment as comparatively under-addressed | It is a research review, not proof that no commercial solutions exist | Prioritize these two hard, neglected task families |
+| UC San Diego Pipe Network Inspection Robot (2026 project update) | Self-centering 2–6 inch in-pipe robots; 6-inch steel-network tests include elbows and T-joints; autonomous network traversal is an active next phase | A component mobility/joint-recognition demonstration, not mine-wide condition assessment or verified repair | Reproduce confined-pipe mobility and joint/pose baselines; add defect observability, condition acceptance and evidence continuity |
+| 2025 gecko-inspired cable inspection robot study | Quadruped cable-inspection concept and image-based detection of insulation ageing, micro-cracks and contamination | Does not establish independent defect acceptance across sites or mine-wide operations | Compare matched sensor/defect tasks; add calibration, coverage, unknowns and independent corroboration |
+| 2026 acoustic in-pipe inspection research | Dual-resolution acoustic sensing for autonomous in-pipe inspection | Modality-specific result; not a complete underground asset workflow | Include acoustic sensing as a matched modality baseline, with calibrated applicability and common-cause analysis |
+| 2026 underground mine infrastructure review | Finds mine-specific pipe/cable inspection and drawpoint hang-up volumetric assessment comparatively under-addressed relative to re-entry and ground-condition assessment | A review of mine-infrastructure maturity, not proof that no adjacent commercial or research pipe/cable robots exist | Prioritize mine-specific condition assessment and drawpoint volume, while benchmarking against adjacent pipe/cable prototypes |
 
 ### 8.1 Standards are interface and safety inputs, not a certification claim
 
@@ -272,6 +274,7 @@ Passing one stage authorizes evaluation at the next stage; it does not automatic
 5. Add a sealed synthetic construction fixture from #12606 and an asset-inspection fixture from #12609; keep their task-specific metrics distinct.
 6. Add a composition runner that records per-loop deadlines, input freshness, preemption, evidence lineage and recovery outcomes.
 7. Reproduce the 2026 charging-aware planning paper's declared simulation before claiming improvement on fleet routing.
+8. Build the decision-conditioned inspection adapters by reusing the existing finite-horizon Subterra measurement planner/referee and the new [#12628 — inspection EVSI benchmark](https://github.com/Luminous-Dynamics/symthaea/issues/12628); do not create a second generic planner.
 
 ## 11. References
 
@@ -279,10 +282,12 @@ Passing one stage authorizes evaluation at the next stage; it does not automatic
 2. Sandvik, [AutoMine Aura launch, May 2026](https://www.mining.sandvik/en/news-and-media/news-archive/2026/05/sandvik-launches-automine-aura-a-first-of-its-kind-automation-platform-for-the-future-of-mining/). Vendor-reported performance.
 3. Komatsu, [Komatsu / AIM autonomous construction partnership, 31 July 2026](https://www.komatsu.jp/en/newsroom/2026/20260731).
 4. Xu et al., [Task allocation and path planning for multi-robot inspection in mines considering charging](https://www.nature.com/articles/s41598-026-65759-z), *Scientific Reports*, 6 August 2026. Simulation result; reproduce before comparison.
-5. Guan & Shakibaei Asli, [Gecko-Inspired Robots for Underground Cable Inspection](https://www.mdpi.com/2079-9292/14/15/3142), *Electronics*, 5 August 2025.
-6. Naheem, Frimpong & Antwi, [Underground Mine of the Future: A Review of Robotic Technology Intervention for Infrastructure Resilience](https://www.frontiersin.org/journals/built-environment/articles/10.3389/fbuil.2026.2017682/abstract), 2026.
-7. [ISO 17757:2019](https://www.iso.org/cms/%20render/live/en/sites/isoorg/contents/data/standard/07/61/76126.html).
-8. [ISO 21423:2026](https://www.iso.org/standard/86749.html).
+5. [UC San Diego Pipe Network Inspection Robot](https://robotics.ucsd.edu/projects/pipe-robot/). Project-reported 2–6 inch pipe prototypes; distinguish demonstrated steel test-network behaviors from the autonomous traversal phase underway in late 2026.
+6. Guan & Shakibaei Asli, [Gecko-Inspired Robots for Underground Cable Inspection](https://www.mdpi.com/2079-9292/14/15/3142), *Electronics*, 5 August 2025.
+7. [Sun et al., dual-resolution acoustic-sensing robot for autonomous in-pipe inspection](https://doi.org/10.1016/j.tust.2025.107133), 2026.
+8. Naheem, Frimpong & Antwi, [Underground Mine of the Future: A Review of Robotic Technology Intervention for Infrastructure Resilience](https://www.frontiersin.org/journals/built-environment/articles/10.3389/fbuil.2026.2017682/abstract), 2026.
+9. [ISO 17757:2019](https://www.iso.org/cms/%20render/live/en/sites/isoorg/contents/data/standard/07/61/76126.html).
+10. [ISO 21423:2026](https://www.iso.org/standard/86749.html).
 
 ## Claim ceiling
 
