@@ -185,7 +185,23 @@ mod tests {
         let fixture = canonical_paired_world_fixture();
         let episodes = fixture.candidate_episodes();
 
-        assert_eq!(episodes[0], episodes[1]);
+        assert_ne!(episodes[0].episode_id, episodes[1].episode_id);
+        assert_eq!(
+            episodes[0].primary_observations,
+            episodes[1].primary_observations
+        );
+        assert_eq!(
+            episodes[0].reference_probe_available,
+            episodes[1].reference_probe_available
+        );
+        assert_eq!(
+            episodes[0].reference_probe_cost,
+            episodes[1].reference_probe_cost
+        );
+        assert_eq!(
+            episodes[0].decision_deadline_step,
+            episodes[1].decision_deadline_step
+        );
         assert_eq!(episodes[0].primary_observations.len(), 3);
         assert!(
             episodes[0]
