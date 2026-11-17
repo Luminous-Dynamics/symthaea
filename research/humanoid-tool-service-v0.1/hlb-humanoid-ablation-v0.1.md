@@ -134,6 +134,7 @@ The first stage uses the existing simulator and a frozen morphology/configuratio
 | H | HLB + validated procedural memory + active sensing | bounded skill executive | tests reusable knowledge and causal inquiry |
 | I | matched AMP-style agent planner + same local controller | agentic planner | strong generalist-planner comparator |
 | J | agent planner + HLB skill/memory layer + same local controller | hybrid | tests whether HLB adds value beyond the planner |
+| K | released ULTRA G1 unified multimodal controller, where its exact checkpoint/runtime and task/sensor compatibility can be qualified | whole-body loco-manipulation baseline | tests Symthaea against a real-G1 sparse-goal/egocentric controller; not a tool-use score |
 
 Ablations must separate these factors rather than attribute every gain to the full stack:
 
@@ -209,6 +210,17 @@ Safety metrics are **non-compensable**: a higher task-success score cannot offse
 ## 8. External comparison and target ladder
 
 The current external comparison is not one leaderboard. AMP1 is a strong agentic-manipulation reference: the live NVIDIA RoboLab-120 leaderboard lists 86.0% ±2.5 percentage points from 2,579/3,000 episodes. Its project page reports 104/108 real-world successes across 12 tasks on a 7-DoF Franka Research 3, not a humanoid. Those numbers are strong but do not prove humanoid tool-use, whole-body recovery or service competence. The November 2026 long-horizon manipulation survey specifically argues that binary success hides partial progress, failure propagation, recovery cost and horizon degradation.
+
+ULTRA is a **more direct whole-body humanoid comparator**: its IROS 2026 project reports a unified multimodal controller evaluated in simulation and on a physical Unitree G1, supporting dense reference tracking and sparse goal-conditioned loco-manipulation from egocentric perception. The project demonstrates long-horizon goal following, depth-based sensing and sim-to-sim transfer. It does not report a directly comparable HumanoidToolBench or service-task aggregate on the project page, so do not invent one. ULTRA's public code is Apache-2.0, the InterMimic-derived stack is MIT, and data/assets/third-party components retain their own terms; the released training recipe uses Python, IsaacGym Preview 4 and MuJoCo. Include it as Arm K only after exact checkpoint, sensor/task semantics, robot morphology, licenses and runtime are pinned and qualified.
+
+This creates a cleaner comparison taxonomy: ULTRA for a learned unified G1 whole-body controller; AMP1 for a deliberative agentic manipulation policy (real-arm results, not humanoid); HumanoidToolBench for tool-selection and tool-use tasks on G1; and the Symthaea ablations for whether HLB provides an incremental advantage over capacity-matched MLP/GRU, current HDC-LTC, and controller/agent baselines.
+
+Relevant sources:
+- ULTRA project and demos: https://ultrahumanoid.github.io/
+- ULTRA paper: https://arxiv.org/abs/2603.03279
+- ULTRA code and licensing notes: https://github.com/Sirui-Xu/ULTRA
+- Whole-body control review (13 November 2026): https://www.mdpi.com/2227-7390/14/22/4173
+- Long-horizon manipulation survey (16 November 2026): https://link.springer.com/article/10.1007/s44336-026-00048-x
 
 Sources:
 - https://research.nvidia.com/labs/srl/projects/robolab/leaderboard.html
