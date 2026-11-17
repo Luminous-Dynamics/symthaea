@@ -43,6 +43,7 @@ jobs:
         run: |
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/main.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/discovery_metrics.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/observation_event_audit.rs
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
@@ -53,6 +54,9 @@ jobs:
       - name: Test deterministic top-K metrics and negative controls
         run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics
 
+      - name: Test condition-bound observation event auditor and negative controls
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit
+
       - name: Run metrics runner on synthetic plumbing fixture
         run: |
           cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics -- \
@@ -60,6 +64,14 @@ jobs:
             --budgets 1,3,6 \
             --out "$RUNNER_TEMP/sc-discovery-metrics-smoke.json"
           cat "$RUNNER_TEMP/sc-discovery-metrics-smoke.json"
+
+      - name: Run synthetic observation event audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit -- \
+            --schema data/schemas/superconductivity_observation_event_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-observation-event-smoke.json"
+          cat "$RUNNER_TEMP/sc-observation-event-smoke.json"
 
       - name: Run exact-input registry audit
         run: |
@@ -73,6 +85,7 @@ jobs:
         run: |
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit -- -D warnings
 
       - name: Record exact-run environment and input identities
         if: always()
@@ -102,3 +115,4 @@ jobs:
             ${{ runner.temp }}/sc-discovery-environment.txt
             ${{ runner.temp }}/sc-discovery-registry-receipt.json
             ${{ runner.temp }}/sc-discovery-metrics-smoke.json
+            ${{ runner.temp }}/sc-observation-event-smoke.json
