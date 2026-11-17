@@ -775,7 +775,7 @@
             "material_id": "fixture-material-001",
             "sample_id": "fixture-sample-002",
             "state_id": "fixture-state-004",
-            "result_id": "fixture-result-018",
+            "result_id": "fixture-parent-result-019",
             "event_id": "fixture-event-018"
           },
           "query_sha256": null
