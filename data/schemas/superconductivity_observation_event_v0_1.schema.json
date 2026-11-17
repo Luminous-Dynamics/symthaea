@@ -433,7 +433,8 @@
                   "type": [
                     "string",
                     "null"
-                  ]
+                  ],
+                  "minLength": 1
                 },
                 "event_id": {
                   "type": [
