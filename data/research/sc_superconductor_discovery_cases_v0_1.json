@@ -264,6 +264,46 @@
         "electric_aircraft_propulsion"
       ],
       "primary_claim_boundary": "Composite scores depend on review-specific weights, application requirements and source data; reproduce inputs and sensitivity before treating as a ranking."
+    },
+    {
+      "source_id": "sclib_jzis_2026",
+      "url": "https://jzis.org/",
+      "repository_url": "https://github.com/JackZH26/SCLib_JZIS",
+      "repository_revision": "80e28f02e07324ff24e0cb08c82a4e2be1cb58bf",
+      "api_base": "https://api.jzis.org/sclib/v1",
+      "dataset_version": "v2026.09.03",
+      "observed_site_version": "be9ecdc",
+      "source_type": "external_versioned_superconductivity_evidence_library",
+      "title": "SCLib by JZIS: superconductivity literature, materials, reported properties and research workflows",
+      "licence": {
+        "code": "Apache-2.0",
+        "data": "CC-BY-4.0 where JZIS has authority",
+        "third_party": "upstream terms remain applicable"
+      },
+      "snapshot_as_of": "2026-11-17",
+      "reported_counts": {
+        "stats_api": {
+          "papers": 75202,
+          "materials": 19042,
+          "stats_refreshed_at": "2026-11-08T15:00:09.712008+00:00"
+        },
+        "stats_page": {
+          "papers": 75202,
+          "materials": 19042,
+          "stats_refreshed_at": "2026-11-17T15:00:00Z"
+        },
+        "public_materials_page": {
+          "reported_tc_results": 13270,
+          "papers": 6118,
+          "material_entries": 7552
+        },
+        "repo_readme_2026_10_09": {
+          "papers": 75202,
+          "stored_material_entries": 11463,
+          "default_public_catalogue_entries": 10507
+        }
+      },
+      "primary_claim_boundary": "External evidence library and API, not an independent validation authority. Public counts have different entity/scope/time bases; the API stats snapshot and website stats page reported different refresh times on 2026-11-17. Snapshot, licence, source revision, query conditions and evidence status must be preserved for every import."
     }
   ],
   "candidate_records": [
@@ -669,6 +709,26 @@
       },
       "metric_interpretation": "paper-reported application-specific translation index, not independently reproduced; reproduce exact weights, hard viability gate and source values, then sensitivity/Pareto extensions.",
       "local_reproducibility_status": "not_reproduced; reconstruct article data and source conditions tracked in #12651"
+    },
+    {
+      "catalog_id": "SCLib-JZIS-2026",
+      "source_ids": [
+        "sclib_jzis_2026"
+      ],
+      "reported_record_count": 13270,
+      "reported_material_count": 7552,
+      "reported_paper_count": 6118,
+      "reported_metric": {
+        "name": "public_coverage_inventory",
+        "api_stats_papers": 75202,
+        "api_stats_materials": 19042,
+        "api_data_version": "v2026.09.03",
+        "public_tc_results": 13270,
+        "public_material_entries": 7552,
+        "discovery_source_candidates": 103
+      },
+      "metric_interpretation": "Scope and entity counts for a versioned external library; not independently verified experimental record counts, not a validated benchmark cohort, and not a count of independent experiments.",
+      "local_reproducibility_status": "not_reproduced; audit snapshot/page/API count bases, source rights, same-record condition semantics and cross-library overlap under #12669"
     }
   ],
   "required_future_fields": [
