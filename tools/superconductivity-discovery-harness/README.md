@@ -7,8 +7,9 @@ This is a standalone Rust tool for validating the versioned superconductivity di
 From the repository root:
 
 ```bash
-cargo test --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
-cargo run --manifest-path tools/superconductivity-discovery-harness/Cargo.toml -- \
+cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
+cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
+cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml -- \
   --schema data/schemas/superconductivity_discovery_case_v0_1.schema.json \
   --instance data/research/sc_superconductor_discovery_cases_v0_1.json \
   --out /tmp/sc-discovery-registry-receipt.json
