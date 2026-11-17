@@ -25,6 +25,7 @@ MEMBER_GLOBS=(crates/core/* crates/domains/* crates/bridges/*)
 # Excluded members — must mirror [workspace].exclude in Cargo.toml.
 EXCLUDES=(
   "crates/core/symthaea"
+  "crates/core/symthaea-iit"
   "crates/core/nixward-web"
   "crates/core/symthaea-zkproof/methods"
   "crates/core/symthaea-zkproof/host"
