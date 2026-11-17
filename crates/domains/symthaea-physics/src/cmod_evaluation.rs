@@ -590,9 +590,12 @@ impl LeadTimeStats {
 // ── Evaluation Config ────────────────────────────────────────────────────────
 
 /// Configuration for the density-limit evaluation harness.
+///
+/// The configured training fraction is taken first; the held-out remainder is
+/// then stratified by discharge outcome and split into validation and final test.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationConfig {
-    /// Fraction of shots used for training (rest for test). Default: 0.8.
+    /// Fraction of shots used for training; the remainder is divided into validation and test. Default: 0.8.
     pub train_fraction: f64,
     /// Sliding window size for Phi-decline monitor. Default: 10.
     pub window_size: usize,
@@ -615,10 +618,12 @@ impl Default for EvaluationConfig {
 /// Complete evaluation report for the density-limit prediction task.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationReport {
-    /// Best free-energy threshold (maximizes F1).
+    /// Free-energy threshold selected by maximizing validation F1.
     pub best_threshold: f64,
-    /// Best F1 score achieved.
+    /// F1 score on the untouched final test partition at the validation-selected threshold.
     pub best_f1: f64,
+    /// Best F1 observed on validation while selecting the threshold.
+    pub validation_best_f1: f64,
     /// Confusion matrix at the best threshold.
     pub confusion_matrix: ConfusionMatrix,
     /// ROC curve points.
@@ -629,7 +634,9 @@ pub struct EvaluationReport {
     pub lead_time_stats: LeadTimeStats,
     /// Number of training shots.
     pub total_shots_train: usize,
-    /// Number of test shots.
+    /// Number of validation shots used for threshold selection.
+    pub total_shots_validation: usize,
+    /// Number of final test shots.
     pub total_shots_test: usize,
     /// Samples per class in the test set: (normal, disruption).
     pub samples_per_class: (usize, usize),
@@ -637,7 +644,7 @@ pub struct EvaluationReport {
     pub phi_decline_cm: ConfusionMatrix,
     /// Normalization ranges used.
     pub normalization_ranges: NormalizationRanges,
-    /// All threshold sweep results: (threshold, f1, precision, recall).
+    /// Validation threshold sweep results: (threshold, f1, precision, recall).
     pub threshold_sweep: Vec<(f64, f64, f64, f64)>,
 }
 
@@ -656,6 +663,7 @@ impl EvaluationReport {
             "| Training shots | {} |\n",
             self.total_shots_train
         ));
+        md.push_str(&format!("| Validation shots | {} |\n", self.total_shots_validation));
         md.push_str(&format!("| Test shots | {} |\n", self.total_shots_test));
         md.push_str(&format!(
             "| Test normal samples | {} |\n",
@@ -673,7 +681,8 @@ impl EvaluationReport {
             "| Best threshold | {:.4} |\n",
             self.best_threshold
         ));
-        md.push_str(&format!("| F1 | {:.4} |\n", self.best_f1));
+        md.push_str(&format!("| Test F1 | {:.4} |\n", self.best_f1));
+        md.push_str(&format!("| Validation-selected threshold F1 | {:.4} |\n", self.validation_best_f1));
         md.push_str(&format!("| Accuracy | {:.4} |\n", cm.accuracy()));
         md.push_str(&format!("| Precision | {:.4} |\n", cm.precision()));
         md.push_str(&format!("| Recall | {:.4} |\n", cm.recall()));
@@ -865,14 +874,69 @@ fn evaluate_phi_decline(
     ConfusionMatrix::new(tp, fp, tn, fn_)
 }
 
+/// Deterministically split held-out shots into validation and final-test partitions.
+///
+/// The split operates on whole discharges, stratifies by disruption outcome, and
+/// hashes shot IDs so the same source data and seed produce the same partition.
+/// Each class must contain at least two held-out shots; failing closed is safer
+/// than silently selecting a threshold on the final test set.
+fn split_validation_test_shots(
+    shots: Vec<DensityLimitShot>,
+    seed: u64,
+) -> Result<(Vec<DensityLimitShot>, Vec<DensityLimitShot>)> {
+    fn split_group(
+        mut group: Vec<DensityLimitShot>,
+        seed: u64,
+    ) -> Result<(Vec<DensityLimitShot>, Vec<DensityLimitShot>)> {
+        anyhow::ensure!(
+            group.len() >= 2,
+            "validation/test split requires at least two held-out shots per class"
+        );
+        group.sort_by_key(|shot| stable_shot_split_key(shot.shot_id, seed));
+        let test = group.split_off(group.len() / 2);
+        Ok((group, test))
+    }
+
+    let mut disrupted = Vec::new();
+    let mut normal = Vec::new();
+    for shot in shots {
+        if shot.has_disruption {
+            disrupted.push(shot);
+        } else {
+            normal.push(shot);
+        }
+    }
+
+    let (mut validation_disrupted, mut test_disrupted) =
+        split_group(disrupted, seed ^ 0xD15A_7E01)?;
+    let (mut validation_normal, mut test_normal) =
+        split_group(normal, seed ^ 0xA11C_E501)?;
+
+    validation_disrupted.append(&mut validation_normal);
+    test_disrupted.append(&mut test_normal);
+    validation_disrupted.sort_by_key(|shot| shot.shot_id);
+    test_disrupted.sort_by_key(|shot| shot.shot_id);
+
+    Ok((validation_disrupted, test_disrupted))
+}
+
+/// Stable SplitMix64-derived key for deterministic discharge partitioning.
+fn stable_shot_split_key(shot_id: u64, seed: u64) -> u64 {
+    let mut value = shot_id ^ seed;
+    value = value.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    value = (value ^ (value >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    value ^ (value >> 31)
+}
+
 /// Run the full evaluation pipeline on DL_DataFrame data.
 ///
-/// 1. Loads CSV and groups by shot
-/// 2. Splits into train/test by sorted shot_id (deterministic)
-/// 3. Builds encoder and reference HV from healthy training samples
-/// 4. Sweeps free-energy thresholds to find optimal F1
-/// 5. Computes ROC curve, AUC, and lead-time statistics
-/// 6. Evaluates Phi-decline method for comparison
+/// 1. Loads CSV and groups by complete discharge/shot
+/// 2. Creates a deterministic train/validation/test split without splitting shots
+/// 3. Fits encoder and reference HV using training shots only
+/// 4. Selects the free-energy threshold using validation F1 only
+/// 5. Evaluates the frozen threshold once on the final test partition
+/// 6. Computes test ROC/AUC, lead-time statistics, and Phi-decline comparison
 pub fn evaluate_density_limit(path: &Path, config: &EvaluationConfig) -> Result<EvaluationReport> {
     // 1. Load data
     let shots = load_density_limit_csv(path)?;
@@ -904,18 +968,25 @@ pub fn evaluate_density_limit(path: &Path, config: &EvaluationConfig) -> Result<
     let mut test_shots_owned: Vec<DensityLimitShot> = Vec::new();
 
     train_shots_owned.extend(disrupted_shots.drain(..d_split));
-    test_shots_owned.extend(disrupted_shots); // remaining disrupted → test
+    test_shots_owned.extend(disrupted_shots); // held-out disrupted shots
     train_shots_owned.extend(normal_shots.drain(..n_split));
-    test_shots_owned.extend(normal_shots); // remaining normal → test
+    test_shots_owned.extend(normal_shots); // held-out normal shots
 
+    let (validation_shots_owned, test_shots_owned) =
+        split_validation_test_shots(test_shots_owned, 0xC0D0_0001)?;
     let train_shots = &train_shots_owned[..];
+    let validation_shots = &validation_shots_owned[..];
     let test_shots = &test_shots_owned[..];
 
     // 3. Build encoder from training data normalization ranges
     let encoder = DensityLimitEncoder::from_shots(train_shots);
     let reference = encoder.build_reference(train_shots);
 
-    // 4. Score all test samples
+    // 4. Score validation and final-test samples independently.
+    let validation_samples: Vec<DensityLimitSample> = validation_shots
+        .iter()
+        .flat_map(|shot| shot.samples.iter().cloned())
+        .collect();
     let test_samples: Vec<DensityLimitSample> = test_shots
         .iter()
         .flat_map(|shot| shot.samples.iter().cloned())
@@ -924,6 +995,7 @@ pub fn evaluate_density_limit(path: &Path, config: &EvaluationConfig) -> Result<
     let normal_count = test_samples.iter().filter(|s| !s.is_disruption).count();
     let disruption_count = test_samples.iter().filter(|s| s.is_disruption).count();
 
+    let validation_scored = score_samples(&encoder, &reference, &validation_samples);
     let scored = score_samples(&encoder, &reference, &test_samples);
 
     // 5. Threshold sweep: 0.05 to 0.95 in steps of 0.05
@@ -933,7 +1005,7 @@ pub fn evaluate_density_limit(path: &Path, config: &EvaluationConfig) -> Result<
 
     for step in 1..=19 {
         let threshold = step as f64 * 0.05;
-        let cm = classify_at_threshold(&scored, threshold);
+        let cm = classify_at_threshold(&validation_scored, threshold);
         let f1 = cm.f1();
         threshold_sweep.push((threshold, f1, cm.precision(), cm.recall()));
         if f1 > best_f1 {
@@ -942,7 +1014,8 @@ pub fn evaluate_density_limit(path: &Path, config: &EvaluationConfig) -> Result<
         }
     }
 
-    // 6. Final classification at best threshold
+    // Freeze the threshold using validation only, then evaluate once on final test.
+    let validation_best_f1 = best_f1;
     let confusion_matrix = classify_at_threshold(&scored, best_threshold);
 
     // 7. ROC curve and AUC
@@ -959,12 +1032,14 @@ pub fn evaluate_density_limit(path: &Path, config: &EvaluationConfig) -> Result<
 
     Ok(EvaluationReport {
         best_threshold,
-        best_f1,
+        best_f1: confusion_matrix.f1(),
+        validation_best_f1,
         confusion_matrix,
         roc_curve,
         auc,
         lead_time_stats,
         total_shots_train: train_shots.len(),
+        total_shots_validation: validation_shots.len(),
         total_shots_test: test_shots.len(),
         samples_per_class: (normal_count, disruption_count),
         phi_decline_cm,
@@ -978,7 +1053,7 @@ pub fn evaluate_density_limit(path: &Path, config: &EvaluationConfig) -> Result<
 /// Configuration for the improved V2 evaluation harness.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationConfigV2 {
-    /// Fraction of shots used for training (rest for test). Default: 0.8.
+    /// Fraction of shots used for training; the remainder is divided into validation and test. Default: 0.8.
     pub train_fraction: f64,
     /// Temporal window size (consecutive samples bundled into one HV). Default: 5.
     pub window_size: usize,
@@ -1103,7 +1178,10 @@ pub fn evaluate_density_limit_v2(
     train_shots_owned.extend(normal_shots.drain(..n_split));
     test_shots_owned.extend(normal_shots);
 
+    let (validation_shots_owned, test_shots_owned) =
+        split_validation_test_shots(test_shots_owned, 0xC0D0_0002)?;
     let train_shots = &train_shots_owned[..];
+    let validation_shots = &validation_shots_owned[..];
     let test_shots = &test_shots_owned[..];
 
     // 3. Build encoder and global reference from training data
@@ -1122,7 +1200,9 @@ pub fn evaluate_density_limit_v2(
         .filter(|s| s.is_disruption)
         .count();
 
-    // 5. Score with V2 method (temporal windows + per-shot reference)
+    // 5. Score validation and final-test shots independently.
+    let validation_scored =
+        score_shots_v2(&encoder, &global_reference, validation_shots, config);
     let scored = score_shots_v2(&encoder, &global_reference, test_shots, config);
 
     // 6. Fine threshold sweep
@@ -1132,7 +1212,7 @@ pub fn evaluate_density_limit_v2(
 
     let mut thresh = config.fine_threshold_step;
     while thresh <= config.fine_threshold_max + 1e-9 {
-        let cm = classify_at_threshold(&scored, thresh);
+        let cm = classify_at_threshold(&validation_scored, thresh);
         let f1 = cm.f1();
         threshold_sweep.push((thresh, f1, cm.precision(), cm.recall()));
         if f1 > best_f1 {
@@ -1142,7 +1222,8 @@ pub fn evaluate_density_limit_v2(
         thresh += config.fine_threshold_step;
     }
 
-    // 7. Final classification at best threshold
+    // Freeze the threshold using validation only, then evaluate once on final test.
+    let validation_best_f1 = best_f1;
     let confusion_matrix = classify_at_threshold(&scored, best_threshold);
 
     // 8. ROC curve and AUC
@@ -1165,12 +1246,14 @@ pub fn evaluate_density_limit_v2(
 
     Ok(EvaluationReport {
         best_threshold,
-        best_f1,
+        best_f1: confusion_matrix.f1(),
+        validation_best_f1,
         confusion_matrix,
         roc_curve,
         auc,
         lead_time_stats,
         total_shots_train: train_shots.len(),
+        total_shots_validation: validation_shots.len(),
         total_shots_test: test_shots.len(),
         samples_per_class: (normal_count, disruption_count),
         phi_decline_cm,
@@ -1284,7 +1367,7 @@ pub fn greenwald_fraction(density: f32, minor_radius: f32, plasma_current: f32) 
 /// Configuration for the V3 physics-informed evaluation harness.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationConfigV3 {
-    /// Fraction of shots used for training (rest for test). Default: 0.8.
+    /// Fraction of shots used for training; the remainder is divided into validation and test. Default: 0.8.
     pub train_fraction: f64,
     /// Temporal window size (consecutive samples bundled into one HV). Default: 5.
     pub window_size: usize,
@@ -1665,7 +1748,10 @@ pub fn evaluate_density_limit_v3(
     train_shots_owned.extend(normal_shots.drain(..n_split));
     test_shots_owned.extend(normal_shots);
 
+    let (validation_shots_owned, test_shots_owned) =
+        split_validation_test_shots(test_shots_owned, 0xC0D0_0003)?;
     let train_shots = &train_shots_owned[..];
+    let validation_shots = &validation_shots_owned[..];
     let test_shots = &test_shots_owned[..];
 
     // 3. Build V3 encoder and global reference from training data
@@ -1692,7 +1778,9 @@ pub fn evaluate_density_limit_v3(
         .filter(|s| s.is_disruption)
         .count();
 
-    // 5. Score with V3 method (physics-informed + temporal windows + per-shot reference)
+    // 5. Score validation and final-test shots independently.
+    let validation_scored =
+        score_shots_v3(&encoder, &global_reference, validation_shots, config);
     let scored = score_shots_v3(&encoder, &global_reference, test_shots, config);
 
     // 6. Fine threshold sweep: 0.002 to 0.50 in 0.002 steps
@@ -1702,7 +1790,7 @@ pub fn evaluate_density_limit_v3(
 
     let mut thresh = config.fine_threshold_step;
     while thresh <= config.fine_threshold_max + 1e-9 {
-        let cm = classify_at_threshold(&scored, thresh);
+        let cm = classify_at_threshold(&validation_scored, thresh);
         let f1 = cm.f1();
         threshold_sweep.push((thresh, f1, cm.precision(), cm.recall()));
         if f1 > best_f1 {
@@ -1712,7 +1800,8 @@ pub fn evaluate_density_limit_v3(
         thresh += config.fine_threshold_step;
     }
 
-    // 7. Final classification at best threshold
+    // Freeze the threshold using validation only, then evaluate once on final test.
+    let validation_best_f1 = best_f1;
     let confusion_matrix = classify_at_threshold(&scored, best_threshold);
 
     // 8. ROC curve and AUC
@@ -1736,12 +1825,14 @@ pub fn evaluate_density_limit_v3(
 
     Ok(EvaluationReport {
         best_threshold,
-        best_f1,
+        best_f1: confusion_matrix.f1(),
+        validation_best_f1,
         confusion_matrix,
         roc_curve,
         auc,
         lead_time_stats,
         total_shots_train: train_shots.len(),
+        total_shots_validation: validation_shots.len(),
         total_shots_test: test_shots.len(),
         samples_per_class: (normal_count, disruption_count),
         phi_decline_cm,
@@ -1806,6 +1897,32 @@ mod tests {
         file.flush().expect("flush");
         let path = file.path().to_path_buf();
         (file, path)
+    }
+
+
+    #[test]
+    fn validation_test_split_is_deterministic_disjoint_and_stratified() {
+        let csv = synthetic_csv(12, 5);
+        let (_file, path) = write_temp_csv(&csv);
+        let shots = load_density_limit_csv(&path).unwrap();
+
+        let (validation_a, test_a) =
+            split_validation_test_shots(shots.clone(), 0xC0D0_1234).unwrap();
+        let (validation_b, test_b) =
+            split_validation_test_shots(shots, 0xC0D0_1234).unwrap();
+
+        let validation_ids_a: Vec<u64> = validation_a.iter().map(|s| s.shot_id).collect();
+        let validation_ids_b: Vec<u64> = validation_b.iter().map(|s| s.shot_id).collect();
+        let test_ids_a: Vec<u64> = test_a.iter().map(|s| s.shot_id).collect();
+        let test_ids_b: Vec<u64> = test_b.iter().map(|s| s.shot_id).collect();
+
+        assert_eq!(validation_ids_a, validation_ids_b);
+        assert_eq!(test_ids_a, test_ids_b);
+        assert!(validation_ids_a.iter().all(|id| !test_ids_a.contains(id)));
+        assert!(validation_a.iter().any(|s| s.has_disruption));
+        assert!(validation_a.iter().any(|s| !s.has_disruption));
+        assert!(test_a.iter().any(|s| s.has_disruption));
+        assert!(test_a.iter().any(|s| !s.has_disruption));
     }
 
     #[test]
