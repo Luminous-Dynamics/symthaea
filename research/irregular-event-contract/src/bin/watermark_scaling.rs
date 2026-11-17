@@ -2,8 +2,8 @@ use std::hint::black_box;
 use std::time::{Duration, Instant};
 
 use symthaea_irregular_event_contract::{
-    EventArrivalClassification, EventRecord, LateEventBreach, Measurement, SourceKey,
-    SourceProgressOperation, SourceProgressRevision, SourceWatermarkLedger,
+    EventArrivalClassification, EventRecord, Measurement, SourceKey, SourceProgressOperation,
+    SourceProgressRevision, SourceWatermarkLedger,
 };
 
 const INDEXED_REPETITIONS: usize = 51;
@@ -133,34 +133,6 @@ fn build_ledger(
     Ok((ledger, required_sources))
 }
 
-fn scan_late_breaches(
-    ledger: &SourceWatermarkLedger,
-    entity_id: u64,
-    required_sources: &[SourceKey],
-    interval_start_us: i64,
-    interval_end_exclusive_us: i64,
-    known_at_us: i64,
-) -> Vec<LateEventBreach> {
-    let mut matches: Vec<_> = ledger
-        .late_breaches()
-        .iter()
-        .filter(|breach| {
-            breach.recorded_at_us <= known_at_us
-                && breach.event.entity_id == entity_id
-                && breach.event.event_time_us >= interval_start_us
-                && breach.event.event_time_us < interval_end_exclusive_us
-                && required_sources.iter().any(|source| {
-                    source.entity_id == breach.event.entity_id
-                        && source.modality_id == breach.event.modality_id
-                        && source.source_id == breach.event.source_id
-                })
-        })
-        .copied()
-        .collect();
-    matches.sort_by_key(|breach| (breach.recorded_at_us, breach.event.event_id));
-    matches
-}
-
 fn run_case(
     event_count: usize,
     source_count: usize,
@@ -182,6 +154,15 @@ fn run_case(
             known_at_us,
         )
     };
+    let linear_scan_query = || {
+        ledger.completeness_linear_scan_reference(
+            1,
+            &required_sources,
+            interval_start_us,
+            interval_end_exclusive_us,
+            known_at_us,
+        )
+    };
     let verified_query = || {
         ledger.completeness_verified(
             1,
@@ -192,30 +173,38 @@ fn run_case(
         )
     };
 
-    // Correctness is established before timing: the indexed and full-history
-    // verifier must return byte-for-byte equal reports for this workload.
+    // Correctness is established before timing: indexed, linear-scan and
+    // verified paths share the complete query contract and must agree exactly
+    // on every semantic result field. Only the breach-selection strategy and
+    // its diagnostic counters differ.
     let warm = query().map_err(|error| format!("warm indexed query: {error}"))?;
+    let scanned = linear_scan_query()
+        .map_err(|error| format!("warm linear-scan query: {error}"))?;
     let verified = verified_query().map_err(|error| format!("warm verified query: {error}"))?;
-    if warm != *verified.report() {
+    let same_semantics = |left: &_, right: &_| {
+        left.interval_start_us == right.interval_start_us
+            && left.interval_end_exclusive_us == right.interval_end_exclusive_us
+            && left.known_at_us == right.known_at_us
+            && left.verdict == right.verdict
+            && left.sources == right.sources
+            && left.blocked_sources == right.blocked_sources
+            && left.late_breaches == right.late_breaches
+    };
+    if !same_semantics(&warm, &scanned) || !same_semantics(&warm, verified.report()) {
         return Err(format!(
-            "indexed and verified reports differ: events={event_count}, sources={source_count}, width={interval_width}, known_at={known_at_us}"
+            "indexed, linear-scan and verified reports differ: events={event_count}, sources={source_count}, width={interval_width}, known_at={known_at_us}"
         ));
+    }
+    if warm.late_breach_linear_scan_receipts_examined != 0
+        || warm.late_breach_candidates_examined > ledger.late_breaches().len()
+        || scanned.late_breach_linear_scan_receipts_examined != ledger.late_breaches().len()
+        || scanned.late_breach_index_buckets_examined != 0
+        || scanned.late_breach_candidates_examined != 0
+    {
+        return Err("indexed / linear-scan instrumentation counters are inconsistent".to_owned());
     }
     if verified.ledger_sha256() != ledger.state_sha256() {
         return Err("verified report digest does not bind the current ledger snapshot".to_owned());
-    }
-    let scanned_breaches = scan_late_breaches(
-        &ledger,
-        1,
-        &required_sources,
-        interval_start_us,
-        interval_end_exclusive_us,
-        known_at_us,
-    );
-    if scanned_breaches != warm.late_breaches {
-        return Err(format!(
-            "indexed and linear-scan breach sets differ: events={event_count}, sources={source_count}, width={interval_width}, known_at={known_at_us}"
-        ));
     }
 
     let mut indexed_samples = Vec::with_capacity(INDEXED_REPETITIONS);
@@ -229,15 +218,10 @@ fn run_case(
     let mut scan_samples = Vec::with_capacity(SCAN_REPETITIONS);
     for _ in 0..SCAN_REPETITIONS {
         let started = Instant::now();
-        let breaches = black_box(scan_late_breaches(
-            &ledger,
-            1,
-            &required_sources,
-            interval_start_us,
-            interval_end_exclusive_us,
-            known_at_us,
-        ));
-        black_box(breaches.len());
+        let report = black_box(
+            linear_scan_query().map_err(|error| format!("linear-scan query: {error}"))?,
+        );
+        black_box((report.verdict, report.late_breaches.len()));
         scan_samples.push(started.elapsed());
     }
 
@@ -269,7 +253,7 @@ fn run_case(
         "{event_count},{source_count},{interval_width},{late_rate_basis_points},{known_at_us},{INDEXED_REPETITIONS},{SCAN_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{},{scan_p50:.3},{scan_p95:.3},{scan_p99:.3},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_max:.3}",
         warm.late_breach_index_buckets_examined,
         warm.late_breach_candidates_examined,
-        ledger.late_breaches().len(),
+        scanned.late_breach_linear_scan_receipts_examined,
         warm.late_breaches.len()
     );
     Ok(())
