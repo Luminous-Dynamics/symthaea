@@ -51,7 +51,7 @@ The union bound is conservative only relative to valid supplied probability uppe
 
 ## Synthetic fixture
 
-The executable fixture has two asset decisions and three candidate inspections. Under the same energy ceiling, gross-EVSI greedy picks a high-value but inefficient option (9 value units); exact campaign search selects two complementary options (14 value units). All values and resource costs are invented arithmetic fixtures, not calibrated inspection performance or field measurements.
+The executable fixture has three asset decisions and three candidate inspections. Under the same energy ceiling, gross-EVSI, EVSI/energy and EVSI/time greedy each choose one high-value option (19 units); exact campaign search selects two complementary inspections (20 units). The fixture uses synthetic-only digests and an unknown inventory disposition, so its output remains research-only. All values and resource costs are invented arithmetic fixtures, not calibrated inspection performance or field measurements.
 
 ## Scope limits
 
