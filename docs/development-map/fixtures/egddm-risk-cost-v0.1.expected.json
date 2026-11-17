@@ -1,0 +1,559 @@
+{
+  "scenario_id": "d6.17-noisy-channels-correlated-sources-v0.1",
+  "adjudication_status": "synthetic_known_answer_robust_risk_cost_evaluation_only",
+  "risk_report_status": "synthetic_known_answer_noisy_channel_evaluation_only",
+  "trace_count": 13,
+  "budget_micros": 1800,
+  "summary": {
+    "robust_risk_qualified_action_count": 3,
+    "within_budget_count": 12,
+    "feasible_action_count": 2,
+    "over_budget_count": 1,
+    "cost_estimate_undercoverage_events": 9,
+    "comparison_group_count": 1
+  },
+  "traces": [
+    {
+      "trace_id": "noisy-point-estimate-false-safe",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 129,
+      "prior_only_robust_risk_bps": 454,
+      "likelihood_only_robust_risk_bps": 291,
+      "worst_case_posterior_risk_bps": 982,
+      "risk_envelope_bps": 700,
+      "risk_qualified": false,
+      "cost_bound_micros": 400,
+      "cold_cost_bound_micros": 400,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 1,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [
+        {
+          "option_id": "optical-primary",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 400,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 400,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "correlated-sensors-not-independent",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 12,
+      "prior_only_robust_risk_bps": 40,
+      "likelihood_only_robust_risk_bps": 350,
+      "worst_case_posterior_risk_bps": 1154,
+      "risk_envelope_bps": 700,
+      "risk_qualified": false,
+      "cost_bound_micros": 850,
+      "cold_cost_bound_micros": 850,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 2,
+      "cost_estimate_undercoverage_count": 1,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [
+        {
+          "option_id": "optical-primary",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 400,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 400,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true
+        },
+        {
+          "option_id": "optical-secondary",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 450,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 450,
+          "candidate_estimate_upper_micros": 500,
+          "estimate_undercovered": false
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "joint-common-mode-model",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 84,
+      "prior_only_robust_risk_bps": 298,
+      "likelihood_only_robust_risk_bps": 160,
+      "worst_case_posterior_risk_bps": 555,
+      "risk_envelope_bps": 700,
+      "risk_qualified": true,
+      "cost_bound_micros": 720,
+      "cold_cost_bound_micros": 600,
+      "warm_cost_bound_micros": 120,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 2,
+      "cost_estimate_undercoverage_count": 1,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": true,
+      "cost_steps": [
+        {
+          "option_id": "optical-joint",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 600,
+              "sample_count": 3
+            },
+            {
+              "mode": "warm",
+              "nearest_rank_p95_cost_bound_micros": 120,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 720,
+          "candidate_estimate_upper_micros": 650,
+          "estimate_undercovered": true
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "qualified-independent-factors",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 1,
+      "prior_only_robust_risk_bps": 4,
+      "likelihood_only_robust_risk_bps": 5,
+      "worst_case_posterior_risk_bps": 15,
+      "risk_envelope_bps": 700,
+      "risk_qualified": true,
+      "cost_bound_micros": 1700,
+      "cold_cost_bound_micros": 1700,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 2,
+      "cost_estimate_undercoverage_count": 1,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": true,
+      "cost_steps": [
+        {
+          "option_id": "software-test",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 1000,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 1000,
+          "candidate_estimate_upper_micros": 950,
+          "estimate_undercovered": true
+        },
+        {
+          "option_id": "runtime-check",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 700,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 700,
+          "candidate_estimate_upper_micros": 700,
+          "estimate_undercovered": false
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "calibration-expired-before-decision",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 1000,
+      "prior_only_robust_risk_bps": 3000,
+      "likelihood_only_robust_risk_bps": 1000,
+      "worst_case_posterior_risk_bps": 3000,
+      "risk_envelope_bps": 700,
+      "risk_qualified": false,
+      "cost_bound_micros": 140,
+      "cold_cost_bound_micros": 140,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 0,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [
+        {
+          "option_id": "stale-check",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 140,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 140,
+          "candidate_estimate_upper_micros": 150,
+          "estimate_undercovered": false
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "calibration-revoked-before-decision",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 1000,
+      "prior_only_robust_risk_bps": 3000,
+      "likelihood_only_robust_risk_bps": 1000,
+      "worst_case_posterior_risk_bps": 3000,
+      "risk_envelope_bps": 700,
+      "risk_qualified": false,
+      "cost_bound_micros": 140,
+      "cold_cost_bound_micros": 140,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 0,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [
+        {
+          "option_id": "revoked-check",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 140,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 140,
+          "candidate_estimate_upper_micros": 150,
+          "estimate_undercovered": false
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "impossible-output-for-actual-world",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 1000,
+      "prior_only_robust_risk_bps": 3000,
+      "likelihood_only_robust_risk_bps": 1000,
+      "worst_case_posterior_risk_bps": 3000,
+      "risk_envelope_bps": 700,
+      "risk_qualified": false,
+      "cost_bound_micros": 350,
+      "cold_cost_bound_micros": 350,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 1,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [
+        {
+          "option_id": "impossible-check",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 350,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 350,
+          "candidate_estimate_upper_micros": 300,
+          "estimate_undercovered": true
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "zero-evidence-support",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 1000,
+      "prior_only_robust_risk_bps": 3000,
+      "likelihood_only_robust_risk_bps": 10000,
+      "worst_case_posterior_risk_bps": 10000,
+      "risk_envelope_bps": 700,
+      "risk_qualified": false,
+      "cost_bound_micros": 100,
+      "cold_cost_bound_micros": 100,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 0,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [
+        {
+          "option_id": "weak-check",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 100,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 100,
+          "candidate_estimate_upper_micros": 100,
+          "estimate_undercovered": false
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "future-evidence",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 1000,
+      "prior_only_robust_risk_bps": 3000,
+      "likelihood_only_robust_risk_bps": 1000,
+      "worst_case_posterior_risk_bps": 3000,
+      "risk_envelope_bps": 700,
+      "risk_qualified": false,
+      "cost_bound_micros": 400,
+      "cold_cost_bound_micros": 400,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 1,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [
+        {
+          "option_id": "optical-primary",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 400,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 400,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "always-act-release",
+      "action_id": "release",
+      "decision_kind": "act",
+      "nominal_risk_bps": 4000,
+      "prior_only_robust_risk_bps": 5000,
+      "likelihood_only_robust_risk_bps": 4000,
+      "worst_case_posterior_risk_bps": 5000,
+      "risk_envelope_bps": 0,
+      "risk_qualified": false,
+      "cost_bound_micros": 0,
+      "cold_cost_bound_micros": 0,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 0,
+      "cost_estimate_undercoverage_count": 0,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "always-abstain-readonly",
+      "action_id": "inspect-readonly",
+      "decision_kind": "defer",
+      "nominal_risk_bps": 0,
+      "prior_only_robust_risk_bps": 0,
+      "likelihood_only_robust_risk_bps": 0,
+      "worst_case_posterior_risk_bps": 0,
+      "risk_envelope_bps": 0,
+      "risk_qualified": false,
+      "cost_bound_micros": 0,
+      "cold_cost_bound_micros": 0,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 0,
+      "cost_estimate_undercoverage_count": 0,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "three-group-certificate-mismatch",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 0,
+      "prior_only_robust_risk_bps": 0,
+      "likelihood_only_robust_risk_bps": 102,
+      "worst_case_posterior_risk_bps": 357,
+      "risk_envelope_bps": 700,
+      "risk_qualified": true,
+      "cost_bound_micros": 2100,
+      "cold_cost_bound_micros": 2100,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 0,
+      "attempt_count": 3,
+      "cost_estimate_undercoverage_count": 2,
+      "within_budget": false,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [
+        {
+          "option_id": "optical-primary",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 400,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 400,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true
+        },
+        {
+          "option_id": "software-test",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 1000,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 1000,
+          "candidate_estimate_upper_micros": 950,
+          "estimate_undercovered": true
+        },
+        {
+          "option_id": "runtime-check",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 700,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 700,
+          "candidate_estimate_upper_micros": 700,
+          "estimate_undercovered": false
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    },
+    {
+      "trace_id": "drift-widened-channel-bounds",
+      "action_id": "bounded-probe",
+      "decision_kind": "act",
+      "nominal_risk_bps": 182,
+      "prior_only_robust_risk_bps": 639,
+      "likelihood_only_robust_risk_bps": 910,
+      "worst_case_posterior_risk_bps": 2648,
+      "risk_envelope_bps": 700,
+      "risk_qualified": false,
+      "cost_bound_micros": 650,
+      "cold_cost_bound_micros": 500,
+      "warm_cost_bound_micros": 0,
+      "retry_cost_bound_micros": 150,
+      "attempt_count": 2,
+      "cost_estimate_undercoverage_count": 1,
+      "within_budget": true,
+      "budget_micros": 1800,
+      "feasible": false,
+      "cost_steps": [
+        {
+          "option_id": "drift-check",
+          "attempts": [
+            {
+              "mode": "cold",
+              "nearest_rank_p95_cost_bound_micros": 500,
+              "sample_count": 3
+            },
+            {
+              "mode": "retry",
+              "nearest_rank_p95_cost_bound_micros": 150,
+              "sample_count": 3
+            }
+          ],
+          "cost_bound_micros": 650,
+          "candidate_estimate_upper_micros": 450,
+          "estimate_undercovered": true
+        }
+      ],
+      "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
+    }
+  ],
+  "comparison_groups": [
+    {
+      "comparison_id": "bounded-probe-verification-strategies",
+      "action_id": "bounded-probe",
+      "plans": [
+        {
+          "trace_id": "correlated-sensors-not-independent",
+          "cost_bound_micros": 850,
+          "worst_case_risk_bps": 1154,
+          "feasible": false
+        },
+        {
+          "trace_id": "joint-common-mode-model",
+          "cost_bound_micros": 720,
+          "worst_case_risk_bps": 555,
+          "feasible": true
+        },
+        {
+          "trace_id": "qualified-independent-factors",
+          "cost_bound_micros": 1700,
+          "worst_case_risk_bps": 15,
+          "feasible": true
+        },
+        {
+          "trace_id": "three-group-certificate-mismatch",
+          "cost_bound_micros": 2100,
+          "worst_case_risk_bps": 357,
+          "feasible": false
+        }
+      ],
+      "feasible_plan_count": 2,
+      "pareto_frontier_trace_ids": [
+        "joint-common-mode-model",
+        "qualified-independent-factors"
+      ]
+    }
+  ],
+  "decision_rule": "lexicographic: hard safety and robust risk first; budget admissibility second; cost/risk Pareto comparison only among feasible actions",
+  "cost_interpretation": "Conservative sum of evaluator-side per-attempt nearest-rank p95 bounds. This is not an empirical p95 of full-trajectory total cost; joint runner receipts are required for that claim.",
+  "claim_ceiling": "Synthetic evaluator joining D6.17 robust risk reports with evaluator-side per-attempt cost distributions. The sum of per-attempt nearest-rank p95 values is a conservative cost bound, not an empirical end-to-end p95. This does not measure real runner costs, prove globally optimal adaptive acquisition, or authorize production actions."
+}

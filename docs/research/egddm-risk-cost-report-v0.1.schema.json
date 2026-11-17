@@ -1,0 +1,331 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-risk-cost-report-v0.1.schema.json",
+  "title": "EGDDM D6.17.2 risk-cost report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "risk_report_status",
+    "trace_count",
+    "budget_micros",
+    "summary",
+    "traces",
+    "comparison_groups",
+    "decision_rule",
+    "cost_interpretation",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adjudication_status": {
+      "const": "synthetic_known_answer_robust_risk_cost_evaluation_only"
+    },
+    "risk_report_status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "trace_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "budget_micros": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "robust_risk_qualified_action_count",
+        "within_budget_count",
+        "feasible_action_count",
+        "over_budget_count",
+        "cost_estimate_undercoverage_events",
+        "comparison_group_count"
+      ],
+      "properties": {
+        "robust_risk_qualified_action_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "within_budget_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "feasible_action_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "over_budget_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cost_estimate_undercoverage_events": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "comparison_group_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "traces": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "action_id",
+          "decision_kind",
+          "nominal_risk_bps",
+          "prior_only_robust_risk_bps",
+          "likelihood_only_robust_risk_bps",
+          "worst_case_posterior_risk_bps",
+          "risk_envelope_bps",
+          "risk_qualified",
+          "cost_bound_micros",
+          "cold_cost_bound_micros",
+          "warm_cost_bound_micros",
+          "retry_cost_bound_micros",
+          "attempt_count",
+          "cost_estimate_undercoverage_count",
+          "within_budget",
+          "budget_micros",
+          "feasible",
+          "cost_steps",
+          "cost_interpretation"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "decision_kind": {
+            "enum": [
+              "act",
+              "defer"
+            ]
+          },
+          "nominal_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "prior_only_robust_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "likelihood_only_robust_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "worst_case_posterior_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "risk_envelope_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "risk_qualified": {
+            "type": "boolean"
+          },
+          "cost_bound_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cold_cost_bound_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "warm_cost_bound_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "retry_cost_bound_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "attempt_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "cost_estimate_undercoverage_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "within_budget": {
+            "type": "boolean"
+          },
+          "budget_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "feasible": {
+            "type": "boolean"
+          },
+          "cost_steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "option_id",
+                "attempts",
+                "cost_bound_micros",
+                "candidate_estimate_upper_micros",
+                "estimate_undercovered"
+              ],
+              "properties": {
+                "option_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cost_bound_micros": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "candidate_estimate_upper_micros": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "estimate_undercovered": {
+                  "type": "boolean"
+                },
+                "attempts": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "mode",
+                      "nearest_rank_p95_cost_bound_micros",
+                      "sample_count"
+                    ],
+                    "properties": {
+                      "mode": {
+                        "enum": [
+                          "cold",
+                          "warm",
+                          "retry"
+                        ]
+                      },
+                      "nearest_rank_p95_cost_bound_micros": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "sample_count": {
+                        "type": "integer",
+                        "minimum": 1
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "cost_interpretation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "comparison_groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "comparison_id",
+          "action_id",
+          "plans",
+          "feasible_plan_count",
+          "pareto_frontier_trace_ids"
+        ],
+        "properties": {
+          "comparison_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "action_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "feasible_plan_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pareto_frontier_trace_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "plans": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "trace_id",
+                "cost_bound_micros",
+                "worst_case_risk_bps",
+                "feasible"
+              ],
+              "properties": {
+                "trace_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "cost_bound_micros": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "worst_case_risk_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "feasible": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "decision_rule": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cost_interpretation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

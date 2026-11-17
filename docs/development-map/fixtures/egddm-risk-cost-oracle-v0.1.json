@@ -1,0 +1,216 @@
+{
+  "decision_cutoff": "2026-11-17T10:00:00Z",
+  "budget_micros": 1800,
+  "options": [
+    {
+      "option_id": "optical-primary",
+      "available_at": "2026-11-17T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          300,
+          350,
+          400
+        ],
+        "warm": [
+          60,
+          70,
+          80
+        ],
+        "retry": [
+          90,
+          105,
+          120
+        ]
+      }
+    },
+    {
+      "option_id": "optical-secondary",
+      "available_at": "2026-11-17T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          350,
+          400,
+          450
+        ],
+        "warm": [
+          70,
+          80,
+          90
+        ],
+        "retry": [
+          100,
+          115,
+          130
+        ]
+      }
+    },
+    {
+      "option_id": "optical-joint",
+      "available_at": "2026-11-17T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          500,
+          550,
+          600
+        ],
+        "warm": [
+          100,
+          110,
+          120
+        ],
+        "retry": [
+          140,
+          160,
+          180
+        ]
+      }
+    },
+    {
+      "option_id": "software-test",
+      "available_at": "2026-11-17T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          800,
+          900,
+          1000
+        ],
+        "warm": [
+          160,
+          180,
+          200
+        ],
+        "retry": [
+          240,
+          270,
+          300
+        ]
+      }
+    },
+    {
+      "option_id": "runtime-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          550,
+          625,
+          700
+        ],
+        "warm": [
+          110,
+          125,
+          140
+        ],
+        "retry": [
+          165,
+          190,
+          210
+        ]
+      }
+    },
+    {
+      "option_id": "stale-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          100,
+          120,
+          140
+        ],
+        "warm": [
+          20,
+          25,
+          30
+        ],
+        "retry": [
+          35,
+          40,
+          45
+        ]
+      }
+    },
+    {
+      "option_id": "revoked-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          100,
+          120,
+          140
+        ],
+        "warm": [
+          20,
+          25,
+          30
+        ],
+        "retry": [
+          35,
+          40,
+          45
+        ]
+      }
+    },
+    {
+      "option_id": "impossible-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          250,
+          300,
+          350
+        ],
+        "warm": [
+          50,
+          60,
+          70
+        ],
+        "retry": [
+          75,
+          90,
+          105
+        ]
+      }
+    },
+    {
+      "option_id": "weak-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          80,
+          90,
+          100
+        ],
+        "warm": [
+          16,
+          18,
+          20
+        ],
+        "retry": [
+          24,
+          27,
+          30
+        ]
+      }
+    },
+    {
+      "option_id": "drift-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "cost_samples_micros": {
+        "cold": [
+          400,
+          450,
+          500
+        ],
+        "warm": [
+          80,
+          90,
+          100
+        ],
+        "retry": [
+          120,
+          135,
+          150
+        ]
+      }
+    }
+  ]
+}
