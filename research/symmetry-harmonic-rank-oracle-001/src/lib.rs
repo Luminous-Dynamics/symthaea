@@ -268,7 +268,7 @@ fn dihedral_weight_pair_count(degree: usize, order: usize) -> Result<usize, Temp
         };
         weight = next;
     }
-    if degree % 2 == 0 {
+    if degree.is_multiple_of(2) {
         count = count
             .checked_add(1)
             .ok_or(TemplateErrorV1::ArithmeticOverflow)?;
@@ -548,7 +548,7 @@ mod tests {
             for degree in 0..=32 {
                 let cyclic = cyclic_fixed_dimension(degree, order).unwrap();
                 let expected = if degree % 2 == 0 {
-                    (cyclic + 1) / 2
+                    cyclic.div_ceil(2)
                 } else {
                     (cyclic - 1) / 2
                 };
