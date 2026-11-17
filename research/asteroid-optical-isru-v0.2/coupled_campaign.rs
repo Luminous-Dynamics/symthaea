@@ -20,9 +20,8 @@ use material_regime::{
     TrapAndGasMeasurement,
 };
 use optical_health::{
-    DepositionEvent, DepositionTransfer, HealthAction,
-    OpticalHealthError, OpticalHealthModel, OpticalHealthReading, OpticalHealthThresholds,
-    SurfaceState,
+    DepositionEvent, DepositionTransfer, HealthAction, OpticalHealthError, OpticalHealthModel,
+    OpticalHealthReading, OpticalHealthThresholds, SurfaceState,
 };
 
 const PROCESS_BAND: usize = 1;
@@ -294,16 +293,7 @@ mod tests {
     fn failed_deposition_rolls_back_material_state() {
         let mut world = campaign();
         let before = world.material_state().clone();
-        let result = world.apply_pulse(
-            "rollback",
-            100.0,
-            1.0,
-            1.0,
-            0.0,
-            &gas(),
-            -1.0,
-            7,
-        );
+        let result = world.apply_pulse("rollback", 100.0, 1.0, 1.0, 0.0, &gas(), -1.0, 7);
         assert!(matches!(result, Err(CoupledError::Optical(_))));
         assert_eq!(*world.material_state(), before);
         assert_eq!(world.process_transmission(), [1.0; 4]);
@@ -325,7 +315,9 @@ mod tests {
             .apply_pulse("wet", 100.0, 1.0, 1.0, 0.0, &wet_gas, 500.0, 7)
             .unwrap();
         assert_eq!(dry_receipt.captured_water_kg, wet_receipt.captured_water_kg);
-        assert!(wet_receipt.gas_analyzer_water_signal_kg > dry_receipt.gas_analyzer_water_signal_kg);
+        assert!(
+            wet_receipt.gas_analyzer_water_signal_kg > dry_receipt.gas_analyzer_water_signal_kg
+        );
     }
 
     #[test]
