@@ -677,9 +677,10 @@ impl SourceWatermarkLedger {
             // The deliberately simple oracle scans the same receipt vector,
             // then applies the identical entity/source/interval/knowledge cut.
             for breach in &self.late_breaches {
-                late_breach_linear_scan_receipts_examined = late_breach_linear_scan_receipts_examined
-                    .checked_add(1)
-                    .ok_or(WatermarkError::ArithmeticOverflow)?;
+                late_breach_linear_scan_receipts_examined =
+                    late_breach_linear_scan_receipts_examined
+                        .checked_add(1)
+                        .ok_or(WatermarkError::ArithmeticOverflow)?;
                 let event = breach.event;
                 let source = SourceKey {
                     entity_id: event.entity_id,
@@ -1115,13 +1116,18 @@ mod tests {
             .record_event_arrival(event(3, 1, 150, 40), 40)
             .unwrap();
 
-        let indexed = ledger.completeness(1, &[source(1), source(2)], 0, 100, 40).unwrap();
+        let indexed = ledger
+            .completeness(1, &[source(1), source(2)], 0, 100, 40)
+            .unwrap();
         let scanned = ledger
             .completeness_linear_scan_reference(1, &[source(1), source(2)], 0, 100, 40)
             .unwrap();
 
         assert_eq!(indexed.interval_start_us, scanned.interval_start_us);
-        assert_eq!(indexed.interval_end_exclusive_us, scanned.interval_end_exclusive_us);
+        assert_eq!(
+            indexed.interval_end_exclusive_us,
+            scanned.interval_end_exclusive_us
+        );
         assert_eq!(indexed.known_at_us, scanned.known_at_us);
         assert_eq!(indexed.verdict, scanned.verdict);
         assert_eq!(indexed.sources, scanned.sources);
