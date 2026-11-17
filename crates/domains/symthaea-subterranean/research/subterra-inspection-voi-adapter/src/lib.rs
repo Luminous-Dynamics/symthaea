@@ -578,8 +578,8 @@ mod tests {
             .iter()
             .find(|a| a.action_id.ends_with("high_eig"))
             .unwrap();
-        assert!(high.expected_information_gain_nats > 0.5);
-        assert!(high.gross_evsi.abs() < 1.0e-8);
+        assert!((high.expected_information_gain_nats - 0.6167159329029419).abs() < 1.0e-10);
+        assert!(high.gross_evsi.abs() < 1.0e-10);
         assert_eq!(
             report.entropy_greedy_action_id.as_deref(),
             Some(high.action_id.as_str())
@@ -605,8 +605,8 @@ mod tests {
             .find(|a| a.action_id.ends_with("decision_evidence"))
             .unwrap();
         assert!(decision.expected_information_gain_nats < high.expected_information_gain_nats);
-        assert!(decision.expected_information_gain_nats > 0.0);
-        assert!(decision.gross_evsi > 0.0);
+        assert!((decision.expected_information_gain_nats - 0.009945983399899605).abs() < 1.0e-10);
+        assert!((decision.gross_evsi - 1.09).abs() < 1.0e-10);
         assert_eq!(
             report.myopic_evsi_action_id.as_deref(),
             Some(decision.action_id.as_str())
