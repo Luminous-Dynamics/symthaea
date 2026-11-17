@@ -253,3 +253,18 @@ A prediction becomes a candidate dossier; a candidate dossier becomes a prospect
 ### Claim ceiling
 
 This addendum records new papers, benchmark design and an offline JSON corpus. It does not reproduce the genome-inspired model, run DFT/Eliashberg calculations, synthesize candidates, or claim experimental qualification.
+
+
+## 10. Executable registry contract — 17 November 2026
+
+A focused, standalone Rust audit harness now accompanies the reference corpus:
+
+- Harness: [tools/superconductivity-discovery-harness](https://github.com/Luminous-Dynamics/symthaea/tree/research/sc-ambient-pressure-001/tools/superconductivity-discovery-harness)
+- It validates the registry against the committed Draft 2020-12 schema, refuses schema reference indirection, verifies unique candidate/source IDs and source closure, prevents predicted Tc from being represented as observed transitions, and requires actinide records to carry an explicit computational-only/exclusion gate.
+- The receipt includes exact SHA-256 digests for both schema and registry and record counts.
+- Negative controls cover duplicate candidate IDs, orphan source references, prediction-to-observation promotion and remote schema references.
+- The harness is a standalone Cargo workspace with exact direct dependency pins and JSON Schema reference-resolution features disabled. First-time Cargo dependency acquisition may still require a package mirror; once built, the audit reads only the explicit local files and performs no evidence-source network lookups.
+
+Run commands and claim limits are documented in [the harness README](https://github.com/Luminous-Dynamics/symthaea/blob/research/sc-ambient-pressure-001/tools/superconductivity-discovery-harness/README.md). A path-scoped exact-head workflow was added at [.github/workflows/superconductivity-discovery.yml](https://github.com/Luminous-Dynamics/symthaea/blob/research/sc-ambient-pressure-001/.github/workflows/superconductivity-discovery.yml).
+
+**Execution status:** the source, schema and negative-control tests have been authored; the Rust binary has not yet been compiled or run in this environment. The workflow is intended to provide the first exact-head compiler/test/clippy receipt. No test pass is claimed until that receipt reports success.
