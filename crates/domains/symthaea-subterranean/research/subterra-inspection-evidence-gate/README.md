@@ -4,7 +4,7 @@ A Rust consumer boundary that decides whether an already-scored inspection optio
 
 ## Why
 
-A candidate's EVSI number is not sufficient provenance. The option must be bound to its precise asset/decision, asset revision, coordinate frame, region, sensor model, likelihood model, loss table, EVSI assessment, observation receipt, calibration receipt, rights disposition and validity interval.
+A candidate's EVSI number is not sufficient provenance. The option must be bound to its precise asset/decision, asset revision, coordinate frame, region, sensor model, likelihood model, loss table, EVSI assessment, source dataset, observation receipt, calibration receipt, rights disposition and validity interval.
 
 ## Run
 
