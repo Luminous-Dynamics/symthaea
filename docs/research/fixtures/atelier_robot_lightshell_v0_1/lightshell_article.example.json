@@ -1,0 +1,114 @@
+{
+  "schema_version": "0.1.0",
+  "article_id": "ATELIER-LS-PILOT-FOREARM-ELBOW-001",
+  "design_state": "concept",
+  "platform": {
+    "platform_id": "SYMTROPY-HUMANOID-JOINT-CARTRIDGE-001",
+    "revision": null,
+    "geometry_status": "unknown",
+    "geometry_digest": null,
+    "coordinate_frame_refs": []
+  },
+  "application_profile": {
+    "intended_use": "Non-weaponized research demonstrator for removable forearm/elbow surface protection",
+    "operating_domain": [],
+    "hazards": [
+      "abrasion",
+      "incidental low-energy contact",
+      "dust exposure (not yet specified)"
+    ],
+    "ballistic_scope": "out_of_scope",
+    "cleaning_profile": null,
+    "human_contact_context": "unknown"
+  },
+  "zones": [
+    {
+      "zone_id": "forearm_elbow",
+      "robot_region": "forearm and elbow joint envelope",
+      "functions": [
+        "abrasion_skin",
+        "environmental_cover",
+        "compliant_cushion",
+        "joint_gaiter"
+      ],
+      "coverage_state": "proposed",
+      "coordinate_frame_ref": null,
+      "keep_outs": [
+        "joint moving envelope",
+        "cable routes",
+        "thermal vents",
+        "sensor apertures",
+        "service connectors"
+      ],
+      "required_rom_ref": null,
+      "thermal_constraint_ref": null,
+      "sensor_constraint_refs": []
+    }
+  ],
+  "components": [
+    {
+      "component_id": "outer_textile_candidate",
+      "role": "outer_textile",
+      "zone_ids": [
+        "forearm_elbow"
+      ],
+      "material_ref": null,
+      "pattern_revision_ref": null,
+      "process_recipe_ref": null,
+      "attachment_state": "concept",
+      "mass_g": null,
+      "inspection_required": true
+    },
+    {
+      "component_id": "spacer_candidate",
+      "role": "spacer_textile",
+      "zone_ids": [
+        "forearm_elbow"
+      ],
+      "material_ref": null,
+      "pattern_revision_ref": null,
+      "process_recipe_ref": null,
+      "attachment_state": "concept",
+      "mass_g": null,
+      "inspection_required": true
+    },
+    {
+      "component_id": "local_guard_candidate",
+      "role": "local_lattice",
+      "zone_ids": [
+        "forearm_elbow"
+      ],
+      "material_ref": null,
+      "pattern_revision_ref": null,
+      "process_recipe_ref": null,
+      "attachment_state": "concept",
+      "mass_g": null,
+      "inspection_required": true
+    }
+  ],
+  "materials": [],
+  "evidence": [
+    {
+      "evidence_id": "lightshell_pilot_initial_state",
+      "kind": "fit_inspection",
+      "status": "not_run",
+      "scope": "No CAD, material, fabricated article or physical test has been admitted",
+      "source_revision": null,
+      "method": null,
+      "instrument_calibration_ref": null,
+      "raw_data_digest": null,
+      "uncertainty_description": "All geometry, load, thermal and material requirements remain open",
+      "reviewer_ref": null
+    }
+  ],
+  "claim_ceiling": [
+    "concept_only",
+    "no_physical_test",
+    "no_human_contact_safety_claim",
+    "no_ingress_rating",
+    "no_fire_rating",
+    "no_hygienic_qualification",
+    "no_ballistic_claim",
+    "no_whole_robot_qualification"
+  ]
+}
