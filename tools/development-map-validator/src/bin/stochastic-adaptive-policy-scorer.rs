@@ -670,7 +670,8 @@ mod tests{
   let release_leaf=r["submitted_policy"]["leaf_reports"].as_array().unwrap().iter()
    .find(|x|x["leaf_node_id"]=="release-after-b-pass").unwrap();
   assert_eq!(release_leaf["nominal_path_probability_bps"],4050);
-  let safe_kernel:&Value=&serde_json::from_str::<Value>(COMMON_CAUSE).unwrap()["oracle"]["world_kernels"][0];
+  let common_bundle:Value=serde_json::from_str(COMMON_CAUSE).unwrap();
+  let safe_kernel:&Value=&common_bundle["oracle"]["world_kernels"][0];
   let pass_pass=safe_kernel["joint_outcomes"].as_array().unwrap().iter()
    .find(|row|row["outcomes"]["gate-a"]=="pass"&&row["outcomes"]["gate-b"]=="pass").unwrap();
   assert_eq!(pass_pass["nominal_probability_bps"],4500);
