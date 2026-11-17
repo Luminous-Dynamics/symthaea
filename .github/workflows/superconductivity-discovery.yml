@@ -84,7 +84,11 @@ jobs:
             sha256sum data/schemas/superconductivity_discovery_case_v0_1.schema.json
             sha256sum data/research/sc_superconductor_discovery_cases_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/Cargo.toml
-            sha256sum tools/superconductivity-discovery-harness/Cargo.lock
+            if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
+              sha256sum tools/superconductivity-discovery-harness/Cargo.lock
+            else
+              echo "cargo_lock=not-generated"
+            fi
           } > "$RUNNER_TEMP/sc-discovery-environment.txt"
 
       - name: Upload exact-run lockfile and receipts
