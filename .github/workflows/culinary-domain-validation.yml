@@ -1,0 +1,48 @@
+name: Culinary Domain Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-culinary/**"
+      - ".github/workflows/culinary-domain-validation.yml"
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "crates/domains/symthaea-culinary/**"
+      - ".github/workflows/culinary-domain-validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: culinary-domain-validation-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  culinary:
+    name: Culinary domain validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Format culinary crate
+        run: cargo fmt --package symthaea-culinary -- --check
+
+      - name: Test culinary crate
+        run: cargo test --package symthaea-culinary
+
+      - name: Clippy culinary crate
+        run: cargo clippy --package symthaea-culinary --all-targets -- -D warnings
