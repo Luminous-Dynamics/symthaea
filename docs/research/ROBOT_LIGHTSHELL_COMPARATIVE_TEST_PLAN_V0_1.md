@@ -208,7 +208,7 @@ The companion contract is implemented in `symthaea-engineering::lightshell_quali
 
 Every hard gate is now recorded per candidate (six candidates × nine gates), and each metric observation is candidate-scoped (six candidates × seven metrics in the seed fixture). One candidate's pass cannot discharge another candidate's gate. A failed or inconclusive run remains visible and blocks that candidate from ranking.
 
-Ranking eligibility requires an exact matched B0 baseline, a common coverage boundary, all candidate-scoped gates resolved acceptably, at least one evidence-complete passed module/integrated test, no adverse run, and observed core metrics with method and uncertainty references. The validator returns eligible candidate IDs only; it does not calculate Pareto dominance or claim superiority.
+Ranking eligibility requires an exact matched B0 baseline, a common coverage boundary, all candidate-scoped gates resolved acceptably, at least one evidence-complete passed module/integrated test, no adverse run, and observed core metrics with method and uncertainty references. Core metrics must use the same units, measurement boundary and comparison direction as B0; the physical comparison run must use the same test stage, protocol revision, instrument references, calibration references and acceptance-rule revision as B0. The validator returns eligible candidate IDs only; it does not calculate Pareto dominance or claim superiority.
 
 The seed fixture remains `inputs_pending`: all gate states are unknown, all observed/target/baseline metric values are null, and no test runs exist. This remains an explicit non-result.
 
