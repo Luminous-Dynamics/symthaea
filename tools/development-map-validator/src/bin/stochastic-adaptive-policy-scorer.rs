@@ -21,7 +21,7 @@ const MAX_HYPOTHESES:usize=64;
 const MAX_OPTIONS:usize=6;
 const MAX_NODES:usize=64;
 const MAX_JOINT_ROWS:usize=4096;
-const CLAIM_CEILING:&str="Exact evaluation of a submitted finite adaptive policy over the evaluator-owned finite joint-outcome credal kernels and bounded prior set. Branch event intervals and conditional expected costs are exact for the registered bounded-simplex sets; the outer expected-cost bound assumes kernel ambiguity sets are independent across hypotheses. It does not optimize over all policies, model stochastic execution costs, authenticate joint-kernel calibration, establish model completeness, or authorize production actions.";
+const CLAIM_CEILING:&str="Exact evaluation of a submitted finite adaptive policy over the evaluator-owned finite joint-outcome credal kernels and bounded prior set. Branch event intervals and conditional expected costs are exact for the registered bounded-simplex sets. Robust leaf risk, aggregate coverage, unsafe-action mass and expected-cost envelopes assume kernel ambiguity sets are independent across hypotheses. It does not optimize over all policies, model stochastic execution costs, authenticate joint-kernel calibration, establish model completeness, or authorize production actions.";
 
 #[derive(Clone,Debug)]
 struct Bounds{lower:u64,upper:u64,nominal:u64}
@@ -671,6 +671,10 @@ fn evaluate(raw:&str)->Result<Value,String>{
  let policy_feasible=risk_violations==0&&budget_violations==0;
  let report=json!({
   "scenario_id":scenario,"adjudication_status":"stochastic_joint_kernel_adaptive_policy_scoring",
+  "ambiguity_model":{
+   "cross_hypothesis_kernel_shape":"independent_per_hypothesis_product_set",
+   "assumption":"Each hypothesis-specific joint-kernel credal set may vary independently across hypotheses, alongside the bounded prior set. This assumption applies to robust leaf risk, aggregate coverage, unsafe-action mass and expected-cost envelopes. Shared latent coupling across hypotheses is not represented."
+  },
   "billing_currency":currency,"world_count":kernels.len(),"joint_row_count":kernels.values().map(|x|x.rows.len()).sum::<usize>(),
   "option_count":options.len(),"leaf_count":leaf_paths.len(),"max_depth":max_depth,
   "kernel_provenance":kernels.iter().map(|(hypothesis,kernel)|json!({
