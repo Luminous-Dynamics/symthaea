@@ -211,7 +211,11 @@
       "resource_envelope",
       "attempt_id",
       "idempotency_key",
-      "monotonic_event_sequence"
+      "monotonic_event_sequence",
+      "common_cause_graph_digest",
+      "common_cause_profile_digest",
+      "common_cause_assessment_digest",
+      "common_cause_inventory_completeness"
     ],
     "states": [
       "approved",
@@ -229,7 +233,8 @@
       "reconciled_not_executed",
       "reconciled_executed_awaiting_inspection",
       "closed",
-      "rework_review"
+      "rework_review",
+      "rework_superseded"
     ],
     "transitions": [
       [
@@ -307,6 +312,10 @@
       [
         "awaiting_additional_evidence",
         "independent_verification"
+      ],
+      [
+        "rework_review",
+        "rework_superseded"
       ]
     ],
     "safety_invariants": [
@@ -319,11 +328,16 @@
       "rework_requires_valid_authority",
       "no_unknown_or_occluded_region_is_silently_marked_clear",
       "insufficient_verification_is_not_the_same_as_unknown_execution",
-      "reconciled_not_executed_is_terminal_for_its_attempt;_retry_creates_a_new_attempt_id"
+      "reconciled_not_executed_is_terminal_for_its_attempt;_retry_creates_a_new_attempt_id",
+      "verification_receipt_must_bind_exact_common_cause_assessment_digest",
+      "incomplete_or_unknown_common_cause_inventory_cannot_support_acceptance",
+      "common_cause_assessment_digest_is_a_reference_not_authentication_or_proof_of_independence",
+      "rework_authorization_must_bind_exact_new_work_package_design_frame_calibration_and_authority_revisions"
     ],
     "attempt_terminal_states": [
       "closed",
-      "reconciled_not_executed"
+      "reconciled_not_executed",
+      "rework_superseded"
     ]
   },
   "robot_roles": [
