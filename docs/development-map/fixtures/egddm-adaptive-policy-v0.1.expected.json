@@ -1,0 +1,156 @@
+{
+  "scenario_id": "d6-17-2-1-adaptive-exact-two-gate-v0.1",
+  "adjudication_status": "synthetic_known_answer_exact_small_tree_adaptive_policy_evaluation",
+  "actual_hypothesis_id_evaluator_only": "safe",
+  "world_count": 4,
+  "option_count": 2,
+  "max_depth": 3,
+  "submitted_policy": {
+    "policy_feasible": true,
+    "action_coverage_nominal_bps": 6000,
+    "unnecessary_abstention_nominal_bps": 0,
+    "actual_unsafe_world_count": 0,
+    "robust_risk_violation_leaf_count": 0,
+    "over_budget_leaf_count": 0,
+    "worst_case_path_cost_bound_micros": 1500,
+    "nominal_expected_cost_bound_micros": 1300,
+    "worst_case_expected_cost_bound_micros": 1420,
+    "budget_micros": 1600,
+    "leaf_reports": [
+      {
+        "leaf_node_id": "defer-after-a-fail",
+        "world_ids": [
+          "hazard-b",
+          "hazard-ab"
+        ],
+        "decision_kind": "defer",
+        "action_id": "inspect-readonly",
+        "nominal_risk_bps": 0,
+        "worst_case_posterior_risk_bps": 0,
+        "risk_qualified": true,
+        "path_cost_bound_micros": 700,
+        "within_budget": true,
+        "feasible": true
+      },
+      {
+        "leaf_node_id": "defer-after-b-fail",
+        "world_ids": [
+          "hazard-a"
+        ],
+        "decision_kind": "defer",
+        "action_id": "inspect-readonly",
+        "nominal_risk_bps": 0,
+        "worst_case_posterior_risk_bps": 0,
+        "risk_qualified": true,
+        "path_cost_bound_micros": 1500,
+        "within_budget": true,
+        "feasible": true
+      },
+      {
+        "leaf_node_id": "release-after-b-pass",
+        "world_ids": [
+          "safe"
+        ],
+        "decision_kind": "act",
+        "action_id": "release",
+        "nominal_risk_bps": 0,
+        "worst_case_posterior_risk_bps": 0,
+        "risk_qualified": true,
+        "path_cost_bound_micros": 1500,
+        "within_budget": true,
+        "feasible": true
+      }
+    ],
+    "world_paths": [
+      {
+        "world_id": "hazard-a",
+        "leaf_node_id": "defer-after-b-fail",
+        "path_cost_bound_micros": 1500
+      },
+      {
+        "world_id": "hazard-ab",
+        "leaf_node_id": "defer-after-a-fail",
+        "path_cost_bound_micros": 700
+      },
+      {
+        "world_id": "hazard-b",
+        "leaf_node_id": "defer-after-a-fail",
+        "path_cost_bound_micros": 700
+      },
+      {
+        "world_id": "safe",
+        "leaf_node_id": "release-after-b-pass",
+        "path_cost_bound_micros": 1500
+      }
+    ]
+  },
+  "exact_oracle": {
+    "search_complete": true,
+    "feasible_policy_count": 13,
+    "objective": "lexicographic: maximize nominal justified target-action coverage; minimize worst-case expected acquisition-cost bound; then nominal expected cost and worst path cost",
+    "action_coverage_nominal_bps": 6000,
+    "worst_case_expected_cost_bound_micros": 1420,
+    "nominal_expected_cost_bound_micros": 1300,
+    "worst_case_path_cost_bound_micros": 1500,
+    "full_revalidation_comparator": {
+      "acquisition_count": 2,
+      "cost_bound_micros": 1500,
+      "nominal_expected_cost_bound_micros": 1500,
+      "worst_case_expected_cost_bound_micros": 1500,
+      "action_coverage_nominal_bps": 6000,
+      "nominal_cost_savings_micros": 200
+    },
+    "policy_tree": {
+      "root_node_id": "acquire-10",
+      "nodes": [
+        {
+          "node_id": "acquire-10",
+          "kind": "acquire",
+          "option_id": "gate-a",
+          "at": "2026-11-17T09:00:00Z",
+          "branches": {
+            "fail": "stop-defer-1",
+            "pass": "acquire-9"
+          }
+        },
+        {
+          "node_id": "acquire-9",
+          "kind": "acquire",
+          "option_id": "gate-b",
+          "at": "2026-11-17T09:00:00Z",
+          "branches": {
+            "fail": "stop-defer-6",
+            "pass": "stop-act-8"
+          }
+        },
+        {
+          "node_id": "stop-act-8",
+          "kind": "stop",
+          "decision_kind": "act",
+          "action_id": "release",
+          "claimed_residual_risk_bps": 0
+        },
+        {
+          "node_id": "stop-defer-1",
+          "kind": "stop",
+          "decision_kind": "defer",
+          "action_id": "inspect-readonly",
+          "claimed_residual_risk_bps": 0
+        },
+        {
+          "node_id": "stop-defer-6",
+          "kind": "stop",
+          "decision_kind": "defer",
+          "action_id": "inspect-readonly",
+          "claimed_residual_risk_bps": 0
+        }
+      ]
+    }
+  },
+  "regret": {
+    "target_action_coverage_bps": 0,
+    "worst_case_expected_cost_bound_micros": 0,
+    "nominal_expected_cost_bound_micros": 0
+  },
+  "claim_ceiling": "Exact exhaustive policy oracle over the registered finite deterministic observation-world fixture and search limits. Risk at each leaf is delegated to D6.17.1. It does not establish optimality outside the finite model, stochastic transition distributions, arbitrary noisy channels beyond the reused risk evaluator, or measured production cost."
+}
