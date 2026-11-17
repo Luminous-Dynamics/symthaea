@@ -80,4 +80,4 @@ These are pairwise, full-probe-family diagnostics. They do not imply a single gl
 
 ## Latest focused qualification
 
-At exact code head `1dca4ffecf7de3490c65b4c0541aedb43ab12897`, the pinned Rust 1.96 workflow passed formatting, **22 tests (0 failures)** and strict Clippy. The later README-only correction does not change the tested source. Repository-wide CI/workflow checks are separate; the draft-runner admission guard remains an inherited failure on the stacked maintenance base.
+At exact code head `1dca4ffecf7de3490c65b4c0541aedb43ab12897`, the pinned Rust 1.96 workflow passed formatting, **22 tests (0 failures)** and strict Clippy. The later README-only correction does not change the tested source. Repository-wide CI/workflow checks are separate. The previously identified inherited draft-runner violation in the Connectome verifier has been patched on the CI-maintenance and deterministic-planner branches; the next workflow run must independently confirm that the repository-wide admission checker now passes.
