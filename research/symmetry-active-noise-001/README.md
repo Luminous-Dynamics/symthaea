@@ -9,7 +9,7 @@ A hypothesis may be eliminated only when its complete declared outcome model can
 V0 implements two separate non-probabilistic regimes:
 
 1. **Bounded per-probe outcomes.** Each hypothesis/probe pair has a finite allowed-outcome set. An observation set retains the hypothesis when it overlaps the allowed set. Repeated observations of the same probe constrain one per-probe outcome through set intersection; they are not treated as independent resamples.
-2. **Campaign-persistent shared bias.** Each hypothesis predicts one outcome for every probe under each possible global error state. A hypothesis survives only if one and the same error-state index explains the entire observation history. The nuisance state cannot silently change between probes.
+2. **Campaign-persistent shared bias.** Each hypothesis predicts one outcome for every probe under each possible global error state. A hypothesis survives only if one and the same error-state index explains the entire observation history. The nuisance state cannot silently change between probes. This is a structured, correlated-noise subcase, not the full general persistent-noise ODT/ASRN model.
 
 An empty surviving set is reported as model inconsistency, not as proof that no physical symmetry exists.
 
