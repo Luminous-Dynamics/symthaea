@@ -624,6 +624,27 @@ mod tests {
 
 
 
+
+    #[test]
+    fn independent_prefix_contours_match_frozen_specification_vectors() {
+        assert_eq!(
+            independent_prefix_contour(ProcessTrajectoryKind::Arch, 4),
+            vec![1, 2, 3, 4, 3, 2, 1]
+        );
+        assert_eq!(
+            independent_prefix_contour(ProcessTrajectoryKind::Terraced, 4),
+            vec![1, 1, 2, 2, 3, 3, 4, 4, 3, 3, 2, 2, 1, 1]
+        );
+        assert_eq!(
+            independent_prefix_contour(ProcessTrajectoryKind::PeakHold, 4),
+            vec![1, 2, 3, 4, 4, 4, 4, 3, 2, 1]
+        );
+        assert_eq!(
+            independent_prefix_contour(ProcessTrajectoryKind::AcceleratingRelease, 4),
+            vec![1, 2, 3, 4, 3, 1, 1]
+        );
+    }
+
     #[test]
     fn audit_report_and_failure_round_trip_as_machine_readable_evidence() {
         let realization = realize_additive_process(
