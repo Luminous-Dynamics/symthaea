@@ -846,4 +846,39 @@ mod tests {
         );
     }
 
+    const INDEPENDENT_CONFORMANCE_VECTOR: &[u8] =
+        include_bytes!("../fixtures/scitt-in-toto-conformance-vector-v0.1.cbor");
+    const INDEPENDENT_CONFORMANCE_PUBLIC_KEY: [u8; 32] = [
+        0x91, 0xa2, 0x8a, 0x0b, 0x74, 0x38, 0x15, 0x93,
+        0xa4, 0xd9, 0x46, 0x95, 0x79, 0x20, 0x89, 0x26,
+        0xaf, 0xc8, 0xad, 0x82, 0xc8, 0x83, 0x9b, 0x76,
+        0x44, 0x35, 0x9b, 0x9e, 0xba, 0x9a, 0x4b, 0x3a,
+    ];
+    const INDEPENDENT_CONFORMANCE_ISSUER: &str =
+        "https://science.example.org/issuers/conformance-vector-01";
+    const INDEPENDENT_CONFORMANCE_SUBJECT: &str =
+        "urn:subterra:site:conformance-site:observation:conformance-obs-001";
+    const INDEPENDENT_CONFORMANCE_KEY_ID: &str = "conformance-key-01";
+
+    #[test]
+    fn independently_generated_python_cbor_ed25519_vector_verifies() {
+        let statement = verify_scitt_signed_science_return_statement(
+            INDEPENDENT_CONFORMANCE_VECTOR,
+            b"abc",
+            INDEPENDENT_CONFORMANCE_ISSUER,
+            INDEPENDENT_CONFORMANCE_SUBJECT,
+            INDEPENDENT_CONFORMANCE_KEY_ID,
+            &INDEPENDENT_CONFORMANCE_PUBLIC_KEY,
+        )
+        .unwrap();
+        assert_eq!(statement.type_uri, IN_TOTO_STATEMENT_V1);
+        assert_eq!(statement.predicate.site_id, "conformance-site");
+        assert_eq!(statement.predicate.observation_id, "conformance-obs-001");
+        assert_eq!(
+            statement.subject[0].digest["sha256"],
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+        assert_eq!(statement.predicate.events.len(), 3);
+    }
+
 }

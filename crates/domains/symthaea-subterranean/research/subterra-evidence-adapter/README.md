@@ -73,3 +73,8 @@ A second, standards-oriented path is provided in `scitt_attestation`:
 - strict Ed25519 verification against caller-supplied, externally trusted issuer/subject/key ID/public key.
 
 This path is intended for interoperability; the earlier project-specific Ed25519 envelope remains experimental and is not the wire format of this standards profile. The implementation rejects duplicate/unprotected security headers and unsupported protected critical headers. It does not register the statement with a Transparency Service and does not verify a SCITT Receipt. A future receipt verifier must validate the service's signature and the relevant verifiable-data-structure proof. Neither a valid signature nor log inclusion establishes that the scientific predicate is true.
+
+
+### Independent SCITT interoperability vector
+
+`fixtures/scitt-in-toto-conformance-vector-v0.1.cbor` is an independently generated tag-18 Signed_Statement, not produced by the Rust `coset` crate. It was generated with Python `cryptography 46.0.4` Ed25519 and a separate minimal canonical-CBOR encoder. Its JSON metadata records the public key, trusted issuer/subject/key ID, payload, and exact binary SHA-256/length. The Rust suite verifies the fixed bytes through the production verifier.

@@ -505,3 +505,6 @@ This is a signature verifier, not a PKI or custody authority. It does not authen
 | ScittReceiptBench | A future Transparency Service receipt has a verifiable proof of inclusion and service signature | Zero fabricated/invalid receipts accepted; pending service integration |
 
 The SCITT Signed_Statement is not yet a Transparent Statement: no transparency service registration or receipt is claimed. A future receipt verifier must qualify service key trust, receipt signature, VDS inclusion proof, consistency/non-equivocation evidence and registration policy. Log inclusion proves that a statement was recorded under that service's policy; it does not prove the statement's scientific claims are true.
+
+
+The independent Signed_Statement vector is pinned by SHA-256 `464b541e1c0918d67248e05159832ce16e6f5a1592f088f8bb1bb1a6ddca5762`, length 1,622 bytes. It uses a three-event science-return record through acquisition and an external public key. The private seed is intentionally not included.

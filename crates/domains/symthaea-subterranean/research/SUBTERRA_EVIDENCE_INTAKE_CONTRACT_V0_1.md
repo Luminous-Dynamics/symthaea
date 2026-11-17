@@ -212,3 +212,8 @@ The custom v0.1 Ed25519 message remains experimental for compatibility and shoul
 
 
 The COSE verifier also rejects COSE security fields placed only in unprotected headers (algorithm, key ID, content type and CWT claims), and rejects protected critical headers it does not understand. This profile intentionally keeps the protected-header surface narrow. A future SCITT receipt is a separate signed COSE structure in the unprotected receipts parameter and must not be confused with the issuer's original signature.
+
+
+### Independent SCITT interoperability fixture
+
+A fixed tag-18 COSE_Sign1/in-toto Statement vector is pinned from an independent producer: Python `cryptography 46.0.4` Ed25519 plus a separate minimal canonical-CBOR encoder. The Rust test verifies the fixed binary against the independently recorded public key, issuer, subject, key ID and payload. This adds an independent producer/consumer conformance test; it does not replace compiled Rust execution or third-party SCITT conformance certification.
