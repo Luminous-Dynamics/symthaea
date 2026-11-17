@@ -271,6 +271,13 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             .and_then(Value::as_str)
             .ok_or_else(|| format!("{observation_id}: missing assertion.unit"))?;
 
+        if property == "Tc" && origin == "observed"
+            && !matches!(measurement_scope, "mesoscopic" | "bulk" | "device")
+        {
+            return Err(format!(
+                "{observation_id}: observed Tc requires mesoscopic, bulk or device measurement scope"
+            ));
+        }
         if property == "Tc"
             && (measurement_scope == "local_probe" || criterion == Some("spectroscopic_gap"))
         {
@@ -587,6 +594,23 @@ mod tests {
         assert_eq!(event["assertion"]["property_code"], "pairing_energy");
         assert_eq!(event["assertion"]["measurement_scope"], "local_probe");
         assert_ne!(event["assertion"]["property_code"], "Tc");
+    }
+
+    #[test]
+    fn observed_tc_cannot_have_unknown_measurement_scope() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][0]["assertion"]["measurement_scope"] = json!("unknown");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn observed_tc_requires_explicit_measurement_scope() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][0]["assertion"]
+            .as_object_mut()
+            .unwrap()
+            .remove("measurement_scope");
+        assert!(audit_mutated(fixture).is_err());
     }
 
     #[test]
