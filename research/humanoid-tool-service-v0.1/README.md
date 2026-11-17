@@ -81,6 +81,16 @@ This programme owns benchmark protocol, tool/service skill composition questions
 
 No single aggregate humanoid score. Every task result retains robot, tool, environment, task, model, evidence class, uncertainty and failure identity.
 
+## Complementary research anchors
+
+HumanoidToolBench is the direct humanoid tool-use anchor. We will also audit:
+- **Evo-DexBench** (arXiv:2610.21180): functional transfer across 30 tasks / six related-task families; best reported average success is 38.5%. This lets us test whether a learned interaction primitive transfers to a new task with few demonstrations.
+- **DexTouch-WM** (arXiv:2609.20649): action-conditioned visual/tactile prediction trained with compatible human and robot tactile interfaces; five hours of robot supervision are held fixed while human tactile experience scales to 100 hours.
+- **PhysCanvas** (arXiv:2610.28613): state-consistent visuo-tactile world modeling; reported world-model/real-success correlation rises from 0.602 to 0.885 with state-reward supervision.
+- **Tabero** (ICML 2026): closed-loop force feedback and a multidimensional gentle-manipulation benchmark; reports over 70% lower average grip force under gentle instructions while maintaining task success.
+
+These results suggest that Symthaea should be judged on *functional transfer, contact prediction, interaction quality and verified physical outcomes*, not only task completion. All values above are paper-reported and task-specific; they are not directly comparable or Symthaea results. Reproduction requires exact source/checkpoint/data/licence and protocol audit.
+
 ## Deliverables
 
 - `protocol-v0.1.md`: preregisterable comparison and claim-boundary protocol.
