@@ -68,13 +68,10 @@ impl fmt::Display for RobustSymFpErrorV1 {
 impl std::error::Error for RobustSymFpErrorV1 {}
 
 fn distance_interval(target_rank: usize, observed: NumericalRankIntervalV1) -> (usize, usize) {
-    let minimum = if target_rank < observed.minimum_rank {
-        observed.minimum_rank - target_rank
-    } else if target_rank > observed.maximum_rank {
-        target_rank - observed.maximum_rank
-    } else {
-        0
-    };
+    let minimum = observed
+        .minimum_rank
+        .saturating_sub(target_rank)
+        .max(target_rank.saturating_sub(observed.maximum_rank));
     let maximum = target_rank
         .abs_diff(observed.minimum_rank)
         .max(target_rank.abs_diff(observed.maximum_rank));
