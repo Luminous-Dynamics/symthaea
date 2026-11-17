@@ -9,7 +9,7 @@ use symthaea_marine_geometry::static_attitude::{
 const USAGE: &str = concat!(
     "Usage: marine-static-attitude-evaluate <attitude-request.json> [--output <report.json>] [--verify <receipt.json>]\n",
     "Evaluates one trial upright/pitch/roll waterplane using full-envelope sectional geometry.\n",
-    "This is a force/moment evaluator, not an equilibrium solver or stability approval.\n",
+    "This is a trial force/moment evaluator, not an equilibrium solver and not a stability approval.\n",
     "Exit codes: 0 = evaluated or receipt verified; 1 = typed validation/integrity rejection; 2 = CLI, I/O, or JSON parse failure."
 );
 
