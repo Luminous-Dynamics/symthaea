@@ -532,10 +532,40 @@ impl BenchmarkManifest {
                         format!("Complete benchmark is missing a passed integrated-robot run for candidate {}.", candidate.candidate_id),
                     );
                 }
+                if !candidate_gates_pass(
+                    &candidate.candidate_id,
+                    self.hard_gates.as_slice(),
+                    &gate_keys,
+                ) {
+                    push(
+                        &mut findings,
+                        "complete_with_unresolved_gates",
+                        "hard_gates",
+                        format!("Complete benchmark has unresolved or failed hard gates for candidate {}.", candidate.candidate_id),
+                    );
+                }
+                if !has_required_observations(
+                    &candidate.candidate_id,
+                    self.metric_registry.as_slice(),
+                ) {
+                    push(
+                        &mut findings,
+                        "complete_without_required_measurements",
+                        "metric_registry",
+                        format!("Complete benchmark is missing observed core metrics with method and uncertainty for candidate {}.", candidate.candidate_id),
+                    );
+                }
             }
         }
 
-        let rankable_candidates = self.compute_rankable_candidates(&candidates, &gate_keys);
+        // Any malformed or contradictory manifest disables ranking globally.
+        // Findings remain visible; the validator never "best-effort" ranks a
+        // partially understood evidence package.
+        let rankable_candidates = if findings.is_empty() {
+            self.compute_rankable_candidates(&candidates, &gate_keys)
+        } else {
+            Vec::new()
+        };
         ValidationReport {
             findings,
             rankable_candidates,
@@ -558,6 +588,7 @@ impl BenchmarkManifest {
 
         if !candidate_gates_pass("B0", self.hard_gates.as_slice(), gate_keys)
             || !has_passed_physical_stage("B0", self.test_runs.as_slice())
+            || has_adverse_test_result("B0", self.test_runs.as_slice())
             || !has_required_observations("B0", self.metric_registry.as_slice())
         {
             return Vec::new();
@@ -578,6 +609,10 @@ impl BenchmarkManifest {
                         gate_keys,
                     )
                     && has_passed_physical_stage(
+                        &candidate.candidate_id,
+                        self.test_runs.as_slice(),
+                    )
+                    && !has_adverse_test_result(
                         &candidate.candidate_id,
                         self.test_runs.as_slice(),
                     )
@@ -627,6 +662,13 @@ fn has_passed_physical_stage(candidate_id: &str, runs: &[TestRun]) -> bool {
             && !run.calibration_refs.is_empty()
             && run.raw_data_digest.as_deref().is_some_and(is_sha256_digest)
             && run.acceptance_rule_ref.is_some()
+    })
+}
+
+fn has_adverse_test_result(candidate_id: &str, runs: &[TestRun]) -> bool {
+    runs.iter().any(|run| {
+        run.candidate_id == candidate_id
+            && matches!(run.status.as_str(), "failed" | "inconclusive")
     })
 }
 
@@ -764,6 +806,28 @@ mod tests {
         let report = manifest.validate();
         assert!(report.is_valid(), "{:#?}", report.findings);
         assert_eq!(report.rankable_candidates, vec!["L1".to_string()]);
+    }
+
+    #[test]
+    fn an_adverse_run_prevents_candidate_ranking_even_after_a_passed_run() {
+        let mut manifest = manifest();
+        qualify_candidate(&mut manifest, "B0");
+        qualify_candidate(&mut manifest, "L1");
+        manifest.test_runs.push(TestRun {
+            run_id: "run-L1-failed-regression".into(),
+            candidate_id: "L1".into(),
+            stage: "module".into(),
+            status: "failed".into(),
+            protocol_revision: Some("lightshell-test-v0.1".into()),
+            instrument_refs: vec!["instrument:reference-load-cell".into()],
+            calibration_refs: vec!["calibration:current".into()],
+            raw_data_digest: Some(format!("sha256:{}", "c".repeat(64))),
+            acceptance_rule_ref: Some("acceptance:L1:failure".into()),
+            deviation_notes: Some("Recorded failure remains part of the candidate evidence.".into()),
+        });
+        let report = manifest.validate();
+        assert!(report.is_valid(), "{:#?}", report.findings);
+        assert!(!report.can_rank("L1"));
     }
 
     #[test]
