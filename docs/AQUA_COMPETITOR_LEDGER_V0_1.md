@@ -49,7 +49,13 @@ A feature-mode percentage is not a whole-service resource result. A sensor estim
 5. **Bouvenot & Beaudet, Energy and Buildings (2025), DOI 10.1016/j.enbuild.2025.115341 — peer-reviewed in-situ study.** The study reports 14 months of operation and separates exchanger-level efficiency from system-level recovery after shower heat losses. Its 52% system result is the relevant initial benchmark for claims at the shower-system boundary.  
    https://doi.org/10.1016/j.enbuild.2025.115341
 
-## 3. Reproducible arithmetic for the initial comparator
+## 3. South African standards and labelling status
+
+The CLASP report recommended that South Africa establish a showerhead SANS aligned with international performance methods; it proposed assessing flow at 150 and 300 kPa, with a maximum of 10 L/min at 300 kPa, and identified 4.5–6 L/min as a candidate highest-efficiency band for future WELS. WRC's 2025 reporting describes the national Water Efficiency Labelling Scheme as under development following stakeholder consultation in May 2025. These are programme proposals and development status, not proof of a published mandatory showerhead label or binding local flow limit as of this snapshot. Verify the current SABS catalogue and DWS/WELS publications before any compliance claim.
+
+The 2026 Consumer Reports results provide another useful performance comparator: shower coverage, force, flow, temperature drop and usability are assessed together. The highest-value research question for Aqua is therefore whether an integrated product can retain equivalent or better task outcome and coverage at 4.5 L/min, not whether it can merely meet a 6 L/min nameplate.
+
+## 4. Reproducible arithmetic for the initial comparator
 
 Use US gallons only as the vendor's declared unit, convert exactly for analysis:
 
@@ -71,13 +77,13 @@ For the KOHLER Cycle Mode example:
 
 This does not yet include any unreported warm-up, commissioning, periodic Deep Clean, maintenance flush, failed attempt, filter/media or standby burden. Those must be measured or explicitly recorded as unknown. Do not imply the above is independently verified KOHLER field performance.
 
-## 4. Candidate Luminous Aqua research targets
+## 5. Candidate Luminous Aqua research targets
 
 These are hypotheses to test, not achieved results or frozen engineering requirements.
 
 | Dimension | Proposed target | Required qualification |
 |---|---|---|
-| Direct-flow shower | ≤6.0 L/min at a named operating point | Meet the selected spray coverage, force and pressure-compensation criteria over low/nominal/high pressure; user comfort non-inferior to the matched control |
+| Direct-flow shower | ≤6.0 L/min at 300 kPa reference | Meet the selected spray coverage, force and pressure-compensation criteria; test at 150 and 300 kPa; user comfort non-inferior to the matched control |
 | Within-session recirculation | ≤18 L fresh water per standardized 10-minute service | Include warm-up/priming, active use, refresh, complete recommended after-session cleaning and purge; never store recirculated water for later users |
 | Water savings | ≥80% versus a matched 2.5 gpm once-through control only if the all-in boundary passes | Include all fresh water and failed attempts; compare the same duration, task, comfort and coverage |
 | Shower heat recovery | ≥60% useful system-level recovery after a declared fouling/maintenance sequence | Count heat actually delivered to incoming water, parasitic electricity, pressure loss, heat lost between head and drain, and uncertainty |
@@ -163,3 +169,15 @@ For recirculating systems, independent microbiological and aerosol-exposure spec
 - CDC hot-tub Legionella guidance: https://www.cdc.gov/control-legionella/php/toolkit/hot-tub-module.html
 - ASHRAE Handbook, Chapter 6: Indoor Swimming Pools: https://handbook.ashrae.org/Handbooks/A23/IP/A23_Ch06/A23_Ch06_ip.aspx
 - City of Johannesburg Water Services By-laws 2023: https://joburg.org.za/documents_/Documents/By-Laws/2023/City%20of%20Johannesburg%20Water%20Services%20Bylaws_%202023%20Gazette.pdf
+
+
+## Additional sources added in v0.2
+
+- CLASP, *South African Shower Heads Testing Report*: https://www.clasp.ngo/research/all/south-african-shower-heads-testing-report/
+- WRC / Water Wheel 2025, South African showerhead testing and WELS development: https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf
+- Hansgrohe South Africa shower range / EcoSmart+: https://www.hansgrohe.co.za/bathroom/products/showers
+- GROHE South Africa Euphoria system specifications: https://www.groheonline.co.za/collections/shower-systems
+- Consumer Reports 2026 best showerheads and test methods: https://www.consumerreports.org/home-garden/showerheads/best-showerheads-of-the-year-a7580523069/
+- Consumer Reports public showerhead ratings: https://www.consumerreports.org/home-garden/showerheads/c33121/
+- Pérez Guillemette & Albrechtsen (2025), microbial indicators for recirculating shower technology, *Science of the Total Environment* 965, 178610: https://doi.org/10.1016/j.scitotenv.2025.178610
+- Ren et al. (2026), opportunistic pathogens in shower systems, *Journal of Environmental Sciences*, DOI: https://doi.org/10.1016/j.jes.2026.02.034
