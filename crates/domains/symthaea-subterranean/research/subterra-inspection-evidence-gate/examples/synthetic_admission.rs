@@ -9,6 +9,7 @@ fn main() {
     let now = 1_800_000_000_000_u64;
     let expected = ExpectedInspectionContext {
         decision_id: "support-08".into(),
+        option_id: "support-08-independent-followup".into(),
         asset_id: "asset-support-08".into(),
         asset_revision: "rev-17".into(),
         coordinate_frame_digest: "sha256:frame".into(),
@@ -17,6 +18,7 @@ fn main() {
         likelihood_model_digest: "sha256:likelihood".into(),
         loss_table_digest: "sha256:loss".into(),
         evsi_assessment_digest: "sha256:evsi".into(),
+        source_dataset_digest: "sha256:synthetic-source".into(),
         purpose: EvidencePurpose::AssetConditionInspection,
         evaluation_time_unix_ms: now,
         maximum_observation_age_ms: 3_600_000,
