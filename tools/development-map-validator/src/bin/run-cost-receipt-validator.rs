@@ -159,17 +159,17 @@ fn validate_attempts(
   let elapsed=nullable_uint(row,"elapsed_ms",&l)?;
   let price=nullable_uint(row,"price_micros",&l)?;
   let cpu=uint(row,"cpu_ms",&l)?;let gpu=uint(row,"gpu_ms",&l)?;let network=uint(row,"network_bytes",&l)?;
-  if let Some(start)=started{
-   if start<event_queued{return Err(format!("{l}.started_at precedes attempt queued_at"));}
-   if run_started.as_ref().is_some_and(|x|&start<x){return Err(format!("{l}.started_at precedes run_started_at"));}
-   earliest_started=Some(earliest_started.as_ref().map_or(start.clone(),|x|x.min(start)));
+  if let Some(start)=started.as_ref(){
+   if start<&event_queued{return Err(format!("{l}.started_at precedes attempt queued_at"));}
+   if run_started.as_ref().is_some_and(|x|start<x){return Err(format!("{l}.started_at precedes run_started_at"));}
+   earliest_started=Some(earliest_started.as_ref().map_or(start.clone(),|x|x.min(start.clone())));
   }
-  if let Some(end)=completed{
-   let start=started.ok_or_else(||format!("{l}.completed_at requires started_at"))?;
+  if let Some(end)=completed.as_ref(){
+   let start=started.as_ref().ok_or_else(||format!("{l}.completed_at requires started_at"))?;
    if end<start{return Err(format!("{l}.completed_at precedes started_at"));}
-   if run_finished.as_ref().is_some_and(|x|&end>x){return Err(format!("{l}.completed_at follows run_finished_at"));}
-   latest_completed=Some(latest_completed.as_ref().map_or(end.clone(),|x|x.max(end)));
-   let actual=(end-start.clone()).num_milliseconds().max(0) as u64;
+   if run_finished.as_ref().is_some_and(|x|end>x){return Err(format!("{l}.completed_at follows run_finished_at"));}
+   latest_completed=Some(latest_completed.as_ref().map_or(end.clone(),|x|x.max(end.clone())));
+   let actual=(end-start).num_milliseconds().max(0) as u64;
    if elapsed!=Some(actual){return Err(format!("{l}.elapsed_ms does not match the timestamp interval"));}
   }else if elapsed.is_some(){return Err(format!("{l}.elapsed_ms must be null when completed_at is null"));}
   let retry_of=nullable_string(row,"retry_of_event_id",&l)?;
@@ -252,11 +252,11 @@ fn validate_attempts(
   event_state.insert(event_id,(option,attempt_no,status));
  }
  if let Some(start)=run_started.as_ref(){
-  if earliest_started.is_some_and(|x|x<start){return Err(format!("{label} run_started_at follows an attempt start"));}
+  if earliest_started.as_ref().is_some_and(|x|x<start){return Err(format!("{label} run_started_at follows an attempt start"));}
  }else if earliest_started.is_some(){return Err(format!("{label} attempts started but run_started_at is null"));}
  if let Some(finish)=run_finished.as_ref(){
-  if finish<queued_at{return Err(format!("{label} run_finished_at precedes queued_at"));}
-  if latest_completed.is_some_and(|x|x>finish){return Err(format!("{label} run_finished_at precedes an attempt completion"));}
+  if finish<&queued_at{return Err(format!("{label} run_finished_at precedes queued_at"));}
+  if latest_completed.as_ref().is_some_and(|x|x>finish){return Err(format!("{label} run_finished_at precedes an attempt completion"));}
  }else{
   cost_complete=false;wall_complete=false;
  }
