@@ -147,6 +147,97 @@ pub struct LiftedCandidateV1 {
     pub inverse_group_element: usize,
 }
 
+
+/// One independently declared operating regime, boundary-condition family,
+/// intervention setting, or task variant over the same candidate universe.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TaskEnvironmentV1 {
+    pub environment_id: String,
+    pub semantics: Vec<CandidateSemanticsV1>,
+}
+
+/// The symmetry that is safe for a family of environments is the intersection
+/// of their individual task-preserving stabilizers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MultiEnvironmentProblemV1 {
+    pub problem_id: String,
+    pub candidate_ids: Vec<String>,
+    pub environments: Vec<TaskEnvironmentV1>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskFieldV1 {
+    InSearchDomain,
+    Admissible,
+    Feasible,
+    ObjectiveCost,
+    ConstraintSignature,
+    BoundaryConditionId,
+    OutputEquivalenceId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnvironmentExclusionWitnessV1 {
+    pub ambient_group_element: usize,
+    pub environment_id: String,
+    pub source_index: usize,
+    pub image_index: usize,
+    pub source_candidate_id: String,
+    pub image_candidate_id: String,
+    pub differing_fields: Vec<TaskFieldV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommonSubgroupEvidenceV1 {
+    pub ambient_group_axiom_checks: usize,
+    pub ambient_action_law_checks: usize,
+    pub environment_semantic_checks: usize,
+    pub subgroup_closure_checks: usize,
+    pub retained_ambient_elements: usize,
+    pub excluded_ambient_elements: usize,
+    pub complete_environment_cover: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommonTaskPreservingSubgroupV1 {
+    pub schema_version: u32,
+    pub problem_id: String,
+    pub ambient_action_id: String,
+    pub ambient_group_id: String,
+    /// Indices refer to the original action's group-element order.
+    pub retained_ambient_elements: Vec<usize>,
+    pub preserving_environment_ids: Vec<String>,
+    /// One concrete counterexample for each excluded ambient element.
+    pub exclusion_witnesses: Vec<EnvironmentExclusionWitnessV1>,
+    /// The exact restricted action used by every per-environment quotient.
+    pub restricted_action: FiniteActionV1,
+    pub evidence: CommonSubgroupEvidenceV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnvironmentQuotientV1 {
+    pub environment_id: String,
+    pub certificate: QuotientCertificateV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MultiEnvironmentQuotientCertificateV1 {
+    pub schema_version: u32,
+    pub problem_id: String,
+    pub common_subgroup: CommonTaskPreservingSubgroupV1,
+    pub environment_quotients: Vec<EnvironmentQuotientV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MultiEnvironmentVerificationReceiptV1 {
+    pub problem_id: String,
+    pub environment_count: usize,
+    pub ambient_group_order: usize,
+    pub common_subgroup_order: usize,
+    pub candidate_count: usize,
+    pub per_environment_orbit_counts: Vec<(String, usize)>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum QuotientErrorV1 {
     InvalidIdentifier,
@@ -187,6 +278,12 @@ pub enum QuotientErrorV1 {
     NonCanonicalOrdering,
     RequestedCandidateIsNotRepresentative,
     EvidenceCountMismatch,
+    InvalidEnvironmentCount,
+    InvalidEnvironmentId,
+    DuplicateEnvironmentId,
+    EnvironmentSemanticsLengthMismatch,
+    CommonTaskPreserversNotSubgroup,
+    EnvironmentCertificateMismatch,
 }
 
 impl fmt::Display for QuotientErrorV1 {
@@ -831,6 +928,276 @@ pub fn lift_representative_solution(
         .collect())
 }
 
+fn validate_multi_environment_problem(
+    problem: &MultiEnvironmentProblemV1,
+    budget: QualificationBudgetV1,
+) -> Result<(), QuotientErrorV1> {
+    if !nonempty(&problem.problem_id) {
+        return Err(QuotientErrorV1::InvalidIdentifier);
+    }
+    if problem.environments.is_empty() {
+        return Err(QuotientErrorV1::InvalidEnvironmentCount);
+    }
+    let mut environment_ids = BTreeSet::new();
+    for environment in &problem.environments {
+        if !nonempty(&environment.environment_id) {
+            return Err(QuotientErrorV1::InvalidEnvironmentId);
+        }
+        if !environment_ids.insert(environment.environment_id.as_str()) {
+            return Err(QuotientErrorV1::DuplicateEnvironmentId);
+        }
+        let search_problem = SearchProblemV1 {
+            problem_id: format!("{}::{}", problem.problem_id, environment.environment_id),
+            candidate_ids: problem.candidate_ids.clone(),
+            semantics: environment.semantics.clone(),
+        };
+        if environment.semantics.len() != problem.candidate_ids.len() {
+            return Err(QuotientErrorV1::EnvironmentSemanticsLengthMismatch);
+        }
+        validate_problem(&search_problem, budget)?;
+    }
+    Ok(())
+}
+
+fn differing_task_fields(
+    left: &CandidateSemanticsV1,
+    right: &CandidateSemanticsV1,
+) -> Vec<TaskFieldV1> {
+    let mut fields = Vec::new();
+    if left.in_search_domain != right.in_search_domain {
+        fields.push(TaskFieldV1::InSearchDomain);
+    }
+    if left.admissible != right.admissible {
+        fields.push(TaskFieldV1::Admissible);
+    }
+    if left.feasible != right.feasible {
+        fields.push(TaskFieldV1::Feasible);
+    }
+    if left.objective_cost != right.objective_cost {
+        fields.push(TaskFieldV1::ObjectiveCost);
+    }
+    if left.constraint_signature != right.constraint_signature {
+        fields.push(TaskFieldV1::ConstraintSignature);
+    }
+    if left.boundary_condition_id != right.boundary_condition_id {
+        fields.push(TaskFieldV1::BoundaryConditionId);
+    }
+    if left.output_equivalence_id != right.output_equivalence_id {
+        fields.push(TaskFieldV1::OutputEquivalenceId);
+    }
+    fields
+}
+
+/// Find the exact intersection of task-preserving stabilizers across every
+/// declared environment. An ambient element is retained only if it preserves
+/// every candidate's complete semantics in every environment. The retained
+/// set is then checked as a subgroup and materialized as a restricted action.
+pub fn qualify_common_task_preserving_subgroup(
+    problem: &MultiEnvironmentProblemV1,
+    ambient_action: &FiniteActionV1,
+    budget: QualificationBudgetV1,
+) -> Result<CommonTaskPreservingSubgroupV1, QuotientErrorV1> {
+    let group_order = ambient_action.group.multiplication.len();
+    let candidate_count = problem.candidate_ids.len();
+    preflight(group_order, candidate_count, budget)?;
+    validate_multi_environment_problem(problem, budget)?;
+    let validated = validate_action(ambient_action, candidate_count, budget)?;
+
+    let environment_checks = problem
+        .environments
+        .len()
+        .checked_mul(group_order)
+        .and_then(|value| value.checked_mul(candidate_count))
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    if environment_checks > budget.maximum_work_units {
+        return Err(QuotientErrorV1::WorkBudgetExceeded);
+    }
+
+    let mut retained = Vec::new();
+    let mut exclusion_witnesses = Vec::new();
+    for (group_element, permutation) in ambient_action.permutations.iter().enumerate() {
+        let mut first_violation = None;
+        'environment_scan: for environment in &problem.environments {
+            for (source_index, image_index) in permutation.iter().copied().enumerate() {
+                let differing_fields = differing_task_fields(
+                    &environment.semantics[source_index],
+                    &environment.semantics[image_index],
+                );
+                if !differing_fields.is_empty() {
+                    first_violation = Some(EnvironmentExclusionWitnessV1 {
+                        ambient_group_element: group_element,
+                        environment_id: environment.environment_id.clone(),
+                        source_index,
+                        image_index,
+                        source_candidate_id: problem.candidate_ids[source_index].clone(),
+                        image_candidate_id: problem.candidate_ids[image_index].clone(),
+                        differing_fields,
+                    });
+                    break 'environment_scan;
+                }
+            }
+        }
+        if let Some(witness) = first_violation {
+            exclusion_witnesses.push(witness);
+        } else {
+            retained.push(group_element);
+        }
+    }
+
+    if !retained.contains(&ambient_action.group.identity) {
+        return Err(QuotientErrorV1::TaskSemanticsMismatch);
+    }
+    let mut ambient_to_restricted = vec![usize::MAX; group_order];
+    for (restricted_index, ambient_index) in retained.iter().copied().enumerate() {
+        ambient_to_restricted[ambient_index] = restricted_index;
+    }
+
+    let mut restricted_multiplication = vec![vec![0; retained.len()]; retained.len()];
+    let mut subgroup_closure_checks = 0usize;
+    for (left_index, left_ambient) in retained.iter().copied().enumerate() {
+        for (right_index, right_ambient) in retained.iter().copied().enumerate() {
+            subgroup_closure_checks += 1;
+            let product = ambient_action.group.multiplication[left_ambient][right_ambient];
+            let restricted_product = ambient_to_restricted[product];
+            if restricted_product == usize::MAX {
+                return Err(QuotientErrorV1::CommonTaskPreserversNotSubgroup);
+            }
+            restricted_multiplication[left_index][right_index] = restricted_product;
+        }
+    }
+    let restricted_identity = ambient_to_restricted[ambient_action.group.identity];
+    for ambient_element in &retained {
+        if ambient_to_restricted[validated.group.inverses[*ambient_element]] == usize::MAX {
+            return Err(QuotientErrorV1::CommonTaskPreserversNotSubgroup);
+        }
+    }
+
+    let restricted_group = FiniteGroupV1 {
+        group_id: format!("{}::common-task-preserving", ambient_action.group.group_id),
+        identity: restricted_identity,
+        multiplication: restricted_multiplication,
+    };
+    let restricted_permutations: Vec<Vec<usize>> = retained
+        .iter()
+        .map(|ambient_element| ambient_action.permutations[*ambient_element].clone())
+        .collect();
+    let restricted_action = FiniteActionV1 {
+        action_id: format!("{}::common-task-preserving", ambient_action.action_id),
+        group: restricted_group,
+        permutations: restricted_permutations,
+    };
+    validate_action(&restricted_action, candidate_count, budget)?;
+
+    Ok(CommonTaskPreservingSubgroupV1 {
+        schema_version: 1,
+        problem_id: problem.problem_id.clone(),
+        ambient_action_id: ambient_action.action_id.clone(),
+        ambient_group_id: ambient_action.group.group_id.clone(),
+        retained_ambient_elements: retained.clone(),
+        preserving_environment_ids: problem
+            .environments
+            .iter()
+            .map(|environment| environment.environment_id.clone())
+            .collect(),
+        exclusion_witnesses,
+        restricted_action,
+        evidence: CommonSubgroupEvidenceV1 {
+            ambient_group_axiom_checks: validated.group.checks,
+            ambient_action_law_checks: validated.checks,
+            environment_semantic_checks: environment_checks,
+            subgroup_closure_checks,
+            retained_ambient_elements: retained.len(),
+            excluded_ambient_elements: group_order - retained.len(),
+            complete_environment_cover: true,
+        },
+    })
+}
+
+/// Compile a separately replayable quotient for every environment, using the
+/// exact common subgroup. A symmetry that fails in even one environment is
+/// excluded before any quotient receives pruning authority.
+pub fn compile_multi_environment_quotient(
+    problem: &MultiEnvironmentProblemV1,
+    ambient_action: &FiniteActionV1,
+    budget: QualificationBudgetV1,
+) -> Result<MultiEnvironmentQuotientCertificateV1, QuotientErrorV1> {
+    let common_subgroup =
+        qualify_common_task_preserving_subgroup(problem, ambient_action, budget)?;
+    let mut environment_quotients = Vec::with_capacity(problem.environments.len());
+    for environment in &problem.environments {
+        let search_problem = SearchProblemV1 {
+            problem_id: format!("{}::{}", problem.problem_id, environment.environment_id),
+            candidate_ids: problem.candidate_ids.clone(),
+            semantics: environment.semantics.clone(),
+        };
+        let outcome = compile_quotient(
+            &search_problem,
+            &common_subgroup.restricted_action,
+            budget,
+        )?;
+        let CompileOutcomeV1::Authorized(certificate) = outcome else {
+            return Err(QuotientErrorV1::TaskSemanticsMismatch);
+        };
+        environment_quotients.push(EnvironmentQuotientV1 {
+            environment_id: environment.environment_id.clone(),
+            certificate,
+        });
+    }
+    Ok(MultiEnvironmentQuotientCertificateV1 {
+        schema_version: 1,
+        problem_id: problem.problem_id.clone(),
+        common_subgroup,
+        environment_quotients,
+    })
+}
+
+/// Independently reconstruct the common subgroup and every environment
+/// quotient. Mutated environment semantics, subgroup witnesses, exclusions,
+/// orbit certificates, or environment ordering are rejected.
+pub fn verify_multi_environment_quotient(
+    problem: &MultiEnvironmentProblemV1,
+    ambient_action: &FiniteActionV1,
+    certificate: &MultiEnvironmentQuotientCertificateV1,
+    budget: QualificationBudgetV1,
+) -> Result<MultiEnvironmentVerificationReceiptV1, QuotientErrorV1> {
+    if certificate.schema_version != 1 || certificate.problem_id != problem.problem_id {
+        return Err(QuotientErrorV1::EnvironmentCertificateMismatch);
+    }
+    let expected = compile_multi_environment_quotient(problem, ambient_action, budget)?;
+    if *certificate != expected {
+        return Err(QuotientErrorV1::EnvironmentCertificateMismatch);
+    }
+
+    let mut per_environment_orbit_counts = Vec::with_capacity(problem.environments.len());
+    for (environment, quotient) in problem
+        .environments
+        .iter()
+        .zip(certificate.environment_quotients.iter())
+    {
+        let search_problem = SearchProblemV1 {
+            problem_id: format!("{}::{}", problem.problem_id, environment.environment_id),
+            candidate_ids: problem.candidate_ids.clone(),
+            semantics: environment.semantics.clone(),
+        };
+        let receipt = verify_certificate(
+            &search_problem,
+            &certificate.common_subgroup.restricted_action,
+            &quotient.certificate,
+            budget,
+        )?;
+        per_environment_orbit_counts.push((environment.environment_id.clone(), receipt.orbit_count));
+    }
+
+    Ok(MultiEnvironmentVerificationReceiptV1 {
+        problem_id: problem.problem_id.clone(),
+        environment_count: problem.environments.len(),
+        ambient_group_order: ambient_action.group.multiplication.len(),
+        common_subgroup_order: certificate.common_subgroup.restricted_action.group.multiplication.len(),
+        candidate_count: problem.candidate_ids.len(),
+        per_environment_orbit_counts,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -960,6 +1327,197 @@ mod tests {
             panic!("expected an exact task-preserving quotient");
         };
         (problem, action, certificate)
+    }
+
+    #[test]
+    fn intersection_of_environment_stabilizers_is_exact_common_subgroup() {
+        let action = d4_action();
+        let mut candidate_ids = Vec::with_capacity(16);
+        let mut rotational_semantics = Vec::with_capacity(16);
+        let mut operational_semantics = Vec::with_capacity(16);
+        for source in 0usize..4 {
+            for target in 0usize..4 {
+                let delta = (target + 4 - source) % 4;
+                let unoriented_distance = delta.min(4 - delta) as i64;
+                let id = format!("p{source}{target}");
+                candidate_ids.push(id);
+                rotational_semantics.push(semantics(
+                    unoriented_distance,
+                    unoriented_distance,
+                    "nominal-boundary",
+                    "distance-output",
+                ));
+                operational_semantics.push(semantics(
+                    delta as i64,
+                    delta as i64,
+                    "rotating-boundary",
+                    "oriented-output",
+                ));
+            }
+        }
+        let problem = MultiEnvironmentProblemV1 {
+            problem_id: "square-search-across-two-environments-v1".to_owned(),
+            candidate_ids,
+            environments: vec![
+                TaskEnvironmentV1 {
+                    environment_id: "nominal-isotropic".to_owned(),
+                    semantics: rotational_semantics,
+                },
+                TaskEnvironmentV1 {
+                    environment_id: "rotating-operating-regime".to_owned(),
+                    semantics: operational_semantics,
+                },
+            ],
+        };
+
+        let subgroup =
+            qualify_common_task_preserving_subgroup(
+                &problem,
+                &action,
+                QualificationBudgetV1::default(),
+            )
+            .unwrap();
+        assert_eq!(subgroup.retained_ambient_elements, vec![0, 1, 2, 3]);
+        assert_eq!(subgroup.exclusion_witnesses.len(), 4);
+        assert_eq!(
+            subgroup
+                .exclusion_witnesses
+                .iter()
+                .map(|witness| witness.ambient_group_element)
+                .collect::<Vec<_>>(),
+            vec![4, 5, 6, 7]
+        );
+        assert!(subgroup.exclusion_witnesses.iter().all(|witness| {
+            witness.environment_id == "rotating-operating-regime"
+                && witness.differing_fields.contains(&TaskFieldV1::ObjectiveCost)
+        }));
+
+        let certificate = compile_multi_environment_quotient(
+            &problem,
+            &action,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        let receipt = verify_multi_environment_quotient(
+            &problem,
+            &action,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(receipt.environment_count, 2);
+        assert_eq!(receipt.ambient_group_order, 8);
+        assert_eq!(receipt.common_subgroup_order, 4);
+        assert_eq!(receipt.candidate_count, 16);
+        assert_eq!(
+            receipt.per_environment_orbit_counts,
+            vec![
+                ("nominal-isotropic".to_owned(), 4),
+                ("rotating-operating-regime".to_owned(), 4),
+            ]
+        );
+    }
+
+    #[test]
+    fn third_environment_can_shrink_common_symmetry_to_identity() {
+        let action = d4_action();
+        let candidate_ids: Vec<String> = (0..16).map(|index| format!("p{index:02}")).collect();
+        let d4_semantics = vec![semantics(1, 1, "base", "same"); 16];
+        let c4_semantics = (0..16)
+            .map(|index| semantics((index % 4) as i64, 0, "base", "same"))
+            .collect();
+        let asymmetric_semantics = (0..16)
+            .map(|index| semantics(index as i64, 0, "base", "same"))
+            .collect();
+        let problem = MultiEnvironmentProblemV1 {
+            problem_id: "three-environment-symmetry-intersection-v1".to_owned(),
+            candidate_ids,
+            environments: vec![
+                TaskEnvironmentV1 {
+                    environment_id: "fully-symmetric".to_owned(),
+                    semantics: d4_semantics,
+                },
+                TaskEnvironmentV1 {
+                    environment_id: "rotation-only".to_owned(),
+                    semantics: c4_semantics,
+                },
+                TaskEnvironmentV1 {
+                    environment_id: "asymmetric-control".to_owned(),
+                    semantics: asymmetric_semantics,
+                },
+            ],
+        };
+        let subgroup = qualify_common_task_preserving_subgroup(
+            &problem,
+            &action,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(subgroup.retained_ambient_elements, vec![0]);
+        assert_eq!(subgroup.restricted_action.group.multiplication, vec![vec![0]]);
+        let certificate = compile_multi_environment_quotient(
+            &problem,
+            &action,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        let receipt = verify_multi_environment_quotient(
+            &problem,
+            &action,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        assert_eq!(receipt.common_subgroup_order, 1);
+        assert_eq!(receipt.per_environment_orbit_counts.len(), 3);
+        assert!(receipt.per_environment_orbit_counts.iter().all(|entry| entry.1 == 16));
+    }
+
+    #[test]
+    fn multi_environment_certificate_rejects_mutated_environment_and_witness() {
+        let action = d4_action();
+        let problem = MultiEnvironmentProblemV1 {
+            problem_id: "mutated-environment-certificate-v1".to_owned(),
+            candidate_ids: (0..16).map(|index| format!("p{index:02}")).collect(),
+            environments: vec![TaskEnvironmentV1 {
+                environment_id: "single-environment".to_owned(),
+                semantics: vec![semantics(1, 1, "boundary", "output"); 16],
+            }],
+        };
+        let mut certificate = compile_multi_environment_quotient(
+            &problem,
+            &action,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+        verify_multi_environment_quotient(
+            &problem,
+            &action,
+            &certificate,
+            QualificationBudgetV1::default(),
+        )
+        .unwrap();
+
+        certificate.common_subgroup.exclusion_witnesses.push(
+            EnvironmentExclusionWitnessV1 {
+                ambient_group_element: 7,
+                environment_id: "forged".to_owned(),
+                source_index: 0,
+                image_index: 1,
+                source_candidate_id: "p00".to_owned(),
+                image_candidate_id: "p01".to_owned(),
+                differing_fields: vec![TaskFieldV1::ObjectiveCost],
+            },
+        );
+        assert_eq!(
+            verify_multi_environment_quotient(
+                &problem,
+                &action,
+                &certificate,
+                QualificationBudgetV1::default(),
+            ),
+            Err(QuotientErrorV1::EnvironmentCertificateMismatch)
+        );
     }
 
     #[test]
