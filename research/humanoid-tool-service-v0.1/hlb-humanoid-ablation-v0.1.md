@@ -191,6 +191,23 @@ Only after humanoid adapter qualification and a second qualified embodiment. Do 
 
 ## 7. Metrics that matter
 
+
+### Capability-transition instrumentation
+
+Do not evaluate HLB's contribution only through terminal task success. HumanoidToolBench reports separate interaction milestones: candidate contact, correct first contact, correct-tool lift, tool-target contact and task success. Its published FastWAM standard BallMove result falls from 76% stationary L1 to 9% mobile L2; the benchmark also notes that L2 changes target layout, so locomotion is not isolated as the sole cause. Figure Helix 2.5's vendor-reported 56% zero-shot result across 30 unseen homes and Google's vendor-reported 96% Apollo 2 automotive-kitting pilot establish a higher bar for broad transfer and industrial repeatability, but the task suites differ and must not be pooled.
+
+For every HLB arm, collect an event/transition ledger with event occurrence timestamp, source clock, capture completeness, attempt/recovery lineage, failure cause and independently verified terminal postcondition. Preserve non-occurrence versus not-instrumented as separate states. Compute per task cell:
+- event incidence and correct-first-contact rate;
+- transition conversion conditioned on both events being instrumented;
+- event-to-event latency and retries;
+- stage-specific recovery/intervention burden;
+- decoy and held-out tool-property generalization;
+- paired L1/L2 change, with layout, route distance and target placement confounds explicit.
+
+These milestones are not assumed to be a strict funnel: regrasping, repeated contacts and out-of-order recovery are valid behaviors. HLB's hypothesis is that it predicts the next failing transition and chooses a bounded intervention targeted to that stage rather than blindly retrying the whole plan.
+
+Prospective target: close at least 30% of the largest preregistered stage-transition failure gap relative to the strongest matched baseline, while reducing the paired L1-to-L2 gap by at least 30% in a layout-controlled extension; keep false success acceptance at zero in frozen negative controls. These targets are not results. Protocol details and external sources are in section 3E of the parent benchmark protocol.
+
 ### Capability and generalization
 - Complete task success and independently verified postcondition success.
 - Tool-selection, grasp, engagement, manipulation and mobile execution success separately.
