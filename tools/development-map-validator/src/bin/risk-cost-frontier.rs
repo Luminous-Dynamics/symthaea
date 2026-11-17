@@ -150,7 +150,7 @@ fn evaluate_cost_frontier_parts_json(
     let cost_oracle: Value = serde_json::from_str(cost_oracle_raw)
         .map_err(|e| format!("invalid cost oracle JSON: {e}"))?;
 
-    allowed_keys(&cost_candidate, &["scenario_id", "decision_cutoff", "budget_micros", "execution_traces", "comparison_groups"], "cost_candidate")?;
+    allowed_keys(&cost_candidate, &["scenario_id", "decision_cutoff", "budget_micros", "cost_estimates", "execution_traces", "comparison_groups"], "cost_candidate")?;
     let scenario_id = required_str(&cost_candidate, "scenario_id", "cost_candidate")?;
     let cutoff = parse_time(&cost_candidate, "decision_cutoff", "cost_candidate")?;
     let budget = required_u64(&cost_candidate, "budget_micros", "cost_candidate")?;
@@ -286,7 +286,7 @@ fn evaluate_cost_frontier_parts_json(
         }
         let risk = risk_by_id.get(&id).ok_or_else(|| format!("D6.17 risk report missing trace {id:?}"))?;
         let (kind, action_id) = decision_by_id.get(&id).ok_or_else(|| format!("decision metadata missing for {id:?}"))?;
-        let risk_ok = *kind == "act" && risk["evidence_accepted"].as_bool() == Some(true)
+        let risk_ok = kind.as_str() == "act" && risk["evidence_accepted"].as_bool() == Some(true)
             && risk["robust_action_justified"].as_bool() == Some(true);
         let over_budget = total_cost > budget;
         let feasible = risk_ok && !over_budget;
@@ -340,7 +340,7 @@ fn evaluate_cost_frontier_parts_json(
             if !selected_ids.insert(id.to_owned()) { return Err(format!("{label} contains duplicate trace {id:?}")); }
             let (kind, action_id) = decision_by_id.get(id).ok_or_else(|| format!("{label} references unknown trace {id:?}"))?;
             if kind.as_str() != "act" { return Err(format!("{label} may compare only act decisions")); }
-            if expected_action.is_some_and(|expected| expected != action_id) {
+            if expected_action.is_some_and(|expected| expected != action_id.as_str()) {
                 return Err(format!("{label} must compare the same action across plans"));
             }
             expected_action = Some(action_id.as_str());
