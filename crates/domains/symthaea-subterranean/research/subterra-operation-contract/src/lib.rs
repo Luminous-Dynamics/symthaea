@@ -998,6 +998,8 @@ mod tests {
             coverage_per_mille: 1000,
             unobserved_required_regions: 0,
             common_cause_domains: vec![3, 4],
+            common_cause_assessment_digest: digest(19),
+            physical_delta_digest: digest(13),
             postconditions_passed: true,
             digest: digest(14),
         }
