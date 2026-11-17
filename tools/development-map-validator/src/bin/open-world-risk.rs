@@ -72,6 +72,7 @@ fn augment_candidate_and_oracle(
     oracle:&Value,
     unknown_id:&str,
     reserve:u64,
+    nominal_reserve:u64,
     unknown_safe_actions:&BTreeSet<String>,
     unknown_rows:&BTreeMap<String,Value>
 )->Result<(Value,Value),String>{
@@ -82,8 +83,8 @@ fn augment_candidate_and_oracle(
     // (1-reserve); retain original uppers (epsilon=0 remains possible); and
     // inject unknown mass in [0,reserve]. The resulting bounded-simplex
     // superset contains every mixture distribution, so robust risk cannot
-    // become artificially smaller. Nominal known mass is scaled to exactly
-    // 10000-reserve using largest-remainder allocation.
+    // become artificially smaller. The point comparator uses the separately
+    // evaluator-specified nominal reserve, not the maximum reserve.
     for root in [&mut candidate_aug,&mut oracle_aug] {
         let bounds=root["hypothesis_bounds"].as_array_mut()
             .ok_or("hypothesis_bounds must be an array")?;
@@ -93,7 +94,7 @@ fn augment_candidate_and_oracle(
         if total_known_nominal!=SCALE {
             return Err("known nominal prior must sum to 10000 before contamination augmentation".to_owned());
         }
-        let target=SCALE-reserve;
+        let target=SCALE-nominal_reserve;
         let mut floors=Vec::new();
         let mut allocated=0u64;
         for (index,bound) in bounds.iter_mut().enumerate() {
@@ -120,7 +121,7 @@ fn augment_candidate_and_oracle(
             "hypothesis_id":unknown_id,
             "lower_probability_bps":0,
             "upper_probability_bps":reserve,
-            "nominal_probability_bps":reserve
+            "nominal_probability_bps":nominal_reserve
         }));
     }
 
@@ -146,10 +147,12 @@ pub fn evaluate_open_world_parts_json(candidate_raw:&str,oracle_raw:&str)->Resul
     allowed_keys(&oracle,&["actual_hypothesis_id","decision_cutoff","actions","hypothesis_bounds","options","factors","hypothesis_safety","calibrations","factorization_certificates","open_world_policy"],"oracle")?;
 
     let policy=required_value(&oracle,"open_world_policy","oracle")?;
-    allowed_keys(policy,&["unknown_hypothesis_id","contamination_reserve_bps","read_only_action_ids","unknown_safe_action_ids","unknown_channel_likelihoods","policy_version"],"oracle.open_world_policy")?;
+    allowed_keys(policy,&["unknown_hypothesis_id","contamination_reserve_bps","contamination_nominal_bps","read_only_action_ids","unknown_safe_action_ids","unknown_channel_likelihoods","policy_version"],"oracle.open_world_policy")?;
     let unknown_id=required_str(policy,"unknown_hypothesis_id","oracle.open_world_policy")?;
     let reserve=required_u64(policy,"contamination_reserve_bps","oracle.open_world_policy")?;
     if reserve==0||reserve>SCALE{return Err("contamination_reserve_bps must be in 1..=10000".to_owned());}
+    let nominal_reserve=required_u64(policy,"contamination_nominal_bps","oracle.open_world_policy")?;
+    if nominal_reserve>reserve{return Err("contamination_nominal_bps must be <= contamination_reserve_bps".to_owned());}
     let policy_version=required_str(policy,"policy_version","oracle.open_world_policy")?;
     let known_ids:BTreeSet<String>=candidate["hypothesis_bounds"].as_array()
         .ok_or("candidate hypothesis_bounds must be an array")?.iter()
@@ -217,7 +220,7 @@ pub fn evaluate_open_world_parts_json(candidate_raw:&str,oracle_raw:&str)->Resul
         Some(noisy_channel::evaluate_noisy_channel_parts_json(&candidate.to_string(),&closed_oracle.to_string())?)
     };
     let (aug_candidate,aug_oracle)=augment_candidate_and_oracle(
-        &candidate,&closed_oracle,&unknown_id,reserve,&unknown_safe_actions,&unknown_rows
+        &candidate,&closed_oracle,&unknown_id,reserve,nominal_reserve,&unknown_safe_actions,&unknown_rows
     )?;
     let open_report=noisy_channel::evaluate_noisy_channel_parts_json(&aug_candidate.to_string(),&aug_oracle.to_string())?;
 
@@ -257,6 +260,7 @@ pub fn evaluate_open_world_parts_json(candidate_raw:&str,oracle_raw:&str)->Resul
         "adjudication_status":"synthetic_known_answer_open_world_contamination_evaluation_only",
         "unknown_hypothesis_id":unknown_id,
         "contamination_reserve_bps":reserve,
+        "contamination_nominal_bps":nominal_reserve,
         "policy_version":policy_version,
         "actual_hypothesis_is_unknown":actual_hypothesis_is_unknown,
         "closed_world_comparison_available":!actual_hypothesis_is_unknown,
@@ -379,6 +383,30 @@ mod tests{
         let mut oracle:Value=serde_json::from_str(ORACLE).unwrap();
         oracle["open_world_policy"]["unknown_safe_action_ids"]=json!(["deploy"]);
         assert!(evaluate_open_world_parts_json(&candidate.to_string(),&oracle.to_string()).unwrap_err().contains("subset of evaluator read_only_action_ids"));
+    }
+    #[test]fn contamination_nominal_cannot_exceed_evaluator_reserve(){
+        let candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
+        let mut oracle:Value=serde_json::from_str(ORACLE).unwrap();
+        oracle["open_world_policy"]["contamination_nominal_bps"]=json!(1001);
+        assert!(evaluate_open_world_parts_json(&candidate.to_string(),&oracle.to_string()).unwrap_err().contains("must be <= contamination_reserve_bps"));
+    }
+    #[test]fn contamination_outer_bound_scales_known_lower_mass_and_preserves_reserve(){
+        let candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
+        let oracle:Value=serde_json::from_str(ORACLE).unwrap();
+        let policy=&oracle["open_world_policy"];
+        let reserve=policy["contamination_reserve_bps"].as_u64().unwrap();
+        let nominal=policy["contamination_nominal_bps"].as_u64().unwrap();
+        let safe=string_set(&policy["unknown_safe_action_ids"],"unknown_safe_action_ids").unwrap();
+        let rows=policy["unknown_channel_likelihoods"].as_array().unwrap();
+        let map:BTreeMap<String,Value>=rows.iter().map(|r|(r["factor_id"].as_str().unwrap().to_owned(),json!({"hypothesis_id":"unknown-world","outcomes":r["outcomes"]}))).collect();
+        let (aug,oracle_aug)=augment_candidate_and_oracle(&candidate,&oracle,"unknown-world",reserve,nominal,&safe,&map).unwrap();
+        let known=&aug["hypothesis_bounds"][0];
+        let unknown=&aug["hypothesis_bounds"][1];
+        assert_eq!(known["lower_probability_bps"],8100);
+        assert_eq!(known["nominal_probability_bps"],9000);
+        assert_eq!(unknown["upper_probability_bps"],1000);
+        assert_eq!(unknown["nominal_probability_bps"],1000);
+        assert_eq!(aug["hypothesis_bounds"],oracle_aug["hypothesis_bounds"]);
     }
     #[test]fn invalid_unknown_channel_partition_fails_closed(){
         let candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
