@@ -6,13 +6,6 @@ on:
       - 'crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**'
       - 'crates/domains/symthaea-subterranean/research/subterra-survival-planner/**'
       - '.github/workflows/subterra-robust-survival-referee.yml'
-  push:
-    branches:
-      - 'research/subterra-robust-survival-referee-v0-1'
-    paths:
-      - 'crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**'
-      - 'crates/domains/symthaea-subterranean/research/subterra-survival-planner/**'
-      - '.github/workflows/subterra-robust-survival-referee.yml'
   workflow_dispatch:
 
 permissions:
