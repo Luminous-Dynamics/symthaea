@@ -48,6 +48,9 @@ jobs:
       - name: Run adapter and parent-crate tests
         run: cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-voi-adapter/Cargo.toml --all-targets --offline
 
+      - name: Run the synthetic EVSI comparison
+        run: cargo run --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-voi-adapter/Cargo.toml --example synthetic_evsi --offline
+
       - name: Run strict Clippy
         run: cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-voi-adapter/Cargo.toml --all-targets --offline -- -D warnings
 
