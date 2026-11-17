@@ -1,0 +1,35 @@
+name: ISRU EIG Reference Tests
+
+on:
+  pull_request:
+    paths:
+      - 'research/asteroid-optical-isru-v0.2/noise_aware_eig.rs'
+      - '.github/workflows/isru-eig-reference-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Format, Clippy and standalone Rust tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Check formatting
+        run: rustfmt --edition 2021 --check research/asteroid-optical-isru-v0.2/noise_aware_eig.rs
+
+      - name: Run standalone Clippy
+        run: clippy-driver --edition=2021 --test research/asteroid-optical-isru-v0.2/noise_aware_eig.rs -o /tmp/isru-eig-clippy -D warnings
+
+      - name: Compile and run exact standalone tests
+        run: |
+          rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/noise_aware_eig.rs -o /tmp/isru-eig-tests
+          /tmp/isru-eig-tests
+    
