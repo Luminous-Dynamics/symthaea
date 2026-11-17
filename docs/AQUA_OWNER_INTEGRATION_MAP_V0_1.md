@@ -104,3 +104,10 @@ The room-mode contract records the required evidence and return-to-ready state f
 - CDC warns that decorative fountains entered by the public must be managed as a splash-pad venue or entry should be prevented.
 - Sol-Atlas #765/#766/#770/#772 remains authority for water-feature/pool thermal, evaporation, regeneration and microclimate; Aqua owns user-contact fixture/task/access and room integration; Mycelix #6100 remains water-use assessment authority.
 - The archetype and safety interface is documented in `docs/AQUA_REFERENCE_ROOM_ARCHETYPES_V0_1.md` and `AQUA-THERMAL-SUITE-001 #12694`.
+
+
+## First product integration article
+
+- Symthaea [AQUA-MODULAR-PLATFORM-001 #12717](https://github.com/Luminous-Dynamics/symthaea/issues/12717) owns the first bounded product integration article: AQS-1 Essential (direct-flow shower + basin + dry-side service spine + optional indirect DWHR test interface).
+- `docs/AQUA_MODULAR_PLATFORM_ARCHITECTURE_V0_1.md` defines the three-layer product assembly (fixture cartridges, service spine, local experience/evidence layer), separate physical circuit classes, control authority and product family configurations.
+- AQS-1 intentionally excludes recirculating human use, greywater treatment, steam, sauna, plunge, pool and interactive fountains. Those require their own fixture/process classes and independent gates.
