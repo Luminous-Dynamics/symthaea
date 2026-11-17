@@ -191,10 +191,11 @@
           "required": [
             "expected_order_source",
             "source_file",
-            "source_file_sha256",
             "observed_mechanism",
             "raw_joint_qpos_materialization_verified",
-            "caveat"
+            "caveat",
+            "source_file_blob_sha",
+            "producer_chain"
           ],
           "properties": {
             "expected_order_source": {
@@ -205,20 +206,48 @@
               "type": "string",
               "minLength": 1
             },
-            "source_file_sha256": {
-              "type": "string",
-              "pattern": "^[0-9a-f]{40}$"
-            },
             "observed_mechanism": {
               "type": "string",
               "minLength": 1
             },
             "raw_joint_qpos_materialization_verified": {
-              "const": false
+              "const": true
             },
             "caveat": {
               "type": "string",
               "minLength": 1
+            },
+            "source_file_blob_sha": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "producer_chain": {
+              "type": "array",
+              "minItems": 3,
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "path",
+                  "blob_sha",
+                  "role"
+                ],
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "blob_sha": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{40}$"
+                  },
+                  "role": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
             }
           }
         }
@@ -715,10 +744,10 @@
           "const": false
         },
         "raw_qpos_materialization_verified": {
-          "const": false
+          "const": true
         },
         "adapter_conformance_status": {
-          "const": "blocked_pending_raw_joint_qpos_materialization_audit_and_UEC_v2_rust_adapter"
+          "const": "blocked_pending_UEC_v2_Rust_adapter_and_runtime_conformance"
         }
       }
     },
