@@ -135,6 +135,52 @@ pub struct EvaluationReport {
     pub per_class: Vec<PerClassMetrics>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SystemsFinalRound {
+    Preliminary,
+    Prize,
+}
+
+impl SystemsFinalRound {
+    pub const fn expected_artifacts(self) -> usize {
+        match self {
+            Self::Preliminary => 20,
+            Self::Prize => 40,
+        }
+    }
+
+    pub const fn maximum_reports(self) -> usize {
+        match self {
+            Self::Preliminary => 25,
+            Self::Prize => 45,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SystemsFinalProfile {
+    pub round: SystemsFinalRound,
+    pub coordinate_frame_id: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct SystemsFinalEvaluation {
+    pub round: SystemsFinalRound,
+    pub expected_artifact_count: usize,
+    pub report_limit: usize,
+    pub submitted_report_count: usize,
+    pub processed_report_count: usize,
+    pub score_points: usize,
+    pub invalid_report_count: usize,
+    pub false_negative_count: usize,
+    pub precision: Option<f64>,
+    pub recall: f64,
+    pub matches: Vec<ArtifactMatch>,
+    pub invalid_report_ids: Vec<String>,
+    pub budget_rejected_report_ids: Vec<String>,
+    pub unreported_ground_truth_ids: Vec<String>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RefereeError {
     EmptyGroundTruth,
@@ -153,6 +199,10 @@ pub enum RefereeError {
         record_id: String,
         expected_frame: String,
         actual_frame: String,
+    },
+    UnexpectedGroundTruthCount {
+        expected: usize,
+        actual: usize,
     },
 }
 
@@ -506,6 +556,125 @@ pub fn evaluate_reports(
     })
 }
 
+/// Replay the historical DARPA Systems Final artifact-report scoring
+/// semantics in submission order.
+///
+/// Preliminary rounds expect 20 ground-truth artifacts and allow 25 reports;
+/// the Prize round expects 40 artifacts and allows 45 reports. A report earns
+/// one point only when its raw type label exactly matches an unreported
+/// artifact and its Euclidean 3-D error is <= 5 m. Invalid reports may be
+/// retried later; once an artifact has been reported successfully, subsequent
+/// reports cannot score against it and still consume the report allowance.
+///
+/// The caller is responsible for applying any separately reviewed,
+/// versioned source-label-to-official-label crosswalk before evaluation.
+/// Timing tiebreakers and API/transport behavior are outside this v0.1 scorer.
+pub fn evaluate_systems_final_stream(
+    ground_truth: &[GroundTruthArtifact],
+    reports: &[CandidateReport],
+    profile: SystemsFinalProfile,
+) -> Result<SystemsFinalEvaluation, RefereeError> {
+    let expected_artifacts = profile.round.expected_artifacts();
+    if ground_truth.len() != expected_artifacts {
+        return Err(RefereeError::UnexpectedGroundTruthCount {
+            expected: expected_artifacts,
+            actual: ground_truth.len(),
+        });
+    }
+
+    let report_limit = profile.round.maximum_reports();
+    let scoring_profile = ReportProfile {
+        coordinate_frame_id: profile.coordinate_frame_id.clone(),
+        maximum_reports: Some(report_limit),
+        localization_tolerance_m: 5.0,
+    };
+    validate_inputs(ground_truth, reports, scoring_profile)?;
+    let (selected, budget_rejected_report_ids) =
+        select_reports(reports, Some(report_limit));
+
+    let mut ordered_truth = ground_truth.iter().collect::<Vec<_>>();
+    ordered_truth.sort_by(|left, right| left.id.cmp(&right.id));
+    let mut already_reported = vec![false; ordered_truth.len()];
+    let mut matches = Vec::new();
+    let mut invalid_report_ids = Vec::new();
+
+    // This is intentionally a sequential state machine. An invalid report
+    // leaves the truth item available for a later corrected report. A valid
+    // report marks that truth item, so any later duplicate cannot score for it.
+    for report in &selected {
+        let mut best_match: Option<(usize, f64)> = None;
+        for (truth_index, truth) in ordered_truth.iter().enumerate() {
+            if already_reported[truth_index] || report.source_type != truth.source_type {
+                continue;
+            }
+            let error = report.position.distance(truth.position)?;
+            if error > 5.0 {
+                continue;
+            }
+            let should_replace = match best_match {
+                None => true,
+                Some((best_index, best_error)) => {
+                    error < best_error
+                        || (error == best_error
+                            && truth.id < ordered_truth[best_index].id)
+                }
+            };
+            if should_replace {
+                best_match = Some((truth_index, error));
+            }
+        }
+
+        if let Some((truth_index, error)) = best_match {
+            already_reported[truth_index] = true;
+            let truth = ordered_truth[truth_index];
+            matches.push(ArtifactMatch {
+                report_id: report.id.clone(),
+                ground_truth_id: truth.id.clone(),
+                source_type: truth.source_type.clone(),
+                localization_error_m: error,
+            });
+        } else {
+            invalid_report_ids.push(report.id.clone());
+        }
+    }
+
+    let mut unreported_ground_truth_ids = ordered_truth
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| !already_reported[*index])
+        .map(|(_, artifact)| artifact.id.clone())
+        .collect::<Vec<_>>();
+    unreported_ground_truth_ids.sort();
+
+    let score_points = matches.len();
+    let processed_report_count = selected.len();
+    let invalid_report_count = invalid_report_ids.len();
+    let false_negative_count = unreported_ground_truth_ids.len();
+    let precision = if processed_report_count == 0 {
+        None
+    } else {
+        Some(score_points as f64 / processed_report_count as f64)
+    };
+    let recall = score_points as f64 / expected_artifacts as f64;
+
+    Ok(SystemsFinalEvaluation {
+        round: profile.round,
+        expected_artifact_count: expected_artifacts,
+        report_limit,
+        submitted_report_count: reports.len(),
+        processed_report_count,
+        score_points,
+        invalid_report_count,
+        false_negative_count,
+        precision,
+        recall,
+        matches,
+        invalid_report_ids,
+        budget_rejected_report_ids,
+        unreported_ground_truth_ids,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -544,6 +713,85 @@ mod tests {
         }
     }
 
+
+    fn preliminary_truth() -> Vec<GroundTruthArtifact> {
+        (0..20)
+            .map(|index| {
+                truth(
+                    &format!("g{index:02}"),
+                    "vent",
+                    index as f64 * 20.0,
+                    0.0,
+                    0.0,
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn systems_preliminary_stream_allows_retry_but_rejects_post_success_duplicate() {
+        let ground_truth = preliminary_truth();
+        let reports = vec![
+            report("r1-wrong-class", "gas", 0.0, 0.0, 0.0, 1),
+            report("r2-valid", "vent", 0.0, 0.0, 0.0, 2),
+            report("r3-duplicate", "vent", 0.0, 0.0, 0.0, 3),
+        ];
+        let result = evaluate_systems_final_stream(
+            &ground_truth,
+            &reports,
+            SystemsFinalProfile {
+                round: SystemsFinalRound::Preliminary,
+                coordinate_frame_id: "darpa".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(result.report_limit, 25);
+        assert_eq!(result.score_points, 1);
+        assert_eq!(result.invalid_report_ids, vec!["r1-wrong-class", "r3-duplicate"]);
+        assert_eq!(result.invalid_report_count, 2);
+        assert_eq!(result.false_negative_count, 19);
+    }
+
+    #[test]
+    fn systems_prize_round_rejects_reports_after_45() {
+        let mut ground_truth = preliminary_truth();
+        for index in 20..40 {
+            ground_truth.push(truth(
+                &format!("g{index:02}"),
+                "vent",
+                index as f64 * 20.0,
+                0.0,
+                0.0,
+            ));
+        }
+        let reports = (0..46)
+            .map(|index| {
+                report(
+                    &format!("r{index:02}"),
+                    "unknown-type",
+                    index as f64,
+                    500.0,
+                    0.0,
+                    index,
+                )
+            })
+            .collect::<Vec<_>>();
+        let result = evaluate_systems_final_stream(
+            &ground_truth,
+            &reports,
+            SystemsFinalProfile {
+                round: SystemsFinalRound::Prize,
+                coordinate_frame_id: "darpa".into(),
+            },
+        )
+        .unwrap();
+        assert_eq!(result.report_limit, 45);
+        assert_eq!(result.processed_report_count, 45);
+        assert_eq!(result.budget_rejected_report_ids.len(), 1);
+        assert_eq!(result.budget_rejected_report_ids[0], "r45");
+        assert_eq!(result.invalid_report_count, 45);
+        assert_eq!(result.score_points, 0);
+    }
 
     #[test]
     fn parses_darpa_tsv_preserving_source_types_and_lineage_ids() {
