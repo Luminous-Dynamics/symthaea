@@ -855,6 +855,45 @@ mod tests {
     }
 
     #[test]
+    fn handoff_schema_and_fixture_are_versioned_without_hardware_authority() {
+        let schema: serde_json::Value = serde_json::from_str(include_str!(
+            "../schemas/MealProposalV1.schema.json"
+        ))
+        .expect("meal proposal schema must parse");
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/meal-proposal-handoff-v1.json"
+        ))
+        .expect("meal proposal fixture bundle must parse");
+        assert_eq!(
+            schema["$schema"],
+            "https://json-schema.org/draft/2020-12/schema"
+        );
+        assert_eq!(schema["properties"]["schema_version"]["const"], 1);
+        assert_eq!(
+            schema["properties"]["claim_ceiling"]["const"],
+            MEAL_PROPOSAL_CLAIM_CEILING
+        );
+        let property_names: BTreeSet<&str> = schema["properties"]
+            .as_object()
+            .expect("schema properties must be an object")
+            .keys()
+            .map(String::as_str)
+            .collect();
+        assert!(!property_names.contains("appliance_id"));
+        assert!(!property_names.contains("module_id"));
+        assert!(!property_names.contains("device_command"));
+        assert!(!property_names.contains("actuator"));
+        let cases = fixtures["cases"].as_array().expect("cases must be an array");
+        assert_eq!(cases.len(), 13);
+        let mut ids = BTreeSet::new();
+        for case in cases {
+            let id = case["case_id"].as_str().expect("case ID must be a string");
+            assert!(!id.trim().is_empty());
+            assert!(ids.insert(id));
+        }
+    }
+
+    #[test]
     fn explicit_human_reviewable_proposal_validates() {
         assert!(validate_meal_proposal(&valid_proposal()).is_valid());
     }
