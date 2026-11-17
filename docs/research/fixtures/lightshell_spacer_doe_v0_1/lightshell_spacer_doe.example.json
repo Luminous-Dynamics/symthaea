@@ -1,0 +1,232 @@
+{
+  "schema_version": "0.1.0",
+  "experiment_id": "LIGHTSHELL-SPACER-STRUCTURE-SCREEN-001",
+  "state": "proposed",
+  "parent_article_id": "ATELIER-LS-PILOT-FOREARM-ELBOW-001",
+  "process_capability": {
+    "machine_ref": null,
+    "capability_state": "unknown",
+    "program_revision": null,
+    "notes": "No knitting machine, gauge, inlay feeder, yarn lot or executable machine program has been admitted. Literature settings are reproduction references only."
+  },
+  "controls": [
+    {
+      "control_id": "C0",
+      "architecture": "plain_spacer",
+      "matching_basis": "structural_baseline",
+      "availability": "unknown"
+    },
+    {
+      "control_id": "C1",
+      "architecture": "textile_only",
+      "matching_basis": "no_spacer_baseline",
+      "availability": "planned"
+    },
+    {
+      "control_id": "C2-T",
+      "architecture": "foam_equal_thickness",
+      "matching_basis": "equal_thickness",
+      "availability": "unknown"
+    },
+    {
+      "control_id": "C2-M",
+      "architecture": "foam_equal_areal_mass",
+      "matching_basis": "equal_areal_mass",
+      "availability": "unknown"
+    },
+    {
+      "control_id": "C3",
+      "architecture": "commercial_spacer",
+      "matching_basis": "commercial_baseline",
+      "availability": "unknown"
+    }
+  ],
+  "factors": [
+    {
+      "factor_id": "inlay_architecture",
+      "unit_or_encoding": "categorical knit/inlay construction",
+      "levels": [
+        "none",
+        "float",
+        "square_wave",
+        "square_wave_anchored_tuck"
+      ],
+      "capability_dependent": true
+    },
+    {
+      "factor_id": "spacer_frequency",
+      "unit_or_encoding": "machine-defined spacer courses per declared length; numeric definition pending gauge and process",
+      "levels": [
+        "low",
+        "reference",
+        "high"
+      ],
+      "capability_dependent": true
+    },
+    {
+      "factor_id": "transition_geometry",
+      "unit_or_encoding": "needle spacing between front/back tuck transitions",
+      "levels": [
+        "not_applicable",
+        "one_needle",
+        "two_needles",
+        "three_needles"
+      ],
+      "capability_dependent": true
+    }
+  ],
+  "candidate_structures": [
+    {
+      "candidate_id": "A0-L",
+      "inlay_architecture": "none",
+      "spacer_frequency": "low",
+      "transition_geometry": "not_applicable",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A0-R",
+      "inlay_architecture": "none",
+      "spacer_frequency": "reference",
+      "transition_geometry": "not_applicable",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A0-H",
+      "inlay_architecture": "none",
+      "spacer_frequency": "high",
+      "transition_geometry": "not_applicable",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A1-L",
+      "inlay_architecture": "float",
+      "spacer_frequency": "low",
+      "transition_geometry": "not_defined",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A1-R",
+      "inlay_architecture": "float",
+      "spacer_frequency": "reference",
+      "transition_geometry": "not_defined",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A1-H",
+      "inlay_architecture": "float",
+      "spacer_frequency": "high",
+      "transition_geometry": "not_defined",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A2-L",
+      "inlay_architecture": "square_wave",
+      "spacer_frequency": "low",
+      "transition_geometry": "one_needle",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A2-R",
+      "inlay_architecture": "square_wave",
+      "spacer_frequency": "reference",
+      "transition_geometry": "two_needles",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A2-H",
+      "inlay_architecture": "square_wave",
+      "spacer_frequency": "high",
+      "transition_geometry": "three_needles",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A3-L",
+      "inlay_architecture": "square_wave_anchored_tuck",
+      "spacer_frequency": "low",
+      "transition_geometry": "one_needle",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A3-R",
+      "inlay_architecture": "square_wave_anchored_tuck",
+      "spacer_frequency": "reference",
+      "transition_geometry": "two_needles",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A3-H",
+      "inlay_architecture": "square_wave_anchored_tuck",
+      "spacer_frequency": "high",
+      "transition_geometry": "three_needles",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    }
+  ],
+  "response_domains": [
+    "identity_dimensions",
+    "compression",
+    "impact",
+    "vibration",
+    "airflow",
+    "thermal",
+    "flex_fatigue",
+    "abrasion",
+    "cleaning_aging",
+    "repairability"
+  ],
+  "specimen_allocation": {
+    "randomization_seed": null,
+    "blocking_variables": [
+      "manufacturing lot",
+      "machine setup",
+      "material lot",
+      "operator/shift where applicable"
+    ],
+    "destructive_tests_isolated": true,
+    "confirmatory_holdout": true,
+    "sample_size_rationale": "Pending pilot variance, effect-size threshold, instrument repeatability and number of independent manufacturing lots. Do not equate repeated readings on one specimen with independent manufacturing replication."
+  },
+  "evidence_policy": {
+    "material_lot_binding": true,
+    "process_binding": true,
+    "instrument_calibration_binding": true,
+    "raw_data_digest_required": true,
+    "uncertainty_required": true,
+    "paper_results_not_lightshell_results": true
+  }
+}
