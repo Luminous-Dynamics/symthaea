@@ -88,7 +88,7 @@
   "comparison_baselines": [
     "exact_Haar_and_Page",
     "Hayden_Preskill_decoupling_and_recovery",
-    "tensor_networks_PE​​PS_and_holographic_codes",
+    "tensor_networks_PEPS_and_holographic_codes",
     "Ryu_Takayanagi_and_quantum_extremal_surfaces",
     "Jacobson_entanglement_equilibrium",
     "causal_sets",
