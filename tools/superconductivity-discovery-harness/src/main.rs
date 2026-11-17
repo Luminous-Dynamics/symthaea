@@ -317,7 +317,8 @@ mod tests {
         let (schema, registry) = committed_inputs();
         let mut value: Value = serde_json::from_slice(&registry).unwrap();
         let records = value["candidate_records"].as_array_mut().unwrap();
-        records.push(records[0].clone());
+        let duplicate = records[0].clone();
+        records.push(duplicate);
         let mutated = serde_json::to_vec(&value).unwrap();
         assert!(audit_registry(&schema, &mutated).is_err());
     }
