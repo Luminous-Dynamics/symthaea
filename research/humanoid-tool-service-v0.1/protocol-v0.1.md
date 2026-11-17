@@ -146,6 +146,80 @@ Keep five distinct scorecards:
 
 A generalist claim requires evidence across the relevant scorecards; success on one cannot compensate for failure on another.
 
+## 3B. Agentic manipulation, persistent memory and motion-latent comparators
+
+A major 6–17 November 2026 development is the emergence of **agentic manipulation policies (AMPs)**: a generalist model stays in the perception/action loop and revises its plan from outcomes, instead of selecting only from a fixed library of pretrained skills.
+
+### AMP1 — direct agent-as-policy comparator
+
+Chen et al., *On Agentic Manipulation Policies*, arXiv:2611.09892 (first submitted 6 Nov, revised 9 Nov 2026):
+- AMP1 reports 85.6% zero-shot success on RoboLab-120 versus 49.2% and 42.9% for cited VLA/WAM comparators.
+- Its real-world test uses a 7-DoF Franka Research 3, Robotiq 2F-85 and three cameras—not a humanoid. It reports 104/108 success (96.3%) over 12 tasks × 9 trials, compared with 49 for FLUX 3 Action and 30 for π0.5.
+- Without its recovery-from-error functions, it reports 94/108 successes (87.0%). Physical failures were often collision/planning-related, including table/wall/self-collision, calibration sensitivity, and simplified robot geometry.
+- The memory-augmented AMP1+ reports RoboDojo bimanual success rising from 26.4% zero-shot to 57.6% after one pass through 42 tasks. The authors report an approximately 4.6× reduction in failure rate on those bimanual tasks versus zero-shot deployment.
+- AMP1 can build reusable procedures, exploit active perception, use objects as tools, infer hidden geometry from failed interactions, and revise plans. Its harness gives the model a persistent Python interpreter and a robot SDK.
+
+Paper: https://arxiv.org/abs/2611.09892  
+Project / trial details: https://apple-aiml-research.github.io/ml-amp/
+
+**Important caveats:** the paper reports that model identity/reasoning effort matters much more than modest harness changes; it also documents benchmark/verifier artefacts. For example, some nominal failures were caused by objects outside the gripper envelope or a flaky verifier. On the 95 RoboLab tasks without the identified benchmark artefacts, Gemini 4 Argon + AMP1 achieved 96.2% in that paper's protocol. These are paper-reported research results, not an independent replication or humanoid result.
+
+### RoboDojo — broader sim/real and memory benchmark
+
+RoboDojo (42 simulation tasks and 18 real tasks across three non-humanoid robot platforms) is a complementary benchmark for general manipulation, long horizon, precision, generalization and memory. It must remain a separate scorecard from HumanoidToolBench.
+
+Public leaderboard snapshot observed 17 November 2026:
+- Standard simulation policy board: WALL-OSS-1.0-lite listed at 42.59 average score / 34.97 success rate.
+- Separate Agent track: NVIDIA SOLVE* listed at 79.50 / 74.96. The asterisk means this entry was tested before the Agent Track rules published 14 November 2026 and is marked non-conforming with at least one updated rule.
+- Public layouts are supplemented with hidden verification layouts in the official protocol.
+
+Leaderboard: https://robodojo-benchmark.com/leaderboard?bench=sim  
+Integrity protocol: https://robodojo-benchmark.com/leaderboard/protocol?lang=en
+
+Do not compare the Agent track's score directly with standard VLA/WAM policy rankings, HumanoidToolBench success rates, or physical trial success.
+
+### VioLA — shared body/hand motion-latent outputs
+
+VioLA (8 Oct 2026; https://arxiv.org/abs/2610.12435) predicts shared body and hand motion latents rather than raw joint commands; pretrained body/hand controllers track those latents. It reports 140.6M training frames with 93.2% human recordings, 100% zero-shot locomotion success on its specific real-humanoid test, and 88.6% manipulation success without task-specific fine-tuning.
+
+This motivates a distinct action-space ablation:
+- raw joint/actuator targets;
+- typed task-space goals;
+- controller-tracked body/hand motion latents.
+
+Human motion is not automatically a robot command. Cross-domain action labels require exact frame, morphology, controller, contact and execution semantics. VioLA code/checkpoints were stated as forthcoming in the paper; mark the comparator unavailable until the exact artifacts and licence can be inspected.
+
+### Symthaea's bounded agentic hypothesis
+
+We should test an agentic generalist model without copying unrestricted live Python actuation:
+1. Planner receives visual observations, typed proprioception, task instruction and explicit remaining time/budget.
+2. It requests narrow typed capabilities: inspect, estimate affordance, check reachability, propose grasp/pose, request motion, read contact state, verify, retreat, regrasp, abstain or hand off.
+3. Skill executive composes versioned procedures and deterministic local controllers.
+4. Every physical effect remains behind the existing UEC/action projection, runtime safety, interlock and qualified backend.
+5. Persistent memory separates embodiment/configuration, semantic tool knowledge, procedural skill, episodes and failure history. Only independently verified and applicability-matched experiences may promote reusable procedures.
+6. Candidate code/parameters remain isolated and never rewrite a live safety-critical controller.
+
+The point is not to forbid all generated code. It is to prevent generated code from becoming physical authority. A compiled/validated candidate skill may be considered only through the existing evidence and authority promotion path.
+
+### Memory promotion and poisoning tests
+
+Memory entries must bind:
+- exact robot profile, as-built generation, tool/fixture identities and calibration applicability;
+- source episode and raw observation/action evidence;
+- independent verifier and accepted postcondition;
+- preconditions, parameter envelope, failure modes and recovery;
+- confidence/coverage and known unknowns;
+- version, validity window and invalidation dependencies.
+
+Negative controls include poisoned demonstrations, false task-success reports, wrong embodiment, changed tool geometry, stale camera transform, revoked calibration, contradictory observations, scene aliasing, skill-family regression and memory replay after morphology change.
+
+Evaluate three memory types separately:
+- episodic memory: retrieval of exact prior events;
+- semantic memory: tested tool/embodiment facts;
+- procedural memory: validated reusable skill contracts.
+
+Count retrieval errors, stale-memory use, harmful transfers, forgotten earlier task families and unsafe actions. A memory-induced performance gain is not acceptable if it silently lowers evidence quality or increases unsafe continuation.
+
 ## 4. Matched baseline ladder
 
 Evaluate the following arms only when the exact artifact and interface are available:
