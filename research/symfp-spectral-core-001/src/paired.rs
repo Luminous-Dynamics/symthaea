@@ -50,6 +50,12 @@ pub struct PairedRobustSymFpReceiptV1 {
     pub candidates: Vec<PointGroupTemplateV1>,
     pub paired_blocks: Vec<PairedRepresentationBlockV1>,
     pub derived_operator_bounds: Vec<SpectralOperatorBoundV1>,
+    /// SVD convergence residuals replayed from each declared reference matrix.
+    pub reference_svd_residuals: Vec<f64>,
+    /// False until a rigorous floating-point SVD error envelope is propagated.
+    pub reference_svd_error_propagated: bool,
+    /// The nearest-template result is conditional on the reproduced reference SVD estimate.
+    pub classification_reference_scope: &'static str,
     pub classification: RobustPointGroupMatchV1,
     pub authority: &'static str,
 }
@@ -268,6 +274,12 @@ fn validate_paired_blocks(
 /// Bind the reference spectral receipt to its source matrices, derive one
 /// perturbation bound per degree, and pass only those derived bounds to the
 /// robust SymFP classifier.
+///
+/// Important numerical boundary: deterministic re-SVD verifies source
+/// provenance and records the convergence residual, but does not prove the
+/// computed singular values are exact. Consequently any nearest-template
+/// guarantee is conditional on the reproduced reference SVD estimates until
+/// a rigorous floating-point SVD error interval is added.
 pub fn classify_paired_representations(
     reference_receipt: &SymFpReceiptV1,
     candidates: &[PointGroupTemplateV1],
@@ -296,6 +308,13 @@ pub fn classify_paired_representations(
         candidates: candidates.to_vec(),
         paired_blocks: paired_blocks.to_vec(),
         derived_operator_bounds,
+        reference_svd_residuals: reference_receipt
+            .spectra
+            .iter()
+            .map(|block| block.svd_residual.expect("paired validation requires SVD provenance"))
+            .collect(),
+        reference_svd_error_propagated: false,
+        classification_reference_scope: "CONDITIONAL_ON_REPRODUCED_REFERENCE_SVD_ESTIMATES",
         classification,
         authority: "PAIRED_SPECTRAL_COMPATIBILITY_ONLY_NOT_A_SYMMETRY_CERTIFICATE",
     })
@@ -368,6 +387,30 @@ mod tests {
         )
     }
 
+
+    #[test]
+    fn paired_receipt_declares_unpropagated_reference_svd_error() {
+        let (reference, paired) = paired_fixture(3, 0.0);
+        let result = classify_paired_representations(
+            &reference,
+            super::super::CRYSTALLOGRAPHIC_TEMPLATES_V1.as_slice(),
+            &paired,
+        )
+        .unwrap();
+        assert!(!result.reference_svd_error_propagated);
+        assert_eq!(
+            result.classification_reference_scope,
+            "CONDITIONAL_ON_REPRODUCED_REFERENCE_SVD_ESTIMATES"
+        );
+        assert_eq!(
+            result.reference_svd_residuals,
+            reference
+                .spectra
+                .iter()
+                .map(|block| block.svd_residual.unwrap())
+                .collect::<Vec<_>>()
+        );
+    }
     #[test]
     fn zero_delta_pairs_derive_zero_bound_and_replay_exact_unique_label() {
         let (reference, paired) = paired_fixture(9, 0.0);
