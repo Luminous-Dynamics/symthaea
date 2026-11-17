@@ -20,6 +20,8 @@ This contract makes functionally graded textile design executable. Each robot zo
 | cleanability | cleaning_residue_fraction |
 | sensor_accommodation | sensor_occlusion_fraction |
 | repairability | repair_time_min |
+| mass_budget | added_mass_g |
+| seam_integrity | seam_strength_n |
 
 Units are canonical per metric. Comparisons use higher_is_better, lower_is_better or within_declared_band, with exact direction semantics checked by Rust. Numeric limits may remain null in proposed/requirements_pending states; a frozen requirement requires valid bounds, method references and acceptance rules. This avoids inventing thresholds before robot CAD, ODD, material capability and measurement systems are known.
 
@@ -74,3 +76,5 @@ Robot safety references must be selected by robot class and application. ISO 102
 ## Current state
 
 The example manifest is synthetic and intentionally proposed. No CAD article revision, numeric performance threshold, material lot, machine process, coupon, physical test, or robot qualification is claimed. Rust tests are authored in source; compilation/test execution and exact-head CI remain pending.
+
+The validator also requires each measurement's `function_id` to be explicitly declared in that zone's `functions` list. The mass-budget and seam-integrity roles expose installed mass and seam-strength measurements without leaving schema-listed but semantically unusable metrics.
