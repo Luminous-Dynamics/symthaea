@@ -188,6 +188,9 @@ pub enum OperationEvent {
 pub struct PhysicalDeltaEvidence {
     pub source_robot_id: u64,
     pub sensor_chain_id: u64,
+    pub work_package_digest: EvidenceDigest,
+    pub design_revision: u64,
+    pub design_digest: EvidenceDigest,
     pub coordinate_frame_revision: u64,
     pub coordinate_frame_digest: EvidenceDigest,
     pub calibration_revision: u64,
@@ -201,6 +204,9 @@ pub struct PhysicalDeltaEvidence {
 pub struct VerificationReceipt {
     pub verifier_id: u64,
     pub sensor_chain_id: u64,
+    pub work_package_digest: EvidenceDigest,
+    pub design_revision: u64,
+    pub design_digest: EvidenceDigest,
     pub coordinate_frame_revision: u64,
     pub coordinate_frame_digest: EvidenceDigest,
     pub calibration_revision: u64,
@@ -244,6 +250,12 @@ impl VerificationReceipt {
         }
         if self.sensor_chain_id == 0 || self.sensor_chain_id == spec.executor_sensor_chain_id {
             issues.push(VerificationIssue::SensorChainShared);
+        }
+        if self.work_package_digest != spec.work_package_digest
+            || self.design_revision != spec.design_revision
+            || self.design_digest != spec.design_digest
+        {
+            issues.push(VerificationIssue::CoordinateFrameMismatch);
         }
         if self.coordinate_frame_revision != spec.coordinate_frame_revision
             || self.coordinate_frame_digest != spec.coordinate_frame_digest
@@ -552,6 +564,12 @@ impl OperationAttempt {
                 {
                     return Err(ContractError::InvalidEvidenceSource);
                 }
+                if evidence.work_package_digest != self.spec.work_package_digest
+                    || evidence.design_revision != self.spec.design_revision
+                    || evidence.design_digest != self.spec.design_digest
+                {
+                    return Err(ContractError::WorkPackageIdentityMismatch);
+                }
                 if evidence.coordinate_frame_revision != self.spec.coordinate_frame_revision
                     || evidence.coordinate_frame_digest != self.spec.coordinate_frame_digest
                 {
@@ -826,6 +844,9 @@ mod tests {
         PhysicalDeltaEvidence {
             source_robot_id: 100,
             sensor_chain_id: 200,
+            work_package_digest: digest(20),
+            design_revision: 9,
+            design_digest: digest(21),
             coordinate_frame_revision: 2,
             coordinate_frame_digest: digest(22),
             calibration_revision: 5,
@@ -840,6 +861,9 @@ mod tests {
         VerificationReceipt {
             verifier_id: 300,
             sensor_chain_id: 400,
+            work_package_digest: digest(20),
+            design_revision: 9,
+            design_digest: digest(21),
             coordinate_frame_revision: 2,
             coordinate_frame_digest: digest(22),
             calibration_revision: 5,
