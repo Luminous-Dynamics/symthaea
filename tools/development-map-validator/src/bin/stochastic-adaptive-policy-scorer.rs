@@ -688,7 +688,9 @@ mod tests{
  }
  #[test]fn invalid_joint_marginal_is_rejected_before_scoring(){
   let mut b:Value=serde_json::from_str(DETERMINISTIC).unwrap();
-  b["candidate_view"]["factors"][0]["likelihoods"][0]["outcomes"]["pass"]["upper_likelihood_bps"]=json!(1);
+  for view in ["candidate_view","oracle"]{
+   b[view]["factors"][0]["likelihoods"][0]["outcomes"]["pass"]["upper_likelihood_bps"]=json!(1);
+  }
   assert!(evaluate(&b.to_string()).unwrap_err().contains("does not conservatively contain"));
  }
  #[test]fn read_only_deferral_is_valid_even_when_evidence_support_is_zero(){
