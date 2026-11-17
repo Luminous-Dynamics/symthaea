@@ -96,7 +96,9 @@ fn validate_probability_vector(values: &[f64], context: &str) -> Result<(), Stri
         .iter()
         .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
     {
-        return Err(format!("{context}: probabilities must be finite and in [0, 1]"));
+        return Err(format!(
+            "{context}: probabilities must be finite and in [0, 1]"
+        ));
     }
     let sum = values.iter().sum::<f64>();
     if !close_enough(sum, 1.0) {
@@ -105,10 +107,7 @@ fn validate_probability_vector(values: &[f64], context: &str) -> Result<(), Stri
     Ok(())
 }
 
-fn best_action(
-    actions: &[Action],
-    state_probabilities: &[f64],
-) -> (String, f64) {
+fn best_action(actions: &[Action], state_probabilities: &[f64]) -> (String, f64) {
     actions
         .iter()
         .map(|action| {
@@ -197,8 +196,8 @@ fn evaluate_measurement(
 }
 
 pub fn evaluate_manifest_json(source: &str) -> Result<DecisionReport, String> {
-    let manifest: Manifest = serde_json::from_str(source)
-        .map_err(|error| format!("invalid EVSI manifest: {error}"))?;
+    let manifest: Manifest =
+        serde_json::from_str(source).map_err(|error| format!("invalid EVSI manifest: {error}"))?;
 
     if manifest.schema_version != "luminous.plasma-experiment-voi.v0" {
         return Err("unsupported EVSI schema version".to_owned());
@@ -209,7 +208,9 @@ pub fn evaluate_manifest_json(source: &str) -> Result<DecisionReport, String> {
     if !nonempty(&manifest.decision_loss_unit)
         || manifest.decision_loss_unit != manifest.measurement_cost_unit
     {
-        return Err("decision loss and measurement cost must use the same declared unit".to_owned());
+        return Err(
+            "decision loss and measurement cost must use the same declared unit".to_owned(),
+        );
     }
     if !manifest.available_budget.is_finite() || manifest.available_budget < 0.0 {
         return Err("available budget must be finite and non-negative".to_owned());
@@ -237,7 +238,10 @@ pub fn evaluate_manifest_json(source: &str) -> Result<DecisionReport, String> {
             return Err("action IDs must be unique and non-empty".to_owned());
         }
         if action.losses.len() != manifest.states.len()
-            || action.losses.iter().any(|loss| !loss.is_finite() || *loss < 0.0)
+            || action
+                .losses
+                .iter()
+                .any(|loss| !loss.is_finite() || *loss < 0.0)
         {
             return Err(format!(
                 "action {} must have one finite non-negative loss per state",
@@ -268,21 +272,16 @@ pub fn evaluate_manifest_json(source: &str) -> Result<DecisionReport, String> {
         let mut outcome_ids = BTreeSet::new();
         let mut likelihood_sums = vec![0.0; manifest.states.len()];
         for outcome in &measurement.outcomes {
-            if !nonempty(&outcome.outcome_id)
-                || !outcome_ids.insert(outcome.outcome_id.as_str())
-            {
+            if !nonempty(&outcome.outcome_id) || !outcome_ids.insert(outcome.outcome_id.as_str()) {
                 return Err(format!(
                     "measurement {} has empty or duplicate outcome IDs",
                     measurement.measurement_id
                 ));
             }
             if outcome.likelihood_by_state.len() != manifest.states.len()
-                || outcome
-                    .likelihood_by_state
-                    .iter()
-                    .any(|likelihood| {
-                        !likelihood.is_finite() || *likelihood < 0.0 || *likelihood > 1.0
-                    })
+                || outcome.likelihood_by_state.iter().any(|likelihood| {
+                    !likelihood.is_finite() || *likelihood < 0.0 || *likelihood > 1.0
+                })
             {
                 return Err(format!(
                     "measurement {} outcome {} must have one valid likelihood per state",
@@ -339,8 +338,7 @@ pub fn evaluate_manifest_json(source: &str) -> Result<DecisionReport, String> {
     Ok(DecisionReport {
         decision_id: manifest.decision_id,
         evidence_class: manifest.evidence_class,
-        claim_ceiling:
-            "SYNTHETIC_ONLY_NO_PHYSICAL_MEASUREMENT_OR_ROUTE_SUPERIORITY".to_owned(),
+        claim_ceiling: "SYNTHETIC_ONLY_NO_PHYSICAL_MEASUREMENT_OR_ROUTE_SUPERIORITY".to_owned(),
         decision_loss_unit: manifest.decision_loss_unit,
         available_budget: manifest.available_budget,
         prior_expected_loss,
@@ -405,38 +403,44 @@ mod tests {
     fn rejects_prior_probabilities_that_do_not_sum_to_one() {
         let mut value = fixture_value();
         value["states"][0]["prior_probability"] = serde_json::json!(0.7);
-        assert!(evaluate_manifest_json(&value.to_string())
-            .unwrap_err()
-            .contains("prior"));
+        assert!(
+            evaluate_manifest_json(&value.to_string())
+                .unwrap_err()
+                .contains("prior")
+        );
     }
 
     #[test]
     fn rejects_measurement_likelihoods_that_do_not_sum_to_one_per_state() {
         let mut value = fixture_value();
-        value["measurements"][0]["outcomes"][0]["likelihood_by_state"][0] =
-            serde_json::json!(0.7);
-        assert!(evaluate_manifest_json(&value.to_string())
-            .unwrap_err()
-            .contains("likelihoods for state"));
+        value["measurements"][0]["outcomes"][0]["likelihood_by_state"][0] = serde_json::json!(0.7);
+        assert!(
+            evaluate_manifest_json(&value.to_string())
+                .unwrap_err()
+                .contains("likelihoods for state")
+        );
     }
 
     #[test]
     fn rejects_outcome_likelihood_dimension_mismatch() {
         let mut value = fixture_value();
-        value["measurements"][0]["outcomes"][0]["likelihood_by_state"] =
-            serde_json::json!([0.9]);
-        assert!(evaluate_manifest_json(&value.to_string())
-            .unwrap_err()
-            .contains("one valid likelihood per state"));
+        value["measurements"][0]["outcomes"][0]["likelihood_by_state"] = serde_json::json!([0.9]);
+        assert!(
+            evaluate_manifest_json(&value.to_string())
+                .unwrap_err()
+                .contains("one valid likelihood per state")
+        );
     }
 
     #[test]
     fn rejects_mismatched_decision_and_measurement_cost_units() {
         let mut value = fixture_value();
         value["measurement_cost_unit"] = serde_json::json!("EUR");
-        assert!(evaluate_manifest_json(&value.to_string())
-            .unwrap_err()
-            .contains("same declared unit"));
+        assert!(
+            evaluate_manifest_json(&value.to_string())
+                .unwrap_err()
+                .contains("same declared unit")
+        );
     }
 
     #[test]
