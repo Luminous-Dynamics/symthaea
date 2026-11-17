@@ -38,6 +38,21 @@ They are not interchangeable. D2D can compare both, but it must never call a heu
 
 Also preserve the physical correspondence boundary: a local branch-gradient certificate is not itself a finite executed trajectory or a real-world measurement. Finite-step separation requires the branch-tube/remainder path (Symtropy #3386); time-domain rigid-body execution and replay must be evaluated in a separately matched lane.
 
+## 1.2 First Symtropy adapter and immediate engineering gates
+
+A concrete downstream execution task is now open:
+
+- [Symtropy #5975 — D2D-SYMTROPY-ADAPTER-001](https://github.com/Luminous-Dynamics/symtropy/issues/5975) will use the existing native `symtropy-physics::PhysicsWorld<3>` plus `ReplayTape`, `WorldSnapshot` and the bitwise replay harness for a small paired contact-probe experiment.
+- It is an execution/replay adapter, not a new simulator. The first controlled world uses a declared floor/body geometry, mass, material/friction, timestep, solver settings and intervention. Rebuilt branches must start from the same frozen manifest.
+- The existing replay snapshot asserts equality for body state and last-step collision events. It does not capture every private solver/contact-cache field; the adapter's claim must be scoped to the public snapshot contract.
+- D2D uses the analytic toy fixture as a protocol baseline; the Symtropy adapter then replaces only the analytic executor. The analytic fixture must not be treated as physical validation.
+
+For certified branch-separating contact experiments, use Symtropy #3406. Important status distinction: #3365, which provides the two-branch six-coordinate sensitivity witness used by #3406's P0 plan, is currently an open draft PR with no passing combined status reported in the audit. It is not yet a qualified main-branch dependency. The finite-step branch-tube owner #3386 remains distinct.
+
+HLB recurrent-learning continuity is another gate: Symthaea #1269 remains the canonical owner for portable, versioned HDC-LTC episode-state checkpoints. The current core NetworkStateSnapshot is only an in-memory scratch buffer and can partially skip mismatched dimensions during restore; D2D must not claim exact recurrent replay until #1269 is qualified.
+
+The existing Symtropy manipulator-demo Monte Carlo example is not an acceptable D2D SOTA baseline as-is: its low-cost Adaptive arm is explicitly a proximity-keyed deterministic stand-in, not the actual cognitive policy, and its default comparison uses 100 s for two arms versus 40 s for the Φ arm. A future use must first be reworked into a matched-policy, matched-horizon protocol.
+
 ## 2. Current external benchmark and industry map
 
 | System / benchmark | Main capability measured | What it does not establish by itself | D2D use |
