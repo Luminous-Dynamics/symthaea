@@ -41,7 +41,8 @@ Do not create a second CAD system, cloth solver, material registry, process sche
 | Existing approach | What it demonstrates | Limitation / fair comparison |
 |---|---|---|
 | Conventional rigid robot panels | Stable geometry, hard local protection, established service interfaces | Can be heavier and less conformal; actual protection and serviceability must be measured for the chosen robot |
-| Industrial robot jackets and bellows | Established custom covers for dust, splash, heat, welding/spraying and other application-specific environments | Often optimized for one hazard/process; folds and seams can complicate cleaning; does not imply impact or human-contact qualification |
+| Industrial robot jackets (e.g. ASP Protection) | Specialist covers for articulated/linear/Delta robots; ASP states solutions cover 1,000+ robot models and 90+ brands, with repairable, process-specific constructions | Strong benchmark for environmental protection and service; product claims still need matched tests; does not automatically provide cushioning or human-contact qualification |
+| Hygienic / food-process covers | ASP describes double-coated fabric, welded seams and inflated construction intended to avoid dirt-retaining folds in high-pressure-cleaning environments | Demonstrates that hygienic cover design differs from a draped garment; requires its own cleaning/chemical/pressure test profile |
 | 1X NEO soft body / washable nylon suit | Commercial humanoid precedent for a soft, textile-covered exterior and washable soft goods | Manufacturer description, not an independent head-to-head protection or lifecycle test |
 | Textile robot skin research | Textile cover with proximity-sensor arrays and passive cushioning has been demonstrated as a research direction | Research prototype does not establish product-level reliability, safety integrity or generality |
 | Textile + lattice cover architecture | A 2026 patent describes a textile cover adjacent to a lattice energy-attenuation assembly | Patent disclosure is not evidence of a tested, deployed or superior product |
@@ -49,6 +50,9 @@ Do not create a second CAD system, cloth solver, material registry, process sche
 
 Relevant sources:
 - 1X NEO product description: https://www.1x.tech/neo
+- ASP Protection industrial robot covers: https://www.asp-protection.eu/
+- ASP food-industry covers and welded/inflatable construction: https://www.asp-protection.eu/protective-covers/protective-cover-for-the-food-industry/
+- ASP spraying-robot covers: https://www.asp-protection.eu/protective-covers/spraying-robot-cover/
 - Shanghai municipal report, 15 September 2026: https://english.shanghai.gov.cn/en-BusinessEnvironmentJiading/20260915/276b40bfbb32491696ba26e33ec2b166.html
 - IEEE, *Prototype of an intelligent textile based robot skin to expand potential applications for cobot's* (2023): https://ieeexplore.ieee.org/document/10379882/
 - Dejene & Gudayu, critical review of 3D woven/knitted spacer fabrics (2024): https://doi.org/10.1177/15280837241253614
@@ -184,7 +188,13 @@ A textile cover can hide pinch/shear interfaces, alter collision geometry, add i
 
 A cover is not an ingress seal by default. Do not claim IP, IK, flame, ESD, chemical, cleanroom, medical, PPE or human-contact compliance without an exact profile and the appropriate independent test. Do not infer that a soft layer makes a robot safe to touch.
 
-For food/pharmaceutical/cleanroom/product-contact applications, textile folds, seams and overlaps can create contamination-retaining areas. The Sirris hygienic-design guide warns against conventional flexible covers in product-contact contexts. Consider a smooth cleanable enclosure or no cover in those zones unless hygienic suitability is demonstrated.
+For food/pharmaceutical/cleanroom/product-contact applications, textile folds, seams and overlaps can create contamination-retaining areas. The Sirris hygienic-design guide warns that conventional flexible covers can create residue-retaining folds and reinstallation risks. Conversely, ASP describes a specialized food-industry cover using double-coated fabric, welded seams and an inflated construction intended to prevent folds where residue can settle. This is an architectural contrast, not independent proof of hygienic conformity.
+
+Define two different product archetypes rather than one universal shell:
+1. **Conformal soft garment:** washable textile, spacer and local compliant guards for domestic, service, research and selected industrial ODDs.
+2. **Sealed process cover:** smooth, welded/coated, cleanable and possibly pressurized enclosure for a specific dust/liquid/chemical/food-process profile.
+
+The same robot may need different coverings for different deployments. A washable nylon suit is not automatically a high-pressure-cleanable food cover, and a sealed industrial jacket is not automatically comfortable, lightweight or suitable for human-contact use. Consider smooth sealed surfaces or no cover in product-contact zones unless the complete installation is qualified.
 
 ## 9. Evidence and claim ladder
 
@@ -225,3 +235,27 @@ No physical prototype or material has been selected or tested as part of this v0
 - ISO 13937-2:2000: https://www.iso.org/standard/23370.html
 - ISO 6330:2021: https://www.iso.org/standard/75934.html
 - Sirris hygienic design of robot-based automation: https://www.sirris.be/system/files/documents/2024-01/GUIDE%20TO%20HYGIENIC%20DESIGN%20OF%20ROBOT-BASED%20AUTOMATION%20SYSTEMS.pdf
+
+
+## 12. Industry refinement — two cover archetypes
+
+The current market is more mature than a simple "fabric versus plastic" comparison suggests.
+
+- 1X NEO publicly describes a custom 3D lattice polymer body, externally covered joints, a machine-washable nylon suit/shoes, body IP44 and hands IP68. Treat these as manufacturer-stated whole-robot architecture/product claims, not independently measured textile performance.
+- ASP Protection states it has made industrial robot covers since 1988 and offers solutions for more than 1,000 robot models across more than 90 brands. Its product families include dust, spray, heat, cold and food-process covers. For food production, it describes double-coated fabric, welded seams, repairable construction and an inflated cover intended to prevent folds where residue can accumulate.
+- A September 2026 Shanghai municipal report describes a garment producer shipping more than 3,000 protective-suit sets, primarily for industrial robot applications, and developing textile surfaces with temperature/pressure sensors.
+
+These sources show three distinct markets: soft humanoid skins, industrial process jackets and robot-facing smart textiles. Lightshell should bridge capabilities without collapsing them into one product. The differentiator is to co-design the covering from robot kinematics and ODD, then bind pattern, lot, seam/process, fit, thermal/sensor impact, service and test evidence into one engineering thread.
+
+## 13. What "better than SOTA" should mean
+
+Do not claim superiority to 1X or ASP from product photos, a single prototype or supplier datasheets. Compare on the same robot, task, hazard envelope, coverage and test fixtures.
+
+The first competitive experiment should include:
+- bare platform;
+- its existing production panel/cover;
+- a commercial cover selected for the same ODD (ASP or equivalent, when platform and use case match);
+- Lightshell textile-only candidate;
+- Lightshell textile + spacer + local guard candidate.
+
+The result should answer whether Lightshell improves the Pareto frontier across added mass, abrasion/impact response, mobility, thermal margin, sensing, cleanability, repair time and cost per accepted service-hour. It may win on repairability or comfort while losing on high-pressure cleaning; report that trade-off honestly. The best product family may therefore be two distinct architectures: a conformal soft garment and a sealed process cover.
