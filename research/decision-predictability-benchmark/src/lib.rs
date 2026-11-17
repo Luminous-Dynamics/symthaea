@@ -36,19 +36,43 @@ impl fmt::Display for MetricError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyForecast => write!(formatter, "forecast series is empty"),
-            Self::InvalidThreshold => write!(formatter, "forecast threshold must be finite and positive"),
+            Self::InvalidThreshold => {
+                write!(formatter, "forecast threshold must be finite and positive")
+            },
             Self::NonFiniteValue(name) => write!(formatter, "{name} must be finite"),
             Self::NegativeValue(name) => write!(formatter, "{name} must be non-negative"),
             Self::NonPositiveValue(name) => write!(formatter, "{name} must be positive"),
-            Self::NonIncreasingForecastTime => write!(formatter, "forecast times must be strictly increasing"),
-            Self::ReferenceNotReliable => write!(formatter, "Lyapunov reference is not qualified as Reliable"),
-            Self::EmptyInformationSets => write!(formatter, "at least one information set is required"),
-            Self::InvalidProbability(name) => write!(formatter, "{name} must be finite and in (0, 1]"),
-            Self::ProbabilityMassNotOne(name) => write!(formatter, "{name} must sum to one within tolerance"),
-            Self::InconsistentActionCount => write!(formatter, "all states must declare the same non-zero action count"),
-            Self::InvalidActionIndex => write!(formatter, "candidate action index is outside the declared action set"),
-            Self::CandidateActionRequired => write!(formatter, "a candidate action is required to calculate policy risk"),
-            Self::InformationIncreasedExpectedRisk => write!(formatter, "expected posterior Bayes risk cannot exceed prior Bayes risk"),
+            Self::NonIncreasingForecastTime => {
+                write!(formatter, "forecast times must be strictly increasing")
+            }
+            Self::ReferenceNotReliable => {
+                write!(formatter, "Lyapunov reference is not qualified as Reliable")
+            }
+            Self::EmptyInformationSets => {
+                write!(formatter, "at least one information set is required")
+            }
+            Self::InvalidProbability(name) => {
+                write!(formatter, "{name} must be finite and in (0, 1]")
+            }
+            Self::ProbabilityMassNotOne(name) => {
+                write!(formatter, "{name} must sum to one within tolerance")
+            }
+            Self::InconsistentActionCount => write!(
+                formatter,
+                "all states must declare the same non-zero action count"
+            ),
+            Self::InvalidActionIndex => write!(
+                formatter,
+                "candidate action index is outside the declared action set"
+            ),
+            Self::CandidateActionRequired => write!(
+                formatter,
+                "a candidate action is required to calculate policy risk"
+            ),
+            Self::InformationIncreasedExpectedRisk => write!(
+                formatter,
+                "expected posterior Bayes risk cannot exceed prior Bayes risk"
+            ),
         }
     }
 }
@@ -97,10 +121,7 @@ pub struct ForecastSample {
 /// whose error does not exceed `threshold`. If the first point already fails,
 /// the result is zero. This is an observed discrete threshold crossing, not a
 /// continuous-time interpolation or confidence bound.
-pub fn forecast_horizon(
-    samples: &[ForecastSample],
-    threshold: f64,
-) -> Result<f64, MetricError> {
+pub fn forecast_horizon(samples: &[ForecastSample], threshold: f64) -> Result<f64, MetricError> {
     if samples.is_empty() {
         return Err(MetricError::EmptyForecast);
     }
@@ -208,7 +229,9 @@ fn validate_information_sets(sets: &[InformationSet]) -> Result<usize, MetricErr
 
     let total_mass: f64 = sets.iter().map(|set| set.probability).sum();
     if !total_mass.is_finite() || (total_mass - 1.0).abs() > PROBABILITY_TOLERANCE {
-        return Err(MetricError::ProbabilityMassNotOne("information-set probability mass"));
+        return Err(MetricError::ProbabilityMassNotOne(
+            "information-set probability mass",
+        ));
     }
 
     let mut action_count = None;
@@ -216,13 +239,13 @@ fn validate_information_sets(sets: &[InformationSet]) -> Result<usize, MetricErr
     for set in sets {
         validate_probability(set.probability, "information-set probability")?;
         if set.states.is_empty() {
-            return Err(MetricError::ProbabilityMassNotOne("conditional state probability mass"));
+            return Err(MetricError::ProbabilityMassNotOne(
+                "conditional state probability mass",
+            ));
         }
 
         let conditional_mass: f64 = set.states.iter().map(|state| state.probability).sum();
-        if !conditional_mass.is_finite()
-            || (conditional_mass - 1.0).abs() > PROBABILITY_TOLERANCE
-        {
+        if !conditional_mass.is_finite() || (conditional_mass - 1.0).abs() > PROBABILITY_TOLERANCE {
             return Err(MetricError::ProbabilityMassNotOne(
                 "conditional state probability mass",
             ));
@@ -307,10 +330,7 @@ pub fn evaluate_decisions(sets: &[InformationSet]) -> Result<DecisionRisk, Metri
         policy_risk += set.probability * expected_losses[chosen_action];
     }
 
-    if !bayes_risk.is_finite()
-        || !policy_risk.is_finite()
-        || !perfect_information_risk.is_finite()
-    {
+    if !bayes_risk.is_finite() || !policy_risk.is_finite() || !perfect_information_risk.is_finite() {
         return Err(MetricError::NonFiniteValue("aggregate decision risk"));
     }
 
@@ -350,7 +370,10 @@ pub fn expected_value_of_information(
 ) -> Result<InformationValue, MetricError> {
     for (name, value) in [
         ("prior Bayes risk", prior_bayes_risk),
-        ("expected posterior Bayes risk", expected_posterior_bayes_risk),
+        (
+            "expected posterior Bayes risk",
+            expected_posterior_bayes_risk,
+        ),
         ("acquisition cost", acquisition_cost),
     ] {
         if !value.is_finite() {
@@ -361,9 +384,7 @@ pub fn expected_value_of_information(
         }
     }
 
-    if expected_posterior_bayes_risk
-        > prior_bayes_risk + REGRET_ROUNDOFF_TOLERANCE
-    {
+    if expected_posterior_bayes_risk > prior_bayes_risk + REGRET_ROUNDOFF_TOLERANCE {
         return Err(MetricError::InformationIncreasedExpectedRisk);
     }
 
@@ -443,7 +464,10 @@ mod tests {
                 lambda_max: 0.5,
                 qualification,
             };
-            assert_eq!(unqualified.lyapunov_time(), Err(MetricError::ReferenceNotReliable));
+            assert_eq!(
+                unqualified.lyapunov_time(),
+                Err(MetricError::ReferenceNotReliable)
+            );
         }
     }
 
@@ -461,10 +485,22 @@ mod tests {
     #[test]
     fn forecast_horizon_is_the_last_passing_prefix_sample() {
         let samples = [
-            ForecastSample { horizon: 1.0, normalized_error: 0.02 },
-            ForecastSample { horizon: 2.0, normalized_error: 0.08 },
-            ForecastSample { horizon: 3.0, normalized_error: 0.12 },
-            ForecastSample { horizon: 4.0, normalized_error: 0.04 },
+            ForecastSample {
+                horizon: 1.0,
+                normalized_error: 0.02,
+            },
+            ForecastSample {
+                horizon: 2.0,
+                normalized_error: 0.08,
+            },
+            ForecastSample {
+                horizon: 3.0,
+                normalized_error: 0.12,
+            },
+            ForecastSample {
+                horizon: 4.0,
+                normalized_error: 0.04,
+            },
         ];
         assert_eq!(forecast_horizon(&samples, 0.1).unwrap(), 2.0);
     }
@@ -481,8 +517,14 @@ mod tests {
     #[test]
     fn forecast_horizon_rejects_non_monotonic_time() {
         let samples = [
-            ForecastSample { horizon: 2.0, normalized_error: 0.01 },
-            ForecastSample { horizon: 1.0, normalized_error: 0.02 },
+            ForecastSample {
+                horizon: 2.0,
+                normalized_error: 0.01,
+            },
+            ForecastSample {
+                horizon: 1.0,
+                normalized_error: 0.02,
+            },
         ];
         assert_eq!(
             forecast_horizon(&samples, 0.1),
@@ -614,9 +656,18 @@ mod tests {
     #[test]
     fn forecast_validates_samples_after_the_first_threshold_crossing() {
         let samples = [
-            ForecastSample { horizon: 1.0, normalized_error: 0.01 },
-            ForecastSample { horizon: 2.0, normalized_error: 0.2 },
-            ForecastSample { horizon: 1.5, normalized_error: 0.03 },
+            ForecastSample {
+                horizon: 1.0,
+                normalized_error: 0.01,
+            },
+            ForecastSample {
+                horizon: 2.0,
+                normalized_error: 0.2,
+            },
+            ForecastSample {
+                horizon: 1.5,
+                normalized_error: 0.03,
+            },
         ];
         assert_eq!(
             forecast_horizon(&samples, 0.1),
@@ -645,5 +696,4 @@ mod tests {
             ))
         );
     }
-
 }
