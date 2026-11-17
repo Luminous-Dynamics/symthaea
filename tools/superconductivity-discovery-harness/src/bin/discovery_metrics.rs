@@ -1,4 +1,4 @@
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::env;
@@ -290,7 +290,10 @@ mod tests {
         assert_eq!(report["candidate_budgets"][0]["hits_at_k"], 1);
         assert_eq!(report["candidate_budgets"][0]["precision_at_k"], 0.5);
         assert_eq!(report["candidate_budgets"][0]["recall_at_k"], 0.5);
-        assert_eq!(report["candidate_budgets"][0]["enrichment_over_random"], 1.0);
+        assert_eq!(
+            report["candidate_budgets"][0]["enrichment_over_random"],
+            1.0
+        );
         assert_eq!(report["candidate_budgets"][1]["precision_at_k"], 0.5);
         assert_eq!(report["average_precision"], 0.8333333333333333);
     }
