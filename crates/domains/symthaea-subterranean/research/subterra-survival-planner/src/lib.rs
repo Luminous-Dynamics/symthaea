@@ -206,7 +206,7 @@ pub struct PlannerConfig {
     pub risk_limits: RiskLimits,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PlanningError {
     EmptyHypotheses,
     MissingUnknownHypothesis,
@@ -679,11 +679,11 @@ fn evaluate_action(
 ) -> Result<Evaluation, PlanningError> {
     let budget_after_action = action.cost.subtract_from(remaining_budget);
     let action_cost_units = action.cost.weighted(prices)?;
-    let mut expected_loss = 0.0;
+    let mut expected_decision_loss = 0.0;
     let mut expected_future_cost_units = 0.0;
     let mut expected_resources = ExpectedResources::default();
-    let mut interruption_probability = 0.0;
-    let mut robot_loss_probability = 0.0;
+    let mut interruption_probability: f64 = 0.0;
+    let mut robot_loss_probability: f64 = 0.0;
     let mut branches = Vec::new();
 
     for outcome in &action.outcomes {
@@ -732,7 +732,7 @@ fn evaluate_action(
                 )
             };
 
-        expected_loss += branch_probability * branch_loss;
+        expected_decision_loss += branch_probability * branch_loss;
         expected_future_cost_units += branch_probability * branch_cost;
         expected_resources =
             ExpectedResources::plus_weighted(expected_resources, branch_resources, branch_probability)?;
@@ -751,9 +751,9 @@ fn evaluate_action(
     let expected_resource_cost_units = action_cost_units + expected_future_cost_units;
     let expected_resources =
         ExpectedResources::add_action_and_future(action.cost, expected_resources)?;
-    let expected_total_value = expected_loss + expected_resource_cost_units;
+    let expected_total_value = expected_decision_loss + expected_resource_cost_units;
 
-    if !expected_loss.is_finite()
+    if !expected_decision_loss.is_finite()
         || !expected_resource_cost_units.is_finite()
         || !expected_total_value.is_finite()
         || !interruption_probability.is_finite()
