@@ -1,0 +1,42 @@
+name: Decision Predictability Metrics
+
+on:
+  pull_request:
+    paths:
+      - "research/decision-predictability-benchmark/**"
+      - ".github/workflows/decision-predictability-metrics.yml"
+  push:
+    branches:
+      - "research/decision-relevant-predictability-v0"
+    paths:
+      - "research/decision-predictability-benchmark/**"
+      - ".github/workflows/decision-predictability-metrics.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: decision-predictability-metrics-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  qualify:
+    name: Standalone Rust metric contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path research/decision-predictability-benchmark/Cargo.toml -- --check
+
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets -- -D warnings
+
+      - name: Run all tests
+        run: cargo test --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
