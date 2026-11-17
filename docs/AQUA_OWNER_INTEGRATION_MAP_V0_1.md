@@ -95,3 +95,12 @@ The room-mode contract records the required evidence and return-to-ready state f
 - Symthaea may recommend or recall only device-qualified settings. Fixture-local deterministic constraints and independent physical safety interlocks remain authoritative; profile, model and network loss must fall back to manual operation.
 - Mycelix consent/identity/authorization evidence is consumed where required; no identity/profile record becomes physical safety authority.
 - KOHLER Anthem / Anthem+ / DTV already provide multi-outlet control, presets and app/voice integration. Aqua's research claim must therefore be about privacy, agency, task outcomes and evidence-qualified bounded adaptation, not "AI presets" alone.
+
+
+## Bathing fountains / aquatic feature integration
+
+- Aqua differentiates decorative non-contact fountains, interactive spray/bathing fountains, and immersive bathing/hydrotherapy pools.
+- CDC MAHC 2024 defines interactive water-play venues as spray/jetted features that contact bathers whether single-pass or recirculated; this is a public aquatic venue model code, not automatically local law.
+- CDC warns that decorative fountains entered by the public must be managed as a splash-pad venue or entry should be prevented.
+- Sol-Atlas #765/#766/#770/#772 remains authority for water-feature/pool thermal, evaporation, regeneration and microclimate; Aqua owns user-contact fixture/task/access and room integration; Mycelix #6100 remains water-use assessment authority.
+- The archetype and safety interface is documented in `docs/AQUA_REFERENCE_ROOM_ARCHETYPES_V0_1.md` and `AQUA-THERMAL-SUITE-001 #12694`.
