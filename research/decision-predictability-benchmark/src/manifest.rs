@@ -699,9 +699,13 @@ mod tests {
 
     #[test]
     fn canonical_digest_ignores_object_key_order() {
-        let reordered = VALID.replace(
-            r#""schema":"luminous.decision-transfer.split-manifest.v1","protocol_revision":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa""#,
-            r#""protocol_revision":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","schema":"luminous.decision-transfer.split-manifest.v1""#,
+        let schema_line = "      \\"schema\\":\\"luminous.decision-transfer.split-manifest.v1\\",\\n";
+        let revision_line = "      \\"protocol_revision\\":\\"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\\",\\n";
+        let without_schema = VALID.replacen(schema_line, "", 1);
+        let reordered = without_schema.replacen(
+            revision_line,
+            &format!("{revision_line}{schema_line}"),
+            1,
         );
         let left = parse_and_validate(VALID.as_bytes()).unwrap();
         let right = parse_and_validate(reordered.as_bytes()).unwrap();
