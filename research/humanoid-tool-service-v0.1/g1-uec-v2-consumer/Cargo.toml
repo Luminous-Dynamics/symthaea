@@ -1,0 +1,13 @@
+[package]
+name = "g1-uec-v2-consumer"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "Read-only HumanoidToolBench G1 decoupled_v1 consumer for Symthaea UEC v2"
+license = "AGPL-3.0-or-later"
+publish = false
+
+[dependencies]
+symthaea-core = { path = "../../../crates/core/symthaea-core" }
+
+[workspace]

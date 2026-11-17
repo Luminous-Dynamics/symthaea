@@ -1,0 +1,37 @@
+name: G1 UEC v2 consumer audit
+
+on:
+  push:
+    branches:
+      - research/g1-uec-v2-adapter-v0-1
+    paths:
+      - "research/humanoid-tool-service-v0.1/g1-uec-v2-consumer/**"
+      - "crates/core/symthaea-core/src/embodiment_v2.rs"
+      - ".github/workflows/g1-uec-v2-consumer.yml"
+  pull_request:
+    branches:
+      - research/uec-v2-consumer-audit-2026-10-16
+    paths:
+      - "research/humanoid-tool-service-v0.1/g1-uec-v2-consumer/**"
+      - "crates/core/symthaea-core/src/embodiment_v2.rs"
+      - ".github/workflows/g1-uec-v2-consumer.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: g1-uec-v2-consumer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    name: test read-only adapter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+      - name: Run adapter tests
+        run: cargo test --manifest-path research/humanoid-tool-service-v0.1/g1-uec-v2-consumer/Cargo.toml
