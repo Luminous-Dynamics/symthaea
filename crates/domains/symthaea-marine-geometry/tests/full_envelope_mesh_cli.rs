@@ -17,10 +17,7 @@ fn run_cli(args: &[&str]) -> std::process::Output {
 fn cli_generates_closed_box_envelope_and_exact_mesh_volume() {
     let spec = fixture_path("marine-full-envelope-box-001.json");
     let profile = fixture_path("marine-full-envelope-mesh-admission-profile-001.json");
-    let output = run_cli(&[
-        spec.to_str().unwrap(),
-        profile.to_str().unwrap(),
-    ]);
+    let output = run_cli(&[spec.to_str().unwrap(), profile.to_str().unwrap()]);
     assert_eq!(
         output.status.code(),
         Some(0),
@@ -30,7 +27,10 @@ fn cli_generates_closed_box_envelope_and_exact_mesh_volume() {
     let report: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("CLI must emit JSON artifact");
     assert_eq!(report["status"], "generated");
-    assert_eq!(report["artifact"]["admission_report"]["disposition"], "admissible-for-profile");
+    assert_eq!(
+        report["artifact"]["admission_report"]["disposition"],
+        "admissible-for-profile"
+    );
     let volume = report["artifact"]["admission_report"]["metrics"]["signed_volume_m3"]
         .as_f64()
         .unwrap();
@@ -76,8 +76,7 @@ fn cli_returns_incomplete_for_unimplemented_opening_geometry() {
     let profile = fixture_path("marine-full-envelope-mesh-admission-profile-001.json");
     let bytes = fs::read(&spec).unwrap();
     let mut source: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-    source["boundary_semantics"]["exterior_shell"] =
-        serde_json::json!("EXPLICIT_BOUNDARY_LOOPS");
+    source["boundary_semantics"]["exterior_shell"] = serde_json::json!("EXPLICIT_BOUNDARY_LOOPS");
     source["boundary_semantics"]["openings"] = serde_json::json!([{
         "opening_id": "HATCH-001",
         "boundary_point_refs": ["BOW-KEEL", "BOW-WL-S", "BOW-SHEER-S"],
@@ -88,10 +87,7 @@ fn cli_returns_incomplete_for_unimplemented_opening_geometry() {
         std::process::id()
     ));
     fs::write(&temporary, serde_json::to_vec(&source).unwrap()).unwrap();
-    let output = run_cli(&[
-        temporary.to_str().unwrap(),
-        profile.to_str().unwrap(),
-    ]);
+    let output = run_cli(&[temporary.to_str().unwrap(), profile.to_str().unwrap()]);
     fs::remove_file(&temporary).unwrap();
     assert_eq!(output.status.code(), Some(1));
     let report: serde_json::Value =
