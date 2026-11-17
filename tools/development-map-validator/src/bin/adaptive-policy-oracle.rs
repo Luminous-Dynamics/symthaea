@@ -24,7 +24,7 @@ const CLAIM_CEILING:&str="Exact exhaustive policy oracle over the registered fin
 #[derive(Clone,Debug)]
 struct Bounds{lower:u64,upper:u64,nominal:u64}
 #[derive(Clone,Debug)]
-struct World{ id:String, safe_actions:BTreeSet<String>, observations:BTreeMap<String,String> }
+struct World{ safe_actions:BTreeSet<String>, observations:BTreeMap<String,String> }
 #[derive(Clone,Debug)]
 struct OptionDef{factor_id:String,available_at:DateTime<FixedOffset>,available_at_raw:String,cost_p95:u64}
 #[derive(Clone,Debug)]
@@ -93,7 +93,7 @@ fn parse_worlds(oracle:&Value,ids:&BTreeSet<String>,option_ids:&BTreeSet<String>
   let obs=object(val(w,"observations",&l)?,&format!("{l}.observations"))?;
   if obs.keys().cloned().collect::<BTreeSet<_>>()!=*option_ids{return Err(format!("world {id:?} observation option set mismatch"));}
   let observations=obs.iter().map(|(k,v)|Ok((k.clone(),v.as_str().ok_or("observation must be string")?.to_owned()))).collect::<Result<BTreeMap<_,_>,String>>()?;
-  if out.insert(id.clone(),World{id,safe_actions:safe_set,observations}).is_some(){return Err(format!("duplicate world {id:?}"));}
+  if out.insert(id.clone(),World{safe_actions:safe_set,observations}).is_some(){return Err(format!("duplicate world {id:?}"));}
  }
  Ok(out)
 }
@@ -127,7 +127,12 @@ fn parse_nodes(tree:&Value,options:&BTreeMap<String,OptionDef>,factor_outcomes:&
    let decision=s(v,"decision_kind",&l)?;if decision!="act"&&decision!="defer"{return Err("decision_kind must be act or defer".to_owned());}
    let action=s(v,"action_id",&l)?;if !actions.contains_key(&action){return Err(format!("unknown action {action:?}"));}
    let claimed=u(v,"claimed_residual_risk_bps",&l)?;if claimed>SCALE{return Err("claimed risk exceeds 10000".to_owned());}
-   if decision=="defer"&&actions[&action].irreversible{return Err("defer must use a non-irreversible action".to_owned());}
+   if decision=="defer"{
+    let policy=&actions[&action];
+    if policy.irreversible||policy.hard_gate||policy.max_risk!=0{
+     return Err("defer must use a non-irreversible, non-hard-gated zero-risk action".to_owned());
+    }
+   }
    Node{id,kind,option_id:None,at:None,branches:BTreeMap::new(),decision_kind:Some(decision),action_id:Some(action),claimed}
   }else{return Err(format!("{l}.kind must be acquire or stop"));};
   if nodes.insert(id.clone(),node).is_some(){return Err(format!("duplicate node id {id:?}"));}
@@ -164,9 +169,6 @@ fn risk_for_path(candidate:&Value,oracle:&Value,steps:&[Step],representative:&st
  let report=noisy_channel::evaluate_noisy_channel_parts_json(&cv.to_string(),&ov.to_string())?;
  Ok(report["traces"][0].clone())
 }
-fn path_cost(steps:&[Step],options:&BTreeMap<String,OptionDef>)->Result<u64,String>{
- steps.iter().try_fold(0u64,|sum,step|sum.checked_add(options[&step.option_id].cost_p95).ok_or_else(||"path cost overflow".to_owned()))
-}
 fn parse_candidate_oracle(candidate:&Value,oracle:&Value)->Result<(BTreeMap<String,Bounds>,BTreeMap<String,Action>,BTreeMap<String,OptionDef>,BTreeMap<String,World>,BTreeMap<String,BTreeSet<String>>,String,u64,usize),String>{
  allowed(candidate,&["scenario_id","decision_cutoff","budget_micros","max_depth","actions","hypothesis_bounds","options","factors","policy_tree"],"candidate_view")?;
  allowed(oracle,&["actual_hypothesis_id","decision_cutoff","budget_micros","actions","hypothesis_bounds","options","factors","hypothesis_safety","calibrations","factorization_certificates","worlds","cost_options"],"oracle")?;
@@ -179,7 +181,14 @@ fn parse_candidate_oracle(candidate:&Value,oracle:&Value)->Result<(BTreeMap<Stri
  let worlds=parse_worlds(oracle,&ids,&option_ids,&actions)?;
  let safe_values=val(oracle,"hypothesis_safety","oracle")?.as_array().ok_or("hypothesis_safety must be array")?;
  let safety:BTreeMap<String,BTreeSet<String>>=safe_values.iter().map(|x|Ok((s(x,"hypothesis_id","safety")?,x["safe_actions"].as_array().ok_or("safe_actions must be array")?.iter().map(|a|a.as_str().ok_or("safe action must be string").map(str::to_owned)).collect::<Result<BTreeSet<_>,_>>()?))).collect::<Result<_,String>>()?;
- for id in &ids{if !safety.contains_key(id){return Err(format!("missing safety label for {id:?}"));}}
+ if safety.keys().cloned().collect::<BTreeSet<_>>()!=ids {
+  return Err("oracle hypothesis_safety must cover the exact world set".to_owned());
+ }
+ for (id,world) in &worlds {
+  if safety[id]!=world.safe_actions {
+   return Err(format!("oracle world and hypothesis_safety labels differ for {id:?}"));
+  }
+ }
  let actual=s(oracle,"actual_hypothesis_id","oracle")?;if !worlds.contains_key(&actual){return Err("actual_hypothesis_id is not a world".to_owned());}
  let outcomes=factor_outcomes(candidate)?;
  for (id,w) in &worlds{for (opt,outcome) in &w.observations{let factor=&options[opt].factor_id;if !outcomes[factor].contains(outcome){return Err(format!("world {id:?} has unknown outcome {outcome:?} for {opt:?}"));}}}
@@ -200,6 +209,9 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
   let mut node_id=tree.root.clone();let mut steps=Vec::new();let mut seen=BTreeSet::new();let mut previous:Option<DateTime<FixedOffset>>=None;let mut total=0u64;let mut depth=0usize;
   loop{
    depth+=1;if depth>MAX_DEPTH+1{return Err("tree traversal exceeds depth limit".to_owned());}
+   if depth.saturating_sub(1)>candidate["max_depth"].as_u64().unwrap_or(0) as usize{
+    return Err("submitted policy exceeds candidate max_depth".to_owned());
+   }
    let node=&tree.nodes[&node_id];
    if node.kind=="stop"{
     let path=LeafPath{leaf_id:node.id.clone(),steps:steps.clone(),decision_kind:node.decision_kind.clone().unwrap(),action_id:node.action_id.clone().unwrap(),claimed:node.claimed,world_ids:vec![world_id.clone()],cost:total};
@@ -223,7 +235,14 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
   let representative=&path.world_ids[0];
   let risk=risk_for_path(candidate,oracle,&path.steps,representative,&path.action_id,path.claimed)?;
   let act=path.decision_kind=="act";
-  let risk_ok=!act||(risk["evidence_accepted"]==true&&risk["robust_action_justified"]==true);
+  let action_policy=&actions[&path.action_id];
+  let risk_ok=if !act{
+   !action_policy.irreversible&&!action_policy.hard_gate&&action_policy.max_risk==0
+     &&path.world_ids.iter().all(|id|worlds[id].safe_actions.contains(&path.action_id))
+  }else{
+   risk["evidence_accepted"]==true&&risk["robust_action_justified"]==true
+     &&(!action_policy.hard_gate||risk["worst_case_posterior_risk_bps"]==0)
+  };
   let within=path.cost<=budget;
   if !risk_ok{robust_violations+=1;}if !within{budget_violations+=1;}
   if path.decision_kind=="defer"{
@@ -282,13 +301,16 @@ fn combine_children(
 }
 fn enumerate_policies(
  remaining:&[String],steps:&[Step],used:&BTreeSet<String>,depth:usize,
- candidate:&Value,oracle:&Value,bounds:&BTreeMap<String,Bounds>,actions:&BTreeMap<String,Action>,
+ candidate:&Value,oracle:&Value,actions:&BTreeMap<String,Action>,
  options:&BTreeMap<String,OptionDef>,worlds:&BTreeMap<String,World>,outcomes:&BTreeMap<String,BTreeSet<String>>,
- budget:u64,target_action:&str,counter:&mut usize,total_generated:&mut usize
+ counter:&mut usize,total_generated:&mut usize
 )->Result<Vec<SubPolicy>,String>{
  if *total_generated>MAX_POLICIES{return Err("exact policy enumeration cap reached".to_owned());}
  let mut output=Vec::new();
- let defer_action=actions.iter().find(|(_,a)|!a.irreversible&&a.max_risk==0).map(|(id,_)|id.clone()).ok_or("no registered read-only zero-risk defer action")?;
+ let defer_action=actions.iter().find(|(id,a)|{
+  !a.irreversible&&!a.hard_gate&&a.max_risk==0
+   &&worlds.values().all(|w|w.safe_actions.contains(*id))
+ }).map(|(id,_)|id.clone()).ok_or("no registered read-only zero-risk action safe in every evaluator world")?;
  let defer_id=format!("stop-defer-{}",*counter);*counter+=1;
  output.push(SubPolicy{root:defer_id.clone(),nodes:vec![json!({"node_id":defer_id,"kind":"stop","decision_kind":"defer","action_id":defer_action,"claimed_residual_risk_bps":SCALE})]});
  if !remaining.is_empty(){
@@ -318,13 +340,16 @@ fn enumerate_policies(
     child_lists.push(vec![SubPolicy{root:id.clone(),nodes:vec![json!({"node_id":id,"kind":"stop","decision_kind":"defer","action_id":defer_action,"claimed_residual_risk_bps":SCALE})]}]);
    }else{
     let mut new_steps=steps.to_vec();new_steps.push(Step{option_id:option_id.clone(),outcome:outcome.clone(),at:at.clone()});
-    let subs=enumerate_policies(part,&new_steps,&new_used,depth+1,candidate,oracle,bounds,actions,options,worlds,outcomes,budget,target_action,counter,total_generated)?;
+    let subs=enumerate_policies(part,&new_steps,&new_used,depth+1,candidate,oracle,actions,options,worlds,outcomes,counter,total_generated)?;
     child_lists.push(subs);
    }
   }
   if child_lists.iter().any(|x|x.is_empty()){continue;}
-  let combinations=child_lists.iter().map(|x|x.len()).product::<usize>();
-  if combinations>MAX_POLICIES-output.len(){return Err("exact policy combination cap reached".to_owned());}
+  let mut combinations=1usize;
+  for child in &child_lists{
+   combinations=combinations.checked_mul(child.len()).ok_or("exact policy combination count overflow")?;
+   if combinations>MAX_POLICIES-output.len(){return Err("exact policy combination cap reached".to_owned());}
+  }
   let root_id=format!("acquire-{}",*counter);*counter+=1;
   let mut branches=BTreeMap::new();let mut child_nodes=Vec::new();
   let mut combined=Vec::new();
@@ -338,7 +363,7 @@ fn enumerate_policies(
 fn evaluate_exact(candidate:&Value,oracle:&Value,bounds:&BTreeMap<String,Bounds>,actions:&BTreeMap<String,Action>,options:&BTreeMap<String,OptionDef>,worlds:&BTreeMap<String,World>,outcomes:&BTreeMap<String,BTreeSet<String>>,budget:u64,max_depth:usize)->Result<(PolicyMetrics,usize,PolicyTree),String>{
  let root_worlds=worlds.keys().cloned().collect::<Vec<_>>();
  let mut counter=0usize;let mut total=0usize;
- let policies=enumerate_policies(&root_worlds,&[],&BTreeSet::new(),0,candidate,oracle,bounds,actions,options,worlds,outcomes,budget,"release",&mut counter,&mut total)?;
+ let policies=enumerate_policies(&root_worlds,&[],&BTreeSet::new(),0,candidate,oracle,actions,options,worlds,outcomes,&mut counter,&mut total)?;
  let mut best:Option<(PolicyMetrics,PolicyTree)>=None;
  let mut feasible_count=0usize;
  for p in policies{
