@@ -52,6 +52,7 @@ pub mod multiscale;
 pub mod nppad_validation;
 pub mod plasma_control;
 pub mod plasma_hdc_encoder;
+pub mod plasma_observability;
 pub mod threat;
 
 pub use plasma_hdc_encoder::{
@@ -94,8 +95,10 @@ pub use multiscale::{
 };
 
 pub use fusion_twin::{
-    DisruptionRisk, FusionDigitalTwin, FusionTwinOutput, PLASMA_HORIZON_LABELS, PLASMA_HORIZONS,
-    PlasmaFepAction, PlasmaFepAgent, PlasmaMultiScalePredictor,
+    AdmittedChannelEvidence, DisruptionRisk, FusionDigitalTwin, FusionTwinAbstentionReason,
+    FusionTwinEvidenceOutcome, FusionTwinOutput, FusionTwinStepError, PLASMA_HORIZON_LABELS,
+    PLASMA_HORIZONS, PlasmaFepAction, PlasmaFepAgent, PlasmaMultiScalePredictor,
+    PlasmaSensorBinding,
 };
 
 pub use grid::{

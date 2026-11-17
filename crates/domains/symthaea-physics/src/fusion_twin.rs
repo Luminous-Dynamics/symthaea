@@ -14,6 +14,11 @@ use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 use crate::plasma_hdc_encoder::{PlasmaReading, PlasmaSensorType};
+use crate::plasma_observability::{
+    BlockedChannel, DecisionChannelRequirement, DecisionInputGate, MeasuredDecisionInputs,
+    ObservationContractError, PlasmaObservationFrame,
+};
+use std::collections::BTreeMap;
 
 // ── FEP Action Thresholds (unified) ────────────────────────────────────────
 /// Free energy thresholds for PlasmaFepAction selection AND DisruptionRisk
@@ -379,6 +384,90 @@ pub struct FusionTwinOutput {
     pub prediction_similarities: Vec<(f32, f32)>,
 }
 
+/// Explicit mapping from a measured observation channel to one of the four
+/// sensor dimensions currently consumed by FusionHdcEncoder.
+///
+/// Units are fixed to the encoder's native conventions; arbitrary unit
+/// conversion is deliberately not inferred here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlasmaSensorBinding {
+    pub channel_id: String,
+    pub sensor: PlasmaSensorType,
+}
+
+/// Provenance retained for one channel admitted by the direct-measurement gate.
+///
+/// This is a traceability record, not a signature or proof that the source
+/// itself is trustworthy. Source and calibration trust remain registry policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmittedChannelEvidence {
+    pub channel_id: String,
+    pub diagnostic_system_id: String,
+    pub units: String,
+    pub source_id: String,
+    pub source_digest: String,
+    pub calibration_id: String,
+    pub calibration_revision: String,
+    pub observed_at_ns: u64,
+}
+
+/// Why a measurement-gated fusion-twin step did not run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FusionTwinAbstentionReason {
+    ObservationGate(Vec<BlockedChannel>),
+    ReferenceNotInitialized,
+}
+
+/// Result of the evidence-gated entry point.
+///
+/// MeasuredInputsProcessed means the declared observations passed the evidence
+/// gate and were mapped into the existing research predictor. It does not
+/// establish physical observability, forecast calibration, or actuator
+/// authority. Abstained means no predictor state update was performed.
+#[derive(Debug)]
+pub enum FusionTwinEvidenceOutcome {
+    MeasuredInputsProcessed {
+        frame_id: String,
+        shot_id: String,
+        frame_time_ns: u64,
+        admitted_channels: Vec<AdmittedChannelEvidence>,
+        output: FusionTwinOutput,
+    },
+    Abstained {
+        frame_id: String,
+        reason: FusionTwinAbstentionReason,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FusionTwinStepError {
+    pub message: String,
+}
+
+impl FusionTwinStepError {
+    fn new(message: impl Into<String>) -> Self {
+        Self { message: message.into() }
+    }
+}
+
+impl std::fmt::Display for FusionTwinStepError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for FusionTwinStepError {}
+
+fn native_encoder_units(sensor: PlasmaSensorType) -> Option<&'static str> {
+    match sensor {
+        PlasmaSensorType::ElectronDensity => Some("10^20 m^-3"),
+        PlasmaSensorType::ElectronTemperature => Some("keV"),
+        PlasmaSensorType::RadiatedPower => Some("MW"),
+        PlasmaSensorType::SafetyFactor => Some("dimensionless"),
+        _ => None,
+    }
+}
+
 /// Fusion Digital Twin: closed-loop plasma control via HDC + CfC + FEP.
 ///
 /// Combines:
@@ -396,6 +485,8 @@ pub struct FusionDigitalTwin {
     predictor: PlasmaMultiScalePredictor,
     agent: PlasmaFepAgent,
     cycle_count: u64,
+    /// True only after the caller has explicitly supplied a non-empty finite reference shot.
+    reference_initialized: bool,
 }
 
 impl FusionDigitalTwin {
@@ -406,19 +497,176 @@ impl FusionDigitalTwin {
             predictor: PlasmaMultiScalePredictor::new(),
             agent: PlasmaFepAgent::new(),
             cycle_count: 0,
+            reference_initialized: false,
         }
     }
 
-    /// Set the reference healthy-plasma state from a known-good shot.
+    /// Set the reference state from a caller-designated reference shot.
+    ///
+    /// The evidence-gated path becomes eligible only if the reference contains
+    /// finite readings for all four sensor dimensions used by the current
+    /// fusion encoder. This method does not authenticate the shot, verify its
+    /// calibration, or establish that it is physically healthy; those remain
+    /// caller-supplied preconditions. It never authorizes actuator use.
     pub fn set_reference_shot(&mut self, readings: &[PlasmaReading]) {
         let reference_hv = self.encoder.encode_window(readings);
         self.agent.set_reference(reference_hv);
+        let required_reference_sensors = [
+            PlasmaSensorType::ElectronDensity,
+            PlasmaSensorType::ElectronTemperature,
+            PlasmaSensorType::RadiatedPower,
+            PlasmaSensorType::SafetyFactor,
+        ];
+        self.reference_initialized = required_reference_sensors.iter().all(|sensor| {
+            readings
+                .iter()
+                .any(|reading| reading.sensor == *sensor && reading.value.is_finite())
+        });
     }
 
-    /// Run one prediction cycle on new sensor readings.
+    /// Run one predictor cycle after a frame passes the direct-measurement gate.
     ///
-    /// Returns a `FusionTwinOutput` containing predictions at all plasma horizons,
-    /// the current disruption risk level, and a recommended action.
+    /// The caller must provide one explicit channel-to-sensor binding per
+    /// required channel. Only the four sensor dimensions consumed by the
+    /// current fusion HDC encoder are accepted, using native units:
+    /// density (10^20 m^-3), temperature (keV), radiated power (MW), and
+    /// safety factor (dimensionless).
+    ///
+    /// If the observation gate abstains, or no complete finite reference shot has been set,
+    /// the predictor state and cycle count are left unchanged. Even a
+    /// MeasuredInputsProcessed result is only an evidence-qualified input
+    /// projection into this research heuristic; it is not proof of physical
+    /// observability or a control authorization.
+    pub fn step_with_measurement_evidence(
+        &mut self,
+        frame: &PlasmaObservationFrame,
+        requirements: &[DecisionChannelRequirement],
+        sensor_bindings: &[PlasmaSensorBinding],
+        dt_seconds: f32,
+    ) -> Result<FusionTwinEvidenceOutcome, FusionTwinStepError> {
+        if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
+            return Err(FusionTwinStepError::new(
+                "dt_seconds must be finite and positive",
+            ));
+        }
+
+        let gate = frame
+            .evaluate_decision_requirements(requirements)
+            .map_err(|error: ObservationContractError| FusionTwinStepError::new(error.message))?;
+        let inputs: MeasuredDecisionInputs = match gate {
+            DecisionInputGate::Abstain {
+                frame_id,
+                blocked_channels,
+            } => {
+                return Ok(FusionTwinEvidenceOutcome::Abstained {
+                    frame_id,
+                    reason: FusionTwinAbstentionReason::ObservationGate(blocked_channels),
+                });
+            }
+            DecisionInputGate::MeasuredInputsAvailable(inputs) => inputs,
+        };
+
+        if !self.reference_initialized {
+            return Ok(FusionTwinEvidenceOutcome::Abstained {
+                frame_id: inputs.frame_id().to_owned(),
+                reason: FusionTwinAbstentionReason::ReferenceNotInitialized,
+            });
+        }
+
+        let mut bindings_by_channel = BTreeMap::new();
+        for binding in sensor_bindings {
+            if binding.channel_id.trim().is_empty() {
+                return Err(FusionTwinStepError::new(
+                    "sensor binding channel_id must be non-empty",
+                ));
+            }
+            if native_encoder_units(binding.sensor).is_none() {
+                return Err(FusionTwinStepError::new(format!(
+                    "sensor {:?} is not supported by the current four-channel fusion encoder",
+                    binding.sensor
+                )));
+            }
+            if bindings_by_channel
+                .insert(binding.channel_id.as_str(), binding.sensor)
+                .is_some()
+            {
+                return Err(FusionTwinStepError::new(format!(
+                    "duplicate sensor binding for channel {}",
+                    binding.channel_id
+                )));
+            }
+        }
+
+        if bindings_by_channel.len() != inputs.values().len() {
+            return Err(FusionTwinStepError::new(
+                "sensor bindings must exactly cover the gate's required measured channels",
+            ));
+        }
+
+        let mut readings = Vec::with_capacity(inputs.values().len());
+        for measured in inputs.values() {
+            let sensor = bindings_by_channel
+                .get(measured.channel_id())
+                .copied()
+                .ok_or_else(|| {
+                    FusionTwinStepError::new(format!(
+                        "missing sensor binding for measured channel {}",
+                        measured.channel_id()
+                    ))
+                })?;
+            let expected_units = native_encoder_units(sensor).ok_or_else(|| {
+                FusionTwinStepError::new("unsupported sensor binding")
+            })?;
+            if measured.units() != expected_units {
+                return Err(FusionTwinStepError::new(format!(
+                    "channel {} has units '{}', but {:?} requires '{}'",
+                    measured.channel_id(),
+                    measured.units(),
+                    sensor,
+                    expected_units
+                )));
+            }
+            let timestamp_seconds = measured.observed_at_ns() as f64 / 1_000_000_000.0;
+            readings.push(PlasmaReading::new(
+                sensor,
+                measured.value(),
+                timestamp_seconds,
+            ));
+        }
+
+        let admitted_channels = inputs
+            .values()
+            .iter()
+            .map(|measured| AdmittedChannelEvidence {
+                channel_id: measured.channel_id().to_owned(),
+                diagnostic_system_id: measured.diagnostic_system_id().to_owned(),
+                units: measured.units().to_owned(),
+                source_id: measured.source_id().to_owned(),
+                source_digest: measured.source_digest().to_owned(),
+                calibration_id: measured.calibration_id().to_owned(),
+                calibration_revision: measured.calibration_revision().to_owned(),
+                observed_at_ns: measured.observed_at_ns(),
+            })
+            .collect();
+        let frame_id = inputs.frame_id().to_owned();
+        let shot_id = inputs.shot_id().to_owned();
+        let frame_time_ns = inputs.frame_time_ns();
+        let output = self.step(&readings, dt_seconds);
+        Ok(FusionTwinEvidenceOutcome::MeasuredInputsProcessed {
+            frame_id,
+            shot_id,
+            frame_time_ns,
+            admitted_channels,
+            output,
+        })
+    }
+
+    /// Legacy research path over caller-supplied raw readings.
+    ///
+    /// This method does not validate source provenance, calibration, freshness,
+    /// or direct-measurement status. It remains available for experiments and
+    /// backwards compatibility, but its output is not evidence-qualified and
+    /// does not authorize physical actuation.
     ///
     /// # Panics
     ///
@@ -549,6 +797,222 @@ mod tests {
     #[test]
     fn test_plasma_horizons_labels_match() {
         assert_eq!(PLASMA_HORIZONS.len(), PLASMA_HORIZON_LABELS.len());
+    }
+
+    fn evidence_test_fixture() -> (
+        PlasmaObservationFrame,
+        Vec<DecisionChannelRequirement>,
+        Vec<PlasmaSensorBinding>,
+    ) {
+        use crate::plasma_observability::{
+            CalibrationIdentity, DiagnosticChannelObservation, ObservationDisposition,
+            PLASMA_OBSERVATION_SCHEMA,
+        };
+
+        let definitions = [
+            ("density", PlasmaSensorType::ElectronDensity, "10^20 m^-3", 0.8),
+            ("temperature", PlasmaSensorType::ElectronTemperature, "keV", 5.0),
+            ("radiated_power", PlasmaSensorType::RadiatedPower, "MW", 2.0),
+            ("safety_factor", PlasmaSensorType::SafetyFactor, "dimensionless", 3.5),
+        ];
+        let frame_time_ns = 1_000_000_000_u64;
+        let mut channels = Vec::new();
+        let mut requirements = Vec::new();
+        let mut bindings = Vec::new();
+        let mut expected_channel_ids = Vec::new();
+
+        for (channel_id, sensor, units, value) in definitions {
+            let source_id = format!("source-{channel_id}");
+            let calibration_id = format!("calibration-{channel_id}");
+            let calibration_revision = "rev-1".to_owned();
+            expected_channel_ids.push(channel_id.to_owned());
+            channels.push(DiagnosticChannelObservation {
+                channel_id: channel_id.to_owned(),
+                diagnostic_system_id: format!("system-{channel_id}"),
+                disposition: ObservationDisposition::Measured {
+                    value,
+                    units: units.to_owned(),
+                    source_id: source_id.clone(),
+                    source_digest: "a".repeat(64),
+                    calibration: CalibrationIdentity {
+                        calibration_id: calibration_id.clone(),
+                        calibration_revision: calibration_revision.clone(),
+                    },
+                    observed_at_ns: frame_time_ns,
+                },
+            });
+            requirements.push(DecisionChannelRequirement {
+                channel_id: channel_id.to_owned(),
+                expected_units: units.to_owned(),
+                max_age_ns: 1_000_000_000,
+                allowed_source_ids: vec![source_id],
+                calibration: CalibrationIdentity {
+                    calibration_id,
+                    calibration_revision,
+                },
+            });
+            bindings.push(PlasmaSensorBinding {
+                channel_id: channel_id.to_owned(),
+                sensor,
+            });
+        }
+
+        (
+            PlasmaObservationFrame {
+                schema_version: PLASMA_OBSERVATION_SCHEMA.to_owned(),
+                shot_id: "synthetic-shot-evidence-test".to_owned(),
+                frame_id: "frame-evidence-test".to_owned(),
+                clock_domain: "shot-relative-ns".to_owned(),
+                frame_time_ns,
+                expected_channel_ids,
+                channels,
+            },
+            requirements,
+            bindings,
+        )
+    }
+
+    fn reference_readings() -> Vec<PlasmaReading> {
+        vec![
+            PlasmaReading::new(PlasmaSensorType::ElectronDensity, 0.8, 1.0),
+            PlasmaReading::new(PlasmaSensorType::ElectronTemperature, 5.0, 1.0),
+            PlasmaReading::new(PlasmaSensorType::RadiatedPower, 2.0, 1.0),
+            PlasmaReading::new(PlasmaSensorType::SafetyFactor, 3.5, 1.0),
+        ]
+    }
+
+    #[test]
+    fn evidence_gated_step_requires_measured_frame_and_explicit_reference() {
+        let (frame, requirements, bindings) = evidence_test_fixture();
+        let mut twin = FusionDigitalTwin::new();
+
+        let before_reference = twin
+            .step_with_measurement_evidence(&frame, &requirements, &bindings, 0.001)
+            .expect("valid frame should be handled");
+        assert!(matches!(
+            before_reference,
+            FusionTwinEvidenceOutcome::Abstained {
+                reason: FusionTwinAbstentionReason::ReferenceNotInitialized,
+                ..
+            }
+        ));
+        assert_eq!(twin.cycle_count(), 0);
+
+        twin.set_reference_shot(&reference_readings());
+        let processed = twin
+            .step_with_measurement_evidence(&frame, &requirements, &bindings, 0.001)
+            .expect("measured frame should be processed");
+        let FusionTwinEvidenceOutcome::MeasuredInputsProcessed {
+            admitted_channels,
+            frame_id,
+            shot_id,
+            frame_time_ns,
+            ..
+        } = processed
+        else {
+            panic!("complete measured frame should be processed");
+        };
+        assert_eq!(frame_id, "frame-evidence-test");
+        assert_eq!(shot_id, "synthetic-shot-evidence-test");
+        assert_eq!(frame_time_ns, 1_000_000_000);
+        assert_eq!(admitted_channels.len(), 4);
+        assert!(admitted_channels.iter().all(|channel| {
+            channel.source_digest == "a".repeat(64)
+                && channel.calibration_revision == "rev-1"
+                && channel.observed_at_ns == frame_time_ns
+        }));
+        assert_eq!(twin.cycle_count(), 1);
+    }
+
+    #[test]
+    fn evidence_gated_step_abstains_after_incomplete_reference_shot() {
+        let (frame, requirements, bindings) = evidence_test_fixture();
+        let mut twin = FusionDigitalTwin::new();
+        twin.set_reference_shot(&[PlasmaReading::new(
+            PlasmaSensorType::ElectronDensity,
+            0.8,
+            1.0,
+        )]);
+
+        let outcome = twin
+            .step_with_measurement_evidence(&frame, &requirements, &bindings, 0.001)
+            .expect("incomplete reference should cause explicit abstention");
+        assert!(matches!(
+            outcome,
+            FusionTwinEvidenceOutcome::Abstained {
+                reason: FusionTwinAbstentionReason::ReferenceNotInitialized,
+                ..
+            }
+        ));
+        assert_eq!(twin.cycle_count(), 0);
+    }
+
+    #[test]
+    fn evidence_gated_step_abstains_on_synthetic_channel_without_state_update() {
+        use crate::plasma_observability::ObservationDisposition;
+
+        let (mut frame, requirements, bindings) = evidence_test_fixture();
+        frame.channels[0].disposition = ObservationDisposition::Synthetic {
+            value: 0.8,
+            units: "10^20 m^-3".to_owned(),
+            model_id: "synthetic-reconstructor".to_owned(),
+            model_revision: "rev-1".to_owned(),
+            input_digest: "b".repeat(64),
+        };
+        let mut twin = FusionDigitalTwin::new();
+        twin.set_reference_shot(&reference_readings());
+
+        let outcome = twin
+            .step_with_measurement_evidence(&frame, &requirements, &bindings, 0.001)
+            .expect("synthetic channel should cause abstention");
+        assert!(matches!(
+            outcome,
+            FusionTwinEvidenceOutcome::Abstained {
+                reason: FusionTwinAbstentionReason::ObservationGate(_),
+                ..
+            }
+        ));
+        assert_eq!(twin.cycle_count(), 0);
+    }
+
+    #[test]
+    fn evidence_gated_step_rejects_units_that_do_not_match_encoder_semantics() {
+        let (mut frame, mut requirements, bindings) = evidence_test_fixture();
+        if let crate::plasma_observability::ObservationDisposition::Measured {
+            units, ..
+        } = &mut frame.channels[0].disposition
+        {
+            *units = "keV".to_owned();
+        }
+        requirements[0].expected_units = "keV".to_owned();
+
+        let mut twin = FusionDigitalTwin::new();
+        twin.set_reference_shot(&reference_readings());
+        let result = twin.step_with_measurement_evidence(
+            &frame,
+            &requirements,
+            &bindings,
+            0.001,
+        );
+        assert!(result.is_err());
+        assert_eq!(twin.cycle_count(), 0);
+    }
+
+    #[test]
+    fn evidence_gated_step_rejects_duplicate_bindings_without_mutation() {
+        let (frame, requirements, mut bindings) = evidence_test_fixture();
+        bindings.push(bindings[0].clone());
+        let mut twin = FusionDigitalTwin::new();
+        twin.set_reference_shot(&reference_readings());
+
+        let result = twin.step_with_measurement_evidence(
+            &frame,
+            &requirements,
+            &bindings,
+            0.001,
+        );
+        assert!(result.is_err());
+        assert_eq!(twin.cycle_count(), 0);
     }
 
     #[test]
