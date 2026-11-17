@@ -153,6 +153,13 @@ pub enum ProcessRealizationAuditError {
         event_index: usize,
     },
     MissingDynamicsProfile,
+    UnexpectedMelodyPartIdentity {
+        event_index: usize,
+        actual: PartId,
+    },
+    UnexpectedProcessVoiceRole {
+        event_index: usize,
+    },
     MelodyDynamicsMismatch {
         cycle_index: usize,
         event_index: usize,
@@ -277,6 +284,12 @@ pub fn verify_additive_process_score_v1(
         }
     }
 
+    for (event_index, note) in score.notes.iter().enumerate() {
+        if !matches!(note.role, VoiceRole::Melody | VoiceRole::Harmony | VoiceRole::Bass) {
+            return Err(ProcessRealizationAuditError::UnexpectedProcessVoiceRole { event_index });
+        }
+    }
+
     let melody: Vec<&ScoreNote> = score
         .notes
         .iter()
@@ -289,6 +302,12 @@ pub fn verify_additive_process_score_v1(
     let mut cycle_events: Vec<Vec<(usize, &ScoreNote)>> =
         (0..plan.prefix_lengths.len()).map(|_| Vec::new()).collect();
     for (event_index, note) in melody.iter().enumerate() {
+        if note.part != PartId::UNASSIGNED {
+            return Err(ProcessRealizationAuditError::UnexpectedMelodyPartIdentity {
+                event_index,
+                actual: note.part,
+            });
+        }
         let owner = (0..plan.cycle_starts.len()).find(|cycle_index| {
             let start = plan.cycle_starts[*cycle_index];
             let end = cycle_end(*cycle_index);
@@ -1070,6 +1089,46 @@ mod tests {
                 field: ProcessAccompanimentField::PartIdentity,
                 ..
             })
+        ));
+    }
+
+
+    #[test]
+    fn score_side_audit_rejects_an_invented_melody_part_identity() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let note = realization.score.notes
+            .iter_mut()
+            .find(|note| note.role == VoiceRole::Melody)
+            .unwrap();
+        note.part = PartId(9);
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::UnexpectedMelodyPartIdentity {
+                actual: PartId(9),
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn score_side_audit_rejects_an_unplanned_voice_role() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let mut extra = realization.score.notes
+            .iter()
+            .find(|note| note.role == VoiceRole::Melody)
+            .unwrap()
+            .clone();
+        extra.role = VoiceRole::CounterMelody;
+        realization.score.notes.push(extra);
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::UnexpectedProcessVoiceRole { .. })
         ));
     }
 
