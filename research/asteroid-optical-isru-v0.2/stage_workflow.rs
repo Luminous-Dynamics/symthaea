@@ -337,16 +337,23 @@ impl CampaignWorkflow {
         Ok(())
     }
 
+    fn ensure_event_time(&self, recorded_at_utc_s: i64) -> Result<(), WorkflowError> {
+        if self
+            .events
+            .last()
+            .is_some_and(|previous| recorded_at_utc_s < previous.recorded_at_utc_s)
+        {
+            return Err(WorkflowError::EventTimeWentBackwards);
+        }
+        Ok(())
+    }
+
     fn append_event(
         &mut self,
         recorded_at_utc_s: i64,
         kind: WorkflowEventKind,
     ) -> Result<(), WorkflowError> {
-        if let Some(previous) = self.events.last() {
-            if recorded_at_utc_s < previous.recorded_at_utc_s {
-                return Err(WorkflowError::EventTimeWentBackwards);
-            }
-        }
+        self.ensure_event_time(recorded_at_utc_s)?;
         self.events.push(WorkflowEvent {
             sequence: self.events.len() as u64,
             recorded_at_utc_s,
@@ -399,6 +406,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         let spec = self.graph.stage(stage_id)?.clone();
         if self.runtime(stage_id)?.status != StageStatus::NotStarted {
             return Err(WorkflowError::InvalidStageTransition {
@@ -438,6 +446,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         if !nonempty(observation_id) {
             return Err(WorkflowError::EmptyIdentity("observation_id"));
         }
@@ -506,6 +515,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         if !nonempty(calibration_receipt_id) {
             return Err(WorkflowError::MissingReceipt("calibration_receipt_id"));
         }
@@ -549,6 +559,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         if !nonempty(rejection_receipt_id) {
             return Err(WorkflowError::MissingReceipt("rejection_receipt_id"));
         }
@@ -582,6 +593,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         if !nonempty(checkpoint_receipt_id) {
             return Err(WorkflowError::MissingCheckpoint(stage_id.to_string()));
         }
@@ -613,6 +625,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         let runtime = self.runtime(stage_id)?;
         if runtime.status != StageStatus::Paused {
             return Err(WorkflowError::InvalidStageTransition {
@@ -641,6 +654,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         lineage.validate()?;
         if lineage != &self.lineage {
             return Err(WorkflowError::LineageMismatch);
@@ -680,6 +694,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         let spec = self.graph.stage(stage_id)?.clone();
         match self.runtime(stage_id)?.status {
             StageStatus::Running | StageStatus::PartiallyObserved => {}
@@ -729,6 +744,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         if !nonempty(failure_receipt_id) {
             return Err(WorkflowError::MissingReceipt("failure_receipt_id"));
         }
@@ -763,6 +779,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         if self.accepted_product {
             return Err(WorkflowError::ProductAlreadyAccepted);
         }
@@ -778,6 +795,7 @@ impl CampaignWorkflow {
             .ok_or_else(|| WorkflowError::UnknownObservation(assay_observation_id.to_string()))?;
         if assay.kind != OutputKind::IndependentProductAssay
             || assay.status != ObservationStatus::Qualified
+            || !self.graph.stage(&assay.stage_id)?.required_for_product_acceptance
         {
             return Err(WorkflowError::IndependentAssayRequired);
         }
@@ -809,6 +827,7 @@ impl CampaignWorkflow {
         recorded_at_utc_s: i64,
     ) -> Result<(), WorkflowError> {
         self.ensure_open()?;
+        self.ensure_event_time(recorded_at_utc_s)?;
         if !nonempty(closeout_receipt_id) {
             return Err(WorkflowError::MissingReceipt("closeout_receipt_id"));
         }
@@ -1306,10 +1325,12 @@ mod tests {
             ),
             Err(WorkflowError::DuplicateObservation("same-id".to_string()))
         );
+        let before = value.clone();
         assert_eq!(
             value.pause_stage("baseline", "checkpoint", 10),
             Err(WorkflowError::EventTimeWentBackwards)
         );
+        assert_eq!(value, before);
     }
 
     #[test]
