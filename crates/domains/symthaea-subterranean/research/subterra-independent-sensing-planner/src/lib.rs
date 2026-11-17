@@ -21,6 +21,8 @@ pub struct PlannedAcquisitionOption {
     pub region_scope_digest: String,
     pub deployment_bundle_id: String,
     pub deployment_bundle_digest: String,
+    pub deployment_bundle_resource_model_digest: String,
+    pub deployment_bundle_assessment_digest: String,
     pub dependency_graph_digest: String,
     pub fault_domain_profile_digest: String,
     pub dependency_assessment_digest: String,
@@ -38,6 +40,26 @@ pub struct PlannedAcquisitionOption {
     pub resources: ResourceVector,
     pub mission_interruption_upper_ppm: u32,
     pub robot_loss_upper_ppm: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeploymentBundleCost {
+    pub bundle_id: String,
+    pub bundle_digest: String,
+    pub resource_model_digest: String,
+    pub assessment_digest: String,
+    pub assessed_at_unix_ms: u64,
+    pub valid_until_unix_ms: u64,
+    /// Fixed mobilisation/setup cost, charged once per distinct bundle in a portfolio.
+    pub fixed_resources: ResourceVector,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SelectedDeploymentBundle {
+    pub bundle_id: String,
+    pub bundle_digest: String,
+    pub assessment_digest: String,
+    pub fixed_resources: ResourceVector,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,6 +114,11 @@ pub enum RejectedOptionReason {
     DependencyAssessmentMismatch,
     InventoryIncomplete,
     InventoryUnknown,
+    MissingDeploymentBundleCost,
+    DeploymentBundleDigestMismatch,
+    DeploymentBundleAssessmentFromFuture,
+    DeploymentBundleAssessmentStale,
+    DeploymentBundleAssessmentExpired,
     EmptyDependencyClosure,
     EmptyDependencyIdentity,
     VerifierOverlap,
@@ -120,6 +147,12 @@ pub struct SourceConflict {
 pub struct AcquisitionPortfolio {
     pub selected_option_ids: Vec<String>,
     pub selected_source_ids: Vec<String>,
+    pub selected_deployment_bundles: Vec<SelectedDeploymentBundle>,
+    /// Sum of per-source variable acquisition costs.
+    pub variable_resources: ResourceVector,
+    /// Sum of each unique selected deployment bundle's fixed resources, once.
+    pub shared_fixed_resources: ResourceVector,
+    /// Total = variable_resources + shared_fixed_resources.
     pub resources: ResourceVector,
     /// Conservative union bound; no independence assumption is used.
     pub mission_interruption_upper_ppm: u32,
@@ -147,6 +180,7 @@ pub enum PlanningError {
     EmptyRequiredSourceCount,
     DuplicateOptionId(String),
     DuplicateSourceId(String),
+    DuplicateDeploymentBundleId(String),
     ConflictingDeploymentBundleDigest(String),
     EmptyVerifierIdentity,
     IncompleteVerifierInventory,
@@ -213,6 +247,7 @@ fn portfolio_dominates(left: &AcquisitionPortfolio, right: &AcquisitionPortfolio
 
 fn option_rejection_reasons(
     option: &PlannedAcquisitionOption,
+    bundle_cost: Option<&DeploymentBundleCost>,
     expected: &ExpectedAcquisitionContext,
     policy: AcquisitionPolicy,
     verifier_dependencies: &BTreeSet<DependencyIdentity>,
@@ -223,6 +258,41 @@ fn option_rejection_reasons(
     }
     if missing(&option.source_id) {
         reasons.push(RejectedOptionReason::EmptySourceId);
+    }
+    match bundle_cost {
+        None => reasons.push(RejectedOptionReason::MissingDeploymentBundleCost),
+        Some(bundle) => {
+            if bundle.bundle_id != option.deployment_bundle_id
+                || bundle.bundle_digest != option.deployment_bundle_digest
+                || bundle.resource_model_digest != option.deployment_bundle_resource_model_digest
+                || bundle.assessment_digest != option.deployment_bundle_assessment_digest
+            {
+                reasons.push(RejectedOptionReason::DeploymentBundleDigestMismatch);
+            }
+            if [
+                bundle.bundle_id.as_str(),
+                bundle.bundle_digest.as_str(),
+                bundle.resource_model_digest.as_str(),
+                bundle.assessment_digest.as_str(),
+            ].iter().any(|value| missing(value)) {
+                reasons.push(RejectedOptionReason::EmptyDigest);
+            }
+            let latest_allowed = policy
+                .evaluation_time_unix_ms
+                .saturating_add(policy.maximum_future_clock_skew_ms);
+            if bundle.assessed_at_unix_ms > latest_allowed {
+                reasons.push(RejectedOptionReason::DeploymentBundleAssessmentFromFuture);
+            } else if policy
+                .evaluation_time_unix_ms
+                .saturating_sub(bundle.assessed_at_unix_ms)
+                > policy.maximum_resource_assessment_age_ms
+            {
+                reasons.push(RejectedOptionReason::DeploymentBundleAssessmentStale);
+            }
+            if bundle.valid_until_unix_ms <= policy.evaluation_time_unix_ms {
+                reasons.push(RejectedOptionReason::DeploymentBundleAssessmentExpired);
+            }
+        }
     }
     if [
         option.deployment_bundle_id.as_str(),
@@ -315,6 +385,8 @@ fn option_rejection_reasons(
 struct SearchState<'a> {
     options: &'a [PlannedAcquisitionOption],
     dependency_sets: &'a [BTreeSet<DependencyIdentity>],
+    option_bundle_indices: &'a [usize],
+    bundle_costs: &'a [DeploymentBundleCost],
     budget: &'a AcquisitionBudget,
     required_count: usize,
     maximum_nodes: u64,
@@ -328,9 +400,12 @@ impl SearchState<'_> {
         &mut self,
         start: usize,
         selected: &mut Vec<usize>,
+        variable_resources: ResourceVector,
+        shared_fixed_resources: ResourceVector,
         resources: ResourceVector,
         interruption: u32,
         robot_loss: u32,
+        selected_bundles: &mut BTreeSet<usize>,
     ) {
         if self.limited {
             return;
@@ -351,6 +426,20 @@ impl SearchState<'_> {
                     .iter()
                     .map(|index| self.options[*index].source_id.clone())
                     .collect(),
+                selected_deployment_bundles: selected_bundles
+                    .iter()
+                    .map(|index| {
+                        let bundle = &self.bundle_costs[*index];
+                        SelectedDeploymentBundle {
+                            bundle_id: bundle.bundle_id.clone(),
+                            bundle_digest: bundle.bundle_digest.clone(),
+                            assessment_digest: bundle.assessment_digest.clone(),
+                            fixed_resources: bundle.fixed_resources.clone(),
+                        }
+                    })
+                    .collect(),
+                variable_resources,
+                shared_fixed_resources,
                 resources,
                 mission_interruption_upper_ppm: interruption,
                 robot_loss_upper_ppm: robot_loss,
@@ -376,9 +465,28 @@ impl SearchState<'_> {
             {
                 continue;
             }
-            let Some(next_resources) =
-                checked_resources_add(&resources, &self.options[index].resources)
+            let bundle_index = self.option_bundle_indices[index];
+            let is_new_bundle = !selected_bundles.contains(&bundle_index);
+            let Some(next_variable_resources) =
+                checked_resources_add(&variable_resources, &self.options[index].resources)
             else {
+                continue;
+            };
+            let next_shared_fixed_resources = if is_new_bundle {
+                let Some(value) = checked_resources_add(
+                    &shared_fixed_resources,
+                    &self.bundle_costs[bundle_index].fixed_resources,
+                ) else {
+                    continue;
+                };
+                value
+            } else {
+                shared_fixed_resources.clone()
+            };
+            let Some(next_resources) = checked_resources_add(
+                &next_variable_resources,
+                &next_shared_fixed_resources,
+            ) else {
                 continue;
             };
             let Some(next_interruption) =
@@ -398,13 +506,22 @@ impl SearchState<'_> {
                 continue;
             }
             selected.push(index);
+            if is_new_bundle {
+                selected_bundles.insert(bundle_index);
+            }
             self.visit(
                 index + 1,
                 selected,
+                next_variable_resources,
+                next_shared_fixed_resources,
                 next_resources,
                 next_interruption,
                 next_robot_loss,
+                selected_bundles,
             );
+            if is_new_bundle {
+                selected_bundles.remove(&bundle_index);
+            }
             selected.pop();
         }
     }
@@ -412,6 +529,7 @@ impl SearchState<'_> {
 
 pub fn plan_independent_acquisition_portfolio(
     mut options: Vec<PlannedAcquisitionOption>,
+    deployment_bundles: &[DeploymentBundleCost],
     expected: &ExpectedAcquisitionContext,
     verifier: &VerifierDependencyClosure,
     policy: AcquisitionPolicy,
@@ -450,6 +568,12 @@ pub fn plan_independent_acquisition_portfolio(
         .map_err(|_| PlanningError::EmptyVerifierDependencyClosure)?;
 
     options.sort_by(|a, b| a.option_id.cmp(&b.option_id));
+    let mut bundle_indices = BTreeMap::new();
+    for (index, bundle) in deployment_bundles.iter().enumerate() {
+        if bundle_indices.insert(bundle.bundle_id.as_str(), index).is_some() {
+            return Err(PlanningError::DuplicateDeploymentBundleId(bundle.bundle_id.clone()));
+        }
+    }
     let mut bundle_digests = BTreeMap::new();
     for option in &options {
         if let Some(existing) = bundle_digests.insert(
@@ -477,8 +601,13 @@ pub fn plan_independent_acquisition_portfolio(
     let mut rejected_options = Vec::new();
     let mut valid_options = Vec::new();
     let mut valid_dependency_sets = Vec::new();
+    let mut valid_bundle_indices = Vec::new();
     for option in options {
-        let reasons = option_rejection_reasons(&option, expected, policy, &verifier_dependencies);
+        let bundle_cost = bundle_indices
+            .get(option.deployment_bundle_id.as_str())
+            .map(|index| &deployment_bundles[*index]);
+        let reasons =
+            option_rejection_reasons(&option, bundle_cost, expected, policy, &verifier_dependencies);
         if !reasons.is_empty() {
             rejected_options.push(RejectedAcquisitionOption {
                 option_id: option.option_id,
@@ -489,6 +618,10 @@ pub fn plan_independent_acquisition_portfolio(
         let dependencies = dependency_set(&option.claim_critical_dependencies)
             .map_err(|_| PlanningError::EmptyVerifierDependencyClosure)?;
         valid_dependency_sets.push(dependencies);
+        let bundle_index = *bundle_indices
+            .get(option.deployment_bundle_id.as_str())
+            .expect("validated bundle cost is present");
+        valid_bundle_indices.push(bundle_index);
         valid_options.push(option);
     }
 
@@ -512,6 +645,8 @@ pub fn plan_independent_acquisition_portfolio(
     let mut search = SearchState {
         options: &valid_options,
         dependency_sets: &valid_dependency_sets,
+        option_bundle_indices: &valid_bundle_indices,
+        bundle_costs: deployment_bundles,
         budget,
         required_count: policy.required_independent_sources,
         maximum_nodes: policy.maximum_search_nodes,
@@ -523,8 +658,11 @@ pub fn plan_independent_acquisition_portfolio(
         0,
         &mut Vec::new(),
         ResourceVector::default(),
+        ResourceVector::default(),
+        ResourceVector::default(),
         0,
         0,
+        &mut BTreeSet::new(),
     );
 
     let mut frontier = Vec::new();
@@ -597,6 +735,8 @@ mod tests {
             region_scope_digest: "sha256:region".into(),
             deployment_bundle_id: "bundle-1".into(),
             deployment_bundle_digest: "sha256:bundle".into(),
+            deployment_bundle_resource_model_digest: "sha256:bundle-resource-model".into(),
+            deployment_bundle_assessment_digest: "sha256:bundle-assessment".into(),
             dependency_graph_digest: "sha256:graph".into(),
             fault_domain_profile_digest: "sha256:profile".into(),
             dependency_assessment_digest: "sha256:assessment".into(),
@@ -619,6 +759,23 @@ mod tests {
             mission_interruption_upper_ppm: 10,
             robot_loss_upper_ppm: 10,
         }
+    }
+
+    fn bundle_costs() -> Vec<DeploymentBundleCost> {
+        vec![DeploymentBundleCost {
+            bundle_id: "bundle-1".into(),
+            bundle_digest: "sha256:bundle".into(),
+            resource_model_digest: "sha256:bundle-resource-model".into(),
+            assessment_digest: "sha256:bundle-assessment".into(),
+            assessed_at_unix_ms: NOW - 100,
+            valid_until_unix_ms: NOW + 10_000,
+            fixed_resources: ResourceVector {
+                energy_millijoules: 5,
+                duration_milliseconds: 2,
+                data_bytes: 3,
+                exposure_milliunits: 1,
+            },
+        }]
     }
 
     fn expected() -> ExpectedAcquisitionContext {
@@ -679,6 +836,7 @@ mod tests {
         ];
         let report = plan_independent_acquisition_portfolio(
             options,
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy(),
@@ -709,6 +867,7 @@ mod tests {
         policy.required_independent_sources = 3;
         let report = plan_independent_acquisition_portfolio(
             options,
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy,
@@ -729,6 +888,7 @@ mod tests {
         options[0].claim_critical_dependencies.push(dep("compute", "verifier-host"));
         let report = plan_independent_acquisition_portfolio(
             options,
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy(),
@@ -754,6 +914,7 @@ mod tests {
         ];
         let report = plan_independent_acquisition_portfolio(
             options,
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy(),
@@ -773,6 +934,7 @@ mod tests {
         budget.resources.energy_millijoules = 15;
         let report = plan_independent_acquisition_portfolio(
             options.clone(),
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy(),
@@ -784,6 +946,7 @@ mod tests {
         budget.mission_interruption_upper_ppm = 15;
         let report = plan_independent_acquisition_portfolio(
             options,
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy(),
@@ -799,6 +962,7 @@ mod tests {
         stale.risk_assessed_at_unix_ms = NOW - 3_600_001;
         let report = plan_independent_acquisition_portfolio(
             vec![stale],
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy(),
@@ -816,6 +980,7 @@ mod tests {
         future.risk_assessed_at_unix_ms = NOW + 5_001;
         let report = plan_independent_acquisition_portfolio(
             vec![future],
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy(),
@@ -845,6 +1010,7 @@ mod tests {
         policy.maximum_search_nodes = 2;
         let report = plan_independent_acquisition_portfolio(
             options,
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy,
@@ -862,6 +1028,7 @@ mod tests {
         ];
         let first = plan_independent_acquisition_portfolio(
             options.clone(),
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy(),
@@ -871,6 +1038,7 @@ mod tests {
         reversed.reverse();
         let second = plan_independent_acquisition_portfolio(
             reversed,
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy(),
@@ -889,6 +1057,7 @@ mod tests {
         assert_eq!(
             plan_independent_acquisition_portfolio(
                 duplicate_option,
+                &bundle_costs(),
                 &expected(),
                 &verifier(),
                 policy(),
@@ -904,6 +1073,7 @@ mod tests {
         assert_eq!(
             plan_independent_acquisition_portfolio(
                 duplicate_source,
+                &bundle_costs(),
                 &expected(),
                 &verifier(),
                 policy(),
@@ -911,6 +1081,52 @@ mod tests {
             ),
             Err(PlanningError::DuplicateSourceId("same-source".into()))
         );
+    }
+
+    #[test]
+    fn shared_deployment_bundle_fixed_cost_is_charged_once() {
+        let options = vec![
+            option("a", "source-a", vec![dep("robot", "a")]),
+            option("b", "source-b", vec![dep("robot", "b")]),
+        ];
+        let mut budget = budget();
+        budget.resources.energy_millijoules = 25;
+        let report = plan_independent_acquisition_portfolio(
+            options,
+            &bundle_costs(),
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget,
+        )
+        .unwrap();
+        assert_eq!(report.pareto_frontier.len(), 1);
+        let portfolio = &report.pareto_frontier[0];
+        assert_eq!(portfolio.variable_resources.energy_millijoules, 20);
+        assert_eq!(portfolio.shared_fixed_resources.energy_millijoules, 5);
+        assert_eq!(portfolio.resources.energy_millijoules, 25);
+        assert_eq!(portfolio.selected_deployment_bundles.len(), 1);
+    }
+
+    #[test]
+    fn same_bundle_cost_is_not_omitted_or_double_charged_for_multiple_sources() {
+        let mut second = option("b", "source-b", vec![dep("robot", "b")]);
+        second.deployment_bundle_id = "bundle-1".into();
+        let options = vec![
+            option("a", "source-a", vec![dep("robot", "a")]),
+            second,
+        ];
+        let report = plan_independent_acquisition_portfolio(
+            options,
+            &bundle_costs(),
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        )
+        .unwrap();
+        assert_eq!(report.pareto_frontier[0].selected_deployment_bundles.len(), 1);
+        assert_eq!(report.pareto_frontier[0].resources.energy_millijoules, 25);
     }
 
     #[test]
@@ -923,6 +1139,7 @@ mod tests {
                 option("a", "source-a", vec![dep("robot", "a")]),
                 second,
             ],
+            &bundle_costs(),
             &expected(),
             &verifier(),
             policy(),
