@@ -365,3 +365,43 @@ The standalone auditor now enforces channel-specific status prefixes, refuses pr
 The evidence registry now contains eight source records, eight material/candidate records and four benchmark catalogs, including the 2026 Be2Hf2Nb / Be2HfNb2 experimental follow-ups and the AutoSuperCon paper benchmark. The registry remains a small literature-grounded seed set, not a comprehensive database or training corpus.
 
 The schema and Rust harness have changed since the prior workflow head. Latest exact-head compiler, tests and clippy status must be read from the current PR run; no Rust pass is claimed until that run reports completed success.
+
+
+## 18. Public generative diffusion baseline — GuidedMatDiffusion
+
+The May 2026 npj Computational Materials article is now source-pinned:
+- DOI: https://doi.org/10.1038/s41524-026-02117-7
+- Code repository: https://github.com/paprakash/GuidedMatDiffusion
+- inspected default branch commit: `6583bb73e7f8c496c094feb6ac4b382ee474bf9d`
+- checkpoint hub: https://huggingface.co/paprakash/GuidedMatDiffusion_model
+- dataset hub: https://huggingface.co/datasets/paprakash/GuidedMatDiffusion_data
+
+The repository README declares MIT for the codebase; this does not automatically establish licenses for the dataset, pretrained checkpoints, Alexandria corpus or all upstream training structures.
+
+Paper-reported performance: 200,000 generated structures; 34,027 unique; 773 DFT-computed Tc > 5 K. Its reported 18 experimental attempts and nine attempts with some signal >4.2 K are a very different outcome measure from target-phase realization or bulk confirmation. The main research target is the **phase realization gap**: how accurately can the pipeline predict which actual phase/disorder ensemble forms under a feasible synthesis process?
+
+See [GUIDED-DIFFUSION-REPRO-001 #12646](https://github.com/Luminous-Dynamics/symthaea/issues/12646). The issue now pins canonical DOI and code snapshot, and requires exact generated/rejected lists, phase concordance and experiment records before reproducing headline hit rates.
+
+## 19. Agentic atomic-model + language-model baseline — ElementsClaw
+
+The v3 preprint (4 May 2026) reports 66 rediscoveries absent from SuperCon3D, 2.4 million equilibrium crystals reduced to 68,000 high-confidence candidates in 28 GPU-hours, and four experimentally synthesized compounds: Zr3ScRe8 (6.5 K), HfZrRe4 (5.9 K), Zr4VRe7 (3.5 K), and Hf21Re25 (2.5 K). The primary source is https://arxiv.org/abs/2604.23758v3.
+
+The critical experiment is **ablation of the agent**. With an identical frozen candidate pool, does LAM+LLM beat LAM-only, LAM+fixed policy, and LLM-only at equal compute/token budgets? A useful research system must show the contribution of each component, not merely combine them. The four claimed outcomes also need sample-linked resistive, magnetic and bulk evidence.
+
+See [ELEMENTSCLAW-REPRO-001 #12647](https://github.com/Luminous-Dynamics/symthaea/issues/12647). No raw checkpoints/data are ingested or claimed reproduced.
+
+## 20. LLM literature-mining and inverse-design baseline — NEMAD
+
+The 15 August 2026 *Journal of Magnetism and Magnetic Materials* paper reports a literature-derived dataset of 78,203 records and 19,058 unique compositions (one methods passage reports 78,204). It includes superconductor and non-superconductor reports and evaluates SC/NSC classification, Tc prediction, structure-aware and CIF-input models, and inverse design. The paper reports 28% inverse-design novelty relative to its own training data and unverified GNoME candidates above 10 K.
+
+Public artifacts inspected:
+- paper DOI https://doi.org/10.1016/j.jmmm.2026.174189
+- data site https://www.nemad.org
+- model repository https://github.com/sumanitani/LLM_for_Superconductors
+- inspected GitHub default-branch commit: `8008870e0229bf2001c04a946e306d25617fd4b9`
+- README blob: `71ec1b961a6231b21c6745b63dc8f774cd7ecbed`
+- model hub https://huggingface.co/sumanitani
+
+The repo README lists LoRA adapters for classification, composition-only Tc, crystal system/space group, CIF and inverse-design tasks, but checkpoint and underlying data release/license/split completeness require further audit. The NEMAD data record count is preserved as two paper-reported counts pending exact data inspection.
+
+See [NEMAD-SC-REPRO-001 #12648](https://github.com/Luminous-Dynamics/symthaea/issues/12648). These data must be overlap-audited against AutoSuperCon, NIMS and BEE-NET-derived experiment records rather than naively merged.
