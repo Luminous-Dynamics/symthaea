@@ -379,7 +379,16 @@
             "electron_phonon_lambda",
             "omega_log",
             "energy_above_hull",
-            "other"
+            "other",
+            "pairing_energy",
+            "pair_transfer_effective_charge",
+            "superfluid_stiffness",
+            "superfluid_density",
+            "phase_correlation_length",
+            "phase_correlation_time",
+            "josephson_coupling_energy",
+            "vortex_density",
+            "kinetic_inductance"
           ]
         },
         "origin": {
@@ -518,6 +527,24 @@
             }
           },
           "additionalProperties": false
+        },
+        "measurement_scope": {
+          "type": "string",
+          "enum": [
+            "local_probe",
+            "mesoscopic",
+            "bulk",
+            "device",
+            "theoretical_model",
+            "unknown"
+          ],
+          "description": "Spatial/physical scope of this assertion. A local pairing signature is not a bulk superconducting transition."
+        },
+        "measurement_scope_description": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -1025,5 +1052,118 @@
       }
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "property_code": {
+                "const": "Tc"
+              },
+              "measurement_scope": {
+                "const": "local_probe"
+              }
+            },
+            "required": [
+              "property_code",
+              "measurement_scope"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "measurement_scope": {
+                "enum": [
+                  "mesoscopic",
+                  "bulk",
+                  "device",
+                  "theoretical_model",
+                  "unknown"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "property_code": {
+                "const": "Tc"
+              },
+              "tc_criterion": {
+                "const": "spectroscopic_gap"
+              }
+            },
+            "required": [
+              "property_code",
+              "tc_criterion"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "tc_criterion": {
+                "not": {
+                  "const": "spectroscopic_gap"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "property_code": {
+                "const": "pairing_energy"
+              },
+              "origin": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "property_code",
+              "origin"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "unit": {
+                "const": "meV"
+              },
+              "measurement_scope": {
+                "enum": [
+                  "local_probe",
+                  "mesoscopic",
+                  "bulk"
+                ]
+              }
+            },
+            "required": [
+              "measurement_scope"
+            ]
+          }
+        }
+      }
+    }
+  ]
 }
