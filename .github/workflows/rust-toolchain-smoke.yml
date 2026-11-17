@@ -1,0 +1,105 @@
+name: Rust Toolchain Migration Smoke
+
+on:
+  pull_request:
+    paths:
+      - "rust-toolchain.toml"
+      - ".cargo/config.toml"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "flake.nix"
+      - "flake.lock"
+      - ".github/workflows/rust-toolchain-smoke.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-toolchain-smoke-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  rust-toolchain-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    steps:
+      - name: Checkout exact pull request head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+
+      - name: Install canonical Rust components
+        uses: dtolnay/rust-toolchain@1.100.0
+        with:
+          components: rustfmt, clippy, rust-src, rust-analyzer, llvm-tools-preview
+          targets: wasm32-unknown-unknown
+
+      - name: Verify exact Rust and Cargo versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustc --version --verbose | tee rustc-version.txt
+          cargo --version | tee cargo-version.txt
+          grep -Fx 'release: 1.100.0' rustc-version.txt
+          grep -E '^cargo 1\.100\.0 ' cargo-version.txt
+
+      - name: Validate workspace membership and tracked targets
+        run: bash scripts/check-workspace-targets.sh
+
+      - name: Validate locked workspace metadata and Cargo policy
+        run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
+
+      - name: Run focused FEP hierarchical-information tests
+        run: cargo test --locked -p symthaea-fep --lib hierarchical_information_gain::tests
+
+      - name: Diagnose Cargo.lock drift after locked validation failure
+        if: failure()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out="$RUNNER_TEMP/cargo-lock-diagnostic"
+          mkdir -p "$out"
+          cp Cargo.lock "$out/Cargo.lock.before"
+          rustc --version --verbose > "$out/rustc-version.txt"
+          cargo --version > "$out/cargo-version.txt"
+
+          set +e
+          cargo metadata --format-version 1 > "$out/metadata.stdout" 2> "$out/metadata.stderr"
+          metadata_status=$?
+          set -e
+
+          printf '%s\n' "$metadata_status" > "$out/metadata.exit-code"
+          cp Cargo.lock "$out/Cargo.lock.after"
+          if cmp -s "$out/Cargo.lock.before" "$out/Cargo.lock.after"; then
+            echo "LOCKFILE_UNCHANGED" > "$out/diagnosis.txt"
+          else
+            echo "LOCKFILE_WOULD_CHANGE" > "$out/diagnosis.txt"
+            diff -u "$out/Cargo.lock.before" "$out/Cargo.lock.after" > "$out/Cargo.lock.diff" || true
+          fi
+
+          {
+            echo "### Cargo.lock diagnostic (not a qualification pass)"
+            echo "- The required `--locked` validation remains authoritative and was not weakened."
+            echo "- Diagnostic `cargo metadata` exit code: $metadata_status"
+            cat "$out/diagnosis.txt"
+            echo "- Any generated lockfile delta is retained as an artifact for review only; it is not committed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Cargo.lock diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lock-diagnostic-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/cargo-lock-diagnostic/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Run strict FEP Clippy
+        run: cargo clippy --locked -p symthaea-fep --lib -- -D warnings

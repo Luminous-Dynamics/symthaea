@@ -72,7 +72,7 @@
         rustToolchainToml = builtins.fromTOML (builtins.readFile ./rust-toolchain.toml);
         rustChannel = rustToolchainToml.toolchain.channel;
         rustToolchain = pkgs.rust-bin.stable.${rustChannel}.default.override {
-          extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
+          extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" "llvm-tools-preview" ];
           targets = [ "wasm32-unknown-unknown" ];
         };
 
@@ -182,6 +182,12 @@
           cargo-expand
           cargo-nextest
           cargo-machete
+          # Supply-chain, test-adequacy, feature-matrix and coverage tooling.
+          cargo-deny
+          cargo-audit
+          cargo-mutants
+          cargo-hack
+          cargo-llvm-cov
           bacon
 
           # System libraries

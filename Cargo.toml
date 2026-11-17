@@ -15,6 +15,18 @@ members = [
 # members despite being listed below, because of this). `default-members`
 # below may still reference "." — only the `members` array triggers the bug.
 exclude = [
+    # Non-package directory matched by crates/core/*; no Cargo.toml exists here.
+    "crates/core/symthaea",
+    "crates/core/symthaea-iit",
+    # Source-only adapter imports an observation API absent from symthaea-core; see #7291.
+    "crates/core/symthaea-observation-attestation",
+    # Non-package directories matched by broad core/domain workspace globs.
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-marine-geometry",
+    "crates/domains/symthaea-rea-compat",
+    # Incomplete verifier directory; see #8673.
+    "crates/domains/symthaea-rea-evidence-verifier",
     # nixward-web's own crate-type (cdylib+rlib for wasm-bindgen) doesn't fit
     # cleanly into workspace-wide manifest resolution alongside its native
     # `nixward` path dependency. Keep it out of the workspace and build it

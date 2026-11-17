@@ -739,7 +739,7 @@ fi
 # CI_TOOLCHAIN is read from rust-toolchain.toml, not hardcoded, because a
 # hardcoded version drifts silently and actively HURTS here: this host has
 # multiple rustup toolchains installed (including a stale 1.93.0 this step
-# used to hardcode, and the correct 1.96.0 rust-toolchain.toml/ci.yml
+# used to hardcode, and the correct 1.100.0 rust-toolchain.toml/ci.yml
 # actually pin). Reformatting with the WRONG version doesn't just fail to
 # help -- it can positively corrupt formatting that already matched the
 # correct version, actively causing the `cargo fmt --check` failure this

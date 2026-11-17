@@ -1,0 +1,10 @@
+[registry]
+# Do not resolve newly published crates immediately. This relies on crates.io
+# publication-time metadata and is a risk reduction, not a complete supply-chain
+# security boundary. Existing Cargo.lock entries are not rewritten.
+global-min-publish-age = "3 days"
+
+[resolver]
+# Prefer a dependency release compatible with the declared rust-version when
+# several versions satisfy the semver requirement.
+incompatible-rust-versions = "fallback"
