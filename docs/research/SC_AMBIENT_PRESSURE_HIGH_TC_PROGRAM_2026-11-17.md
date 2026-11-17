@@ -578,3 +578,18 @@ A dedicated JSON Schema and Rust auditor now represent the protocol-first P→X�
 The contract separates precursor and target identity, planned step sequence/setpoints, execution runs/readback, source evidence, realized phases and characterization event references. The auditor enforces plan/execution linkage, unique identifiers and sequences, state-specific actual/evidence requirements, failed-step reason retention, run/outcome linkage, and phase-fraction bounds. It does not infer successful execution from a written protocol or setpoint.
 
 The dedicated exact-head workflow now formats, tests, runs and Clippy-checks the synthesis protocol auditor along with the registry, metrics and observation-event auditors. It records schema/fixture digests and uploads a machine-readable smoke receipt. The fixture is synthetic and does not authorize physical synthesis.
+
+
+## 33. Pair formation versus phase coherence: new 2026 evidence and research lane
+
+Niu et al. reported local shot-noise spectroscopy on Bi2Sr2CaCu2O8+δ in *Science* 394, 682 (5 November 2026), DOI 10.1126/science.adt3444. The paper reports that the pseudogap energy coincides with the onset energy for electron pairing, is spatially heterogeneous and reaches up to approximately 70 meV. The authors interpret this as evidence for preformed Cooper pairs and suggest that phase coherence, rather than pair formation alone, may be limiting higher Tc.
+
+This is not a 70 meV Tc, a directly measured 300 K bulk gap, or a 300 K zero-resistance state. The measurement is local shot-noise spectroscopy on Bi2212. The 70 meV value is an energy scale, and the inference that pairing can persist to ambient temperature must remain separate from a measured phase-coherent superconducting transition.
+
+A complementary theoretical baseline is Ebot et al., *Enhancement of superconducting stiffness in hybrid superconducting-metallic bilayers*, PRB 114, 264507 (10 November 2026), DOI 10.1103/9tsf-lrgd. It numerically explores a pairing subsystem coupled to a metallic reservoir, where one subsystem supplies pairing and the other can mediate extended-range pair-pair coupling and phase stiffness. The study predicts both pairing-limited and stiffness-limited regimes; it does not demonstrate a higher-Tc physical bilayer.
+
+New work package: [SC-PAIR-COHERENCE-001 #12677](https://github.com/Luminous-Dynamics/symthaea/issues/12677). It separates pair energy, local pair transfer, superfluid stiffness, phase ordering, Josephson coupling, vortex/phase-slip behavior and the measured resistive/thermodynamic transition. The programme will reproduce both experimental and theoretical baselines and test whether stiffness can improve at matched pairing amplitude.
+
+This is a distinct route to higher-temperature superconductivity: after identifying materials with strong pairing, engineer coherence without destroying the pairs. It must be tested against pair-breaking, interface disorder, charge-transfer, finite-size and parasitic normal-conduction effects.
+
+The source registry now includes the Science and bilayer theory papers as separate sources and benchmark catalogs; their evidence types and claim boundaries are kept distinct.
