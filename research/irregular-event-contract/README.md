@@ -28,7 +28,7 @@ each benchmark's official protocol.
 One hundred Rust test functions are authored (28 event/bitemporal contract, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter, 27 source-watermark, and 17 clock-calibration tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
-and input validation. The standalone crate was first exercised by a pinned Rust 1.96 workflow: dependency resolution and changed-module formatting succeeded, then whole-crate compilation exposed four real type errors. Those have been corrected. The latest exact-head test and Clippy results remain pending; no test pass or dataset score is claimed.
+and input validation. The standalone crate is being exercised by a pinned Rust 1.96 workflow. Hosted formatting and dependency resolution have passed on recent exact heads. A whole-crate compile exposed four real type errors (fixed), and the next compile exposed one benchmark-wrapper accessor mismatch (fixed). The latest exact-head PR-triggered run is in progress; the 100 tests, release scaling experiment and Clippy have not yet completed. No test pass or dataset score is claimed.
 
 
 ## Microsecond bitemporal source revisions
