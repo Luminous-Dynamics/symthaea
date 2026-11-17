@@ -679,7 +679,12 @@ mod tests {
         let mut value = scheduler();
         value
             .launch_job(
-                proposal("job-1", "candidate-1", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::RealisticMean,
                 ObjectiveSense::Maximize,
                 10,
@@ -698,7 +703,12 @@ mod tests {
         let mut maximize = scheduler();
         maximize
             .launch_job(
-                proposal("job-max", "candidate-max", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-max",
+                    "candidate-max",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::PessimisticBound { beta: 2.0 },
                 ObjectiveSense::Maximize,
                 10,
@@ -710,7 +720,12 @@ mod tests {
         let mut minimize = scheduler();
         minimize
             .launch_job(
-                proposal("job-min", "candidate-min", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-min",
+                    "candidate-min",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::PessimisticBound { beta: 2.0 },
                 ObjectiveSense::Minimize,
                 10,
@@ -728,7 +743,12 @@ mod tests {
         };
         let mut first = scheduler();
         let mut second = scheduler();
-        let p = proposal("job-1", "candidate-1", "reactor", resources(1.0, 100.0, 10.0));
+        let p = proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                );
         first
             .launch_job(p.clone(), policy, ObjectiveSense::Maximize, 10, 10)
             .unwrap();
@@ -746,7 +766,12 @@ mod tests {
         let mut value = scheduler();
         value
             .launch_job(
-                proposal("job-1", "candidate-1", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::NoPlaceholder,
                 ObjectiveSense::Maximize,
                 10,
@@ -762,7 +787,12 @@ mod tests {
         let mut value = scheduler();
         value
             .launch_job(
-                proposal("job-1", "candidate-1", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::RealisticMean,
                 ObjectiveSense::Maximize,
                 10,
@@ -771,7 +801,12 @@ mod tests {
             .unwrap();
         value
             .launch_job(
-                proposal("job-2", "candidate-2", "spectrometer", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-2",
+                    "candidate-2",
+                    "spectrometer",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::RealisticMean,
                 ObjectiveSense::Maximize,
                 11,
@@ -780,7 +815,12 @@ mod tests {
             .unwrap();
         assert!(matches!(
             value.launch_job(
-                proposal("job-3", "candidate-3", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-3",
+                    "candidate-3",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::RealisticMean,
                 ObjectiveSense::Maximize,
                 12,
@@ -795,7 +835,12 @@ mod tests {
         let mut value = scheduler();
         value
             .launch_job(
-                proposal("job-1", "candidate-1", "reactor", resources(8.0, 900.0, 10.0)),
+                proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(8.0, 900.0, 10.0),
+                ),
                 PlaceholderPolicy::NoPlaceholder,
                 ObjectiveSense::Maximize,
                 10,
@@ -804,7 +849,12 @@ mod tests {
             .unwrap();
         assert!(matches!(
             value.launch_job(
-                proposal("job-2", "candidate-2", "spectrometer", resources(3.0, 10.0, 10.0)),
+                proposal(
+                    "job-2",
+                    "candidate-2",
+                    "spectrometer",
+                    resources(3.0, 10.0, 10.0),
+                ),
                 PlaceholderPolicy::NoPlaceholder,
                 ObjectiveSense::Maximize,
                 11,
@@ -818,7 +868,12 @@ mod tests {
     #[test]
     fn duplicate_inflight_candidate_is_rejected_unless_replicate_is_distinct() {
         let mut value = scheduler();
-        let first = proposal("job-1", "candidate-1", "reactor", resources(1.0, 100.0, 10.0));
+        let first = proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                );
         value
             .launch_job(
                 first.clone(),
@@ -830,7 +885,12 @@ mod tests {
             .unwrap();
         assert!(matches!(
             value.launch_job(
-                proposal("job-2", "candidate-1", "spectrometer", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-2",
+                    "candidate-1",
+                    "spectrometer",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::NoPlaceholder,
                 ObjectiveSense::Maximize,
                 11,
@@ -839,7 +899,12 @@ mod tests {
             Err(AsyncError::DuplicateInFlightCandidate(_))
         ));
 
-        let mut replicate = proposal("job-3", "candidate-1", "spectrometer", resources(1.0, 100.0, 10.0));
+        let mut replicate = proposal(
+                    "job-3",
+                    "candidate-1",
+                    "spectrometer",
+                    resources(1.0, 100.0, 10.0),
+                );
         replicate.candidate.replicate_id = Some("replicate-2".to_string());
         value
             .launch_job(
@@ -918,7 +983,12 @@ mod tests {
         let mut value = scheduler();
         value
             .launch_job(
-                proposal("job-1", "candidate-1", "reactor", resources(2.0, 200.0, 20.0)),
+                proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(2.0, 200.0, 20.0),
+                ),
                 PlaceholderPolicy::NoPlaceholder,
                 ObjectiveSense::Maximize,
                 10,
@@ -934,7 +1004,12 @@ mod tests {
 
         value
             .launch_job(
-                proposal("job-2", "candidate-2", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-2",
+                    "candidate-2",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::NoPlaceholder,
                 ObjectiveSense::Maximize,
                 13,
@@ -948,7 +1023,12 @@ mod tests {
         let mut value = scheduler();
         value
             .launch_job(
-                proposal("job-1", "candidate-1", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::NoPlaceholder,
                 ObjectiveSense::Maximize,
                 10,
@@ -963,7 +1043,12 @@ mod tests {
         value.close("closeout", 13).unwrap();
         assert_eq!(
             value.launch_job(
-                proposal("job-2", "candidate-2", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-2",
+                    "candidate-2",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::NoPlaceholder,
                 ObjectiveSense::Maximize,
                 14,
@@ -978,7 +1063,12 @@ mod tests {
         let mut value = scheduler();
         value
             .launch_job(
-                proposal("job-1", "candidate-1", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::NoPlaceholder,
                 ObjectiveSense::Maximize,
                 10,
@@ -1025,7 +1115,12 @@ mod tests {
         let mut value = scheduler();
         value
             .launch_job(
-                proposal("job-1", "candidate-1", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::NoPlaceholder,
                 ObjectiveSense::Maximize,
                 10,
@@ -1045,7 +1140,12 @@ mod tests {
         let mut value = scheduler();
         assert_eq!(
             value.launch_job(
-                proposal("job-1", "candidate-1", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::SeededUniform {
                     seed: 0,
                     radius_multiplier: 1.0,
@@ -1064,7 +1164,12 @@ mod tests {
         let mut value = scheduler();
         value
             .launch_job(
-                proposal("job-1", "candidate-1", "reactor", resources(1.0, 100.0, 10.0)),
+                proposal(
+                    "job-1",
+                    "candidate-1",
+                    "reactor",
+                    resources(1.0, 100.0, 10.0),
+                ),
                 PlaceholderPolicy::PessimisticBound { beta: 2.0 },
                 ObjectiveSense::Maximize,
                 10,
