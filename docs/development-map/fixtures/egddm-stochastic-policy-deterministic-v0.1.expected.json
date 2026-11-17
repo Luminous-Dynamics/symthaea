@@ -113,7 +113,17 @@
         "claimed_residual_risk_bps": 0,
         "claimed_risk_understatement": false
       }
-    ]
+    ],
+    "justified_action_coverage_bounds_bps": {
+      "lower": 5000,
+      "nominal": 6000,
+      "upper": 7000
+    },
+    "unsafe_action_mass_bounds_bps": {
+      "lower": 0,
+      "nominal": 0,
+      "upper": 0
+    }
   },
   "expected_cost": {
     "assumption": "Per-hypothesis joint-kernel credal sets are independent across hypotheses; the evaluator then optimizes the outer prior credal set. Cross-hypothesis shared latent ambiguity requires a coupled joint set.",
