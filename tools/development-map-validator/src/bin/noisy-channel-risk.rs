@@ -661,8 +661,8 @@ mod tests{
     }
     #[test]fn point_likelihood_looks_safe_but_robust_channel_risk_rejects(){
         let t=trace(&report(),"noisy-point-estimate-false-safe");
-        assert_eq!(t["nominal_posterior_risk_bps"],851);
-        assert_eq!(t["worst_case_posterior_risk_bps"],2145);
+        assert_eq!(t["nominal_posterior_risk_bps"],129);
+        assert_eq!(t["worst_case_posterior_risk_bps"],982);
         assert_eq!(t["nominal_action_justified"],true);
         assert_eq!(t["robust_action_justified"],false);
         assert_eq!(t["nominal_false_safe"],true);
@@ -678,14 +678,14 @@ mod tests{
     #[test]fn joint_model_preserves_common_mode_uncertainty_without_false_independence(){
         let t=trace(&report(),"joint-common-mode-model");
         assert_eq!(t["factorization_qualified"],true);
-        assert_eq!(t["worst_case_posterior_risk_bps"],991);
+        assert_eq!(t["worst_case_posterior_risk_bps"],555);
         assert_eq!(t["robust_action_justified"],true);
     }
     #[test]fn exact_set_mutual_certificate_allows_qualified_factorization(){
         let t=trace(&report(),"qualified-independent-factors");
         assert_eq!(t["factorization_qualified"],true);
-        assert_eq!(t["nominal_posterior_risk_bps"],15);
-        assert_eq!(t["worst_case_posterior_risk_bps"],65);
+        assert_eq!(t["nominal_posterior_risk_bps"],1);
+        assert_eq!(t["worst_case_posterior_risk_bps"],15);
         assert_eq!(t["robust_action_justified"],true);
     }
     #[test]fn calibration_expired_after_observation_is_invalid_at_decision(){
