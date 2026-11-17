@@ -25,7 +25,7 @@ The crate contains no future target or evaluator label. It does not define
 benchmark-specific train/validation/test splits: those must remain pinned to
 each benchmark's official protocol.
 
-Ninety-nine Rust test functions are authored (28 event/bitemporal contract, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter, 26 source-watermark, and 17 clock-calibration tests) for delayed-observation non-leakage,
+One hundred Rust test functions are authored (28 event/bitemporal contract, 8 purged-split, 10 train-only-scaler, 10 Time-IMM adapter, 27 source-watermark, and 17 clock-calibration tests) for delayed-observation non-leakage,
 out-of-order event times, missingness preservation, censored intervals,
 source-local sequence uniqueness, legitimate future-covariate availability,
 and input validation. The standalone crate was first exercised by a pinned Rust 1.96 workflow: dependency resolution and changed-module formatting succeeded, then whole-crate compilation exposed four real type errors. Those have been corrected. The latest exact-head test and Clippy results remain pending; no test pass or dataset score is claimed.
@@ -165,7 +165,7 @@ remain unchanged. The caller must also append the raw event to the bitemporal
 event ledger; the watermark module records the breach receipt, not the
 authoritative event itself.
 
-Twenty-five source-authored watermark tests cover empty progress, multi-source
+Twenty-seven source-authored watermark tests cover empty progress, multi-source
 minimum progress, exclusive boundaries, as-known progress, late-breach
 reopening, terminal streams, generation and monotonicity, atomic batches,
 idempotent event arrivals, evidence-bound completeness and breach receipts,
@@ -189,9 +189,20 @@ The completeness hot path uses the ordered per-source progress chain and a secon
 The deterministic multi-source differential regression generates 48 event arrivals under three distinct source watermarks, then compares indexed and fully audited reports across six required-source sets, five half-open intervals and six knowledge-time cutoffs (180 exact report comparisons). This exercises late-event indexing, source scoping and historical visibility without nondeterministic fixtures.
 
 
+
+The event-arrival batch path first validates the complete incoming batch
+(timestamp monotonicity, event validity, availability cutoff, and event-ID
+uniqueness), then commits without cloning the full append-only ledger. The
+commit phase has no remaining typed-error branch; invalid batches leave the
+ledger digest and all indexes unchanged. This makes successful append work
+proportional to incoming batch size plus index insertion rather than total
+history size. The exact-head scaling benchmark records this arrival-path time
+separately from query and full-replay timings. The rollback guarantee is for
+typed validation errors; it is not a durable transaction or OOM-recovery claim.
+
 ## Reproducible source-watermark scaling benchmark
 
-`src/bin/watermark_scaling.rs` builds deterministic ledgers with 4,096, 16,384 and 65,536 event records. It crosses source counts 1/4/16, half-open interval widths 1/16/256 microseconds, four late-event densities (0, 100, 5,000 and 10,000 basis points), and early/full knowledge cutoffs (216 workload combinations). Event-time keys are permuted relative to four receipt-time batches. Each case compares 51 indexed complete queries, 31 linear-scan complete queries using `completeness_linear_scan_reference`, and 15 `completeness_verified` queries that replay and validate the full history. All three paths share validation, source-progress lookup, report construction and verdict calculation; only the late-breach selection strategy differs. Before timing, the indexed and linear semantic report fields must match, the indexed report must equal the verified report, scan/index instrumentation counters must agree with their execution paths, and the verified digest must match the ledger snapshot. CSV output includes source count, interval width, late-event rate, knowledge cutoff, event-time buckets visited, indexed receipt candidates, all breach receipts scanned by the full-query linear path, matches and p50/p95/p99 for indexed and scan paths plus verified median/worst-observed latency. This is diagnostic in-memory CPU timing, not a physical energy or durable-WAL measurement; runner CPU model, toolchain, release profile and exact source/fixture hashes must accompany each artifact. The latest run has not completed; no latency advantage is asserted yet.
+`src/bin/watermark_scaling.rs` builds deterministic ledgers with 4,096, 16,384 and 65,536 event records. It crosses source counts 1/4/16, half-open interval widths 1/16/256 microseconds, four late-event densities (0, 100, 5,000 and 10,000 basis points), and early/full knowledge cutoffs (216 workload combinations). Event-time keys are permuted relative to four receipt-time batches. Each case compares 51 indexed complete queries, 31 linear-scan complete queries using `completeness_linear_scan_reference`, and 15 `completeness_verified` queries that replay and validate the full history. All three paths share validation, source-progress lookup, report construction and verdict calculation; only the late-breach selection strategy differs. Before timing, the indexed and linear semantic report fields must match, the indexed report must equal the verified report, scan/index instrumentation counters must agree with their execution paths, and the verified digest must match the ledger snapshot. CSV output includes source count, interval width, late-event rate, knowledge cutoff, four arrival batches, total event-arrival ingestion microseconds and nanoseconds per event, event-time buckets visited, indexed receipt candidates, all breach receipts scanned by the full-query linear path, matches and p50/p95/p99 for indexed and scan paths plus verified median/worst-observed latency. Ingestion timing excludes event generation and source-progress setup and covers the complete four-batch commit path, including its index updates; it is one diagnostic sample per workload, not a latency percentile. This is diagnostic in-memory CPU timing, not a physical energy or durable-WAL measurement; runner CPU model, toolchain, release profile and exact source/fixture hashes must accompany each artifact. The latest run has not completed; no latency advantage is asserted yet.
 
 ## Current foundation-model comparator snapshot
 
