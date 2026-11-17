@@ -1334,6 +1334,13 @@ mod tests {
     }
 
     #[test]
+    fn scaled_duration_saturates_without_integer_overflow() {
+        assert_eq!(scaled_duration(u64::MAX, u64::MAX), u64::MAX);
+        assert_eq!(scaled_duration(0, 1000), 1);
+        assert_eq!(scaled_duration(100, 1500), 150);
+    }
+
+    #[test]
     fn two_instruments_allow_parallel_independent_jobs_and_finish_out_of_order() {
         let mut world = world(17, 0, 10, 1_000);
         let mut api = world.agent_api();
