@@ -331,11 +331,12 @@ pub fn parse_and_validate(input: &[u8]) -> Result<ValidatedManifest, ManifestErr
 
     // Derived struct deserialization rejects duplicate known fields; every
     // struct uses deny_unknown_fields to reject unreviewed schema extensions.
-    let manifest: SplitManifestV1 =
-        serde_json::from_slice(input).map_err(|error| ManifestError::InvalidJson(error.to_string()))?;
+    let manifest: SplitManifestV1 = serde_json::from_slice(input)
+        .map_err(|error| ManifestError::InvalidJson(error.to_string()))?;
     validate_manifest(&manifest)?;
 
-    let value = serde_json::to_value(&manifest).map_err(|_| ManifestError::CanonicalizationFailure)?;
+    let value =
+        serde_json::to_value(&manifest).map_err(|_| ManifestError::CanonicalizationFailure)?;
     let mut canonical = Vec::new();
     write_canonical_json(&value, &mut canonical)?;
     let digest = sha256_hex(&canonical);
@@ -355,26 +356,48 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
     validate_commit(&manifest.generator.commit, "generator.commit")?;
     validate_nonempty(&manifest.generator.generator_id, "generator.generator_id")?;
     validate_nonempty(&manifest.generator.solver_id, "generator.solver_id")?;
-    validate_sha256(&manifest.generator.solver_configuration_digest, "generator.solver_configuration_digest")?;
+    validate_sha256(
+        &manifest.generator.solver_configuration_digest,
+        "generator.solver_configuration_digest",
+    )?;
 
     validate_nonempty(&manifest.task.task_id, "task.task_id")?;
-    validate_sha256(&manifest.task.task_contract_digest, "task.task_contract_digest")?;
-    validate_sha256(&manifest.task.loss_contract_digest, "task.loss_contract_digest")?;
-    validate_sha256(&manifest.task.observation_operator_digest, "task.observation_operator_digest")?;
+    validate_sha256(
+        &manifest.task.task_contract_digest,
+        "task.task_contract_digest",
+    )?;
+    validate_sha256(
+        &manifest.task.loss_contract_digest,
+        "task.loss_contract_digest",
+    )?;
+    validate_sha256(
+        &manifest.task.observation_operator_digest,
+        "task.observation_operator_digest",
+    )?;
 
     validate_nesting(&manifest.sampling)?;
-    validate_sha256(&manifest.randomization.permutation_suite_digest, "randomization.permutation_suite_digest")?;
+    validate_sha256(
+        &manifest.randomization.permutation_suite_digest,
+        "randomization.permutation_suite_digest",
+    )?;
     if manifest.randomization.seed_commitment_algorithm != "sha256" {
-        return Err(ManifestError::InvalidField("randomization.seed_commitment_algorithm"));
+        return Err(ManifestError::InvalidField(
+            "randomization.seed_commitment_algorithm",
+        ));
     }
     validate_timestamp(&manifest.freeze.protocol_frozen_at)?;
-    validate_sha256(&manifest.freeze.analysis_plan_digest, "freeze.analysis_plan_digest")?;
+    validate_sha256(
+        &manifest.freeze.analysis_plan_digest,
+        "freeze.analysis_plan_digest",
+    )?;
 
     if manifest.scenarios.is_empty() {
         return Err(ManifestError::EmptyCollection("scenarios"));
     }
     if manifest.scenarios.len() > MAX_SCENARIOS {
-        return Err(ManifestError::InvalidField("scenarios exceeds maximum count"));
+        return Err(ManifestError::InvalidField(
+            "scenarios exceeds maximum count",
+        ));
     }
     if manifest.split_axes.is_empty() {
         return Err(ManifestError::EmptyCollection("split_axes"));
@@ -389,11 +412,15 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
     }
 
     if !axes.contains_key(&manifest.sampling.primary_independent_unit) {
-        return Err(ManifestError::InvalidField("sampling.primary_independent_unit is not a split axis"));
+        return Err(ManifestError::InvalidField(
+            "sampling.primary_independent_unit is not a split axis",
+        ));
     }
     for axis in axes.keys() {
         if !manifest.sampling.nesting.contains(axis) {
-            return Err(ManifestError::InvalidField("split axis is absent from sampling.nesting"));
+            return Err(ManifestError::InvalidField(
+                "split axis is absent from sampling.nesting",
+            ));
         }
     }
 
@@ -406,8 +433,14 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
             return Err(ManifestError::DuplicateValue("scenario_id"));
         }
         validate_sha256(&scenario.seed_commitment, "scenario.seed_commitment")?;
-        validate_sha256(&scenario.reference_data_digest, "scenario.reference_data_digest")?;
-        validate_sha256(&scenario.solver_qualification_digest, "scenario.solver_qualification_digest")?;
+        validate_sha256(
+            &scenario.reference_data_digest,
+            "scenario.reference_data_digest",
+        )?;
+        validate_sha256(
+            &scenario.solver_qualification_digest,
+            "scenario.solver_qualification_digest",
+        )?;
 
         let mut scenario_axes = BTreeSet::new();
         for membership in &scenario.groups {
@@ -420,8 +453,14 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
             // shared across train/validation/test (e.g. parameter transfer
             // within one equation family).
             if let Some(split_axis) = axes.get(&membership.axis) {
-                if !split_axis.groups_for(scenario.split_role).iter().any(|id| id == &membership.group_id) {
-                    let any_role_has_group = split_axis.all_groups().any(|(id, _)| id == membership.group_id);
+                if !split_axis
+                    .groups_for(scenario.split_role)
+                    .iter()
+                    .any(|id| id == &membership.group_id)
+                {
+                    let any_role_has_group = split_axis
+                        .all_groups()
+                        .any(|(id, _)| id == membership.group_id);
                     if any_role_has_group {
                         return Err(ManifestError::GroupRoleMismatch {
                             scenario: scenario.scenario_id.clone(),
@@ -434,9 +473,14 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
                         group: membership.group_id.clone(),
                     });
                 }
-                referenced_groups.entry(membership.axis).or_default().insert(membership.group_id.clone());
+                referenced_groups
+                    .entry(membership.axis)
+                    .or_default()
+                    .insert(membership.group_id.clone());
             } else if !manifest.sampling.nesting.contains(&membership.axis) {
-                return Err(ManifestError::InvalidField("scenario context axis is absent from sampling.nesting"));
+                return Err(ManifestError::InvalidField(
+                    "scenario context axis is absent from sampling.nesting",
+                ));
             }
         }
 
@@ -452,7 +496,10 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
 
     for split_axis in &manifest.split_axes {
         for (group, _) in split_axis.all_groups() {
-            if !referenced_groups.get(&split_axis.axis).is_some_and(|set| set.contains(group)) {
+            if !referenced_groups
+                .get(&split_axis.axis)
+                .is_some_and(|set| set.contains(group))
+            {
                 return Err(ManifestError::UnreferencedDeclaredGroup {
                     axis: split_axis.axis.as_str().to_owned(),
                     group: group.to_owned(),
@@ -463,7 +510,11 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
 
     let primary_axis = axes[&manifest.sampling.primary_independent_unit];
     let minimum = manifest.sampling.minimum_independent_units_per_role;
-    for role in [SplitRole::Train, SplitRole::Validation, SplitRole::ConfirmatoryTest] {
+    for role in [
+        SplitRole::Train,
+        SplitRole::Validation,
+        SplitRole::ConfirmatoryTest,
+    ] {
         let independent_units = primary_axis.groups_for(role).len();
         if independent_units < minimum {
             return Err(ManifestError::InsufficientIndependentUnits {
@@ -487,10 +538,14 @@ fn validate_nesting(sampling: &SamplingDesign) -> Result<(), ManifestError> {
         }
     }
     if !seen.contains(&sampling.primary_independent_unit) {
-        return Err(ManifestError::InvalidField("primary independent unit is absent from nesting"));
+        return Err(ManifestError::InvalidField(
+            "primary independent unit is absent from nesting",
+        ));
     }
     if sampling.minimum_independent_units_per_role == 0 {
-        return Err(ManifestError::InvalidField("sampling.minimum_independent_units_per_role"));
+        return Err(ManifestError::InvalidField(
+            "sampling.minimum_independent_units_per_role",
+        ));
     }
     Ok(())
 }
