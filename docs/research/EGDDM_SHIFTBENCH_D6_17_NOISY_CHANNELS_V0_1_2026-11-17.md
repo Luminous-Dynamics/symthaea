@@ -88,7 +88,7 @@ The evaluator does not verify a real calibration authority, cryptographic signat
 
 ## Synthetic known-answer fixture results
 
-The 12-trace synthetic fixture uses a 700-basis-point (7%) reversible-probe envelope. The optical primary-channel control produces:
+The 13-trace synthetic fixture uses a 700-basis-point (7%) reversible-probe envelope. The optical primary-channel control produces:
 
 | Evaluation mode | Posterior risk | Decision |
 |---|---:|---|
@@ -99,7 +99,9 @@ The 12-trace synthetic fixture uses a 700-basis-point (7%) reversible-probe enve
 
 The fixture therefore tests an interaction effect: neither uncertainty layer independently crosses the policy threshold, but their joint ambiguity does. The nominal-only action would be a false-safe decision under the registered robust envelope.
 
-A joint optical-pair channel with common-mode uncertainty gives 0.84% nominal and 5.55% worst-case risk, which remains inside the 7% reversible envelope. In contrast, acquiring the two optical devices as separate factors while both share the same dependence group is rejected; their observations do not narrow the hypothesis set. A separate build-pipeline/runtime pair is combined only under an evaluator-held exact-set mutual conditional-independence certificate and yields 0.15% worst-case risk.
+A drift-widened optical channel is a second, different failure mode: nominal risk is 1.82%, prior-only robust risk 6.39%, likelihood-only robust risk 9.10%, and combined robust risk 26.48%. The evaluator does not detect drift itself; it demonstrates that once independent calibration work widens the declared likelihood intervals, stale point-confidence can no longer justify the action.
+
+A joint optical-pair channel with common-mode uncertainty gives 0.84% nominal and 5.55% worst-case risk, which remains inside the 7% reversible envelope. In contrast, acquiring the two optical devices as separate factors while both share the same dependence group is rejected; their observations do not narrow the hypothesis set. A separate build-pipeline/runtime pair is combined only under an evaluator-held exact-set mutual conditional-independence certificate and yields 0.15% worst-case risk. The three-factor negative control includes all three pairwise certificates among the selected groups but deliberately omits a three-way certificate; the evaluator still rejects factorization, because pairwise independence does not establish mutual independence of the full set.
 
 The other fixture controls reject expired and revoked calibration, an output impossible under the hidden actual world, zero evidence-support lower bound, future evidence and an incomplete three-group factorization certificate. Always-act fails the irreversible release gate; always-abstain fails the read-only positive control.
 
