@@ -74,7 +74,8 @@
             "event_sha256": "e75a1fd81e14074aa5e1b87ea58d5dcbbaa1b9bef34d94e6b04ae91e76cd2429"
           }
         ],
-        "receipt_sha256": "7de9c46acc20ac4153337601773610cebb88a73d52ecfbb4b4c1ef03c138bd58"
+        "receipt_sha256": "655b6223aa75ceff785d27d7392c91c645bab51103a2c55842634e067f26f71e",
+        "billing_currency": "USD"
       },
       {
         "schema_version": "1.0",
@@ -149,7 +150,8 @@
             "event_sha256": "b6432fa5c1674f5dc7699a9fe2993ecd80ff7dda2e006a7183fc0e99d4c77799"
           }
         ],
-        "receipt_sha256": "6f823600621a17af97558b9da1e868f5c7d381698c535bc8b9ee0958e2ddce2e"
+        "receipt_sha256": "cdbfe2265ad67c1f66ab65a0e00ee62a794a8252a5a4e8c0f83273177f675216",
+        "billing_currency": "USD"
       }
     ]
   },
@@ -168,7 +170,8 @@
       "runner_class": "synthetic-runner",
       "hardware_class": "cpu-reference",
       "runner_image_digest_sha256": "f0b6a24ef0e24719080044d1281237aa2ee95aef13af9c737e336c713e5cf8a4",
-      "region": "test-region-1"
+      "region": "test-region-1",
+      "billing_currency": "USD"
     },
     "approved_option_ids": [
       "gate-a",
