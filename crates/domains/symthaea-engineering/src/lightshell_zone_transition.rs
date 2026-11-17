@@ -266,7 +266,27 @@ impl TransitionManifest {
                 }
             }
 
+            if transition.state == "capability_checked" || transition.state == "frozen" {
+                for (field, value) in [
+                    ("interface_detail_ref", transition.interface_detail_ref.as_deref()),
+                    ("process_route_ref", transition.process_route_ref.as_deref()),
+                ] {
+                    if value.is_none_or(is_blank) {
+                        push(&mut findings, "capability_checked_transition_missing_detail", format!("{path}.{field}"),
+                            "A capability-checked transition must bind its interface detail and process route.");
+                    }
+                }
+            }
+
             if transition.state == "frozen" {
+                for zone_id in [&transition.from_zone_id, &transition.to_zone_id] {
+                    if let Some(zone) = zones.get(zone_id.as_str()) {
+                        if is_blank_option(&zone.construction_ref) {
+                            push(&mut findings, "frozen_transition_zone_missing_construction", format!("{path}.zone_refs[{zone_id}].construction_ref"),
+                                "A frozen transition must bind the exact construction on both sides of the interface.");
+                        }
+                    }
+                }
                 for (field, value) in [
                     ("transition_width_mm", transition.transition_width_mm.map(|_| "present")),
                     ("interface_detail_ref", transition.interface_detail_ref.as_deref()),
@@ -280,6 +300,17 @@ impl TransitionManifest {
             }
         }
 
+        let mut supported_strategies = HashSet::new();
+        for (index, strategy) in self.process_capability.supported_strategies.iter().enumerate() {
+            if !is_known_strategy(strategy) {
+                push(&mut findings, "unknown_capability_strategy", format!("process_capability.supported_strategies[{index}]"),
+                    "Capability evidence must name a known transition strategy.");
+            }
+            if !supported_strategies.insert(strategy.as_str()) {
+                push(&mut findings, "duplicate_capability_strategy", format!("process_capability.supported_strategies[{index}]"),
+                    "Supported transition strategies must be unique.");
+            }
+        }
         if self.process_capability.capability_state == "qualified_for_transition" {
             for (field, value) in [
                 ("machine_ref", self.process_capability.machine_ref.as_deref()),
@@ -295,6 +326,9 @@ impl TransitionManifest {
                 push(&mut findings, "qualified_process_without_strategies", "process_capability.supported_strategies",
                     "A qualified process must declare the supported transition strategies.");
             }
+        } else if !self.process_capability.supported_strategies.is_empty() {
+            push(&mut findings, "unqualified_process_claims_supported_strategies", "process_capability.supported_strategies",
+                "Only a qualified process may list supported transition strategies.");
         }
 
         if self.state == "frozen" {
@@ -682,6 +716,50 @@ mod tests {
         }
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.is_freezable(), "{:?}", report.findings);
+    }
+
+    #[test]
+    fn unqualified_process_cannot_claim_supported_strategies() {
+        let mut manifest = base_manifest();
+        manifest["process_capability"]["supported_strategies"] = json!(["graded_knit"]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "unqualified_process_claims_supported_strategies"));
+    }
+
+    #[test]
+    fn frozen_transition_requires_construction_identity_for_both_zones() {
+        let mut manifest = base_manifest();
+        manifest["state"] = json!("frozen");
+        manifest["process_capability"]["capability_state"] = json!("qualified_for_transition");
+        manifest["process_capability"]["machine_ref"] = json!("MACHINE-001");
+        manifest["process_capability"]["program_revision_ref"] = json!("PROGRAM-REV-A");
+        manifest["process_capability"]["capability_evidence_ref"] = json!("CAPABILITY-TEST-001");
+        manifest["process_capability"]["supported_strategies"] = json!(["graded_knit","sewn_seam","replaceable_overlap"]);
+        for zone in manifest["zone_refs"].as_array_mut().unwrap() {
+            zone["construction_ref"] = json!("CONSTRUCTION-REV-A");
+        }
+        for transition in manifest["transitions"].as_array_mut().unwrap() {
+            transition["state"] = json!("frozen");
+            transition["transition_width_mm"] = json!(12.0);
+            transition["interface_detail_ref"] = json!("INTERFACE-DETAIL-REV-A");
+            transition["process_route_ref"] = json!("PROCESS-ROUTE-REV-A");
+            for requirement in transition["requirements"].as_array_mut().unwrap() {
+                match requirement["direction"].as_str().unwrap() {
+                    "higher_is_better" => requirement["lower_bound"] = json!(1.0),
+                    "lower_is_better" => requirement["upper_bound"] = json!(10.0),
+                    "within_declared_band" => {
+                        requirement["lower_bound"] = json!(0.8);
+                        requirement["upper_bound"] = json!(1.2);
+                    }
+                    _ => unreachable!()
+                }
+                requirement["method_ref"] = json!("METHOD-REV-A");
+                requirement["acceptance_rule_ref"] = json!("ACCEPTANCE-REV-A");
+            }
+        }
+        manifest["zone_refs"][0]["construction_ref"] = json!(null);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "frozen_transition_zone_missing_construction"));
     }
 
     #[test]
