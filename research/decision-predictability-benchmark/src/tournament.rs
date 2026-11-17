@@ -575,13 +575,10 @@ fn error_metrics(prediction: &[f64], truth: &[f64], scale: f64) -> ErrorMetrics 
         .iter()
         .zip(truth.iter())
         .map(|(estimate, actual)| (estimate - actual).abs() / max_error);
-    let mae = max_error * normalized_abs.clone().sum::<f64>() / prediction.len() as f64;
+    let count = prediction.len() as f64;
+    let mae = max_error * (normalized_abs.clone().sum::<f64>() / count);
     let rmse = max_error
-        * normalized_abs
-            .map(|value| value * value)
-            .sum::<f64>()
-            .div_euclid(prediction.len() as f64)
-            .sqrt();
+        * (normalized_abs.map(|value| value * value).sum::<f64>() / count).sqrt();
     let nrmse = rmse / scale;
 
     ErrorMetrics { mae, rmse, nrmse }
@@ -617,24 +614,28 @@ fn write_status_row(
     validation_nrmse: Option<f64>,
     status: &str,
 ) {
-    use std::fmt::Write;
-    let order_text = order.map(|value| value.to_string()).unwrap_or_default();
-    let validation_text = format_optional(validation_nrmse);
-    let _ = writeln!(
-        output,
-        "{},{},{},{},{},{},{},{},{},{},,,,,,,{},",
-        fixture.fixture_id,
-        fixture.regime,
-        channel.as_str(),
-        model,
-        order_text,
-        train_n,
-        validation_n,
-        test_n,
-        origin_step,
-        validation_text,
-        status
-    );
+    let fields = vec![
+        fixture.fixture_id.clone(),
+        fixture.regime.clone(),
+        channel.as_str().to_owned(),
+        model.to_owned(),
+        order.map(|value| value.to_string()).unwrap_or_default(),
+        train_n.to_string(),
+        validation_n.to_string(),
+        test_n.to_string(),
+        origin_step.to_string(),
+        format_optional(validation_nrmse),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        String::new(),
+        status.to_owned(),
+    ];
+    output.push_str(&fields.join(","));
+    output.push('\\n');
 }
 
 fn write_metric_row(
@@ -651,31 +652,28 @@ fn write_metric_row(
     metrics: ErrorMetrics,
     skill: Option<f64>,
 ) {
-    use std::fmt::Write;
-    let order_text = spec.order.map(|value| value.to_string()).unwrap_or_default();
-    let validation_text = format_optional(spec.validation_nrmse);
-    let skill_text = format_optional(skill);
-    let _ = writeln!(
-        output,
-        "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},ok,",
-        fixture.fixture_id,
-        fixture.regime,
-        channel.as_str(),
-        spec.name,
-        order_text,
-        train_n,
-        validation_n,
-        test_n,
-        origin_step,
-        validation_text,
-        lead_first,
-        lead_last,
-        lead_last - lead_first + 1,
+    let fields = vec![
+        fixture.fixture_id.clone(),
+        fixture.regime.clone(),
+        channel.as_str().to_owned(),
+        spec.name.clone(),
+        spec.order.map(|value| value.to_string()).unwrap_or_default(),
+        train_n.to_string(),
+        validation_n.to_string(),
+        test_n.to_string(),
+        origin_step.to_string(),
+        format_optional(spec.validation_nrmse),
+        lead_first.to_string(),
+        lead_last.to_string(),
+        (lead_last - lead_first + 1).to_string(),
         format!("{:.12e}", metrics.mae),
         format!("{:.12e}", metrics.rmse),
         format!("{:.12e}", metrics.nrmse),
-        skill_text
-    );
+        format_optional(skill),
+        "ok".to_owned(),
+    ];
+    output.push_str(&fields.join(","));
+    output.push('\\n');
 }
 
 fn format_optional(value: Option<f64>) -> String {
