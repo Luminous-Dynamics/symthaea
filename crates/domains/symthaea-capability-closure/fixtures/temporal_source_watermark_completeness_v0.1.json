@@ -225,6 +225,12 @@
       "name": "indexed_breach_result_matches_independent_linear_scan",
       "expect": "exact_ordered_breach_receipt_equality_before_timing",
       "safety": "index_speed_claim_is_tied_to_independent_scan_oracle"
+    },
+    {
+      "id": "WM-026",
+      "name": "full_completeness_query_linear_reference_parity",
+      "expect": "indexed_and_linear_complete_query_semantic_reports_equal",
+      "safety": "performance_comparison_changes_only_late_breach_selection_strategy"
     }
   ],
   "metrics": {
@@ -278,8 +284,8 @@
     "source_authentication_executed": false,
     "benchmark_results_available": false,
     "targets_are_results": false,
-    "watermark_test_functions_authored": 25,
-    "crate_test_functions_authored": 98,
+    "watermark_test_functions_authored": 26,
+    "crate_test_functions_authored": 99,
     "benchmark_protocol_authored": true,
     "clock_calibration_test_functions_authored": 17,
     "clock_calibration_tests_executed": false
@@ -301,9 +307,9 @@
       "known_at_us",
       "indexed_event_time_buckets_visited",
       "indexed_receipt_candidates_examined",
-      "scan_receipts_examined",
+      "linear_scan_receipts_examined",
       "matching_breaches",
-      "scan_p50_p95_p99_us",
+      "linear_scan_p50_p95_p99_us",
       "indexed_p50_p95_p99_us",
       "verified_p50_us",
       "verified_max_us",
@@ -312,8 +318,8 @@
       "verified_event_arrival_count",
       "verified_late_breach_count"
     ],
-    "known_answer": "indexed_report_equals_verified_receipt.report; indexed_late_breaches_equals_linear_scan_breaches; verified_receipt.ledger_sha256_equals_current_ledger_state_sha256",
-    "correctness_gate": "exact_indexed_verified_report_equality_and_indexed_linear_scan_breach_set_equality_and_current_ledger_digest_match_before_timing",
+    "known_answer": "indexed_semantic_report_equals_linear_scan_reference_semantic_report_equals_verified_receipt.report; verified_receipt.ledger_sha256_equals_current_ledger_state_sha256",
+    "correctness_gate": "semantic_report_equality_for_all_three_complete_query_paths_and_consistent_instrumentation_counters_and_current_ledger_digest_match_before_timing",
     "measurement_boundary": "in_memory_release_build_cpu_query_and_replay_time_only",
     "energy_measurement": "not_measured",
     "source_counts": [
@@ -340,7 +346,7 @@
     ],
     "availability_time": "equal_to_each_event_arrival_transaction_and_after_generated_event_time",
     "event_time": "zero_based_per_source_permuted_microsecond_values_below_declared_watermark",
-    "statistical_note": "51 indexed and 31 linear-scan timing samples report nearest-rank p50/p95/p99; 15 full replay samples report median and observed maximum only",
+    "statistical_note": "51 indexed complete-query samples and 31 linear-reference complete-query samples report nearest-rank p50/p95/p99; 15 full replay samples report median and observed maximum",
     "late_rate_basis_points": [
       0,
       100,
