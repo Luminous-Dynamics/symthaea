@@ -375,6 +375,16 @@ pub fn admit_candidate(
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidenceBoundCampaignConfig {
+    pub campaign_id: String,
+    pub decisions: Vec<DecisionRequirement>,
+    pub deployment_bundles: Vec<DeploymentBundle>,
+    pub budget: CampaignBudget,
+    pub assurance: AssuranceBindings,
+    pub maximum_search_nodes: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RejectedCampaignCandidate {
     pub candidate_id: String,
     pub option_id: String,
@@ -438,14 +448,9 @@ impl EvidenceBoundCampaign {
 /// exact frozen context. A single rejected candidate aborts the whole build;
 /// callers cannot accidentally continue with a partial, silently filtered set.
 pub fn build_evidence_bound_campaign(
-    campaign_id: String,
     mut candidates: Vec<CandidateInspectionOption>,
     expected_contexts: &[ExpectedInspectionContext],
-    decisions: Vec<DecisionRequirement>,
-    deployment_bundles: Vec<DeploymentBundle>,
-    budget: CampaignBudget,
-    assurance: AssuranceBindings,
-    maximum_search_nodes: u64,
+    config: EvidenceBoundCampaignConfig,
 ) -> Result<EvidenceBoundCampaign, CampaignAdmissionError> {
     if candidates.is_empty() {
         return Err(CampaignAdmissionError::EmptyCandidateSet);
@@ -499,13 +504,14 @@ pub fn build_evidence_bound_campaign(
     }
 
     let problem = CampaignProblem {
-        campaign_id,
-        decisions,
-        deployment_bundles,
+        campaign_id: config.campaign_id,
+        decisions: config.decisions,
+        deployment_bundles: config.deployment_bundles,
         options: admitted_options,
-        budget,
-        assurance,
-        maximum_search_nodes,
+        budget: config.budget,
+        prices: Default::default(),
+        assurance: config.assurance,
+        maximum_search_nodes: config.maximum_search_nodes,
     };
     evidence_manifests.sort_by(|a, b| a.option_id.cmp(&b.option_id));
 
@@ -908,14 +914,16 @@ mod tests {
     #[test]
     fn campaign_builder_retains_manifests_and_optimizes_only_admitted_options() {
         let built = build_evidence_bound_campaign(
-            "accepted-test-campaign".into(),
             vec![candidate()],
             &[context()],
-            campaign_decisions(),
-            campaign_bundles(),
-            campaign_budget(),
-            campaign_assurance(),
-            1_000,
+            EvidenceBoundCampaignConfig {
+                campaign_id: "accepted-test-campaign".into(),
+                decisions: campaign_decisions(),
+                deployment_bundles: campaign_bundles(),
+                budget: campaign_budget(),
+                assurance: campaign_assurance(),
+                maximum_search_nodes: 1_000,
+            },
         )
         .unwrap();
         assert_eq!(built.candidate_count(), 1);
@@ -938,14 +946,16 @@ mod tests {
         let mut stale_context = context();
         stale_context.option_id = "support-08-stale-followup".into();
         let result = build_evidence_bound_campaign(
-            "campaign-with-one-stale-option".into(),
             vec![candidate(), stale],
             &[context(), stale_context],
-            campaign_decisions(),
-            campaign_bundles(),
-            campaign_budget(),
-            campaign_assurance(),
-            1_000,
+            EvidenceBoundCampaignConfig {
+                campaign_id: "campaign-with-one-stale-option".into(),
+                decisions: campaign_decisions(),
+                deployment_bundles: campaign_bundles(),
+                budget: campaign_budget(),
+                assurance: campaign_assurance(),
+                maximum_search_nodes: 1_000,
+            },
         );
         assert!(matches!(
             result,
@@ -958,14 +968,16 @@ mod tests {
     #[test]
     fn campaign_builder_rejects_missing_and_duplicate_contexts() {
         let missing = build_evidence_bound_campaign(
-            "missing-context-campaign".into(),
             vec![candidate()],
             &[],
-            campaign_decisions(),
-            campaign_bundles(),
-            campaign_budget(),
-            campaign_assurance(),
-            1_000,
+            EvidenceBoundCampaignConfig {
+                campaign_id: "missing-context-campaign".into(),
+                decisions: campaign_decisions(),
+                deployment_bundles: campaign_bundles(),
+                budget: campaign_budget(),
+                assurance: campaign_assurance(),
+                maximum_search_nodes: 1_000,
+            },
         );
         assert_eq!(
             missing,
@@ -975,14 +987,16 @@ mod tests {
         );
 
         let duplicate = build_evidence_bound_campaign(
-            "duplicate-context-campaign".into(),
             vec![candidate()],
             &[context(), context()],
-            campaign_decisions(),
-            campaign_bundles(),
-            campaign_budget(),
-            campaign_assurance(),
-            1_000,
+            EvidenceBoundCampaignConfig {
+                campaign_id: "duplicate-context-campaign".into(),
+                decisions: campaign_decisions(),
+                deployment_bundles: campaign_bundles(),
+                budget: campaign_budget(),
+                assurance: campaign_assurance(),
+                maximum_search_nodes: 1_000,
+            },
         );
         assert_eq!(
             duplicate,
