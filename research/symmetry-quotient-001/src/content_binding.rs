@@ -13,9 +13,9 @@
 //! The bound verifier always replays the independent quotient verifier.
 
 use crate::{
-    compile_quotient, verify_certificate, CandidateSemanticsV1, CompileOutcomeV1,
-    FiniteActionV1, FiniteGroupV1, PruningAuthorityV1, QualificationBudgetV1,
-    QuotientCertificateV1, QuotientErrorV1, SearchProblemV1, VerificationReceiptV1,
+    CandidateSemanticsV1, CompileOutcomeV1, FiniteActionV1, FiniteGroupV1, PruningAuthorityV1,
+    QualificationBudgetV1, QuotientCertificateV1, QuotientErrorV1, SearchProblemV1,
+    VerificationReceiptV1, compile_quotient, verify_certificate,
 };
 use sha2::{Digest, Sha256};
 use std::fmt;
