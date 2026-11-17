@@ -119,9 +119,8 @@ pub fn evaluate_open_world_parts_json(candidate_raw:&str,oracle_raw:&str)->Resul
         .ok_or("candidate hypothesis_bounds must be an array")?.iter()
         .map(|h|required_str(h,"hypothesis_id","candidate hypothesis")).collect::<Result<_,_>>()?;
     if known_ids.contains(&unknown_id){return Err("unknown hypothesis ID collides with a known hypothesis".to_owned());}
-    if required_str(&oracle,"actual_hypothesis_id","oracle")?==unknown_id{
-        return Err("D6.18 synthetic fixture actual hypothesis must be a registered known world".to_owned());
-    }
+    let actual_hypothesis_id=required_str(&oracle,"actual_hypothesis_id","oracle")?;
+    let actual_hypothesis_is_unknown=actual_hypothesis_id==unknown_id;
     let actions=required_value(&candidate,"actions","candidate_view")?.as_array()
         .ok_or("candidate actions must be an array")?;
     let action_policies:BTreeMap<String,(bool,bool,u64)>=actions.iter().map(|a|{
@@ -169,33 +168,43 @@ pub fn evaluate_open_world_parts_json(candidate_raw:&str,oracle_raw:&str)->Resul
         value.as_object_mut().ok_or("oracle must be object")?.remove("open_world_policy");
         value
     };
-    let closed_report=noisy_channel::evaluate_noisy_channel_parts_json(&candidate.to_string(),&closed_oracle.to_string())?;
+    // If the actual world is omitted from the closed-world hypothesis class,
+    // that baseline is explicitly unadjudicable. Never substitute a convenient
+    // known-world actual label just to manufacture a closed-world score.
+    let closed_report=if actual_hypothesis_is_unknown {
+        None
+    } else {
+        Some(noisy_channel::evaluate_noisy_channel_parts_json(&candidate.to_string(),&closed_oracle.to_string())?)
+    };
     let (aug_candidate,aug_oracle)=augment_candidate_and_oracle(
         &candidate,&closed_oracle,&unknown_id,reserve,&unknown_safe_actions,&unknown_rows
     )?;
     let open_report=noisy_channel::evaluate_noisy_channel_parts_json(&aug_candidate.to_string(),&aug_oracle.to_string())?;
 
-    let closed_traces=closed_report["traces"].as_array().ok_or("closed-world report missing traces")?;
+    let closed_by_id:BTreeMap<String,&Value>=if let Some(report)=&closed_report {
+        report["traces"].as_array().ok_or("closed-world report missing traces")?.iter().map(|t|(
+            t["trace_id"].as_str().unwrap_or_default().to_owned(),t
+        )).collect()
+    } else {BTreeMap::new()};
     let open_traces=open_report["traces"].as_array().ok_or("open-world report missing traces")?;
-    let closed_by_id:BTreeMap<String,&Value>=closed_traces.iter().map(|t|(
-        t["trace_id"].as_str().unwrap_or_default().to_owned(),t
-    )).collect();
     let mut traces=Vec::new();
     for open in open_traces{
         let id=open["trace_id"].as_str().ok_or("open-world trace ID missing")?;
-        let closed=closed_by_id.get(id).ok_or_else(||format!("closed-world report missing trace {id:?}"))?;
-        let closed_justified=closed["robust_action_justified"].as_bool()==Some(true);
+        let closed=closed_by_id.get(id);
+        let closed_justified=closed.and_then(|t|t["robust_action_justified"].as_bool());
         let open_justified=open["robust_action_justified"].as_bool()==Some(true);
-        let closed_risk=closed["worst_case_posterior_risk_bps"].as_u64().unwrap_or(SCALE);
+        let closed_risk=closed.and_then(|t|t["worst_case_posterior_risk_bps"].as_u64());
         let open_risk=open["worst_case_posterior_risk_bps"].as_u64().unwrap_or(SCALE);
+        let risk_uplift=closed_risk.map(|risk|open_risk.saturating_sub(risk));
         traces.push(json!({
             "trace_id":id,
             "closed_world_risk_bps":closed_risk,
             "open_world_risk_bps":open_risk,
-            "open_world_risk_uplift_bps":open_risk.saturating_sub(closed_risk),
+            "open_world_risk_uplift_bps":risk_uplift,
             "closed_world_action_justified":closed_justified,
             "open_world_action_justified":open_justified,
-            "closed_world_false_assurance":closed_justified&&!open_justified,
+            "closed_world_false_assurance":closed_justified==Some(true)&&!open_justified,
+            "actual_unsafe_action":open["actual_unsafe_action"],
             "open_world_evidence_status":open["evidence_status"],
             "open_world_evidence_support_lower_bps":open["evidence_support_lower_bps"],
             "decision_kind":candidate["traces"].as_array().unwrap().iter()
@@ -209,10 +218,13 @@ pub fn evaluate_open_world_parts_json(candidate_raw:&str,oracle_raw:&str)->Resul
         "unknown_hypothesis_id":unknown_id,
         "contamination_reserve_bps":reserve,
         "policy_version":policy_version,
+        "actual_hypothesis_is_unknown":actual_hypothesis_is_unknown,
+        "closed_world_comparison_available":!actual_hypothesis_is_unknown,
         "unknown_world_safe_action_ids":unknown_safe_actions,
         "closed_world_report":closed_report,
         "open_world_report":open_report,
         "summary":{
+            "closed_world_unadjudicable_actual_hypothesis":actual_hypothesis_is_unknown,
             "closed_world_false_assurance_trace_count":false_assurance,
             "closed_world_justified_trace_count":traces.iter().filter(|t|t["closed_world_action_justified"]==true).count(),
             "open_world_justified_trace_count":traces.iter().filter(|t|t["open_world_action_justified"]==true).count(),
@@ -253,6 +265,8 @@ mod tests{
     const CANDIDATE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-open-world-candidate-v0.1.json");
     const ORACLE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-open-world-oracle-v0.1.json");
     const EXPECTED:&str=include_str!("../../../../docs/development-map/fixtures/egddm-open-world-v0.1.expected.json");
+    const UNKNOWN_ACTUAL_CANDIDATE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-open-world-unknown-actual-candidate-v0.1.json");
+    const UNKNOWN_ACTUAL_ORACLE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-open-world-unknown-actual-oracle-v0.1.json");
     fn report()->Value{evaluate_open_world_parts_json(CANDIDATE,ORACLE).expect("D6.18 fixture evaluates")}
     fn trace<'a>(value:&'a Value,id:&str)->&'a Value{
         value["traces"].as_array().unwrap().iter().find(|t|t["trace_id"]==id).expect("trace exists")
@@ -281,6 +295,15 @@ mod tests{
         let t=trace(&report(),"discriminating-test-release");
         assert_eq!(t["open_world_action_justified"],false);
         assert!(t["open_world_risk_bps"].as_u64().unwrap()>0);
+    }
+    #[test]fn withheld_actual_hazard_is_adjudicated_without_closed_world_substitution(){
+        let r=evaluate_open_world_parts_json(UNKNOWN_ACTUAL_CANDIDATE,UNKNOWN_ACTUAL_ORACLE).unwrap();
+        assert_eq!(r["actual_hypothesis_is_unknown"],true);
+        assert_eq!(r["closed_world_report"],Value::Null);
+        let t=&r["traces"][0];
+        assert_eq!(t["open_world_evidence_status"],"impossible_output_under_actual_hypothesis");
+        assert_eq!(t["actual_unsafe_action"],true);
+        assert_eq!(t["open_world_action_justified"],false);
     }
     #[test]fn candidate_cannot_supply_or_override_unknown_world_policy(){
         let mut candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
