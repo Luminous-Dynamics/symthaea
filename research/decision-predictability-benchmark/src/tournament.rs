@@ -260,6 +260,18 @@ struct FailedForecast {
     status: &'static str,
 }
 
+struct RowContext<'a> {
+    fixture: &'a FixtureTrajectory,
+    channel: Channel,
+    model: &'a str,
+    order: Option<usize>,
+    train_n: usize,
+    validation_n: usize,
+    test_n: usize,
+    origin_step: usize,
+    validation_nrmse: Option<f64>,
+}
+
 #[derive(Clone, Copy, Debug)]
 struct ErrorMetrics {
     mae: f64,
@@ -317,15 +329,17 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
     if sample_count < MIN_TOTAL_SAMPLES {
         write_status_row(
             output,
-            fixture,
-            channel,
-            "none",
-            None,
-            0,
-            0,
-            sample_count,
-            sample_count.saturating_sub(1),
-            None,
+            RowContext {
+                fixture,
+                channel,
+                model: "none",
+                order: None,
+                train_n: 0,
+                validation_n: 0,
+                test_n: sample_count,
+                origin_step: sample_count.saturating_sub(1),
+                validation_nrmse: None,
+            },
             "insufficient_samples",
         );
         return;
@@ -336,15 +350,17 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
     if train_end < 2 || development_end <= train_end || development_end >= sample_count {
         write_status_row(
             output,
-            fixture,
-            channel,
-            "none",
-            None,
-            train_end,
-            development_end.saturating_sub(train_end),
-            sample_count.saturating_sub(development_end),
-            development_end.saturating_sub(1),
-            None,
+            RowContext {
+                fixture,
+                channel,
+                model: "none",
+                order: None,
+                train_n: train_end,
+                validation_n: development_end.saturating_sub(train_end),
+                test_n: sample_count.saturating_sub(development_end),
+                origin_step: development_end.saturating_sub(1),
+                validation_nrmse: None,
+            },
             "invalid_split",
         );
         return;
@@ -364,15 +380,17 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
     {
         write_status_row(
             output,
-            fixture,
-            channel,
-            "none",
-            None,
-            train_end,
-            validation.len(),
-            test.len(),
-            development_end.saturating_sub(1),
-            None,
+            RowContext {
+                fixture,
+                channel,
+                model: "none",
+                order: None,
+                train_n: train_end,
+                validation_n: validation.len(),
+                test_n: test.len(),
+                origin_step: development_end.saturating_sub(1),
+                validation_nrmse: None,
+            },
             "constant_or_unscaled_channel",
         );
         return;
@@ -499,13 +517,17 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
 
             write_metric_row(
                 output,
-                fixture,
-                channel,
-                &forecast.spec,
-                train_end,
-                validation.len(),
-                test.len(),
-                development_end.saturating_sub(1),
+                RowContext {
+                    fixture,
+                    channel,
+                    model: &forecast.spec.name,
+                    order: forecast.spec.order,
+                    train_n: train_end,
+                    validation_n: validation.len(),
+                    test_n: test.len(),
+                    origin_step: development_end.saturating_sub(1),
+                    validation_nrmse: forecast.spec.validation_nrmse,
+                },
                 first,
                 end,
                 metrics,
@@ -517,15 +539,17 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
     for failure in failed {
         write_status_row(
             output,
-            fixture,
-            channel,
-            &failure.spec.name,
-            failure.spec.order,
-            train_end,
-            validation.len(),
-            test.len(),
-            development_end.saturating_sub(1),
-            failure.spec.validation_nrmse,
+            RowContext {
+                fixture,
+                channel,
+                model: &failure.spec.name,
+                order: failure.spec.order,
+                train_n: train_end,
+                validation_n: validation.len(),
+                test_n: test.len(),
+                origin_step: development_end.saturating_sub(1),
+                validation_nrmse: failure.spec.validation_nrmse,
+            },
             failure.status,
         );
     }
@@ -655,30 +679,21 @@ fn horizon_bins(horizon: usize) -> Vec<(usize, usize)> {
         .collect()
 }
 
-fn write_status_row(
-    output: &mut String,
-    fixture: &FixtureTrajectory,
-    channel: Channel,
-    model: &str,
-    order: Option<usize>,
-    train_n: usize,
-    validation_n: usize,
-    test_n: usize,
-    origin_step: usize,
-    validation_nrmse: Option<f64>,
-    status: &str,
-) {
+fn write_status_row(output: &mut String, context: RowContext<'_>, status: &str) {
     let fields = vec![
-        fixture.fixture_id.clone(),
-        fixture.regime.clone(),
-        channel.as_str().to_owned(),
-        model.to_owned(),
-        order.map(|value| value.to_string()).unwrap_or_default(),
-        train_n.to_string(),
-        validation_n.to_string(),
-        test_n.to_string(),
-        origin_step.to_string(),
-        format_optional(validation_nrmse),
+        context.fixture.fixture_id.clone(),
+        context.fixture.regime.clone(),
+        context.channel.as_str().to_owned(),
+        context.model.to_owned(),
+        context
+            .order
+            .map(|value| value.to_string())
+            .unwrap_or_default(),
+        context.train_n.to_string(),
+        context.validation_n.to_string(),
+        context.test_n.to_string(),
+        context.origin_step.to_string(),
+        format_optional(context.validation_nrmse),
         String::new(),
         String::new(),
         String::new(),
@@ -689,36 +704,31 @@ fn write_status_row(
         status.to_owned(),
     ];
     output.push_str(&fields.join(","));
-    output.push('\n');
+    output.push('\\n');
 }
 
 fn write_metric_row(
     output: &mut String,
-    fixture: &FixtureTrajectory,
-    channel: Channel,
-    spec: &ModelSpec,
-    train_n: usize,
-    validation_n: usize,
-    test_n: usize,
-    origin_step: usize,
+    context: RowContext<'_>,
     lead_first: usize,
     lead_last: usize,
     metrics: ErrorMetrics,
     skill: Option<f64>,
 ) {
     let fields = vec![
-        fixture.fixture_id.clone(),
-        fixture.regime.clone(),
-        channel.as_str().to_owned(),
-        spec.name.clone(),
-        spec.order
+        context.fixture.fixture_id.clone(),
+        context.fixture.regime.clone(),
+        context.channel.as_str().to_owned(),
+        context.model.to_owned(),
+        context
+            .order
             .map(|value| value.to_string())
             .unwrap_or_default(),
-        train_n.to_string(),
-        validation_n.to_string(),
-        test_n.to_string(),
-        origin_step.to_string(),
-        format_optional(spec.validation_nrmse),
+        context.train_n.to_string(),
+        context.validation_n.to_string(),
+        context.test_n.to_string(),
+        context.origin_step.to_string(),
+        format_optional(context.validation_nrmse),
         lead_first.to_string(),
         lead_last.to_string(),
         (lead_last - lead_first + 1).to_string(),
@@ -729,7 +739,7 @@ fn write_metric_row(
         "ok".to_owned(),
     ];
     output.push_str(&fields.join(","));
-    output.push('\n');
+    output.push('\\n');
 }
 
 fn format_optional(value: Option<f64>) -> String {
