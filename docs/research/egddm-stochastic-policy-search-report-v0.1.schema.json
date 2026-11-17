@@ -1,0 +1,257 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-stochastic-policy-search-report-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.2.4 exact stochastic policy search report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "adjudication_status",
+    "search_complete",
+    "optimality_claim",
+    "objective_order",
+    "generated_policy_count",
+    "evaluated_policy_count",
+    "invalid_node_limit_policy_count",
+    "feasible_policy_count",
+    "evaluator_candidate_cap",
+    "pareto_frontier_count",
+    "pareto_frontier_truncated",
+    "pareto_frontier",
+    "best_policy",
+    "submitted_policy",
+    "exact_regret",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "adjudication_status": {
+      "const": "finite_stochastic_policy_search"
+    },
+    "search_complete": {
+      "type": "boolean"
+    },
+    "optimality_claim": {
+      "enum": [
+        "exact_optimum_over_registered_finite_tree_class",
+        "none_search_incomplete"
+      ]
+    },
+    "objective_order": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    },
+    "generated_policy_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "evaluated_policy_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "invalid_node_limit_policy_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "feasible_policy_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "evaluator_candidate_cap": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 50000
+    },
+    "pareto_frontier_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pareto_frontier_truncated": {
+      "type": "boolean"
+    },
+    "pareto_frontier": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "robust_coverage_lower_bps",
+          "nominal_coverage_bps",
+          "worst_case_expected_cost_micros",
+          "nominal_expected_cost_micros",
+          "worst_case_path_cost_micros",
+          "policy_tree"
+        ],
+        "properties": {
+          "robust_coverage_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "nominal_coverage_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "worst_case_expected_cost_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "nominal_expected_cost_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "worst_case_path_cost_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "policy_tree": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "best_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_feasible",
+        "robust_coverage_lower_bps",
+        "nominal_coverage_bps",
+        "worst_case_expected_cost_micros",
+        "nominal_expected_cost_micros",
+        "worst_case_path_cost_micros",
+        "policy_tree",
+        "scorer_report"
+      ],
+      "properties": {
+        "policy_feasible": {
+          "type": "boolean"
+        },
+        "robust_coverage_lower_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "nominal_coverage_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "worst_case_expected_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nominal_expected_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "worst_case_path_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "policy_tree": {
+          "type": "object"
+        },
+        "scorer_report": {
+          "type": "object"
+        }
+      }
+    },
+    "submitted_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_feasible",
+        "robust_coverage_lower_bps",
+        "nominal_coverage_bps",
+        "worst_case_expected_cost_micros",
+        "nominal_expected_cost_micros",
+        "worst_case_path_cost_micros",
+        "policy_tree",
+        "scorer_report"
+      ],
+      "properties": {
+        "policy_feasible": {
+          "type": "boolean"
+        },
+        "robust_coverage_lower_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "nominal_coverage_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "worst_case_expected_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nominal_expected_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "worst_case_path_cost_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "policy_tree": {
+          "type": "object"
+        },
+        "scorer_report": {
+          "type": "object"
+        }
+      }
+    },
+    "exact_regret": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "robust_coverage_shortfall_bps",
+            "nominal_coverage_shortfall_bps",
+            "worst_case_cost_excess_micros",
+            "nominal_cost_excess_micros",
+            "worst_path_cost_excess_micros"
+          ],
+          "properties": {
+            "robust_coverage_shortfall_bps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "nominal_coverage_shortfall_bps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "worst_case_cost_excess_micros": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "nominal_cost_excess_micros": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "worst_path_cost_excess_micros": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
