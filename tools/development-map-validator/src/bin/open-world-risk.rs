@@ -428,9 +428,10 @@ mod tests{
         assert_eq!(unknown["nominal_probability_bps"],600);
     }
     #[test]fn no_acquisition_is_reported_as_no_evidence(){
-        let t=trace(&report(),"no-evidence-deploy");
+        let r=report();
+        let t=trace(&r,"no-evidence-deploy");
         assert_eq!(t["open_world_evidence_status"],"accepted");
-        assert_eq!(report()["open_world_report"]["traces"][0]["dependence_mode"],"no_evidence");
+        assert_eq!(r["open_world_report"]["traces"][0]["dependence_mode"],"no_evidence");
     }
     #[test]fn invalid_unknown_channel_partition_fails_closed(){
         let candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
