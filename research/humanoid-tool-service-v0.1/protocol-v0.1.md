@@ -20,14 +20,64 @@ Secondary:
 
 Paper: Jang et al., *HumanoidToolBench: Benchmarking Humanoid Tool Use from Selection to Mobile Execution*, 1 October 2026. https://arxiv.org/abs/2610.02089
 
-The published matrix contains:
-- Scenarios: BallMove, BallRetrieve, IceBreak.
-- Levels: L0 tool selection/pickup; L1 stationary tool use; L2 mobile tool use.
-- Modes: standard and decoy tool sets.
-- Total: 3 × 3 × 2 = 18 task cells.
-- ToolBook: approximately 3.1k demonstration trajectories across simulation and real Unitree G1 collection.
+### 2.1 Exact upstream and rights snapshot
 
-Published simulation comparison (scenario order BallMove / BallRetrieve / IceBreak; percentages are paper-reported):
+- Official evaluation repository: https://github.com/SNU-PI/HumanoidToolBench
+- Pinned source snapshot for this protocol: `SNU-PI/HumanoidToolBench@3fec9bd36933a1648ff7f95468c983f3452243a0` (observed 17 November 2026).
+- Evaluation-toolkit code: MIT, per the upstream `LICENSE`.
+- ToolBook recordings: CC BY-NC 4.0. Upstream publishes separate simulation and physical-recording revisions:
+  - Simulation: `8b2cd31e107b64cb13f812ea217a63a20845c78a`.
+  - Real G1: `47eca9322bb53fa1c685363271a87d2e414cb0e8`.
+- Third-party models, weights, meshes and assets retain their own terms. The MIT code licence does not relicense these assets or the ToolBook dataset.
+
+**Commercial-use boundary:** ToolBook is non-commercial research data. Do not use its recordings or derived training artefacts in a commercial product or commercial training pipeline without a separately reviewed permission/licence. The MIT evaluator can be studied or adapted subject to preserving its licence and auditing bundled third-party components. Luminous commercial deployment must be kept on a separate rights-cleared data/model path.
+
+### 2.2 Benchmark matrix and task semantics
+
+The published matrix contains:
+- Scenarios: BallMove (long stick pushes a ball), BallRetrieve (hook pulls a ball), IceBreak (hammer impact breaks two ice blocks).
+- Levels: L0 correct tool selection and pickup; L1 stationary use; L2 mobile use after repositioning along the table.
+- Modes: S (standard) and R (decoy). The paper uses D for the decoy mode; upstream environment IDs use R.
+- Total: 3 × 3 × 2 = 18 conditions.
+- ToolBook: approximately 3.1k simulation and real Unitree G1 demonstrations.
+- Success is held for 50 consecutive controller steps (1 second) at 50 Hz. L0 requires lifting the correct tool at least 0.08 m. L1/L2 require the scenario-specific physical task predicate; simply picking up or touching a tool is not task completion.
+
+Official environment IDs follow `humanoidtoolbench/G1<Scenario>-L<level>-<S|R>`, e.g. `G1BallMove-L2-R`. The case manifest records exact IDs and the S/R code token separately from its human-readable `standard`/`decoy` label.
+
+### 2.3 Exact evaluator interface: not a torque-vector API
+
+The official public evaluator simulates a **Unitree G1** in MuJoCo and uses a supplied whole-body controller. It runs a policy through an HTTP interface. The public policy contract is:
+- Observation: 32-value state plus one egocentric RGB image and task instruction.
+- Action: 36-value `decoupled_v1` action chunk, one row per 50 Hz control step.
+- Action slots: 14 hand targets, 14 arm targets, 3 torso targets, base height, then 4 navigation values.
+- One action chunk is executed before the next policy query (unless the episode terminates).
+
+The 32-value policy state is not the raw 43-value recorded G1 observation. The real-hardware recordings also have a separate 35-value supervised action contract; the documented real-hardware control semantics differ from the simulation contract, including waist targets and navigation yaw. Never pad, truncate or reorder arrays and call the result an adapter.
+
+This is materially different from Symthaea's current DMC21 / Dexterous53 morphology and its inspected 21-joint PCA9685 HAL path. A valid comparison needs a named, typed G1-to-Symthaea observation/action adapter with explicit semantic joint mapping, units, frames, base/navigation semantics, timing, reset/history behaviour and failure handling. Until that adapter is qualified, Symthaea's G1 benchmark result is **Unavailable / Incompatible**, not zero and not a matched direct comparison.
+
+### 2.4 Official evaluation budget and compute reality
+
+The upstream protocol specifies:
+- 100 episodes per condition;
+- seeds 10000–10099;
+- up to 3000 policy-control steps per episode;
+- 50 Hz policy control;
+- MuJoCo 3.11.0 and CPython 3.10 in the pinned toolkit.
+
+Maintainers report approximately 4 GB setup download, 9 GB disk use, an additional ~2 GB first policy-checkpoint download, about two hours for one 100-episode condition with the shipped ACT checkpoint on one workstation GPU, and roughly a day and a half / 15 GB for all 18 conditions sequentially. These are upstream estimates, not measurements on Luminous hardware.
+
+Use staged execution:
+1. Install/asset verification and a one-episode/100-step diagnostic.
+2. Check camera/EGL correctness and validate the policy adapter.
+3. Run one fully reportable 100-episode condition.
+4. Expand to all 18 only after the first condition and resource budget are sound.
+
+The toolkit supports Mesa software-rendered smoke tests, but these are diagnostics, not benchmark scores. If the system cannot support the pinned runtime, record the blocker rather than silently substituting a different simulator, asset set, controller or action interface.
+
+### 2.5 Paper-reported simulation comparison
+
+Scenario order in each cell is BallMove / BallRetrieve / IceBreak. These percentages are paper-reported, not locally reproduced:
 
 | Policy | Level | Standard | Decoy |
 |---|---|---|---|
@@ -38,9 +88,15 @@ Published simulation comparison (scenario order BallMove / BallRetrieve / IceBre
 | FastWAM | L1 | 76 / 57 / 86 | 75 / 45 / 82 |
 | FastWAM | L2 | 9 / 20 / 69 | 8 / 11 / 61 |
 
-These values are not a single overall score and must not be averaged across unlike tasks to manufacture one. They illustrate the level-dependent gap and are not locally reproduced results.
+These values are not a single overall score and must not be pooled across unlike task conditions. They show that success at tool selection or stationary use does not imply success at mobile tool use.
 
-The paper reports real-robot results for a narrow selected subset: three policies, L1 scenarios, and ten trials per condition. It also reports only one training run per policy, so policy-training variability is not estimated. A Symthaea reproduction must disclose this and, where computationally feasible, use at least five independent training seeds.
+The paper's real-robot evaluation is a narrow selected subset: three policies, selected L1 tasks, and ten trials per condition. It also reports one training run per policy, so training-seed variability is not estimated. A Symthaea research reproduction must disclose this limitation and, where computationally feasible, use at least five independent training seeds.
+
+Official source documentation:
+- Repository README and licence: https://github.com/SNU-PI/HumanoidToolBench
+- Environment/task definitions: https://github.com/SNU-PI/HumanoidToolBench/blob/main/docs/ENVIRONMENTS.md
+- Public policy interface and execution budget: https://github.com/SNU-PI/HumanoidToolBench/blob/main/docs/PUBLIC_EVALUATION.md
+- ToolBook data, revisions and rights: https://github.com/SNU-PI/HumanoidToolBench/blob/main/data/README.md
 
 ## 3. Current industry reference points
 
