@@ -21,22 +21,22 @@
 //!
 //! The following table documents prototype values only; these are not validated
 //! operating thresholds or regulatory criteria.
- //!
- //! | Threshold | Value | Meaning |
+//! 
+//! | Threshold | Value | Meaning |
 //! |-----------|-------|---------|
 //! | Stable    | ≥0.6  | Normal operation, maintain state |
 //! | Warning   | 0.4-0.6 | Elevated risk, consider power reduction |
 //! | Critical  | 0.25-0.4 | Imminent disruption, soft landing |
-//! | Emergency | <0.25 | Emergency shutdown required |
+//! | Emergency | <0.25 | Prototype emergency-category label; not a shutdown command |
 //!
-//! ## Integration with FEP
+//! ## Internal FEP command-category mapping
 //!
-//! The plasma control actions map to FEP `MotorCommandType`:
+//! The simulator's action labels map to FEP `MotorCommandType` categories:
 //! - `MaintainState` -> `NoOp`
-//! - `ReducePower` -> `LearningRateAdjust` (reduce system energy)
-//! - `AdjustMagneticField` -> `AttentionShift` (redirect configuration)
-//! - `InjectGas` -> `ExplorationTrigger` (introduce new dynamics)
-//! - `TriggerSoftLanding` -> `ReflectionInitiate` (controlled wind-down)
+//! - `ReducePower` -> `LearningRateAdjust` (internal category mapping only)
+//! - `AdjustMagneticField` -> `AttentionShift` (internal category mapping only)
+//! - `InjectGas` -> `ExplorationTrigger` (internal category mapping only)
+//! - `TriggerSoftLanding` -> `ReflectionInitiate` (internal category mapping only)
 //! These are internal agent command categories only; no hardware API is called.
 
 use serde::{Deserialize, Serialize};
