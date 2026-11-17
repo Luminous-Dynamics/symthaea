@@ -656,6 +656,243 @@ pub fn evaluate_decision_manifest_json(source:&str)->Result<DecisionReport,Strin
     Ok(DecisionReport{decision_id:m.decision_id,evidence_class:m.evidence_class,claim_ceiling:"SYNTHETIC_ONLY_NO_PHYSICAL_RESULT_OR_ROUTE_SUPERIORITY".into(),draws:m.draws,seed:m.seed,groups})
 }
 
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SensitivitySettings {
+    schema_version: String,
+    sensitivity_id: String,
+    seeds: Vec<u64>,
+    draw_counts: Vec<u32>,
+    max_feasibility_probability_range: f64,
+    max_pareto_probability_range: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SensitivityReport {
+    pub sensitivity_id: String,
+    pub evidence_class: String,
+    pub claim_ceiling: String,
+    pub seed_count: usize,
+    pub draw_counts: Vec<u32>,
+    pub run_count: usize,
+    pub groups: Vec<GroupSensitivityReport>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupSensitivityReport {
+    pub group_id: String,
+    pub run_count: u32,
+    pub disposition_counts: BTreeMap<String, u32>,
+    pub routes: Vec<RouteSensitivityReport>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RouteSensitivityReport {
+    pub route_id: String,
+    pub technology: String,
+    pub run_count: u32,
+    pub feasibility_probability_min: f64,
+    pub feasibility_probability_max: f64,
+    pub feasibility_probability_range: f64,
+    pub feasibility_range_within_tolerance: bool,
+    pub robustly_feasible_runs: u32,
+    pub robust_classification_stable: bool,
+    pub pareto_membership_available_runs: u32,
+    pub pareto_membership_probability_min: Option<f64>,
+    pub pareto_membership_probability_max: Option<f64>,
+    pub pareto_membership_probability_range: Option<f64>,
+    pub pareto_range_within_tolerance: Option<bool>,
+    pub diagnostic_top_rank_runs: BTreeMap<String, u32>,
+}
+
+#[derive(Debug, Default)]
+struct RouteSensitivityAccumulator {
+    technology: Option<String>,
+    feasibility_probabilities: Vec<f64>,
+    robust_flags: Vec<bool>,
+    pareto_probabilities: Vec<f64>,
+    diagnostic_top_rank_runs: BTreeMap<String, u32>,
+}
+
+fn value_range(values: &[f64]) -> Option<(f64, f64)> {
+    if values.is_empty() || values.iter().any(|value| !value.is_finite()) {
+        return None;
+    }
+    let min = values.iter().copied().fold(f64::INFINITY, f64::min);
+    let max = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    Some((min, max))
+}
+
+/// Re-evaluates one explicitly synthetic decision fixture across multiple seeds and
+/// draw budgets. This diagnoses Monte Carlo stability only; it does not calibrate
+/// or validate the input distributions against physical data.
+pub fn evaluate_decision_sensitivity_json(
+    decision_source: &str,
+    settings_source: &str,
+) -> Result<SensitivityReport, String> {
+    let settings: SensitivitySettings = serde_json::from_str(settings_source)
+        .map_err(|error| format!("invalid sensitivity settings: {error}"))?;
+    if settings.schema_version != "luminous.plasma-pathway-sensitivity.v0" {
+        return Err("unsupported pathway sensitivity schema".into());
+    }
+    if !nonempty(&settings.sensitivity_id) {
+        return Err("sensitivity_id must be non-empty".into());
+    }
+    if settings.seeds.len() < 3 {
+        return Err("at least three distinct seeds are required".into());
+    }
+    let mut unique_seeds = BTreeSet::new();
+    if settings.seeds.iter().any(|seed| !unique_seeds.insert(*seed)) {
+        return Err("sensitivity seeds must be unique".into());
+    }
+    if settings.draw_counts.len() < 2 {
+        return Err("at least two draw budgets are required".into());
+    }
+    if settings.draw_counts.iter().any(|draws| *draws < MIN_DRAWS || *draws > 1_000_000) {
+        return Err(format!(
+            "draw budgets must be between {MIN_DRAWS} and 1000000"
+        ));
+    }
+    if settings.draw_counts.windows(2).any(|pair| pair[0] >= pair[1]) {
+        return Err("draw budgets must be strictly increasing".into());
+    }
+    if !settings.max_feasibility_probability_range.is_finite()
+        || !(0.0..=1.0).contains(&settings.max_feasibility_probability_range)
+        || !settings.max_pareto_probability_range.is_finite()
+        || !(0.0..=1.0).contains(&settings.max_pareto_probability_range)
+    {
+        return Err("sensitivity probability-range tolerances must be within [0, 1]".into());
+    }
+
+    let mut base: serde_json::Value = serde_json::from_str(decision_source)
+        .map_err(|error| format!("invalid decision manifest: {error}"))?;
+    if base.get("evidence_class").and_then(serde_json::Value::as_str) != Some("SYNTHETIC") {
+        return Err("sensitivity v0 accepts synthetic decision manifests only".into());
+    }
+
+    let run_count = settings.seeds.len() * settings.draw_counts.len();
+    let mut route_accumulators: BTreeMap<(String, String), RouteSensitivityAccumulator> =
+        BTreeMap::new();
+    let mut group_dispositions: BTreeMap<String, BTreeMap<String, u32>> = BTreeMap::new();
+    let mut group_run_counts: BTreeMap<String, u32> = BTreeMap::new();
+
+    for seed in &settings.seeds {
+        for draws in &settings.draw_counts {
+            base["seed"] = serde_json::json!(seed);
+            base["draws"] = serde_json::json!(draws);
+            let report = evaluate_decision_manifest_json(&base.to_string())?;
+            for group in report.groups {
+                *group_run_counts.entry(group.group_id.clone()).or_default() += 1;
+                *group_dispositions
+                    .entry(group.group_id.clone())
+                    .or_default()
+                    .entry(group.disposition.clone())
+                    .or_default() += 1;
+
+                for route in group.routes {
+                    let key = (group.group_id.clone(), route.route_id.clone());
+                    let accumulator = route_accumulators.entry(key).or_default();
+                    if let Some(existing) = &accumulator.technology {
+                        if existing != &route.technology {
+                            return Err("route technology changed across sensitivity runs".into());
+                        }
+                    } else {
+                        accumulator.technology = Some(route.technology.clone());
+                    }
+                    accumulator.feasibility_probabilities.push(route.feasibility_probability);
+                    accumulator.robust_flags.push(route.robustly_feasible);
+                    if let Some(probability) = route.pareto_membership_probability {
+                        accumulator.pareto_probabilities.push(probability);
+                    }
+                }
+
+                for baseline in group.diagnostic_baselines {
+                    if let Some(top_route_id) = baseline.ranked_route_ids.first() {
+                        let key = (group.group_id.clone(), top_route_id.clone());
+                        let accumulator = route_accumulators.entry(key).or_default();
+                        *accumulator
+                            .diagnostic_top_rank_runs
+                            .entry(baseline.method)
+                            .or_default() += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    let mut groups = Vec::new();
+    for (group_id, run_count_for_group) in group_run_counts {
+        let mut routes = Vec::new();
+        for ((candidate_group, route_id), accumulator) in &route_accumulators {
+            if candidate_group != &group_id {
+                continue;
+            }
+            let Some((feasibility_min, feasibility_max)) =
+                value_range(&accumulator.feasibility_probabilities)
+            else {
+                return Err(format!("route {route_id} has no valid feasibility estimates"));
+            };
+            let feasibility_range = feasibility_max - feasibility_min;
+            let robustly_feasible_runs = accumulator
+                .robust_flags
+                .iter()
+                .filter(|value| **value)
+                .count() as u32;
+            let robust_classification_stable = robustly_feasible_runs == 0
+                || robustly_feasible_runs == accumulator.robust_flags.len() as u32;
+            let pareto_range = value_range(&accumulator.pareto_probabilities);
+            let (pareto_min, pareto_max, pareto_width, pareto_within_tolerance) =
+                match pareto_range {
+                    Some((min, max)) => (
+                        Some(min),
+                        Some(max),
+                        Some(max - min),
+                        Some(max - min <= settings.max_pareto_probability_range),
+                    ),
+                    None => (None, None, None, None),
+                };
+
+            routes.push(RouteSensitivityReport {
+                route_id: route_id.clone(),
+                technology: accumulator.technology.clone().unwrap_or_default(),
+                run_count: accumulator.feasibility_probabilities.len() as u32,
+                feasibility_probability_min: feasibility_min,
+                feasibility_probability_max: feasibility_max,
+                feasibility_probability_range: feasibility_range,
+                feasibility_range_within_tolerance: feasibility_range
+                    <= settings.max_feasibility_probability_range,
+                robustly_feasible_runs,
+                robust_classification_stable,
+                pareto_membership_available_runs: accumulator.pareto_probabilities.len() as u32,
+                pareto_membership_probability_min: pareto_min,
+                pareto_membership_probability_max: pareto_max,
+                pareto_membership_probability_range: pareto_width,
+                pareto_range_within_tolerance: pareto_within_tolerance,
+                diagnostic_top_rank_runs: accumulator.diagnostic_top_rank_runs.clone(),
+            });
+        }
+        routes.sort_by(|left, right| left.route_id.cmp(&right.route_id));
+        groups.push(GroupSensitivityReport {
+            group_id: group_id.clone(),
+            run_count: run_count_for_group,
+            disposition_counts: group_dispositions.remove(&group_id).unwrap_or_default(),
+            routes,
+        });
+    }
+
+    groups.sort_by(|left, right| left.group_id.cmp(&right.group_id));
+    Ok(SensitivityReport {
+        sensitivity_id: settings.sensitivity_id,
+        evidence_class: "SYNTHETIC".to_owned(),
+        claim_ceiling: "MONTE_CARLO_STABILITY_ONLY_NOT_EMPIRICAL_CALIBRATION_OR_PHYSICAL_VALIDATION".to_owned(),
+        seed_count: settings.seeds.len(),
+        draw_counts: settings.draw_counts,
+        run_count,
+        groups,
+    })
+}
+
 pub fn evaluate_registered_target_json(source:&str)->Result<(String,Vec<(String,String)>),String>{
     let root:serde_json::Value=serde_json::from_str(source).map_err(|e|format!("invalid register: {e}"))?;
     let target=root.get("benchmark_targets").and_then(serde_json::Value::as_array).and_then(|x|x.iter().find(|t|t["target_id"]=="PLASMA-PROCESS-PATHWAY-SELECTION-001")).ok_or("pathway selection target missing")?;
@@ -680,6 +917,7 @@ mod tests{
     use serde_json::Value;
     const FIXTURE:&str=include_str!("../plasma-audit-harness/fixtures/pathway-selection-synthetic-v0.json");
     const SOURCE:&str=include_str!("../../data/research/plasma_energy_reference_cases_v0_1.json");
+    const SENSITIVITY:&str=include_str!("../plasma-audit-harness/fixtures/pathway-sensitivity-v0.json");
     fn fixture()->Value{serde_json::from_str(FIXTURE).unwrap()}
 
     #[test] fn synthetic_fixture_executes_10000_paired_draws(){
@@ -770,6 +1008,63 @@ mod tests{
         let report=evaluate_decision_manifest_json(&value.to_string()).unwrap();
         assert_eq!(report.groups[0].disposition,"ABSTAIN_INSUFFICIENT_FEASIBLE_ROUTES");
         assert!(report.groups[0].routes.iter().all(|route|!route.robustly_feasible));
+    }
+
+
+    #[test]
+    fn sensitivity_runs_multiple_seeds_and_draw_budgets() {
+        let report = evaluate_decision_sensitivity_json(FIXTURE, SENSITIVITY).unwrap();
+        assert_eq!(report.seed_count, 3);
+        assert_eq!(report.draw_counts, vec![10_000, 20_000]);
+        assert_eq!(report.run_count, 6);
+        assert_eq!(report.groups.len(), 1);
+        assert_eq!(report.groups[0].run_count, 6);
+        assert_eq!(report.groups[0].routes.len(), 3);
+        assert_eq!(
+            report.claim_ceiling,
+            "MONTE_CARLO_STABILITY_ONLY_NOT_EMPIRICAL_CALIBRATION_OR_PHYSICAL_VALIDATION"
+        );
+    }
+
+    #[test]
+    fn sensitivity_is_reproducible_for_a_pinned_seed_grid() {
+        let first = serde_json::to_string(
+            &evaluate_decision_sensitivity_json(FIXTURE, SENSITIVITY).unwrap()
+        )
+        .unwrap();
+        let second = serde_json::to_string(
+            &evaluate_decision_sensitivity_json(FIXTURE, SENSITIVITY).unwrap()
+        )
+        .unwrap();
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn sensitivity_rejects_duplicate_seeds() {
+        let mut value: Value = serde_json::from_str(SENSITIVITY).unwrap();
+        value["seeds"][1] = value["seeds"][0].clone();
+        assert!(evaluate_decision_sensitivity_json(FIXTURE, &value.to_string()).is_err());
+    }
+
+    #[test]
+    fn sensitivity_rejects_non_increasing_draw_budgets() {
+        let mut value: Value = serde_json::from_str(SENSITIVITY).unwrap();
+        value["draw_counts"] = serde_json::json!([20_000, 10_000]);
+        assert!(evaluate_decision_sensitivity_json(FIXTURE, &value.to_string()).is_err());
+    }
+
+    #[test]
+    fn sensitivity_reports_robust_feasibility_flip_count() {
+        let report = evaluate_decision_sensitivity_json(FIXTURE, SENSITIVITY).unwrap();
+        for route in &report.groups[0].routes {
+            assert!(route.robustly_feasible_runs <= route.run_count);
+            assert_eq!(
+                route.robust_classification_stable,
+                route.robustly_feasible_runs == 0
+                    || route.robustly_feasible_runs == route.run_count
+            );
+            assert!(route.feasibility_probability_min <= route.feasibility_probability_max);
+        }
     }
 
     #[test] fn less_than_10000_draws_is_rejected(){
