@@ -92,6 +92,11 @@
       "option_id": "weak-check",
       "available_at": "2026-11-17T09:00:00Z",
       "factor_id": "weak-check"
+    },
+    {
+      "option_id": "drift-check",
+      "available_at": "2026-11-17T09:00:00Z",
+      "factor_id": "drifted-optical"
     }
   ],
   "factors": [
@@ -765,6 +770,76 @@
           }
         }
       ]
+    },
+    {
+      "factor_id": "drifted-optical",
+      "dependence_group": "optical-drifted-path",
+      "source_ids": [
+        "drifted-optical-sensor"
+      ],
+      "calibration_ref": "drift-cal",
+      "likelihoods": [
+        {
+          "hypothesis_id": "safe",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 5000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 8000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 5000,
+              "nominal_likelihood_bps": 2000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-a",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 5000,
+              "nominal_likelihood_bps": 2000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 5000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 8000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-b",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 5000,
+              "nominal_likelihood_bps": 2000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 5000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 8000
+            }
+          }
+        },
+        {
+          "hypothesis_id": "hazard-ab",
+          "outcomes": {
+            "clear": {
+              "lower_likelihood_bps": 0,
+              "upper_likelihood_bps": 3000,
+              "nominal_likelihood_bps": 1000
+            },
+            "cloudy": {
+              "lower_likelihood_bps": 7000,
+              "upper_likelihood_bps": 10000,
+              "nominal_likelihood_bps": 9000
+            }
+          }
+        }
+      ]
     }
   ],
   "hypothesis_safety": [
@@ -869,6 +944,16 @@
       "factor_ids": [
         "weak-check"
       ]
+    },
+    {
+      "calibration_id": "drift-cal",
+      "authority": "independent-drift-characterization-lab",
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "factor_ids": [
+        "drifted-optical"
+      ]
     }
   ],
   "factorization_certificates": [
@@ -877,6 +962,36 @@
       "authority": "independent-dependence-adjudication-board",
       "dependence_groups": [
         "build-pipeline",
+        "runtime-host"
+      ],
+      "action_ids": [
+        "bounded-probe"
+      ],
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "mutual_conditional_independence": true
+    },
+    {
+      "certificate_id": "pair-optical-build",
+      "authority": "independent-dependence-adjudication-board",
+      "dependence_groups": [
+        "optical-common-path",
+        "build-pipeline"
+      ],
+      "action_ids": [
+        "bounded-probe"
+      ],
+      "valid_from": "2026-11-01T00:00:00Z",
+      "valid_until": "2026-12-01T00:00:00Z",
+      "revoked_at": null,
+      "mutual_conditional_independence": true
+    },
+    {
+      "certificate_id": "pair-optical-runtime",
+      "authority": "independent-dependence-adjudication-board",
+      "dependence_groups": [
+        "optical-common-path",
         "runtime-host"
       ],
       "action_ids": [
