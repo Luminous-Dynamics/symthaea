@@ -40,3 +40,18 @@ The Aqua adapter only binds the product comparison to those owner outputs. It ca
 ```sh
 cargo test -p symthaea-aqua-bench
 ```
+
+
+## Aqua programme interfaces
+
+Product and benchmark contexts are defined in:
+- `docs/AQUA_SHOWER_SERVICE_CONTRACT_V0_1.md`
+- `docs/AQUA_SHOWER_BENCHMARK_V0_1.md`
+- `docs/AQUA_WASHSTATION_BENCHMARK_V0_1.md`
+- `docs/AQUA_THERMAL_SUITE_BENCHMARK_V0_1.md`
+- `docs/AQUA_DHW_CASCADE_BENCHMARK_V0_1.md`
+- `docs/AQUA_REFERENCE_BATHROOM_V0_1.md`
+- `docs/AQUA_REFERENCE_ROOM_ARCHETYPES_V0_1.md`
+- `docs/AQUA_OWNER_INTEGRATION_MAP_V0_1.md`
+
+The adapter remains deliberately small: it binds paired Aqua test runs to equivalent conditions and canonical owner evidence. New fixture classes and room modes must not add a second water, energy, hydraulic, water-quality, metrology, thermal, pool or safety authority.
