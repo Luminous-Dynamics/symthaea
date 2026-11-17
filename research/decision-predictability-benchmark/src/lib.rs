@@ -416,8 +416,12 @@ pub struct ResourceVector {
     pub sensor_wakeups: u64,
     pub acquisition_latency_us: u64,
     pub compute_time_us: u64,
+    pub end_to_end_p99_latency_us: u64,
     pub peak_memory_bytes: u64,
     pub persistent_memory_bytes: u64,
+    pub training_time_us: u64,
+    pub update_time_us: u64,
+    pub preprocessing_time_us: u64,
     pub measured_energy_uj: u64,
     pub communication_bytes: u64,
 }
@@ -428,8 +432,12 @@ pub fn pareto_dominates(left: ResourceVector, right: ResourceVector) -> bool {
         && left.sensor_wakeups <= right.sensor_wakeups
         && left.acquisition_latency_us <= right.acquisition_latency_us
         && left.compute_time_us <= right.compute_time_us
+        && left.end_to_end_p99_latency_us <= right.end_to_end_p99_latency_us
         && left.peak_memory_bytes <= right.peak_memory_bytes
         && left.persistent_memory_bytes <= right.persistent_memory_bytes
+        && left.training_time_us <= right.training_time_us
+        && left.update_time_us <= right.update_time_us
+        && left.preprocessing_time_us <= right.preprocessing_time_us
         && left.measured_energy_uj <= right.measured_energy_uj
         && left.communication_bytes <= right.communication_bytes;
 
@@ -437,8 +445,12 @@ pub fn pareto_dominates(left: ResourceVector, right: ResourceVector) -> bool {
         || left.sensor_wakeups < right.sensor_wakeups
         || left.acquisition_latency_us < right.acquisition_latency_us
         || left.compute_time_us < right.compute_time_us
+        || left.end_to_end_p99_latency_us < right.end_to_end_p99_latency_us
         || left.peak_memory_bytes < right.peak_memory_bytes
         || left.persistent_memory_bytes < right.persistent_memory_bytes
+        || left.training_time_us < right.training_time_us
+        || left.update_time_us < right.update_time_us
+        || left.preprocessing_time_us < right.preprocessing_time_us
         || left.measured_energy_uj < right.measured_energy_uj
         || left.communication_bytes < right.communication_bytes;
 
