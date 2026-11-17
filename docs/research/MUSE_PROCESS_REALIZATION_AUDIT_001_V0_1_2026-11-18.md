@@ -86,6 +86,60 @@ The differentiated proposition is **verifiable musical control**: a generator ca
 
 The next M1 integration should invoke this verifier on the Minimalism segment and retain its report beside the existing trace-integrity report. The verifier should remain narrowly scoped to ProcessAdditive until another grammar family has its own independent semantic contract. The MUSE Analyst typed-obligation work in #9797/#9835 remains the owner for general compositional obligations; this audit does not create a parallel obligation protocol.
 
+## Important limitation: source motif identity is not yet bound
+
+The v1 audit compares each cycle against the maximal-prefix cell **observed in the supplied score**. It does not receive the original `Motif`, a source-cell digest, or an authenticated generation receipt. A coherent pitch transformation applied to every cycle therefore remains internally prefix-consistent and is accepted by this audit.
+
+A dedicated test now documents that behavior so this contract is not later overstated. This is intentional scope, not an accidental claim that motif preservation has been proven. The next stronger contract should bind the source cell explicitly (for example, a versioned source-cell digest plus a canonical pitch/rhythm representation) and independently verify each realized cycle against it. That work should reuse the source identity and event-mapping contracts rather than infer identity from `VoiceRole`, event order, or register.
+
+Likewise, this verifier assumes the supplied plan and score are the inputs being qualified; it does not authenticate their origin. A caller that needs provenance must bind both to an immutable generation receipt and exact pinned engine/input digests.
+
+## November 2026 external benchmark and product context
+
+The competitive landscape reinforces why this is a control-verification increment, not an audio-quality claim.
+
+### Audio-generation preference
+
+Artificial Analysis currently publishes separate instrumental and vocal v1.1 boards. Its method uses blind same-prompt, same-modality pairwise preference, at least ten seconds of listening per track, Bradley–Terry estimation and 95% confidence intervals; tracks are statically loudness-normalized to approximately -16 LUFS and capped at -1 dBTP before 320 kbps MP3 delivery.
+
+Its current displayed instrumental board lists Suno v6 at 1148±22, Suno v6-mini at 1114±21, Mureka V9.5 at 1084±21, Mureka V9 at 1083±21, Lyria 3 Pro at 1080±21 and Lyria 3.5 at 1078±21. Its vocal board lists ACE Music v1 at 1160±21, Suno v6 at 1144±18, Suno v6-mini at 1132±18 and Mureka V9.5 at 1101±18. These are arena-specific preference estimates, not symbolic-control measurements; overlapping confidence intervals should not be presented as definitive rank separations.
+
+Sources: [Artificial Analysis methodology](https://artificialanalysis.ai/methodology/music), [instrumental leaderboard](https://artificialanalysis.ai/music/leaderboard/instrumental), [vocal leaderboard](https://artificialanalysis.ai/music/leaderboard/vocals).
+
+### Product control and editing
+
+Suno Studio 2.0 now offers a browser-based production workflow with MIDI import/record/edit, piano roll, MIDI-to-audio workflows, automation, built-in effects and synths, and chat-driven plugin creation. Lyria RealTime exposes moment-by-moment steering, blended text prompts and direct key, tempo, density and brightness controls in a continuous 48 kHz stereo stream.
+
+Muse should not claim that “controllability” alone is unique. The differentiator must be independently measured control correctness: whether a requested edit changes the intended musical variables, preserves protected material, produces a replayable event diff, and can be reversed.
+
+Sources: [Suno Studio 2.0](https://help.suno.com/en/articles/13670529), [Google DeepMind Lyria RealTime](https://deepmind.google/models/lyria/lyria-realtime/).
+
+### Symbolic long-range structure
+
+CAST (Scientific Reports, 14 April 2026) is a direct comparison point. It separates macro-harmonic skeleton planning from micro-texture generation using MusicBERT and MuseFormer, reporting structural error 0.22 versus 0.58 for its baseline and chord accuracy of 96% on sequences up to 1,000 tokens. The paper's stated limitations are important: its evaluated setup is single-track piano and chord-progression-driven; complex counterpoint, atonality and multi-track timbral orchestration remain future directions.
+
+This means a skeleton/texture split is not, by itself, a novel Muse claim. Muse's research bar should be higher: a typed multi-grammar plan, exact event identity, score-side independent verification, protected-edit semantics, and reproducible evidence receipts on multi-part tasks. These are target capabilities, not demonstrated comparative wins.
+
+Sources: [CAST paper](https://www.nature.com/articles/s41598-026-46750-0), [CAST limitations](https://www.nature.com/articles/s41598-026-46750-0).
+
+### Symbolic benchmark design
+
+LilyBench (June 2026) jointly evaluates symbolic generation and understanding with a 200-prompt generation suite and ten understanding tasks. It triangulates compile rate, MusPy descriptor distributions (Jensen–Shannon similarity), and LilyBERT Fréchet Music Distance, and reports disagreement between descriptor and embedding metrics. Muse should use benchmark triangulation: a file compiling is not proof of form, a descriptor match is not proof of motif identity, and a preference vote is not proof of control fidelity.
+
+Source: [LilyBench paper and benchmark](https://arxiv.org/abs/2606.08722).
+
+## Recommended next benchmark programme
+
+Keep five scorecards independent:
+
+1. **Symbolic plan fidelity:** exact constraints and grammar obligations accepted/rejected, with adversarial mutation detection and false-accept/false-reject counts.
+2. **Revision safety:** event-level correspondence F1; protected-event retention; edit locality; exact undo/redo; no unrequested mutation.
+3. **Causal control:** same seed and frozen inputs, one declared control varied at a time; effect size on intended measures plus invariance on unrelated measures.
+4. **Perceptual outcome:** blinded musician/listener judgments of process audibility, musicality and preference. Use the Artificial Analysis-style protocol for preference comparisons, but add task-specific questions for whether the requested process was actually heard.
+5. **Collaboration quality:** compare live adaptive co-creation against a yoked replay of the same prior user actions and against a fixed-policy baseline; measure latency, user agency, accepted edits, recovery from misunderstanding and user-rated usefulness.
+
+For deterministic structural invariants, the target should be 100% on frozen positive and negative fixtures. For open-ended generative behavior, preregister coverage/abstention, stratify by grammar and task, report confidence intervals, and do not optimize one headline scalar at the expense of protected-content failures.
+
 ## Validation status
 
 - Source authored on a branch based on current `main` at `67939c904adcfafd246848b74cd53c52a2cca244`.
