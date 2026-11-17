@@ -500,3 +500,12 @@ A new schema defines one immutable, condition-bound observation event rather tha
 - Four synthetic fixtures cover observed Tc, a bounded non-detection, calculated Tc under applied pressure and ML-predicted Tc.
 - tools/superconductivity-discovery-harness/src/bin/observation_event_audit.rs checks source closure, unique observation IDs, origin semantics, non-detection representation and pressure missingness.
 - The dedicated workflow tests and executes this auditor in addition to the registry and top-K metrics binaries, and retains the observation receipt.
+
+
+## 27. Synthesis-first P -> X -> y programme
+
+A new research work package, [SC-SYNTHESIS-FIRST-001 #12671](https://github.com/Luminous-Dynamics/symthaea/issues/12671), moves from structure-only candidate ranking to synthesis protocol, realized phase ensemble and property prediction. It is based on Lambard's 2026 perspective (DOI 10.1088/2515-7639/ae6e72; arXiv 2605.00313), which argues for machine-readable protocols, protocol-aware inverse design and closed-loop experimental feedback.
+
+The registry records this as a framework reference, not an empirical superconductivity benchmark. Its cited <2% realisation estimate for >50,000 low-enthalpy phases is a review-level motivation and must not be reused as a superconductivity-specific success rate.
+
+The protocol-first work is connected to the condition-bound observation-event schema and GuidedMatDiffusion phase-realization audit. It separates planned procedures, issued commands, measured execution deviations, realized structure/phase and subsequent property observations.
