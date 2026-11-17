@@ -89,6 +89,19 @@ pub struct WindBenchmarkResult {
     pub recovery_events: Vec<WindGustRecoveryResult>,
 }
 
+/// Recovery disposition for one configured gust within the observed episode horizon.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WindGustRecoveryStatus {
+    /// The gust window completed and position error crossed below 5 cm afterward.
+    Recovered,
+    /// The gust window completed but no recovery crossing occurred before the episode ended.
+    NotRecoveredByHorizon,
+    /// The episode observed the gust start but ended before its configured window completed.
+    GustWindowTruncated,
+    /// The episode ended before the configured gust start.
+    GustNotObserved,
+}
+
 /// Recovery outcome for one configured gust in one paired simulation trial.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WindGustRecoveryResult {
@@ -99,8 +112,8 @@ pub struct WindGustRecoveryResult {
     /// Number of simulated plant steps from gust end until first recovery crossing.
     /// If `recovered_within_horizon` is false, this is right-censored at the horizon.
     pub steps_after_gust_end: usize,
-    /// Whether position error crossed below 5 cm before the trial ended.
-    pub recovered_within_horizon: bool,
+    /// Distinguishes completed non-recovery from incomplete or absent gust exposure.
+    pub status: WindGustRecoveryStatus,
 }
 
 /// Physics backend selection for polymorphic benchmarks.
@@ -143,6 +156,24 @@ fn derive_episode_seed(base_phrase: &str, episode_index: usize) -> u64 {
         hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
     }
     hash.max(1)
+}
+
+/// Classify recovery without treating an unobserved or truncated gust as failure.
+fn classify_gust_recovery(
+    gust: &WindGust,
+    episode_end_time: f64,
+    recovered: bool,
+) -> WindGustRecoveryStatus {
+    let gust_end_time = gust.start_time + gust.duration;
+    if episode_end_time <= gust.start_time {
+        WindGustRecoveryStatus::GustNotObserved
+    } else if episode_end_time < gust_end_time {
+        WindGustRecoveryStatus::GustWindowTruncated
+    } else if recovered {
+        WindGustRecoveryStatus::Recovered
+    } else {
+        WindGustRecoveryStatus::NotRecoveredByHorizon
+    }
 }
 
 /// Apply every gust active at the beginning of the current plant interval.
@@ -316,13 +347,19 @@ pub fn run_wind_benchmark_with_backend(
 
             fep_errors.push(total_err / config.flight_config.steps_per_episode as f64);
 
-            for (gust_index, (_, recovered, count)) in gust_end_tracking.iter().enumerate() {
+            let episode_end_time = physics.state().timestamp;
+            for (gust_index, (gust, (_, recovered, count))) in config
+                .gusts
+                .iter()
+                .zip(gust_end_tracking.iter())
+                .enumerate()
+            {
                 recovery_steps.push(*count);
                 recovery_events.push(WindGustRecoveryResult {
                     episode_seed,
                     gust_index,
                     steps_after_gust_end: *count,
-                    recovered_within_horizon: *recovered,
+                    status: classify_gust_recovery(gust, episode_end_time, *recovered),
                 });
             }
         }
@@ -1114,6 +1151,35 @@ mod tests {
         assert_eq!(result.recovery_events.len(), 1);
         assert_eq!(result.recovery_events[0].episode_seed, result.episode_seeds[0]);
         assert_eq!(result.recovery_events[0].gust_index, 0);
+        assert_ne!(
+            result.recovery_events[0].status,
+            WindGustRecoveryStatus::GustNotObserved
+        );
+    }
+
+    #[test]
+    fn recovery_classifier_preserves_unobserved_and_truncated_gusts() {
+        let gust = WindGust {
+            force: [0.1, 0.0, 0.0],
+            start_time: 1.0,
+            duration: 0.5,
+        };
+        assert_eq!(
+            classify_gust_recovery(&gust, 0.9, false),
+            WindGustRecoveryStatus::GustNotObserved
+        );
+        assert_eq!(
+            classify_gust_recovery(&gust, 1.2, false),
+            WindGustRecoveryStatus::GustWindowTruncated
+        );
+        assert_eq!(
+            classify_gust_recovery(&gust, 1.5, true),
+            WindGustRecoveryStatus::Recovered
+        );
+        assert_eq!(
+            classify_gust_recovery(&gust, 2.0, false),
+            WindGustRecoveryStatus::NotRecoveredByHorizon
+        );
     }
 
     #[test]
