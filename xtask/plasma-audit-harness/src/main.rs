@@ -35,6 +35,48 @@ fn main() -> anyhow::Result<()> {
         demo.groups.len(),
         demo.draws
     );
+    let sensitivity_settings = std::fs::read_to_string(
+        repository_root
+            .join("xtask/plasma-audit-harness/fixtures/pathway-sensitivity-v0.json"),
+    )?;
+    let sensitivity =
+        xtask::plasma_pathway_decision::evaluate_decision_sensitivity_json(
+            &fixture,
+            &sensitivity_settings,
+        )
+        .map_err(anyhow::Error::msg)?;
+    println!(
+        "SYNTHETIC SENSITIVITY: {} runs / {} seeds / {} draw budgets / no physical calibration",
+        sensitivity.run_count,
+        sensitivity.seed_count,
+        sensitivity.draw_counts.len()
+    );
+    for group in &sensitivity.groups {
+        println!(
+            "  {}: {}",
+            group.group_id,
+            group.disposition_counts
+                .iter()
+                .map(|(disposition, count)| format!("{disposition}={count}"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        for route in &group.routes {
+            println!(
+                "    {}: feasibility range {:.5}; robust classification stable={}; Pareto range={:?}",
+                route.route_id,
+                route.feasibility_probability_range,
+                route.robust_classification_stable,
+                route.pareto_membership_probability_range
+            );
+        }
+    }
+    anyhow::ensure!(
+        sensitivity.run_count == 6
+            && sensitivity.claim_ceiling
+                == "MONTE_CARLO_STABILITY_ONLY_NOT_EMPIRICAL_CALIBRATION_OR_PHYSICAL_VALIDATION",
+        "pathway sensitivity must remain a six-run synthetic stability analysis"
+    );
     anyhow::ensure!(
         demo.groups
             .iter()
