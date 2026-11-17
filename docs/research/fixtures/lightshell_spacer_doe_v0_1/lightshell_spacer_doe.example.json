@@ -78,6 +78,7 @@
   "candidate_structures": [
     {
       "candidate_id": "A0-L",
+      "stage": "screen",
       "inlay_architecture": "none",
       "spacer_frequency": "low",
       "transition_geometry": "not_applicable",
@@ -88,6 +89,7 @@
     },
     {
       "candidate_id": "A0-R",
+      "stage": "screen",
       "inlay_architecture": "none",
       "spacer_frequency": "reference",
       "transition_geometry": "not_applicable",
@@ -98,6 +100,7 @@
     },
     {
       "candidate_id": "A0-H",
+      "stage": "screen",
       "inlay_architecture": "none",
       "spacer_frequency": "high",
       "transition_geometry": "not_applicable",
@@ -108,9 +111,10 @@
     },
     {
       "candidate_id": "A1-L",
+      "stage": "screen",
       "inlay_architecture": "float",
       "spacer_frequency": "low",
-      "transition_geometry": "not_defined",
+      "transition_geometry": "not_applicable",
       "state": "proposed",
       "material_lot_ref": null,
       "process_revision_ref": null,
@@ -118,9 +122,10 @@
     },
     {
       "candidate_id": "A1-R",
+      "stage": "screen",
       "inlay_architecture": "float",
       "spacer_frequency": "reference",
-      "transition_geometry": "not_defined",
+      "transition_geometry": "not_applicable",
       "state": "proposed",
       "material_lot_ref": null,
       "process_revision_ref": null,
@@ -128,9 +133,10 @@
     },
     {
       "candidate_id": "A1-H",
+      "stage": "screen",
       "inlay_architecture": "float",
       "spacer_frequency": "high",
-      "transition_geometry": "not_defined",
+      "transition_geometry": "not_applicable",
       "state": "proposed",
       "material_lot_ref": null,
       "process_revision_ref": null,
@@ -138,9 +144,10 @@
     },
     {
       "candidate_id": "A2-L",
+      "stage": "screen",
       "inlay_architecture": "square_wave",
       "spacer_frequency": "low",
-      "transition_geometry": "one_needle",
+      "transition_geometry": "two_needles",
       "state": "proposed",
       "material_lot_ref": null,
       "process_revision_ref": null,
@@ -148,6 +155,7 @@
     },
     {
       "candidate_id": "A2-R",
+      "stage": "screen",
       "inlay_architecture": "square_wave",
       "spacer_frequency": "reference",
       "transition_geometry": "two_needles",
@@ -158,9 +166,10 @@
     },
     {
       "candidate_id": "A2-H",
+      "stage": "screen",
       "inlay_architecture": "square_wave",
       "spacer_frequency": "high",
-      "transition_geometry": "three_needles",
+      "transition_geometry": "two_needles",
       "state": "proposed",
       "material_lot_ref": null,
       "process_revision_ref": null,
@@ -168,9 +177,10 @@
     },
     {
       "candidate_id": "A3-L",
+      "stage": "screen",
       "inlay_architecture": "square_wave_anchored_tuck",
       "spacer_frequency": "low",
-      "transition_geometry": "one_needle",
+      "transition_geometry": "two_needles",
       "state": "proposed",
       "material_lot_ref": null,
       "process_revision_ref": null,
@@ -178,6 +188,7 @@
     },
     {
       "candidate_id": "A3-R",
+      "stage": "screen",
       "inlay_architecture": "square_wave_anchored_tuck",
       "spacer_frequency": "reference",
       "transition_geometry": "two_needles",
@@ -188,8 +199,75 @@
     },
     {
       "candidate_id": "A3-H",
+      "stage": "screen",
       "inlay_architecture": "square_wave_anchored_tuck",
       "spacer_frequency": "high",
+      "transition_geometry": "two_needles",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A2-T-one_needle",
+      "stage": "transition_refinement",
+      "inlay_architecture": "square_wave",
+      "spacer_frequency": "reference",
+      "transition_geometry": "one_needle",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A3-T-one_needle",
+      "stage": "transition_refinement",
+      "inlay_architecture": "square_wave_anchored_tuck",
+      "spacer_frequency": "reference",
+      "transition_geometry": "one_needle",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A2-T-two_needles",
+      "stage": "transition_refinement",
+      "inlay_architecture": "square_wave",
+      "spacer_frequency": "reference",
+      "transition_geometry": "two_needles",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A3-T-two_needles",
+      "stage": "transition_refinement",
+      "inlay_architecture": "square_wave_anchored_tuck",
+      "spacer_frequency": "reference",
+      "transition_geometry": "two_needles",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A2-T-three_needles",
+      "stage": "transition_refinement",
+      "inlay_architecture": "square_wave",
+      "spacer_frequency": "reference",
+      "transition_geometry": "three_needles",
+      "state": "proposed",
+      "material_lot_ref": null,
+      "process_revision_ref": null,
+      "replicate_plan": "Exploratory pilot only; finalize independent manufacturing-lot and specimen replicate counts from capability preflight and pilot variance before preregistration."
+    },
+    {
+      "candidate_id": "A3-T-three_needles",
+      "stage": "transition_refinement",
+      "inlay_architecture": "square_wave_anchored_tuck",
+      "spacer_frequency": "reference",
       "transition_geometry": "three_needles",
       "state": "proposed",
       "material_lot_ref": null,
