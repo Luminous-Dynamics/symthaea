@@ -202,6 +202,29 @@ Operations: wall-clock to qualified simulated decision, accepted-simulated-produ
 
 Trust: zero holdout leakage, zero simulator-to-physical evidence promotion, zero stale calibration use, zero stage-order violations, zero budget overrun, deterministic replay equality.
 
+### External benchmark anchors and comparison discipline
+
+The comparison set must be updated as the field moves; the following publications add concrete, current anchors:
+
+| External work | What it demonstrates | What B1 must compare (and must not claim) |
+|---|---|---|
+| BALPI, first published 4 June 2026 | GP classifier/regressor phase mapping; MES, BALD, SMOCU and e-straddle; resolves disconnected regions in CALPHAD oracle worlds | Reproduce e-straddle(c), e-straddle(b), SMOCU and MES on matched hidden phase worlds. Its CALPHAD results are not physical ISRU validation. |
+| Cost-aware nanoindentation BO, first published 22 June 2026 | Heteroskedastic GP-BO with drift stabilization, lateral movement and reconfiguration costs; nearly 30× efficiency versus grid mapping in that thin-film workflow | Include instrument stabilization, inspection, calibration and reconfiguration costs. Do not transplant the 30× result as an ISRU target or claim. |
+| Cost-aware batch BO with hierarchical/deep GP (2026) | Multi-fidelity/heterotopic query allocation and batch optimization across multiple material properties | Include cheap proxy vs expensive assay actions, batch selection and multi-fidelity baselines; test whether extra model complexity helps only on nonlinear/high-dimensional worlds. |
+| NASA LR-1 molten-regolith electrolysis (ICES 2026) | 25 kg simulant processed; reported 0.07 kg O₂/h average for a 9 h vacuum campaign | Industrially relevant sustained-throughput and monitoring comparator for a different extraction route. Not directly comparable to asteroid optical water release/capture. |
+| NASA CaRD solar-carbothermal prototype (2026) | Integrated solar concentrator, optical splash plate/shutter, reactor, gas analysis and control; CO detection confirmed reaction | Systems integration, optical protection, gas measurement and energy-boundary comparator. CO confirmation is not a quantified commercial oxygen-production rate. |
+| Nectar A/B optical-mining campaign (2025) | Irradiance/morphology-dependent spallation, brittle–ductile transition, melt/surface-refresh effects, organic fouling and purge-water signal contamination | Directly relevant physical failure-mode evidence for the optical-mining model; reported rates remain specific to the test-bed and simulants. |
+
+Sources:
+- BALPI: https://pubs.rsc.org/en/content/articlehtml/2026/dd/d5dd00459d
+- Cost-aware nanoindentation: https://pubs.rsc.org/en/content/articlehtml/2026/dd/d5dd00518c
+- Cost-aware batch BO: https://www.nature.com/articles/s41524-026-01981-7
+- NASA LR-1 MRE: https://ntrs.nasa.gov/citations/20260006167
+- NASA CaRD: https://ntrs.nasa.gov/citations/20260002864
+- Nectar A/B: https://doi.org/10.1016/j.actaastro.2025.04.033
+
+A further paradigm shift is to score the campaign against the *first correct qualified decision*, not the best predicted response. This requires action-level baselines that can choose an experiment, reference measurement, QCM/witness inspection, calibration, cleaning/requalification, independent assay or pause. The dedicated decision-directed benchmark is tracked in [ISRU-DECISION-BO-001 #12607](https://github.com/Luminous-Dynamics/symthaea/issues/12607).
+
 ## 8. Initial targets (hypotheses, not achieved results)
 
 - Detect an optical-health threshold crossing before the next exposure action in at least 99% of frozen B1 failure/contamination scenarios.
@@ -238,6 +261,7 @@ Current regression tests cover asynchronous out-of-order completion, lock conten
 - Noise is a deterministic approximation, not an empirical instrument noise distribution.
 - Maintenance/recalibration are initially synchronous and require an idle event queue; a later iteration should make them first-class asynchronous tasks.
 - The model does not yet represent reactive chemistry, particulate adhesion dynamics, thermal gradients, coating delamination, sensor saturation or a validated vacuum/outgassing transport solver.
+- The coupled pulse transaction is an initial deterministic composition. It does not yet model spatially resolved deposition, time-varying contaminant chemistry, temperature-dependent sticking/desorption, particulate impact, or uncertainty propagation across the material-to-surface transfer.
 - Signatures, external metrology authority, raw-file custody and physical safety interlocks remain external.
 - B2 requires representative terrestrial experiments, independently characterized transfer factors, randomized/blocked validation, independent assay and an external safety authority.
 
