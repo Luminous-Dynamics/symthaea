@@ -118,7 +118,7 @@ Proposed target: reduce evaluator-dominated submissions by at least 50% versus t
 
 ## 8. Exact-artifact multiplicity follow-up
 
-The selector now receives a canonical view rather than the raw attempt packet. Two ready rows with the same exact model-artifact digest collapse to the lexicographically smallest candidate ID, and the remaining row data must agree exactly on development metrics, eligibility and permitted evidence. A policy cannot select a noncanonical alias ID. The raw attempt packet remains intact for evaluator accounting, and the report separately records attempted rows, distinct artifact count and exact duplicate-attempt count.
+The selector now receives a canonical view rather than the raw attempt packet. Two ready rows with the same exact model-artifact digest collapse to the lexicographically smallest candidate ID, and the remaining row data must agree exactly on development metrics, eligibility and permitted evidence. A policy cannot select a noncanonical alias ID. Evaluator outcomes are supplied once per canonical artifact; outcomes attached only to a duplicate alias are rejected. The raw attempt packet remains intact for evaluator accounting, and the report separately records total attempted rows, ready/generation-failed/execution-failed/timed-out/invalid/rejected/incomplete attempt counts, distinct artifact count, selectable candidate count and exact duplicate-attempt count. Missing evaluator outcomes are counted against distinct selectable artifacts, not duplicate aliases.
 
 This rule applies only to exact SHA-256 identity. It does not merge different byte artifacts that are functionally or scientifically equivalent. Such equivalence requires an independent scientific test and remains a separate endpoint.
 
