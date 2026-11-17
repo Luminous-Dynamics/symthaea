@@ -29,7 +29,7 @@ A feature-mode percentage is not a whole-service resource result. A sensor estim
 | US EPA WaterSense showerhead programme | Maximum 2.0 US gpm = 7.6 L/min | Efficient-shower reference with minimum-flow, spray-force, spray-coverage and pressure-compensation criteria | Not a South African legal flow limit; not a recirculating system; not a full bathroom service benchmark |
 | KOHLER Anthem EvoCycle, Cycle Mode | Manufacturer advertises up to 80% water saving; 0.5 gpm fresh water blended into a 2.5 gpm total shower stream | A current high-end recirculating-shower incumbent with fresh-water refresh during one active session | Manufacturer figure is not independent hygiene evidence or a complete all-in lifecycle comparison |
 | Orbital Shower | Manufacturer says a long shower can use about 20 L | A second commercial recirculating-shower comparator | The public claim is not normalized here for exact duration, user task, startup, cleaning, purge or service life |
-| Shower drain-water heat recovery | 14-month in-situ study: 66% overall exchanger efficiency after fouling/unsteady effects; 52% overall system efficiency after showerhead-to-drain heat loss; fouling reduced nominal efficiency by 8% | A field-informed comparator for long-term, whole-system thermal recovery | Not a universal device efficiency; result depends on exchanger, geometry, water profile, fouling and installation |
+| Shower drain-water heat recovery | 14-month in-situ study: 66% overall exchanger efficiency after fouling/unsteady effects; 52% overall system efficiency after showerhead-to-drain heat loss; fouling reduced nominal efficiency by 8% | A field-informed comparator for long-term, whole-system thermal recovery | Not a universal device efficiency; result depends on exchanger, geometry, water profile, fouling and installation |\n| CLASP South African sample / WRC 2025 synthesis | Pressure-compensating models averaged ~6.6 L/min at 300 kPa; fixed-orifice models ~24–27 L/min | A locally relevant market benchmark from a 19-product sample and later WRC summary | Not a 2026 exhaustive market census or an exact named-SKU result |\n| Hansgrohe EcoSmart+ family | Manufacturer states ≤6 L/min at 3 bar for certain shower products | Premium local-market flow claim | Family-level manufacturer claim, not an independently matched product test |\n| Consumer Reports 2026 test population | Publicly listed top-performing examples include 1.5–1.6 gpm (5.68–6.06 L/min) heads; tests include coverage, force, water use and temperature drop | Global independent consumer-lab comparator | Exact model/market variant and test protocol must be reproduced before head-to-head claims |
 
 ### Sources and evidence class
 
@@ -83,7 +83,7 @@ These are hypotheses to test, not achieved results or frozen engineering require
 
 | Dimension | Proposed target | Required qualification |
 |---|---|---|
-| Direct-flow shower | ≤6.0 L/min at 300 kPa reference | Meet the selected spray coverage, force and pressure-compensation criteria; test at 150 and 300 kPa; user comfort non-inferior to the matched control |
+| Direct-flow primary target | ≤6.0 L/min at 300 kPa reference | Meet the selected spray coverage, force and pressure-compensation criteria; test at 150 and 300 kPa; user comfort non-inferior to the matched control |\n| Direct-flow stretch target | ≤4.5 L/min at 300 kPa | Preserve non-inferior spray coverage, force, temperature stability and user task outcome; a research stretch, not a binding South African standard |
 | Within-session recirculation | ≤18 L fresh water per standardized 10-minute service | Include warm-up/priming, active use, refresh, complete recommended after-session cleaning and purge; never store recirculated water for later users |
 | Water savings | ≥80% versus a matched 2.5 gpm once-through control only if the all-in boundary passes | Include all fresh water and failed attempts; compare the same duration, task, comfort and coverage |
 | Shower heat recovery | ≥60% useful system-level recovery after a declared fouling/maintenance sequence | Count heat actually delivered to incoming water, parasitic electricity, pressure loss, heat lost between head and drain, and uncertainty |
@@ -92,11 +92,11 @@ These are hypotheses to test, not achieved results or frozen engineering require
 
 The 18 L target intentionally sits below both the arithmetic KOHLER example including its stated Rapid Clean water (21.8 L) and the public Orbital long-shower claim (~20 L). This is only a target-setting comparison: a superiority claim requires equal test duration, use profile and full system boundary for each incumbent.
 
-The 6.0 L/min direct-flow target is 21% below the WaterSense 7.6 L/min maximum. It is only useful if pressure compensation, coverage, force and satisfaction are retained.
+The 6.0 L/min direct-flow target is 21% below the WaterSense 7.6 L/min maximum, but this alone is not a global SOTA claim: independent 2026 consumer testing lists showerheads at 1.5–1.6 gpm (5.68–6.06 L/min), and Hansgrohe advertises ≤6 L/min on some EcoSmart+ models. The 4.5 L/min stretch target is intended to move beyond those visible benchmarks while preserving pressure robustness and task quality; it must be validated rather than assumed.
 
 The 60% heat-recovery target is a stretch above the cited 52% in-situ system result. It is not a permissible design assumption. Test long-term fouling, service interval and parasitic losses before evaluating it.
 
-## 5. Safety, room engineering and South African deployment context
+## 6. Safety, room engineering and South African deployment context
 
 ### Pool and hot-tub systems
 - CDC's 2024 fifth-edition Model Aquatic Health Code is model guidance for public aquatic venues; it only becomes binding when adopted by a jurisdiction.
@@ -114,7 +114,7 @@ https://handbook.ashrae.org/Handbooks/A23/IP/A23_Ch06/A23_Ch06_ip.aspx
 The City of Johannesburg Water Services By-laws 2023 section 74 states that greywater tank installations must comply with applicable building requirements and that stored greywater must be filtered and disinfected to a water specialist's written specification. Section 106A controls pool backwash discharge and prohibits pool-water discharge to roads, gutters, storm-water drains, watercourses and other properties. These provisions do not by themselves establish a treatment recipe or a blanket approval for any reuse application. Qualified local plumbing/building/water specialists must verify the applicable current requirements before any installation.  
 https://joburg.org.za/documents_/Documents/By-Laws/2023/City%20of%20Johannesburg%20Water%20Services%20Bylaws_%202023%20Gazette.pdf
 
-## 6. Architecture consequences
+## 7. Architecture consequences
 
 1. Treat clean-water direct-flow and within-session recirculation as two separate shower modes with an explicit safe transition and independent water accounting.
 2. Keep in-session recirculation physically separate from household greywater storage/reuse, pools, bidets, toilets and rainwater/non-potable circuits.
@@ -124,7 +124,7 @@ https://joburg.org.za/documents_/Documents/By-Laws/2023/City%20of%20Johannesburg
 6. Use Mycelix-admitted metrology and water-quality assessment for claims; use Symtropy's existing physical owners and Sol-Atlas pool thermal work rather than creating duplicate solvers.
 7. Make repairability and cleaning time part of the benchmark, not an afterthought.
 
-## 7. Minimum matched-test protocol
+## 8. Minimum matched-test protocol
 
 For every comparator, freeze exact model/market variant, installed options, software/firmware, installation geometry, supply pressure, inlet temperature, ambient temperature/RH, task duration and user-selected mode.
 
@@ -142,7 +142,7 @@ Run cold-start, warm-start, 5/10/15-minute durations, low/nominal/high pressure,
 
 For recirculating systems, independent microbiological and aerosol-exposure specialists must define sampling methods, challenge organisms/indicators, detection limits, sampling points and acceptance criteria before a bench can advance. A turbidity, conductivity, ORP, UV-intensity or ozone sensor reading alone is not proof of pathogen control.
 
-## 8. Claim and evidence rules
+## 9. Claim and evidence rules
 
 - A vendor statement stays a vendor statement until independently tested.
 - Standards-based product qualification, analytical calculation, synthetic simulation, unoccupied bench result, human-factors result and field result are separate evidence classes.
@@ -151,7 +151,7 @@ For recirculating systems, independent microbiological and aerosol-exposure spec
 - No performance number transfers from shower to bath, basin, bidet, steam room, sauna or pool.
 - No medical, therapeutic, pathogen-free, regulatory-compliance or consumer-superiority claim is permitted without the relevant independent evidence.
 
-## 9. Next actions
+## 10. Next actions
 
 1. Obtain current installation, maintenance, filter and cleaning documentation for each named shower comparator.
 2. Build a matched comparison worksheet with one row per configuration and explicit unknown fields.
@@ -159,7 +159,7 @@ For recirculating systems, independent microbiological and aerosol-exposure spec
 4. Compose Mycelix metrology/quality, Symtropy WaterLoop and Sol-Atlas pool-thermal dependencies.
 5. Only then select a test-article architecture and freeze an unoccupied bench protocol.
 
-## References
+## 11. References
 
 - US EPA WaterSense showerheads: https://www.epa.gov/watersense/showerheads
 - KOHLER Anthem EvoCycle product description and operating boundary: https://www.kohler.com/en/products/showers/anthem-evocycle
@@ -171,7 +171,7 @@ For recirculating systems, independent microbiological and aerosol-exposure spec
 - City of Johannesburg Water Services By-laws 2023: https://joburg.org.za/documents_/Documents/By-Laws/2023/City%20of%20Johannesburg%20Water%20Services%20Bylaws_%202023%20Gazette.pdf
 
 
-## Additional sources added in v0.2
+## 12. Additional sources added in v0.2
 
 - CLASP, *South African Shower Heads Testing Report*: https://www.clasp.ngo/research/all/south-african-shower-heads-testing-report/
 - WRC / Water Wheel 2025, South African showerhead testing and WELS development: https://www.wrc.org.za/wp-content/uploads/mdocs/WW%20July%20-%20Sept%202025_web.pdf
