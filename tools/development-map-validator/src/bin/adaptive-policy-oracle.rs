@@ -121,7 +121,7 @@ fn parse_nodes(tree:&Value,options:&BTreeMap<String,OptionDef>,factor_outcomes:&
    let branches=raw.iter().map(|(k,x)|Ok((k.clone(),x.as_str().ok_or("branch target must be string")?.to_owned()))).collect::<Result<BTreeMap<_,_>,String>>()?;
    let factor=factor_outcomes.get(&opt.factor_id).ok_or_else(||format!("missing factor outcome set for {:?}",opt.factor_id))?;
    if branches.keys().cloned().collect::<BTreeSet<_>>()!=*factor{return Err(format!("{l}.branches must cover every factor outcome exactly"));}
-   Node{id,kind,option_id:Some(option),at:Some(at),branches,decision_kind:None,action_id:None,claimed:0}
+   Node{id:id.clone(),kind:kind.clone(),option_id:Some(option),at:Some(at),branches,decision_kind:None,action_id:None,claimed:0}
   }else if kind=="stop"{
    allowed(v,&["node_id","kind","decision_kind","action_id","claimed_residual_risk_bps"],&l)?;
    let decision=s(v,"decision_kind",&l)?;if decision!="act"&&decision!="defer"{return Err("decision_kind must be act or defer".to_owned());}
@@ -133,7 +133,7 @@ fn parse_nodes(tree:&Value,options:&BTreeMap<String,OptionDef>,factor_outcomes:&
      return Err("defer must use a non-irreversible, non-hard-gated zero-risk action".to_owned());
     }
    }
-   Node{id,kind,option_id:None,at:None,branches:BTreeMap::new(),decision_kind:Some(decision),action_id:Some(action),claimed}
+   Node{id:id.clone(),kind:kind.clone(),option_id:None,at:None,branches:BTreeMap::new(),decision_kind:Some(decision),action_id:Some(action),claimed}
   }else{return Err(format!("{l}.kind must be acquire or stop"));};
   if nodes.insert(id.clone(),node).is_some(){return Err(format!("duplicate node id {id:?}"));}
  }
@@ -220,8 +220,8 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
    }
    let option=node.option_id.as_ref().unwrap();if !seen.insert(option.clone()){return Err(format!("policy repeats option {option:?} on path for {world_id:?}"));}
    let at_raw=node.at.as_ref().unwrap();let at=parse_time(at_raw,"policy acquisition at")?;let opt=&options[option];
-   if at<opt.available_at||at>cutoff{return Err(format!("option {option:?} is not available at submitted timestamp"));}
-   if previous.as_ref().is_some_and(|t|at<*t){return Err("acquisition times must be nondecreasing on each path".to_owned());}
+   if &at<&opt.available_at||at>cutoff{return Err(format!("option {option:?} is not available at submitted timestamp"));}
+   if previous.as_ref().is_some_and(|t|&at<t){return Err("acquisition times must be nondecreasing on each path".to_owned());}
    previous=Some(at);
    let outcome=world.observations.get(option).ok_or_else(||format!("world {world_id:?} has no observation for {option:?}"))?.clone();
    let child=node.branches.get(&outcome).ok_or_else(||format!("policy has no branch for observed outcome {outcome:?}"))?.clone();
