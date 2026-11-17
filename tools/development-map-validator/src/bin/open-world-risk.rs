@@ -409,6 +409,29 @@ mod tests{
         assert_eq!(unknown["nominal_probability_bps"],1000);
         assert_eq!(aug["hypothesis_bounds"],oracle_aug["hypothesis_bounds"]);
     }
+    #[test]fn maximum_reserve_scales_lower_bound_separately_from_nominal_reserve(){
+        let candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
+        let oracle:Value=serde_json::from_str(ORACLE).unwrap();
+        let policy=&oracle["open_world_policy"];
+        let safe=string_set(&policy["unknown_safe_action_ids"],"unknown_safe_action_ids").unwrap();
+        let rows=policy["unknown_channel_likelihoods"].as_array().unwrap();
+        let map:BTreeMap<String,Value>=rows.iter().map(|r|(
+            r["factor_id"].as_str().unwrap().to_owned(),
+            json!({"hypothesis_id":"unknown-world","outcomes":r["outcomes"]})
+        )).collect();
+        let (aug,_)=augment_candidate_and_oracle(&candidate,&oracle,"unknown-world",1200,600,&safe,&map).unwrap();
+        let known=&aug["hypothesis_bounds"][0];
+        let unknown=&aug["hypothesis_bounds"][1];
+        assert_eq!(known["lower_probability_bps"],7920);
+        assert_eq!(known["nominal_probability_bps"],9400);
+        assert_eq!(unknown["upper_probability_bps"],1200);
+        assert_eq!(unknown["nominal_probability_bps"],600);
+    }
+    #[test]fn no_acquisition_is_reported_as_no_evidence(){
+        let t=trace(&report(),"no-evidence-deploy");
+        assert_eq!(t["open_world_evidence_status"],"accepted");
+        assert_eq!(report()["open_world_report"]["traces"][0]["dependence_mode"],"no_evidence");
+    }
     #[test]fn invalid_unknown_channel_partition_fails_closed(){
         let candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
         let mut oracle:Value=serde_json::from_str(ORACLE).unwrap();
