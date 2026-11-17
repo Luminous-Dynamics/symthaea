@@ -58,3 +58,17 @@ The companion `robust` module accepts one explicit operator-norm bound per degre
 A rank/template result is called guaranteed only if one candidate's worst-case L1 distance is strictly below every competitor's best-case distance. Otherwise the module returns a conservative set of templates that have not been ruled out. This is an interval decision, not a probability distribution.
 
 The bounds are assumptions supplied by the caller. The module does not prove that the bounds hold, estimate them from the Jacobi SVD residual, or promote a spectral match into an action or pruning certificate. Its claim ceiling remains spectral compatibility only.
+
+
+## Paired-matrix perturbation provenance (new)
+
+The `paired` module closes a provenance gap in the caller-supplied Weyl bounds:
+
+- A paired case carries the exact row-major reference and observed representation matrices for every degree, with stable reference/observation IDs.
+- The reference matrices are re-SVD'd under the exact profile and must reproduce the stored SymFP spectrum, sweep count and normalized orthogonality residual bit-for-bit. A rank-only receipt without matrix/SVD provenance is rejected by this path.
+- The observed-minus-reference matrix is constructed internally. The module computes an outward-rounded Frobenius norm upper bound from those finite f64 entries. Since `||A||₂ ≤ ||A||F`, this supplies a conservative operator-norm perturbation bound for that exact supplied matrix pair.
+- The derived bounds feed the existing robust threshold/rank/template interval classifier. The paired receipt carries the complete matrix pair, derived bounds and classification; verification recomputes all of them.
+
+This improves reproducibility over accepting an unexplained delta value. The exact guarantee is limited to the supplied reference/observed matrix pair and the outward-rounded numerical bound. It does **not** establish that the reference is the true physical representation, that future/noisy samples remain within the same envelope, or that a rank match proves a symmetry. The authority string remains `PAIRED_SPECTRAL_COMPATIBILITY_ONLY_NOT_A_SYMMETRY_CERTIFICATE`.
+
+Tests cover zero-delta exact classification, a known 3-4-5 Frobenius bound, source-matrix mutation, forged-bound rejection, shape mismatch and overflow. The existing caller-supplied-bound API remains available as an explicit assumption-based path; use the paired API when the actual reference and observed representation matrices are available.
