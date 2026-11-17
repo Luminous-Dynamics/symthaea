@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-stochastic-kernel-oracle-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.2 evaluator-owned stochastic joint-kernel oracle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "world_kernels"
+  ],
+  "properties": {
+    "world_kernels": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "hypothesis_id",
+          "kernel_id",
+          "authority",
+          "valid_from",
+          "valid_until",
+          "revoked_at",
+          "joint_outcomes"
+        ],
+        "properties": {
+          "hypothesis_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kernel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "authority": {
+            "type": "string",
+            "minLength": 1
+          },
+          "valid_from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "valid_until": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "joint_outcomes": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 4096,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "outcomes",
+                "lower_probability_bps",
+                "upper_probability_bps",
+                "nominal_probability_bps"
+              ],
+              "properties": {
+                "outcomes": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "lower_probability_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "upper_probability_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "nominal_probability_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
