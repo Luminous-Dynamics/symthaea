@@ -39,7 +39,6 @@
         "type": "object",
         "required": [
           "source_id",
-          "doi",
           "url",
           "source_type",
           "title",
@@ -50,7 +49,8 @@
             "type": "string"
           },
           "doi": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "url": {
             "type": "string",
@@ -67,9 +67,37 @@
           },
           "primary_claim_boundary": {
             "type": "string"
+          },
+          "arxiv_id": {
+            "type": "string",
+            "minLength": 1
           }
         },
-        "additionalProperties": true
+        "additionalProperties": true,
+        "anyOf": [
+          {
+            "required": [
+              "doi"
+            ],
+            "properties": {
+              "doi": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          {
+            "required": [
+              "arxiv_id"
+            ],
+            "properties": {
+              "arxiv_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        ]
       }
     },
     "candidate_records": {
