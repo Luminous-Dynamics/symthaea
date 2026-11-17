@@ -159,28 +159,34 @@
                   "y"
                 ]
               },
-              "monomial_exponents": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "type": "array",
-                  "minItems": 2,
-                  "maxItems": 2,
-                  "items": {
-                    "type": "integer",
-                    "minimum": 0
-                  }
-                }
-              },
-              "coefficients": {
-                "type": "array",
-                "minItems": 1,
-                "items": {
-                  "type": "number"
-                }
-              },
               "exact_rational": {
                 "type": "boolean"
+              },
+              "terms": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "exponents",
+                    "coefficient"
+                  ],
+                  "properties": {
+                    "exponents": {
+                      "type": "array",
+                      "minItems": 2,
+                      "maxItems": 2,
+                      "items": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "coefficient": {
+                      "type": "number"
+                    }
+                  }
+                }
               }
             }
           },
