@@ -38,6 +38,12 @@ exclude = [
     # They have no Cargo.toml and must not be selected by the crates/core/* glob.
     "crates/core/symthaea-iit",
     "crates/core/symthaea-observation-attestation",
+    # Non-package domain shells identified by a complete crates/domains/* tree inventory.
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-marine-geometry",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
 ]
 default-members = [
     "xtask",
