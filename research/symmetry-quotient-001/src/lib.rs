@@ -11,6 +11,13 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
+pub mod content_binding;
+pub use content_binding::{
+    BoundQuotientPackageV1, ContentBindingBudgetV1, ContentBindingErrorV1,
+    bind_quotient_certificate, canonical_action_bytes_v1, canonical_certificate_bytes_v1,
+    canonical_problem_bytes_v1, sha256_hex, verify_bound_certificate,
+};
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FiniteGroupV1 {
     pub group_id: String,
