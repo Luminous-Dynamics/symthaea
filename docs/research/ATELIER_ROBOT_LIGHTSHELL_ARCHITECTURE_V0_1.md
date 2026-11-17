@@ -259,3 +259,12 @@ The first competitive experiment should include:
 - Lightshell textile + spacer + local guard candidate.
 
 The result should answer whether Lightshell improves the Pareto frontier across added mass, abrasion/impact response, mobility, thermal margin, sensing, cleanability, repair time and cost per accepted service-hour. It may win on repairability or comfort while losing on high-pressure cleaning; report that trade-off honestly. The best product family may therefore be two distinct architectures: a conformal soft garment and a sealed process cover.
+
+
+## Research extensions — 17 November 2026
+
+Two follow-on tracks now make the frontier explicit:
+- [LIGHTSHELL-SENSOR-FABRIC-001 #12704](https://github.com/Luminous-Dynamics/symthaea/issues/12704) evaluates modular tactile/strain/temperature textile sensing against current fibre-based and self-powered textile-skin research. Sensor readings remain observational and cannot authorize robot motion.
+- [ROBOT-GARMENT-COMPILER-001 #12710](https://github.com/Luminous-Dynamics/symthaea/issues/12710) explores generating robot-specific textile panels and seam topology from exact CAD, kinematics, swept envelopes, thermal/sensor/service keep-outs and process capabilities.
+
+RGBench is a cloth simulation/manipulation comparator, not a protective-shell test. The January 2026 auxetic-lattice research is a candidate local reinforcement direction, not a qualified robot-cover material. These distinctions are recorded in the comparative test plan.
