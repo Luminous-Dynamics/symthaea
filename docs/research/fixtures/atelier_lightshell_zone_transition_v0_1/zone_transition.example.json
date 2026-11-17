@@ -1,0 +1,183 @@
+{
+  "schema_version": "0.1.0",
+  "program_id": "LIGHTSHELL-TRANSITION-SYNTHETIC-001",
+  "state": "proposed",
+  "zone_refs": [
+    {
+      "zone_id": "impact_panel",
+      "functional_roles": [
+        "impact_compression"
+      ],
+      "construction_ref": null
+    },
+    {
+      "zone_id": "articulation_gaiter",
+      "functional_roles": [
+        "articulation"
+      ],
+      "construction_ref": null
+    },
+    {
+      "zone_id": "vent_panel",
+      "functional_roles": [
+        "airflow"
+      ],
+      "construction_ref": null
+    },
+    {
+      "zone_id": "sensor_insert",
+      "functional_roles": [
+        "sensor_accommodation"
+      ],
+      "construction_ref": null
+    },
+    {
+      "zone_id": "passive_textile",
+      "functional_roles": [
+        "repairability"
+      ],
+      "construction_ref": null
+    }
+  ],
+  "process_capability": {
+    "capability_state": "unknown",
+    "machine_ref": null,
+    "program_revision_ref": null,
+    "capability_evidence_ref": null,
+    "supported_strategies": []
+  },
+  "transitions": [
+    {
+      "transition_id": "impact_to_gaiter",
+      "from_zone_id": "impact_panel",
+      "to_zone_id": "articulation_gaiter",
+      "strategy": "graded_knit",
+      "state": "proposed",
+      "transition_width_mm": null,
+      "interface_detail_ref": null,
+      "process_route_ref": null,
+      "requirements": [
+        {
+          "metric_id": "transition_strain_concentration_ratio",
+          "unit": "ratio",
+          "direction": "lower_is_better",
+          "hard_gate": true,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "metric_id": "stiffness_jump_ratio",
+          "unit": "ratio",
+          "direction": "within_declared_band",
+          "hard_gate": true,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "metric_id": "compression_continuity_ratio",
+          "unit": "ratio",
+          "direction": "within_declared_band",
+          "hard_gate": true,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        }
+      ]
+    },
+    {
+      "transition_id": "vent_to_service",
+      "from_zone_id": "vent_panel",
+      "to_zone_id": "passive_textile",
+      "strategy": "sewn_seam",
+      "state": "proposed",
+      "transition_width_mm": null,
+      "interface_detail_ref": null,
+      "process_route_ref": null,
+      "requirements": [
+        {
+          "metric_id": "seam_strength_n",
+          "unit": "N",
+          "direction": "higher_is_better",
+          "hard_gate": true,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "metric_id": "seam_fatigue_cycles",
+          "unit": "cycles",
+          "direction": "higher_is_better",
+          "hard_gate": false,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "metric_id": "compression_continuity_ratio",
+          "unit": "ratio",
+          "direction": "within_declared_band",
+          "hard_gate": false,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        }
+      ]
+    },
+    {
+      "transition_id": "sensor_to_passive",
+      "from_zone_id": "sensor_insert",
+      "to_zone_id": "passive_textile",
+      "strategy": "replaceable_overlap",
+      "state": "proposed",
+      "transition_width_mm": null,
+      "interface_detail_ref": null,
+      "process_route_ref": null,
+      "requirements": [
+        {
+          "metric_id": "attachment_retention_cycles",
+          "unit": "cycles",
+          "direction": "higher_is_better",
+          "hard_gate": true,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "metric_id": "repair_time_min",
+          "unit": "min",
+          "direction": "lower_is_better",
+          "hard_gate": false,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "metric_id": "added_mass_g",
+          "unit": "g",
+          "direction": "lower_is_better",
+          "hard_gate": false,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        }
+      ]
+    }
+  ],
+  "evidence_policy": {
+    "unknown_process_capability_fails_closed": true,
+    "simulation_is_not_interface_qualification": true,
+    "supplier_process_claims_are_not_capability_evidence": true,
+    "coupon_interface_results_are_not_robot_qualification": true
+  }
+}
