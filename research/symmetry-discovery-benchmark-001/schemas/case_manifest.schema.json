@@ -209,8 +209,7 @@
             "additionalProperties": false,
             "required": [
               "variables",
-              "monomial_exponents",
-              "coefficients",
+              "terms",
               "exact_rational"
             ],
             "properties": {
