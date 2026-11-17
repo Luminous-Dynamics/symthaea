@@ -154,8 +154,11 @@ IndependentVerification
    v             v                 v
 Accepted       Rejected        Insufficient
    |             |                 |
-   v             v                 +--> hold / gather new evidence / reconcile
-Closed        ReworkReview
+   v             v                 v
+Closed        ReworkReview   AwaitAdditionalEvidence
+                                  |
+                                  +--> new qualified observations
+                                       then independent verification
                  |
                  +--> requires valid authority for a new mutation
 ```
