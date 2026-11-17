@@ -194,6 +194,8 @@ Only after humanoid adapter qualification and a second qualified embodiment. Do 
 
 ### Capability-transition instrumentation
 
+The event statistics are implemented as a dependency-free Rust evaluator in [capability-transition-ledger](capability-transition-ledger/) and tracked by #12741. This gives the HLB ablation a common per-episode event receipt rather than requiring each model arm to invent its own progress metric. It does not measure task success unless the independent event recorder supplies that evidence.
+
 Do not evaluate HLB's contribution only through terminal task success. HumanoidToolBench reports separate interaction milestones: candidate contact, correct first contact, correct-tool lift, tool-target contact and task success. Its published FastWAM standard BallMove result falls from 76% stationary L1 to 9% mobile L2; the benchmark also notes that L2 changes target layout, so locomotion is not isolated as the sole cause. Figure Helix 2.5's vendor-reported 56% zero-shot result across 30 unseen homes and Google's vendor-reported 96% Apollo 2 automotive-kitting pilot establish a higher bar for broad transfer and industrial repeatability, but the task suites differ and must not be pooled.
 
 For every HLB arm, collect an event/transition ledger with event occurrence timestamp, source clock, capture completeness, attempt/recovery lineage, failure cause and independently verified terminal postcondition. Preserve non-occurrence versus not-instrumented as separate states. Compute per task cell:
