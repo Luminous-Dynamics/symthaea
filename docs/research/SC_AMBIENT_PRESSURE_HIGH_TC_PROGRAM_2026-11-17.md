@@ -201,3 +201,55 @@ For room-temperature ambient-pressure superconductors, there is currently no equ
 ## Claim ceiling
 
 This is a research and qualification programme. It does not claim that Luminous has discovered, synthesized, measured, independently replicated or manufactured a room-temperature superconductor. It does not establish ambient-pressure room-temperature superconductivity as likely or impossible.
+
+
+## 9. Prospective discovery tournament — 17 November 2026
+
+A new child work package, [SC-DISCOVERY-TOURNAMENT-001 #12634](https://github.com/Luminous-Dynamics/symthaea/issues/12634), turns the discovery benchmark into a budgeted decision problem. This is a deliberate paradigm change: optimize how many credible, synthesisable candidates survive independent validation at a fixed compute and laboratory budget, rather than optimizing retrospective Tc MAE alone.
+
+### Research update
+
+1. **Genome-inspired AI (29 October 2026).** The early-access *Scientific Reports* paper reports a 53,196-material DataG Non-Sc dataset and a screening workflow over ICSD, COD and Materials Project. It predicts 22 Pu-containing candidates above 50 K, including approximately 89 K for Pu2Co17, plus more than 40 hydrides with predicted Tc up to 100 K. These are ML predictions, not experimental confirmations. The dataset, training/test split, model weights, features, negative-label definition and full pipeline need to be obtained and independently reproduced before its metrics are admitted. Actinide-containing candidates are computational-only in the general programme pending specialist institutional review.
+   - https://doi.org/10.1038/s41598-026-76977-w
+
+2. **Metal-embedded hydrogen units (August 2026).** A computational study screened more than one million M-Be-H configurations. It predicts CaAuH6 at approximately 70 K under 30 GPa and approximately 44 K at ambient pressure; it also reports an AcBeH6 metastable phase approximately 131 meV/atom above the convex hull with predicted Tc around 52 K at 30 GPa. These are calculated predictions. The nominal ambient-pressure result must not be conflated with experimentally synthesized or decompression-retained material.
+   - https://doi.org/10.1016/j.mtphys.2026.102142
+
+3. **Ambient-pressure nickelate film (March 2026).** The (La,Pr)3Ni2O7 epitaxial-film report gives approximately 63 K onset, 37 K zero resistance and a diamagnetic transition beginning around 23 K. Those temperatures describe distinct observables; exact specimen-to-observable linkage must be extracted from the source and supplement before combining them as one specimen-level record.
+   - https://doi.org/10.1093/nsr/nwag151
+
+4. **Bulk nickelate requiring pressure.** La2SmNi2O7-delta crystals were synthesized at ambient pressure, but the reported superconducting state occurs at approximately 21.6 GPa (92 K onset, 73 K zero resistance), with Meissner response around 60 K at 20.6 GPa. This is a high-pressure operating material, not an ambient-pressure superconductor.
+   - https://doi.org/10.1038/s41586-025-09954-4
+
+### Benchmark design lessons
+
+- **BEE-NET** is a conventional electron–phonon / Eliashberg workflow whose 0.87 K result is an error against DFT/Allen–Dynes labels. Do not compare that number directly with experimental Tc error or with empirical composition-model accuracy.
+- **HTSC-2025** has 155 computational candidate records and its own structural-system splits. It is an independent computational benchmark, not a specimen-level experimental dataset.
+- **DataG Non-Sc** is a new negative-material dataset from the 29 October 2026 study. It should not be considered admitted until its schema, row identities, split manifest, license and provenance are recovered.
+- **Matbench Discovery** is the methodological model: evaluate selection quality along a ranked campaign, including precision/recall as the validation budget K increases. Its discovery-acceleration result is for crystal stability, not superconductivity, and is used only as a benchmark-design precedent.
+  - https://doi.org/10.1038/s42256-025-01055-1
+- A 2026 review of superconductivity ML specifically warns that random splits can place doped variants of the same parent compound in both train and test sets; family/prototype/formula grouping and OOD evaluation are therefore mandatory.
+  - https://doi.org/10.1021/acsomega.6c01100
+
+### New machine-readable corpus
+
+- [Candidate and source register v0.1](https://github.com/Luminous-Dynamics/symthaea/blob/research/sc-ambient-pressure-001/data/research/sc_superconductor_discovery_cases_v0_1.json)
+- Contains five candidate/reference records, seven source records and three benchmark-catalog entries.
+- Preserves computational predictions separately from reported experimental transitions, and pressure of synthesis separately from pressure of operation.
+- This is a small hand-auditable seed corpus, not a complete training dataset or leaderboard. The register deliberately flags unresolved specimen identity, missing phase-stability evidence, and unverified dataset/checkpoint access.
+
+### Decision-centric benchmark protocol
+
+For each mechanism-specific track, use identical frozen candidate pools and report precision@K / verified yield@K at K = 10, 25, 50, 100 and 500; discovery acceleration versus random and simple heuristics; novelty by family/prototype; calibration and selective risk; OOD abstention; synthesis/phase-retention outcomes; and cost per independently verified result. Use paired confidence intervals, record all failed/non-converged candidates and preserve uncertainty.
+
+Mandatory holdouts include reduced-formula groups, parent family, structure prototype, chemistry family, source/lab, time and pressure. All preprocessing, feature selection, calibration and model selection must remain inside the training partition. Freeze the prospective candidate list before expensive DFT or external evidence retrieval.
+
+The stretch targets in #12634 are proposed research targets, not current results: at K <= 50, seek at least 1.5x validated-candidate enrichment over the strongest admitted baseline on a frozen prospective pool, and at least 2x fewer expensive follow-ups per independently verified candidate than the best simple heuristic. If the cohort is too small for meaningful confidence intervals, report inconclusive.
+
+### Cross-domain design rule
+
+A prediction becomes a candidate dossier; a candidate dossier becomes a prospective test; a prospective test becomes a specimen-level evidence chain; and only independently verified material enters the conductor/device programme. No weighted score may compensate for a failed hard constraint such as pressure release, unsafe composition, or inability to retain a usable phase. Existing REBCO conductor-to-coil engineering remains with [HTS-FUSION-MAGNET-001 #11736](https://github.com/Luminous-Dynamics/symthaea/issues/11736).
+
+### Claim ceiling
+
+This addendum records new papers, benchmark design and an offline JSON corpus. It does not reproduce the genome-inspired model, run DFT/Eliashberg calculations, synthesize candidates, or claim experimental qualification.
