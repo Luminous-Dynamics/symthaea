@@ -26,7 +26,8 @@ struct RunMetrics{
  run_id:String,task_family:String,paired_seed:u64,
  cost_micros:Option<u64>,wall_ms:Option<u64>,queue_delay_ms:Option<u64>,
  complete_cost:bool,complete_wall:bool,queued_attempts:u64,unknown_attempts:u64,
- retries:u64,option_costs:BTreeMap<String,Vec<u64>>
+ retries:u64,skipped_attempts:u64,failed_attempts:u64,timeout_attempts:u64,cancelled_attempts:u64,executed_attempts:u64,
+ option_costs:BTreeMap<String,Vec<u64>>
 }
 
 fn object<'a>(v:&'a Value,label:&str)->Result<&'a serde_json::Map<String,Value>,String>{
@@ -124,6 +125,7 @@ fn validate_attempts(
  let mut previous_hash=String::new();
  let mut previous_queue:Option<DateTime<FixedOffset>>=None;
  let mut queued_count=0u64;let mut unknown_count=0u64;let mut retry_count=0u64;
+ let mut skipped_count=0u64;let mut failed_count=0u64;let mut timeout_count=0u64;let mut cancelled_count=0u64;let mut executed_count=0u64;
  let mut total_cost=0u64;let mut cost_complete=true;let mut wall_complete=true;
  let mut earliest_started:Option<DateTime<FixedOffset>>=None;
  let mut latest_completed:Option<DateTime<FixedOffset>>=None;
@@ -152,6 +154,7 @@ fn validate_attempts(
   if !["pass","fail","unknown","not_applicable"].contains(&result.as_str()){return Err(format!("{l}.result is invalid"));}
   let event_queued=timestamp(&string(row,"queued_at",&l)?,&format!("{l}.queued_at"))?;
   if event_queued<receipt_queued_at{return Err(format!("{l}.queued_at precedes run receipt queued_at"));}
+  if run_finished.as_ref().is_some_and(|finish|&event_queued>finish){return Err(format!("{l}.queued_at follows run_finished_at"));}
   if previous_queue.as_ref().is_some_and(|previous|&event_queued<previous){return Err(format!("{label} attempt queue times regress"));}
   previous_queue=Some(event_queued);
   let started=optional_time(row,"started_at",&l)?;
@@ -196,19 +199,23 @@ fn validate_attempts(
     if started.is_none()||completed.is_none()||result!="unknown"{
      return Err(format!("{l} failed status requires completed execution and unknown result"));
     }
+    failed_count+=1;
    },
    "timeout"=>{
     if started.is_none()||result!="unknown"{return Err(format!("{l} timeout requires started execution and unknown result"));}
+    timeout_count+=1;
     if completed.is_none(){wall_complete=false;}
    },
    "cancelled"=>{
     if started.is_none()||result!="unknown"{return Err(format!("{l} cancelled status requires started execution and unknown result"));}
+    cancelled_count+=1;
     if completed.is_none(){wall_complete=false;}
    },
    "skipped"=>{
     if started.is_some()||completed.is_some()||elapsed.is_some()||price!=Some(0)||cpu!=0||gpu!=0||network!=0||result!="not_applicable"{
      return Err(format!("{l} skipped status must have no execution and zero cost"));
     }
+    skipped_count+=1;
    },
    "queued"=>{
     if started.is_some()||completed.is_some()||elapsed.is_some()||price.is_some()||cpu!=0||gpu!=0||network!=0||result!="not_applicable"{
@@ -224,6 +231,7 @@ fn validate_attempts(
   }
   if status!="skipped"&&status!="queued"{
    if started.is_none(){return Err(format!("{l} executed attempt requires started_at"));}
+   executed_count+=1;
    if price.is_none(){cost_complete=false;}
    if let Some(cost)=price{
     total_cost=total_cost.checked_add(cost).ok_or_else(||format!("{label} trajectory cost overflow"))?;
@@ -270,7 +278,9 @@ fn validate_attempts(
   run_id:String::new(),task_family:String::new(),paired_seed:0,
   cost_micros,wall_ms,queue_delay_ms,
   complete_cost:cost_micros.is_some(),complete_wall:wall_ms.is_some(),
-  queued_attempts:queued_count,unknown_attempts:unknown_count,retries:retry_count,option_costs
+  queued_attempts:queued_count,unknown_attempts:unknown_count,retries:retry_count,
+  skipped_attempts:skipped_count,failed_attempts:failed_count,timeout_attempts:timeout_count,
+  cancelled_attempts:cancelled_count,executed_attempts:executed_count,option_costs
  })
 }
 fn evaluate(raw:&str)->Result<Value,String>{
@@ -327,8 +337,11 @@ fn evaluate(raw:&str)->Result<Value,String>{
  let mut option_costs:BTreeMap<String,Vec<u64>>=BTreeMap::new();
  for option in &option_ids{option_costs.insert(option.clone(),Vec::new());}
  let mut retries=0u64;let mut queued=0u64;let mut unknown=0u64;
+ let mut skipped=0u64;let mut failed=0u64;let mut timeouts=0u64;let mut cancelled=0u64;let mut executed=0u64;
  for m in &metrics{
   retries+=m.retries;queued+=m.queued_attempts;unknown+=m.unknown_attempts;
+  skipped+=m.skipped_attempts;failed+=m.failed_attempts;timeouts+=m.timeout_attempts;
+  cancelled+=m.cancelled_attempts;executed+=m.executed_attempts;
   for (option,values) in &m.option_costs{option_costs.entry(option.clone()).or_default().extend(values);}
  }
  let mut marginal_p95=Vec::new();let mut marginal_sum=0u64;let mut all_options_sampled=true;
@@ -344,7 +357,12 @@ fn evaluate(raw:&str)->Result<Value,String>{
   "complete_cost_run_count":complete_cost.len(),
   "complete_wall_run_count":complete_wall.len(),
   "censored_or_incomplete_run_count":metrics.iter().filter(|m|!m.complete_cost||!m.complete_wall).count(),
+  "executed_attempt_count":executed,
   "queued_attempt_count":queued,
+  "skipped_attempt_count":skipped,
+  "failed_attempt_count":failed,
+  "timeout_attempt_count":timeouts,
+  "cancelled_attempt_count":cancelled,
   "unknown_execution_count":unknown,
   "retry_count":retries,
   "full_run_cost_micros":summary_quantiles(&complete_cost),
