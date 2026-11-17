@@ -142,6 +142,25 @@ impl fmt::Display for MappingError {
 
 impl Error for MappingError {}
 
+/// Project the 43-value `joint_qpos` vector using its source-traced pinned order.
+///
+/// The producer chain was verified at HumanoidToolBench commit
+/// `3fec9bd36933a1648ff7f95468c983f3452243a0`:
+/// `SonicLocoManip._get_obs -> MujocoEngine.get_robot_qpos -> G1Sonic.get_robot_qpos`.
+/// G1Sonic's `self.joints` dictionary is populated in `self.joint_names` order.
+/// Do not use this helper with a different upstream revision or profile without
+/// repeating the producer audit.
+pub fn project_pinned_qpos(
+    raw_joint_positions_rad: &[f32],
+    previous_base_height_command_m: f32,
+) -> Result<[f32; POLICY_STATE_DIMENSION], MappingError> {
+    project_policy_state(
+        &RAW_JOINT_NAMES,
+        raw_joint_positions_rad,
+        previous_base_height_command_m,
+    )
+}
+
 /// Project named raw joint positions into the 32-value benchmark policy state.
 ///
 /// - Every one of the 43 expected G1 joint names must occur exactly once.
@@ -312,7 +331,7 @@ mod tests {
     }
 
     fn project_in_pinned_order() -> [f32; POLICY_STATE_DIMENSION] {
-        project_policy_state(&RAW_JOINT_NAMES, &sentinel_joint_positions(), 0.74).unwrap()
+        project_pinned_qpos(&sentinel_joint_positions(), 0.74).unwrap()
     }
 
     #[test]
@@ -325,6 +344,14 @@ mod tests {
             13.0, 14.0, 12.0, 0.74,
         ];
         assert_eq!(project_in_pinned_order(), expected);
+    }
+
+    #[test]
+    fn pinned_qpos_helper_rejects_wrong_dimensions() {
+        assert!(matches!(
+            project_pinned_qpos(&[0.0; 42], 0.74),
+            Err(MappingError::RawJointCount { .. })
+        ));
     }
 
     #[test]
