@@ -1329,18 +1329,23 @@ mod tests {
     }
 
     #[test]
-    fn zero_probability_outcomes_are_skipped_without_fabricating_a_posterior() {
-        let mut p = problem(0.0, true);
-        p.actions[0].outcomes[1].likelihood_by_hypothesis = vec![0.0; 3];
-        p.actions[0].outcomes[0].likelihood_by_hypothesis = vec![1.0; 3];
-        let mut tree = policy();
-        tree.branches.retain(|branch| branch.outcome_id == "observed");
+    fn outcome_possible_in_one_model_may_have_zero_mass_in_another() {
+        let mut zero = problem(0.0, true);
+        zero.actions[0].outcomes[1].likelihood_by_hypothesis = vec![0.0; 3];
+        zero.actions[0].outcomes[0].likelihood_by_hypothesis = vec![1.0; 3];
+        let positive = problem(0.02, true);
+        // The shared policy contains both branches because robot loss is possible
+        // in at least one model. The zero-mass model must skip that branch.
         let report = evaluate_policy_robustly(
-            &[ModelScenario { model_id: "zero".into(), problem: p }],
-            &tree,
+            &[
+                ModelScenario { model_id: "zero".into(), problem: zero },
+                ModelScenario { model_id: "positive".into(), problem: positive },
+            ],
+            &policy(),
             config(),
         ).unwrap();
         assert!((report.per_model[0].robot_loss_probability).abs() < 1.0e-12);
+        assert!((report.per_model[1].robot_loss_probability - 0.02).abs() < 1.0e-8);
     }
 
     #[test]
