@@ -593,9 +593,9 @@ fn expected_value_of_action(
 
         let hypothesis_count = prior.len();
         let mut next_hypothesis_mass = vec![0.0; hypothesis_count];
-        for current_index in 0..hypothesis_count {
+        for (current_index, prior_probability) in prior.iter().enumerate() {
             let current_mass =
-                prior[current_index] * outcome.likelihood_by_hypothesis[current_index];
+                prior_probability * outcome.likelihood_by_hypothesis[current_index];
             for (next_index, transition_probability) in outcome.next_hypothesis_probability
                 [current_index]
                 .iter()
