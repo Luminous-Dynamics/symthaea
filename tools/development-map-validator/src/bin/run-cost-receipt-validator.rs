@@ -172,7 +172,7 @@ fn validate_attempts(
    if end<start{return Err(format!("{l}.completed_at precedes started_at"));}
    if run_finished.as_ref().is_some_and(|x|end>x){return Err(format!("{l}.completed_at follows run_finished_at"));}
    latest_completed=Some(latest_completed.as_ref().map_or(end.clone(),|x|std::cmp::max(x.clone(),end.clone())));
-   let actual=(end-start).num_milliseconds().max(0) as u64;
+   let actual=(end.clone()-start.clone()).num_milliseconds().max(0) as u64;
    if elapsed!=Some(actual){return Err(format!("{l}.elapsed_ms does not match the timestamp interval"));}
   }else if elapsed.is_some(){return Err(format!("{l}.elapsed_ms must be null when completed_at is null"));}
   let retry_of=nullable_string(row,"retry_of_event_id",&l)?;
