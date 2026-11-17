@@ -77,11 +77,12 @@
       "module_count": 7
     },
     "seed": 20261117,
-    "contact_episode_count": 50,
+    "contact_episode_count": null,
     "independent_reference_contact_count": null,
     "active_taxel_site_excitations": null,
     "operator_time_seconds": null,
-    "elapsed_setup_seconds": null
+    "elapsed_setup_seconds": null,
+    "replicate_count": 50
   },
   "splits": {
     "train_digest": "sha256:synthetic-training-patterns",
@@ -164,7 +165,7 @@
       "false_alarm_rate": null
     },
     "resources": {
-      "status": "measured",
+      "status": "not_run",
       "latency_p50_ms": null,
       "latency_p95_ms": null,
       "latency_p99_ms": null,
