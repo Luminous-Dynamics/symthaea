@@ -690,7 +690,7 @@ Prospective research targets (not results): reduce repeated failure by at least 
 
 ### Event-level capability transition reporting
 
-Use the dependency-free evaluator in [capability-transition-ledger](capability-transition-ledger/), tracked by [HUM-CAPABILITY-TRANSITION-001 #12741](https://github.com/Luminous-Dynamics/symthaea/issues/12741). Every episode carries five event records: candidate contact, correct first contact, correct-tool lift, tool-target contact and independently verified task success. Each record is explicitly `NotInstrumented`, `InstrumentedAbsent` or `OccurredAt(source_timestamp)`.
+Use the Rust-based evaluator in [capability-transition-ledger](capability-transition-ledger/), tracked by [HUM-CAPABILITY-TRANSITION-001 #12741](https://github.com/Luminous-Dynamics/symthaea/issues/12741). Every episode carries five event records: candidate contact, correct first contact, correct-tool lift, tool-target contact and independently verified task success. Each record is explicitly `NotInstrumented`, `InstrumentedAbsent` or `OccurredAt(source_timestamp)`.
 
 Report, per policy/split/scenario/L0-L1-L2/standard-decoy cell:
 - event incidence among episodes where the event was instrumented;
@@ -792,7 +792,7 @@ Human-contact capability remains separate and consent-bound under #4680. V0 excl
 2. **Establish G1/control/observation compatibility — raw simulation qpos order resolved; UEC v2 runtime adapter pending.** The 43-value chain is traced through `SonicLocoManip._get_obs`, `MujocoEngine.get_robot_qpos` and `G1Sonic.get_robot_qpos`; the mapping manifest records the three producer files/blob IDs. A pure, non-actuating Rust mapping audit crate and nine authored tests are now in the branch. UEC v2 platform integration and runtime conformance remain blocked on its canonical APIs and qualification.
 3. **Freeze the 18-cell HumanoidToolBench protocol and baseline ledger — specification complete.** Event-level capability-transition evaluator is now implemented in a pure-Rust crate (tests authored, not run); see #12741. No local benchmark is run or claimed yet. First runtime work should be a one-episode diagnostic / one-condition 100-episode run after environment and compute qualification.
 4. **Build active tool discovery — protocol/corpus defined.** The 24-case synthetic corpus spans six families with development, held-out instance, transfer and decoy splits. The candidate view must exclude hidden physical parameters and evaluator oracles. No physics episodes have run.
-5. **Run pure mapping audit locally/CI — authored, not yet executed.** The crate is dependency-free and has a focused workflow. The current editing environment has no `rustc` or `cargo`; no test/format/CI pass is claimed.
+5. **Run pure mapping audit locally/CI — authored, not yet executed.** The crate is Rust-based and has a focused workflow. The current editing environment has no `rustc` or `cargo`; no test/format/CI pass is claimed.
 6. **Run no-op/scripted probes before costly model work.** Use matched budget and sealed-oracle controls; do not use benchmark success flags as the only postcondition evidence.
 7. **Run matched agentic/VLA/Symthaea simulation ablations.** Separate model/provider, reasoning effort, harness, action interface, reasoning wall time, action-motion time and compute/API costs. Do not copy AMP source without licence review.
 8. **Advance human-augmentation evaluation in parallel.** Compose HUMAN-TOOL-001 #7983 / PR #7997; this is a human + advisory outcome, not humanoid dexterity.
