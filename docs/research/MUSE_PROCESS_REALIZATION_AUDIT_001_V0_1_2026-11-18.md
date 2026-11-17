@@ -47,6 +47,17 @@ Frozen reference values for normalized prefixes 1/4, 2/4, 3/4 and 4/4 are:
 
 The audit only verifies the current melody envelope. It does not verify the separate constant accompaniment layers (harmony/bass), acoustic loudness after rendering, perceptual crescendi, expressive timing, or whether the linear envelope is artistically appropriate. The purpose is to prove adherence to an explicit contract, not to claim that this contract is musically optimal.
 
+## Accompaniment and identity verification
+
+The score-side audit now covers all three roles emitted by the current ProcessAdditive generator and rejects any extra role:
+
+- **Harmony clock:** the exact repeating scale-degree pattern 1–5–8–5 in octave 4, with eighth-note timing clipped only at the terminal score boundary; velocity 0.34, section intensity 0.62, Normal emphasis.
+- **Bass anchor:** scale degree 1 in octave 2, one score-meter bar per event with a terminal clipped duration if necessary; velocity 0.43, section intensity 0.58, Normal emphasis.
+- **Identity boundary:** all current melody, harmony and bass events must retain `PartId::UNASSIGNED`. The verifier rejects invented part IDs rather than reconstructing identity from role, register or ordering.
+- **Role boundary:** only Melody, Harmony and Bass are currently accepted. Extra CounterMelody/other roles fail closed until a new ProcessAdditive contract is defined.
+
+The audit report includes the exact number of verified harmony and bass events alongside melody and expressive counts. These checks establish adherence to the current score contract; they do not assert that a tonic pedal or repeating fifth-clock is harmonically sophisticated, that it is the best accompaniment, or that it renders/performs perceptually well.
+
 ## Evidence boundary
 
 This establishes symbolic score-to-plan realization only. It does **not** establish:
@@ -62,7 +73,7 @@ In particular, event-count growth is a structural fact, not a listener-experienc
 
 ## Adversarial fixtures authored
 
-Sixteen new tests are present in `process_grammar.rs`:
+Twenty-one new tests are present in `process_grammar.rs`:
 
 1. Accept unmodified realizations for all four declared trajectory kinds.
 2. Match hand-frozen expected contour vectors for all four process kinds.
@@ -78,6 +89,10 @@ Sixteen new tests are present in `process_grammar.rs`:
 12. Match frozen prefix-linear velocity and section-intensity reference values.
 13. Reject velocity, section-intensity and phrase-start emphasis mutations.
 14. Refuse expressive verification when a legacy plan lacks the dynamics profile.
+15. Reject mutations to the harmony clock pitch and bass-anchor duration.
+16. Reject assigned identities on accompaniment or melody events.
+17. Reject unplanned voice roles.
+18. Exercise the 4,096-case generated holdout after all melody, expressive and accompaniment checks.
 
 Existing process tests remain in place. No test has been compiled or executed in the current environment. Do not describe these tests as passing.
 
@@ -88,7 +103,7 @@ Report separate measurements; do not collapse them into a single music-quality s
 | Dimension | Metric | Qualification target |
 |---|---|---|
 | Deterministic positive fixtures | Exact plan-to-score audit acceptance | 100% |
-| Frozen adversarial fixtures | Invalid score rejection | 100%; zero false semantic accepts |\n| Expressive envelope | Bit-exact note-level velocity/intensity/emphasis profile adherence | 100% for the declared profile; unsupported/legacy profiles explicitly rejected |
+| Frozen adversarial fixtures | Invalid score rejection | 100%; zero false semantic accepts |\n| Expressive envelope | Bit-exact note-level velocity/intensity/emphasis profile adherence | 100% for the declared profile; unsupported/legacy profiles explicitly rejected |\n| Accompaniment contract | Harmony-clock and bass-anchor event correctness, role scope and unassigned identity | 100% deterministic fixtures; zero invented part identities accepted |
 | Generated holdout cohort | Exact adherence across trajectory kinds, seeds, and bar counts | 100% for the pinned deterministic generator |
 | Mutation robustness | Detection rate by mutation class, plus false rejection rate | 100% detection on the frozen matrix; report every class separately |
 | Coverage | Accepted examples / all examples; abstentions by reason | Report explicitly; never hide abstentions in accuracy |
@@ -168,6 +183,12 @@ Keep five scorecards independent:
 5. **Collaboration quality:** compare live adaptive co-creation against a yoked replay of the same prior user actions and against a fixed-policy baseline; measure latency, user agency, accepted edits, recovery from misunderstanding and user-rated usefulness.
 
 For deterministic structural invariants, the target should be 100% on frozen positive and negative fixtures. For open-ended generative behavior, preregister coverage/abstention, stratify by grammar and task, report confidence intervals, and do not optimize one headline scalar at the expense of protected-content failures.
+
+## November 18 implementation update — complete ProcessAdditive score contract
+
+The verifier now audits the current three-role realization rather than melody alone. Its serialized report records melody, expressive, harmony and bass event counts. It checks the plan-carried process cell, prefix contour, exact note pitches/durations, velocity and section-intensity bit patterns, phrase-start emphasis, harmony clock, bass anchor, and the no-inferred-PartId boundary. Any extra voice role or assigned part ID is rejected. The existing generator behavior is unchanged; this is an audit of its explicit current contract.
+
+Twenty-one new tests are authored in addition to the three pre-existing ProcessAdditive tests. No test is compiled or run in this environment.
 
 ## External industry and benchmark refresh — 2026-11-18
 
