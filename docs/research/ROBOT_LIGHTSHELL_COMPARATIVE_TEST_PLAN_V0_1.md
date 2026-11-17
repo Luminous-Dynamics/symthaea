@@ -243,3 +243,37 @@ The next architectural step is [ROBOT-GARMENT-COMPILER-001 #12710](https://githu
 ### Evidence scope
 
 All literature results remain external paper/project claims until independently reproduced on the declared task. No RGBench data, sensor array, auxetic coupon or Lightshell physical sample is claimed downloaded, fabricated or tested by this PR.
+
+
+## 16. Smart textile architecture frontier — 17 November 2026
+
+### SoTa: common taxel layout and cross-embodiment sensing
+
+The October 2026 preprint **SoTa: Soft Tactile Skins for Dexterous Manipulation** reports:
+- a common layout of 202 taxels across human and robot hand embodiments;
+- multilayer fabric-electrode construction, with reported material cost below US$10 per skin;
+- more than 97% of initial response span after 10,000 loading/unloading cycles;
+- conductive traces retained through 1,280 tight-fist folding cycles;
+- improved contact-rich manipulation performance when human demonstrations augmented robot demonstrations, under the paper's eight evaluation conditions.
+
+Reference: https://arxiv.org/abs/2610.02338
+
+This is a preprint's hand-skin result, not a Lightshell performance result or forearm acceptance threshold. The architectural lesson is to define a **shared sensor-tile coordinate and observation contract** for replaceable modules, while retaining per-panel geometry, sensor-lot and calibration metadata. A common layout may improve replaceability, cross-robot data reuse and calibration tooling, but does not make sensors physically interchangeable without calibration.
+
+### Deployment-oriented e-skin evaluation
+
+The 1 November 2026 review *Tactile electronic skin: From mechanical perception to intelligent interfaces* argues that peak sensitivity alone is a poor deployment metric. It emphasizes working range, durability, environmental stability, signal integrity, conformal integration and task-level reliability, and discusses hysteresis, crosstalk, wet interfaces and mechanical decoupling.
+
+Reference: https://doi.org/10.1016/j.sna.2026.118150
+
+This reinforces the #12704 sensor-fabric test matrix: measure calibration/drift, wet-state response, flex/wash aging, mechanical decoupling, crosstalk, fault detection and task outcomes. Keep sensor-free mechanical Lightshell as a control.
+
+### Scalable in-situ fabrication
+
+A 29 January 2026 *npj Flexible Electronics* paper reports a scalable, cleanroom-free, in-situ fabrication approach for multimodal electronic skin, combining capacitive tactile structures with UV-laser-patterned flexible circuitry.
+
+Reference: https://www.nature.com/articles/s41528-026-00538-4
+
+This is a process comparator for manufacturable sensor panels, not evidence that the same method is suitable for industrial robot garments. Evaluate process capability, textile compatibility, repairability, connector life and calibration retention before adoption.
+
+**Sensor claim boundary:** all literature values are paper-specific. The first Lightshell pilot should use robot-only sensor calibration and physical reference instruments. It should not ingest human tactile data, assume human/robot signal equivalence, or feed textile sensor output directly into a safety or motion-authority path.
