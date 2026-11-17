@@ -681,6 +681,28 @@ mod tests{
   assert_eq!(rectangular,4359);
   assert!(coupled<rectangular);
  }
+ #[test]fn risk_probe_reports_shared_and_rectangular_posterior_bounds(){
+  let r=report();
+  let q=&r["risk_queries"][0];
+  assert_eq!(q["query_id"],"pass-pass-release");
+  assert_eq!(q["support_lower_bps"],3500);
+  assert_eq!(q["nominal_posterior_risk_bps"],3750);
+  assert_eq!(q["shared_latent_worst_case_posterior_risk_bps"],3778);
+  assert_eq!(q["rectangular_hull_worst_case_posterior_risk_bps"],4359);
+  assert_eq!(q["rectangular_excess_risk_bps"],581);
+ }
+ #[test]fn risk_probe_requires_exact_registered_outcome_vector(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["oracle"]["risk_queries"][0]["observed_outcomes"]["gate-b"]=json!("unknown");
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("unknown outcome"));
+ }
+ #[test]fn risk_probe_prior_must_cover_all_hypotheses_and_normalize(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["oracle"]["risk_queries"][0]["prior_bounds"][0]["lower_probability_bps"]=json!(6000);
+  b["oracle"]["risk_queries"][0]["prior_bounds"][0]["upper_probability_bps"]=json!(6000);
+  b["oracle"]["risk_queries"][0]["prior_bounds"][0]["nominal_probability_bps"]=json!(6000);
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("infeasible"));
+ }
  #[test]fn candidate_cannot_inject_shared_latent_oracle(){
   let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
   b["candidate_view"]["latent_states"]=json!([]);
