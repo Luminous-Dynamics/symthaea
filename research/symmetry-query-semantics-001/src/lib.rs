@@ -534,7 +534,7 @@ mod tests {
         for (left, multiplication_row) in multiplication.iter_mut().enumerate() {
             let left_rotation = left % 4;
             let left_reflection = left / 4;
-            for right in 0..8 {
+            for (right, product_slot) in multiplication_row.iter_mut().enumerate() {
                 let right_rotation = right % 4;
                 let right_reflection = right / 4;
                 let signed_rotation = if left_reflection == 0 {
@@ -544,7 +544,7 @@ mod tests {
                 };
                 let product_rotation = (left_rotation + signed_rotation) % 4;
                 let product_reflection = left_reflection ^ right_reflection;
-                multiplication_row[right] = product_reflection * 4 + product_rotation;
+                *product_slot = product_reflection * 4 + product_rotation;
             }
         }
 
@@ -553,13 +553,13 @@ mod tests {
             let rotation = element % 4;
             let reflection = element / 4;
             let mut permutation = vec![0; 4];
-            for vertex in 0..4 {
+            for (vertex, image_slot) in permutation.iter_mut().enumerate() {
                 let signed_vertex = if reflection == 0 {
                     vertex
                 } else {
                     (4 - vertex) % 4
                 };
-                permutation[vertex] = (rotation + signed_vertex) % 4;
+                *image_slot = (rotation + signed_vertex) % 4;
             }
             permutations.push(permutation);
         }
