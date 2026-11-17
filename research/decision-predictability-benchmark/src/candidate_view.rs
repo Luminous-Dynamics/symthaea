@@ -361,7 +361,7 @@ mod tests {
         parse_and_validate(include_bytes!("../fixtures/split-manifest-v1.json")).unwrap()
     }
 
-    fn packet(ticket: &str) -> CandidatePacketV1 {
+    fn make_packet(ticket: &str) -> CandidatePacketV1 {
         CandidatePacketV1::new(
             ticket.to_owned(),
             DIGEST.to_owned(),
@@ -388,7 +388,7 @@ mod tests {
         let mut book = EvaluatorTicketBook::default();
         let manifest = validated_manifest();
         let scenario_id = manifest.manifest().scenarios[2].scenario_id.clone();
-        let packet = packet(TICKET);
+        let packet = make_packet(TICKET);
         book.bind_from_manifest(&packet, &manifest, &scenario_id)
             .unwrap();
 
@@ -416,7 +416,7 @@ mod tests {
 
     #[test]
     fn rejects_observations_after_as_of_time() {
-        let mut packet = packet(TICKET);
+        let mut packet = make_packet(TICKET);
         packet.observations[1].timestamp = 2.1;
         assert_eq!(
             packet.validate(),
@@ -426,14 +426,14 @@ mod tests {
 
     #[test]
     fn rejects_duplicate_channels_and_action_ids() {
-        let mut packet = packet(TICKET);
+        let mut packet = make_packet(TICKET);
         packet.channel_names[1] = packet.channel_names[0].clone();
         assert_eq!(
             packet.validate(),
             Err(CandidateViewError::DuplicateValue("channel_names"))
         );
 
-        let mut packet = packet(TICKET);
+        let mut packet = make_packet(TICKET);
         packet.allowed_action_ids[1] = packet.allowed_action_ids[0].clone();
         assert_eq!(
             packet.validate(),
@@ -443,7 +443,7 @@ mod tests {
 
     #[test]
     fn rejects_unknown_candidate_packet_fields() {
-        let packet = packet(TICKET);
+        let packet = make_packet(TICKET);
         let mut value = serde_json::to_value(packet).unwrap();
         value.as_object_mut().unwrap().insert(
             "split_role".to_owned(),
@@ -471,7 +471,7 @@ mod tests {
 
     #[test]
     fn candidate_packet_parser_revalidates_semantics_after_deserialization() {
-        let packet = packet(TICKET);
+        let packet = make_packet(TICKET);
         let mut value = serde_json::to_value(packet).unwrap();
         value["observations"][1]["timestamp"] = serde_json::json!(2.1);
         let bytes = serde_json::to_vec(&value).unwrap();
@@ -485,7 +485,7 @@ mod tests {
     fn evaluator_ticket_book_rejects_ticket_reuse() {
         let manifest = validated_manifest();
         let scenario_id = manifest.manifest().scenarios[2].scenario_id.clone();
-        let packet = packet(TICKET);
+        let packet = make_packet(TICKET);
         let mut book = EvaluatorTicketBook::default();
         book.bind_from_manifest(&packet, &manifest, &scenario_id)
             .unwrap();
@@ -499,7 +499,7 @@ mod tests {
     #[test]
     fn evaluator_book_rejects_scenario_outside_validated_manifest() {
         let manifest = validated_manifest();
-        let packet = packet(TICKET);
+        let packet = make_packet(TICKET);
         let mut book = EvaluatorTicketBook::default();
         assert_eq!(
             book.bind_from_manifest(&packet, &manifest, "ffffffffffffffffffffffffffffffff"),
@@ -512,7 +512,7 @@ mod tests {
     fn evaluator_book_rejects_task_contract_mismatch() {
         let manifest = validated_manifest();
         let scenario_id = manifest.manifest().scenarios[2].scenario_id.clone();
-        let mut packet = packet(TICKET);
+        let mut packet = make_packet(TICKET);
         packet.task_contract_digest =
             "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
         let mut book = EvaluatorTicketBook::default();
@@ -525,11 +525,11 @@ mod tests {
 
     #[test]
     fn candidate_packet_rejects_invalid_digest_and_nonfinite_values() {
-        let mut packet = packet(TICKET);
+        let mut packet = make_packet(TICKET);
         packet.task_contract_digest = "sha256:abc".to_owned();
         assert_eq!(packet.validate(), Err(CandidateViewError::InvalidDigest));
 
-        let mut packet = packet(TICKET);
+        let mut packet = make_packet(TICKET);
         packet.observations[0].values[0] = Some(f64::NAN);
         assert_eq!(
             packet.validate(),
