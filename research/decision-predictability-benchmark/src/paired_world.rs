@@ -397,4 +397,14 @@ mod tests {
         );
     }
 
+    #[test]
+    fn reference_probe_is_denied_when_not_permitted() {
+        let mut fixture = canonical_paired_world_fixture();
+        fixture.candidate_episodes[0].reference_probe_available = false;
+        assert_eq!(
+            fixture.reference_probe_observation(0, 3, 0.1),
+            Err(ProbeDenial::ProbeUnavailable)
+        );
+    }
+
 }
