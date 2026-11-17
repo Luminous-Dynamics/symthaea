@@ -110,20 +110,23 @@ A candidate can enter comparative analysis only when:
 4. all candidate-specific hard gates are resolved acceptably;
 5. at least one passed module or integrated-robot test is admitted;
 6. no failed or inconclusive test remains for that candidate;
-7. required observed metrics are present with methods and uncertainty references;
+7. required observed metrics are present with methods and uncertainty references, and share the same units, measurement boundary and comparison direction as B0;
+8. the passed physical module/integrated run matches B0's stage, protocol revision, instrument references, calibration references and acceptance-rule revision;
 8. the overall manifest has no structural or evidence-policy findings.
 
 The validator does not calculate improvements, infer unobserved measurements, rank Pareto fronts, or certify a protection level.
 
 ## 6. Unit-test coverage authored
 
-The module contains tests for:
+The module contains eight tests for:
 - the seed fixture being valid but not rankable;
 - candidate-specific failure not being hidden by a different candidate's PASS;
 - ranking only against an exact matched B0 control and common coverage boundary;
 - a passed test without calibration being rejected;
 - frozen benchmark rejection when geometry/task requirements are absent;
-- adverse failed test evidence preventing candidate ranking even if another run passed.
+- adverse failed test evidence preventing candidate ranking even if another run passed;
+- unit/measurement-boundary mismatch preventing a matched ranking;
+- differing physical protocol revisions preventing matched ranking.
 
 These tests are authored in source, but a source review or file fetch is not equivalent to running `cargo test`. CI status must be read at the exact current head; skipped/queued is not PASS.
 
