@@ -356,6 +356,11 @@ fn compose_likelihoods(
     acquired: &[AcquiredFactor],
     use_exact_factorization: bool
 ) -> BTreeMap<String,Bounds> {
+    if acquired.is_empty() {
+        return hypothesis_ids.iter().map(|id| {
+            (id.clone(),Bounds{lower:SCALE,upper:SCALE,nominal:SCALE})
+        }).collect();
+    }
     let mut groups: BTreeMap<String, Vec<&AcquiredFactor>> = BTreeMap::new();
     for factor in acquired {
         groups.entry(factor.group.clone()).or_default().push(factor);
