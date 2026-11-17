@@ -689,3 +689,16 @@ Keep pairing amplitude fixed or matched when testing stiffness improvement. Othe
 - Preserve dimensionality penalty as a baseline: the single-plane Bi-2201 study reports about a 10% decrease in optimal Tc relative to thicker material.
 
 Sources are registered as separate records/catalogues; no paper raw data have been ingested and no physical replication is claimed.
+
+
+## 37. Same-specimen pairing / coherence comparison contract
+
+A second executable evidence layer now links a local pairing observation to a bulk/mesoscopic stiffness or phase-coherence observation:
+
+- schema: \`data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json\`;
+- synthetic fixture: \`tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json\`;
+- Rust executable: \`sc_pair_coherence_audit\`.
+
+The auditor checks that both events are distinct, source-linked, observed, and tied to the same material, state, specimen and batch. It requires consistent pressure semantics/value, field, doping and strain. It rejects unresolved sample identity, predictions/calculations used as measurements, a local pairing event presented as Tc, wrong pairing units, and cross-specimen comparisons.
+
+The report preserves pairing energy and stiffness as separate values with separate units and measurement temperatures. It does not compute a temperature-equivalent from meV and does not derive a Tc from a local gap. The exact-head workflow now formats, tests, runs and Clippy-checks this fifth Rust binary, retaining its synthetic audit receipt.
