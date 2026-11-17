@@ -5,6 +5,7 @@
 
 pub mod decoder;
 pub mod geometry;
+pub mod grid;
 pub mod statistics;
 
 pub use decoder::{
@@ -13,5 +14,9 @@ pub use decoder::{
 };
 pub use geometry::{
     Bounds2, GeometryDescriptor, GeometryError, Point2, SymmetryScore, describe,
+};
+pub use grid::{
+    BinaryGrid, GridDecodeOutcome, GridDecoderSpec, GridError, GridTransform,
+    TraversalOrder, run_grid_tournament,
 };
 pub use statistics::{wilson_interval, binary_entropy, upper_tail_max_p_value};
