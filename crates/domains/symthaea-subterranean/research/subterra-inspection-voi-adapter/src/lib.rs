@@ -628,10 +628,9 @@ mod tests {
 
     #[test]
     fn independent_referee_detects_cached_branches_under_prior_shift() {
-        let report = evaluate_inspection_case(
-            &synthetic_decision_boundary_case(InspectionTask::PipeCable),
-        )
-        .unwrap();
+        let report =
+            evaluate_inspection_case(&synthetic_decision_boundary_case(InspectionTask::PipeCable))
+                .unwrap();
         let shifted = report
             .robust
             .per_model
@@ -652,7 +651,8 @@ mod tests {
             Err(AdapterError::MissingEvaluationModels)
         );
         let mut case = synthetic_decision_boundary_case(InspectionTask::PipeCable);
-        case.evaluation_models.retain(|model| model.model_id != "nominal_synthetic");
+        case.evaluation_models
+            .retain(|model| model.model_id != "nominal_synthetic");
         assert_eq!(
             evaluate_inspection_case(&case),
             Err(AdapterError::MissingPrimaryModel)
