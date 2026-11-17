@@ -302,17 +302,22 @@ pub fn classify_paired_representations(
             return Err(PairedSymFpErrorV1::DuplicateCandidate);
         }
     }
+    let reference_svd_residuals = reference_receipt
+        .spectra
+        .iter()
+        .map(|block| {
+            block
+                .svd_residual
+                .ok_or(PairedSymFpErrorV1::ReferenceSvdProvenanceMissing)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(PairedRobustSymFpReceiptV1 {
         schema_version: 1,
         reference_receipt: reference_receipt.clone(),
         candidates: candidates.to_vec(),
         paired_blocks: paired_blocks.to_vec(),
         derived_operator_bounds,
-        reference_svd_residuals: reference_receipt
-            .spectra
-            .iter()
-            .map(|block| block.svd_residual.expect("paired validation requires SVD provenance"))
-            .collect(),
+        reference_svd_residuals,
         reference_svd_error_propagated: false,
         classification_reference_scope: "CONDITIONAL_ON_REPRODUCED_REFERENCE_SVD_ESTIMATES",
         classification,
