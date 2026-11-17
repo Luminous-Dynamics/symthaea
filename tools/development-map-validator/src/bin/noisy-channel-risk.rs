@@ -500,6 +500,15 @@ fn evaluate_trace(
     let likelihoods=if evidence_accepted {compose_likelihoods(&hypothesis_ids,&selected)} else {neutral};
     let support=support_lower_bps(priors,&likelihoods);
     let nominal=nominal_risk_bps(priors,&likelihoods,safe_actions,&action_id);
+    let point_priors:BTreeMap<String,Bounds>=priors.iter().map(|(id,p)| {
+        (id.clone(),Bounds{lower:p.nominal,upper:p.nominal,nominal:p.nominal})
+    }).collect();
+    let point_likelihoods:BTreeMap<String,Bounds>=likelihoods.iter().map(|(id,q)| {
+        (id.clone(),Bounds{lower:q.nominal,upper:q.nominal,nominal:q.nominal})
+    }).collect();
+    // Ablations isolate prior ambiguity from observation-channel ambiguity.
+    let prior_only_robust=robust_upper_risk_bps(priors,&point_likelihoods,safe_actions,&action_id);
+    let likelihood_only_robust=robust_upper_risk_bps(&point_priors,&likelihoods,safe_actions,&action_id);
     let robust=if support==0 {SCALE} else {robust_upper_risk_bps(priors,&likelihoods,safe_actions,&action_id)};
     let nominal_justified=evidence_accepted && support>0 && nominal<=policy.max_risk;
     let robust_justified=evidence_accepted && support>0 && robust<=policy.max_risk;
@@ -528,6 +537,8 @@ fn evaluate_trace(
         "false_observation_count":false_observation_count,
         "acquisition_count":raw_acquisitions.len(),
         "nominal_posterior_risk_bps":nominal,
+        "prior_only_robust_risk_bps":prior_only_robust,
+        "likelihood_only_robust_risk_bps":likelihood_only_robust,
         "worst_case_posterior_risk_bps":robust,
         "evidence_support_lower_bps":support,
         "max_residual_risk_bps":policy.max_risk,
@@ -667,6 +678,8 @@ mod tests{
     #[test]fn point_likelihood_looks_safe_but_robust_channel_risk_rejects(){
         let t=trace(&report(),"noisy-point-estimate-false-safe");
         assert_eq!(t["nominal_posterior_risk_bps"],129);
+        assert_eq!(t["prior_only_robust_risk_bps"],454);
+        assert_eq!(t["likelihood_only_robust_risk_bps"],291);
         assert_eq!(t["worst_case_posterior_risk_bps"],982);
         assert_eq!(t["nominal_action_justified"],true);
         assert_eq!(t["robust_action_justified"],false);
