@@ -7,6 +7,18 @@
   "option_count": 2,
   "leaf_count": 3,
   "max_depth": 3,
+  "kernel_provenance": [
+    {
+      "hypothesis_id": "safe-world",
+      "kernel_id": "common-cause-safe-v1",
+      "authority": "independent-stochastic-evaluation-lab"
+    },
+    {
+      "hypothesis_id": "common-cause-hazard",
+      "kernel_id": "common-cause-hazard-v1",
+      "authority": "independent-stochastic-evaluation-lab"
+    }
+  ],
   "submitted_policy": {
     "policy_feasible": true,
     "nominal_justified_action_coverage_bps": 4050,
@@ -41,7 +53,9 @@
           "nominal_risk_bps": 1819,
           "robust_risk_bps": 3847,
           "support_lower_bps": 4300
-        }
+        },
+        "claimed_residual_risk_bps": 0,
+        "claimed_risk_understatement": false
       },
       {
         "leaf_node_id": "defer-after-b-fail",
@@ -64,7 +78,9 @@
           "nominal_risk_bps": 0,
           "robust_risk_bps": 10000,
           "support_lower_bps": 0
-        }
+        },
+        "claimed_residual_risk_bps": 0,
+        "claimed_risk_understatement": false
       },
       {
         "leaf_node_id": "release-after-b-pass",
@@ -83,7 +99,9 @@
         "action_justified": true,
         "path_cost_micros": 1500,
         "within_budget": true,
-        "target_action_counterfactual": null
+        "target_action_counterfactual": null,
+        "claimed_residual_risk_bps": 0,
+        "claimed_risk_understatement": false
       }
     ]
   },
@@ -97,12 +115,20 @@
       {
         "hypothesis_id": "safe-world",
         "nominal_conditional_cost_numerator": 11000000,
-        "worst_case_conditional_cost_numerator": 11800000
+        "worst_case_conditional_cost_numerator": 11800000,
+        "nominal_expected_cost_micros": 1100,
+        "worst_case_expected_cost_micros": 1180,
+        "nominal_conditional_cost_numerator_bps_micros": 11000000,
+        "worst_case_conditional_cost_numerator_bps_micros": 11800000
       },
       {
         "hypothesis_id": "common-cause-hazard",
         "nominal_conditional_cost_numerator": 7000000,
-        "worst_case_conditional_cost_numerator": 7000000
+        "worst_case_conditional_cost_numerator": 7000000,
+        "nominal_expected_cost_micros": 700,
+        "worst_case_expected_cost_micros": 700,
+        "nominal_conditional_cost_numerator_bps_micros": 7000000,
+        "worst_case_conditional_cost_numerator_bps_micros": 7000000
       }
     ]
   },
