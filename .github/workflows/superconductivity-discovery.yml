@@ -7,6 +7,7 @@ on:
       - "tools/superconductivity-discovery-harness/**"
       - "data/research/sc_superconductor_discovery_cases_v0_1.json"
       - "data/schemas/superconductivity_discovery_case_v0_1.schema.json"
+      - "data/schemas/superconductivity_observation_event_v0_1.schema.json"
       - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
       - ".github/workflows/superconductivity-discovery.yml"
   pull_request:
@@ -14,6 +15,7 @@ on:
       - "tools/superconductivity-discovery-harness/**"
       - "data/research/sc_superconductor_discovery_cases_v0_1.json"
       - "data/schemas/superconductivity_discovery_case_v0_1.schema.json"
+      - "data/schemas/superconductivity_observation_event_v0_1.schema.json"
       - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
       - ".github/workflows/superconductivity-discovery.yml"
   workflow_dispatch:
@@ -95,6 +97,8 @@ jobs:
             echo "rustc=$(rustc --version)"
             echo "cargo=$(cargo --version)"
             sha256sum data/schemas/superconductivity_discovery_case_v0_1.schema.json
+            sha256sum data/schemas/superconductivity_observation_event_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json
             sha256sum data/research/sc_superconductor_discovery_cases_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/Cargo.toml
             if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
