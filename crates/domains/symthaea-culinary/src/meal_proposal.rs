@@ -9,7 +9,7 @@
 //! for task-graph grounding, exact module admission and resource scheduling.
 
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
 pub const MEAL_PROPOSAL_SCHEMA_VERSION: u32 = 1;
 pub const MEAL_PROPOSAL_CLAIM_CEILING: &str =
@@ -348,6 +348,16 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
             "servings must be greater than zero",
         );
     }
+    if proposal.constraints.budget_minor_units.is_some()
+        && proposal.constraints.currency_code.is_none()
+    {
+        violation(
+            &mut violations,
+            MealProposalViolationCodeV1::MissingRequiredValue,
+            Some("constraints.currency_code"),
+            "budget amount requires an explicit currency code",
+        );
+    }
     if proposal.constraints.currency_code.is_some()
         && proposal.constraints.currency_code.as_deref().is_none_or(|value| {
             value.len() != 3 || !value.bytes().all(|b| b.is_ascii_uppercase())
@@ -519,7 +529,9 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
                 "fact source, source record ID and source version are required",
             );
         }
-        if fact.valid_until_epoch_ms.is_some_and(|expiry| expiry < fact.observed_at_epoch_ms) {
+        if fact.observed_at_epoch_ms == 0
+            || fact.valid_until_epoch_ms.is_some_and(|expiry| expiry < fact.observed_at_epoch_ms)
+        {
             violation(
                 &mut violations,
                 MealProposalViolationCodeV1::InvalidFactTimeWindow,
