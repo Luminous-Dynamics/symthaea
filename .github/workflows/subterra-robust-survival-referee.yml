@@ -22,7 +22,7 @@ jobs:
   verify:
     name: Format, tests and strict Clippy
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
 
@@ -34,29 +34,38 @@ jobs:
       # Temporary normalization: apply rustfmt in the runner and commit the
       # mechanical result back to this first-party research branch. The final
       # workflow returns to a non-mutating format --check gate after this pass.
-      - name: Normalize referee source
-        run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml
+      - name: Normalize both standalone research crates
+        run: |
+          cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-survival-planner/Cargo.toml
+          cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml
 
       - name: Commit formatter output to the research branch
         if: github.event_name != 'workflow_dispatch'
         run: |
-          if ! git diff --quiet -- crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/src/lib.rs; then
+          if ! git diff --quiet -- crates/domains/symthaea-subterranean/research/subterra-survival-planner/src/lib.rs crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/src/lib.rs; then
             git config user.name 'github-actions[bot]'
             git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/src/lib.rs
-            git commit -m 'style(subterra): rustfmt robust survival policy referee'
+            git add crates/domains/symthaea-subterranean/research/subterra-survival-planner/src/lib.rs crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/src/lib.rs
+            git commit -m 'style(subterra): format survival planning research crates'
             git push origin HEAD:refs/heads/research/subterra-robust-survival-referee-v0-1
           fi
 
-      - name: Confirm normalized formatting
-        run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml -- --check
+      - name: Confirm formatting
+        run: |
+          cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-survival-planner/Cargo.toml -- --check
+          cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml -- --check
 
-      - name: Run referee tests
+      - name: Test survival planner dependency
+        run: cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterra-survival-planner/Cargo.toml --all-targets
+
+      - name: Test robust survival policy referee
         run: cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml --all-targets
 
-      - name: Strict Clippy
-        run: cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml --all-targets -- -D warnings
+      - name: Strict Clippy for both crates
+        run: |
+          cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-survival-planner/Cargo.toml --all-targets -- -D warnings
+          cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml --all-targets -- -D warnings
 
       - name: Preserve claim ceiling
         if: always()
-        run: echo 'A PASS applies only to the standalone finite-model referee tests; it is not physical, analogue, flight or planetary qualification.'
+        run: echo 'A PASS applies only to standalone finite-model reference tests; it is not physical, analogue, flight or planetary qualification.'
