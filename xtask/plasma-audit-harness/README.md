@@ -21,3 +21,15 @@ The pathway report includes Wilson 95% intervals and Monte Carlo standard errors
 Four baseline rankings are reported with `diagnostic_only=true`: best qualified non-plasma incumbent, fixed equal-weight normalized sum, TOPSIS, and central-mean non-dominated sorting. The last is not NSGA-II. No baseline is allowed to override hard constraints or abstention.
 
 These statistics quantify only simulation sampling error for the declared synthetic distributions. They do not demonstrate empirical probability calibration or physical route performance.
+
+
+## Pathway decision sensitivity v0.3
+
+The harness also replays the frozen synthetic pathway fixture across a declared grid of three seeds and two increasing draw budgets (10,000 and 20,000). The report includes:
+- min/max/range of route feasibility probabilities;
+- whether the hard robust-feasibility classification changes across runs;
+- the range of Pareto-membership estimates where at least two routes remain robustly feasible;
+- how often each diagnostic baseline puts a route first;
+- the per-run authoritative group disposition.
+
+This is a Monte Carlo convergence/stability diagnostic. It does not measure empirical prediction calibration, uncertainty-model validity, physical model discrepancy or real process performance. A stable result on invented triangular bands is not evidence that the bands describe a real plant.
