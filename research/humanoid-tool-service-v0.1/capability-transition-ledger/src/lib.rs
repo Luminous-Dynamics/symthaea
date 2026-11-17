@@ -477,6 +477,27 @@ mod tests {
     }
 
     #[test]
+    fn absent_success_requires_verifier_but_uninstrumented_success_does_not() {
+        let mut episode = row(
+            "episode-1",
+            ExecutionLevel::L1StationaryUse,
+            ToolSetMode::Standard,
+            [
+                EventEvidence::OccurredAtNs(10),
+                EventEvidence::InstrumentedAbsent,
+                EventEvidence::NotInstrumented,
+                EventEvidence::NotInstrumented,
+                EventEvidence::InstrumentedAbsent,
+            ],
+        );
+        episode.independent_verifier_id = None;
+        assert!(summarize_by_cell(&[episode.clone()]).is_err());
+
+        episode.events[EventKind::TaskSuccess.index()] = EventEvidence::NotInstrumented;
+        assert!(summarize_by_cell(&[episode]).is_ok());
+    }
+
+    #[test]
     fn empty_provenance_is_rejected() {
         let mut episode = row(
             "episode-1",
