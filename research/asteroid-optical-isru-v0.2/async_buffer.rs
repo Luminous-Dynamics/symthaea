@@ -243,7 +243,7 @@ fn over_budget(cost: &ResourceVector, budget: &ResourceVector) -> Vec<&'static s
 fn validate_policy(policy: PlaceholderPolicy) -> Result<(), AsyncError> {
     match policy {
         PlaceholderPolicy::NoPlaceholder | PlaceholderPolicy::RealisticMean => Ok(()),
-        PlaceholderPolicy::PessimisticBound { beta } if beta.is_finite() && beta >= 0.0 => Ok(())
+        PlaceholderPolicy::PessimisticBound { beta } if beta.is_finite() && beta >= 0.0 => Ok(()),
         PlaceholderPolicy::SeededUniform {
             seed,
             radius_multiplier,
