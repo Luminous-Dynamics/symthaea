@@ -9,6 +9,7 @@ on:
       - 'research/asteroid-optical-isru-v0.2/optical_health.rs'
       - 'research/asteroid-optical-isru-v0.2/material_regime.rs'
       - 'docs/research/OPTICAL_ISRU_SEALED_AUTONOMOUS_SCIENCE_BENCHMARK_V0_1.md'
+      - 'docs/research/OPTICAL_ISRU_B1_DIGITAL_TWIN_AND_DYNAMIC_FOULING_V0_1.md'
       - '.github/workflows/isru-benchmark-contract-tests.yml'
   workflow_dispatch:
 
