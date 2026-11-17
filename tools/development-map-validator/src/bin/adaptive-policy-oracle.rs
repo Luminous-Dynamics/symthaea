@@ -105,7 +105,9 @@ fn parse_worlds(oracle:&Value,ids:&BTreeSet<String>,option_ids:&BTreeSet<String>
  Ok(out)
 }
 fn parse_actions(v:&Value)->Result<BTreeMap<String,Action>,String>{
- let items=val(v,"actions","candidate_view")?.as_array().ok_or("actions must be array")?;let mut out=BTreeMap::new();
+ let items=val(v,"actions","candidate_view")?.as_array().ok_or("actions must be array")?;
+ if items.is_empty()||items.len()>16{return Err("actions must contain 1..=16 entries".to_owned());}
+ let mut out=BTreeMap::new();
  for (i,a) in items.iter().enumerate(){let l=format!("actions[{i}]");allowed(a,&["action_id","irreversible","hard_gate","max_residual_risk_bps"],&l)?;
   let id=s(a,"action_id",&l)?;let irreversible=val(a,"irreversible",&l)?.as_bool().ok_or("irreversible must be boolean")?;let hard=val(a,"hard_gate",&l)?.as_bool().ok_or("hard_gate must be boolean")?;let risk=u(a,"max_residual_risk_bps",&l)?;
   if risk>SCALE||(hard&&risk!=0)||(irreversible&&!hard){return Err(format!("invalid action policy {id:?}"));}
@@ -273,7 +275,7 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
    let target_risk=risk_for_path(candidate,oracle,&path.steps,representative,target_action,SCALE)?;
    let target_justified=target_risk["evidence_accepted"].as_bool()==Some(true)
     &&target_risk["robust_action_justified"].as_bool()==Some(true);
-   if target_justified{
+   if target_justified&&within{
     unnecessary=unnecessary.saturating_add(path.world_ids.iter().map(|id|bounds[id].nominal).sum::<u64>());
    }
   }
@@ -311,7 +313,7 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
   "policy_feasible":feasible,
   "action_coverage_nominal_bps":coverage,
   "unnecessary_abstention_nominal_bps":unnecessary,
-  "actual_unsafe_world_count":unsafe_worlds,
+  "unsafe_world_action_count":unsafe_worlds,
   "robust_risk_violation_leaf_count":robust_violations,
   "over_budget_leaf_count":budget_violations,
   "worst_case_path_cost_bound_micros":max_path,
