@@ -43,6 +43,7 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
 
     let mut observation_ids = HashSet::new();
     let mut origin_counts = serde_json::Map::new();
+    let mut measurement_scope_counts = serde_json::Map::new();
     let mut checked = Vec::with_capacity(events.len());
 
     for (index, event) in events.iter().enumerate() {
@@ -261,6 +262,34 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             .and_then(Value::as_str)
             .ok_or_else(|| format!("{observation_id}: missing property_code"))?;
         let criterion = assertion.get("tc_criterion").and_then(Value::as_str);
+        let measurement_scope = assertion
+            .get("measurement_scope")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let unit = assertion
+            .get("unit")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("{observation_id}: missing assertion.unit"))?;
+
+        if property == "Tc"
+            && (measurement_scope == "local_probe" || criterion == Some("spectroscopic_gap"))
+        {
+            return Err(format!(
+                "{observation_id}: local pairing/gap spectroscopy is not a bulk Tc transition"
+            ));
+        }
+        if property == "pairing_energy" && origin == "observed" {
+            if unit != "meV" {
+                return Err(format!(
+                    "{observation_id}: observed pairing_energy must use meV"
+                ));
+            }
+            if !matches!(measurement_scope, "local_probe" | "mesoscopic" | "bulk") {
+                return Err(format!(
+                    "{observation_id}: observed pairing_energy requires an experimental measurement scope"
+                ));
+            }
+        }
 
         match origin {
             "observed" => {
@@ -400,6 +429,12 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             }
         }
 
+        let next_scope_count = measurement_scope_counts
+            .get(measurement_scope)
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+            + 1;
+        measurement_scope_counts.insert(measurement_scope.to_owned(), json!(next_scope_count));
         let next_count = origin_counts
             .get(origin)
             .and_then(Value::as_u64)
@@ -417,6 +452,7 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
         "process_step_count": events.iter().map(|event| event.get("process_history").and_then(Value::as_array).map_or(0, Vec::len)).sum::<usize>(),
         "source_count": source_ids.len(),
         "origin_counts": origin_counts,
+        "measurement_scope_counts": measurement_scope_counts,
         "observation_ids": checked,
         "checks": {
             "schema_valid": true,
@@ -428,7 +464,10 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             "ambient_pressure_is_explicit": true,
             "process_steps_ordered_and_unique": true,
             "planned_commands_not_promoted_to_execution": true,
-            "sensor_verified_steps_have_source_evidence": true
+            "sensor_verified_steps_have_source_evidence": true,
+            "local_pairing_is_not_bulk_tc": true,
+            "spectroscopic_gap_is_not_a_tc_criterion": true,
+            "pairing_energy_has_explicit_mev_and_scope": true
         },
         "claim_ceiling": "Fixture validation only; it does not establish scientific truth, independent replication or a material discovery."
     }))
@@ -531,11 +570,53 @@ mod tests {
         let (schema, fixture) = committed_inputs();
         let bytes = serde_json::to_vec(&fixture).unwrap();
         let receipt = validate_fixture(&schema, &bytes).unwrap();
-        assert_eq!(receipt["observation_count"], 5);
+        assert_eq!(receipt["observation_count"], 7);
         assert_eq!(receipt["process_step_count"], 2);
-        assert_eq!(receipt["origin_counts"]["observed"], 2);
+        assert_eq!(receipt["origin_counts"]["observed"], 4);
+        assert_eq!(receipt["measurement_scope_counts"]["local_probe"], 1);
+        assert_eq!(receipt["measurement_scope_counts"]["bulk"], 4);
+        assert_eq!(receipt["measurement_scope_counts"]["theoretical_model"], 2);
         assert_eq!(receipt["origin_counts"]["calculated"], 1);
         assert_eq!(receipt["origin_counts"]["predicted"], 1);
+    }
+
+    #[test]
+    fn local_pairing_energy_is_not_a_bulk_transition() {
+        let (_, fixture) = committed_inputs();
+        let event = &fixture["observations"][5];
+        assert_eq!(event["assertion"]["property_code"], "pairing_energy");
+        assert_eq!(event["assertion"]["measurement_scope"], "local_probe");
+        assert_ne!(event["assertion"]["property_code"], "Tc");
+    }
+
+    #[test]
+    fn local_pairing_signal_cannot_be_promoted_to_bulk_tc() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][5]["assertion"]["property_code"] = json!("Tc");
+        fixture["observations"][5]["assertion"]["tc_criterion"] = json!("onset");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn spectroscopic_gap_is_not_a_tc_criterion() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][0]["assertion"]["tc_criterion"] = json!("spectroscopic_gap");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn observed_pairing_energy_requires_mev_units() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][5]["assertion"]["unit"] = json!("K");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn bulk_superfluid_stiffness_remains_a_separate_observable() {
+        let (_, fixture) = committed_inputs();
+        let event = &fixture["observations"][6];
+        assert_eq!(event["assertion"]["property_code"], "superfluid_stiffness");
+        assert_eq!(event["assertion"]["measurement_scope"], "bulk");
     }
 
     #[test]
