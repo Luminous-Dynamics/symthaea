@@ -615,8 +615,8 @@ mod tests {
     fn query_rows(invariant_predicate: bool) -> Vec<QueryRowV1> {
         (0..16)
             .map(|index| {
-                let source = index / 4;
-                let target = index % 4;
+                let source: usize = index / 4;
+                let target: usize = index % 4;
                 let raw_distance = source.abs_diff(target);
                 let distance = raw_distance.min(4 - raw_distance);
                 QueryRowV1 {
