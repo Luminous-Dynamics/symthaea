@@ -74,12 +74,12 @@ pub struct FullEnvelopeMeshArtifact {
     pub admission_report: AdmissionReport,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct StationMeshIndices<'a> {
-    station_id: &'a str,
-    starboard: &'a [u32],
-    port: &'a [u32],
-    deck: &'a [u32],
+#[derive(Debug, Clone)]
+struct StationMeshIndices {
+    station_id: String,
+    starboard: Vec<u32>,
+    port: Vec<u32>,
+    deck: Vec<u32>,
 }
 
 #[derive(Serialize)]
@@ -237,7 +237,13 @@ fn preflight_mesh_budget(spec: &FullEnvelopeSpec) -> Result<(), Vec<FullEnvelope
             detail: "at least two non-empty stations are required".into(),
         }]);
     };
-    let Some(deck_point_count) = spec.deck_surface.sections.first().map(|section| section.points.len()) else {
+    let Some(deck_point_count) = spec
+        .deck_surface
+        .sections
+        .iter()
+        .map(|section| section.points.len())
+        .max()
+    else {
         return Err(vec![FullEnvelopeMeshIssue {
             code: "deck_station_count".into(),
             level: FullEnvelopeMeshIssueLevel::Rejected,
@@ -265,7 +271,7 @@ fn preflight_mesh_budget(spec: &FullEnvelopeSpec) -> Result<(), Vec<FullEnvelope
     let cap_faces_per_end = profile_point_count
         .checked_mul(2)
         .and_then(|count| count.checked_add(deck_point_count))
-        .and_then(|count| count.checked_sub(4));
+        .and_then(|count| count.checked_sub(3));
     let cap_face_upper = cap_faces_per_end.and_then(|count| count.checked_mul(2));
     let face_upper = side_faces
         .and_then(|count| checked_add(count, deck_faces?))
@@ -430,7 +436,13 @@ fn validate_generation_profile(
     }
 
     if spec.stations.len() >= 2 {
-        let deck_count = spec.deck_surface.sections[0].points.len();
+        let deck_count = spec
+            .deck_surface
+            .sections
+            .iter()
+            .map(|section| section.points.len())
+            .max()
+            .unwrap_or(0);
         for (station, section) in spec
             .stations
             .iter()
@@ -534,7 +546,7 @@ fn add_deck_vertices(
 
 fn cap_ring(
     station_id: &str,
-    station: &StationMeshIndices<'_>,
+    station: &StationMeshIndices,
 ) -> Result<Vec<u32>, FullEnvelopeMeshIssue> {
     let mut ring = station.starboard.to_vec();
     if station.deck.len() < 2 || station.port.len() < 2 {
@@ -672,8 +684,8 @@ fn append_transom_cap(
 }
 
 fn append_side_interval(
-    left: &StationMeshIndices<'_>,
-    right: &StationMeshIndices<'_>,
+    left: &StationMeshIndices,
+    right: &StationMeshIndices,
     left_spec: &crate::full_envelope::FullEnvelopeStation,
     right_spec: &crate::full_envelope::FullEnvelopeStation,
     right_collapsed: bool,
@@ -727,8 +739,8 @@ fn append_side_interval(
 }
 
 fn append_deck_interval(
-    left: &StationMeshIndices<'_>,
-    right: &StationMeshIndices<'_>,
+    left: &StationMeshIndices,
+    right: &StationMeshIndices,
     deck_faces: &mut Vec<[u32; 3]>,
 ) {
     if left.deck.len() == 1 {
@@ -798,7 +810,7 @@ pub fn generate_full_envelope_mesh(
     let mut vertices = Vec::<[f64; 3]>::new();
     let mut identity_map = BTreeMap::<String, u32>::new();
     let mut bindings = Vec::<VertexIdentityBinding>::new();
-    let mut stations = Vec::<StationMeshIndices<'_>>::with_capacity(station_count);
+    let mut stations = Vec::<StationMeshIndices>::with_capacity(station_count);
 
     for (station_index, station) in spec.stations.iter().enumerate() {
         let x_m = station.x_over_length * spec.principal_dimensions.length_m;
@@ -871,10 +883,10 @@ pub fn generate_full_envelope_mesh(
         .map_err(|issue| vec![issue])?;
 
         stations.push(StationMeshIndices {
-            station_id: &station.station_id,
-            starboard: Box::leak(starboard.into_boxed_slice()),
-            port: Box::leak(port.into_boxed_slice()),
-            deck: Box::leak(deck.into_boxed_slice()),
+            station_id: station.station_id.clone(),
+            starboard,
+            port,
+            deck,
         });
     }
 
