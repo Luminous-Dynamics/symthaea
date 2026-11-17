@@ -21,10 +21,9 @@ use material_regime::{
 };
 use optical_health::{
     DepositionEvent, DepositionTransfer, HealthAction, OpticalHealthError, OpticalHealthModel,
-    OpticalHealthReading, OpticalHealthThresholds, SurfaceState,
+    OpticalHealthReading, OpticalHealthThresholds, SpectralBand, SurfaceState,
 };
 
-const PROCESS_BAND: usize = 1;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CoupledError {
@@ -55,6 +54,7 @@ pub struct CoupledCampaign {
     optics: OpticalHealthModel,
     thresholds: OpticalHealthThresholds,
     transfer: DepositionTransfer,
+    process_band: SpectralBand,
 }
 
 impl CoupledCampaign {
@@ -63,6 +63,7 @@ impl CoupledCampaign {
         optics: OpticalHealthModel,
         thresholds: OpticalHealthThresholds,
         transfer: DepositionTransfer,
+        process_band: SpectralBand,
     ) -> Result<Self, OpticalHealthError> {
         transfer.validate()?;
         Ok(Self {
@@ -70,6 +71,7 @@ impl CoupledCampaign {
             optics,
             thresholds,
             transfer,
+            process_band,
         })
     }
 
@@ -103,7 +105,7 @@ impl CoupledCampaign {
             return Err(CoupledError::CampaignBlocked(action));
         }
 
-        let transmission = staged_optics.process_transmission()[PROCESS_BAND];
+        let transmission = staged_optics.process_transmission()[self.process_band.index()];
         let pulse = LaserPulse {
             incident_irradiance_w_cm2,
             beam_area_cm2,
@@ -246,6 +248,7 @@ mod tests {
                 optical_witness_factor: 0.5,
                 qcm_factor: 0.25,
             },
+            SpectralBand::Visible,
         )
         .unwrap()
     }
@@ -264,7 +267,7 @@ mod tests {
         let first = world
             .apply_pulse("pulse-1", 100.0, 1.0, 1.0, 0.0, &gas(), 500.0, 7)
             .unwrap();
-        let after_first = world.process_transmission()[PROCESS_BAND];
+        let after_first = world.process_transmission()[SpectralBand::Visible.index()];
         let second = world
             .apply_pulse("pulse-2", 100.0, 1.0, 1.0, 0.0, &gas(), 500.0, 8)
             .unwrap();
@@ -281,11 +284,11 @@ mod tests {
             .apply_pulse("pulse-1", 100.0, 1.0, 1.0, 0.0, &gas(), 500.0, 7)
             .unwrap();
         assert!(world.qcm_areal_mass_ug_cm2() > 0.0);
-        assert!(world.witness_transmission()[PROCESS_BAND] < 1.0);
-        assert!(world.process_transmission()[PROCESS_BAND] < 1.0);
+        assert!(world.witness_transmission()[SpectralBand::Visible.index()] < 1.0);
+        assert!(world.process_transmission()[SpectralBand::Visible.index()] < 1.0);
         assert_ne!(
             world.qcm_areal_mass_ug_cm2(),
-            1.0 - world.witness_transmission()[PROCESS_BAND]
+            1.0 - world.witness_transmission()[SpectralBand::Visible.index()]
         );
     }
 
