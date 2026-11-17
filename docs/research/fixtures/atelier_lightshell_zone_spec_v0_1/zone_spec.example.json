@@ -1,0 +1,189 @@
+{
+  "schema_version": "0.1.0",
+  "spec_id": "LIGHTSHELL-ZONE-SPEC-SYNTHETIC-001",
+  "state": "proposed",
+  "platform": {
+    "platform_id": "SYNTHETIC-HUMANOID-FOREARM-ELBOW-001",
+    "article_revision": null,
+    "geometry_digest": null
+  },
+  "operating_domain": [],
+  "zones": [
+    {
+      "zone_id": "elbow_gaiter",
+      "robot_zone_ref": null,
+      "frame_ref": null,
+      "functions": ["articulation"],
+      "requirements": [
+        {
+          "function_id": "articulation",
+          "metric_id": "joint_rom_delta_deg",
+          "unit": "deg",
+          "direction": "within_declared_band",
+          "hard_gate": true,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "function_id": "articulation",
+          "metric_id": "flex_fatigue_cycles",
+          "unit": "cycles",
+          "direction": "higher_is_better",
+          "hard_gate": false,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "function_id": "articulation",
+          "metric_id": "minimum_clearance_mm",
+          "unit": "mm",
+          "direction": "higher_is_better",
+          "hard_gate": true,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        }
+      ],
+      "keep_out_refs": [],
+      "clearance_review_ref": null,
+      "service": {
+        "replaceable": true,
+        "interface_ref": null,
+        "inspection_access": false
+      }
+    },
+    {
+      "zone_id": "forearm_shell",
+      "robot_zone_ref": null,
+      "frame_ref": null,
+      "functions": ["abrasion", "impact_compression"],
+      "requirements": [
+        {
+          "function_id": "abrasion",
+          "metric_id": "abrasion_cycles",
+          "unit": "cycles",
+          "direction": "higher_is_better",
+          "hard_gate": false,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "function_id": "impact_compression",
+          "metric_id": "transmitted_force_n",
+          "unit": "N",
+          "direction": "lower_is_better",
+          "hard_gate": false,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "function_id": "impact_compression",
+          "metric_id": "compression_energy_j_g",
+          "unit": "J/g",
+          "direction": "higher_is_better",
+          "hard_gate": false,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        }
+      ],
+      "keep_out_refs": [],
+      "clearance_review_ref": null,
+      "service": {
+        "replaceable": true,
+        "interface_ref": null,
+        "inspection_access": false
+      }
+    },
+    {
+      "zone_id": "vent_adjacent_panel",
+      "robot_zone_ref": null,
+      "frame_ref": null,
+      "functions": ["airflow", "thermal_management"],
+      "requirements": [
+        {
+          "function_id": "airflow",
+          "metric_id": "air_permeability_mm_s",
+          "unit": "mm/s",
+          "direction": "higher_is_better",
+          "hard_gate": true,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "function_id": "thermal_management",
+          "metric_id": "temperature_delta_c",
+          "unit": "degC",
+          "direction": "within_declared_band",
+          "hard_gate": true,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        }
+      ],
+      "keep_out_refs": [],
+      "clearance_review_ref": null,
+      "service": {
+        "replaceable": true,
+        "interface_ref": null,
+        "inspection_access": false
+      }
+    },
+    {
+      "zone_id": "camera_sensor_shroud",
+      "robot_zone_ref": null,
+      "frame_ref": null,
+      "functions": ["sensor_accommodation", "cleanability"],
+      "requirements": [
+        {
+          "function_id": "sensor_accommodation",
+          "metric_id": "sensor_occlusion_fraction",
+          "unit": "fraction",
+          "direction": "lower_is_better",
+          "hard_gate": true,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        },
+        {
+          "function_id": "cleanability",
+          "metric_id": "cleaning_residue_fraction",
+          "unit": "fraction",
+          "direction": "lower_is_better",
+          "hard_gate": false,
+          "lower_bound": null,
+          "upper_bound": null,
+          "method_ref": null,
+          "acceptance_rule_ref": null
+        }
+      ],
+      "keep_out_refs": [],
+      "clearance_review_ref": null,
+      "service": {
+        "replaceable": true,
+        "interface_ref": null,
+        "inspection_access": false
+      }
+    }
+  ],
+  "evidence_policy": {
+    "unknowns_fail_closed": true,
+    "visual_estimates_are_non_qualifying": true,
+    "simulation_is_not_physical_qualification": true,
+    "supplier_claims_are_not_independent_qualification": true
+  }
+}
