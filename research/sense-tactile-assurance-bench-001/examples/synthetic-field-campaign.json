@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.1.0",
+  "schema_version": "0.2.0",
   "benchmark_id": "SENSE-TACTILE-ASSURANCE-BENCH-001",
   "run_id": "symtropy-field-campaign-2026-11-17-seed-20261117",
   "claim_class": "synthetic_benchmark",
