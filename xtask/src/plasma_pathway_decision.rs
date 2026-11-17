@@ -83,6 +83,7 @@ pub struct RouteReport {
     pub route_id: String,
     pub technology: String,
     pub feasibility_probability: f64,
+    pub feasibility_lower_95: f64,
     pub robustly_feasible: bool,
     pub pareto_membership_probability: Option<f64>,
     pub mean_regret: BTreeMap<String, Option<f64>>,
@@ -169,6 +170,20 @@ fn valid_group(g:&Group,min_feasibility:f64)->Result<(),Vec<String>>{
     for m in OBJECTIVES{if !ref_metrics.as_ref().is_some_and(|s|s.contains(m)){e.push(format!("missing Pareto objective {m}"));}}
     if e.is_empty(){Ok(())}else{Err(e)}
 }
+fn wilson_lower_95(successes: u32, trials: u32) -> f64 {
+    if trials == 0 {
+        return 0.0;
+    }
+    let n = f64::from(trials);
+    let p = f64::from(successes.min(trials)) / n;
+    let z = 1.959_963_984_540_054_f64;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = p + z2 / (2.0 * n);
+    let radius = z * ((p * (1.0 - p) / n + z2 / (4.0 * n * n)).sqrt());
+    ((center - radius) / denominator).clamp(0.0, 1.0)
+}
+
 fn constraint_passes(limit:&Limit,values:&BTreeMap<String,f64>)->bool{
     match (limit.op.as_str(),values.get(&limit.metric)){
         ("MIN",Some(v))=>*v>=limit.threshold,("MAX",Some(v))=>*v<=limit.threshold,_=>false
@@ -190,12 +205,13 @@ fn evaluate_group(g:&Group,m:&Manifest)->GroupReport{
         }
     }
     let probs:Vec<f64>=ok.iter().map(|x|f64::from(*x)/f64::from(m.draws)).collect();
-    let robust:Vec<bool>=probs.iter().map(|p|*p>=m.min_feasibility).collect();
+    let lower_95:Vec<f64>=ok.iter().map(|x|wilson_lower_95(*x,m.draws)).collect();
+    let robust:Vec<bool>=lower_95.iter().map(|lower|*lower>=m.min_feasibility).collect();
     let qualified:Vec<usize>=robust.iter().enumerate().filter_map(|(i,x)|if *x{Some(i)}else{None}).collect();
     if qualified.len()<2{
         let routes=g.routes.iter().enumerate().map(|(i,r)|{
             let empty: BTreeMap<String, Option<f64>> = OBJECTIVES.iter().map(|x|(x.to_string(),None)).collect();
-            RouteReport{route_id:r.route_id.clone(),technology:r.technology.clone(),feasibility_probability:probs[i],robustly_feasible:robust[i],pareto_membership_probability:None,mean_regret:empty.clone(),p95_regret:empty}
+            RouteReport{route_id:r.route_id.clone(),technology:r.technology.clone(),feasibility_probability:probs[i],feasibility_lower_95:lower_95[i],robustly_feasible:robust[i],pareto_membership_probability:None,mean_regret:empty.clone(),p95_regret:empty}
         }).collect();
         return GroupReport{group_id:g.group_id.clone(),disposition:"ABSTAIN_INSUFFICIENT_FEASIBLE_ROUTES".to_owned(),reasons:vec!["fewer than two routes satisfy all hard constraints at the required probability".to_owned()],routes,pairwise_dominance:vec![]};
     }
@@ -252,7 +268,7 @@ fn evaluate_group(g:&Group,m:&Manifest)->GroupReport{
     let routes=g.routes.iter().enumerate().map(|(i,r)|{
         let mut mean=BTreeMap::new();let mut tail=BTreeMap::new();
         for metric in OBJECTIVES{let values=regrets[i].get_mut(metric).unwrap();mean.insert(metric.to_owned(),if values.is_empty(){None}else{Some(values.iter().sum::<f64>()/values.len() as f64)});tail.insert(metric.to_owned(),p95(values));}
-        RouteReport{route_id:r.route_id.clone(),technology:r.technology.clone(),feasibility_probability:probs[i],robustly_feasible:robust[i],pareto_membership_probability:if robust[i]{Some(f64::from(pareto[i])/f64::from(m.draws))}else{None},mean_regret:mean,p95_regret:tail}
+        RouteReport{route_id:r.route_id.clone(),technology:r.technology.clone(),feasibility_probability:probs[i],feasibility_lower_95:lower_95[i],robustly_feasible:robust[i],pareto_membership_probability:if robust[i]{Some(f64::from(pareto[i])/f64::from(m.draws))}else{None},mean_regret:mean,p95_regret:tail}
     }).collect();
     let pairwise_dominance=pairs.into_iter().map(|((a,b),(joint,aw,bw))|PairReport{
         route_a:g.routes[a].route_id.clone(),route_b:g.routes[b].route_id.clone(),
@@ -323,6 +339,27 @@ mod tests{
     #[test] fn no_coproduct_credit_is_mandatory(){
         let mut v=fixture();v["groups"][0]["routes"][0]["credit_policy"]=serde_json::json!("AVOIDED_PRODUCT_CREDIT");let r=evaluate_decision_manifest_json(&v.to_string()).unwrap();assert_eq!(r.groups[0].disposition,"BLOCKED");
     }
+    #[test]
+    fn wilson_lower_bound_is_conservative_at_the_feasibility_threshold() {
+        let lower = wilson_lower_95(9_900, 10_000);
+        assert!(lower < 0.99);
+        assert!(wilson_lower_95(10_000, 10_000) > 0.99);
+    }
+
+    #[test]
+    fn wilson_lower_bound_handles_zero_trials_and_zero_successes() {
+        assert_eq!(wilson_lower_95(0, 0), 0.0);
+        assert!(wilson_lower_95(0, 10_000) < 0.001);
+    }
+
+    #[test]
+    fn route_report_exposes_point_estimate_and_confidence_lower_bound() {
+        let report = evaluate_decision_manifest_json(FIXTURE).unwrap();
+        let route = &report.groups[0].routes[0];
+        assert!(route.feasibility_lower_95 <= route.feasibility_probability);
+        assert!(route.feasibility_lower_95 >= 0.0);
+    }
+
     #[test] fn less_than_10000_draws_is_rejected(){
         let mut v=fixture();v["draws"]=serde_json::json!(9999);assert!(evaluate_decision_manifest_json(&v.to_string()).is_err());
     }
