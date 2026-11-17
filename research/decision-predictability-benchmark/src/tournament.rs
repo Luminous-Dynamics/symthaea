@@ -8,7 +8,7 @@
 //! equation-family tournament and not a source of independent statistical
 //! replicates.
 
-use crate::baseline::{fit_linear_ar, fit_mean, fit_persistence, FittedBaseline};
+use crate::baseline::{FittedBaseline, fit_linear_ar, fit_mean, fit_persistence};
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt;
@@ -58,13 +58,32 @@ pub enum TournamentError {
     EmptyInput,
     MissingRecords,
     InvalidHeader,
-    FieldCount { line: usize, actual: usize },
-    InvalidStep { line: usize },
-    InvalidNumber { line: usize, field: &'static str },
-    NonFiniteValue { line: usize, field: &'static str },
-    EmptyFixtureId { line: usize },
-    RegimeMismatch { line: usize },
-    NonContiguousStep { line: usize, expected: usize, actual: usize },
+    FieldCount {
+        line: usize,
+        actual: usize,
+    },
+    InvalidStep {
+        line: usize,
+    },
+    InvalidNumber {
+        line: usize,
+        field: &'static str,
+    },
+    NonFiniteValue {
+        line: usize,
+        field: &'static str,
+    },
+    EmptyFixtureId {
+        line: usize,
+    },
+    RegimeMismatch {
+        line: usize,
+    },
+    NonContiguousStep {
+        line: usize,
+        expected: usize,
+        actual: usize,
+    },
 }
 
 impl fmt::Display for TournamentError {
@@ -72,16 +91,27 @@ impl fmt::Display for TournamentError {
         match self {
             Self::EmptyInput => write!(formatter, "fixture CSV input is empty"),
             Self::MissingRecords => write!(formatter, "fixture CSV contains no sample records"),
-            Self::InvalidHeader => write!(formatter, "fixture CSV header does not match the v0 contract"),
+            Self::InvalidHeader => write!(
+                formatter,
+                "fixture CSV header does not match the v0 contract"
+            ),
             Self::FieldCount { line, actual } => {
                 write!(formatter, "line {line} has {actual} fields; expected 6")
             }
-            Self::InvalidStep { line } => write!(formatter, "line {line} has an invalid step index"),
+            Self::InvalidStep { line } => {
+                write!(formatter, "line {line} has an invalid step index")
+            }
             Self::InvalidNumber { line, field } => {
-                write!(formatter, "line {line} has an invalid numeric field {field}")
+                write!(
+                    formatter,
+                    "line {line} has an invalid numeric field {field}"
+                )
             }
             Self::NonFiniteValue { line, field } => {
-                write!(formatter, "line {line} has a non-finite numeric field {field}")
+                write!(
+                    formatter,
+                    "line {line} has a non-finite numeric field {field}"
+                )
             }
             Self::EmptyFixtureId { line } => write!(formatter, "line {line} has an empty fixture ID"),
             Self::RegimeMismatch { line } => {
@@ -248,8 +278,12 @@ pub fn evaluate_fixture_csv(input: &str) -> Result<String, TournamentError> {
         fnv1a_non_security(input.as_bytes())
     ));
     output.push_str("# split=60_percent_train,10_percent_validation,30_percent_test\n");
-    output.push_str("# forecast=recursive_free_running_from_one_fixed_as_of_origin;no_test_assimilation\n");
-    output.push_str("# ar_selection=minimum_full_validation_rollout_nrmse_over_orders_1_2_4_8;no_test_tuning\n");
+    output.push_str(
+        "# forecast=recursive_free_running_from_one_fixed_as_of_origin;no_test_assimilation\n",
+    );
+    output.push_str(
+        "# ar_selection=minimum_full_validation_rollout_nrmse_over_orders_1_2_4_8;no_test_tuning\n",
+    );
     output.push_str("# nrmse=rmse_divided_by_development_population_standard_deviation\n");
     output.push_str("# scope=within_trajectory_same_regime_continuation_only;not_held_out_family_generalization\n");
     output.push_str("# uncertainty=no_confidence_intervals;forecast_leads_are_correlated\n");
@@ -264,7 +298,11 @@ pub fn evaluate_fixture_csv(input: &str) -> Result<String, TournamentError> {
 }
 
 fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut String) {
-    let values: Vec<f64> = fixture.values.iter().map(|row| row[channel.index()]).collect();
+    let values: Vec<f64> = fixture
+        .values
+        .iter()
+        .map(|row| row[channel.index()])
+        .collect();
     let sample_count = values.len();
 
     if sample_count < MIN_TOTAL_SAMPLES {
@@ -343,13 +381,7 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
 
     let mut eligible_ar_orders = Vec::new();
     for order in AR_ORDERS {
-        let score = validation_score(
-            "ar",
-            Some(order),
-            training,
-            validation,
-            validation_scale,
-        );
+        let score = validation_score("ar", Some(order), training, validation, validation_scale);
         if let Some(score) = score {
             eligible_ar_orders.push((order, score));
         }
@@ -366,10 +398,7 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
             .then_with(|| left.0.cmp(&right.0))
     });
 
-    let mut final_specs = vec![
-        validation_specs[0].clone(),
-        validation_specs[1].clone(),
-    ];
+    let mut final_specs = vec![validation_specs[0].clone(), validation_specs[1].clone()];
     final_specs.extend(validation_specs.into_iter().skip(2));
     if let Some((order, score)) = selected_ar {
         final_specs.push(ModelSpec {
@@ -428,7 +457,11 @@ fn evaluate_series(fixture: &FixtureTrajectory, channel: Channel, output: &mut S
                     let end = last.min(forecast.predictions.len());
                     let truth = &test[start..end];
                     let prediction = &forecast.predictions[start..end];
-                    (first, last, error_metrics(prediction, truth, development_scale).rmse)
+                    (
+                        first,
+                        last,
+                        error_metrics(prediction, truth, development_scale).rmse,
+                    )
                 })
                 .collect::<Vec<_>>()
         })
@@ -502,7 +535,10 @@ fn validation_score(
     metrics.nrmse.is_finite().then_some(metrics.nrmse)
 }
 
-fn fit_spec(spec: &ModelSpec, history: &[f64]) -> Result<FittedBaseline, crate::baseline::BaselineError> {
+fn fit_spec(
+    spec: &ModelSpec,
+    history: &[f64],
+) -> Result<FittedBaseline, crate::baseline::BaselineError> {
     fit_named_model(&spec.name, spec.order, history)
 }
 
@@ -514,9 +550,11 @@ fn fit_named_model(
     match name {
         "persistence" => fit_persistence(history),
         "mean" => fit_mean(history),
-        "ar" | "ar_tuned" | "ar1" | "ar2" | "ar4" | "ar8" => {
-            fit_linear_ar(history, order.ok_or(crate::baseline::BaselineError::InvalidAutoregressionOrder)?, RIDGE_PENALTY)
-        }
+        "ar" | "ar_tuned" | "ar1" | "ar2" | "ar4" | "ar8" => fit_linear_ar(
+            history,
+            order.ok_or(crate::baseline::BaselineError::InvalidAutoregressionOrder)?,
+            RIDGE_PENALTY,
+        ),
         _ => Err(crate::baseline::BaselineError::NumericalFailure),
     }
 }
@@ -525,12 +563,16 @@ fn population_std(values: &[f64]) -> f64 {
     if values.is_empty() {
         return 0.0;
     }
-    let max_abs = values.iter().map(|value| value.abs()).fold(0.0_f64, f64::max);
+    let max_abs = values
+        .iter()
+        .map(|value| value.abs())
+        .fold(0.0_f64, f64::max);
     if max_abs == 0.0 || !max_abs.is_finite() {
         return 0.0;
     }
 
-    let normalized_mean = values.iter().map(|value| value / max_abs).sum::<f64>() / values.len() as f64;
+    let normalized_mean =
+        values.iter().map(|value| value / max_abs).sum::<f64>() / values.len() as f64;
     let variance = values
         .iter()
         .map(|value| {
@@ -543,7 +585,11 @@ fn population_std(values: &[f64]) -> f64 {
 }
 
 fn error_metrics(prediction: &[f64], truth: &[f64], scale: f64) -> ErrorMetrics {
-    if prediction.is_empty() || prediction.len() != truth.len() || !scale.is_finite() || scale <= 0.0 {
+    if prediction.is_empty()
+        || prediction.len() != truth.len()
+        || !scale.is_finite()
+        || scale <= 0.0
+    {
         return ErrorMetrics {
             mae: f64::NAN,
             rmse: f64::NAN,
@@ -577,8 +623,7 @@ fn error_metrics(prediction: &[f64], truth: &[f64], scale: f64) -> ErrorMetrics 
         .map(|(estimate, actual)| (estimate - actual).abs() / max_error);
     let count = prediction.len() as f64;
     let mae = max_error * (normalized_abs.clone().sum::<f64>() / count);
-    let rmse = max_error
-        * (normalized_abs.map(|value| value * value).sum::<f64>() / count).sqrt();
+    let rmse = max_error * (normalized_abs.map(|value| value * value).sum::<f64>() / count).sqrt();
     let nrmse = rmse / scale;
 
     ErrorMetrics { mae, rmse, nrmse }
@@ -657,7 +702,9 @@ fn write_metric_row(
         fixture.regime.clone(),
         channel.as_str().to_owned(),
         spec.name.clone(),
-        spec.order.map(|value| value.to_string()).unwrap_or_default(),
+        spec.order
+            .map(|value| value.to_string())
+            .unwrap_or_default(),
         train_n.to_string(),
         validation_n.to_string(),
         test_n.to_string(),
@@ -697,11 +744,12 @@ mod tests {
     use super::*;
 
     fn csv_for(values: &[f64]) -> String {
-        let mut input = String::from(
-            "# suite=symthaea-chaos-reference-suite-v0\nfixture,regime,step,x,y,z\n",
-        );
+        let mut input =
+            String::from("# suite=symthaea-chaos-reference-suite-v0\nfixture,regime,step,x,y,z\n");
         for (step, value) in values.iter().enumerate() {
-            input.push_str(&format!("ar_fixture,known_regime,{step},{value:.17e},1.0,2.0\n"));
+            input.push_str(&format!(
+                "ar_fixture,known_regime,{step},{value:.17e},1.0,2.0\n"
+            ));
         }
         input
     }
@@ -765,7 +813,9 @@ mod tests {
         }
         let result = evaluate_fixture_csv(&csv_for(&values)).unwrap();
         assert!(result.contains("# split=60_percent_train,10_percent_validation,30_percent_test"));
-        assert!(result.contains("# forecast=recursive_free_running_from_one_fixed_as_of_origin;no_test_assimilation"));
+        assert!(result.contains(
+            "# forecast=recursive_free_running_from_one_fixed_as_of_origin;no_test_assimilation"
+        ));
         assert!(result.contains("ar_tuned"));
         assert!(result.contains("persistence"));
         assert!(result.contains("mean"));
@@ -789,15 +839,15 @@ mod tests {
 
     #[test]
     fn horizon_bins_are_fixed_and_clipped() {
-        assert_eq!(
-            horizon_bins(12),
-            vec![(1, 1), (2, 5), (6, 10), (11, 12)]
-        );
+        assert_eq!(horizon_bins(12), vec![(1, 1), (2, 5), (6, 10), (11, 12)]);
     }
 
     #[test]
     fn source_digest_is_deterministic_and_non_security() {
-        assert_eq!(fnv1a_non_security(b"fixture"), fnv1a_non_security(b"fixture"));
+        assert_eq!(
+            fnv1a_non_security(b"fixture"),
+            fnv1a_non_security(b"fixture")
+        );
         assert_ne!(fnv1a_non_security(b"fixture"), fnv1a_non_security(b"other"));
     }
 }
