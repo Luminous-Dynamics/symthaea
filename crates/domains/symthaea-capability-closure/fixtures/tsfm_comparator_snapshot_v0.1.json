@@ -477,5 +477,192 @@
     },
     "confirmation_protocol": "select candidate on validation only, then rebuild and retrain fixed code on reserved random seeds; research agents cannot modify evaluation code or access benchmark labels",
     "qualification": "These are Abel AI Lab's own development claims, not independently audited or reproduced Symthaea results. Research-loop efficiency and model-quality leaderboards are separate measures."
-  }
+  },
+  "benchmark_source_snapshots": [
+    {
+      "snapshot_id": "tsfm_fev_views_2026_11_17",
+      "retrieved_at": "2026-11-17",
+      "observations": [
+        {
+          "source": "https://tsfm.ai/benchmarks/fev-bench",
+          "source_type": "live_leaderboard_mase_skill",
+          "metric": "MASE Skill Score",
+          "benchmark": "FEV-Bench",
+          "values": [
+            {
+              "model": "TimeRSI-1.5",
+              "value": 41.44,
+              "rank": 1
+            },
+            {
+              "model": "ci-proto",
+              "value": 40.8,
+              "rank": 2
+            },
+            {
+              "model": "TimeRSI",
+              "value": 40.58,
+              "rank": 3
+            },
+            {
+              "model": "TimeH2O-v1",
+              "value": 39.95,
+              "rank": 4
+            },
+            {
+              "model": "Timestral-209M",
+              "value": 39.49,
+              "rank": 5
+            },
+            {
+              "model": "PDM-Nano",
+              "value": 39.21,
+              "rank": 6
+            },
+            {
+              "model": "Timestral-123M",
+              "value": 39.19,
+              "rank": 7
+            },
+            {
+              "model": "t0-gamma",
+              "value": 37.99,
+              "rank": 8
+            },
+            {
+              "model": "Simons-297M",
+              "value": 37.85,
+              "rank": 9
+            },
+            {
+              "model": "TimesFM-3",
+              "value": 37.82,
+              "rank": 10
+            },
+            {
+              "model": "PDM-Pico",
+              "value": 37.78,
+              "rank": 11
+            },
+            {
+              "model": "Simons-178M",
+              "value": 37.43,
+              "rank": 12
+            }
+          ],
+          "qualification": "Live leaderboard crawl, 52 entries total. Point-accuracy MASE skill, not SQL win rate or GIFT-Eval probabilistic average rank."
+        },
+        {
+          "source": "https://theaggregate.ai/benchmark?slug=fev-bench-sql",
+          "source_type": "live_sql_win_rate_snapshot",
+          "benchmark": "FEV-Bench",
+          "metric": "SQL Win Rate",
+          "snapshot_date": "2026-11-16",
+          "values": [
+            {
+              "model": "ci-proto",
+              "value": 90,
+              "unit": "percent",
+              "rank": 1
+            },
+            {
+              "model": "TimeH2O-v1",
+              "value": 89.65,
+              "unit": "percent",
+              "rank": 2
+            },
+            {
+              "model": "Timestral-209M",
+              "value": 87.06,
+              "unit": "percent",
+              "rank": 3
+            },
+            {
+              "model": "t0-gamma",
+              "value": 84.68,
+              "unit": "percent",
+              "rank": 4
+            },
+            {
+              "model": "Simons-297M",
+              "value": 81.97,
+              "unit": "percent",
+              "rank": 5
+            },
+            {
+              "model": "TimesFM-3",
+              "value": 79.26,
+              "unit": "percent",
+              "rank": 6
+            },
+            {
+              "model": "iAmTime",
+              "value": 73.68,
+              "unit": "percent",
+              "rank": 7
+            },
+            {
+              "model": "Chronos-2",
+              "value": 72.24,
+              "unit": "percent",
+              "rank": 8
+            },
+            {
+              "model": "t0-beta",
+              "value": 69.88,
+              "unit": "percent",
+              "rank": 9
+            },
+            {
+              "model": "Toto-2.0-2.5B",
+              "value": 69.44,
+              "unit": "percent",
+              "rank": 10
+            }
+          ],
+          "qualification": "Daily-refreshed full-suite SQL view. This is win rate under one FEV-Bench metric, not MASE skill."
+        },
+        {
+          "source": "https://h2oai.github.io/benchmarks/",
+          "source_type": "live_vendor_benchmark_dashboard",
+          "benchmark": "FEV-Bench",
+          "metric": "SQL Win Rate",
+          "retrieved_at": "2026-11-17",
+          "values": [
+            {
+              "model": "TimeH2O-v1",
+              "value": 91.5,
+              "unit": "percent"
+            },
+            {
+              "model": "Timestral-209M",
+              "value": 89,
+              "unit": "percent"
+            },
+            {
+              "model": "t0-gamma",
+              "value": 87.4,
+              "unit": "percent"
+            },
+            {
+              "model": "TimesFM-3",
+              "value": 82,
+              "unit": "percent"
+            },
+            {
+              "model": "Chronos-2",
+              "value": 75.8,
+              "unit": "percent"
+            },
+            {
+              "model": "Toto-2.0-2.5B",
+              "value": 72.2,
+              "unit": "percent"
+            }
+          ],
+          "qualification": "Live H2O dashboard surface retrieved 17 Nov. Its current values conflict with H2O GitHub README data read 13 Nov and the independent Aggregate view. Preserve as a separate un-dated/live observation; do not average or choose the highest."
+        }
+      ]
+    }
+  ]
 }
