@@ -723,8 +723,11 @@ mod tests {
     #[test]
     fn feature_and_timestamp_specs_fail_closed() {
         let mut cfg = config();
-        cfg.features[0].modality_id = cfg.text_modality_id;
-        assert_eq!(TimeImmCsvAdapter::new(cfg).unwrap_err(), TimeImmAdapterError::DuplicateModalityId { modality_id: 5 });
+        cfg.features[1].modality_id = cfg.features[0].modality_id;
+        assert_eq!(
+            TimeImmCsvAdapter::new(cfg).unwrap_err(),
+            TimeImmAdapterError::DuplicateModalityId { modality_id: 1 }
+        );
         let mut cfg = config();
         cfg.naive_timestamp_zone = Some(NaiveTimestampZone::Iana("not/a_timezone".into()));
         assert!(matches!(TimeImmCsvAdapter::new(cfg), Err(TimeImmAdapterError::InvalidNaiveTimezone { .. })));
