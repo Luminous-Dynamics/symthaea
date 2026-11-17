@@ -70,6 +70,8 @@ The library caps the reference count, state dimension and total stored cells. It
 
 This is only the retrieval/correction primitive from the 2026 dynamic-structural-bias reservoir method. It does not implement the recurrent reservoir, learned bias matrix, readout, autonomous rollout or full paper training protocol. See #12650 for full method parity and negative controls.
 
+The crate also provides `structural_bias_reservoir::StructuralBiasReservoirCell`, a bounded transition kernel for fixed caller-supplied row-major recurrent and input matrices. It applies the dynamic correction inside the recurrent activation as `Wr*r + Win*u + Wr*(reference - r)`, followed by tanh and the declared leak update. Tests verify this equation on hand-computed one- and two-dimensional cases and reject malformed matrices, dimensions, non-finite states/inputs and invalid leak rates. Weight generation, training/readout fitting and autonomous benchmarking are intentionally outside this kernel.
+
 ## Candidate exposure envelope
 
 The candidate-view module provides an explicit, serializable `CandidatePacketV1` and a separate, non-serializable `EvaluatorTicketBook`.
