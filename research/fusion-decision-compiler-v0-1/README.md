@@ -65,6 +65,16 @@ The initial 15 authored tests cover matched outputs, descriptive-only and covari
 
 The graph helper returns the changed nodes and their full transitive downstream closure. Cycles are tolerated and traversal is deterministic. This is a structural impact calculation, not automatic revocation of an external certificate or authority decision.
 
+
+## Preregistered measured test-stand and blind-holdout metrics
+
+The `measured_holdout_metrics` module composes with `validation_domain.rs` rather than duplicating split-integrity checks. A pre-reveal prediction commitment binds model revision/configuration, input/output manifests, observable profile, record IDs, artifact digests and expected sample counts. Measurement verification receipts are separate for test-stand and blind-holdout payloads.
+
+Each successful report retains the exact `ValidationDomainAudit` returned by the existing domain gate, including model/domain/use identity, calibration counts, held-out record IDs, distinct holdout dimensions, admissibility and claim ceiling. If the domain gate fails, the report carries no successful audit and no prediction metrics are computed.
+
+The synthetic runner uses fabricated samples and declared verifier placeholders. It must remain `DescriptiveOnly`; numerical residuals from synthetic observations are not measured validation. Empirical interval coverage remains descriptive and is not a confidence guarantee.
+
+
 ## Run locally
 
 From this directory:
@@ -76,6 +86,7 @@ cargo run --manifest-path Cargo.toml --bin verify_fecomp_corpus
 cargo run --manifest-path Cargo.toml --bin verify_validation_domain_corpus
 cargo run --manifest-path Cargo.toml --bin compare_solver_outputs
 cargo run --manifest-path Cargo.toml --bin qualify_plant_service
+cargo run --manifest-path Cargo.toml --bin audit_measured_holdout
 cargo clippy --manifest-path Cargo.toml --all-targets -- -D warnings
 ```
 
