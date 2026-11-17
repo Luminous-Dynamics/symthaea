@@ -88,7 +88,7 @@ For EPA WaterSense comparability, obtain and follow the applicable test method a
 
 ### Delivered bathing task
 - spray coverage using the chosen repeatable method;
-- spray force / impact distribution using the chosen repeatable method;
+- spray force / impact distribution using the chosen repeatable method;\n- spray temperature drop at a declared bather-plane distance and ambient condition (Consumer Reports describes a container placed 18 inches from the head);
 - outlet temperature stability and overshoot;
 - flow variation under the declared pressure envelope;
 - noise and vibration;
@@ -226,7 +226,7 @@ Passing one gate does not imply another. A queued/skipped workflow is not a pass
 
 ## 12. South African comparator protocol addendum
 
-The CLASP South African showerhead study measured 19 models across approximately 250–550 kPa, with spray patterns recorded at 300 kPa. The report recommends considering 150 and 300 kPa test points; WRC's 2025 summary reports pressure-compensating models averaging 6.6 L/min at 300 kPa and fixed-orifice models averaging roughly 24–27 L/min. Aqua's controlled bench should include:
+The CLASP South African showerhead study tested a 19-model sample across approximately 250–550 kPa, with spray patterns recorded at 300 kPa. The report recommends considering 150 and 300 kPa test points; WRC's 2025 summary reports pressure-compensating models averaging 6.6 L/min at 300 kPa and fixed-orifice models averaging roughly 24–27 L/min. Aqua's controlled bench should include:
 - 150 kPa low-pressure operation;
 - 300 kPa reference operation;
 - 3 bar for direct comparison with Hansgrohe EcoSmart+ product-family claims;
