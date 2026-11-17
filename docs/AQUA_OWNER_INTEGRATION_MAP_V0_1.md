@@ -111,3 +111,12 @@ The room-mode contract records the required evidence and return-to-ready state f
 - Symthaea [AQUA-MODULAR-PLATFORM-001 #12717](https://github.com/Luminous-Dynamics/symthaea/issues/12717) owns the first bounded product integration article: AQS-1 Essential (direct-flow shower + basin + dry-side service spine + optional indirect DWHR test interface).
 - `docs/AQUA_MODULAR_PLATFORM_ARCHITECTURE_V0_1.md` defines the three-layer product assembly (fixture cartridges, service spine, local experience/evidence layer), separate physical circuit classes, control authority and product family configurations.
 - AQS-1 intentionally excludes recirculating human use, greywater treatment, steam, sauna, plunge, pool and interactive fountains. Those require their own fixture/process classes and independent gates.
+
+
+## Circular serviceability and lifecycle integration
+
+- Symthaea [AQUA-CIRCULAR-SERVICE-001 #12727](https://github.com/Luminous-Dynamics/symthaea/issues/12727) defines the Aqua product-side repairability, maintenance labour, spare-parts, consumables, downtime, material provenance and end-of-life benchmark per 1,000 qualified bathing services.
+- Symtropy #5425 remains the canonical water-service lifecycle cost authority; Symtropy #2152 remains physical resource and residual closure. Aqua must not implement a second cost, energy, material-flow or environmental-impact calculator.
+- Mycelix measurement owners retain calibration, uncertainty, channel identity and applicability; supplier declarations and EPDs remain evidence with explicit scope/geography/vintage and are not treated as measured results.
+- AQS-1 (#12717) is the first repairability article: test whether routine wet-side wear parts can be inspected, cleaned and replaced from the dry-side service spine without destructive finish removal. Report actual technician time, tools, parts, downtime and requalification burden.
+- Report lifecycle cost, physical resource use, technician labour, replaceable-part mass, and embodied-impact evidence as separate dimensions. Do not collapse them into an opaque sustainability score or assign zero to unavailable supplier data.
