@@ -4,6 +4,7 @@ pub mod decision_horizon;
 pub mod manifest;
 pub mod ngrc;
 pub mod paired_world;
+pub mod selective;
 pub mod tournament;
 
 use std::error::Error;
