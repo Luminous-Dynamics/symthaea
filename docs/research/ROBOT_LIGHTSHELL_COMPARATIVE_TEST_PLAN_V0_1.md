@@ -287,3 +287,23 @@ Two additional 2026 studies should inform [LIGHTSHELL-SENSOR-FABRIC-001 #12704](
 - **Which Taxels, Not How Many** (7 November 2026) reports that contact-informed taxel placement can match a much larger uniform array under its controlled in-palm rotation and grasping tasks; rarely contacted sites add little. https://arxiv.org/abs/2611.10647
 
 Therefore compare **uniform low-density**, **task/contact-informed**, **joint/edge/service-zone targeted**, and **sensor-free** constructions. Measure observability at the task-relevant contact zones and downstream task performance rather than using taxel count or spatial resolution as the sole objective. No sensor distribution is fixed until the robot's tasks, expected contacts, mounting, calibration and failure modes are frozen.
+
+
+## 17. Spacer-fabric design of experiments
+
+The application-specific spacer programme is now tracked in [LIGHTSHELL-SPACER-DOE-001 #12724](https://github.com/Luminous-Dynamics/symthaea/issues/12724). Its proposed machine-readable plan and fixture are:
+- `docs/research/LIGHTShell_SPACER_DOE_PLAN_V0_1.md`
+- `docs/research/fixtures/lightshell_spacer_doe_v0_1/lightshell_spacer_doe.schema.json`
+- `docs/research/fixtures/lightshell_spacer_doe_v0_1/lightshell_spacer_doe.example.json`
+
+The proposal has five controls and 18 candidate definitions: 12 screening structures (four inlay architectures × three spacer-course-frequency levels, with square-wave transition geometry held fixed) and six conditional transition-refinement structures (two square-wave families × three transition spacings at a fixed reference spacer frequency).
+
+This split prevents transition geometry and spacer frequency from being confounded. All structures remain proposed; process capability, machine, yarn/filament, material lot and specimen allocation must be admitted before preregistration. The seed contains no test result.
+
+### New material-design principle
+
+The January 2026 spacer study demonstrates that compression/impact response and vibration isolation can move in opposite directions, and that added structural features can introduce extra resonances. Therefore select spacer constructions by measured robot-zone function, not one universal "best cushioning" score.
+
+A second active-evidence comparator is **AVT-Fabric**: RGB-first comparison with force-tagged tactile observations selected when evidence is uncertain. Its project page reports 98% accuracy on 400 held-out comparisons and 1.60/5 observation stages on average; its real-robot demonstration reports 78.1% pairwise ranking accuracy and 7/8 correct final selections. These are task-specific fabric-comparison results, not a physical mechanical-property estimator. <https://zhuochenn.github.io/AVT-project/>
+
+Lightshell can adapt the decision pattern (visual triage → uncertainty-triggered calibrated physical observation → measured evidence) but must never infer compression, impact, airflow or durability from image appearance alone. The physical response curve is the evidence.
