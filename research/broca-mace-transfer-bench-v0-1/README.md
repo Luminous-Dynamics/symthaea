@@ -128,3 +128,7 @@ The candidate crate adds an `invariant_transport` policy alongside exact-scope `
 The generated suite includes a few-shot invariant positive control and a mechanism-break negative control. Exact-scope policy should abstain on the positive few-shot case; invariant transport may transfer. It must abstain when action effects move beyond the tolerance or source families overlap.
 
 This is a transparent empirical-invariance heuristic, not a general transportability proof. The 0.12 tolerance is an uncalibrated prototype parameter. Future work should use preregistered equivalence margins, uncertainty intervals, explicit causal assumptions and independent target-regime witnesses.
+
+## Benchmark portfolio
+
+See [MACE causal-memory benchmark portfolio](../../docs/research/MACE_CAUSAL_MEMORY_BENCHMARK_PORTFOLIO.md) for the current industry comparison, matched-protocol SOTA targets, paradigm shifts, and qualification gates. External benchmark scores remain separate; internal synthetic scores are not SOTA claims.
