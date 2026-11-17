@@ -1,0 +1,271 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_discovery_case_v0_1.schema.json",
+  "title": "Superconductivity Discovery Reference Registry v0.1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "registry_id",
+    "created_at",
+    "source_register",
+    "candidate_records",
+    "benchmark_catalogs",
+    "non_goals"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "registry_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "claim_ceiling": {
+      "type": "string"
+    },
+    "units": {
+      "type": "object"
+    },
+    "source_register": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "source_id",
+          "doi",
+          "url",
+          "source_type",
+          "title",
+          "primary_claim_boundary"
+        ],
+        "properties": {
+          "source_id": {
+            "type": "string"
+          },
+          "doi": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "published": {
+            "type": "string"
+          },
+          "source_type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "primary_claim_boundary": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "candidate_records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "candidate_id",
+          "formula",
+          "family",
+          "source_ids",
+          "evidence_class",
+          "tc_observations"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string"
+          },
+          "formula": {
+            "type": "string"
+          },
+          "family": {
+            "type": "string"
+          },
+          "form": {
+            "type": "string"
+          },
+          "source_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "evidence_class": {
+            "enum": [
+              "experimental_report",
+              "computational_prediction",
+              "machine_learning_prediction",
+              "reported_material_reference"
+            ]
+          },
+          "operating_pressure_gpa": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "synthesis_pressure_gpa": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "tc_observations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "observable",
+                "value_k",
+                "status"
+              ],
+              "properties": {
+                "observable": {
+                  "type": "string"
+                },
+                "value_k": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "pressure_gpa": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "tc_prediction": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "object",
+              "required": [
+                "value_k",
+                "pressure_gpa",
+                "method",
+                "status"
+              ],
+              "properties": {
+                "value_k": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "pressure_gpa": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "method": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "bulk_thermodynamic_transition_k": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "sample_identity_resolution": {
+            "type": "string"
+          },
+          "decompression_retention": {
+            "type": "string"
+          },
+          "engineering_readiness": {
+            "type": "string"
+          },
+          "safety_review": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "benchmark_catalogs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "catalog_id",
+          "source_ids",
+          "metric_interpretation",
+          "local_reproducibility_status"
+        ],
+        "properties": {
+          "catalog_id": {
+            "type": "string"
+          },
+          "source_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reported_record_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reported_test_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reported_metric": {
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "metric_interpretation": {
+            "type": "string"
+          },
+          "local_reproducibility_status": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    "required_future_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "non_goals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": true
+}
