@@ -225,8 +225,7 @@ pub fn evaluate_decision_envelope(plan: &DecisionEnvelopePlan) -> DecisionEnvelo
     }
 
     dependence_reports.sort_by(|left, right| {
-        (&left.first_run_id, &left.second_run_id)
-            .cmp(&(&right.first_run_id, &right.second_run_id))
+        (&left.first_run_id, &left.second_run_id).cmp(&(&right.first_run_id, &right.second_run_id))
     });
 
     let mut model_decisions = Vec::new();
@@ -260,8 +259,11 @@ pub fn evaluate_decision_envelope(plan: &DecisionEnvelopePlan) -> DecisionEnvelo
         }
     }
 
-    let absolute_range = minimum.zip(maximum).map(|(min_value, max_value)| max_value - min_value);
-    let relative_range = absolute_range.zip(plan.profile.relative_spread_reference_scale)
+    let absolute_range = minimum
+        .zip(maximum)
+        .map(|(min_value, max_value)| max_value - min_value);
+    let relative_range = absolute_range
+        .zip(plan.profile.relative_spread_reference_scale)
         .map(|(range, scale)| range / scale);
 
     let (disposition, spread_disposition) = if !diagnostics.is_empty() {
@@ -316,17 +318,41 @@ pub fn evaluate_decision_envelope(plan: &DecisionEnvelopePlan) -> DecisionEnvelo
 fn validate_profile(profile: &DecisionEnvelopeProfile) -> Vec<DecisionEnvelopeDiagnostic> {
     let mut diagnostics = Vec::new();
     for (value, diagnostic) in [
-        (&profile.case_id, DecisionEnvelopeDiagnostic::EmptyCaseIdentity),
-        (&profile.candidate_id, DecisionEnvelopeDiagnostic::EmptyCandidateIdentity),
-        (&profile.candidate_revision, DecisionEnvelopeDiagnostic::EmptyCandidateRevision),
-        (&profile.service_boundary_ref, DecisionEnvelopeDiagnostic::EmptyServiceBoundary),
-        (&profile.observable_id, DecisionEnvelopeDiagnostic::EmptyObservable),
-        (&profile.canonical_quantity_ref, DecisionEnvelopeDiagnostic::EmptyCanonicalQuantity),
+        (
+            &profile.case_id,
+            DecisionEnvelopeDiagnostic::EmptyCaseIdentity,
+        ),
+        (
+            &profile.candidate_id,
+            DecisionEnvelopeDiagnostic::EmptyCandidateIdentity,
+        ),
+        (
+            &profile.candidate_revision,
+            DecisionEnvelopeDiagnostic::EmptyCandidateRevision,
+        ),
+        (
+            &profile.service_boundary_ref,
+            DecisionEnvelopeDiagnostic::EmptyServiceBoundary,
+        ),
+        (
+            &profile.observable_id,
+            DecisionEnvelopeDiagnostic::EmptyObservable,
+        ),
+        (
+            &profile.canonical_quantity_ref,
+            DecisionEnvelopeDiagnostic::EmptyCanonicalQuantity,
+        ),
         (&profile.unit_ref, DecisionEnvelopeDiagnostic::EmptyUnit),
         (&profile.frame_ref, DecisionEnvelopeDiagnostic::EmptyFrame),
-        (&profile.sign_convention_ref, DecisionEnvelopeDiagnostic::EmptySignConvention),
+        (
+            &profile.sign_convention_ref,
+            DecisionEnvelopeDiagnostic::EmptySignConvention,
+        ),
         (&profile.time_basis_ref, DecisionEnvelopeDiagnostic::EmptyTimeBasis),
-        (&profile.normalization_contract_ref, DecisionEnvelopeDiagnostic::EmptyNormalizationContract),
+        (
+            &profile.normalization_contract_ref,
+            DecisionEnvelopeDiagnostic::EmptyNormalizationContract,
+        ),
     ] {
         if value.trim().is_empty() {
             diagnostics.push(diagnostic);
@@ -341,7 +367,8 @@ fn validate_profile(profile: &DecisionEnvelopeProfile) -> Vec<DecisionEnvelopeDi
     if !profile.absolute_spread_tolerance.is_finite() || profile.absolute_spread_tolerance < 0.0 {
         diagnostics.push(DecisionEnvelopeDiagnostic::InvalidSpreadTolerance);
     }
-    if profile.relative_spread_reference_scale
+    if profile
+        .relative_spread_reference_scale
         .is_some_and(|scale| !scale.is_finite() || scale <= 0.0)
     {
         diagnostics.push(DecisionEnvelopeDiagnostic::InvalidReferenceScale);
@@ -356,10 +383,19 @@ fn validate_model(
 ) {
     for (value, diagnostic) in [
         (&model.run_id, DecisionEnvelopeDiagnostic::EmptyRunIdentity),
-        (&model.solver_id, DecisionEnvelopeDiagnostic::EmptySolverIdentity),
-        (&model.solver_revision, DecisionEnvelopeDiagnostic::EmptySolverRevision),
+        (
+            &model.solver_id,
+            DecisionEnvelopeDiagnostic::EmptySolverIdentity,
+        ),
+        (
+            &model.solver_revision,
+            DecisionEnvelopeDiagnostic::EmptySolverRevision,
+        ),
         (&model.run_receipt_ref, DecisionEnvelopeDiagnostic::EmptyRunReceipt),
-        (&model.output_evidence_ref, DecisionEnvelopeDiagnostic::EmptyOutputEvidence),
+        (
+            &model.output_evidence_ref,
+            DecisionEnvelopeDiagnostic::EmptyOutputEvidence,
+        ),
     ] {
         if value.trim().is_empty() {
             diagnostics.push(diagnostic);
@@ -421,7 +457,11 @@ fn validate_model(
     if model.dependencies.run_id != model.run_id {
         diagnostics.push(DecisionEnvelopeDiagnostic::DependencyManifestRunMismatch);
     }
-    if !model.dependencies.output_observables.contains(&profile.observable_id) {
+    if !model
+        .dependencies
+        .output_observables
+        .contains(&profile.observable_id)
+    {
         diagnostics.push(DecisionEnvelopeDiagnostic::DependencyManifestMissingOutput);
     }
 }
@@ -438,7 +478,11 @@ fn threshold_result(
         (ThresholdDirection::AtMost, true) => value <= threshold,
         (ThresholdDirection::AtMost, false) => value < threshold,
     };
-    if passes { ThresholdResult::Pass } else { ThresholdResult::Fail }
+    if passes {
+        ThresholdResult::Pass
+    } else {
+        ThresholdResult::Fail
+    }
 }
 
 fn is_sha256(value: &str) -> bool {
@@ -448,9 +492,7 @@ fn is_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::evidence_dependence::{
-        DependencyIdentity, DependencyKind, ObservableDependency,
-    };
+    use crate::evidence_dependence::{DependencyIdentity, DependencyKind, ObservableDependency};
 
     fn sha(character: char) -> String {
         character.to_string().repeat(64)
@@ -534,7 +576,11 @@ mod tests {
             models: values
                 .iter()
                 .map(|(run, value)| {
-                    let solver = if run.contains("process") { "PROCESS" } else { "SARAS" };
+                    let solver = if run.contains("process") {
+                        "PROCESS"
+                    } else {
+                        "SARAS"
+                    };
                     model(run, solver, *value)
                 })
                 .collect(),
@@ -543,21 +589,36 @@ mod tests {
 
     #[test]
     fn all_models_passing_produces_an_all_pass_observed_envelope() {
-        let report = evaluate_decision_envelope(&plan(&[("run-process", 120.0), ("run-saras", 130.0)]));
-        assert_eq!(report.disposition, DecisionEnvelopeDisposition::AllModelsPassObservedEnvelope);
-        assert_eq!(report.spread_disposition, SpreadDisposition::WithinDeclaredTolerance);
+        let report =
+            evaluate_decision_envelope(&plan(&[("run-process", 120.0), ("run-saras", 130.0)]));
+        assert_eq!(
+            report.disposition,
+            DecisionEnvelopeDisposition::AllModelsPassObservedEnvelope
+        );
+        assert_eq!(
+            report.spread_disposition,
+            SpreadDisposition::WithinDeclaredTolerance
+        );
     }
 
     #[test]
     fn all_models_failing_produces_an_all_fail_observed_envelope() {
-        let report = evaluate_decision_envelope(&plan(&[("run-process", 70.0), ("run-saras", 80.0)]));
-        assert_eq!(report.disposition, DecisionEnvelopeDisposition::AllModelsFailObservedEnvelope);
+        let report =
+            evaluate_decision_envelope(&plan(&[("run-process", 70.0), ("run-saras", 80.0)]));
+        assert_eq!(
+            report.disposition,
+            DecisionEnvelopeDisposition::AllModelsFailObservedEnvelope
+        );
     }
 
     #[test]
     fn threshold_split_is_explicit_and_not_averaged_away() {
-        let report = evaluate_decision_envelope(&plan(&[("run-process", 90.0), ("run-saras", 110.0)]));
-        assert_eq!(report.disposition, DecisionEnvelopeDisposition::DecisionSplit);
+        let report =
+            evaluate_decision_envelope(&plan(&[("run-process", 90.0), ("run-saras", 110.0)]));
+        assert_eq!(
+            report.disposition,
+            DecisionEnvelopeDisposition::DecisionSplit
+        );
         assert_eq!(report.minimum_value, Some(90.0));
         assert_eq!(report.maximum_value, Some(110.0));
     }
@@ -578,18 +639,32 @@ mod tests {
 
     #[test]
     fn same_side_but_large_spread_is_reported_separately() {
-        let report = evaluate_decision_envelope(&plan(&[("run-process", 120.0), ("run-saras", 180.0)]));
-        assert_eq!(report.disposition, DecisionEnvelopeDisposition::AllModelsPassObservedEnvelope);
-        assert_eq!(report.spread_disposition, SpreadDisposition::ExceedsDeclaredTolerance);
+        let report =
+            evaluate_decision_envelope(&plan(&[("run-process", 120.0), ("run-saras", 180.0)]));
+        assert_eq!(
+            report.disposition,
+            DecisionEnvelopeDisposition::AllModelsPassObservedEnvelope
+        );
+        assert_eq!(
+            report.spread_disposition,
+            SpreadDisposition::ExceedsDeclaredTolerance
+        );
         assert_eq!(report.absolute_range, Some(60.0));
         assert_eq!(report.relative_range, Some(0.6));
     }
 
     #[test]
     fn large_spread_far_above_threshold_is_not_a_decision_split() {
-        let report = evaluate_decision_envelope(&plan(&[("run-process", 180.0), ("run-saras", 280.0)]));
-        assert_eq!(report.disposition, DecisionEnvelopeDisposition::AllModelsPassObservedEnvelope);
-        assert_eq!(report.spread_disposition, SpreadDisposition::ExceedsDeclaredTolerance);
+        let report =
+            evaluate_decision_envelope(&plan(&[("run-process", 180.0), ("run-saras", 280.0)]));
+        assert_eq!(
+            report.disposition,
+            DecisionEnvelopeDisposition::AllModelsPassObservedEnvelope
+        );
+        assert_eq!(
+            report.spread_disposition,
+            SpreadDisposition::ExceedsDeclaredTolerance
+        );
     }
 
     #[test]
@@ -597,8 +672,15 @@ mod tests {
         let mut input = plan(&[("run-process", 120.0), ("run-saras", 130.0)]);
         input.models[1].unit_ref = "MW".to_string();
         let report = evaluate_decision_envelope(&input);
-        assert_eq!(report.disposition, DecisionEnvelopeDisposition::IncompleteOrNotComparable);
-        assert!(report.diagnostics.contains(&DecisionEnvelopeDiagnostic::UnitMismatch));
+        assert_eq!(
+            report.disposition,
+            DecisionEnvelopeDisposition::IncompleteOrNotComparable
+        );
+        assert!(
+            report
+                .diagnostics
+                .contains(&DecisionEnvelopeDiagnostic::UnitMismatch)
+        );
     }
 
     #[test]
@@ -606,7 +688,10 @@ mod tests {
         let mut input = plan(&[("run-process", 120.0), ("run-saras", 130.0)]);
         input.models[1].applicability = ApplicabilityState::OutOfDomain;
         let report = evaluate_decision_envelope(&input);
-        assert_eq!(report.disposition, DecisionEnvelopeDisposition::IncompleteOrNotComparable);
+        assert_eq!(
+            report.disposition,
+            DecisionEnvelopeDisposition::IncompleteOrNotComparable
+        );
         assert!(report.model_decisions.is_empty());
     }
 
@@ -625,7 +710,11 @@ mod tests {
         input.models[1].dependencies.run_id = input.models[1].run_id.clone();
         let report = evaluate_decision_envelope(&input);
         assert_eq!(report.disposition, DecisionEnvelopeDisposition::IncompleteOrNotComparable);
-        assert!(report.diagnostics.contains(&DecisionEnvelopeDiagnostic::DuplicateRunIdentity));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DecisionEnvelopeDiagnostic::DuplicateRunIdentity)
+        );
     }
 
     #[test]
@@ -633,14 +722,22 @@ mod tests {
         let mut input = plan(&[("run-process", 120.0), ("run-saras", 130.0)]);
         input.models[1].dependencies.run_id = "stale-run".to_string();
         let report = evaluate_decision_envelope(&input);
-        assert!(report.diagnostics.contains(&DecisionEnvelopeDiagnostic::DependencyManifestRunMismatch));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DecisionEnvelopeDiagnostic::DependencyManifestRunMismatch)
+        );
     }
 
     #[test]
     fn shared_assumptions_are_reported_as_common_mode() {
         let mut input = plan(&[("run-process", 120.0), ("run-saras", 130.0)]);
-        input.models[1].dependencies.dependencies[0].dependency.node_id =
-            input.models[0].dependencies.dependencies[0].dependency.node_id.clone();
+        input.models[1].dependencies.dependencies[0]
+            .dependency
+            .node_id = input.models[0].dependencies.dependencies[0]
+            .dependency
+            .node_id
+            .clone();
         let report = evaluate_decision_envelope(&input);
         assert_eq!(
             report.dependence_reports[0].assessment.state,
@@ -672,7 +769,8 @@ mod tests {
 
     #[test]
     fn adding_an_extreme_model_extends_the_observed_envelope() {
-        let base = evaluate_decision_envelope(&plan(&[("run-process", 120.0), ("run-saras", 130.0)]));
+        let base =
+            evaluate_decision_envelope(&plan(&[("run-process", 120.0), ("run-saras", 130.0)]));
         let extended = evaluate_decision_envelope(&plan(&[
             ("run-process", 120.0),
             ("run-saras", 130.0),
@@ -680,7 +778,10 @@ mod tests {
         ]));
         assert_eq!(base.minimum_value, Some(120.0));
         assert_eq!(extended.minimum_value, Some(80.0));
-        assert_eq!(extended.disposition, DecisionEnvelopeDisposition::DecisionSplit);
+        assert_eq!(
+            extended.disposition,
+            DecisionEnvelopeDisposition::DecisionSplit
+        );
     }
 
     #[test]
@@ -688,7 +789,11 @@ mod tests {
         let mut input = plan(&[("run-process", 120.0), ("run-saras", 130.0)]);
         input.models[0].output_sha256 = "bad".to_string();
         let report = evaluate_decision_envelope(&input);
-        assert!(report.diagnostics.contains(&DecisionEnvelopeDiagnostic::InvalidOutputDigest));
+        assert!(
+            report
+                .diagnostics
+                .contains(&DecisionEnvelopeDiagnostic::InvalidOutputDigest)
+        );
     }
 
     #[test]
@@ -697,6 +802,9 @@ mod tests {
         input.profile.threshold_direction = ThresholdDirection::AtMost;
         input.profile.threshold_value = 25.0;
         let report = evaluate_decision_envelope(&input);
-        assert_eq!(report.disposition, DecisionEnvelopeDisposition::DecisionSplit);
+        assert_eq!(
+            report.disposition,
+            DecisionEnvelopeDisposition::DecisionSplit
+        );
     }
 }
