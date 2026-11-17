@@ -464,4 +464,90 @@ mod tests {
             Err(ContractError::SameRunCompared)
         );
     }
+
+    #[test]
+    fn rejects_different_task_duration() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.conditions.duration_seconds = 599;
+        assert_eq!(
+            validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly),
+            Err(ContractError::ContextMismatch { field: "duration_seconds" })
+        );
+    }
+
+    #[test]
+    fn rejects_different_inlet_water_profile() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.conditions.inlet_water_profile_sha256 = digest('9');
+        assert_eq!(
+            validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly),
+            Err(ContractError::ContextMismatch { field: "inlet_water_profile_sha256" })
+        );
+    }
+
+    #[test]
+    fn rejects_different_room_conditions() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.conditions.room_conditions_sha256 = digest('9');
+        assert_eq!(
+            validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly),
+            Err(ContractError::ContextMismatch { field: "room_conditions_sha256" })
+        );
+    }
+
+    #[test]
+    fn rejects_different_measurement_protocol() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.conditions.measurement_protocol_sha256 = digest('9');
+        assert_eq!(
+            validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly),
+            Err(ContractError::ContextMismatch { field: "measurement_protocol_sha256" })
+        );
+    }
+
+    #[test]
+    fn rejects_different_accounting_boundary() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.conditions.accounting_boundary_sha256 = digest('9');
+        assert_eq!(
+            validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly),
+            Err(ContractError::ContextMismatch { field: "accounting_boundary_sha256" })
+        );
+    }
+
+    #[test]
+    fn rejects_missing_independent_task_outcome_evidence() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.evidence.task_outcome_assessment.record_id.clear();
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterServiceOnly),
+            Err(ContractError::MissingField { field: "task_outcome_assessment" })
+        );
+    }
+
+    #[test]
+    fn rejects_wrong_energy_resource_owner() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.evidence.energy_resource_closure.as_mut().unwrap().owner =
+            EvidenceOwner::SymtropyWaterServiceT0;
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterAndEnergy),
+            Err(ContractError::WrongEvidenceOwner { field: "energy_resource_closure" })
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_device_cleaning_protocol_digest() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.device.cleaning_protocol_sha256 = "not-a-digest".to_owned();
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterServiceOnly),
+            Err(ContractError::InvalidDigest { field: "cleaning_protocol_sha256" })
+        );
+    }
 }
