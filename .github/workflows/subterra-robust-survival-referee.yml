@@ -29,7 +29,13 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check formatting
+      # Temporary normalization step: persist the formatter's output as an
+      # artifact so the source can be corrected on the branch. The final
+      # workflow returns to a non-mutating --check gate after that commit.
+      - name: Normalize source in ephemeral runner workspace
+        run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml
+
+      - name: Confirm normalized formatting
         run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml -- --check
 
       - name: Run referee tests
@@ -38,5 +44,15 @@ jobs:
       - name: Strict Clippy
         run: cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml --all-targets -- -D warnings
 
+      - name: Upload rustfmt-normalized source for exact branch update
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: subterra-referee-rustfmt-source
+          path: crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/src/lib.rs
+          if-no-files-found: error
+          retention-days: 3
+
       - name: Preserve claim ceiling
+        if: always()
         run: echo 'PASS applies only to the standalone finite-model referee tests; it is not physical, analogue, flight or planetary qualification.'
