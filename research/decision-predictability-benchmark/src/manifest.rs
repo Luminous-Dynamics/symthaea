@@ -526,6 +526,7 @@ fn validate_timestamp(value: &str) -> Result<(), ManifestError> {
             matches!(index, 4 | 7 | 10 | 13 | 16)
                 || byte.is_ascii_digit()
                 || (*byte == b'.' && index > 18 && index < bytes.len() - 1)
+                || (index == bytes.len() - 1 && *byte == b'Z')
         });
     if !valid_shape {
         return Err(ManifestError::InvalidField("freeze.protocol_frozen_at must be UTC RFC3339 ending in Z"));
