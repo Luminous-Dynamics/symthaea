@@ -201,6 +201,24 @@
       "name": "historical_query_prunes_future_breach_receipts",
       "expect": "zero_one_and_three_visible_candidates_at_successive_knowledge_cutoffs",
       "safety": "index_range_lookup_does_not_visit_future_known_evidence"
+    },
+    {
+      "id": "WM-022",
+      "name": "same-calibration-exclusive-equality",
+      "expect": "event_equal_to_watermark_is_definitely_not_late",
+      "safety": "preserve_strict_exclusive_boundary"
+    },
+    {
+      "id": "WM-023",
+      "name": "cross-calibration-overlap-is-ambiguous",
+      "expect": "no_forced_on_time_or_late_order",
+      "safety": "uncertainty_never_collapsed_to_midpoint"
+    },
+    {
+      "id": "WM-024",
+      "name": "mapped-event-watermark-reference-domain-mismatch",
+      "expect": "reject",
+      "safety": "no_cross-clock-comparison_without_common_reference"
     }
   ],
   "metrics": {
@@ -253,7 +271,7 @@
     "watermark_test_functions_authored": 25,
     "crate_test_functions_authored": 81,
     "benchmark_protocol_authored": true,
-    "clock_calibration_test_functions_authored": 14,
+    "clock_calibration_test_functions_authored": 17,
     "clock_calibration_tests_executed": false
   },
   "benchmark_protocol": {
@@ -340,6 +358,22 @@
     "ledger": "ClockCalibrationLedger",
     "revision_selection": "latest_revision_visible_at_known_at_that_covers_source_time",
     "transaction_semantics": "monotonic_knowledge_time; same-time atomic batches; unique calibration IDs",
-    "replay_audit": "rebuild_domain_pair_index_and_state_sha256"
+    "replay_audit": "rebuild_domain_pair_index_and_state_sha256",
+    "event_watermark_ordering": {
+      "operation": "compare_event_time_to_exclusive_watermark",
+      "result_type": "EventWatermarkComparisonV1",
+      "ordering_values": [
+        "definitely_late",
+        "definitely_not_late",
+        "ambiguous"
+      ],
+      "definitely_late_when": "event_latest_reference_us < watermark_earliest_reference_bound_us",
+      "definitely_not_late_when": "event_earliest_reference_us >= watermark_latest_reference_bound_us",
+      "same_source_same_calibration": "compare source-local coordinates directly to preserve strict exclusive-boundary equality",
+      "different_calibrations_or_sources": "overlapping mapped intervals return ambiguous",
+      "reference_domain_mismatch": "reject",
+      "calibration_provenance": "both calibration IDs and SHA-256 digests preserved in comparison result",
+      "automatic_source_watermark_ledger_integration": false
+    }
   }
 }
