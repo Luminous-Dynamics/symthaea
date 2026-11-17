@@ -255,7 +255,9 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
    node_id=child;
   }
  }
- let mut leaf_reports=Vec::new();let mut robust_violations=0usize;let mut budget_violations=0usize;let mut unnecessary=0u64;
+ let mut leaf_reports=Vec::new();
+ let mut leaf_feasible:BTreeMap<String,bool>=BTreeMap::new();
+ let mut robust_violations=0usize;let mut budget_violations=0usize;let mut unnecessary=0u64;
  for path in leaf_paths.values(){
   let representative=path.world_ids.first().ok_or("leaf has no reachable worlds")?;
   let risk=risk_for_path(candidate,oracle,&path.steps,representative,&path.action_id,path.claimed)?;
@@ -266,6 +268,7 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
    &&(!action_policy.hard_gate||risk["worst_case_posterior_risk_bps"].as_u64()==Some(0));
   let within=path.cost<=budget;
   if !risk_ok{robust_violations+=1;}if !within{budget_violations+=1;}
+  leaf_feasible.insert(path.leaf_id.clone(),risk_ok&&within);
   if !acts{
    let target_risk=risk_for_path(candidate,oracle,&path.steps,representative,target_action,SCALE)?;
    let target_justified=target_risk["evidence_accepted"].as_bool()==Some(true)
@@ -292,7 +295,12 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
   let path=&leaf_paths[leaf_id];
   if path.decision_kind=="act"{
    if !worlds[world_id].safe_actions.contains(&path.action_id){unsafe_worlds+=1;}
-   if path.action_id==target_action&&worlds[world_id].safe_actions.contains(target_action){coverage+=bounds[world_id].nominal;}
+   if path.action_id==target_action
+    &&worlds[world_id].safe_actions.contains(target_action)
+    &&leaf_feasible.get(leaf_id)==Some(&true)
+   {
+    coverage+=bounds[world_id].nominal;
+   }
   }
  }
  let nominal_cost:u128=bounds.iter().map(|(id,b)|b.nominal as u128*world_costs[id] as u128).sum();
