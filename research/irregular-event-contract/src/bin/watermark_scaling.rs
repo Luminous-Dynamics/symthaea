@@ -2,11 +2,12 @@ use std::hint::black_box;
 use std::time::{Duration, Instant};
 
 use symthaea_irregular_event_contract::{
-    EventArrivalClassification, EventRecord, Measurement, SourceKey, SourceProgressOperation,
-    SourceProgressRevision, SourceWatermarkLedger,
+    EventArrivalClassification, EventRecord, LateEventBreach, Measurement, SourceKey,
+    SourceProgressOperation, SourceProgressRevision, SourceWatermarkLedger,
 };
 
 const INDEXED_REPETITIONS: usize = 51;
+const SCAN_REPETITIONS: usize = 31;
 const VERIFIED_REPETITIONS: usize = 15;
 const EVENT_COUNTS: [usize; 3] = [4_096, 16_384, 65_536];
 const SOURCE_COUNTS: [usize; 3] = [1, 4, 16];
@@ -132,6 +133,34 @@ fn build_ledger(
     Ok((ledger, required_sources))
 }
 
+fn scan_late_breaches(
+    ledger: &SourceWatermarkLedger,
+    entity_id: u64,
+    required_sources: &[SourceKey],
+    interval_start_us: i64,
+    interval_end_exclusive_us: i64,
+    known_at_us: i64,
+) -> Vec<LateEventBreach> {
+    let mut matches: Vec<_> = ledger
+        .late_breaches()
+        .iter()
+        .filter(|breach| {
+            breach.recorded_at_us <= known_at_us
+                && breach.event.entity_id == entity_id
+                && breach.event.event_time_us >= interval_start_us
+                && breach.event.event_time_us < interval_end_exclusive_us
+                && required_sources.iter().any(|source| {
+                    source.entity_id == breach.event.entity_id
+                        && source.modality_id == breach.event.modality_id
+                        && source.source_id == breach.event.source_id
+                })
+        })
+        .copied()
+        .collect();
+    matches.sort_by_key(|breach| (breach.recorded_at_us, breach.event.event_id));
+    matches
+}
+
 fn run_case(
     event_count: usize,
     source_count: usize,
@@ -175,6 +204,19 @@ fn run_case(
     if verified.ledger_sha256() != ledger.state_sha256() {
         return Err("verified report digest does not bind the current ledger snapshot".to_owned());
     }
+    let scanned_breaches = scan_late_breaches(
+        &ledger,
+        1,
+        &required_sources,
+        interval_start_us,
+        interval_end_exclusive_us,
+        known_at_us,
+    );
+    if scanned_breaches != warm.late_breaches {
+        return Err(format!(
+            "indexed and linear-scan breach sets differ: events={event_count}, sources={source_count}, width={interval_width}, known_at={known_at_us}"
+        ));
+    }
 
     let mut indexed_samples = Vec::with_capacity(INDEXED_REPETITIONS);
     for _ in 0..INDEXED_REPETITIONS {
@@ -182,6 +224,21 @@ fn run_case(
         let report = black_box(query().map_err(|error| format!("indexed query: {error}"))?);
         black_box(report.verdict);
         indexed_samples.push(started.elapsed());
+    }
+
+    let mut scan_samples = Vec::with_capacity(SCAN_REPETITIONS);
+    for _ in 0..SCAN_REPETITIONS {
+        let started = Instant::now();
+        let breaches = black_box(scan_late_breaches(
+            &ledger,
+            1,
+            &required_sources,
+            interval_start_us,
+            interval_end_exclusive_us,
+            known_at_us,
+        ));
+        black_box(breaches.len());
+        scan_samples.push(started.elapsed());
     }
 
     let mut verified_samples = Vec::with_capacity(VERIFIED_REPETITIONS);
@@ -194,10 +251,14 @@ fn run_case(
     }
 
     let mut indexed_for_percentiles = indexed_samples.clone();
+    let mut scan_for_percentiles = scan_samples.clone();
     let mut verified_for_percentiles = verified_samples.clone();
     let indexed_p50 = percentile_micros(&mut indexed_for_percentiles, 0.50);
     let indexed_p95 = percentile_micros(&mut indexed_for_percentiles, 0.95);
     let indexed_p99 = percentile_micros(&mut indexed_for_percentiles, 0.99);
+    let scan_p50 = percentile_micros(&mut scan_for_percentiles, 0.50);
+    let scan_p95 = percentile_micros(&mut scan_for_percentiles, 0.95);
+    let scan_p99 = percentile_micros(&mut scan_for_percentiles, 0.99);
     let verified_p50 = percentile_micros(&mut verified_for_percentiles, 0.50);
     let verified_max = verified_for_percentiles
         .last()
@@ -205,9 +266,10 @@ fn run_case(
         .unwrap_or_default();
 
     println!(
-        "{event_count},{source_count},{interval_width},{late_rate_basis_points},{known_at_us},{INDEXED_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_max:.3}",
+        "{event_count},{source_count},{interval_width},{late_rate_basis_points},{known_at_us},{INDEXED_REPETITIONS},{SCAN_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{},{scan_p50:.3},{scan_p95:.3},{scan_p99:.3},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_max:.3}",
         warm.late_breach_index_buckets_examined,
         warm.late_breach_candidates_examined,
+        ledger.late_breaches().len(),
         warm.late_breaches.len()
     );
     Ok(())
@@ -215,7 +277,7 @@ fn run_case(
 
 fn main() {
     println!(
-        "events,sources,interval_width_us,late_rate_basis_points,known_at_us,indexed_samples,verified_samples,index_buckets,receipt_candidates,matching_breaches,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_max_us"
+        "events,sources,interval_width_us,late_rate_basis_points,known_at_us,indexed_samples,scan_samples,verified_samples,index_buckets,indexed_receipt_candidates,scan_receipts_examined,matching_breaches,scan_p50_us,scan_p95_us,scan_p99_us,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_max_us"
     );
     for event_count in EVENT_COUNTS {
         for source_count in SOURCE_COUNTS {
