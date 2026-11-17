@@ -237,13 +237,18 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                     ));
                 }
             }
-            other => return Err(format!("{observation_id}: unsupported pressure semantics {other}")),
+            other => {
+                return Err(format!(
+                    "{observation_id}: unsupported pressure semantics {other}"
+                ));
+            }
         }
 
         let next_count = origin_counts
             .get(origin)
             .and_then(Value::as_u64)
-            .unwrap_or(0) + 1;
+            .unwrap_or(0)
+            + 1;
         origin_counts.insert(origin.to_owned(), json!(next_count));
         checked.push(observation_id.to_owned());
     }
@@ -344,8 +349,10 @@ mod tests {
 
     fn committed_inputs() -> (Vec<u8>, Value) {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
-        let schema = fs::read(root.join("data/schemas/superconductivity_observation_event_v0_1.schema.json"))
-            .expect("observation schema must be readable");
+        let schema = fs::read(
+            root.join("data/schemas/superconductivity_observation_event_v0_1.schema.json"),
+        )
+        .expect("observation schema must be readable");
         let fixture: Value = serde_json::from_slice(
             &fs::read(root.join("tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json"))
                 .expect("observation fixture must be readable")
@@ -387,7 +394,8 @@ mod tests {
     #[test]
     fn ambient_pressure_requires_explicit_zero() {
         let (_, mut fixture) = committed_inputs();
-        fixture["observations"][0]["conditions"]["pressure"]["semantics"] = json!("explicit_ambient");
+        fixture["observations"][0]["conditions"]["pressure"]["semantics"] =
+            json!("explicit_ambient");
         fixture["observations"][0]["conditions"]["pressure"]["value_gpa"] = Value::Null;
         assert!(audit_mutated(fixture).is_err());
     }
