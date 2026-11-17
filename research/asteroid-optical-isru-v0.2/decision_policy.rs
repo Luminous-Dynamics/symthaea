@@ -452,7 +452,8 @@ fn best_decision(
         let risk = expected_loss(probabilities, &decisions[index].loss_by_hypothesis);
         match best {
             None => Some((index, risk)),
-            Some((best_index, best_risk)) if risk < best_risk - NUMERIC_TOLERANCE => {
+            Some((best_index, best_risk))
+                if index != best_index && risk < best_risk - NUMERIC_TOLERANCE => {
                 Some((index, risk))
             }
             Some((best_index, best_risk))
