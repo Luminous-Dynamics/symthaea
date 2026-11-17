@@ -62,7 +62,28 @@
       "published": "2025",
       "source_type": "computational_benchmark_dataset",
       "title": "HTSC-2025: A benchmark dataset of ambient-pressure high-temperature superconductors for AI-driven critical temperature prediction",
-      "primary_claim_boundary": "155-material benchmark; labels and structural-system splits are computational and must not be merged with specimen-level experimental Tc."
+      "primary_claim_boundary": "155-material benchmark; labels and structural-system splits are computational and must not be merged with specimen-level experimental Tc.",
+      "upstream_repository": "https://huggingface.co/datasets/xiao-qi/HTSC-2025",
+      "upstream_revision": "ab53472",
+      "upstream_files": [
+        {
+          "path": "HTSC-2025.json",
+          "size_reported_bytes": 169984,
+          "license": "not_declared_in_visible_card_metadata"
+        },
+        {
+          "path": "README.md",
+          "size_reported_bytes": null,
+          "license": "not_declared_in_visible_card_metadata"
+        },
+        {
+          "path": ".gitattributes",
+          "size_reported_bytes": null,
+          "license": "not_applicable"
+        }
+      ],
+      "upstream_revision_verified_at": "2026-11-17",
+      "note": "Hugging Face tree displayed verified revision ab53472; dataset README category counts sum to 140 while paper reports 155; do not redistribute until rights clarified."
     },
     {
       "source_id": "matbench_discovery_2025",
