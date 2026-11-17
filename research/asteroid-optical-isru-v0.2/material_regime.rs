@@ -22,6 +22,7 @@ pub struct MaterialParameters {
     pub volatile_release_onset_k: f64,
     pub brittle_ductile_transition_k: f64,
     pub melt_onset_k: f64,
+    pub melt_transition_width_k: f64,
     pub spallation_yield_per_pulse: f64,
     pub volatile_release_efficiency: f64,
     pub melt_growth_time_constant_s: f64,
@@ -48,6 +49,7 @@ impl MaterialParameters {
             ("volatile_release_onset_k", self.volatile_release_onset_k),
             ("brittle_ductile_transition_k", self.brittle_ductile_transition_k),
             ("melt_onset_k", self.melt_onset_k),
+            ("melt_transition_width_k", self.melt_transition_width_k),
             ("spallation_yield_per_pulse", self.spallation_yield_per_pulse),
             ("volatile_release_efficiency", self.volatile_release_efficiency),
             ("melt_growth_time_constant_s", self.melt_growth_time_constant_s),
@@ -67,6 +69,7 @@ impl MaterialParameters {
         if self.bulk_density_kg_m3 == 0.0
             || self.specific_heat_j_kg_k == 0.0
             || self.active_thermal_depth_m == 0.0
+            || self.melt_transition_width_k == 0.0
             || self.melt_growth_time_constant_s == 0.0
             || self.cooling_time_constant_s == 0.0
         {
@@ -316,7 +319,7 @@ impl MaterialRegimeModel {
         };
 
         let melt_excess_fraction = ((peak_temperature - self.parameters.melt_onset_k)
-            / (self.parameters.melt_onset_k * 0.5))
+            / self.parameters.melt_transition_width_k)
             .clamp(0.0, 1.0);
         let melt_kinetics = 1.0
             - (-pulse.on_duration_seconds / self.parameters.melt_growth_time_constant_s).exp();
@@ -462,6 +465,7 @@ mod tests {
             volatile_release_onset_k: 600.0,
             brittle_ductile_transition_k: 850.0,
             melt_onset_k: 1_100.0,
+            melt_transition_width_k: 250.0,
             spallation_yield_per_pulse: 0.10,
             volatile_release_efficiency: 0.80,
             melt_growth_time_constant_s: 2.0,
@@ -608,14 +612,17 @@ mod tests {
     fn sample_inventory_is_depleted_and_exhaustion_is_explicit() {
         let mut params = parameters();
         params.spallation_yield_per_pulse = 1.0;
+        params.melt_suppression_exponent = 0.0;
+        params.ductile_spallation_floor = 1.0;
         let mut state = state();
         state.remaining_solid_kg = 0.000_3;
         let mut value = MaterialRegimeModel::new(params, state, 1.0, 100.0).unwrap();
         value.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()).unwrap();
-        assert!(matches!(
+        value.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()).unwrap();
+        assert_eq!(
             value.apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap()),
             Err(RegimeError::SampleExhausted)
-        ));
+        );
     }
 
     #[test]
