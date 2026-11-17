@@ -6,9 +6,7 @@
 
 use std::collections::BTreeSet;
 
-use super::validation_domain::{
-    ValidationDomainError, ValidationPlan, validate_validation_domain,
-};
+use super::validation_domain::{ValidationDomainError, ValidationPlan, validate_validation_domain};
 
 pub const HOLDOUT_METRICS_VERSION: &str = "fusion-vv-holdout-metrics/0.1";
 
@@ -205,9 +203,7 @@ pub struct HoldoutEvaluationReport {
 ///
 /// The returned interval coverage is empirical descriptive coverage. It is
 /// not a confidence statement and does not assume independent samples.
-pub fn evaluate_measured_holdout(
-    campaign: &HoldoutEvaluationCampaign,
-) -> HoldoutEvaluationReport {
+pub fn evaluate_measured_holdout(campaign: &HoldoutEvaluationCampaign) -> HoldoutEvaluationReport {
     let plan = &campaign.validation_plan;
     let commitment = &campaign.prediction_commitment;
     let profile = &campaign.metric_profile;
@@ -311,8 +307,14 @@ pub fn evaluate_measured_holdout(
             holdout_record_id: plan.blind_holdout.observation.record_id.clone(),
             commitment_ref: commitment.commitment_ref.clone(),
             measurement_verification_refs: vec![
-                campaign.test_stand_measurement_verification.attestation_ref.clone(),
-                campaign.holdout_measurement_verification.attestation_ref.clone(),
+                campaign
+                    .test_stand_measurement_verification
+                    .attestation_ref
+                    .clone(),
+                campaign
+                    .holdout_measurement_verification
+                    .attestation_ref
+                    .clone(),
             ],
             claim_ceiling: "descriptive paired metrics on declared validation inputs only",
         };
@@ -342,9 +344,7 @@ pub fn evaluate_measured_holdout(
         && commitment.committed_before_holdout_reveal
         && commitment.commitment_evidence_class
             == CommitmentEvidenceClass::IndependentlyTimestampedPreReveal;
-    let measured_payloads_verified = campaign
-        .test_stand_measurement_verification
-        .evidence_class
+    let measured_payloads_verified = campaign.test_stand_measurement_verification.evidence_class
         == MeasurementAttestationClass::ExternallyVerifiedMeasuredPayload
         && campaign.holdout_measurement_verification.evidence_class
             == MeasurementAttestationClass::ExternallyVerifiedMeasuredPayload;
@@ -374,8 +374,14 @@ pub fn evaluate_measured_holdout(
         holdout_record_id: plan.blind_holdout.observation.record_id.clone(),
         commitment_ref: commitment.commitment_ref.clone(),
         measurement_verification_refs: vec![
-            campaign.test_stand_measurement_verification.attestation_ref.clone(),
-            campaign.holdout_measurement_verification.attestation_ref.clone(),
+            campaign
+                .test_stand_measurement_verification
+                .attestation_ref
+                .clone(),
+            campaign
+                .holdout_measurement_verification
+                .attestation_ref
+                .clone(),
         ],
         claim_ceiling: "paired measured metrics on the declared held-out domain only",
     }
@@ -388,9 +394,9 @@ fn report_for_domain_errors(
     let out_of_domain = errors
         .iter()
         .any(|error| matches!(error, ValidationDomainError::OutOfDomain { .. }));
-    let insufficient_measured = errors.iter().any(|error| {
-        matches!(error, ValidationDomainError::NonMeasuredObservation { .. })
-    });
+    let insufficient_measured = errors
+        .iter()
+        .any(|error| matches!(error, ValidationDomainError::NonMeasuredObservation { .. }));
     let diagnostics = if out_of_domain {
         vec![HoldoutEvaluationDiagnostic::ObservableMismatch]
     } else if insufficient_measured {
@@ -422,8 +428,14 @@ fn report_for_domain_errors(
             .clone(),
         commitment_ref: campaign.prediction_commitment.commitment_ref.clone(),
         measurement_verification_refs: vec![
-            campaign.test_stand_measurement_verification.attestation_ref.clone(),
-            campaign.holdout_measurement_verification.attestation_ref.clone(),
+            campaign
+                .test_stand_measurement_verification
+                .attestation_ref
+                .clone(),
+            campaign
+                .holdout_measurement_verification
+                .attestation_ref
+                .clone(),
         ],
         claim_ceiling: "split and domain audit failed before metric evaluation",
     }
@@ -550,7 +562,10 @@ fn validate_samples(
         if sample.prediction_evidence_ref.trim().is_empty() {
             diagnostics.push(HoldoutEvaluationDiagnostic::MissingPredictionEvidence);
         }
-        if sample.predicted_value.is_some_and(|value| !value.is_finite()) {
+        if sample
+            .predicted_value
+            .is_some_and(|value| !value.is_finite())
+        {
             diagnostics.push(HoldoutEvaluationDiagnostic::NonFinitePrediction);
         }
         if let Some(interval) = sample.prediction_interval {
@@ -609,13 +624,12 @@ fn summarize_samples(
         .reduce(f64::max);
     let normalized_root_mean_square_error =
         root_mean_square_error.map(|value| value / normalized_error_scale);
-    let mean_absolute_error_over_measurement_uncertainty = average(predictions.iter().filter_map(
-        |(sample, error)| {
+    let mean_absolute_error_over_measurement_uncertainty =
+        average(predictions.iter().filter_map(|(sample, error)| {
             sample
                 .measurement_standard_uncertainty
                 .map(|uncertainty| error.abs() / uncertainty)
-        },
-    ));
+        }));
     let within_tolerance_count = predictions
         .iter()
         .filter(|(_, error)| error.abs() <= absolute_error_tolerance)
@@ -625,38 +639,31 @@ fn summarize_samples(
     let intervals: Vec<(bool, f64)> = predictions
         .iter()
         .filter_map(|(sample, _)| {
-            sample
-                .prediction_interval
-                .map(|interval| {
-                    (
-                        sample.measured_value >= interval.lower
-                            && sample.measured_value <= interval.upper,
-                        interval.upper - interval.lower,
-                    )
-                })
+            sample.prediction_interval.map(|interval| {
+                (
+                    sample.measured_value >= interval.lower
+                        && sample.measured_value <= interval.upper,
+                    interval.upper - interval.lower,
+                )
+            })
         })
         .collect();
     let interval_sample_count = intervals.len();
-    let empirical_prediction_interval_coverage = if interval_sample_count == prediction_count
-        && prediction_count > 0
-    {
-        Some(
-            intervals
-                .iter()
-                .filter(|(covered, _)| *covered)
-                .count() as f64
-                / prediction_count as f64,
-        )
-    } else {
-        None
-    };
-    let mean_prediction_interval_width = if interval_sample_count == prediction_count
-        && prediction_count > 0
-    {
-        average(intervals.iter().map(|(_, width)| *width))
-    } else {
-        None
-    };
+    let empirical_prediction_interval_coverage =
+        if interval_sample_count == prediction_count && prediction_count > 0 {
+            Some(
+                intervals.iter().filter(|(covered, _)| *covered).count() as f64
+                    / prediction_count as f64,
+            )
+        } else {
+            None
+        };
+    let mean_prediction_interval_width =
+        if interval_sample_count == prediction_count && prediction_count > 0 {
+            average(intervals.iter().map(|(_, width)| *width))
+        } else {
+            None
+        };
 
     ValidationSetMetrics {
         sample_count,
@@ -682,8 +689,8 @@ fn meets_thresholds(
     profile: &HoldoutMetricProfile,
     is_holdout: bool,
 ) -> bool {
-    let enough_groups = !is_holdout
-        || metrics.unique_group_count >= profile.minimum_holdout_group_count;
+    let enough_groups =
+        !is_holdout || metrics.unique_group_count >= profile.minimum_holdout_group_count;
     let interval_coverage_ok = profile
         .minimum_empirical_interval_coverage
         .is_none_or(|minimum| {
@@ -920,12 +927,44 @@ mod tests {
             test_stand_measurement_verification: attestation("test-stand-1", 'd'),
             holdout_measurement_verification: attestation("holdout-1", 'e'),
             test_stand_samples: vec![
-                sample("test-1", "test-group-a", "test-stand-1", 'd', '4', 10.0, 10.05),
-                sample("test-2", "test-group-b", "test-stand-1", 'd', '4', 11.0, 11.08),
+                sample(
+                    "test-1",
+                    "test-group-a",
+                    "test-stand-1",
+                    'd',
+                    '4',
+                    10.0,
+                    10.05,
+                ),
+                sample(
+                    "test-2",
+                    "test-group-b",
+                    "test-stand-1",
+                    'd',
+                    '4',
+                    11.0,
+                    11.08,
+                ),
             ],
             holdout_samples: vec![
-                sample("holdout-a", "holdout-group-a", "holdout-1", 'e', '5', 12.0, 12.04),
-                sample("holdout-b", "holdout-group-b", "holdout-1", 'e', '5', 13.0, 13.07),
+                sample(
+                    "holdout-a",
+                    "holdout-group-a",
+                    "holdout-1",
+                    'e',
+                    '5',
+                    12.0,
+                    12.04,
+                ),
+                sample(
+                    "holdout-b",
+                    "holdout-group-b",
+                    "holdout-1",
+                    'e',
+                    '5',
+                    13.0,
+                    13.07,
+                ),
             ],
         }
     }
@@ -938,7 +977,10 @@ mod tests {
             HoldoutEvaluationDisposition::HoldoutPassedWithinDeclaredDomain
         );
         assert_eq!(report.test_stand_metrics.as_ref().unwrap().sample_count, 2);
-        assert_eq!(report.holdout_metrics.as_ref().unwrap().unique_group_count, 2);
+        assert_eq!(
+            report.holdout_metrics.as_ref().unwrap().unique_group_count,
+            2
+        );
         assert_eq!(
             report
                 .holdout_metrics
@@ -1093,9 +1135,11 @@ mod tests {
             report.disposition,
             HoldoutEvaluationDisposition::NotEvaluable
         );
-        assert!(report.diagnostics.contains(
-            &HoldoutEvaluationDiagnostic::PartialPredictionIntervalCoverage
-        ));
+        assert!(
+            report
+                .diagnostics
+                .contains(&HoldoutEvaluationDiagnostic::PartialPredictionIntervalCoverage)
+        );
     }
 
     #[test]
@@ -1113,7 +1157,13 @@ mod tests {
             report.disposition,
             HoldoutEvaluationDisposition::HoldoutFailed
         );
-        assert!(report.holdout_metrics.unwrap().empirical_prediction_interval_coverage.is_none());
+        assert!(
+            report
+                .holdout_metrics
+                .unwrap()
+                .empirical_prediction_interval_coverage
+                .is_none()
+        );
     }
 
     #[test]
@@ -1126,7 +1176,14 @@ mod tests {
             HoldoutEvaluationDisposition::HoldoutFailed
         );
         assert_eq!(report.holdout_metrics.as_ref().unwrap().sample_count, 2);
-        assert!(report.holdout_metrics.unwrap().maximum_absolute_error.unwrap() > 1.0);
+        assert!(
+            report
+                .holdout_metrics
+                .unwrap()
+                .maximum_absolute_error
+                .unwrap()
+                > 1.0
+        );
     }
 
     #[test]
@@ -1157,7 +1214,10 @@ mod tests {
     fn interval_coverage_is_empirical_not_a_confidence_claim() {
         let report = evaluate_measured_holdout(&campaign());
         assert_eq!(
-            report.holdout_metrics.unwrap().empirical_prediction_interval_coverage,
+            report
+                .holdout_metrics
+                .unwrap()
+                .empirical_prediction_interval_coverage,
             Some(1.0)
         );
         assert!(report.claim_ceiling.contains("declared held-out domain"));
@@ -1166,7 +1226,11 @@ mod tests {
     #[test]
     fn out_of_domain_holdout_cannot_be_rescued_by_low_residuals() {
         let mut source = campaign();
-        source.validation_plan.blind_holdout.observation.geometry_sha256 = digest('9');
+        source
+            .validation_plan
+            .blind_holdout
+            .observation
+            .geometry_sha256 = digest('9');
         assert_eq!(
             evaluate_measured_holdout(&source).disposition,
             HoldoutEvaluationDisposition::OutOfDomain
