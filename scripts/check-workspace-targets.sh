@@ -26,6 +26,12 @@ MEMBER_GLOBS=(crates/core/* crates/domains/* crates/bridges/*)
 EXCLUDES=(
   "crates/core/symthaea"
   "crates/core/symthaea-iit"
+  "crates/core/symthaea-observation-attestation"
+  "crates/domains/symthaea-architecture-engineering"
+  "crates/domains/symthaea-dishwasher-design"
+  "crates/domains/symthaea-marine-geometry"
+  "crates/domains/symthaea-rea-compat"
+  "crates/domains/symthaea-rea-evidence-verifier"
   "crates/core/nixward-web"
   "crates/core/symthaea-zkproof/methods"
   "crates/core/symthaea-zkproof/host"
