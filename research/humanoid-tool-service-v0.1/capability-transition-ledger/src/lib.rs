@@ -93,6 +93,9 @@ pub struct EpisodeEventLedger {
     pub tool_set_mode: ToolSetMode,
     pub clock_domain_id: String,
     pub source_id: String,
+    /// Separate evaluator/verifier identity for the task-success channel.
+    /// This is provenance, not proof of organizational independence.
+    pub independent_verifier_id: Option<String>,
     pub events: [EventEvidence; EVENT_COUNT],
 }
 
@@ -112,6 +115,14 @@ impl EpisodeEventLedger {
         }
         if self.events.iter().all(|event| !event.is_instrumented()) {
             return Err("episode has no instrumented events".into());
+        }
+        if self.events[EventKind::TaskSuccess.index()].is_instrumented() {
+            let verifier = self.independent_verifier_id.as_deref()
+                .filter(|value| !value.trim().is_empty())
+                .ok_or_else(|| "instrumented task-success evidence requires independent_verifier_id".to_string())?;
+            if verifier == self.source_id || verifier == self.policy_id {
+                return Err("task-success verifier identity must differ from policy_id and event source_id".into());
+            }
         }
         Ok(())
     }
@@ -312,7 +323,8 @@ mod tests {
             execution_level: level,
             tool_set_mode: mode,
             clock_domain_id: format!("sim-clock-{episode_id}"),
-            source_id: "independent-event-recorder".into(),
+            source_id: "episode-event-recorder".into(),
+            independent_verifier_id: Some("external-task-oracle".into()),
             events,
         }
     }
@@ -445,6 +457,22 @@ mod tests {
             ToolSetMode::Standard,
             [EventEvidence::NotInstrumented; EVENT_COUNT],
         );
+        assert!(summarize_by_cell(&[episode]).is_err());
+    }
+
+    #[test]
+    fn task_success_requires_a_separate_verifier_identity() {
+        let mut episode = row(
+            "episode-1",
+            ExecutionLevel::L1StationaryUse,
+            ToolSetMode::Standard,
+            ordered_success(),
+        );
+        episode.independent_verifier_id = None;
+        assert!(summarize_by_cell(&[episode.clone()]).is_err());
+        episode.independent_verifier_id = Some(episode.policy_id.clone());
+        assert!(summarize_by_cell(&[episode.clone()]).is_err());
+        episode.independent_verifier_id = Some(episode.source_id.clone());
         assert!(summarize_by_cell(&[episode]).is_err());
     }
 
