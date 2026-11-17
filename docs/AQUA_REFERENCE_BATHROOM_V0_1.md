@@ -216,3 +216,8 @@ The room is not released because each fixture works independently. Commission th
 - exact owner receipts and configuration hashes.
 
 No occupied prototype or construction authorization follows from this conceptual update.
+
+
+## 11. Composable room archetypes
+
+The detailed spatial patterns for compact essential, accessible all-age, premium thermal-suite and shared/community bathing rooms are in [AQUA_REFERENCE_ROOM_ARCHETYPES_V0_1.md](AQUA_REFERENCE_ROOM_ARCHETYPES_V0_1.md). These archetypes separate human, water, thermal, air/moisture and maintenance paths; they are conceptual, not dimensioned construction drawings.
