@@ -35,7 +35,7 @@ struct JointRow{outcomes:BTreeMap<String,String>,probability:Bounds}
 struct Kernel{kernel_id:String,authority:String,rows:Vec<JointRow>}
 #[derive(Clone,Debug)]
 struct Node{
- id:String,kind:String,option_id:Option<String>,at:Option<String>,
+ kind:String,option_id:Option<String>,at:Option<String>,
  branches:BTreeMap<String,String>,decision_kind:Option<String>,
  action_id:Option<String>,claimed:u64
 }
@@ -45,11 +45,6 @@ struct PolicyTree{root:String,nodes:BTreeMap<String,Node>}
 struct LeafPath{
  leaf_id:String,decision_kind:String,action_id:String,claimed:u64,
  option_ids:Vec<String>,world_row_count:usize,path_cost:u64
-}
-#[derive(Clone,Debug)]
-struct PolicyMetrics{
- report:Value,coverage:u64,nominal_expected_cost:u64,worst_expected_cost:u64,
- max_path_cost:u64,feasible:bool
 }
 
 fn object<'a>(v:&'a Value,label:&str)->Result<&'a serde_json::Map<String,Value>,String>{
@@ -395,7 +390,7 @@ fn parse_tree(tree:&Value,options:&BTreeMap<String,OptionDef>,outcomes:&BTreeMap
    let registered=outcomes.get(&opt.factor_id).ok_or_else(||format!("missing outcome partition for {:?}",opt.factor_id))?;
    let actual=branches.keys().cloned().collect::<BTreeSet<_>>();
    if actual!=*registered{return Err(format!("{label}.branches must cover every registered outcome exactly"));}
-   Node{id:id.clone(),kind,option_id:Some(option),at:Some(at),branches,decision_kind:None,action_id:None,claimed:0}
+   Node{kind,option_id:Some(option),at:Some(at),branches,decision_kind:None,action_id:None,claimed:0}
   }else if kind=="stop"{
    allowed(row,&["node_id","kind","decision_kind","action_id","claimed_residual_risk_bps"],&label)?;
    let decision=string(row,"decision_kind",&label)?;
@@ -408,7 +403,7 @@ fn parse_tree(tree:&Value,options:&BTreeMap<String,OptionDef>,outcomes:&BTreeMap
     let a=&actions[&action];
     if !a.read_only||a.irreversible||a.hard_gate||a.max_risk!=0{return Err("defer must use canonical read-only zero-risk action".to_owned());}
    }
-   Node{id:id.clone(),kind,option_id:None,at:None,branches:BTreeMap::new(),decision_kind:Some(decision),action_id:Some(action),claimed}
+   Node{kind,option_id:None,at:None,branches:BTreeMap::new(),decision_kind:Some(decision),action_id:Some(action),claimed}
   }else{return Err(format!("{label}.kind must be acquire or stop"));};
   if nodes.insert(id.clone(),node).is_some(){return Err(format!("duplicate node ID {id:?}"));}
  }
@@ -606,11 +601,11 @@ fn evaluate(raw:&str)->Result<Value,String>{
   let within=path.path_cost<=budget;
   if path.decision_kind=="act"&&!justified{risk_violations+=1;}
   if !within{budget_violations+=1;}
-  let mut leaf_nominal_numerator=0u128;let mut leaf_unsafe_numerator=0u128;
+  let mut leaf_nominal_numerator=0u128;
   for (hypothesis,prior) in &priors{
    let probability=likelihoods[hypothesis].nominal as u128;
    leaf_nominal_numerator+=prior.nominal as u128*probability;
-   if !safety[hypothesis].contains(&path.action_id){leaf_unsafe_numerator+=prior.nominal as u128*probability;}
+
   }
   let leaf_nominal_bps=(leaf_nominal_numerator/SCALE as u128) as u64;
   if path.decision_kind=="act"&&justified&&within{
