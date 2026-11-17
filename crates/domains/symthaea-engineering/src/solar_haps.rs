@@ -946,7 +946,7 @@ mod tests {
 
     #[test]
     fn multi_day_horizon_splits_intervals_at_day_boundaries() {
-        let mut config = base_config();
+        let config = base_config();
         let profile = [SolarHapsInterval {
             duration_s: 2.0 * DAY_SECONDS,
             incident_irradiance_w_m2: 1000.0,
