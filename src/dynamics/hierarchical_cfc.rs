@@ -90,6 +90,7 @@ pub struct HierarchicalOutput {
 }
 
 /// Hierarchical CfC network with multi-scale temporal processing
+#[derive(Debug, Clone)]
 pub struct HierarchicalCfC {
     /// Configuration
     config: HierarchicalCfCConfig,
