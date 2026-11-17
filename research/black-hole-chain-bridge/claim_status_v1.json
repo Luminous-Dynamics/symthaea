@@ -13,7 +13,7 @@
       "source_location": "main text and supplement",
       "status": "finite_model_exact_computation",
       "statement": "The stated definitions yield an exact algebraic candidate; inverse approximately 137.03599918956616.",
-      "next_test": "Independent exact arithmetic and reconstruction of the 172-record census.",
+      "next_test": "Execute the independent Rust slot/orbit oracle; independently reproduce the full operator-matrix/commutator construction; pin the exact Lean source digest and inspect its kernel-checked theorem dependencies.",
       "not_established": "Physical identification with alpha(0)."
     },
     {
@@ -102,5 +102,11 @@
     "construction_order_does_not_imply_physical_time",
     "finite_Page_curve_does_not_imply_black_hole_evaporation",
     "classical_graph_grammar_result_does_not_validate_quantum_postulates"
-  ]
+  ],
+  "reproduction_status": {
+    "finite_slot_orbit_oracle": "implemented_tests_not_executed",
+    "source_lean_revision": "url_reviewed_digest_not_pinned",
+    "full_matrix_algebra_reproduction": "not_implemented",
+    "physical_alpha_identification": "conjecture_not_established"
+  }
 }
