@@ -215,7 +215,10 @@ pub enum PlanningError {
     DuplicateHypothesisId(String),
     DuplicateDecisionId(String),
     DuplicateActionId(String),
-    DuplicateOutcomeId { action_id: String, outcome_id: String },
+    DuplicateOutcomeId {
+        action_id: String,
+        outcome_id: String,
+    },
     EmptyIdentifier(&'static str),
     InvalidProbability(String),
     PriorNotNormalized(f64),
@@ -223,9 +226,19 @@ pub enum PlanningError {
     InvalidDecisionLoss(String),
     DecisionDimensionMismatch(String),
     NoObservationOutcomes(String),
-    InvalidLikelihood { action_id: String, outcome_id: String },
-    LikelihoodDimensionMismatch { action_id: String, outcome_id: String },
-    LikelihoodsNotNormalized { action_id: String, hypothesis_id: String, sum: f64 },
+    InvalidLikelihood {
+        action_id: String,
+        outcome_id: String,
+    },
+    LikelihoodDimensionMismatch {
+        action_id: String,
+        outcome_id: String,
+    },
+    LikelihoodsNotNormalized {
+        action_id: String,
+        hypothesis_id: String,
+        sum: f64,
+    },
     UnexpectedTerminalLoss(String),
     MissingTerminalLoss(String),
     InvalidTerminalLoss(String),
@@ -234,7 +247,9 @@ pub enum PlanningError {
     InvalidRiskLimit(&'static str),
     InvalidPlannerLimit(&'static str),
     NumericalOverflow(&'static str),
-    SearchBudgetExceeded { maximum: usize },
+    SearchBudgetExceeded {
+        maximum: usize,
+    },
 }
 
 impl std::fmt::Display for PlanningError {
@@ -294,10 +309,7 @@ pub struct ExpectedResources {
 }
 
 impl ExpectedResources {
-    fn add_action_and_future(
-        action: ResourceCost,
-        future: Self,
-    ) -> Result<Self, PlanningError> {
+    fn add_action_and_future(action: ResourceCost, future: Self) -> Result<Self, PlanningError> {
         let result = Self {
             energy_j: action.energy_j + future.energy_j,
             duration_s: action.duration_s + future.duration_s,
@@ -314,11 +326,7 @@ impl ExpectedResources {
         Ok(result)
     }
 
-    fn plus_weighted(
-        current: Self,
-        future: Self,
-        probability: f64,
-    ) -> Result<Self, PlanningError> {
+    fn plus_weighted(current: Self, future: Self, probability: f64) -> Result<Self, PlanningError> {
         let result = Self {
             energy_j: current.energy_j + future.energy_j * probability,
             duration_s: current.duration_s + future.duration_s * probability,
@@ -437,10 +445,7 @@ fn outcome_probability(belief: &[f64], likelihood: &[f64]) -> Result<f64, Planni
     Ok(probability)
 }
 
-fn expected_loss(
-    belief: &[f64],
-    losses: &[f64],
-) -> Result<f64, PlanningError> {
+fn expected_loss(belief: &[f64], losses: &[f64]) -> Result<f64, PlanningError> {
     let value = belief
         .iter()
         .zip(losses)
@@ -488,10 +493,7 @@ fn best_stop_decision(
     })
 }
 
-fn validate_problem(
-    problem: &PlanningProblem,
-    config: PlannerConfig,
-) -> Result<(), PlanningError> {
+fn validate_problem(problem: &PlanningProblem, config: PlannerConfig) -> Result<(), PlanningError> {
     if problem.hypotheses.is_empty() {
         return Err(PlanningError::EmptyHypotheses);
     }
@@ -511,16 +513,22 @@ fn validate_problem(
         ));
     }
     if problem.actions.len() > config.maximum_actions {
-        return Err(PlanningError::InvalidPlannerLimit("maximum action count exceeded"));
+        return Err(PlanningError::InvalidPlannerLimit(
+            "maximum action count exceeded",
+        ));
     }
-    if !config.risk_limits.maximum_mission_interruption_probability.is_finite()
-        || !(0.0..=1.0).contains(
-            &config.risk_limits.maximum_mission_interruption_probability,
-        )
+    if !config
+        .risk_limits
+        .maximum_mission_interruption_probability
+        .is_finite()
+        || !(0.0..=1.0).contains(&config.risk_limits.maximum_mission_interruption_probability)
     {
         return Err(PlanningError::InvalidRiskLimit("mission interruption"));
     }
-    if !config.risk_limits.maximum_robot_loss_probability.is_finite()
+    if !config
+        .risk_limits
+        .maximum_robot_loss_probability
+        .is_finite()
         || !(0.0..=1.0).contains(&config.risk_limits.maximum_robot_loss_probability)
     {
         return Err(PlanningError::InvalidRiskLimit("robot loss"));
@@ -572,7 +580,9 @@ fn validate_problem(
             return Err(PlanningError::DuplicateDecisionId(decision.id.clone()));
         }
         if decision.loss_by_hypothesis.len() != hypothesis_count {
-            return Err(PlanningError::DecisionDimensionMismatch(decision.id.clone()));
+            return Err(PlanningError::DecisionDimensionMismatch(
+                decision.id.clone(),
+            ));
         }
         if decision
             .loss_by_hypothesis
@@ -595,7 +605,9 @@ fn validate_problem(
             return Err(PlanningError::NoObservationOutcomes(action.id.clone()));
         }
         if action.outcomes.len() > config.maximum_outcomes_per_action {
-            return Err(PlanningError::InvalidPlannerLimit("maximum outcome count exceeded"));
+            return Err(PlanningError::InvalidPlannerLimit(
+                "maximum outcome count exceeded",
+            ));
         }
 
         let mut outcome_ids = BTreeSet::new();
@@ -636,7 +648,9 @@ fn validate_problem(
                     return Err(PlanningError::DecisionDimensionMismatch(outcome.id.clone()));
                 }
                 (_, Some(losses))
-                    if losses.iter().any(|value| !value.is_finite() || *value < 0.0) =>
+                    if losses
+                        .iter()
+                        .any(|value| !value.is_finite() || *value < 0.0) =>
                 {
                     return Err(PlanningError::InvalidTerminalLoss(outcome.id.clone()));
                 }
@@ -687,8 +701,7 @@ fn evaluate_action(
     let mut branches = Vec::new();
 
     for outcome in &action.outcomes {
-        let branch_probability =
-            outcome_probability(belief, &outcome.likelihood_by_hypothesis)?;
+        let branch_probability = outcome_probability(belief, &outcome.likelihood_by_hypothesis)?;
         if branch_probability <= 0.0 {
             continue;
         }
@@ -698,44 +711,61 @@ fn evaluate_action(
             branch_probability,
         )?;
 
-        let (branch_loss, branch_cost, branch_resources, branch_interruption, branch_robot_loss, continuation) =
-            if outcome.kind == OutcomeKind::Observation {
-                let child = solve_state(
-                    &posterior,
-                    budget_after_action,
-                    remaining_steps - 1,
-                    problem,
-                    prices,
-                    config,
-                    counter,
-                )?;
-                (
-                    child.expected_decision_loss,
-                    child.expected_resource_cost_units,
-                    child.expected_resources,
-                    child.mission_interruption_probability,
-                    child.robot_loss_probability,
-                    Some(Box::new(child.policy)),
-                )
-            } else {
-                let terminal_losses = outcome
-                    .terminal_loss_by_hypothesis
-                    .as_ref()
-                    .ok_or_else(|| PlanningError::MissingTerminalLoss(outcome.id.clone()))?;
-                (
-                    expected_loss(&posterior, terminal_losses)?,
-                    0.0,
-                    ExpectedResources::default(),
-                    if outcome.kind.is_mission_interruption() { 1.0 } else { 0.0 },
-                    if outcome.kind.is_robot_loss() { 1.0 } else { 0.0 },
-                    None,
-                )
-            };
+        let (
+            branch_loss,
+            branch_cost,
+            branch_resources,
+            branch_interruption,
+            branch_robot_loss,
+            continuation,
+        ) = if outcome.kind == OutcomeKind::Observation {
+            let child = solve_state(
+                &posterior,
+                budget_after_action,
+                remaining_steps - 1,
+                problem,
+                prices,
+                config,
+                counter,
+            )?;
+            (
+                child.expected_decision_loss,
+                child.expected_resource_cost_units,
+                child.expected_resources,
+                child.mission_interruption_probability,
+                child.robot_loss_probability,
+                Some(Box::new(child.policy)),
+            )
+        } else {
+            let terminal_losses = outcome
+                .terminal_loss_by_hypothesis
+                .as_ref()
+                .ok_or_else(|| PlanningError::MissingTerminalLoss(outcome.id.clone()))?;
+            (
+                expected_loss(&posterior, terminal_losses)?,
+                0.0,
+                ExpectedResources::default(),
+                if outcome.kind.is_mission_interruption() {
+                    1.0
+                } else {
+                    0.0
+                },
+                if outcome.kind.is_robot_loss() {
+                    1.0
+                } else {
+                    0.0
+                },
+                None,
+            )
+        };
 
         expected_decision_loss += branch_probability * branch_loss;
         expected_future_cost_units += branch_probability * branch_cost;
-        expected_resources =
-            ExpectedResources::plus_weighted(expected_resources, branch_resources, branch_probability)?;
+        expected_resources = ExpectedResources::plus_weighted(
+            expected_resources,
+            branch_resources,
+            branch_probability,
+        )?;
         interruption_probability += branch_probability * branch_interruption;
         robot_loss_probability += branch_probability * branch_robot_loss;
 
@@ -813,8 +843,7 @@ fn solve_state(
         )?;
         if candidate.mission_interruption_probability
             > config.risk_limits.maximum_mission_interruption_probability
-            || candidate.robot_loss_probability
-                > config.risk_limits.maximum_robot_loss_probability
+            || candidate.robot_loss_probability > config.risk_limits.maximum_robot_loss_probability
         {
             continue;
         }
@@ -917,9 +946,7 @@ pub fn plan_survival_conditioned(
             robot_loss_probability: Some(candidate.robot_loss_probability),
         });
 
-        if !exceeds_risk
-            && candidate.total_value() < root.total_value() - COMPARISON_TOLERANCE
-        {
+        if !exceeds_risk && candidate.total_value() < root.total_value() - COMPARISON_TOLERANCE {
             root = candidate;
         }
     }
@@ -1097,13 +1124,9 @@ mod tests {
             },
         ];
 
-        let report = plan_survival_conditioned(
-            &problem(vec![dangerous]),
-            budget(),
-            prices(),
-            config(2),
-        )
-        .unwrap();
+        let report =
+            plan_survival_conditioned(&problem(vec![dangerous]), budget(), prices(), config(2))
+                .unwrap();
 
         assert!(report.policy.measurement_action_id.is_none());
         assert_eq!(
@@ -1123,13 +1146,9 @@ mod tests {
             exposure_units: 1.0,
         };
 
-        let report = plan_survival_conditioned(
-            &problem(vec![action]),
-            small_budget,
-            prices(),
-            config(3),
-        )
-        .unwrap();
+        let report =
+            plan_survival_conditioned(&problem(vec![action]), small_budget, prices(), config(3))
+                .unwrap();
 
         assert_eq!(
             report.policy.measurement_action_id.as_deref(),
@@ -1169,15 +1188,14 @@ mod tests {
             },
         ];
 
-        let report = plan_survival_conditioned(
-            &problem(vec![action]),
-            budget(),
-            prices(),
-            config(2),
-        )
-        .unwrap();
+        let report =
+            plan_survival_conditioned(&problem(vec![action]), budget(), prices(), config(2))
+                .unwrap();
 
-        assert_eq!(report.policy.measurement_action_id.as_deref(), Some("survey"));
+        assert_eq!(
+            report.policy.measurement_action_id.as_deref(),
+            Some("survey")
+        );
         assert!(report.metrics.mission_interruption_probability.abs() < 1e-9);
         assert!(report.policy.branches.iter().all(|branch| {
             if branch.kind.is_terminal() {
@@ -1248,12 +1266,7 @@ mod tests {
         let mut limited = config(4);
         limited.maximum_search_nodes = 1;
         assert_eq!(
-            plan_survival_conditioned(
-                &problem(vec![scan("survey")]),
-                budget(),
-                prices(),
-                limited
-            ),
+            plan_survival_conditioned(&problem(vec![scan("survey")]), budget(), prices(), limited),
             Err(PlanningError::SearchBudgetExceeded { maximum: 1 })
         );
     }
@@ -1287,13 +1300,19 @@ mod tests {
         .unwrap();
 
         assert_eq!(report.policy.measurement_action_id.as_deref(), Some("survey"));
-        let observation = report.policy.branches.iter()
+        let observation = report
+            .policy
+            .branches
+            .iter()
             .find(|branch| branch.kind == OutcomeKind::Observation)
             .unwrap();
         let child = observation.continuation.as_ref().unwrap();
         assert_eq!(child.measurement_action_id.as_deref(), Some("survey"));
 
-        let lost = report.policy.branches.iter()
+        let lost = report
+            .policy
+            .branches
+            .iter()
             .find(|branch| branch.kind == OutcomeKind::RobotLost)
             .unwrap();
         assert!(lost.continuation.is_none());
