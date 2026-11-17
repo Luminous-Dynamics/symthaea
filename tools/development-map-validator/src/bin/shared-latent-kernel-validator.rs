@@ -16,7 +16,7 @@ const MAX_HYPOTHESES:usize=32;
 const MAX_OPTIONS:usize=6;
 const MAX_LATENT_STATES:usize=8;
 const MAX_ROWS:usize=4096;
-const CLAIM_CEILING:&str="Validates an evaluator-owned shared latent-weight credal simplex and exact conditional joint outcome distributions for every hypothesis/latent-state pair. It derives cross-hypothesis coupled marginal and pairwise event intervals and checks candidate channel consistency. It does not estimate latent weights from real measurements, prove latent-state completeness, optimize adaptive policies, validate drift, authenticate the evaluator's oracle, or authorize actions.";
+const CLAIM_CEILING:&str="Validates an evaluator-owned shared latent-weight credal simplex and exact conditional joint outcome distributions for every hypothesis/latent-state pair. It derives cross-hypothesis coupled marginal and pairwise event intervals, checks candidate channel consistency, computes evaluator-only posterior-risk probes, and evaluates exact one-step decision value of information over finite outcome-to-action rules under supplied losses and robust action constraints. It does not optimize multi-step adaptive policies, estimate latent weights from real measurements, prove latent-state completeness, validate drift, authenticate the evaluator's oracle, or authorize actions.";
 
 #[derive(Clone,Debug)]
 struct Bounds{lower:u64,upper:u64,nominal:u64}
@@ -525,6 +525,11 @@ const MAX_DECISION_VOI_QUERIES:usize=16;
 const MAX_DECISION_RULES:usize=10_000;
 const MAX_LOSS_MICROS:u64=1_000_000_000_000;
 
+fn floor_ratio(numerator:u128,denominator:u128,label:&str)->Result<u64,String>{
+ if denominator==0{return Err(format!("{label} denominator is zero"));}
+ let value=numerator/denominator;
+ u64::try_from(value).map_err(|_|format!("{label} exceeds u64"))
+}
 fn ceil_ratio(numerator:u128,denominator:u128,label:&str)->Result<u64,String>{
  if denominator==0{return Err(format!("{label} denominator is zero"));}
  let value=(numerator+denominator-1)/denominator;
@@ -559,7 +564,7 @@ fn robust_stop_loss(
   Ok((hypothesis.clone(),*actions.get(action).ok_or_else(||format!("loss matrix missing action {action:?}"))? as i128))
  }).collect::<Result<BTreeMap<_,_>,String>>()?;
  let worst=prior_extreme(priors,&coefficients,true)?;
- ceil_ratio(worst as u128,SCALE as u128,"robust stop loss")
+ floor_ratio(worst as u128,SCALE as u128,"robust stop loss")
 }
 fn nominal_stop_loss(
  priors:&BTreeMap<String,Bounds>,
@@ -570,7 +575,7 @@ fn nominal_stop_loss(
   let loss=*losses[hypothesis].get(action).ok_or_else(||format!("loss matrix missing action {action:?}"))?;
   sum.checked_add(prior.nominal as u128*loss as u128).ok_or_else(||"nominal stop loss overflow".to_owned())
  })?;
- ceil_ratio(numerator,SCALE as u128,"nominal stop loss")
+ floor_ratio(numerator,SCALE as u128,"nominal stop loss")
 }
 fn decision_rule_coefficients(
  hypothesis:&str,
@@ -851,6 +856,7 @@ fn parse_decision_voi_queries(
   reports.push(json!({
    "query_id":query_id,"loss_currency":currency,
    "loss_unit":"micro-units of the declared currency",
+   "net_value_rounding":"stop-loss floors to the micro-unit; post-measurement loss ceils to the micro-unit; net robust value is therefore rounded conservatively",
    "robust_stop_action_id":stop_action,
    "robust_stop_loss_micros":stop_robust,
    "nominal_stop_loss_micros":stop_nominal,
@@ -1060,6 +1066,52 @@ mod tests{
   b["oracle"]["risk_queries"][0]["prior_bounds"][0]["upper_probability_bps"]=json!(6000);
   b["oracle"]["risk_queries"][0]["prior_bounds"][0]["nominal_probability_bps"]=json!(6000);
   assert!(evaluate(&b.to_string()).unwrap_err().contains("infeasible"));
+ }
+ #[test]fn target_decision_voi_recommends_only_robust_positive_value_measurement(){
+  let r=report();
+  let q=&r["decision_voi"][0];
+  assert_eq!(q["robust_stop_action_id"],"inspect-readonly");
+  assert_eq!(q["robust_stop_loss_micros"],1000);
+  assert_eq!(q["nominal_stop_loss_micros"],1000);
+  assert_eq!(q["recommended_next_step"],"measure");
+  assert_eq!(q["recommended_option_id"],"gate-a");
+  assert_eq!(q["best_net_robust_decision_value_micros"],40);
+  let a=q["option_evaluations"].as_array().unwrap().iter()
+   .find(|x|x["option_id"]=="gate-a").unwrap();
+  let b=q["option_evaluations"].as_array().unwrap().iter()
+   .find(|x|x["option_id"]=="gate-b").unwrap();
+  assert_eq!(a["robust_post_measurement_loss_micros"],860);
+  assert_eq!(a["nominal_post_measurement_loss_micros"],850);
+  assert_eq!(a["net_robust_decision_value_micros"],40);
+  assert_eq!(a["net_nominal_decision_value_micros"],50);
+  assert_eq!(a["decision_rule"]["pass"],"release");
+  assert_eq!(a["decision_rule"]["fail"],"inspect-readonly");
+  assert_eq!(a["qualified_decision_rule_count"],2);
+  assert_eq!(b["net_robust_decision_value_micros"],-60);
+ }
+ #[test]fn tightening_action_risk_envelope_changes_measure_into_stop(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["oracle"]["decision_voi_queries"][0]["action_constraints"][0]["max_residual_risk_bps"]=json!(4000);
+  let r=evaluate(&b.to_string()).expect("tight robust risk policy falls back to defer");
+  let q=&r["decision_voi"][0];
+  assert_eq!(q["recommended_next_step"],"stop");
+  assert_eq!(q["recommended_option_id"],Value::Null);
+  assert_eq!(q["best_net_robust_decision_value_micros"],-100);
+  let a=q["option_evaluations"].as_array().unwrap().iter()
+   .find(|x|x["option_id"]=="gate-a").unwrap();
+  assert_eq!(a["decision_rule"]["pass"],"inspect-readonly");
+  assert_eq!(a["decision_rule"]["fail"],"inspect-readonly");
+  assert_eq!(a["qualified_decision_rule_count"],1);
+ }
+ #[test]fn decision_voi_cannot_be_injected_by_candidate(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["candidate_view"]["decision_voi_queries"]=b["oracle"]["decision_voi_queries"].clone();
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("unknown field"));
+ }
+ #[test]fn decision_voi_requires_exactly_one_globally_safe_read_only_defer(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["oracle"]["decision_voi_queries"][0]["action_constraints"][1]["safe_hypotheses"]=json!(["safe-world"]);
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("read-only deferral must be safe under every registered hypothesis"));
  }
  #[test]fn candidate_cannot_inject_shared_latent_oracle(){
   let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
