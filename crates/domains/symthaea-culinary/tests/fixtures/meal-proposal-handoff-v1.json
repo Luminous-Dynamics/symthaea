@@ -56,6 +56,16 @@
       "case_id": "hardware-assignment-not-in-proposal-shape",
       "expected": "forbidden",
       "description": "No appliance/module assignment, device resource ID, actuator or command field exists in this proposal contract."
+    },
+    {
+      "case_id": "price-fact-needs-market-unit-and-basis",
+      "expected": "invalid",
+      "description": "Price claim must identify market, currency/unit and package or mass basis."
+    },
+    {
+      "case_id": "allergen-claim-needs-product-or-lot-scope",
+      "expected": "invalid",
+      "description": "Generic ingredient-level allergen claims cannot replace exact product-SKU or supplier-lot label evidence."
     }
   ]
 }
