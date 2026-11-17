@@ -960,6 +960,21 @@ pub fn lift_representative_solution(
         .collect())
 }
 
+fn multi_environment_validation_work(
+    problem: &MultiEnvironmentProblemV1,
+) -> Result<usize, QuotientErrorV1> {
+    let candidate_count = problem.candidate_ids.len();
+    let per_candidate = ceil_log2(candidate_count)
+        .checked_add(1)
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    problem
+        .environments
+        .len()
+        .checked_mul(candidate_count)
+        .and_then(|value| value.checked_mul(per_candidate))
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)
+}
+
 fn validate_multi_environment_problem(
     problem: &MultiEnvironmentProblemV1,
     budget: QualificationBudgetV1,
@@ -969,6 +984,9 @@ fn validate_multi_environment_problem(
     }
     if problem.environments.is_empty() {
         return Err(QuotientErrorV1::InvalidEnvironmentCount);
+    }
+    if multi_environment_validation_work(problem)? > budget.maximum_work_units {
+        return Err(QuotientErrorV1::WorkBudgetExceeded);
     }
     let mut environment_ids = BTreeSet::new();
     for environment in &problem.environments {
@@ -1031,23 +1049,30 @@ pub fn qualify_common_task_preserving_subgroup(
 ) -> Result<CommonTaskPreservingSubgroupV1, QuotientErrorV1> {
     let group_order = ambient_action.group.multiplication.len();
     let candidate_count = problem.candidate_ids.len();
-    validate_multi_environment_problem(problem, budget)?;
-
+    let validation_work = multi_environment_validation_work(problem)?;
     let environment_checks = problem
         .environments
         .len()
         .checked_mul(group_order)
         .and_then(|value| value.checked_mul(candidate_count))
         .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
+    let overhead_work = validation_work
+        .checked_add(environment_checks)
+        .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
     let remaining_work = budget
         .maximum_work_units
-        .checked_sub(environment_checks)
+        .checked_sub(overhead_work)
         .ok_or(QuotientErrorV1::WorkBudgetExceeded)?;
     let adjusted_budget = QualificationBudgetV1 {
         maximum_work_units: remaining_work,
         ..budget
     };
     preflight(group_order, candidate_count, adjusted_budget)?;
+    let validation_budget = QualificationBudgetV1 {
+        maximum_work_units: validation_work,
+        ..budget
+    };
+    validate_multi_environment_problem(problem, validation_budget)?;
     let validated = validate_action(ambient_action, candidate_count, adjusted_budget)?;
 
     let mut retained = Vec::new();
@@ -1221,6 +1246,7 @@ fn contextual_stage_budget(
         .environments
         .len()
         .checked_mul(3)
+        .and_then(|value| value.checked_add(1))
         .ok_or(QuotientErrorV1::ArithmeticOverflow)?;
     if stage_count == 0 {
         return Err(QuotientErrorV1::InvalidEnvironmentCount);
@@ -1246,8 +1272,8 @@ pub fn compile_contextual_multi_environment_quotient(
     ambient_action: &FiniteActionV1,
     budget: QualificationBudgetV1,
 ) -> Result<ContextualMultiEnvironmentCertificateV1, QuotientErrorV1> {
-    validate_multi_environment_problem(problem, budget)?;
     let stage_budget = contextual_stage_budget(problem, budget)?;
+    validate_multi_environment_problem(problem, stage_budget)?;
     let mut environment_quotients = Vec::with_capacity(problem.environments.len());
     for environment in &problem.environments {
         let local_problem = MultiEnvironmentProblemV1 {
