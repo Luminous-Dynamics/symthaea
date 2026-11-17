@@ -52,7 +52,7 @@ The package has its own Cargo workspace and does not join the production Symthae
 ## Validation boundary
 
 - Site, cave-network and non-uniform-profile adapters, science-return lifecycle, pinned upstream-schema manifest and unit-test fixtures: AUTHORED.
-- Authored tests: 21 site/network + 6 profile + 39 science-return + 20 SCITT/in-toto attestation = 86 adapter tests.
+- Authored tests: 21 site/network + 6 profile + 39 science-return + 23 SCITT/in-toto attestation = 89 adapter tests.
 - The profile adapter validates ordered contiguous coverage and computes observed-only geometry summaries; it does not yet propagate uncertainty through the summary statistics.
 - The science-return record validates stage sequence, canonical UTC timestamp syntax, clock identity, declared uncertainty (at least 1,000 ms for whole-second timestamps), definite same-clock regressions, and acquired-payload SHA-256/byte-length integrity. `verify_signed_payload_bytes()` additionally verifies a detached Ed25519 signature using externally expected actor/key identities and a caller-trusted public key. The signature binds site, observation, acquired event/actor/source-evidence-reference/clock metadata, digest, byte length and key ID. This proves only that the corresponding private key signed the envelope. The package does not establish the key's identity, authorization, expiry/revocation, secure storage, immutable custody or transport delivery.
 - The upstream manifest pins source Git objects but does not fetch or authenticate upstream content at runtime.
@@ -86,3 +86,6 @@ The conformance fixture is guarded by an exact 1,622-byte length and SHA-256 che
 ### Canonical SCITT observation subject
 
 The CWT sub claim must equal the canonical observation URN derived from site ID and observation ID: urn:subterra:site:{percent-encoded-site}:observation:{percent-encoded-observation}. Components use UTF-8 percent encoding, leaving only RFC 3986 unreserved bytes literal. Creator and verifier enforce this binding; a valid signature pointing at another observation is rejected.
+
+
+The SCITT verifier uses a strict ASCII absolute-URI check for issuer identity. It rejects receipts in the unprotected header because this package does not yet verify SCITT Receipt signatures or inclusion proofs, and rejects X.509 certificate headers because certificate-chain validation is not implemented.

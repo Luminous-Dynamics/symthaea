@@ -520,3 +520,6 @@ The independent conformance fixture has two additional immutable controls: exact
 | CanonicalObservationUrnBench | Site and observation identifiers are encoded independently as canonical URI components | One canonical output per input pair |
 | CwtSubjectPredicateBindingBench | CWT sub equals the canonical URN derived from the signed in-toto predicate | Zero validly signed but misbound subject/predicate pairs accepted |
 | SubjectDelimiterInjectionBench | Delimiters, spaces and UTF-8 bytes cannot collide across site/observation boundaries | 100% adversarial identifiers remain unambiguous |
+
+
+Additional fail-closed gates: malformed/non-ASCII/oversize issuer URIs are rejected; an unverified SCITT Receipt header cannot be silently ignored; unsupported X.509 key-chain headers are rejected until certificate path validation is implemented.

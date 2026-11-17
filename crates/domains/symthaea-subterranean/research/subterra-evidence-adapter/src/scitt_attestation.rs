@@ -35,6 +35,9 @@ pub const SUBTERRA_SCIENCE_RETURN_PREDICATE_V1: &str =
     "https://luminousdynamics.io/attestations/subterra/science-return/v0.1";
 pub const IN_TOTO_JSON_CONTENT_TYPE: &str = "application/vnd.in-toto+json";
 pub const SCITT_COSE_SIGN1_TAG: u64 = 18;
+const SCITT_RECEIPTS_HEADER_LABEL: i64 = 394;
+const COSE_X5CHAIN_HEADER_LABEL: i64 = 33;
+const COSE_X5T_HEADER_LABEL: i64 = 34;
 pub const IN_TOTO_SUBJECT_NAME: &str = "subterra-observation-v0.1";
 const CWT_CLAIMS_HEADER_LABEL: i64 = 15;
 
@@ -80,6 +83,8 @@ pub enum ScittAttestationError {
     WrongCoseContentType,
     UnexpectedUnprotectedSecurityHeader,
     UnsupportedProtectedCriticalHeader,
+    UnsupportedCertificateHeader,
+    UnexpectedTransparencyReceipt,
     MissingCwtClaims,
     DuplicateCwtClaims,
     InvalidCwtClaims,
@@ -113,9 +118,24 @@ fn nonempty(value: &str) -> bool {
 /// Narrow URI gate for the v0.1 profile. Full URI authorization and ownership
 /// must be enforced by the caller's issuer/key registry.
 fn valid_absolute_uri(value: &str) -> bool {
-    nonempty(value)
-        && value.contains(':')
-        && !value.chars().any(char::is_whitespace)
+    if !nonempty(value)
+        || value.len() > 8_192
+        || !value.is_ascii()
+        || value
+            .bytes()
+            .any(|byte| byte.is_ascii_control() || byte.is_ascii_whitespace())
+    {
+        return false;
+    }
+
+    let Some((scheme, _rest)) = value.split_once(':') else {
+        return false;
+    };
+    let mut scheme_bytes = scheme.bytes();
+    matches!(scheme_bytes.next(), Some(byte) if byte.is_ascii_alphabetic())
+        && scheme_bytes.all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'-' | b'.')
+        })
 }
 
 
@@ -229,6 +249,12 @@ fn check_cose_profile(
     if !sign1.protected.header.crit.is_empty() {
         return Err(ScittAttestationError::UnsupportedProtectedCriticalHeader);
     }
+    if sign1.protected.header.rest.iter().any(|(label, _)| {
+        label == &Label::Int(COSE_X5CHAIN_HEADER_LABEL)
+            || label == &Label::Int(COSE_X5T_HEADER_LABEL)
+    }) {
+        return Err(ScittAttestationError::UnsupportedCertificateHeader);
+    }
     if sign1.protected.header.content_type.as_ref()
         != Some(&coset::ContentType::Text(IN_TOTO_JSON_CONTENT_TYPE.to_string()))
     {
@@ -237,11 +263,18 @@ fn check_cose_profile(
 
     // Security-relevant fields must be protected. A conflicting unprotected
     // algorithm, key ID or CWT claim is rejected rather than merged.
+    if sign1.unprotected.rest.iter().any(|(label, _)| {
+        label == &Label::Int(SCITT_RECEIPTS_HEADER_LABEL)
+    }) {
+        return Err(ScittAttestationError::UnexpectedTransparencyReceipt);
+    }
     if sign1.unprotected.alg.is_some()
         || sign1.unprotected.content_type.is_some()
         || !sign1.unprotected.key_id.is_empty()
         || sign1.unprotected.rest.iter().any(|(label, _)| {
             label == &Label::Int(CWT_CLAIMS_HEADER_LABEL)
+                || label == &Label::Int(COSE_X5CHAIN_HEADER_LABEL)
+                || label == &Label::Int(COSE_X5T_HEADER_LABEL)
         })
     {
         return Err(ScittAttestationError::UnexpectedUnprotectedSecurityHeader);
@@ -1016,6 +1049,74 @@ mod tests {
                 expected: "urn:subterra:site:another-site:observation:obs-001".into(),
                 actual: SUBJECT_URI.into()
             })
+        );
+    }
+
+    #[test]
+    fn issuer_and_subject_uris_require_strict_absolute_uri_syntax() {
+        assert!(valid_absolute_uri("https://science.example.org/issuers/robot-01"));
+        assert!(valid_absolute_uri("urn:subterra:site:site-a:observation:obs-01"));
+        assert!(!valid_absolute_uri("not-a-uri"));
+        assert!(!valid_absolute_uri("1bad-scheme:value"));
+        assert!(!valid_absolute_uri("https://science.example.org/path with space"));
+        assert!(!valid_absolute_uri("https://science.example.org/\u{00a0}"));
+        assert!(!valid_absolute_uri(&format!("urn:{}", "x".repeat(8_192))));
+    }
+
+    #[test]
+    fn verifier_rejects_unverified_scitt_transparency_receipt_headers() {
+        let (signed, public_key) = signed_fixture();
+        let Value::Tag(_, inner) = Value::from_slice(&signed).unwrap() else {
+            panic!("expected tag wrapper");
+        };
+        let mut sign1 = CoseSign1::from_cbor_value(*inner).unwrap();
+        sign1.unprotected.rest.push((
+            Label::Int(SCITT_RECEIPTS_HEADER_LABEL),
+            Value::Array(Vec::new()),
+        ));
+        let with_unverified_receipt = Value::Tag(
+            SCITT_COSE_SIGN1_TAG,
+            Box::new(sign1.to_cbor_value().unwrap())
+        ).to_vec().unwrap();
+        assert_eq!(
+            verify_scitt_signed_science_return_statement(
+                &with_unverified_receipt,
+                b"abc",
+                ISSUER_URI,
+                SUBJECT_URI,
+                KEY_ID,
+                &public_key,
+            ),
+            Err(ScittAttestationError::UnexpectedTransparencyReceipt)
+        );
+    }
+
+    #[test]
+    fn verifier_rejects_unsupported_certificate_chain_headers() {
+        let (signed, public_key) = signed_fixture();
+        let Value::Tag(_, inner) = Value::from_slice(&signed).unwrap() else {
+            panic!("expected tag wrapper");
+        };
+        let mut sign1 = CoseSign1::from_cbor_value(*inner).unwrap();
+        sign1.protected.original_data = None;
+        sign1.protected.header.rest.push((
+            Label::Int(COSE_X5CHAIN_HEADER_LABEL),
+            Value::Bytes(vec![1, 2, 3]),
+        ));
+        let with_x5chain = Value::Tag(
+            SCITT_COSE_SIGN1_TAG,
+            Box::new(sign1.to_cbor_value().unwrap())
+        ).to_vec().unwrap();
+        assert_eq!(
+            verify_scitt_signed_science_return_statement(
+                &with_x5chain,
+                b"abc",
+                ISSUER_URI,
+                SUBJECT_URI,
+                KEY_ID,
+                &public_key,
+            ),
+            Err(ScittAttestationError::UnsupportedCertificateHeader)
         );
     }
 

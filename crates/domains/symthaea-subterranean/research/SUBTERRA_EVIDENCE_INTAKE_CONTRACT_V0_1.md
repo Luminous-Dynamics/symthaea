@@ -220,3 +220,6 @@ A fixed tag-18 COSE_Sign1/in-toto Statement vector is pinned from an independent
 
 
 The Subterra profile further requires the SCITT CWT sub claim to be the canonical observation URN derived from the signed in-toto predicate site and observation IDs. Each component is UTF-8 percent-encoded independently (only RFC 3986 unreserved bytes remain literal), preventing delimiter ambiguity. Both creation and verification enforce this identity relation; a cryptographically valid statement bound to a different subject is not accepted for the requested observation.
+
+
+The v0.1 verifier accepts only strict ASCII absolute URIs (scheme syntax, no controls/whitespace, maximum 8,192 bytes). It rejects SCITT receipts in the unprotected header instead of silently treating a Transparent Statement as a merely signed statement, because receipt signature and verifiable-data-structure proof verification are not implemented. It also rejects X.509 certificate headers until a real chain/identity verifier exists.
