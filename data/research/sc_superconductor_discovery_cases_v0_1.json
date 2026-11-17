@@ -662,21 +662,23 @@
           "observable": "resistive_onset",
           "value_k": 151,
           "status": "reported_post_quench_ambient_pressure",
-          "sample_id": "S4",
+          "sample_id": null,
           "pressure_gpa": 0,
           "measurement_direction": "warming",
           "treatment_pressure_gpa": 18.9,
-          "quench_temperature_k": 4.2
+          "quench_temperature_k": 4.2,
+          "sample_identity_status": "figure/sample mapping requires source supplement reconciliation"
         },
         {
           "observable": "resistive_onset",
           "value_k": 150,
           "status": "reported_post_quench_ambient_pressure",
-          "sample_id": "S4",
+          "sample_id": null,
           "pressure_gpa": 0,
           "measurement_direction": "cooling",
           "treatment_pressure_gpa": 18.9,
-          "quench_temperature_k": 4.2
+          "quench_temperature_k": 4.2,
+          "sample_identity_status": "figure/sample mapping requires source supplement reconciliation"
         },
         {
           "observable": "resistive_onset",
@@ -692,24 +694,15 @@
           "observable": "resistive_onset",
           "value_k": 149,
           "status": "reported_post_quench_ambient_pressure",
-          "sample_id": "S3_or_S4_source_mapping_pending",
+          "sample_id": null,
           "pressure_gpa": 0,
           "measurement_direction": "warming",
           "treatment_pressure_gpa": 10.9,
-          "quench_temperature_k": 4.2
-        },
-        {
-          "observable": "bulk_superconducting_volume_fraction",
-          "value_percent": 78,
-          "status": "reported_DC_magnetization",
-          "sample_id": "retrieved_specimen_after_10.1_GPa_PQP",
-          "pressure_gpa": 0,
-          "associated_tc_k": 140,
-          "treatment_pressure_gpa": 10.1,
-          "quench_temperature_k": 4.2
+          "quench_temperature_k": 4.2,
+          "sample_identity_status": "figure/sample mapping requires source supplement reconciliation"
         }
       ],
-      "sample_identity_resolution": "The paper uses five 100-130 μm specimens cut from three parent crystals. The record-level sample labels for each measurement must be reconciled against figure and supplement; the 151 K onset sample is not the same evidence row as the retrieved magnetization specimen.",
+      "sample_identity_resolution": "The paper uses five 100-130 μm specimens cut from three parent crystals. The record-level sample mapping for the 151 K figure and 78% magnetic-volume specimen must be reconciled against figure and supplement; no exact specimen ID is assumed here.",
       "phase_and_process_notes": "Rapid decompression after pressure target at 4.2 K. XRD retained tetragonal Hg1223 structure with (200) FWHM broadening 0.12° to 0.20°, consistent with pressure-generated strain/defects. Mechanism unresolved.",
       "pqp_process": {
         "quench_pressure_gpa_range": [
@@ -723,7 +716,21 @@
       },
       "bulk_thermodynamic_evidence": "A retrieved PQed specimen showed ~78% superconducting volume fraction by DC magnetization at a lower Tc around 140 K. No 151 K calorimetric transition is claimed.",
       "engineering_readiness": "micrometre-scale metastable bulk superconducting state; no conductor form, scale-up or engineering qualification",
-      "safety_review": "PQP source uses DAC high-pressure and cryogenic conditions; any experimental replication requires qualified institutional pressure/cryogenic safety review"
+      "safety_review": "PQP source uses DAC high-pressure and cryogenic conditions; any experimental replication requires qualified institutional pressure/cryogenic safety review",
+      "property_observations": [
+        {
+          "property": "superconducting_volume_fraction",
+          "value": 78,
+          "unit": "percent",
+          "status": "reported_DC_magnetization",
+          "sample_id": null,
+          "sample_identity_status": "separate retrieved specimen; exact source sample label requires supplement reconciliation",
+          "associated_tc_k": 140,
+          "pressure_gpa": 0,
+          "treatment_pressure_gpa": 10.1,
+          "quench_temperature_k": 4.2
+        }
+      ]
     },
     {
       "candidate_id": "SC-EXP-YNBTIZRHF-HEA-2026",
