@@ -170,10 +170,19 @@ Compare on a matched application and operating point. Do not compare self-field 
 
 ## 7. Can superconductors work at scale today?
 
-Yes, in specialized applications. REBCO tape is commercially manufactured and used in high-current cable/magnet programmes. A 2025 SuperRail report describes an HTS cable system in commercial operation on a Paris railway grid, with two cables rated at 2.25 MW each. This is real engineering scale, but it is not room-temperature operation or a universal grid replacement:
+Yes, in specialized applications. REBCO tape is commercially manufactured and used in high-current cable/magnet programmes, without requiring room-temperature superconductivity.
+
+A 2025 PLD-REBCO industry perspective reports that top-tier manufacturers exceed 3,000 km/year of 12 mm tape, and cites representative performance above 200 A per 4 mm at 20 K, 20 T (field parallel to c-axis), with an approximate $20/m price. These are industry-perspective figures and specific product claims, not universal supplier guarantees:
+https://doi.org/10.1016/j.supcon.2025.100188
+
+A 2025 SuperRail paper reports a commercial HTS DC cable installation for Paris Montparnasse using two 60 m, 1.5 kV, 3.5 kA cables. The system was type-tested for thermal cycles, dielectric performance, pressure, system losses and a 67 kA/100 ms fault-current duty. It demonstrates a real niche where constrained right-of-way can justify HTS infrastructure, not a universal grid cost advantage:
 https://doi.org/10.1049/icp.2025.2154
 
-A 2026 conductor translation review reports approximate routine REBCO piece lengths of 0.3–2 km and estimated yields of 80–90%; these are review-derived estimates, not universal supplier guarantees. It highlights cost, manufacturing throughput, jointing and mechanical robustness. Commercial REBCO is therefore scalable but not yet a drop-in low-cost replacement for all copper/aluminium systems.
+A separate 2025 REBCO cable-in-conduit prototype reports 80 kA at 10.85 T and 4.5 K, with cyclic Lorentz loading to at least 830 kN/m. This is an important fusion-magnet conductor milestone, not room-temperature or standard utility-grid operation:
+https://doi.org/10.1016/j.eng.2025.05.015
+
+A 2026 conductor translation review estimates approximate routine REBCO piece lengths of 0.3–2 km and yields of 80–90%, with costs around 4–10 USD/kA·m at 77 K self-field versus an illustrative grid-scale target at or below 1.5 USD/kA·m. These values are review-derived and sensitive to specification; compare only at matched field, temperature, angle and conductor cross-section:
+https://www.sciencedirect.com/science/article/pii/S2949822826015558
 
 For room-temperature ambient-pressure superconductors, there is currently no equivalent qualified conductor supply chain because no independently reproduced material has reached that state.
 
