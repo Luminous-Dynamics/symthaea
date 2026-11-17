@@ -393,3 +393,128 @@ fn main(){
   Err(e)=>{eprintln!("ERROR D6.17.2.3-EVALUATION-001: {e}");process::exit(1)}
  }
 }
+
+
+#[cfg(test)]
+mod tests{
+ use super::*;
+ const FIXTURE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-run-cost-receipts-v0.1.json");
+ const EXPECTED:&str=include_str!("../../../../docs/development-map/fixtures/egddm-run-cost-receipts-v0.1.expected.json");
+ fn report()->Value{evaluate(FIXTURE).expect("run receipt fixture validates")}
+ fn reseal_receipt(receipt:&mut Value){
+  let attempts=receipt["attempts"].as_array_mut().expect("attempt array");
+  let mut previous:Option<String>=None;
+  for row in attempts{
+   row["previous_event_sha256"]=previous.clone().map(Value::String).unwrap_or(Value::Null);
+   row.as_object_mut().expect("attempt object").remove("event_sha256");
+   let digest=hash_object_without(row,"event_sha256","test attempt").expect("event digest");
+   row["event_sha256"]=json!(digest);
+   previous=Some(digest);
+  }
+  receipt.as_object_mut().expect("receipt object").remove("receipt_sha256");
+  let digest=hash_object_without(receipt,"receipt_sha256","test receipt").expect("receipt digest");
+  receipt["receipt_sha256"]=json!(digest);
+ }
+ #[test]fn complete_report_matches_known_answer(){
+  let actual=report();
+  let expected:Value=serde_json::from_str(EXPECTED).expect("expected JSON");
+  assert_eq!(actual,expected);
+ }
+ #[test]fn full_run_p95_is_not_sum_of_marginal_p95s(){
+  let r=report();
+  assert_eq!(r["full_run_cost_micros"]["p95"],100);
+  assert_eq!(r["sum_of_marginal_option_p95_micros"],180);
+  assert_ne!(r["full_run_cost_micros"]["p95"],r["sum_of_marginal_option_p95_micros"]);
+ }
+ #[test]fn event_content_tampering_is_rejected(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  bundle["candidate_view"]["run_receipts"][0]["attempts"][0]["price_micros"]=json!(91);
+  assert!(evaluate(&bundle.to_string()).unwrap_err().contains("does not match canonical SHA-256"));
+ }
+ #[test]fn event_chain_predecessor_mismatch_is_rejected(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  bundle["candidate_view"]["run_receipts"][0]["attempts"][1]["previous_event_sha256"]=json!("d".repeat(64));
+  assert!(evaluate(&bundle.to_string()).unwrap_err().contains("event hash chain predecessor mismatch"));
+ }
+ #[test]fn evaluator_context_mismatch_is_rejected(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  bundle["candidate_view"]["run_receipts"][0]["runner_class"]=json!("unapproved-runner");
+  reseal_receipt(&mut bundle["candidate_view"]["run_receipts"][0]);
+  assert!(evaluate(&bundle.to_string()).unwrap_err().contains("does not match evaluator-approved context"));
+ }
+ #[test]fn queued_attempt_is_censored_not_zero_cost(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  let receipt=&mut bundle["candidate_view"]["run_receipts"][0];
+  let event=&mut receipt["attempts"][0];
+  event["status"]=json!("queued");
+  event["result"]=json!("not_applicable");
+  event["started_at"]=Value::Null;
+  event["completed_at"]=Value::Null;
+  event["elapsed_ms"]=Value::Null;
+  event["price_micros"]=Value::Null;
+  event["cpu_ms"]=json!(0);event["gpu_ms"]=json!(0);event["network_bytes"]=json!(0);
+  event["evidence_digest_sha256"]=Value::Null;
+  event["billing_record_ref"]=Value::Null;event["billing_record_sha256"]=Value::Null;
+  reseal_receipt(receipt);
+  let r=evaluate(&bundle.to_string()).expect("queued run remains structurally valid");
+  assert_eq!(r["queued_attempt_count"],1);
+  assert_eq!(r["censored_or_incomplete_run_count"],1);
+  assert_eq!(r["complete_cost_run_count"],1);
+  assert_eq!(r["complete_wall_run_count"],1);
+  assert_eq!(r["run_samples"][0]["full_run_cost_micros"],Value::Null);
+ }
+ #[test]fn skipped_attempt_is_explicit_and_zero_cost_not_a_pass(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  let receipt=&mut bundle["candidate_view"]["run_receipts"][0];
+  let event=&mut receipt["attempts"][1];
+  event["status"]=json!("skipped");event["result"]=json!("not_applicable");
+  event["started_at"]=Value::Null;event["completed_at"]=Value::Null;event["elapsed_ms"]=Value::Null;
+  event["price_micros"]=json!(0);event["cpu_ms"]=json!(0);event["gpu_ms"]=json!(0);event["network_bytes"]=json!(0);
+  event["evidence_digest_sha256"]=Value::Null;event["billing_record_ref"]=Value::Null;event["billing_record_sha256"]=Value::Null;
+  reseal_receipt(receipt);
+  let r=evaluate(&bundle.to_string()).expect("skipped event validates explicitly");
+  assert_eq!(r["skipped_attempt_count"],1);
+  assert_eq!(r["executed_attempt_count"],3);
+  assert_eq!(r["run_samples"][0]["full_run_cost_micros"],90);
+ }
+ #[test]fn duplicate_run_id_is_rejected(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  bundle["candidate_view"]["run_receipts"][1]["run_id"]=json!("run-001");
+  assert!(evaluate(&bundle.to_string()).unwrap_err().contains("duplicate run_id"));
+ }
+ #[test]fn noncontiguous_event_sequence_is_rejected(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  bundle["candidate_view"]["run_receipts"][0]["attempts"][1]["sequence"]=json!(3);
+  assert!(evaluate(&bundle.to_string()).unwrap_err().contains("sequence must be contiguous"));
+ }
+ #[test]fn elapsed_time_must_match_monotonic_timestamps(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  bundle["candidate_view"]["run_receipts"][0]["attempts"][0]["elapsed_ms"]=json!(1999);
+  assert!(evaluate(&bundle.to_string()).unwrap_err().contains("does not match the timestamp interval"));
+ }
+ #[test]fn unresolved_timeout_cannot_be_retried_without_reconciliation(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  let receipt=&mut bundle["candidate_view"]["run_receipts"][0];
+  let first=&mut receipt["attempts"][0];
+  first["status"]=json!("timeout");first["result"]=json!("unknown");
+  let retry=json!({
+   "event_id":"run-001-a-retry","sequence":2,"option_id":"gate-a","attempt_no":2,"mode":"retry",
+   "status":"completed","result":"pass","queued_at":"2026-11-17T10:00:16Z",
+   "started_at":"2026-11-17T10:00:17Z","completed_at":"2026-11-17T10:00:18Z","elapsed_ms":1000,
+   "cpu_ms":1000,"gpu_ms":0,"network_bytes":1024,"price_micros":1,"retry_of_event_id":"run-001-a",
+   "evidence_digest_sha256":"a".repeat(64),"billing_record_ref":"billing://synthetic/run-001-a-retry",
+   "billing_record_sha256":"b".repeat(64),"previous_event_sha256":Value::Null,"event_sha256":"0".repeat(64)
+  });
+  receipt["attempts"].as_array_mut().expect("attempts").push(retry);
+  receipt["run_finished_at"]=json!("2026-11-17T10:00:18Z");
+  reseal_receipt(receipt);
+  assert!(evaluate(&bundle.to_string()).unwrap_err().contains("unknown outcomes require reconciliation"));
+ }
+ #[test]fn positive_cost_requires_billing_record_reference(){
+  let mut bundle:Value=serde_json::from_str(FIXTURE).expect("fixture");
+  let receipt=&mut bundle["candidate_view"]["run_receipts"][0];
+  receipt["attempts"][0]["billing_record_ref"]=Value::Null;
+  reseal_receipt(receipt);
+  assert!(evaluate(&bundle.to_string()).unwrap_err().contains("billing_record_ref"));
+ }
+}
