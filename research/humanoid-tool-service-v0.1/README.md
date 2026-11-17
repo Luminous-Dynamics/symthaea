@@ -103,6 +103,36 @@ HumanoidToolBench is the direct humanoid tool-use anchor. We will also audit:
 
 These results suggest that Symthaea should be judged on *functional transfer, contact prediction, interaction quality and verified physical outcomes*, not only task completion. All values above are paper-reported and task-specific; they are not directly comparable or Symthaea results. Reproduction requires exact source/checkpoint/data/licence and protocol audit.
 
+## Current SOTA shift: agentic policies and durable skill memory
+
+The benchmark portfolio now explicitly includes **agentic manipulation policies**, not only VLA/WAM action-chunk policies.
+
+AMP1 (arXiv:2611.09892, 6 Nov 2026) reports 85.6% on RoboLab-120 and 104/108 trials on a Franka-based real-world evaluation, with an AMP1+ persistent-memory experiment reporting 4.6× lower failure rate on RoboDojo bimanual tasks versus zero-shot. This is an arm-based result, not a humanoid result. The paper also documents collision/calibration failures and benchmark/verifier artefacts; it states model choice matters much more than modest changes to its harness.
+
+RoboDojo's 17 Nov 2026 public snapshot distinguishes its standard policy leaderboard from the Agent track. Its SOLVE* agent entry is marked as evaluated before the 14 Nov Agent Track rules and is therefore flagged as non-conforming with updated rules. The scores must not be compared directly with the standard policy board or HumanoidToolBench.
+
+VioLA (8 Oct 2026) motivates a second output-space baseline: predict transferable body/hand motion latents and let a qualified whole-body controller track them, rather than predicting raw joint commands. Its reported 140.6M frames include 93.2% human motion data, but human motion must be converted through a valid morphology/frame/action contract before it is usable as robot supervision.
+
+Symthaea's hypothesis is to combine:
+- a generalist agent that remains in the task loop and performs active perception / plan revision;
+- typed, bounded capabilities instead of unrestricted generated code with direct live hardware access;
+- HDC-LTC / FEP multi-timescale cognition and local fast controllers;
+- a validated, provenance-bearing procedural skill memory;
+- terminal deterministic safety, explicit authority and independent physical postcondition verification.
+
+Related programme: [HUM-AGENTIC-POLICY-001 #12685](https://github.com/Luminous-Dynamics/symthaea/issues/12685).
+
+## G1 interface compatibility artifact
+
+The exact HumanoidToolBench G1 action/state mapping is now pinned separately:
+- [G1 decoupled_v1 mapping manifest](g1-decoupled-v1-mapping.json)
+- [G1 mapping JSON Schema](g1-decoupled-v1-mapping.schema.json)
+- [HUM-G1-UEC-ADAPTER-001 #12681](https://github.com/Luminous-Dynamics/symthaea/issues/12681)
+
+The mapping preserves all 43 raw named G1 joint positions, the derived 32-value policy-state projection, the 36-value action schema, the left-hand thumb/middle/index permutation, the waist order change, the base-height command-history field, RGB image modality, and the navigation turn-flag semantics.
+
+This is a **non-actuating software compatibility specification**. It does not map G1 joint targets onto Symthaea DMC21/Dexterous53 torques, does not connect to the current 21-joint PCA9685 HAL, and creates no UEC Applied/Measured receipt or actuation authority. The typed Rust adapter is deliberately dependent on the canonical UEC v2 APIs and their current qualification state.
+
 ## Deliverables
 
 - `protocol-v0.1.md`: preregisterable comparison and claim-boundary protocol.
