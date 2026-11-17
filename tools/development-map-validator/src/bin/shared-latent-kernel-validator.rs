@@ -275,12 +275,251 @@ fn mixture_interval(weights:&[LatentState],coefficients:&[u64])->Result<Bounds,S
  if lower>nominal||nominal>upper{return Err("shared-latent mixture interval does not contain nominal point".to_owned());}
  Ok(Bounds{lower,upper,nominal})
 }
+fn simplex_vertices(weights:&[LatentState])->Result<Vec<Vec<u64>>,String>{
+ if weights.is_empty()||weights.len()>MAX_LATENT_STATES{return Err("latent vertex enumeration dimensions invalid".to_owned());}
+ let mut unique:BTreeMap<String,Vec<u64>>=BTreeMap::new();
+ let dimension=weights.len();
+ let assignment_count=1usize.checked_shl((dimension-1) as u32).ok_or("latent vertex assignment count overflow")?;
+ for pivot in 0..dimension{
+  let others:Vec<usize>=(0..dimension).filter(|i|*i!=pivot).collect();
+  for mask in 0..assignment_count{
+   let mut vertex=vec![0u64;dimension];let mut assigned=0u64;
+   for (bit,index) in others.iter().enumerate(){
+    let value=if (mask>>bit)&1==0{weights[*index].probability.lower}else{weights[*index].probability.upper};
+    vertex[*index]=value;assigned=assigned.checked_add(value).ok_or("latent vertex mass overflow")?;
+   }
+   if assigned>SCALE{continue;}
+   let residual=SCALE-assigned;
+   if residual<weights[pivot].probability.lower||residual>weights[pivot].probability.upper{continue;}
+   vertex[pivot]=residual;
+   let key=serde_json::to_string(&vertex).map_err(|e|format!("latent vertex serialization failed: {e}"))?;
+   unique.insert(key,vertex);
+  }
+ }
+ if unique.is_empty(){return Err("shared latent credal simplex has no enumerated vertices".to_owned());}
+ Ok(unique.into_values().collect())
+}
+fn prior_extreme(
+ priors:&BTreeMap<String,Bounds>,
+ coefficients:&BTreeMap<String,i128>,
+ maximize:bool
+)->Result<i128,String>{
+ if priors.keys().cloned().collect::<BTreeSet<_>>()!=coefficients.keys().cloned().collect::<BTreeSet<_>>(){
+  return Err("prior coefficients must cover exact hypothesis set".to_owned());
+ }
+ let lower_sum:u64=priors.values().map(|x|x.lower).sum();
+ if lower_sum>SCALE{return Err("prior lower mass exceeds scale".to_owned());}
+ let mut total=priors.iter().try_fold(0i128,|sum,(id,p)|{
+  sum.checked_add(p.lower as i128*coefficients[id]).ok_or_else(||"prior linear objective overflow".to_owned())
+ })?;
+ let mut remaining=SCALE-lower_sum;
+ let mut ids:Vec<String>=priors.keys().cloned().collect();
+ if maximize{
+  ids.sort_by(|a,b|coefficients[b].cmp(&coefficients[a]).then_with(||a.cmp(b)));
+ }else{
+  ids.sort_by(|a,b|coefficients[a].cmp(&coefficients[b]).then_with(||a.cmp(b)));
+ }
+ for id in ids{
+  let p=&priors[&id];let take=remaining.min(p.upper-p.lower);
+  total=total.checked_add(take as i128*coefficients[&id]).ok_or("prior linear objective overflow")?;
+  remaining-=take;if remaining==0{break;}
+ }
+ if remaining>0{return Err("prior upper bounds cannot allocate unit probability".to_owned());}
+ Ok(total)
+}
+fn shared_likelihood_numerator(vertex:&[u64],likelihoods:&[u64])->Result<i128,String>{
+ if vertex.len()!=likelihoods.len(){return Err("latent weight and conditional likelihood dimensions differ".to_owned());}
+ vertex.iter().zip(likelihoods).try_fold(0i128,|sum,(weight,likelihood)|{
+  sum.checked_add(*weight as i128*(*likelihood as i128)).ok_or_else(||"shared likelihood numerator overflow".to_owned())
+ })
+}
+fn shared_support_lower(
+ priors:&BTreeMap<String,Bounds>,
+ weights:&[LatentState],
+ likelihoods:&BTreeMap<String,Vec<u64>>
+)->Result<u64,String>{
+ let vertices=simplex_vertices(weights)?;
+ let mut minimum=i128::MAX;
+ for vertex in vertices{
+  let coefficients=likelihoods.iter().map(|(hypothesis,values)|{
+   Ok((hypothesis.clone(),shared_likelihood_numerator(&vertex,values)?))
+  }).collect::<Result<BTreeMap<_,_>,String>>()?;
+  minimum=minimum.min(prior_extreme(priors,&coefficients,false)?);
+ }
+ if minimum<0{return Err("shared event support became negative".to_owned());}
+ Ok((minimum as u128/((SCALE as u128)*(SCALE as u128))) as u64)
+}
+fn shared_nominal_risk(
+ priors:&BTreeMap<String,Bounds>,
+ weights:&[LatentState],
+ likelihoods:&BTreeMap<String,Vec<u64>>,
+ safe:&BTreeSet<String>
+)->Result<u64,String>{
+ let mut numerator=0u128;let mut denominator=0u128;
+ for (hypothesis,prior) in priors{
+  let likelihood=weighted_nominal(&weights.iter().map(|z|z.probability.clone()).collect::<Vec<_>>(),&likelihoods[hypothesis])?;
+  let mass=prior.nominal as u128*likelihood as u128;
+  denominator+=mass;if !safe.contains(hypothesis){numerator+=mass;}
+ }
+ if denominator==0{return Ok(SCALE);}
+ Ok(((numerator*SCALE as u128+denominator-1)/denominator).min(SCALE as u128) as u64)
+}
+fn shared_max_surplus(
+ risk:u64,
+ priors:&BTreeMap<String,Bounds>,
+ weights:&[LatentState],
+ likelihoods:&BTreeMap<String,Vec<u64>>,
+ safe:&BTreeSet<String>
+)->Result<i128,String>{
+ let mut maximum=i128::MIN;
+ for vertex in simplex_vertices(weights)?{
+  let mut coefficients=BTreeMap::new();
+  for (hypothesis,values) in likelihoods{
+   let likelihood=shared_likelihood_numerator(&vertex,values)?;
+   let coefficient=if safe.contains(hypothesis){
+    -(risk as i128)*likelihood
+   }else{
+    (SCALE as i128-risk as i128)*likelihood
+   };
+   coefficients.insert(hypothesis.clone(),coefficient);
+  }
+  maximum=maximum.max(prior_extreme(priors,&coefficients,true)?);
+ }
+ Ok(maximum)
+}
+fn shared_robust_risk(
+ priors:&BTreeMap<String,Bounds>,
+ weights:&[LatentState],
+ likelihoods:&BTreeMap<String,Vec<u64>>,
+ safe:&BTreeSet<String>
+)->Result<u64,String>{
+ let support=shared_support_lower(priors,weights,likelihoods)?;
+ if support==0{return Ok(SCALE);}
+ let mut low=0u64;let mut high=SCALE;
+ while low<high{
+  let mid=low+(high-low)/2;
+  if shared_max_surplus(mid,priors,weights,likelihoods,safe)?<=0{high=mid}else{low=mid+1;}
+ }
+ Ok(low)
+}
+fn rectangular_max_surplus(
+ risk:u64,priors:&BTreeMap<String,Bounds>,likelihoods:&BTreeMap<String,Bounds>,safe:&BTreeSet<String>
+)->Result<i128,String>{
+ let coefficients=likelihoods.iter().map(|(hypothesis,bounds)|{
+  let coefficient=if safe.contains(hypothesis){
+   -(risk as i128)*(bounds.lower as i128)
+  }else{
+   ((SCALE-risk) as i128)*(bounds.upper as i128)
+  };
+  (hypothesis.clone(),coefficient)
+ }).collect::<BTreeMap<_,_>>();
+ prior_extreme(priors,&coefficients,true)
+}
+fn rectangular_robust_risk(
+ priors:&BTreeMap<String,Bounds>,likelihoods:&BTreeMap<String,Bounds>,safe:&BTreeSet<String>
+)->Result<u64,String>{
+ let mut low=0u64;let mut high=SCALE;
+ while low<high{
+  let mid=low+(high-low)/2;
+  if rectangular_max_surplus(mid,priors,likelihoods,safe)?<=0{high=mid}else{low=mid+1;}
+ }
+ Ok(low)
+}
+fn parse_risk_queries(
+ oracle:&Value,
+ hypotheses:&BTreeSet<String>,
+ options:&BTreeMap<String,OptionDef>,
+ factors:&BTreeMap<String,Factor>,
+ latents:&[LatentState],
+ kernels:&BTreeMap<(String,String),ConditionalKernel>
+)->Result<Vec<Value>,String>{
+ let rows=match oracle.get("risk_queries"){
+  None=>return Ok(Vec::new()),
+  Some(v)=>v.as_array().ok_or("oracle.risk_queries must be array")?
+ };
+ if rows.len()>64{return Err("oracle.risk_queries must contain at most 64 queries".to_owned());}
+ let option_ids:BTreeSet<String>=options.keys().cloned().collect();
+ let latent_weights:Vec<Bounds>=latents.iter().map(|z|z.probability.clone()).collect();
+ let mut reports=Vec::new();let mut query_ids=BTreeSet::new();
+ for (i,query) in rows.iter().enumerate(){
+  let label=format!("oracle.risk_queries[{i}]");
+  allowed(query,&["query_id","action_id","safe_hypotheses","prior_bounds","observed_outcomes"],&label)?;
+  let query_id=string(query,"query_id",&label)?;
+  if !query_ids.insert(query_id.clone()){return Err(format!("duplicate risk query {query_id:?}"));}
+  let action_id=string(query,"action_id",&label)?;
+  let safe_rows=get(query,"safe_hypotheses",&label)?.as_array().ok_or("safe_hypotheses must be array")?;
+  let mut safe=BTreeSet::new();
+  for raw in safe_rows{
+   let id=raw.as_str().filter(|x|!x.trim().is_empty()).ok_or("safe hypothesis ID must be non-empty string")?;
+   if !hypotheses.contains(id)||!safe.insert(id.to_owned()){return Err(format!("{label}.safe_hypotheses contains unknown or duplicate hypothesis"));}
+  }
+  let prior_rows=get(query,"prior_bounds",&label)?.as_array().ok_or("prior_bounds must be array")?;
+  if prior_rows.len()!=hypotheses.len(){return Err(format!("{label}.prior_bounds must cover exact hypothesis set"));}
+  let mut priors=BTreeMap::new();
+  for (j,row) in prior_rows.iter().enumerate(){
+   let pl=format!("{label}.prior_bounds[{j}]");
+   allowed(row,&["hypothesis_id","lower_probability_bps","upper_probability_bps","nominal_probability_bps"],&pl)?;
+   let id=string(row,"hypothesis_id",&pl)?;
+   if !hypotheses.contains(&id){return Err(format!("{pl} references unknown hypothesis"));}
+   let b=Bounds{lower:uint(row,"lower_probability_bps",&pl)?,upper:uint(row,"upper_probability_bps",&pl)?,nominal:uint(row,"nominal_probability_bps",&pl)?};
+   if b.lower>b.nominal||b.nominal>b.upper||b.upper>SCALE{return Err(format!("{pl} violates probability interval ordering"));}
+   if priors.insert(id.clone(),b).is_some(){return Err(format!("{pl} duplicates hypothesis {id:?}"));}
+  }
+  bounded_simplex(&priors.values().cloned().collect::<Vec<_>>(),&format!("{label}.prior_bounds"))?;
+  if priors.keys().cloned().collect::<BTreeSet<_>>()!=*hypotheses{return Err(format!("{label}.prior_bounds must cover exact hypothesis set"));}
+  let observed=obj(get(query,"observed_outcomes",&label)?,"observed_outcomes")?;
+  if observed.keys().cloned().collect::<BTreeSet<_>>()!=option_ids{return Err(format!("{label}.observed_outcomes must cover every option exactly"));}
+  for (option,value) in observed{
+   let outcome=value.as_str().filter(|x|!x.trim().is_empty()).ok_or("observed outcome must be non-empty string")?;
+   if !factors[&options[option].factor_id].outcomes.contains(outcome){return Err(format!("{label} references unknown outcome {outcome:?}"));}
+  }
+  let mut likelihoods=BTreeMap::new();
+  for hypothesis in hypotheses{
+   let mut by_latent=Vec::new();
+   for latent in latents{
+    let kernel=&kernels[&(hypothesis.clone(),latent.id.clone())];
+    let probability=kernel.rows.iter().filter(|row|{
+     observed.iter().all(|(option,outcome)|row.outcomes.get(option)==outcome.as_str())
+    }).map(|row|row.probability).sum();
+    by_latent.push(probability);
+   }
+   likelihoods.insert(hypothesis.clone(),by_latent);
+  }
+  let shared_support=shared_support_lower(&priors,latents,&likelihoods)?;
+  let nominal_risk=shared_nominal_risk(&priors,latents,&likelihoods,&safe)?;
+  let shared_risk=shared_robust_risk(&priors,latents,&likelihoods,&safe)?;
+  let mut rectangular_likelihoods=BTreeMap::new();
+  for hypothesis in hypotheses{
+   let coeffs=&likelihoods[hypothesis];
+   rectangular_likelihoods.insert(hypothesis.clone(),Bounds{
+    lower:weighted_extreme(&latent_weights,coeffs,false)?,
+    upper:weighted_extreme(&latent_weights,coeffs,true)?,
+    nominal:weighted_nominal(&latent_weights,coeffs)?
+   });
+  }
+  let rectangular_risk=rectangular_robust_risk(&priors,&rectangular_likelihoods,&safe)?;
+  reports.push(json!({
+   "query_id":query_id,"action_id":action_id,
+   "safe_hypotheses":safe.iter().collect::<Vec<_>>(),
+   "observed_outcomes":observed,
+   "support_lower_bps":shared_support,
+   "nominal_posterior_risk_bps":nominal_risk,
+   "shared_latent_worst_case_posterior_risk_bps":shared_risk,
+   "rectangular_hull_worst_case_posterior_risk_bps":rectangular_risk,
+   "rectangular_excess_risk_bps":rectangular_risk.saturating_sub(shared_risk),
+   "per_hypothesis_likelihood_bounds":rectangular_likelihoods.iter().map(|(h,b)|json!({
+    "hypothesis_id":h,"lower":b.lower,"nominal":b.nominal,"upper":b.upper
+   })).collect::<Vec<_>>()
+  }));
+ }
+ Ok(reports)
+}
 fn evaluate(raw:&str)->Result<Value,String>{
  let bundle:Value=serde_json::from_str(raw).map_err(|e|format!("invalid JSON: {e}"))?;
  allowed(&bundle,&["candidate_view","oracle"],"bundle")?;
  let candidate=get(&bundle,"candidate_view","bundle")?;
  let oracle=get(&bundle,"oracle","bundle")?;
- allowed(oracle,&["decision_cutoff","latent_states","conditional_kernels"],"oracle")?;
+ allowed(oracle,&["decision_cutoff","latent_states","conditional_kernels","risk_queries"],"oracle")?;
  let (scenario,cutoff,options,factors,hypotheses)=parse_candidate(candidate)?;
  if string(oracle,"decision_cutoff","oracle")?!=cutoff{return Err("candidate and evaluator decision cutoffs differ".to_owned());}
  let latents=parse_latents(oracle,&cutoff)?;
@@ -353,6 +592,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
   "hypothesis_id":k.hypothesis_id,"latent_state_id":k.latent_state_id,
   "kernel_id":k.kernel_id,"authority":k.authority,"joint_row_count":k.rows.len()
  })).collect::<Vec<_>>();
+ let risk_queries=parse_risk_queries(&oracle,&hypotheses,&options,&factors,&latents,&kernels)?;
  Ok(json!({
   "scenario_id":scenario,
   "adjudication_status":"shared_latent_joint_kernel_validation",
@@ -372,6 +612,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
   "kernel_provenance":provenance,
   "marginal_checks":marginal_checks,
   "pairwise_joint_checks":pairwise_checks,
+  "risk_queries":risk_queries,
   "claim_ceiling":CLAIM_CEILING
  }))
 }
