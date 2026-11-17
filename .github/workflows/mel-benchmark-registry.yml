@@ -21,18 +21,18 @@ jobs:
       - name: Check out exact pull request branch
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.ref || github.ref_name }}
+          ref: \${{ github.event.pull_request.head.ref || github.ref_name }}
           persist-credentials: false
       - name: Verify exact pull request head
         shell: bash
         run: |
           set -euo pipefail
           actual="$(git rev-parse HEAD)"
-          expected="${{ github.event.pull_request.head.sha || github.sha }}"
+          expected="\${{ github.event.pull_request.head.sha || github.sha }}"
           test "$actual" = "$expected"
           echo "MEL_BENCHMARK_REGISTRY_REVISION=$actual" >> "$GITHUB_ENV"
       - name: Install pinned Rust
-        uses: dtolnay/rust-toolchain@1.100.0
+        uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt
       - name: Stage standalone registry crate outside root workspace
@@ -48,13 +48,13 @@ jobs:
           echo "MEL_BENCHMARK_REGISTRY_MANIFEST=$staged/Cargo.toml" >> "$GITHUB_ENV"
           echo "MEL_BENCHMARK_REGISTRY_DIR=$staged" >> "$GITHUB_ENV"
       - name: Format isolated registry crate
-        run: cargo +1.100.0 fmt --check --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
+        run: cargo +1.96.0 fmt --check --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
       - name: Resolve and lock standalone dependencies
-        run: cargo +1.100.0 generate-lockfile --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
+        run: cargo +1.96.0 generate-lockfile --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
       - name: Test exact benchmark registry module
-        run: cargo +1.100.0 test --locked --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
+        run: cargo +1.96.0 test --locked --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST"
       - name: Validate the committed synthetic profile
-        run: cargo +1.100.0 run --locked --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST" --example profile_check
+        run: cargo +1.96.0 run --locked --manifest-path "$MEL_BENCHMARK_REGISTRY_MANIFEST" --example profile_check
       - name: Record exact source and lock identities
         shell: bash
         run: |
@@ -69,7 +69,7 @@ jobs:
       - name: Upload registry evidence
         uses: actions/upload-artifact@v4
         with:
-          name: mel-benchmark-registry-${{ github.event.pull_request.head.sha || github.sha }}
-          path: ${{ runner.temp }}/mel-benchmark-registry-evidence/
+          name: mel-benchmark-registry-\${{ github.event.pull_request.head.sha || github.sha }}
+          path: \${{ runner.temp }}/mel-benchmark-registry-evidence/
           if-no-files-found: error
           retention-days: 90
