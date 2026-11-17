@@ -496,7 +496,7 @@ impl PortfolioSearch<'_> {
             }
         }
 
-        let group = &self.groups[state.index];
+        let group = self.groups[state.index].clone();
         for option in &group.options {
             if let Some(mut next) =
                 apply_option(self.problem, self.bundles, &state, option)?
