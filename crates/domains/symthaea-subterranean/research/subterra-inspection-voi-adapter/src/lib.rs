@@ -68,6 +68,9 @@ pub struct ActionBaseline {
     /// Gross EVSI. Resource costs remain separate and are not silently
     /// subtracted from decision-loss units.
     pub gross_evsi: f64,
+    pub resource_cost: ResourceCost,
+    pub mission_interruption_probability: f64,
+    pub robot_loss_probability: f64,
     pub eligible: bool,
 }
 
@@ -253,14 +256,16 @@ fn assess_action(
     no_test_risk: f64,
     prior_entropy: f64,
     budget: ResourceBudget,
+    risk_limits: RiskLimits,
 ) -> Result<ActionBaseline, AdapterError> {
-    let eligible = action.external_gate_passed
-        && action.cost.energy_j <= budget.energy_j
+    let within_resource_budget = action.cost.energy_j <= budget.energy_j
         && action.cost.duration_s <= budget.duration_s
         && action.cost.data_bytes <= budget.data_bytes
         && action.cost.exposure_units <= budget.exposure_units;
     let mut expected_loss_sum = 0.0;
     let mut expected_entropy = 0.0;
+    let mut mission_interruption_probability = 0.0;
+    let mut robot_loss_probability = 0.0;
     for outcome in &action.outcomes {
         let (probability, posterior) =
             posterior_and_probability(belief, &outcome.likelihood_by_hypothesis)?;
@@ -268,6 +273,12 @@ fn assess_action(
             continue;
         }
         expected_entropy += probability * entropy(&posterior);
+        if matches!(outcome.kind, OutcomeKind::MissionInterrupted | OutcomeKind::RobotLost) {
+            mission_interruption_probability += probability;
+        }
+        if outcome.kind == OutcomeKind::RobotLost {
+            robot_loss_probability += probability;
+        }
         let branch_risk = if outcome.kind == OutcomeKind::Observation {
             best_decision(problem, &posterior)?.1
         } else {
@@ -283,11 +294,19 @@ fn assess_action(
     if !information_gain.is_finite() || !expected_loss_sum.is_finite() {
         return Err(AdapterError::NumericalFailure("action baseline"));
     }
+    let eligible = action.external_gate_passed
+        && within_resource_budget
+        && mission_interruption_probability
+            <= risk_limits.maximum_mission_interruption_probability + EPSILON
+        && robot_loss_probability <= risk_limits.maximum_robot_loss_probability + EPSILON;
     Ok(ActionBaseline {
         action_id: action.id.clone(),
         expected_information_gain_nats: information_gain.max(0.0),
         expected_posterior_decision_loss: expected_loss_sum,
         gross_evsi: no_test_risk - expected_loss_sum,
+        resource_cost: action.cost,
+        mission_interruption_probability,
+        robot_loss_probability,
         eligible,
     })
 }
@@ -340,6 +359,7 @@ pub fn evaluate_inspection_case(
                 no_test_risk,
                 prior_entropy,
                 case.budget,
+                case.planner_config.risk_limits,
             )
         })
         .collect::<Result<Vec<_>, _>>()?;
