@@ -209,11 +209,15 @@ typed validation errors; it is not a durable transaction or OOM-recovery claim.
 The versioned comparator observations are stored at
 `crates/domains/symthaea-capability-closure/fixtures/tsfm_comparator_snapshot_v0.1.json`.
 The snapshot keeps FEV-Bench win rate distinct from MASE skill, GIFT-Eval CRPS
-and MASE distinct from BOOM telemetry CRPS, and PMLR energy-study observations
-separate from leaderboard accuracy. It preserves the H2O site / GitHub README
-FEV-Bench disagreement and the 15 Nov 2026 TSFM.ai MASE-skill snapshot.
-The comparator registry hashes this fixture in the exact-head workflow.
-No model checkpoint or external baseline has been reproduced.
+and MASE distinct from BOOM telemetry CRPS, TIME/M6 task ranks and PMLR energy
+observations separate from leaderboard accuracy. It preserves the H2O site /
+GitHub README discrepancy, the 15 Nov TSFM.ai MASE-skill snapshot, and Abel AI
+Lab's 11 Nov Simons-297M release ranks/licences as vendor-reported evidence.
+The Simons research-loop claim (under $8k, about two weeks, over 250 directions,
+nearly 2,000 experiments; reported gains dominated by data/input transforms)
+is kept separate from forecast quality. The comparator registry hashes this
+fixture in the exact-head workflow. No checkpoint or external baseline has
+been reproduced.
 
 
 The breach index is keyed by source identity, event time and receipt/knowledge time. A historical `known_at` query prunes future receipts inside the ordered range lookup instead of visiting them and filtering afterward. A regression checks zero candidates before the first breach, one candidate at the first receipt and three after all receipts, with full replay/index parity.
@@ -261,3 +265,17 @@ cover the queried source time.
 
 
 Clock event ordering now has a three-valued contract: definitely late, definitely not late, or ambiguous when mapped uncertainty intervals overlap. Same-source/same-calibration comparisons preserve the exclusive equality boundary; cross-revision comparisons retain both calibration digests. It remains a pure comparison primitive pending adapter integration into the source-watermark receipt.
+
+
+## Research-loop efficiency as a distinct benchmark lane
+
+The benchmark matrix now tracks not only forecast quality but also verified
+research throughput: quality versus cumulative compute cost, cost per confirmed
+improvement, validation-to-reserved-seed confirmation rate, false-discovery
+rate, time from hypothesis to confirmed artifact, and attribution between data,
+input transforms, training schedule and architecture. A candidate is selected
+on validation only, re-trained on reserved seeds with fixed evaluator code,
+and tested once after protocol lock. The target is at least 50% less
+compute-to-confirmation than a budget-matched manual baseline at equal verified
+improvement, or 20% more confirmed improvement under an equal compute budget.
+These are aspirations, not measured results.
