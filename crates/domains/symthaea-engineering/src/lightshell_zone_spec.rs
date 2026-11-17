@@ -291,7 +291,7 @@ impl ZoneSpecManifest {
                         "A metric unit must be explicit.",
                     );
                 }
-                if !bounds_are_consistent(requirement) {
+                if !bounds_are_consistent(requirement, self.state == "frozen") {
                     push(
                         &mut findings,
                         "invalid_metric_bounds",
@@ -540,7 +540,7 @@ fn function_supports_metric(function_id: &str, metric_id: &str) -> bool {
     }
 }
 
-fn bounds_are_consistent(requirement: &ZoneRequirement) -> bool {
+fn bounds_are_consistent(requirement: &ZoneRequirement, frozen: bool) -> bool {
     if let (Some(lower), Some(upper)) = (requirement.lower_bound, requirement.upper_bound) {
         if !lower.is_finite() || !upper.is_finite() || lower > upper {
             return false;
@@ -554,13 +554,15 @@ fn bounds_are_consistent(requirement: &ZoneRequirement) -> bool {
 
     match requirement.direction.as_str() {
         "higher_is_better" => {
-            requirement.lower_bound.is_some() && requirement.upper_bound.is_none()
+            requirement.upper_bound.is_none() && (!frozen || requirement.lower_bound.is_some())
         }
         "lower_is_better" => {
-            requirement.upper_bound.is_some() && requirement.lower_bound.is_none()
+            requirement.lower_bound.is_none() && (!frozen || requirement.upper_bound.is_some())
         }
         "within_declared_band" => {
-            requirement.lower_bound.is_some() && requirement.upper_bound.is_some()
+            let both_or_neither =
+                requirement.lower_bound.is_some() == requirement.upper_bound.is_some();
+            both_or_neither && (!frozen || requirement.lower_bound.is_some())
         }
         _ => false,
     }
@@ -741,6 +743,14 @@ mod tests {
         }
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.is_freezable(), "{:?}", report.findings);
+    }
+
+    #[test]
+    fn frozen_replaceable_zone_without_interface_is_rejected() {
+        let mut manifest = proposed_manifest();
+        manifest["state"] = json!("frozen");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|item| item.code == "replaceable_zone_not_serviceable"));
     }
 
     #[test]
