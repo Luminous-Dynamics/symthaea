@@ -286,7 +286,6 @@ mod tests {
         })
     }
 
-
     #[test]
     fn deposition_from_one_pulse_attenuates_the_next_pulse() {
         let mut world = campaign();
@@ -297,6 +296,31 @@ mod tests {
         assert!(after_first < 1.0);
         assert!(second.applied_transmission < first.applied_transmission);
         assert!(second.absorbed_energy_j < first.absorbed_energy_j);
+    }
+
+    #[test]
+    fn unsafe_optical_transmission_blocks_the_next_pulse() {
+        let mut world = CoupledCampaign::new(
+            material(),
+            optics(),
+            OpticalHealthThresholds {
+                minimum_process_transmission: [0.99; 4],
+                maximum_witness_loss: [0.99; 4],
+                maximum_qcm_mass_ug_cm2: 1.0e9,
+            },
+            DepositionTransfer {
+                process_optic_factor: 1.0,
+                optical_witness_factor: 0.5,
+                qcm_factor: 0.25,
+            },
+            SpectralBand::Visible,
+        )
+        .unwrap();
+        run_pulse(&mut world, "first", &gas(), 500.0, 7).unwrap();
+        assert!(matches!(
+            run_pulse(&mut world, "second", &gas(), 500.0, 8),
+            Err(CoupledError::CampaignBlocked(HealthAction::CleanAndRequalify))
+        ));
     }
 
     #[test]
