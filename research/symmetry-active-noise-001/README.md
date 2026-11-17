@@ -52,3 +52,13 @@ The Rust reference also includes an exact fixed-point interval path:
 - `SharedAdditiveBiasProblemV1` models one continuous, campaign-wide additive nuisance value. Each observation induces a feasible interval for that bias; a hypothesis survives only if the intersection across all probes and repeated readings is nonempty. It cannot assign a different bias to each probe.
 
 Tests include interval-overlap discrimination, repeated-reading contradiction, one shared bias across probes, fixed-point overflow rejection, and observationally equivalent hypotheses that must remain ambiguous. The required quantity_unit_id binds the integer endpoint scale into canonical problem bytes (for example, millimetre-integer); changing the unit changes the receipt contract. These intervals are not probabilities or confidence intervals.
+
+
+## Conservative minimax probe selection
+
+The follow-on selector provides a one-step, bounded-noise baseline without pretending to solve the full general noisy ODT/ASRN problem:
+- For categorical allowed-outcome sets, each possible outcome induces an overlapping survivor branch. A probe is eligible only when every outcome leaves strictly fewer candidates than the current active set.
+- For numeric fixed-point intervals, each prediction interval is expanded by the known measurement radius. The worst overlap across all fixed-point measurement centres is attained at a left endpoint of an expanded interval, so the implementation checks those exact endpoints. Overflow or a negative radius fails closed.
+- Eligible probes are ranked by worst-case survivors, then acquisition cost, then stable probe ID. If none guarantees progress, the selector returns no choice instead of inventing information gain.
+
+This is a myopic minimax baseline. It does not model campaign-persistent bias state in the selection objective, search complete adaptive trees, use posterior probabilities, or provide the approximation guarantees of the general noisy ODT/ASRN literature. Full noisy policy search and matched JMLR/AFABench comparisons remain separate work.

@@ -102,6 +102,9 @@ pub enum NoiseErrorV1 {
     EmptyQuantityUnitId,
     InvalidInterval,
     IntervalArithmeticOverflow,
+    InvalidHypothesisMask,
+    InvalidProbeMask,
+    NegativeObservationRadius,
 }
 
 impl fmt::Display for NoiseErrorV1 {
@@ -653,6 +656,21 @@ impl FixedIntervalV1 {
             .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
         Self::new(lower, upper)
     }
+
+    pub fn expanded_by(self, radius: i128) -> Result<Self, NoiseErrorV1> {
+        if radius < 0 {
+            return Err(NoiseErrorV1::NegativeObservationRadius);
+        }
+        let lower = self
+            .lower
+            .checked_sub(radius)
+            .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+        let upper = self
+            .upper
+            .checked_add(radius)
+            .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+        Self::new(lower, upper)
+    }
 }
 
 fn append_interval(target: &mut Vec<u8>, interval: FixedIntervalV1) {
@@ -1041,6 +1059,263 @@ pub fn verify_shared_additive_bias_receipt(
         return Err(NoiseErrorV1::ReceiptMismatch);
     }
     Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoiseMinimaxBranchV1 {
+    /// One possible categorical observation. Branches may overlap in their
+    /// survivor sets because a hypothesis may allow several outcomes.
+    pub outcome: u32,
+    pub surviving_hypothesis_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NoiseMinimaxChoiceV1 {
+    pub probe_id: String,
+    pub probe_index: usize,
+    pub probe_cost: u64,
+    pub worst_case_remaining: usize,
+    pub active_hypothesis_count: usize,
+    pub branches: Vec<NoiseMinimaxBranchV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IntervalNoiseMinimaxBranchV1 {
+    /// Fixed-point centre value; measurement resolution is accounted for by
+    /// expanding each model interval before evaluating candidate branches.
+    pub outcome_value: i128,
+    pub surviving_hypothesis_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IntervalNoiseMinimaxChoiceV1 {
+    pub probe_id: String,
+    pub probe_index: usize,
+    pub probe_cost: u64,
+    pub observation_radius: i128,
+    pub worst_case_remaining: usize,
+    pub active_hypothesis_count: usize,
+    pub branches: Vec<IntervalNoiseMinimaxBranchV1>,
+}
+
+fn valid_mask(count: usize) -> u64 {
+    if count == 64 {
+        u64::MAX
+    } else {
+        (1_u64 << count) - 1
+    }
+}
+
+fn validate_noise_masks(
+    hypothesis_count: usize,
+    probe_count: usize,
+    active_hypothesis_mask: u64,
+    available_probe_mask: u64,
+) -> Result<(), NoiseErrorV1> {
+    let valid_hypotheses = valid_mask(hypothesis_count);
+    let valid_probes = valid_mask(probe_count);
+    if active_hypothesis_mask == 0 || active_hypothesis_mask & !valid_hypotheses != 0 {
+        return Err(NoiseErrorV1::InvalidHypothesisMask);
+    }
+    if available_probe_mask & !valid_probes != 0 {
+        return Err(NoiseErrorV1::InvalidProbeMask);
+    }
+    Ok(())
+}
+
+/// Conservative one-step minimax selector for categorical bounded-noise
+/// models. A branch for outcome o contains every active hypothesis whose
+/// allowed outcome set contains o. These branches can overlap. A probe is
+/// selected only when its *worst possible* observation leaves fewer active
+/// hypotheses than the current set.
+///
+/// Objective order: minimize worst-case survivors, then probe cost, then
+/// lexical probe ID. This is a one-step policy, not a full adaptive decision
+/// tree and not the general noisy ODT/ASRN algorithm.
+pub fn choose_bounded_noise_minimax_probe(
+    problem: &BoundedNoiseProblemV1,
+    active_hypothesis_mask: u64,
+    available_probe_mask: u64,
+    remaining_cost: u64,
+) -> Result<Option<NoiseMinimaxChoiceV1>, NoiseErrorV1> {
+    problem.validate()?;
+    validate_noise_masks(
+        problem.hypothesis_ids.len(),
+        problem.probes.len(),
+        active_hypothesis_mask,
+        available_probe_mask,
+    )?;
+    let active_count = active_hypothesis_mask.count_ones() as usize;
+    let mut best: Option<NoiseMinimaxChoiceV1> = None;
+
+    for probe_index in 0..problem.probes.len() {
+        if available_probe_mask & (1_u64 << probe_index) == 0 {
+            continue;
+        }
+        let probe = &problem.probes[probe_index];
+        if !probe.admissible || probe.cost > remaining_cost {
+            continue;
+        }
+
+        let mut branch_masks: BTreeMap<u32, u64> = BTreeMap::new();
+        for (hypothesis_index, by_probe) in
+            problem.allowed_outcomes_by_hypothesis.iter().enumerate()
+        {
+            if active_hypothesis_mask & (1_u64 << hypothesis_index) == 0 {
+                continue;
+            }
+            for outcome in &by_probe[probe_index] {
+                *branch_masks.entry(*outcome).or_insert(0) |= 1_u64 << hypothesis_index;
+            }
+        }
+
+        let branches: Vec<NoiseMinimaxBranchV1> = branch_masks
+            .iter()
+            .map(|(outcome, survivor_mask)| NoiseMinimaxBranchV1 {
+                outcome: *outcome,
+                surviving_hypothesis_ids: problem
+                    .hypothesis_ids
+                    .iter()
+                    .enumerate()
+                    .filter(|(index, _)| survivor_mask & (1_u64 << index) != 0)
+                    .map(|(_, hypothesis_id)| hypothesis_id.clone())
+                    .collect(),
+            })
+            .collect();
+        let worst_case_remaining = branches
+            .iter()
+            .map(|branch| branch.surviving_hypothesis_ids.len())
+            .max()
+            .unwrap_or(active_count);
+
+        // No action is returned unless every possible observation outcome
+        // guarantees strict candidate-set reduction.
+        if worst_case_remaining >= active_count {
+            continue;
+        }
+        let candidate = NoiseMinimaxChoiceV1 {
+            probe_id: probe.probe_id.clone(),
+            probe_index,
+            probe_cost: probe.cost,
+            worst_case_remaining,
+            active_hypothesis_count: active_count,
+            branches,
+        };
+        let replace = best.as_ref().is_none_or(|current| {
+            (
+                candidate.worst_case_remaining,
+                candidate.probe_cost,
+                &candidate.probe_id,
+            ) < (
+                current.worst_case_remaining,
+                current.probe_cost,
+                &current.probe_id,
+            )
+        });
+        if replace {
+            best = Some(candidate);
+        }
+    }
+    Ok(best)
+}
+
+/// One-step minimax selection for fixed-point bounded numeric intervals.
+///
+/// Each predicted interval is expanded by the allowed measurement radius.
+/// The maximum overlap of a finite collection of closed intervals is attained
+/// at a left endpoint, so evaluating the distinct expanded lower endpoints
+/// suffices to find the worst-case number of survivors over all fixed-point
+/// observation centres. Arithmetic overflow is an error, never saturation.
+pub fn choose_bounded_interval_minimax_probe(
+    problem: &BoundedIntervalProblemV1,
+    active_hypothesis_mask: u64,
+    available_probe_mask: u64,
+    remaining_cost: u64,
+    observation_radius: i128,
+) -> Result<Option<IntervalNoiseMinimaxChoiceV1>, NoiseErrorV1> {
+    problem.validate()?;
+    validate_noise_masks(
+        problem.hypothesis_ids.len(),
+        problem.probes.len(),
+        active_hypothesis_mask,
+        available_probe_mask,
+    )?;
+    if observation_radius < 0 {
+        return Err(NoiseErrorV1::NegativeObservationRadius);
+    }
+
+    let active_count = active_hypothesis_mask.count_ones() as usize;
+    let mut best: Option<IntervalNoiseMinimaxChoiceV1> = None;
+
+    for probe_index in 0..problem.probes.len() {
+        if available_probe_mask & (1_u64 << probe_index) == 0 {
+            continue;
+        }
+        let probe = &problem.probes[probe_index];
+        if !probe.admissible || probe.cost > remaining_cost {
+            continue;
+        }
+
+        let mut expanded_by_hypothesis = Vec::new();
+        let mut candidate_values = BTreeSet::new();
+        for (hypothesis_index, by_probe) in
+            problem.predicted_intervals_by_hypothesis.iter().enumerate()
+        {
+            if active_hypothesis_mask & (1_u64 << hypothesis_index) == 0 {
+                continue;
+            }
+            let expanded = by_probe[probe_index].expanded_by(observation_radius)?;
+            candidate_values.insert(expanded.lower);
+            expanded_by_hypothesis.push((hypothesis_index, expanded));
+        }
+
+        let branches: Vec<IntervalNoiseMinimaxBranchV1> = candidate_values
+            .iter()
+            .map(|outcome_value| IntervalNoiseMinimaxBranchV1 {
+                outcome_value: *outcome_value,
+                surviving_hypothesis_ids: expanded_by_hypothesis
+                    .iter()
+                    .filter(|(_, interval)| {
+                        interval.lower <= *outcome_value && *outcome_value <= interval.upper
+                    })
+                    .map(|(index, _)| problem.hypothesis_ids[*index].clone())
+                    .collect(),
+            })
+            .collect();
+        let worst_case_remaining = branches
+            .iter()
+            .map(|branch| branch.surviving_hypothesis_ids.len())
+            .max()
+            .unwrap_or(active_count);
+
+        if worst_case_remaining >= active_count {
+            continue;
+        }
+        let candidate = IntervalNoiseMinimaxChoiceV1 {
+            probe_id: probe.probe_id.clone(),
+            probe_index,
+            probe_cost: probe.cost,
+            observation_radius,
+            worst_case_remaining,
+            active_hypothesis_count: active_count,
+            branches,
+        };
+        let replace = best.as_ref().is_none_or(|current| {
+            (
+                candidate.worst_case_remaining,
+                candidate.probe_cost,
+                &candidate.probe_id,
+            ) < (
+                current.worst_case_remaining,
+                current.probe_cost,
+                &current.probe_id,
+            )
+        });
+        if replace {
+            best = Some(candidate);
+        }
+    }
+    Ok(best)
 }
 
 #[cfg(test)]
@@ -1460,6 +1735,146 @@ mod tests {
         let receipt = replay_shared_additive_bias(&problem, &observations).unwrap();
         assert_eq!(receipt.snapshots[1].active_hypothesis_ids, vec!["H-A"]);
         assert!(receipt.snapshots[2].active_hypothesis_ids.is_empty());
+    }
+
+    #[test]
+    fn categorical_noise_minimax_guarantees_reduction_for_every_possible_outcome() {
+        let problem = BoundedNoiseProblemV1 {
+            problem_id: "bounded-noise-minimax-v1".to_owned(),
+            hypothesis_ids: vec![
+                "H-A".to_owned(),
+                "H-B".to_owned(),
+                "H-C".to_owned(),
+                "H-D".to_owned(),
+            ],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p-overlap".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p-balanced".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p-unaffordable".to_owned(),
+                    cost: 99,
+                    admissible: true,
+                },
+            ],
+            allowed_outcomes_by_hypothesis: vec![
+                vec![vec![0, 1], vec![0], vec![0]],
+                vec![vec![0, 1], vec![0], vec![0]],
+                vec![vec![1, 2], vec![1], vec![1]],
+                vec![vec![1, 2], vec![1], vec![1]],
+            ],
+        };
+        let choice = choose_bounded_noise_minimax_probe(&problem, 0b1111, 0b111, 2)
+            .unwrap()
+            .unwrap();
+        assert_eq!(choice.probe_id, "p-balanced");
+        assert_eq!(choice.worst_case_remaining, 2);
+        assert_eq!(choice.active_hypothesis_count, 4);
+        assert_eq!(choice.branches.len(), 2);
+        assert_eq!(
+            choice.branches[0].surviving_hypothesis_ids,
+            vec!["H-A", "H-B"]
+        );
+        assert_eq!(
+            choice.branches[1].surviving_hypothesis_ids,
+            vec!["H-C", "H-D"]
+        );
+    }
+
+    #[test]
+    fn categorical_noise_minimax_abstains_when_no_probe_guarantees_reduction() {
+        let mut problem = bounded_fixture();
+        for by_probe in &mut problem.allowed_outcomes_by_hypothesis {
+            by_probe[0] = vec![0, 1, 2];
+            by_probe[1] = vec![0, 1, 2];
+        }
+        assert_eq!(
+            choose_bounded_noise_minimax_probe(&problem, 0b111, 0b11, u64::MAX).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn numeric_interval_minimax_accounts_for_measurement_resolution() {
+        let problem = BoundedIntervalProblemV1 {
+            problem_id: "numeric-interval-minimax-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned(), "H-C".to_owned()],
+            probes: vec![
+                NoiseProbeV1 {
+                    probe_id: "p-overlap".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p-separated".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
+            ],
+            predicted_intervals_by_hypothesis: vec![
+                vec![
+                    FixedIntervalV1::new(0, 20).unwrap(),
+                    FixedIntervalV1::new(0, 1).unwrap(),
+                ],
+                vec![
+                    FixedIntervalV1::new(10, 30).unwrap(),
+                    FixedIntervalV1::new(9, 10).unwrap(),
+                ],
+                vec![
+                    FixedIntervalV1::new(20, 40).unwrap(),
+                    FixedIntervalV1::new(19, 20).unwrap(),
+                ],
+            ],
+        };
+        let choice = choose_bounded_interval_minimax_probe(&problem, 0b111, 0b11, u64::MAX, 0)
+            .unwrap()
+            .unwrap();
+        assert_eq!(choice.probe_id, "p-separated");
+        assert_eq!(choice.worst_case_remaining, 1);
+
+        assert_eq!(
+            choose_bounded_interval_minimax_probe(&problem, 0b111, 0b11, u64::MAX, 10).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn numeric_interval_minimax_rejects_negative_radius_and_overflow() {
+        let mut problem = BoundedIntervalProblemV1 {
+            problem_id: "numeric-interval-minimax-overflow-v1".to_owned(),
+            quantity_unit_id: "millimetre-integer".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+            probes: vec![NoiseProbeV1 {
+                probe_id: "p0".to_owned(),
+                cost: 1,
+                admissible: true,
+            }],
+            predicted_intervals_by_hypothesis: vec![
+                vec![FixedIntervalV1::new(i128::MIN, i128::MAX).unwrap()],
+                vec![FixedIntervalV1::point(0)],
+            ],
+        };
+        assert_eq!(
+            choose_bounded_interval_minimax_probe(&problem, 0b11, 1, u64::MAX, -1),
+            Err(NoiseErrorV1::NegativeObservationRadius)
+        );
+        assert_eq!(
+            choose_bounded_interval_minimax_probe(&problem, 0b11, 1, u64::MAX, 1),
+            Err(NoiseErrorV1::IntervalArithmeticOverflow)
+        );
+        problem.probes[0].admissible = false;
+        assert_eq!(
+            choose_bounded_interval_minimax_probe(&problem, 0b11, 1, u64::MAX, 0).unwrap(),
+            None
+        );
     }
 
     #[test]
