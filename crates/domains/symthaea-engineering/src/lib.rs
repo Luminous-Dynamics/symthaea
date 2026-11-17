@@ -5,6 +5,8 @@
 
 #![deny(unsafe_code)]
 
+pub mod robot_garment_compiler;
+
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
 use symthaea_causal_reasoning::causal_calculus::StructuralCausalModel;

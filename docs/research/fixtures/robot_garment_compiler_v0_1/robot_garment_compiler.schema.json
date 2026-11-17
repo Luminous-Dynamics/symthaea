@@ -1,0 +1,281 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/robot_garment_compiler_fixture_v0_1.schema.json",
+  "title": "Robot Garment Compiler Candidate Geometry Fixture v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "compilation_id",
+    "state",
+    "units",
+    "robot",
+    "zones",
+    "keepouts",
+    "candidate_panels"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "compilation_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "synthetic_fixture",
+        "inputs_pending",
+        "candidate_geometry"
+      ]
+    },
+    "units": {
+      "const": "mm"
+    },
+    "robot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "robot_id",
+        "revision",
+        "geometry_state",
+        "geometry_digest",
+        "coordinate_frames"
+      ],
+      "properties": {
+        "robot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geometry_state": {
+          "enum": [
+            "synthetic_fixture",
+            "cad_revision_bound"
+          ]
+        },
+        "geometry_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(sha256:[0-9a-fA-F]{64})?$"
+        },
+        "coordinate_frames": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "frame_id",
+              "units"
+            ],
+            "properties": {
+              "frame_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "units": {
+                "const": "mm"
+              }
+            }
+          }
+        }
+      }
+    },
+    "zones": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "zone_id",
+          "coordinate_frame_ref",
+          "bounds",
+          "functions"
+        ],
+        "properties": {
+          "zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "coordinate_frame_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bounds": {
+            "$ref": "#/$defs/bounds3"
+          },
+          "functions": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "enum": [
+                "abrasion_skin",
+                "environmental_cover",
+                "compliant_cushion",
+                "local_guard",
+                "joint_gaiter",
+                "sensor_mount",
+                "service_panel"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "keepouts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "keepout_id",
+          "coordinate_frame_ref",
+          "bounds",
+          "kind",
+          "affected_zone_ids",
+          "required_clearance_mm",
+          "uncertainty_mm",
+          "severity"
+        ],
+        "properties": {
+          "keepout_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "coordinate_frame_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bounds": {
+            "$ref": "#/$defs/bounds3"
+          },
+          "kind": {
+            "enum": [
+              "swept_motion",
+              "pinch_shear",
+              "cable_route",
+              "sensor_aperture",
+              "optical_field",
+              "thermal_vent",
+              "service_access",
+              "emergency_access",
+              "charging_interface"
+            ]
+          },
+          "affected_zone_ids": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "required_clearance_mm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "uncertainty_mm": {
+            "type": "number",
+            "minimum": 0
+          },
+          "severity": {
+            "enum": [
+              "hard",
+              "advisory"
+            ]
+          }
+        }
+      }
+    },
+    "candidate_panels": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "panel_id",
+          "zone_id",
+          "coordinate_frame_ref",
+          "bounds",
+          "material_evidence_state",
+          "material_profile_ref",
+          "pattern_revision_ref"
+        ],
+        "properties": {
+          "panel_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "coordinate_frame_ref": {
+            "type": "string",
+            "minLength": 1
+          },
+          "bounds": {
+            "$ref": "#/$defs/bounds3"
+          },
+          "material_evidence_state": {
+            "enum": [
+              "unknown",
+              "supplier_declared",
+              "measured_coupon",
+              "qualified"
+            ]
+          },
+          "material_profile_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pattern_revision_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "bounds3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_mm",
+        "max_mm"
+      ],
+      "properties": {
+        "min_mm": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number"
+          }
+        },
+        "max_mm": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": {
+            "type": "number"
+          }
+        }
+      }
+    }
+  }
+}
