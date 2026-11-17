@@ -66,13 +66,7 @@ fn main() {
     );
     let higher_service = candidate(
         "higher-service",
-        12_000.0,
-        8_000.0,
-        0.90,
-        650.0,
-        350.0,
-        0.9,
-        15.0,
+        [12_000.0, 8_000.0, 0.90, 650.0, 350.0, 0.9, 15.0],
     );
 
     let pair = compare_pair(&profile, &higher_qeng, &higher_service);
@@ -96,7 +90,10 @@ fn main() {
         std::process::exit(1);
     }
 
-    let strict_dominator = candidate("dominant", 13_000.0, 7_000.0, 0.97, 250.0, 150.0, 0.6, 10.0);
+    let strict_dominator = candidate(
+        "dominant",
+        [13_000.0, 7_000.0, 0.97, 250.0, 150.0, 0.6, 10.0],
+    );
     let frontier = extract_pareto_front(&profile, &[higher_qeng, higher_service, strict_dominator]);
     println!("pareto_front={:?}", frontier.frontier_candidate_ids);
     println!(
