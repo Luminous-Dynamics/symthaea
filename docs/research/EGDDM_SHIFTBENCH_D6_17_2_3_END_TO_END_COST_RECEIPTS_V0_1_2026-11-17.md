@@ -71,8 +71,8 @@ The report distinguishes:
 1. full-run total price from all priced attempts on a complete run;
 2. full-run wall time from run start to run finish;
 3. queue delay from receipt queued time to run start;
-4. per-option attempt cost p95;
-5. sum of marginal per-option p95 values, as descriptive-only comparator.
+4. per-option aggregate cost per complete run (including retries), then p95 across runs;
+5. sum of per-option aggregate p95 values, as a descriptive-only comparator.
 
 A run is excluded from the corresponding full-run quantile if its cost or wall time is incomplete. The report separately counts runs incomplete in either dimension. It never treats queued or unknown execution as zero cost. Skipped attempts are explicit and only have zero cost when the receipt records no execution and zero resource use.
 
@@ -102,9 +102,9 @@ The Rust binary run-cost-receipt-validator.rs currently:
 - requires billing records when positive price is reported and evidence digests for pass/fail outputs;
 - tracks executed, queued, skipped, failed, timed-out, cancelled, unknown and retry counts separately;
 - derives per-run cost and wall-time samples only when complete;
-- reports full-run p50/p95/p99, queue-delay quantiles, marginal option p95s and the sum comparator separately.
+- reports full-run p50/p95/p99, queue-delay quantiles, per-option aggregate-per-run p95s and the sum comparator separately.
 
-The current fixture is entirely synthetic. Its expected report has two complete runs, four attempts, full-run total 100 micro-USD on both runs, per-option p95s of 90 and 90, and sum comparator 180. It does not contain real runner/billing evidence.
+The current fixture is entirely synthetic and uses USD micro-units. Its expected report has two complete runs, four attempts, full-run total 100 micro-USD on both runs, per-option aggregate p95s of 90 and 90, and sum comparator 180. A retry negative/positive control confirms that failed-attempt and retry prices are included in both the full-run and per-option totals. It does not contain real runner/billing evidence.
 
 ## Benchmark protocol and targets
 
