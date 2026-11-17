@@ -317,6 +317,70 @@
       "nims_record": "https://mdr.nims.go.jp/datasets/db14c5de-27d9-4758-8395-d61a6204fe42",
       "licence": "CC BY 4.0",
       "primary_claim_boundary": "Perspective framework for synthesis-first materials discovery. The cited <2% realisation of >50,000 low-enthalpy phases is a literature-review estimate, not a measured superconductivity-specific synthesis rate. No superconducting recipe or independent experiment is validated by this paper."
+    },
+    {
+      "source_id": "hg1223_pressure_quench_2026",
+      "doi": "10.1073/pnas.2536178123",
+      "url": "https://doi.org/10.1073/pnas.2536178123",
+      "published": "2026-03-09",
+      "source_type": "peer_reviewed_experimental_pressure_quench_metastability",
+      "title": "Ambient-pressure 151-K superconductivity in HgBa2Ca2Cu3O8+δ via pressure quench",
+      "authors": [
+        "Liangzi Deng",
+        "Thacien Habamahoro",
+        "Artin Safezoddeh",
+        "Bishnu Karki",
+        "Sudaice Kazibwe",
+        "Daniel J. Schulze",
+        "Zheng Wu",
+        "Matthew Julian",
+        "Rohit P. Prasankumar",
+        "Hua Zhou",
+        "Jesse S. Smith",
+        "Pavan R. Hosur",
+        "Ching-Wu Chu"
+      ],
+      "material_formula": "HgBa2Ca2Cu3O8+delta",
+      "protocol_name": "pressure-quench protocol (PQP)",
+      "reported_quench_pressure_gpa": [
+        10.1,
+        29.7
+      ],
+      "reported_quench_temperature_k": 4.2,
+      "ambient_pressure_onset_tc_k": 151,
+      "reported_onset_tc_post_quench_range_k": [
+        147,
+        151
+      ],
+      "reported_bulk_magnetic_volume_fraction_percent": 78,
+      "bulk_magnetic_sample_tc_approx_k": 140,
+      "thermal_retention": "~149 K retained inside DAC at 77 K for at least 3 days; thermal cycling to room temperature reduced ~147 K to ~143 K; degradation above 200 K reported",
+      "source_status": "peer-reviewed publication; not independently reproduced by Symthaea",
+      "primary_claim_boundary": "151 K is an ambient-pressure resistive onset after 10-30 GPa PQP at 4.2 K; it is not a 151 K zero-resistance or thermodynamic transition. Separate retrieved sample showed ~78% magnetic volume fraction at approximately 140 K. State is metastable and thermally/temporally limited. A 172 K observation was not reproduced and remains unresolved."
+    },
+    {
+      "source_id": "ynbtizrhf_hea_2026",
+      "doi": "10.1103/k1yr-t59z",
+      "url": "https://doi.org/10.1103/k1yr-t59z",
+      "published": "2026-08-11",
+      "source_type": "peer_reviewed_experimental_high_entropy_superconductor",
+      "title": "Complete superconducting phase diagram and flux pinning mechanisms in the yttrium-containing high-entropy alloy YNbTiZrHf",
+      "authors": [
+        "Rafał Idczak",
+        "Wojciech Nowak",
+        "Adam Pikul"
+      ],
+      "licence": "CC BY 4.0",
+      "formula_nominal": "YNbTiZrHf",
+      "reported_properties": {
+        "Tc_K": 6.1,
+        "Jc_kA_cm2": 45,
+        "upper_critical_field_T": 12.5,
+        "theoretical_depairing_current_density_MA_cm2": 21
+      },
+      "phase_microstructure": "BCC matrix with minor yttrium-rich hexagonal precipitates",
+      "pinning": "dominant surface pinning with secondary point contribution; crossover from delta-Tc to delta-l pinning with increasing field",
+      "primary_claim_boundary": "Bulk type-II superconductivity confirmed by resistivity, magnetization, AC susceptibility and specific heat. Jc and Hc2 are paper-reported, exact test conditions must be extracted before cross-comparison. The estimated depairing current density is theoretical, not an observed engineering current."
     }
   ],
   "candidate_records": [
@@ -581,6 +645,138 @@
       "sample_identity_resolution": "Parent/control sample is part of same study's experimental characterization; exact specimen/batch-level data mapping requires supplementary/source audit.",
       "engineering_readiness": "known low-temperature laboratory bulk superconductor; no conductor/engineering qualification in this source",
       "safety_review": "beryllium-bearing material; any experimental handling requires qualified institutional toxic-material controls; no synthesis procedure included"
+    },
+    {
+      "candidate_id": "SC-EXP-HG1223-PQP-151K-2026",
+      "formula": "HgBa2Ca2Cu3O8+delta",
+      "family": "Hg-based trilayer cuprate",
+      "form": "self-flux-grown single-crystal fragments; pressure-quenched metastable state",
+      "source_ids": [
+        "hg1223_pressure_quench_2026"
+      ],
+      "evidence_class": "experimental_report",
+      "synthesis_pressure_gpa": null,
+      "operating_pressure_gpa": 0,
+      "tc_observations": [
+        {
+          "observable": "resistive_onset",
+          "value_k": 151,
+          "status": "reported_post_quench_ambient_pressure",
+          "sample_id": "S4",
+          "pressure_gpa": 0,
+          "measurement_direction": "warming",
+          "treatment_pressure_gpa": 18.9,
+          "quench_temperature_k": 4.2
+        },
+        {
+          "observable": "resistive_onset",
+          "value_k": 150,
+          "status": "reported_post_quench_ambient_pressure",
+          "sample_id": "S4",
+          "pressure_gpa": 0,
+          "measurement_direction": "cooling",
+          "treatment_pressure_gpa": 18.9,
+          "quench_temperature_k": 4.2
+        },
+        {
+          "observable": "resistive_onset",
+          "value_k": 147,
+          "status": "reported_post_quench_ambient_pressure",
+          "sample_id": "S2",
+          "pressure_gpa": 0,
+          "measurement_direction": "warming_and_cooling",
+          "treatment_pressure_gpa": 10.1,
+          "quench_temperature_k": 4.2
+        },
+        {
+          "observable": "resistive_onset",
+          "value_k": 149,
+          "status": "reported_post_quench_ambient_pressure",
+          "sample_id": "S3_or_S4_source_mapping_pending",
+          "pressure_gpa": 0,
+          "measurement_direction": "warming",
+          "treatment_pressure_gpa": 10.9,
+          "quench_temperature_k": 4.2
+        },
+        {
+          "observable": "bulk_superconducting_volume_fraction",
+          "value_percent": 78,
+          "status": "reported_DC_magnetization",
+          "sample_id": "retrieved_specimen_after_10.1_GPa_PQP",
+          "pressure_gpa": 0,
+          "associated_tc_k": 140,
+          "treatment_pressure_gpa": 10.1,
+          "quench_temperature_k": 4.2
+        }
+      ],
+      "sample_identity_resolution": "The paper uses five 100-130 μm specimens cut from three parent crystals. The record-level sample labels for each measurement must be reconciled against figure and supplement; the 151 K onset sample is not the same evidence row as the retrieved magnetization specimen.",
+      "phase_and_process_notes": "Rapid decompression after pressure target at 4.2 K. XRD retained tetragonal Hg1223 structure with (200) FWHM broadening 0.12° to 0.20°, consistent with pressure-generated strain/defects. Mechanism unresolved.",
+      "pqp_process": {
+        "quench_pressure_gpa_range": [
+          10.1,
+          29.7
+        ],
+        "quench_temperature_k": 4.2,
+        "result_pressure_gpa": 0,
+        "method": "rapid decompression from DAC; exact dP/dt must be recovered from full methods/supplement",
+        "thermal_lifetime": "~149 K in DAC at 77 K for >=3 days; 147 K->143 K after thermal cycle to room temperature; degradation after >200 K reported"
+      },
+      "bulk_thermodynamic_evidence": "A retrieved PQed specimen showed ~78% superconducting volume fraction by DC magnetization at a lower Tc around 140 K. No 151 K calorimetric transition is claimed.",
+      "engineering_readiness": "micrometre-scale metastable bulk superconducting state; no conductor form, scale-up or engineering qualification",
+      "safety_review": "PQP source uses DAC high-pressure and cryogenic conditions; any experimental replication requires qualified institutional pressure/cryogenic safety review"
+    },
+    {
+      "candidate_id": "SC-EXP-YNBTIZRHF-HEA-2026",
+      "formula": "YNbTiZrHf",
+      "family": "refractory high-entropy alloy superconductor",
+      "form": "bulk alloy with BCC matrix and minor Y-rich hexagonal precipitates",
+      "source_ids": [
+        "ynbtizrhf_hea_2026"
+      ],
+      "evidence_class": "experimental_report",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [
+        {
+          "observable": "bulk_superconducting_transition",
+          "value_k": 6.1,
+          "status": "reported_bulk_type_II",
+          "evidence_methods": [
+            "electrical_resistivity",
+            "magnetization",
+            "AC_susceptibility",
+            "specific_heat"
+          ]
+        }
+      ],
+      "property_observations": [
+        {
+          "property": "Jc",
+          "value": 45,
+          "unit": "kA/cm^2",
+          "status": "reported_experimental",
+          "exact_field_temperature_geometry": "source condition extraction required"
+        },
+        {
+          "property": "Hc2",
+          "value": 12.5,
+          "unit": "T",
+          "status": "reported_experimental",
+          "exact_field_temperature_geometry": "source condition extraction required"
+        },
+        {
+          "property": "Jd",
+          "value": 21,
+          "unit": "MA/cm^2",
+          "status": "theoretical_depairing_estimate",
+          "not_an_observed_engineering_current": true
+        }
+      ],
+      "phase_and_process_notes": "BCC matrix with minor Y-rich hexagonal precipitates; reported dominant surface pinning plus secondary point contribution and delta-Tc to delta-l crossover as field increases.",
+      "microstructure_opportunity": "Theoretical depairing-current estimate is >2 orders above measured Jc, indicating a large gap potentially connected to vortex pinning/microstructure and current connectivity; causality remains to be established.",
+      "sample_identity_resolution": "Nominal composition YNbTiZrHf; retrieve actual refined/matrix/precipitate chemistry, sample dimensions and measurement conditions from paper before comparing numerical Jc.",
+      "engineering_readiness": "bulk superconducting HEA research sample; no wire/tape/cable, long-length yield, joint or magnet qualification in the source",
+      "safety_review": "laboratory materials; institutional material/process risk review required before experiments"
     }
   ],
   "benchmark_catalogs": [
@@ -752,6 +948,46 @@
       "reported_metric": null,
       "metric_interpretation": "Framework and benchmark-design reference only; not an experimental dataset or performance leaderboard.",
       "local_reproducibility_status": "not_applicable_as_performance_benchmark; protocol-first P->X->y programme tracked in #12671"
+    },
+    {
+      "catalog_id": "Hg1223-PQP-2026",
+      "source_ids": [
+        "hg1223_pressure_quench_2026"
+      ],
+      "reported_record_count": 5,
+      "reported_metric": {
+        "name": "post_quench_resistive_onset_tc_K",
+        "maximum": 151,
+        "range": [
+          147,
+          151
+        ],
+        "reported_bulk_magnetic_volume_fraction_percent": 78,
+        "magnetization_sample_tc_approx_K": 140,
+        "quench_pressure_gpa": [
+          10.1,
+          29.7
+        ],
+        "quench_temperature_k": 4.2
+      },
+      "metric_interpretation": "Peer-reviewed PQP case study; distinguish onset at 151 K from 78% magnetic volume fraction on a different retrieved specimen around 140 K. The phase is metastable and thermal history dependent.",
+      "local_reproducibility_status": "not_reproduced; protocol, sample-specific records, dP/dt, state lifetime, scale-up and independent-batch replication tracked in #12672"
+    },
+    {
+      "catalog_id": "YNbTiZrHf-HEA-2026",
+      "source_ids": [
+        "ynbtizrhf_hea_2026"
+      ],
+      "reported_record_count": 1,
+      "reported_metric": {
+        "name": "bulk_type_II_he_superconductor",
+        "Tc_K": 6.1,
+        "Jc_kA_cm2": 45,
+        "Hc2_T": 12.5,
+        "theoretical_Jd_MA_cm2": 21
+      },
+      "metric_interpretation": "Peer-reviewed bulk HEA superconductivity with multi-probe evidence; Jd is a theoretical estimate, not measured conductor current. Exact Jc field/temperature/geometry conditions require source extraction.",
+      "local_reproducibility_status": "not_reproduced; microstructure/flux-pinning and in-field engineering comparison tracked in #12673"
     }
   ],
   "required_future_fields": [
