@@ -439,10 +439,8 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
 
     let mut scenario_ids = BTreeSet::new();
     let mut referenced_groups: BTreeMap<SplitAxisKind, BTreeSet<String>> = BTreeMap::new();
-    let mut parent_by_child: BTreeMap<
-        (SplitAxisKind, String),
-        (SplitAxisKind, String),
-    > = BTreeMap::new();
+    let mut parent_by_child: BTreeMap<(SplitAxisKind, String), (SplitAxisKind, String)> =
+        BTreeMap::new();
 
     for scenario in &manifest.scenarios {
         validate_opaque_id(&scenario.scenario_id, "scenario.scenario_id")?;
@@ -521,18 +519,18 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
         for pair in manifest.sampling.nesting.windows(2) {
             let parent_axis = pair[0];
             let child_axis = pair[1];
-            let parent_group = scenario_groups
-                .get(&parent_axis)
-                .ok_or_else(|| ManifestError::MissingAxisMembership {
+            let parent_group = scenario_groups.get(&parent_axis).ok_or_else(|| {
+                ManifestError::MissingAxisMembership {
                     scenario: scenario.scenario_id.clone(),
                     axis: parent_axis.as_str().to_owned(),
-                })?;
-            let child_group = scenario_groups
-                .get(&child_axis)
-                .ok_or_else(|| ManifestError::MissingAxisMembership {
+                }
+            })?;
+            let child_group = scenario_groups.get(&child_axis).ok_or_else(|| {
+                ManifestError::MissingAxisMembership {
                     scenario: scenario.scenario_id.clone(),
                     axis: child_axis.as_str().to_owned(),
-                })?;
+                }
+            })?;
             let key = (child_axis, (*child_group).to_owned());
             let parent = (parent_axis, (*parent_group).to_owned());
             if let Some(previous_parent) = parent_by_child.insert(key.clone(), parent.clone())
