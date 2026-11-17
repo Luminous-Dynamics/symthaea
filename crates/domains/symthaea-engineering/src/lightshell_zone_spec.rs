@@ -571,7 +571,7 @@ fn bounds_are_consistent(requirement: &ZoneRequirement, frozen: bool) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{json, Value};
+    use serde_json::json;
 
     fn proposed_manifest() -> Value {
         json!({
