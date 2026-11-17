@@ -71,6 +71,8 @@ It predicts Eliashberg spectral functions and DFT/Allen–Dynes Tc labels. Its p
 Paper: https://www.nature.com/articles/s41524-026-01964-8  
 Code and data: https://github.com/henniggroup/BEE-NET
 
+**Reproducibility caveat from direct repository audit (17 November 2026):** the BEE-NET README says the full database and model checkpoints are not tracked in Git. GitHub contents checks return 404 for database.json and models/, the referenced workflow/pkl_files intermediate is absent, no GitHub releases are listed, and the full pipeline contains site-specific /blue/hennig paths. The README also warns that the bootstrap index files contain DataFrame row labels while the index column holds CIF filenames; substituting one for the other can cause held-out test leakage. This establishes that a clean clone is not a complete reproducibility package; it does not prove that data/checkpoints are unavailable from Materials Cloud, another artifact host or the authors. The work to close these dependencies is tracked in [BEE-NET-REPRO-001 #12619](https://github.com/Luminous-Dynamics/symthaea/issues/12619).
+
 The 0.87 K error is against computational labels, not measured experimental Tc. The workflow is conventional-superconductor-focused; its authors note that its ambient-pressure training and alpha2F frequency range do not directly cover high-pressure hydrides or unconventional superconductors.
 
 Our first task is to reproduce the exact released dataset, code, checkpoint, environment and original train/test split. Then test chemistry/family/source/temporal/pressure holdouts. A model that interpolates within a known family is not evidence of discovery generalization.
