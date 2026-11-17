@@ -393,6 +393,9 @@ pub fn evaluate_adaptive_policy_json(raw:&str)->Result<Value,String>{
  let tree=parse_nodes(val(candidate,"policy_tree","candidate_view")?,&options,&outcomes,&actions)?;
  let submitted=evaluate_policy(candidate,oracle,&tree,&bounds,&actions,&options,&worlds,budget,"release")?;
  let (optimal,optimal_count,optimal_tree)=evaluate_exact(candidate,oracle,&bounds,&actions,&options,&worlds,&outcomes,budget,max_depth)?;
+ let full_revalidation_cost=options.values()
+  .filter(|option|option.available_at<=parse_time(candidate["decision_cutoff"].as_str().unwrap(),"cutoff").unwrap())
+  .try_fold(0u64,|sum,option|sum.checked_add(option.cost_p95).ok_or("full revalidation cost overflow"))?;
  let coverage_regret=optimal.coverage.saturating_sub(submitted.coverage);
  let cost_regret=submitted.worst_expected_cost.saturating_sub(optimal.worst_expected_cost);
  let nominal_regret=submitted.nominal_expected_cost.saturating_sub(optimal.nominal_expected_cost);
@@ -412,6 +415,14 @@ pub fn evaluate_adaptive_policy_json(raw:&str)->Result<Value,String>{
    "worst_case_expected_cost_bound_micros":optimal.worst_expected_cost,
    "nominal_expected_cost_bound_micros":optimal.nominal_expected_cost,
    "worst_case_path_cost_bound_micros":optimal.max_path_cost,
+   "full_revalidation_comparator":{
+    "acquisition_count":options.values().filter(|option|option.available_at<=parse_time(candidate["decision_cutoff"].as_str().unwrap(),"cutoff").unwrap()).count(),
+    "cost_bound_micros":full_revalidation_cost,
+    "nominal_expected_cost_bound_micros":full_revalidation_cost,
+    "worst_case_expected_cost_bound_micros":full_revalidation_cost,
+    "action_coverage_nominal_bps":optimal.coverage,
+    "nominal_cost_savings_micros":full_revalidation_cost.saturating_sub(optimal.nominal_expected_cost)
+   },
    "policy_tree":{"root_node_id":optimal_tree.root,"nodes":optimal_tree.nodes.values().map(|n|node_to_json(n)).collect::<Vec<_>>()}
   },
   "regret":{
