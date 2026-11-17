@@ -1,6 +1,7 @@
 pub mod baseline;
 pub mod decision_horizon;
 pub mod paired_world;
+pub mod tournament;
 
 use std::error::Error;
 use std::fmt;
