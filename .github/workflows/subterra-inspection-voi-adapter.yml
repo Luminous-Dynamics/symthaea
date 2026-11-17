@@ -1,0 +1,59 @@
+name: Subterra inspection EVSI adapter
+
+on:
+  push:
+    branches:
+      - research/subterra-inspection-voi-adapter-v0-1
+    paths:
+      - crates/domains/symthaea-subterranean/research/subterra-inspection-voi-adapter/**
+      - crates/domains/symthaea-subterranean/research/subterra-survival-planner/**
+      - crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**
+      - .github/workflows/subterra-inspection-voi-adapter.yml
+  pull_request:
+    branches:
+      - research/subterra-robust-survival-referee-v0-1
+    paths:
+      - crates/domains/symthaea-subterranean/research/subterra-inspection-voi-adapter/**
+      - crates/domains/symthaea-subterranean/research/subterra-survival-planner/**
+      - crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**
+      - .github/workflows/subterra-inspection-voi-adapter.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: subterra-inspection-voi-adapter-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head:
+    name: Rust 1.96.0 format, adapter tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting without modifying source
+        run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-voi-adapter/Cargo.toml -- --check
+
+      - name: Run adapter and parent-crate tests
+        run: cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-voi-adapter/Cargo.toml --all-targets --offline
+
+      - name: Run the synthetic EVSI comparison
+        run: cargo run --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-voi-adapter/Cargo.toml --example synthetic_evsi --offline
+
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-voi-adapter/Cargo.toml --all-targets --offline -- -D warnings
+
+      - name: Preserve claim ceiling
+        if: always()
+        run: echo "This qualifies synthetic adapter/planner/referee semantics only; it does not qualify inspection sensors, robotics hardware, mine safety, geotechnical adequacy or field operation."

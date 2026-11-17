@@ -1,0 +1,17 @@
+[package]
+name = "subterra-inspection-voi-adapter"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Task-to-EVSI adapter for the existing Subterra survival planner and robust referee"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+subterra-survival-reference = { path = "../subterra-survival-planner" }
+subterra-robust-survival-referee = { path = "../subterra-robust-survival-referee" }
+
+[workspace]
