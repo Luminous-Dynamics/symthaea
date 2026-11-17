@@ -459,7 +459,7 @@ fn solve_3x3(
                 continue;
             }
             let factor = augmented[row][pivot_column];
-            for column in pivot_column..6 {
+            for column in pivot_column..7 {
                 augmented[row][column] -= factor * augmented[pivot_column][column];
             }
         }
