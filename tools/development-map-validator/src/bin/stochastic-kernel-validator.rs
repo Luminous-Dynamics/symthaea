@@ -198,7 +198,12 @@ fn parse_oracle(v:&Value,cutoff:&str,options:&BTreeMap<String,String>,factors:&B
    }
    let signature=serde_json::to_string(&outcomes).map_err(|e|format!("cannot canonicalize joint outcome: {e}"))?;
    if !signatures.insert(signature){return Err(format!("{label} contains duplicate joint outcome vectors"));}
-   let probability=parse_probability(row,&rl)?;
+   let probability_value=json!({
+    "lower_probability_bps":row["lower_probability_bps"],
+    "upper_probability_bps":row["upper_probability_bps"],
+    "nominal_probability_bps":row["nominal_probability_bps"]
+   });
+   let probability=parse_probability(&probability_value,&rl)?;
    rows.push(JointRow{outcomes,probability});
   }
   validate_partition(&rows,&label)?;
