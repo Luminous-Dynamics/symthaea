@@ -367,6 +367,171 @@
         "conflict_group_id": null,
         "rights_review": "cleared_for_metadata"
       }
+    },
+    {
+      "schema_version": "0.1.0",
+      "observation_id": "fixture-hg1223-pqp-onset-ambient",
+      "fixture_only": true,
+      "material": {
+        "material_id": "fixture-hg1223",
+        "formula_as_reported": "HgBa2Ca2Cu3O8+delta",
+        "formula_normalized": "HgBa2Ca2Cu3O8+delta",
+        "identity_status": "resolved",
+        "state_id": "fixture-hg1223-pressure-quenched",
+        "phase_id": null,
+        "structure_prototype": "tetragonal Hg1223",
+        "space_group": "P4/mmm"
+      },
+      "sample": {
+        "identity_status": "matched_specimen",
+        "sample_id": "fixture-hg1223-s4",
+        "batch_id": "fixture-hg1223-batch-a",
+        "phase_id": null,
+        "sample_form": "single_crystal",
+        "substrate": null,
+        "phase_fraction_percent": null,
+        "purity_percent": null,
+        "stoichiometry_status": "refined"
+      },
+      "source": {
+        "source_id": "fixture-source-only",
+        "document_id": {
+          "kind": "other",
+          "identifier": "synthetic-fixture"
+        },
+        "source_revision": "fixture-v0",
+        "source_content_sha256": null,
+        "locator": {
+          "page": 3,
+          "section": "synthetic pressure-quench example",
+          "table": null,
+          "figure": null,
+          "figure_panel": null,
+          "supplementary_file": null,
+          "row_or_record_id": null,
+          "source_span_sha256": null
+        },
+        "rights_scope": "metadata_only",
+        "source_snapshot_id": "fixture-only"
+      },
+      "assertion": {
+        "property_code": "Tc",
+        "origin": "observed",
+        "value": 151,
+        "unit": "K",
+        "detection_status": "detected",
+        "tc_criterion": "onset",
+        "measurement_method": "four-probe transport",
+        "model_id": null,
+        "model_revision": null,
+        "tested_window": null,
+        "uncertainty": null
+      },
+      "conditions": {
+        "pressure": {
+          "semantics": "explicit_ambient",
+          "value_gpa": 0,
+          "pressure_method": null,
+          "chemical_pressure_description": null
+        },
+        "measurement_temperature_k": 151,
+        "magnetic_field_t": 0,
+        "field_orientation": null,
+        "current_density_a_m2": null,
+        "geometry": "synthetic fixture",
+        "doping_state": null,
+        "strain_state": "pressure-quenched metastable state"
+      },
+      "provenance": {
+        "extraction_method": "manual_curated",
+        "extraction_model": null,
+        "extraction_revision": "fixture-v0",
+        "extraction_confidence": 1,
+        "review_status": "human_source_checked",
+        "reviewer_independence": "not_applicable",
+        "independence_group_id": "fixture-study-pqp",
+        "duplicate_of": null,
+        "conflict_group_id": null,
+        "rights_review": "cleared_for_metadata"
+      },
+      "processing_history": [
+        {
+          "step_id": "pqp-pressure-hold",
+          "sequence": 0,
+          "operation": "pressure_hold",
+          "execution_state": "sensor_verified",
+          "target": {
+            "pressure_gpa": 18.9,
+            "temperature_k": 4.2,
+            "duration_s": null,
+            "pressure_change_rate_gpa_s": null,
+            "temperature_ramp_k_min": null,
+            "atmosphere": null,
+            "notes": "synthetic target state"
+          },
+          "actual": {
+            "pressure_gpa": 18.9,
+            "temperature_k": 4.2,
+            "duration_s": null,
+            "pressure_change_rate_gpa_s": null,
+            "temperature_ramp_k_min": null,
+            "atmosphere": null,
+            "notes": "synthetic sensor readback"
+          },
+          "actual_source": {
+            "source_id": "fixture-source-only",
+            "measurement_status": "sensor_measured",
+            "locator": {
+              "page": 3,
+              "section": "synthetic pressure-quench example",
+              "table": null,
+              "figure": null,
+              "row_or_record_id": null
+            }
+          },
+          "failure_reason": null,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "step_id": "pqp-decompression",
+          "sequence": 1,
+          "operation": "decompression",
+          "execution_state": "sensor_verified",
+          "target": {
+            "pressure_gpa": 0,
+            "temperature_k": 4.2,
+            "duration_s": null,
+            "pressure_change_rate_gpa_s": null,
+            "temperature_ramp_k_min": null,
+            "atmosphere": null,
+            "notes": "synthetic target pressure"
+          },
+          "actual": {
+            "pressure_gpa": 0,
+            "temperature_k": 4.2,
+            "duration_s": null,
+            "pressure_change_rate_gpa_s": null,
+            "temperature_ramp_k_min": null,
+            "atmosphere": null,
+            "notes": "synthetic pressure readback"
+          },
+          "actual_source": {
+            "source_id": "fixture-source-only",
+            "measurement_status": "controller_readback",
+            "locator": {
+              "page": 3,
+              "section": "synthetic pressure-quench example",
+              "table": null,
+              "figure": null,
+              "row_or_record_id": null
+            }
+          },
+          "failure_reason": null,
+          "started_at": null,
+          "completed_at": null
+        }
+      ]
     }
   ]
 }
