@@ -339,9 +339,9 @@ mod tests {
         let (schema, registry) = committed_inputs();
         let receipt = audit_registry(&schema, &registry).expect("registry must pass");
         assert_eq!(receipt["status"], "pass");
-        assert_eq!(receipt["source_count"], 12);
+        assert_eq!(receipt["source_count"], 13);
         assert_eq!(receipt["candidate_count"], 8);
-        assert_eq!(receipt["benchmark_catalog_count"], 8);
+        assert_eq!(receipt["benchmark_catalog_count"], 9);
     }
 
     #[test]
@@ -409,6 +409,22 @@ mod tests {
         }]);
         let mutated = serde_json::to_vec(&value).unwrap();
         assert!(audit_registry(&schema, &mutated).is_err());
+    }
+
+    #[test]
+    fn repository_url_source_identifier_is_accepted() {
+        let (schema, registry) = committed_inputs();
+        let value: Value = serde_json::from_slice(&registry).unwrap();
+        let source = value["source_register"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|source| source["source_id"] == "sclib_jzis_2026")
+            .unwrap();
+        assert!(source.get("repository_url").is_some());
+        assert!(source.get("doi").is_none());
+        assert!(source.get("arxiv_id").is_none());
+        assert!(audit_registry(&schema, &registry).is_ok());
     }
 
     #[test]
