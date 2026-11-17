@@ -5,6 +5,7 @@ This is the first executable component of CROP-INTEL-001. It is deliberately sma
 ## Current scope
 
 - 2D point-set geometry descriptors: centroid, bounds, radius statistics, radial/angular histograms and approximate rotational symmetry residuals.
+- Binary-grid representation with explicit D4 transforms (four rotations/reflections) and row-major/column-major traversal.
 - Predeclared 7-bit ASCII decoder specifications with complete attempt logging.
 - A family-wise maximum-statistic empirical p-value helper. The caller must run the **entire** decoder/transform family on each null replicate and provide that replicate's maximum score.
 - Binary entropy and Wilson intervals for simple benchmark reporting.
@@ -26,7 +27,7 @@ cargo test --all-targets
 cargo clippy --all-targets -- -D warnings
 ```
 
-The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace.
+The crate has no third-party dependencies. It includes a local `[workspace]` declaration so that it is not silently pulled into the root Symthaea workspace. The current source contains 19 authored unit tests; their execution remains pending because this editing environment has no Rust toolchain.
 
 ## Statistical interpretation
 
