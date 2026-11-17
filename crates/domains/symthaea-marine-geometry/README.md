@@ -197,3 +197,22 @@ This is evidence provenance, not a change to the physical scope of the solver. I
 ### Next: static trim/heel equilibrium
 
 The distinct follow-on specification is [MARINE-STATIC-ATTITUDE-EQUILIBRIUM-001 #12498](https://github.com/Luminous-Dynamics/symthaea/issues/12498). It will solve offset + pitch + roll using explicit CG, density, a body-frame oblique waterplane, force balance and two independent moment residuals. It is not the same as the WAPS manoeuvring/leeway 3-DOF programme and is not a GZ or stability approval. See `docs/research/marine/MARINE-FULL-ENVELOPE-G2F-A.md` for the equations, fixtures and current SOTA comparison.
+
+
+## G2f-b full external envelope mesh generation
+
+The `full_envelope_mesh` module turns a valid G2f-a source specification into a distinct closed external hull mesh. It creates bottom, topsides, deck, bow-end and stern-end semantic face ranges, preserves station-scoped source-point identities, uses exact reflected identities only under an explicit symmetric policy, and runs fresh G0/G1 admission.
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-full-envelope-mesh -- docs/research/marine/fixtures/marine-full-envelope-box-001.json docs/research/marine/fixtures/marine-full-envelope-mesh-admission-profile-001.json --output /tmp/full-envelope-mesh.json
+
+Replay the source, exact admission profile and artifact:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-full-envelope-mesh -- --verify docs/research/marine/fixtures/marine-full-envelope-box-001.json docs/research/marine/fixtures/marine-full-envelope-mesh-admission-profile-001.json /tmp/full-envelope-mesh.json
+
+The initial supported profile is deliberately narrow: closed shells only, compatible station profile semantics, explicit/asymmetric port handling, lofted deck sections, pointed ends and convex transom caps. Openings, non-convex transoms, unshared asymmetric keel identities, incompatible topology, unsupported profile segments and non-manifold output remain INCOMPLETE/REJECTED. There is no coordinate welding, snapping, healing or implicit symmetry inference.
+
+The synthetic 100 m × 20 m hull with 6 m draft, 4 m freeboard and 0.5 m deck crown has full external-envelope volume 20,500 m³. Its separate z=0 displacement volume remains 12,000 m³. This G2f-b mesh represents the full external boundary; it must not be substituted for the G2b displacement shell in hydrostatic comparisons.
+
+The mesh manifest binds the source spec, station-scoped source-point-to-vertex identities, geometry digest, semantic face ranges, admission profile and fresh G0/G1 report. Replay regenerates the exact mesh from the source and profile; recomputing hashes after a face mutation does not qualify the artifact.
+
+This remains triangle-mesh generation and topology admission. It is not a CAD B-rep, surface fairness assessment, hydrostatic equilibrium, stability approval, CFD, propulsion, seakeeping, manufacturing or class approval.
