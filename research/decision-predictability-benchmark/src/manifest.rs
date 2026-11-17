@@ -821,6 +821,31 @@ mod tests {
     }
 
     #[test]
+    fn rejects_duplicate_scenario_identifiers() {
+        let mut value: serde_json::Value = serde_json::from_str(VALID).unwrap();
+        let scenarios = value["scenarios"].as_array_mut().unwrap();
+        let first_id = scenarios[0]["scenario_id"].clone();
+        scenarios[1]["scenario_id"] = first_id;
+        let bytes = serde_json::to_vec(&value).unwrap();
+        assert!(matches!(
+            parse_and_validate(&bytes),
+            Err(ManifestError::DuplicateValue("scenario_id"))
+        ));
+    }
+
+    #[test]
+    fn rejects_incompatible_split_policy_and_axis() {
+        let mut value: serde_json::Value = serde_json::from_str(VALID).unwrap();
+        let axes = value["split_axes"].as_array_mut().unwrap();
+        axes[0]["policy"] = serde_json::json!("held_out_region");
+        let bytes = serde_json::to_vec(&value).unwrap();
+        assert!(matches!(
+            parse_and_validate(&bytes),
+            Err(ManifestError::InvalidField("split policy is incompatible with its axis"))
+        ));
+    }
+
+    #[test]
     fn rejects_manifest_size_limit_before_deserialization() {
         let oversized = vec![b' '; MAX_MANIFEST_BYTES + 1];
         assert!(matches!(parse_and_validate(&oversized), Err(ManifestError::InputTooLarge { .. })));
