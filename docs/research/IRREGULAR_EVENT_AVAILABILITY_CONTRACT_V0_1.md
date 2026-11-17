@@ -120,13 +120,14 @@ SHA-256 over the exact input bytes.
 
 ## 7. Authored test inventory and limits
 
-The current source contains 99 authored Rust test functions:
+The current source contains 100 authored Rust test functions:
 - 16 event-contract tests in `lib.rs`;
 - 12 bitemporal ledger tests in `lib.rs`;
 - 8 purged-split tests;
 - 10 train-only-scaler tests;
 - 10 Time-IMM adapter tests;
-- 26 source-watermark/completeness tests.
+- 27 source-watermark/completeness tests.
+- 17 clock-calibration tests.
 
 No Cargo build, rustfmt, Clippy, unit test, dataset adapter execution or
 benchmark has run in this environment. The source and fixture inventory is
@@ -160,6 +161,17 @@ to that source claim, not as proof of global completeness. Historical queries
 before the late receipt remain unchanged. The caller must append the raw event
 to BitemporalEventLedger separately; the watermark ledger owns progress and
 breach evidence, not the authoritative source event.
+
+Event-arrival batches now use preflight validation followed by direct append:
+the full incoming batch is checked for event validity, availability cutoff,
+transaction-time monotonicity and duplicate IDs before the ledger is mutated.
+After preflight, classification reads only the immutable source-progress chain
+and the append phase has no further typed Result error path. This removes the
+previous whole-ledger clone per arrival batch. A regression confirms that an
+invalid later batch member leaves all earlier candidate members unapplied,
+preserving event-arrival and breach indexes, transaction time and ledger
+SHA-256. This provides Result-level atomicity, not crash consistency or
+recoverable allocation-panic semantics.
 
 The source-completeness report separates Complete, Incomplete and Contested,
 shows each required source's exact supporting progress record (ID, generation,
@@ -195,7 +207,7 @@ complexity improvement by construction, not yet a measured throughput result;
 the benchmark records p50/p95/p99 query latency, late-breach candidates visited,
 and full-audit rebuild latency separately.
 
-Twenty-five source-authored tests cover missing progress, multi-source minimum,
+Twenty-seven source-authored tests cover missing progress, multi-source minimum,
 exclusive boundary behavior, as-known watermarks, late arrivals, terminal
 sources, monotonicity/generation, policy identity, atomic batches, duplicate
 arrivals, unqualified no-progress arrivals, evidence-bound completeness and
@@ -210,7 +222,7 @@ durable WAL and a trusted progress-policy registry remain out of scope.
 
 The machine-readable fixture
 `crates/domains/symthaea-capability-closure/fixtures/temporal_source_watermark_completeness_v0.1.json`
-pins twenty-one adversarial scenarios and required metrics. False-complete rate is
+pins twenty-seven adversarial scenarios and required metrics. False-complete rate is
 the primary safety metric; false-incomplete rate and completeness lag are
 reported separately so an always-incomplete strategy cannot pass. Late-arrival
 detection recall/latency, source watermark skew, and historical as-known
@@ -236,11 +248,15 @@ report assembly and verdict calculation; only late-breach selection differs.
 The verified receipt binds the full-history replay to the ledger SHA-256 and
 progress/arrival/breach counts; this is in-memory ledger consistency, not source
 authentication. It additionally requires the receipt digest to match the
-current ledger snapshot before timing. Each case records 51 indexed complete
-query samples and 31 linear-reference complete query samples (nearest-rank
-p50/p95/p99 for both), plus 15 verified replay samples (median and observed
-maximum), event-time index buckets visited, indexed receipt candidates
-examined, full linear scan receipts visited and matching breaches.
+current ledger snapshot before timing. Each case first times the four-batch event-arrival commit path, excluding
+event generation and initial source-progress setup. It reports total ingestion
+microseconds and nanoseconds per event as one diagnostic sample. It then
+records 51 indexed complete query samples and 31 linear-reference complete
+query samples (nearest-rank p50/p95/p99 for both), plus 15 verified replay
+samples (median and observed maximum), event-time index buckets visited,
+indexed receipt candidates examined, full linear scan receipts visited and
+matching breaches. The ingest timing separates write-side cost from query and
+full-history replay cost.
 
 The hosted workflow retains CSV output with the exact commit, Rust toolchain,
 dependency lock, and fixture/source digests. This measures in-memory release
