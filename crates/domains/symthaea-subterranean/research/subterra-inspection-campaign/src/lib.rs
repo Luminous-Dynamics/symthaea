@@ -789,10 +789,7 @@ mod tests {
             energy_greedy.selection.selected_option_ids,
             vec!["lower_value_light_setup"]
         );
-        assert_eq!(
-            energy_greedy.selection.resources.energy_millijoules,
-            4
-        );
+        assert_eq!(energy_greedy.selection.resources.energy_millijoules, 4);
     }
 
     #[test]
