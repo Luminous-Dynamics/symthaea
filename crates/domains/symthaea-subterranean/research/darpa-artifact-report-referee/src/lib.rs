@@ -164,6 +164,79 @@ impl std::fmt::Display for RefereeError {
 
 impl std::error::Error for RefereeError {}
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum GroundTruthParseError {
+    EmptySourceFileId,
+    EmptyCoordinateFrameId,
+    InvalidFieldCount { line: usize, fields: usize },
+    EmptyTypeLabel { line: usize },
+    InvalidCoordinate { line: usize, column: usize },
+    NonFiniteCoordinate { line: usize, column: usize },
+}
+
+/// Parse the source DARPA tab-separated artifact format:
+/// `type<TAB>x<TAB>y<TAB>z`, optionally followed by one empty trailing
+/// tab field. No header row is expected. The raw type string is preserved.
+/// Record IDs are deterministic `source_file_id:line_number` values.
+pub fn parse_ground_truth_tsv(
+    source_file_id: &str,
+    coordinate_frame_id: &str,
+    input: &str,
+) -> Result<Vec<GroundTruthArtifact>, GroundTruthParseError> {
+    if source_file_id.trim().is_empty() {
+        return Err(GroundTruthParseError::EmptySourceFileId);
+    }
+    if coordinate_frame_id.trim().is_empty() {
+        return Err(GroundTruthParseError::EmptyCoordinateFrameId);
+    }
+
+    let mut artifacts = Vec::new();
+    for (index, raw_line) in input.lines().enumerate() {
+        let line_number = index + 1;
+        if raw_line.trim().is_empty() {
+            continue;
+        }
+        let mut fields = raw_line.split('\t').collect::<Vec<_>>();
+        if fields.len() == 5 && fields[4].is_empty() {
+            fields.pop();
+        }
+        if fields.len() != 4 {
+            return Err(GroundTruthParseError::InvalidFieldCount {
+                line: line_number,
+                fields: fields.len(),
+            });
+        }
+        if fields[0].trim().is_empty() {
+            return Err(GroundTruthParseError::EmptyTypeLabel { line: line_number });
+        }
+
+        let mut coordinates = [0.0; 3];
+        for (column, value) in fields[1..4].iter().enumerate() {
+            let coordinate = value.parse::<f64>().map_err(|_| {
+                GroundTruthParseError::InvalidCoordinate {
+                    line: line_number,
+                    column: column + 1,
+                }
+            })?;
+            if !coordinate.is_finite() {
+                return Err(GroundTruthParseError::NonFiniteCoordinate {
+                    line: line_number,
+                    column: column + 1,
+                });
+            }
+            coordinates[column] = coordinate;
+        }
+
+        artifacts.push(GroundTruthArtifact {
+            id: format!("{source_file_id}:{line_number}"),
+            coordinate_frame_id: coordinate_frame_id.to_owned(),
+            source_type: fields[0].to_owned(),
+            position: Vec3::new(coordinates[0], coordinates[1], coordinates[2]),
+        });
+    }
+    Ok(artifacts)
+}
+
 fn validate_identifier(value: &str, field: &'static str) -> Result<(), RefereeError> {
     if value.trim().is_empty() {
         return Err(RefereeError::EmptyIdentifier(field));
@@ -469,6 +542,35 @@ mod tests {
             maximum_reports,
             localization_tolerance_m: tolerance,
         }
+    }
+
+
+    #[test]
+    fn parses_darpa_tsv_preserving_source_types_and_lineage_ids() {
+        let input = "cellphone\t1\t2\t3\t\r\nfireextinguisher\t4.5\t6\t7\r\n";
+        let parsed = parse_ground_truth_tsv("prize.csv", "darpa", input).unwrap();
+        assert_eq!(parsed.len(), 2);
+        assert_eq!(parsed[0].id, "prize.csv:1");
+        assert_eq!(parsed[0].source_type, "cellphone");
+        assert_eq!(parsed[1].source_type, "fireextinguisher");
+        assert_eq!(parsed[1].coordinate_frame_id, "darpa");
+        assert_eq!(parsed[1].position, Vec3::new(4.5, 6.0, 7.0));
+    }
+
+    #[test]
+    fn tsv_parser_rejects_malformed_and_non_finite_rows() {
+        assert!(matches!(
+            parse_ground_truth_tsv("source.csv", "darpa", "vent\t1\t2"),
+            Err(GroundTruthParseError::InvalidFieldCount { line: 1, .. })
+        ));
+        assert!(matches!(
+            parse_ground_truth_tsv("source.csv", "darpa", "vent\tNaN\t2\t3"),
+            Err(GroundTruthParseError::NonFiniteCoordinate { line: 1, column: 1 })
+        ));
+        assert!(matches!(
+            parse_ground_truth_tsv("source.csv", "darpa", " \t1\t2\t3"),
+            Err(GroundTruthParseError::EmptyTypeLabel { line: 1 })
+        ));
     }
 
     #[test]
