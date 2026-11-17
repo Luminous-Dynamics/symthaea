@@ -204,7 +204,10 @@ The dedicated workflow compiles and tests standalone Rust references with pinned
     rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/optical_health.rs -o /tmp/isru-optical-health
     /tmp/isru-optical-health
 
-Current tests exercise out-of-order completion, lock contention, stage prerequisites, holdout access, calibration expiry, instrument maintenance, failures, budgets, deterministic replay, noise moments, QCM/witness/process-optic separation, source-drift normalization, spectral dependence, cleaning residuals, post-clean requalification, spallation/melt regime changes, equal-energy pulsed versus continuous delivery, purge-moisture interference and sample-inventory limits.
+    rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/material_regime.rs -o /tmp/isru-material-regime
+    /tmp/isru-material-regime
+
+Current regression tests cover asynchronous out-of-order completion, lock contention, stage prerequisites, holdout access, calibration expiry, instrument maintenance, failures, resource/time budgets, deterministic replay, noise moments, optical reference normalization, QCM/witness/process-optic separation, spectral dependence, cleaning residuals, monotonic metrology chronology, post-clean requalification, spallation/melt regime changes, equal-energy pulsed versus continuous delivery, purge-moisture interference, optical-deposition estimates and sample-inventory exhaustion.
 
 ## 10. Limitations and next increments
 
