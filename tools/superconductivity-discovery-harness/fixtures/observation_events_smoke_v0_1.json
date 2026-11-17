@@ -715,6 +715,115 @@
         "tested_window": null,
         "uncertainty": null
       }
+    },
+    {
+      "schema_version": "0.1.0",
+      "observation_id": "fixture-sclib-imported-observation",
+      "fixture_only": true,
+      "material": {
+        "material_id": "fixture-sclib-material-001",
+        "formula_as_reported": "X2Y3",
+        "formula_normalized": "X2Y3",
+        "identity_status": "resolved",
+        "state_id": "fixture-sclib-state-004",
+        "phase_id": null,
+        "structure_prototype": "synthetic fixture structure",
+        "space_group": null
+      },
+      "sample": {
+        "identity_status": "matched_specimen",
+        "sample_id": "fixture-sclib-sample-002",
+        "batch_id": "fixture-sclib-batch-001",
+        "phase_id": null,
+        "sample_form": "polycrystal",
+        "substrate": null,
+        "phase_fraction_percent": null,
+        "purity_percent": null,
+        "stoichiometry_status": "unknown"
+      },
+      "source": {
+        "source_id": "fixture-source-only",
+        "document_id": {
+          "kind": "other",
+          "identifier": "synthetic-fixture"
+        },
+        "source_revision": "fixture-v0",
+        "source_content_sha256": null,
+        "locator": {
+          "page": 2,
+          "section": null,
+          "table": null,
+          "figure": null,
+          "figure_panel": null,
+          "supplementary_file": null,
+          "row_or_record_id": null,
+          "source_span_sha256": null
+        },
+        "rights_scope": "metadata_only",
+        "source_snapshot_id": "fixture-only",
+        "external_catalog": {
+          "library_id": "SCLib-JZIS",
+          "external_record_id": "fixture-result-018",
+          "api_version": "1",
+          "data_version": "v2026.09.03",
+          "snapshot_id": "fixture-sclib-snapshot-2026-11-17T15:00Z",
+          "retrieved_at": "2026-11-17T15:00:00Z",
+          "etag": "W/\"fixture-etag\"",
+          "x_data_version": "v2026.09.03",
+          "external_parent_ids": {
+            "paper_id": "fixture-paper-005",
+            "material_id": "fixture-material-001",
+            "sample_id": "fixture-sample-002",
+            "state_id": "fixture-state-004",
+            "result_id": "fixture-result-018",
+            "event_id": "fixture-event-018"
+          },
+          "query_sha256": null
+        }
+      },
+      "assertion": {
+        "property_code": "Tc",
+        "origin": "observed",
+        "value": 6.8,
+        "unit": "K",
+        "detection_status": "detected",
+        "tc_criterion": "zero_resistance",
+        "measurement_scope": "bulk",
+        "measurement_scope_description": "synthetic library-import event",
+        "measurement_method": "synthetic four-probe transport",
+        "model_id": null,
+        "model_revision": null,
+        "tested_window": null,
+        "uncertainty": null
+      },
+      "conditions": {
+        "pressure": {
+          "semantics": "explicit_ambient",
+          "value_gpa": 0,
+          "pressure_method": null,
+          "chemical_pressure_description": null
+        },
+        "measurement_temperature_k": 6.8,
+        "magnetic_field_t": 0,
+        "field_orientation": null,
+        "current_density_a_m2": null,
+        "geometry": "synthetic polycrystal fixture",
+        "doping_state": "synthetic nominal composition",
+        "strain_state": null
+      },
+      "provenance": {
+        "extraction_method": "database_import",
+        "extraction_model": null,
+        "extraction_revision": "fixture-importer-v0",
+        "extraction_confidence": 1,
+        "review_status": "unreviewed",
+        "reviewer_independence": "not_recorded",
+        "independence_group_id": "fixture-sclib-import-job-001",
+        "duplicate_of": null,
+        "conflict_group_id": null,
+        "rights_review": "unknown"
+      },
+      "process_history": []
     }
   ]
 }
