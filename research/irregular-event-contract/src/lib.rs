@@ -796,7 +796,7 @@ mod tests {
     }
 
     fn revision_record(event_id: u64, event_time_us: i64, available_at_us: i64, value: i64) -> EventRecord {
-        let mut record = observed(event_id, 1, event_time_us, available_at_us, 0);
+        let mut record = observed(event_id, 1, event_time_us, available_at_us, event_id);
         record.measurement = Measurement::Observed { scaled_value: value, decimal_scale: 0 };
         record.source_sha256 = digest(value as u8);
         record
@@ -974,7 +974,7 @@ mod tests {
                 revision(2, 2, 1, 10, EventRevisionOperation::Assert { record: second }),
             ]),
             Err(BitemporalEventError::DuplicateActiveSourceSequence {
-                entity_id: 1, modality_id: 1, source_id: 1, source_sequence: 0,
+                entity_id: 1, modality_id: 1, source_id: 1, source_sequence: 1,
             })
         );
         assert!(ledger.revisions().is_empty());
