@@ -95,6 +95,7 @@ pub enum RejectionReason {
     EmptyRequiredDigest,
     ExternalOptionGateNotPassed,
     DecisionMismatch,
+    OptionIdMismatch,
     AssetMismatch,
     AssetRevisionMismatch,
     CoordinateFrameMismatch,
@@ -113,6 +114,7 @@ pub enum RejectionReason {
     MissingRightsReceipt,
     MissingVerifierReceipt,
     MissingSourceDatasetDigest,
+    SourceDatasetMismatch,
     ObservationFromFuture,
     ObservationStale,
     EvidenceExpired,
@@ -199,8 +201,8 @@ pub fn admit_candidate(
     );
     push_if_mismatch(
         &mut reasons,
-        manifest.option_id != option.option_id,
-        RejectionReason::EmptyOptionId,
+        manifest.option_id != option.option_id || manifest.option_id != expected.option_id,
+        RejectionReason::OptionIdMismatch,
     );
     push_if_mismatch(
         &mut reasons,
@@ -246,7 +248,7 @@ pub fn admit_candidate(
     push_if_mismatch(
         &mut reasons,
         manifest.source_dataset_digest != expected.source_dataset_digest,
-        RejectionReason::MissingSourceDatasetDigest,
+        RejectionReason::SourceDatasetMismatch,
     );
     push_if_mismatch(
         &mut reasons,
