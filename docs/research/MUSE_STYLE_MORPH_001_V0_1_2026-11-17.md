@@ -356,4 +356,4 @@ The current Minimalism engine still emits `PartId::UNASSIGNED` for its notes. Th
 
 ### Current test and execution state
 
-Four M1 unit tests have been authored (shared-clock typed pair, clock mismatch rejection, deterministic replay, exact segment-window containment) alongside the 19 M0 tests. These **23 tests are authored, not compiled or executed** in this environment. The M1 path is code on an open draft PR, not a demonstrated runtime success. Exact-head GitHub workflows are checked separately and skipped is not pass.
+Six M1 unit tests have been authored (shared-clock typed pair, clock mismatch rejection, deterministic replay, exact segment-window containment, boundary-gap reporting, and crossing-event detection) alongside the 19 M0 tests. These **25 tests are authored, not compiled or executed** in this environment. The M1 path is code on an open draft PR, not a demonstrated runtime success. Exact-head GitHub workflows are checked separately and skipped is not pass.
