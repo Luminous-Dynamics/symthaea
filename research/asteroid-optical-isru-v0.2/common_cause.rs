@@ -326,9 +326,13 @@ impl CommonCauseModel {
                     cause_id.clone(),
                 ));
             }
-            let elapsed = measurement
-                .observed_at_utc_s
-                .saturating_sub(cause.reference_epoch_utc_s) as f64;
+            let elapsed = if measurement.observed_at_utc_s < cause.reference_epoch_utc_s {
+                0.0
+            } else {
+                measurement
+                    .observed_at_utc_s
+                    .saturating_sub(cause.reference_epoch_utc_s) as f64
+            };
             let latent_bias = cause.bias_at_reference + cause.drift_per_second * elapsed;
             let loaded_bias = loading * latent_bias;
             let loaded_variance = (loading * cause.latent_stddev).powi(2);
