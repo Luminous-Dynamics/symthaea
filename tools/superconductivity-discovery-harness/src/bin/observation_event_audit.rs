@@ -207,14 +207,11 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             other => return Err(format!("{observation_id}: unsupported pressure semantics {other}")),
         }
 
-        *origin_counts
-            .entry(origin.to_owned())
-            .or_insert(json!(0)) = json!(
-            origin_counts
-                .get(origin)
-                .and_then(Value::as_u64)
-                .unwrap_or(0) + 1
-        );
+        let next_count = origin_counts
+            .get(origin)
+            .and_then(Value::as_u64)
+            .unwrap_or(0) + 1;
+        origin_counts.insert(origin.to_owned(), json!(next_count));
         checked.push(observation_id.to_owned());
     }
 
@@ -323,7 +320,7 @@ mod tests {
         (schema, fixture)
     }
 
-    fn audit_mutated(mut fixture: Value) -> Result<Value, String> {
+    fn audit_mutated(fixture: Value) -> Result<Value, String> {
         let (schema, _) = committed_inputs();
         let bytes = serde_json::to_vec(&fixture).unwrap();
         validate_fixture(&schema, &bytes)
