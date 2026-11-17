@@ -1619,7 +1619,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn variable_draft_fixture_integrates_section_first_moments_exactly() {
         let mut request = fixture_request();

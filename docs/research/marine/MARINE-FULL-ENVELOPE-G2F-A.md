@@ -857,3 +857,58 @@ CLI:
 
 Exit code 0 reports an evaluated receipt, 1 reports typed validation/integration rejection and 2 indicates CLI, I/O or JSON parsing failure.
 
+
+
+## 13. G2f-b first full-envelope surface-loft implementation
+
+Branch: `research/marine-full-envelope-mesh-g2f-b-20261117`.
+
+The first G2f-b source slice adds `full_envelope_mesh.rs`, a deterministic triangle-mesh generator distinct from the G2b displacement-volume loft. It generates:
+- port/starboard bottom and topside strips from compatible station profile segments;
+- the deck as a separately identified lofted surface;
+- transom end caps via a deterministic fan only when the complete cross-section perimeter is convex;
+- no planar cap at a pointed stem; side and deck faces converge on declared shared centreline identities.
+
+### Identity and topology
+
+Every vertex is bound to a station-scoped source point identity. Symmetric-derived port points use `MIRROR:<source-id>`; centreline points reuse the same identity. Explicit asymmetric profiles use their supplied port IDs, with a shared keel identity required for the closed v1 shell. Deck-edge vertices reuse exact sheer identities. Coordinates that happen to coincide do not cause welding.
+
+The generator uses the G2e-compatible stern-interval diagonal flip when a stern collapses to the centreline. It preflights vertex/face budgets with checked arithmetic and rejects unsupported cross-station semantic mismatches, unclosed transom identities, non-convex cap polygons and opening loops. It does not repair or fill geometry.
+
+The output `FullEnvelopeMeshArtifact` binds:
+- source schema and full-envelope spec digest;
+- station-scoped source-point/vertex identity digest;
+- ordered Bottom, Topsides, Deck, BowEndClosure and SternEndClosure face ranges;
+- exact triangle mesh digest;
+- caller-supplied G0/G1 admission profile and fresh admission report;
+- full-envelope mesh manifest digest.
+
+The verifier regenerates from the exact source spec and admission profile and compares the complete artifact. A caller cannot mutate face indices, recompute the mesh/manifest hashes and obtain a valid replay.
+
+### Synthetic known answers and tests authored
+
+The symmetric box hull has full external volume 20,500 m³, including its deck crown. This is distinct from the 12,000 m³ z=0 displacement shell.
+
+The current Rust unit suite covers transom/transom, pointed-bow/transom, transom/pointed-stern, pointed/pointed with an interior full-breadth station, explicit asymmetric geometry, non-convex transom rejection, profile-count mismatch, shared asymmetric keel identity, opening-loop incompleteness, semantic face-range coverage, deterministic replay, rehashed face mutation and unknown G0/G1 checks. A CLI plus integration tests exercise generation and verification.
+
+### Competitive position and benchmark refinement
+
+The 2026 representation-aware hull-generation paper already combines surface point clouds, waterline splines and buttock curves in a shared latent space with conditional latent diffusion. Its dataset is 15,000 synthetic hulls produced by 625 variations of each of 24 parent hulls; the authors explicitly note that finite parent-hull diversity limits generalization and that the current approach assumes symmetric, watertight monohulls. The correct comparison is not to claim multimodal generation as new, but to benchmark whether explicit source identities, asymmetric geometry and replayable topology improve out-of-family and damaged/legacy reconstruction.
+
+The Raster2Hull 2026 benchmark introduces 5,000 synthetic pairs of rasterized general-arrangement/lines drawings and hull point clouds, while explicitly acknowledging that real degraded scans and watertight CAD reconstruction remain unsolved. Our reconstruction benchmark should therefore report drawing-to-surface error, unsupported/ambiguous geometry, cross-view consistency and CAD recoverability separately; synthetic raster performance is not real-fleet accuracy.
+
+References:
+- Htein et al. (2026), *Representation-Aware Generative Modeling for Early-Stage Ship Design*: https://www.mdpi.com/2077-1312/14/7/642
+- Uur et al. (2026), *Raster2Hull*: https://doi.org/10.1109/ACCESS.2026.3717961
+- Liu et al. (15 Nov 2026), *An integrated data-driven and experimental methodology for toroidal propeller design improvement*: https://doi.org/10.1016/j.engappai.2026.116126
+
+### Next engineering benchmark
+
+The most valuable near-term benchmark is cross-representation recovery on the *same immutable design revision*:
+1. Generate the external mesh from station profiles/deck sections.
+2. Independently slice it into transverse sections, waterlines, buttock curves and surface point clouds.
+3. Reconstruct the same source representations from those slices.
+4. Compare point/surface Hausdorff and percentile distances, curve deviations, integral hydrostatic properties, boundary/seam identity and AP242 persistent IDs.
+5. Repeat across transom, pointed, asymmetric and held-out parent families.
+
+Targets are research aspirations, not achievements: zero unaccounted surface regions; zero boundary/non-manifold edges for admitted closed shells; zero silent geometry repair; 100% exact source-to-vertex identity recovery; 100% manifest replay; and bounded surface/curve/property residuals under frozen tolerances. Only after independent CAD-kernel round-trip should we claim CAD recovery; only after specialist CFD/physical comparison should we claim hydrodynamic improvement.

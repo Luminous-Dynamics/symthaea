@@ -938,7 +938,10 @@ pub fn verify_loft_artifact_integrity(
             let range = artifact.stern_end_cap_face_range;
             let end = range.first_face.saturating_add(range.face_count);
             if end <= faces.len()
-                && faces[range.first_face..end].iter().copied().ne(expected.iter().copied())
+                && faces[range.first_face..end]
+                    .iter()
+                    .copied()
+                    .ne(expected.iter().copied())
             {
                 violation(
                     &mut violations,
@@ -1325,7 +1328,7 @@ pub fn loft_waterplane_capped_hull(
 
     if vertices.len() != vertex_count || faces.len() != face_count {
         return Err(vec![LoftViolation {
-            code: "mesh_count_invariant",
+            code: "mesh_count_invariant".into(),
             detail: "generated vertex/face counts differ from preflight budget calculation".into(),
         }]);
     }
@@ -1338,7 +1341,7 @@ pub fn loft_waterplane_capped_hull(
     };
     let geometry_digest_blake3 = compute_geometry_digest(&geometry).map_err(|error| {
         vec![LoftViolation {
-            code: "geometry_digest",
+            code: "geometry_digest".into(),
             detail: format!("could not compute normalized geometry digest: {error}"),
         }]
     })?;
@@ -1444,6 +1447,14 @@ mod tests {
         }
     }
 
+    fn rebind_loft_after_test_mutation(loft: &mut LoftedHullArtifact) {
+        let digest = compute_geometry_digest(&loft.candidate.geometry).unwrap();
+        loft.candidate.geometry_digest_blake3 = digest.clone();
+        loft.mesh_digest_blake3 = digest;
+        loft.admission_report = admit(&loft.candidate);
+        loft.loft_manifest_digest_blake3 = compute_loft_manifest_digest(loft).unwrap();
+    }
+
     fn profile() -> AdmissionProfile {
         AdmissionProfile {
             id: "waterplane-capped-displacement-v1".into(),
@@ -1466,7 +1477,8 @@ mod tests {
             spec.stations[0].half_breadth_fraction = 0.0;
         }
         if stern == LongitudinalEndCondition::CollapsedCentreline {
-            spec.stations[spec.stations.len() - 1].half_breadth_fraction = 0.0;
+            let last_station = spec.stations.len() - 1;
+            spec.stations[last_station].half_breadth_fraction = 0.0;
         }
         spec
     }
@@ -1876,8 +1888,7 @@ mod tests {
             LongitudinalEndCondition::PlanarEndCap,
         );
         let face_index = loft.bow_end_cap_face_range.first_face;
-        loft.candidate.geometry.faces[face_index][0] =
-            loft.candidate.geometry.faces[face_index][1];
+        loft.candidate.geometry.faces[face_index][0] = loft.candidate.geometry.faces[face_index][1];
         rebind_loft_after_test_mutation(&mut loft);
         let errors = verify_loft_artifact_integrity(&loft).unwrap_err();
         assert!(errors.iter().any(|item| item.code == "bow_cap_topology"));
@@ -1973,8 +1984,9 @@ mod tests {
     fn non_monotonic_station_coordinates_are_rejected() {
         let mut source = artifact();
         source.sections[1].x_m = source.sections[0].x_m;
+        let station_x = source.sections[1].x_m;
         for point in &mut source.sections[1].keel_to_sheer_m {
-            point[0] = source.sections[1].x_m;
+            point[0] = station_x;
         }
         source.sampled_sections_digest_blake3 =
             compute_sampled_sections_digest(&source.sections).unwrap();
