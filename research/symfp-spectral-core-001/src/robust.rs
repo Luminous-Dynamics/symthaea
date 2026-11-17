@@ -87,7 +87,7 @@ fn distance_interval(target_rank: usize, observed: NumericalRankIntervalV1) -> (
 /// operator_norm_error_bounds[l] is a caller-supplied upper bound delta_l on
 /// the spectral-norm perturbation of the degree-l representation block:
 ///
-///     ||Delta V_l||_2 <= delta_l.
+/// `||Delta V_l||_2 <= delta_l`.
 ///
 /// It is propagated using Weyl's singular-value perturbation theorem. The
 /// degree-zero singular value used in SymFP's common threshold is also given
