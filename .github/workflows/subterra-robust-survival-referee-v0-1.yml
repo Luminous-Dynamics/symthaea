@@ -1,0 +1,39 @@
+name: subterra-robust-survival-referee-v0-1
+
+on:
+  push:
+    branches:
+      - research/subterra-robust-survival-referee-v0-1
+    paths:
+      - "crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**"
+      - "crates/domains/symthaea-subterranean/research/subterra-survival-planner/**"
+      - ".github/workflows/subterra-robust-survival-referee-v0-1.yml"
+  pull_request:
+    paths:
+      - "crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**"
+      - "crates/domains/symthaea-subterranean/research/subterra-survival-planner/**"
+      - ".github/workflows/subterra-robust-survival-referee-v0-1.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  referee:
+    name: Standalone Rust format, tests and strict Clippy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee
+    steps:
+      - name: Check out exact source
+        uses: actions/checkout@v4
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Run offline tests
+        run: cargo test --offline --all-targets
+      - name: Run strict offline Clippy
+        run: cargo clippy --offline --all-targets -- -D warnings
