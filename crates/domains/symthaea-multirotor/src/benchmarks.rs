@@ -70,23 +70,37 @@ impl Default for WindBenchmarkConfig {
 /// Results from a wind gust benchmark run.
 #[derive(Debug, Clone)]
 pub struct WindBenchmarkResult {
-    /// Mean position error for the HDC controller without FEP modulation.
-    /// This arm still trains against the declared PD target; it is not a frozen controller.
+    /// Per-episode mean position error for the HDC controller without FEP modulation.
+    /// Aligned by index with `episode_seeds`; this arm still trains against the PD target.
     pub baseline_metrics: Vec<f64>,
-    /// Mean position error for the HDC controller with FEP modulation.
+    /// Per-episode mean position error for the HDC controller with FEP modulation.
+    /// Aligned by index with `episode_seeds`.
     pub fep_metrics: Vec<f64>,
     /// Steps to recover within 5cm after each gust (FEP).
     pub recovery_steps: Vec<usize>,
-    /// Maximum deviation during gusts (FEP).
+    /// Maximum position deviation over all evaluated steps (FEP).
     pub max_deviation: f64,
-    /// Maximum deviation during gusts (baseline).
+    /// Maximum position deviation over all evaluated steps (baseline).
     pub baseline_max_deviation: f64,
     /// Stable per-episode seeds shared by paired baseline/FEP runs.
     /// These identify simulation trials, not physical flights or independent models.
     pub episode_seeds: Vec<u64>,
-    /// Whether each FEP gust window recovered within the evaluated horizon.
-    /// A false value is a right-censored non-recovery, not a successful zero-step result.
-    pub recovery_success: Vec<bool>,
+    /// Per-gust recovery outcomes, bound to episode seed and configured gust index.
+    pub recovery_events: Vec<WindGustRecoveryResult>,
+}
+
+/// Recovery outcome for one configured gust in one paired simulation trial.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WindGustRecoveryResult {
+    /// Stable seed shared by the paired baseline/FEP episode.
+    pub episode_seed: u64,
+    /// Zero-based index into `WindBenchmarkConfig::gusts`.
+    pub gust_index: usize,
+    /// Number of simulated plant steps from gust end until first recovery crossing.
+    /// If `recovered_within_horizon` is false, this is right-censored at the horizon.
+    pub steps_after_gust_end: usize,
+    /// Whether position error crossed below 5 cm before the trial ended.
+    pub recovered_within_horizon: bool,
 }
 
 /// Physics backend selection for polymorphic benchmarks.
@@ -140,7 +154,9 @@ fn apply_active_gusts(
     interval_start: f64,
 ) {
     for gust in gusts {
-        if interval_start >= gust.start_time && interval_start < gust.start_time + gust.duration {
+        if interval_start >= gust.start_time
+            && interval_start < gust.start_time + gust.duration
+        {
             physics.apply_external_force(gust.force);
         }
     }
@@ -182,7 +198,7 @@ pub fn run_wind_benchmark_with_backend(
     let mut baseline_errors = Vec::new();
     let mut fep_errors = Vec::new();
     let mut recovery_steps = Vec::new();
-    let mut recovery_success = Vec::new();
+    let mut recovery_events = Vec::new();
     let mut episode_seeds = Vec::with_capacity(config.eval_episodes);
     let mut max_dev_fep = 0.0f64;
     let mut max_dev_baseline = 0.0f64;
@@ -208,8 +224,8 @@ pub fn run_wind_benchmark_with_backend(
             let mut total_err = 0.0;
 
             for step in 0..config.flight_config.steps_per_episode {
-                let time = step as f64 * dt;
                 let state = physics.state().clone();
+                let time = state.timestamp;
                 let sensor_hv = encoder.encode(&state);
                 let command = controller.forward(&sensor_hv, dt as f32);
                 apply_active_gusts(&mut *physics, &config.gusts, time);
@@ -252,8 +268,8 @@ pub fn run_wind_benchmark_with_backend(
                 .collect();
 
             for step in 0..config.flight_config.steps_per_episode {
-                let time = step as f64 * dt;
                 let state = physics.state().clone();
+                let time = state.timestamp;
                 let sensor_hv = encoder.encode(&state);
                 let mut command = controller.forward(&sensor_hv, dt as f32);
 
@@ -300,12 +316,15 @@ pub fn run_wind_benchmark_with_backend(
 
             fep_errors.push(total_err / config.flight_config.steps_per_episode as f64);
 
-            for (_, recovered, count) in &gust_end_tracking {
+            for (gust_index, (_, recovered, count)) in gust_end_tracking.iter().enumerate() {
                 recovery_steps.push(*count);
-                recovery_success.push(*recovered);
+                recovery_events.push(WindGustRecoveryResult {
+                    episode_seed,
+                    gust_index,
+                    steps_after_gust_end: *count,
+                    recovered_within_horizon: *recovered,
+                });
             }
-
-            let _ = ep;
         }
     }
 
@@ -316,7 +335,7 @@ pub fn run_wind_benchmark_with_backend(
         max_deviation: max_dev_fep,
         baseline_max_deviation: max_dev_baseline,
         episode_seeds,
-        recovery_success,
+        recovery_events,
     }
 }
 
@@ -1092,7 +1111,9 @@ mod tests {
             derive_episode_seed(&config.flight_config.genesis_phrase, 0)
         );
         assert_eq!(result.recovery_steps.len(), 1);
-        assert_eq!(result.recovery_success.len(), 1);
+        assert_eq!(result.recovery_events.len(), 1);
+        assert_eq!(result.recovery_events[0].episode_seed, result.episode_seeds[0]);
+        assert_eq!(result.recovery_events[0].gust_index, 0);
     }
 
     #[test]
