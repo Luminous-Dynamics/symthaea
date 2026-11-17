@@ -382,6 +382,10 @@ impl fmt::Display for SelectionAuditError {
                 f,
                 "ready candidate {candidate_id} is missing its canonical model artifact digest"
             ),
+            Self::ConflictingDuplicateArtifact { digest } => write!(
+                f,
+                "exact duplicate artifact {digest} has conflicting development metrics, eligibility or evidence references"
+            ),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate ID: {id}"),
             Self::EmptyCandidateId => write!(f, "candidate ID must not be empty"),
             Self::EmptyEvidenceId => write!(f, "evidence ID must not be empty"),
