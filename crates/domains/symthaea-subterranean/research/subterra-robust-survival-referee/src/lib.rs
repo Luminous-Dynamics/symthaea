@@ -1707,7 +1707,6 @@ mod tests {
     }
 
     #[test]
-    #[test]
     fn robot_loss_limit_fails_even_when_mean_model_risk_is_lower() {
         let models = vec![
             ModelScenario {
