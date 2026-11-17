@@ -5,6 +5,7 @@ pub mod manifest;
 pub mod ngrc;
 pub mod paired_world;
 pub mod structural_bias;
+pub mod structural_bias_reservoir;
 pub mod tournament;
 
 use std::error::Error;
