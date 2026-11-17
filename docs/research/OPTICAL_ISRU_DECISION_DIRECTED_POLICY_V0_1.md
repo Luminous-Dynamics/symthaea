@@ -217,3 +217,55 @@ The competitive claim must not be "we produce more water/oxygen" until measured.
 - The current code tests validate software semantics only. Exact-head workflow status must be inspected independently; skipped or queued jobs are not passes.
 
 Next physical-model increment: replace the lumped thermal proxy with a conservative 1-D finite-volume heat-conduction column, then fit/validate it against instrumented coupons before adding higher-dimensional mechanics or claiming predictive fidelity.
+
+
+## 10. Action-conditioned state transitions — 17 November 2026
+
+The first observation-only EVSI formulation was too narrow for two important campaign actions:
+
+- **Cleaning/requalification** changes the physical apparatus state. It is not merely a measurement about whether the optic was fouled; a successful cleaning process can move the optic into a recovered state, while incomplete cleaning or surface damage may leave it unqualified.
+- **Independent assay** can change evidence eligibility. A successful independent assay can unlock a terminal accept-product decision; a failed assay must not.
+
+The executable policy now factorizes an action outcome as:
+
+[
+P(y mid h,a);P(h' mid h,y,a)
+]
+
+where (h) is the current hypothesis, (y) the observed outcome and (h') the post-action hypothesis. The outcome also carries a constrained set of gate updates. The next posterior is:
+
+[
+p(h' mid y,a)=
+rac{sum_h p(h)P(ymid h,a)P(h'mid h,y,a)}
+{sum_h p(h)P(ymid h,a)}
+]
+
+The expected next decision risk is calculated against terminal decisions eligible under the outcome-specific evidence state. For identity transitions and no gate updates, this reduces to ordinary EVSI. For cleaning, the transition can represent physical recovery. For assay, the outcome can set only the independent-assay-pass gate.
+
+### Gate-update authority boundary
+
+Outcome updates are restricted by action type:
+- optical reference may update only the reference-channel validity gate;
+- QCM/witness inspection may update only its evidence-chain validity gate;
+- calibration may update only instrument calibration validity;
+- cleaning/requalification may update only optical-path qualification;
+- independent assay may update only independent-assay pass;
+- material experiment cannot mint an evidence gate.
+
+Sample identity, thermal safety, cleaning-protocol qualification, calibration-standard validity and independent-assay-chain validity are protected from these updates. They must originate from their appropriate external evidence/authority paths. A diagnostic result cannot declare a machine thermally safe.
+
+### New regression cases
+
+The standalone policy suite now additionally checks:
+- an assay-pass outcome can unlock the accept-product decision, while a failed assay cannot;
+- cleaning can both transform the fouled hypothesis into a recovered state and update optical qualification;
+- hard thermal safety cannot be minted from an optical-reference observation;
+- an action cannot update a gate outside its evidence scope;
+- transition matrices must normalize and preserve probability mass;
+- measurement-only identity transitions still provide ordinary EVSI behavior.
+
+These are still synthetic finite-state fixtures. The model does not prove that a physical cleaning protocol recovers an optic or that an assay result is authentic; it computes decision value only from supplied, independently qualified likelihoods and evidence updates.
+
+### Next algorithmic research
+
+The action-conditioned one-step controller remains myopic. The next step is a finite-horizon campaign planner over resource-constrained action sequences, using the transition-aware controller as the one-step baseline. Compare this against MSBO, batch/asynchronous BO, and a small exact dynamic-programming oracle on finite hidden worlds. To avoid gaming, include material depletion, irreversible sample consumption, calibration expiry, delayed jobs, cleaning downtime, assay cost and failure/abort transitions.
