@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/lightshell-zone-spec-0.1.0.json",
+  "title": "Atelier Lightshell Zone Requirements",
+  "description": "A proposed or frozen, robot-specific functional requirement brief for textile garment zones. This is not physical qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "spec_id", "state", "platform", "operating_domain", "zones", "evidence_policy"],
+  "properties": {
+    "schema_version": { "const": "0.1.0" },
+    "spec_id": { "type": "string", "minLength": 1 },
+    "state": { "enum": ["proposed", "requirements_pending", "frozen"] },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["platform_id", "article_revision", "geometry_digest"],
+      "properties": {
+        "platform_id": { "type": "string", "minLength": 1 },
+        "article_revision": { "type": ["string", "null"] },
+        "geometry_digest": {
+          "type": ["string", "null"],
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        }
+      }
+    },
+    "operating_domain": { "type": "array", "items": { "type": "string" } },
+    "zones": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["zone_id", "robot_zone_ref", "frame_ref", "functions", "requirements", "keep_out_refs", "clearance_review_ref", "service"],
+        "properties": {
+          "zone_id": { "type": "string", "minLength": 1 },
+          "robot_zone_ref": { "type": ["string", "null"] },
+          "frame_ref": { "type": ["string", "null"] },
+          "functions": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "impact_compression",
+                "vibration_isolation",
+                "airflow",
+                "thermal_management",
+                "articulation",
+                "abrasion",
+                "fluid_chemical_barrier",
+                "cleanability",
+                "sensor_accommodation",
+                "repairability"
+              ]
+            }
+          },
+          "requirements": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "function_id", "metric_id", "unit", "direction", "hard_gate",
+                "lower_bound", "upper_bound", "method_ref", "acceptance_rule_ref"
+              ],
+              "properties": {
+                "function_id": {
+                  "enum": [
+                    "impact_compression",
+                    "vibration_isolation",
+                    "airflow",
+                    "thermal_management",
+                    "articulation",
+                    "abrasion",
+                    "fluid_chemical_barrier",
+                    "cleanability",
+                    "sensor_accommodation",
+                    "repairability"
+                  ]
+                },
+                "metric_id": {
+                  "enum": [
+                    "compression_energy_j_g",
+                    "transmitted_force_n",
+                    "vibration_transmissibility_ratio",
+                    "air_permeability_mm_s",
+                    "temperature_delta_c",
+                    "joint_rom_delta_deg",
+                    "flex_fatigue_cycles",
+                    "minimum_clearance_mm",
+                    "abrasion_cycles",
+                    "fluid_ingress_mass_g_m2",
+                    "chemical_mass_change_pct",
+                    "cleaning_residue_fraction",
+                    "sensor_occlusion_fraction",
+                    "repair_time_min",
+                    "added_mass_g",
+                    "seam_strength_n"
+                  ]
+                },
+                "unit": {
+                  "enum": ["J/g", "N", "ratio", "mm/s", "degC", "deg", "cycles", "mm", "g/m2", "%", "fraction", "min", "g"]
+                },
+                "direction": {
+                  "enum": ["higher_is_better", "lower_is_better", "within_declared_band"]
+                },
+                "hard_gate": { "type": "boolean" },
+                "lower_bound": { "type": ["number", "null"] },
+                "upper_bound": { "type": ["number", "null"] },
+                "method_ref": { "type": ["string", "null"] },
+                "acceptance_rule_ref": { "type": ["string", "null"] }
+              }
+            }
+          },
+          "keep_out_refs": { "type": "array", "items": { "type": "string" } },
+          "clearance_review_ref": { "type": ["string", "null"] },
+          "service": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["replaceable", "interface_ref", "inspection_access"],
+            "properties": {
+              "replaceable": { "type": "boolean" },
+              "interface_ref": { "type": ["string", "null"] },
+              "inspection_access": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unknowns_fail_closed",
+        "visual_estimates_are_non_qualifying",
+        "simulation_is_not_physical_qualification",
+        "supplier_claims_are_not_independent_qualification"
+      ],
+      "properties": {
+        "unknowns_fail_closed": { "const": true },
+        "visual_estimates_are_non_qualifying": { "const": true },
+        "simulation_is_not_physical_qualification": { "const": true },
+        "supplier_claims_are_not_independent_qualification": { "const": true }
+      }
+    }
+  }
+}
