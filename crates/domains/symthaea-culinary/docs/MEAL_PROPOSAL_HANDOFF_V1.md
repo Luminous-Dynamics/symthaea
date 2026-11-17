@@ -21,6 +21,8 @@ Each fact carries a claim kind, scope, value, unit/basis, source record/version,
 ## Validation
 
 - duplicate ingredient/task/fact IDs and unresolved references are rejected;
+- price claims require a market, currency/unit and normalization basis; availability requires a market and validity end; allergen declarations require product-SKU or supplier-lot scope;
+- task evidence links are fact IDs, not arbitrary unversioned labels;
 - dependency cycles and invalid duration windows are rejected;
 - unknown quantities need a matching uncertainty record;
 - exact hardware assignment is intentionally absent;
