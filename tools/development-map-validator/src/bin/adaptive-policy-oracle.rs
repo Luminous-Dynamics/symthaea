@@ -28,7 +28,7 @@ struct World{ safe_actions:BTreeSet<String>, observations:BTreeMap<String,String
 #[derive(Clone,Debug)]
 struct OptionDef{factor_id:String,available_at:DateTime<FixedOffset>,available_at_raw:String,cost_p95:u64}
 #[derive(Clone,Debug)]
-struct Action{irreversible:bool,hard_gate:bool,max_risk:u64}
+struct Action{read_only:bool,irreversible:bool,hard_gate:bool,max_risk:u64}
 #[derive(Clone,Debug)]
 struct Step{option_id:String,outcome:String,at:String}
 #[derive(Clone,Debug)]
@@ -109,10 +109,16 @@ fn parse_actions(v:&Value)->Result<BTreeMap<String,Action>,String>{
  let items=val(v,"actions","candidate_view")?.as_array().ok_or("actions must be array")?;
  if items.is_empty()||items.len()>16{return Err("actions must contain 1..=16 entries".to_owned());}
  let mut out=BTreeMap::new();
- for (i,a) in items.iter().enumerate(){let l=format!("actions[{i}]");allowed(a,&["action_id","irreversible","hard_gate","max_residual_risk_bps"],&l)?;
-  let id=s(a,"action_id",&l)?;let irreversible=val(a,"irreversible",&l)?.as_bool().ok_or("irreversible must be boolean")?;let hard=val(a,"hard_gate",&l)?.as_bool().ok_or("hard_gate must be boolean")?;let risk=u(a,"max_residual_risk_bps",&l)?;
-  if risk>SCALE||(hard&&risk!=0)||(irreversible&&!hard){return Err(format!("invalid action policy {id:?}"));}
-  if out.insert(id,Action{irreversible,hard_gate:hard,max_risk:risk}).is_some(){return Err("duplicate action".to_owned());}
+ for (i,a) in items.iter().enumerate(){let l=format!("actions[{i}]");allowed(a,&["action_id","read_only","irreversible","hard_gate","max_residual_risk_bps"],&l)?;
+  let id=s(a,"action_id",&l)?;
+  let read_only=val(a,"read_only",&l)?.as_bool().ok_or("read_only must be boolean")?;
+  let irreversible=val(a,"irreversible",&l)?.as_bool().ok_or("irreversible must be boolean")?;
+  let hard=val(a,"hard_gate",&l)?.as_bool().ok_or("hard_gate must be boolean")?;
+  let risk=u(a,"max_residual_risk_bps",&l)?;
+  if risk>SCALE||(hard&&risk!=0)||(irreversible&&!hard)||(read_only&&(irreversible||hard||risk!=0)){
+   return Err(format!("invalid action policy {id:?}"));
+  }
+  if out.insert(id,Action{read_only,irreversible,hard_gate:hard,max_risk:risk}).is_some(){return Err("duplicate action".to_owned());}
  }
  Ok(out)
 }
@@ -140,7 +146,7 @@ fn parse_nodes(tree:&Value,options:&BTreeMap<String,OptionDef>,factor_outcomes:&
    let claimed=u(v,"claimed_residual_risk_bps",&l)?;if claimed>SCALE{return Err("claimed risk exceeds 10000".to_owned());}
    if decision=="defer"{
     let policy=&actions[&action];
-    if policy.irreversible||policy.hard_gate||policy.max_risk!=0{
+    if !policy.read_only||policy.irreversible||policy.hard_gate||policy.max_risk!=0{
      return Err("defer must use a non-irreversible, non-hard-gated zero-risk action".to_owned());
     }
    }
@@ -173,10 +179,22 @@ fn factor_outcomes(candidate:&Value)->Result<BTreeMap<String,BTreeSet<String>>,S
  }Ok(out)
 }
 fn parse_world_bounds(v:&Value)->Result<BTreeMap<String,Bounds>,String>{parse_bounds(val(v,"hypothesis_bounds","candidate_view")?)}
+fn risk_compatible_actions(value:&Value)->Result<Value,String>{
+ let items=value.as_array().ok_or("actions must be an array")?;
+ let mut output=Vec::new();
+ for item in items{
+  let mut row=object(item,"adaptive action")?.clone();
+  row.remove("read_only");
+  output.push(Value::Object(row));
+ }
+ Ok(Value::Array(output))
+}
 fn risk_for_path(candidate:&Value,oracle:&Value,steps:&[Step],representative:&str,action:&str,claimed:u64)->Result<Value,String>{
  let trace=json!({"trace_id":format!("risk-{}",steps.iter().map(|s|s.option_id.as_str()).collect::<Vec<_>>().join("-")),"acquisitions":steps.iter().map(|x|json!({"option_id":x.option_id,"observed_value":x.outcome,"at":x.at})).collect::<Vec<_>>(),"decision":{"kind":"act","action_id":action,"claimed_residual_risk_bps":claimed}});
- let cv=json!({"scenario_id":candidate["scenario_id"],"decision_cutoff":candidate["decision_cutoff"],"actions":candidate["actions"],"hypothesis_bounds":candidate["hypothesis_bounds"],"options":candidate["options"],"factors":candidate["factors"],"traces":[trace]});
- let ov=json!({"actual_hypothesis_id":representative,"decision_cutoff":oracle["decision_cutoff"],"actions":oracle["actions"],"hypothesis_bounds":oracle["hypothesis_bounds"],"options":oracle["options"],"factors":oracle["factors"],"hypothesis_safety":oracle["hypothesis_safety"],"calibrations":oracle["calibrations"],"factorization_certificates":oracle["factorization_certificates"]});
+ let candidate_actions=risk_compatible_actions(&candidate["actions"])?;
+ let oracle_actions=risk_compatible_actions(&oracle["actions"])?;
+ let cv=json!({"scenario_id":candidate["scenario_id"],"decision_cutoff":candidate["decision_cutoff"],"actions":candidate_actions,"hypothesis_bounds":candidate["hypothesis_bounds"],"options":candidate["options"],"factors":candidate["factors"],"traces":[trace]});
+ let ov=json!({"actual_hypothesis_id":representative,"decision_cutoff":oracle["decision_cutoff"],"actions":oracle_actions,"hypothesis_bounds":oracle["hypothesis_bounds"],"options":oracle["options"],"factors":oracle["factors"],"hypothesis_safety":oracle["hypothesis_safety"],"calibrations":oracle["calibrations"],"factorization_certificates":oracle["factorization_certificates"]});
  let report=noisy_channel::evaluate_noisy_channel_parts_json(&cv.to_string(),&ov.to_string())?;
  Ok(report["traces"][0].clone())
 }
@@ -185,7 +203,7 @@ fn canonical_defer_action(
  worlds:&BTreeMap<String,World>
 )->Result<String,String>{
  let matches:Vec<String>=actions.iter().filter(|(id,action)|{
-  !action.irreversible&&!action.hard_gate&&action.max_risk==0
+  action.read_only&&!action.irreversible&&!action.hard_gate&&action.max_risk==0
    &&worlds.values().all(|world|world.safe_actions.contains(*id))
  }).map(|(id,_)|id.clone()).collect();
  if matches.len()!=1{
