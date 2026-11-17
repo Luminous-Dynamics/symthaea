@@ -1,0 +1,16 @@
+[package]
+name = "symmetry-active-noise-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Interval-safe finite and persistent-noise evidence replay for symmetry experiments"
+
+[dependencies]
+symmetry-active-experiment-reference = { path = "../symmetry-active-experiment-001" }
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
