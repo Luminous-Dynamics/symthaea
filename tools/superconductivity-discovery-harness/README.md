@@ -165,3 +165,9 @@ The fixture uses synthetic local pairing-energy and bulk stiffness observations 
 The current v0.1 registry contains 23 source records, 13 candidate/material references and 18 benchmark catalogs. This is a source inventory, not 23 independent experiments or 13 validated new superconductors. The new metallic-screening, single-plane, spatial-coherence and stiffness-metrology sources are separately represented, and the source-level measurement/claim boundaries are preserved.
 
 Measurement scope is now required on every observation assertion. An observed Tc must be explicitly mesoscopic, bulk or device scope; local_probe and unknown fail closed. Calculated and predicted records retain their own scope (for example theoretical_model). This prevents unscoped measurements from being silently treated as bulk evidence.
+
+## External literature-library import identity
+
+Observation events may carry a source.external_catalog object when extraction_method is database_import. It preserves library_id, external_record_id, API version, dataset version, snapshot ID, retrieval time, ETag, X-Data-Version and parent paper/material/sample/state/result IDs.
+
+The Rust observation auditor now requires those fields on database imports, checks X-Data-Version against the declared dataset version, and verifies imported parent material/sample/state/result IDs against the event. A synthetic SCLib-shaped example and negative controls are included. No real external dataset has been downloaded or mirrored.
