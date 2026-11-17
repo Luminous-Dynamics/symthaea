@@ -25,7 +25,7 @@ pub enum SpectralBand {
 }
 
 impl SpectralBand {
-    pub(super) fn index(self) -> usize {
+    pub fn index(self) -> usize {
         match self {
             Self::Ultraviolet => 0,
             Self::Visible => 1,
