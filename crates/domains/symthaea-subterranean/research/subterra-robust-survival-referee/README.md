@@ -56,3 +56,7 @@ The only dependency is the adjacent standalone survival-planner reference crate.
 ## Core tests
 
 The unit tests include hand-computable expected-loss/risk values, model-specific risk divergence, external-gate denial, path-wise budget exhaustion, policy-cache tampering, missing branches and model-schema mismatch. They are source-authored tests until an exact-head Rust toolchain run records execution evidence.
+
+## Stacked dependency repair
+
+The v0.1 referee depends on the adjacent finite-horizon survival planner. The stacked integration branch includes the minimal compile corrections needed for that dependency (non-Eq error enum containing f64 values, non-shadowing expected-loss accumulator, explicit risk accumulator types, and the corresponding result field). These repairs do not change the planner's decision semantics. The focused workflow checks both standalone crates; they remain research references until exact-head checks and independent review pass.
