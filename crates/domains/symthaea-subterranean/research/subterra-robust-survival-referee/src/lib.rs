@@ -538,7 +538,10 @@ fn validate_model_schema(models: &[ModelScenario]) -> Result<(), RefereeError> {
                     )
                 })
                 .collect::<Vec<_>>();
-            if action.modality != *modality || action.cost != *cost || actual != *expected_outcomes {
+            if action.modality.as_str() != *modality
+                || action.cost != *cost
+                || actual.as_slice() != expected_outcomes.as_slice()
+            {
                 return Err(RefereeError::ModelSchemaMismatch(format!(
                     "model {} changes action/outcome semantics for {}",
                     model.model_id, action.id
@@ -561,7 +564,7 @@ fn validate_policy(
     node_count: &mut usize,
     config: RefereeConfig,
 ) -> Result<(), RefereeError> {
-    *node_count = node_count.saturating_add(1);
+    *node_count = (*node_count).saturating_add(1);
     if *node_count > config.maximum_policy_nodes {
         return Err(RefereeError::PolicyNodeLimitExceeded);
     }
@@ -907,7 +910,11 @@ pub fn evaluate_policy_robustly(
     let values = per_model.iter().map(|metric| metric.expected_total_value).collect::<Vec<_>>();
     let worst_case_expected_total_value = values.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let best_case_expected_total_value = values.iter().copied().fold(f64::INFINITY, f64::min);
-    let mean_expected_total_value = values.iter().sum::<f64>() / values.len() as f64;
+    let total_value_sum = values.iter().sum::<f64>();
+    if !total_value_sum.is_finite() {
+        return Err(RefereeError::NumericalOverflow("mean model value"));
+    }
+    let mean_expected_total_value = total_value_sum / values.len() as f64;
     let maximum_mission_interruption_probability = per_model.iter()
         .map(|metric| metric.mission_interruption_probability)
         .fold(0.0, f64::max);
