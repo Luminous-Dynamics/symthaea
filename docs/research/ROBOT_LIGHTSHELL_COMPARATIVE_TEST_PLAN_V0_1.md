@@ -211,3 +211,35 @@ Every hard gate is now recorded per candidate (six candidates × nine gates), an
 Ranking eligibility requires an exact matched B0 baseline, a common coverage boundary, all candidate-scoped gates resolved acceptably, at least one evidence-complete passed module/integrated test, no adverse run, and observed core metrics with method and uncertainty references. The validator returns eligible candidate IDs only; it does not calculate Pareto dominance or claim superiority.
 
 The seed fixture remains `inputs_pending`: all gate states are unknown, all observed/target/baseline metric values are null, and no test runs exist. This remains an explicit non-result.
+
+
+## 15. Simulation, smart-textile and metamaterial frontier (17 November 2026)
+
+### RGBench — use as a cloth-model comparator, not a protective-shell rating
+
+The AAAI-2026 RGBench project reports a large garment-mesh corpus and its GarmentDynamics simulator, with paper-reported average simulation error reduction of about 20% and around 3× speed versus the compared simulator baselines. Its publicly released real-capture evaluation package is distinct from its full research corpus: the published GitHub release describes nine garments, 98 capture sessions and three bimanual actions (fling/fold/grasp), with a separate 2,794-row garment-asset research subset carrying a non-commercial research license.
+
+Use existing Symtropy [RGBENCH-REPRODUCE-001 #4870](https://github.com/Luminous-Dynamics/symtropy/issues/4870) for rights-aware reproduction. Lightshell should consume an admitted cloth profile and test simulator residuals against RGBench where relevant, but must also calibrate the actual Lightshell fabric, seams, attachment tension and robot-mounted deformation. RGBench measures cloth simulation/manipulation; it does not qualify impact protection, seam durability, robot kinematics, cooling or human-contact safety.
+
+Sources:
+- RGBench project page: https://rgbench.github.io/
+- Public evaluation/code release: https://github.com/hwk0809/RGBench
+- RGBench evaluation dataset: https://huggingface.co/datasets/RGBench/RGBench-Cloth-Sim2Real-v1
+
+### Auxetic textile/lattice hybrids
+
+A January 2026 study optimized a 2D hybrid auxetic lattice's strut slenderness and viscoelastic properties to reduce transmitted peak force while increasing energy mitigation in its modeled/validated context. This supports a local reinforcement research lane: compare conventional elastomer/lattice patches against auxetic geometries coupled to the same textile/spacer face. It does not establish performance in a robot shell. The test must account for rate, temperature, fatigue, attachment, local pressure peaks and actual print/material process.
+
+Source: https://doi.org/10.1016/j.ijsolstr.2025.113659
+
+### Sensor textiles are a distinct qualification domain
+
+The 2026 fibre-piezoresistive e-skin and self-powered minimal-channel textile papers are now tracked under [LIGHTSHELL-SENSOR-FABRIC-001 #12704](https://github.com/Luminous-Dynamics/symthaea/issues/12704). Keep sensor-free mechanical protection as the control; compare sensor architectures separately. Wash/flex/humidity/calibration/fault performance is part of sensor qualification, not inferred from base textile strength.
+
+### Kinematic pattern generation
+
+The next architectural step is [ROBOT-GARMENT-COMPILER-001 #12710](https://github.com/Luminous-Dynamics/symthaea/issues/12710): transform source robot CAD, joint motion, thermal/sensor/service keep-outs and protection zones into candidate panel/seam/attachment/manufacturing packages. The compiler's geometric result remains a candidate. It must not replace robot CAD, garment authoring, cloth simulation or human engineering approval.
+
+### Evidence scope
+
+All literature results remain external paper/project claims until independently reproduced on the declared task. No RGBench data, sensor array, auxetic coupon or Lightshell physical sample is claimed downloaded, fabricated or tested by this PR.
