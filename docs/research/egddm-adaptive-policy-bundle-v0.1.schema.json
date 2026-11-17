@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-adaptive-policy-bundle-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.1 adaptive policy evaluator bundle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_view",
+    "oracle"
+  ],
+  "properties": {
+    "candidate_view": {
+      "$ref": "https://luminousdynamics.io/schemas/egddm-adaptive-policy-candidate-v0.1.schema.json"
+    },
+    "oracle": {
+      "$ref": "https://luminousdynamics.io/schemas/egddm-adaptive-policy-oracle-v0.1.schema.json"
+    }
+  }
+}

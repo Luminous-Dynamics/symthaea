@@ -1,0 +1,394 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-adaptive-policy-report-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.1 exact adaptive policy report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "actual_hypothesis_id_evaluator_only",
+    "world_count",
+    "option_count",
+    "max_depth",
+    "submitted_policy",
+    "exact_oracle",
+    "regret",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adjudication_status": {
+      "const": "synthetic_known_answer_exact_small_tree_adaptive_policy_evaluation"
+    },
+    "actual_hypothesis_id_evaluator_only": {
+      "type": "string",
+      "minLength": 1
+    },
+    "world_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8
+    },
+    "option_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 6
+    },
+    "max_depth": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "submitted_policy": {
+      "$ref": "#/$defs/policyMetrics"
+    },
+    "exact_oracle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "search_complete",
+        "feasible_policy_count",
+        "objective",
+        "action_coverage_nominal_bps",
+        "worst_case_expected_cost_bound_micros",
+        "nominal_expected_cost_bound_micros",
+        "worst_case_path_cost_bound_micros",
+        "full_revalidation_comparator",
+        "policy_tree"
+      ],
+      "properties": {
+        "search_complete": {
+          "type": "boolean"
+        },
+        "feasible_policy_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "objective": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_coverage_nominal_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "worst_case_expected_cost_bound_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nominal_expected_cost_bound_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "worst_case_path_cost_bound_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "full_revalidation_comparator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "acquisition_count",
+            "cost_bound_micros",
+            "nominal_expected_cost_bound_micros",
+            "worst_case_expected_cost_bound_micros",
+            "action_coverage_nominal_bps",
+            "nominal_cost_savings_micros"
+          ],
+          "properties": {
+            "acquisition_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "cost_bound_micros": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "nominal_expected_cost_bound_micros": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "worst_case_expected_cost_bound_micros": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "action_coverage_nominal_bps": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "nominal_cost_savings_micros": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "policy_tree": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "root_node_id",
+            "nodes"
+          ],
+          "properties": {
+            "root_node_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "nodes": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 64,
+              "items": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "node_id",
+                      "kind",
+                      "option_id",
+                      "at",
+                      "branches"
+                    ],
+                    "properties": {
+                      "node_id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "acquire"
+                      },
+                      "option_id": {
+                        "type": "string"
+                      },
+                      "at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "branches": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "node_id",
+                      "kind",
+                      "decision_kind",
+                      "action_id",
+                      "claimed_residual_risk_bps"
+                    ],
+                    "properties": {
+                      "node_id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "const": "stop"
+                      },
+                      "decision_kind": {
+                        "enum": [
+                          "act",
+                          "defer"
+                        ]
+                      },
+                      "action_id": {
+                        "type": "string"
+                      },
+                      "claimed_residual_risk_bps": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 10000
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "regret": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target_action_coverage_bps",
+        "worst_case_expected_cost_bound_micros",
+        "nominal_expected_cost_bound_micros"
+      ],
+      "properties": {
+        "target_action_coverage_bps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "worst_case_expected_cost_bound_micros": {
+          "type": "integer"
+        },
+        "nominal_expected_cost_bound_micros": {
+          "type": "integer"
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "policyMetrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "policy_feasible",
+        "action_coverage_nominal_bps",
+        "unnecessary_abstention_nominal_bps",
+        "unsafe_world_action_count",
+        "robust_risk_violation_leaf_count",
+        "over_budget_leaf_count",
+        "worst_case_path_cost_bound_micros",
+        "nominal_expected_cost_bound_micros",
+        "worst_case_expected_cost_bound_micros",
+        "budget_micros",
+        "leaf_reports",
+        "world_paths"
+      ],
+      "properties": {
+        "policy_feasible": {
+          "type": "boolean"
+        },
+        "action_coverage_nominal_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "unnecessary_abstention_nominal_bps": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "robust_risk_violation_leaf_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "over_budget_leaf_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "worst_case_path_cost_bound_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nominal_expected_cost_bound_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "worst_case_expected_cost_bound_micros": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "budget_micros": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "leaf_reports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "leaf_node_id",
+              "world_ids",
+              "decision_kind",
+              "action_id",
+              "nominal_risk_bps",
+              "worst_case_posterior_risk_bps",
+              "risk_qualified",
+              "path_cost_bound_micros",
+              "within_budget",
+              "feasible"
+            ],
+            "properties": {
+              "leaf_node_id": {
+                "type": "string"
+              },
+              "world_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "decision_kind": {
+                "enum": [
+                  "act",
+                  "defer"
+                ]
+              },
+              "action_id": {
+                "type": "string"
+              },
+              "nominal_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "worst_case_posterior_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "risk_qualified": {
+                "type": "boolean"
+              },
+              "path_cost_bound_micros": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "within_budget": {
+                "type": "boolean"
+              },
+              "feasible": {
+                "type": "boolean"
+              }
+            }
+          }
+        },
+        "world_paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "world_id",
+              "leaf_node_id",
+              "path_cost_bound_micros"
+            ],
+            "properties": {
+              "world_id": {
+                "type": "string"
+              },
+              "leaf_node_id": {
+                "type": "string"
+              },
+              "path_cost_bound_micros": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        },
+        "unsafe_world_action_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

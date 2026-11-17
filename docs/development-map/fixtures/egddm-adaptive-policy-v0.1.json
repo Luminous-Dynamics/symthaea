@@ -1,0 +1,593 @@
+{
+  "candidate_view": {
+    "scenario_id": "d6-17-2-1-adaptive-exact-two-gate-v0.1",
+    "decision_cutoff": "2026-11-17T10:00:00Z",
+    "budget_micros": 1600,
+    "max_depth": 3,
+    "actions": [
+      {
+        "action_id": "release",
+        "irreversible": true,
+        "hard_gate": true,
+        "max_residual_risk_bps": 0,
+        "read_only": false
+      },
+      {
+        "action_id": "inspect-readonly",
+        "irreversible": false,
+        "hard_gate": false,
+        "max_residual_risk_bps": 0,
+        "read_only": true
+      }
+    ],
+    "hypothesis_bounds": [
+      {
+        "hypothesis_id": "safe",
+        "lower_probability_bps": 5000,
+        "upper_probability_bps": 7000,
+        "nominal_probability_bps": 6000
+      },
+      {
+        "hypothesis_id": "hazard-a",
+        "lower_probability_bps": 500,
+        "upper_probability_bps": 2500,
+        "nominal_probability_bps": 1500
+      },
+      {
+        "hypothesis_id": "hazard-b",
+        "lower_probability_bps": 500,
+        "upper_probability_bps": 2500,
+        "nominal_probability_bps": 1500
+      },
+      {
+        "hypothesis_id": "hazard-ab",
+        "lower_probability_bps": 500,
+        "upper_probability_bps": 3000,
+        "nominal_probability_bps": 1000
+      }
+    ],
+    "options": [
+      {
+        "option_id": "gate-a",
+        "available_at": "2026-11-17T09:00:00Z",
+        "factor_id": "gate-a-factor"
+      },
+      {
+        "option_id": "gate-b",
+        "available_at": "2026-11-17T09:00:00Z",
+        "factor_id": "gate-b-factor"
+      }
+    ],
+    "factors": [
+      {
+        "factor_id": "gate-a-factor",
+        "dependence_group": "gate-a-system",
+        "source_ids": [
+          "gate-a-oracle"
+        ],
+        "calibration_ref": "gate-a-cal",
+        "likelihoods": [
+          {
+            "hypothesis_id": "safe",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              },
+              "fail": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-a",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              },
+              "fail": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-b",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-ab",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          }
+        ]
+      },
+      {
+        "factor_id": "gate-b-factor",
+        "dependence_group": "gate-b-system",
+        "source_ids": [
+          "gate-b-oracle"
+        ],
+        "calibration_ref": "gate-b-cal",
+        "likelihoods": [
+          {
+            "hypothesis_id": "safe",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              },
+              "fail": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-a",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-b",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              },
+              "fail": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-ab",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "policy_tree": {
+      "root_node_id": "gate-a-root",
+      "nodes": [
+        {
+          "node_id": "gate-a-root",
+          "kind": "acquire",
+          "option_id": "gate-a",
+          "at": "2026-11-17T09:01:00Z",
+          "branches": {
+            "pass": "gate-b-after-a-pass",
+            "fail": "defer-after-a-fail"
+          }
+        },
+        {
+          "node_id": "gate-b-after-a-pass",
+          "kind": "acquire",
+          "option_id": "gate-b",
+          "at": "2026-11-17T09:02:00Z",
+          "branches": {
+            "pass": "release-after-b-pass",
+            "fail": "defer-after-b-fail"
+          }
+        },
+        {
+          "node_id": "release-after-b-pass",
+          "kind": "stop",
+          "decision_kind": "act",
+          "action_id": "release",
+          "claimed_residual_risk_bps": 0
+        },
+        {
+          "node_id": "defer-after-a-fail",
+          "kind": "stop",
+          "decision_kind": "defer",
+          "action_id": "inspect-readonly",
+          "claimed_residual_risk_bps": 0
+        },
+        {
+          "node_id": "defer-after-b-fail",
+          "kind": "stop",
+          "decision_kind": "defer",
+          "action_id": "inspect-readonly",
+          "claimed_residual_risk_bps": 0
+        }
+      ]
+    }
+  },
+  "oracle": {
+    "actual_hypothesis_id": "safe",
+    "decision_cutoff": "2026-11-17T10:00:00Z",
+    "budget_micros": 1600,
+    "actions": [
+      {
+        "action_id": "release",
+        "irreversible": true,
+        "hard_gate": true,
+        "max_residual_risk_bps": 0,
+        "read_only": false
+      },
+      {
+        "action_id": "inspect-readonly",
+        "irreversible": false,
+        "hard_gate": false,
+        "max_residual_risk_bps": 0,
+        "read_only": true
+      }
+    ],
+    "hypothesis_bounds": [
+      {
+        "hypothesis_id": "safe",
+        "lower_probability_bps": 5000,
+        "upper_probability_bps": 7000,
+        "nominal_probability_bps": 6000
+      },
+      {
+        "hypothesis_id": "hazard-a",
+        "lower_probability_bps": 500,
+        "upper_probability_bps": 2500,
+        "nominal_probability_bps": 1500
+      },
+      {
+        "hypothesis_id": "hazard-b",
+        "lower_probability_bps": 500,
+        "upper_probability_bps": 2500,
+        "nominal_probability_bps": 1500
+      },
+      {
+        "hypothesis_id": "hazard-ab",
+        "lower_probability_bps": 500,
+        "upper_probability_bps": 3000,
+        "nominal_probability_bps": 1000
+      }
+    ],
+    "options": [
+      {
+        "option_id": "gate-a",
+        "available_at": "2026-11-17T09:00:00Z",
+        "factor_id": "gate-a-factor"
+      },
+      {
+        "option_id": "gate-b",
+        "available_at": "2026-11-17T09:00:00Z",
+        "factor_id": "gate-b-factor"
+      }
+    ],
+    "factors": [
+      {
+        "factor_id": "gate-a-factor",
+        "dependence_group": "gate-a-system",
+        "source_ids": [
+          "gate-a-oracle"
+        ],
+        "calibration_ref": "gate-a-cal",
+        "likelihoods": [
+          {
+            "hypothesis_id": "safe",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              },
+              "fail": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-a",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              },
+              "fail": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-b",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-ab",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          }
+        ]
+      },
+      {
+        "factor_id": "gate-b-factor",
+        "dependence_group": "gate-b-system",
+        "source_ids": [
+          "gate-b-oracle"
+        ],
+        "calibration_ref": "gate-b-cal",
+        "likelihoods": [
+          {
+            "hypothesis_id": "safe",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              },
+              "fail": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-a",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-b",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              },
+              "fail": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              }
+            }
+          },
+          {
+            "hypothesis_id": "hazard-ab",
+            "outcomes": {
+              "pass": {
+                "lower_likelihood_bps": 0,
+                "upper_likelihood_bps": 0,
+                "nominal_likelihood_bps": 0
+              },
+              "fail": {
+                "lower_likelihood_bps": 10000,
+                "upper_likelihood_bps": 10000,
+                "nominal_likelihood_bps": 10000
+              }
+            }
+          }
+        ]
+      }
+    ],
+    "hypothesis_safety": [
+      {
+        "hypothesis_id": "safe",
+        "safe_actions": [
+          "release",
+          "inspect-readonly"
+        ]
+      },
+      {
+        "hypothesis_id": "hazard-a",
+        "safe_actions": [
+          "inspect-readonly"
+        ]
+      },
+      {
+        "hypothesis_id": "hazard-b",
+        "safe_actions": [
+          "inspect-readonly"
+        ]
+      },
+      {
+        "hypothesis_id": "hazard-ab",
+        "safe_actions": [
+          "inspect-readonly"
+        ]
+      }
+    ],
+    "calibrations": [
+      {
+        "calibration_id": "gate-a-cal",
+        "authority": "independent-test-oracle-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "factor_ids": [
+          "gate-a-factor"
+        ]
+      },
+      {
+        "calibration_id": "gate-b-cal",
+        "authority": "independent-runtime-verification-lab",
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "factor_ids": [
+          "gate-b-factor"
+        ]
+      }
+    ],
+    "factorization_certificates": [
+      {
+        "certificate_id": "gate-pair-mutual-v1",
+        "authority": "independent-assurance-board",
+        "dependence_groups": [
+          "gate-a-system",
+          "gate-b-system"
+        ],
+        "conditioning_scope": [
+          "hypothesis",
+          "deployment_configuration",
+          "same_decision_window"
+        ],
+        "factor_ids": [
+          "gate-a-factor",
+          "gate-b-factor"
+        ],
+        "action_ids": [
+          "release"
+        ],
+        "valid_from": "2026-11-01T00:00:00Z",
+        "valid_until": "2026-12-01T00:00:00Z",
+        "revoked_at": null,
+        "mutual_conditional_independence": true
+      }
+    ],
+    "worlds": [
+      {
+        "world_id": "safe",
+        "safe_actions": [
+          "release",
+          "inspect-readonly"
+        ],
+        "observations": {
+          "gate-a": "pass",
+          "gate-b": "pass"
+        }
+      },
+      {
+        "world_id": "hazard-a",
+        "safe_actions": [
+          "inspect-readonly"
+        ],
+        "observations": {
+          "gate-a": "pass",
+          "gate-b": "fail"
+        }
+      },
+      {
+        "world_id": "hazard-b",
+        "safe_actions": [
+          "inspect-readonly"
+        ],
+        "observations": {
+          "gate-a": "fail",
+          "gate-b": "pass"
+        }
+      },
+      {
+        "world_id": "hazard-ab",
+        "safe_actions": [
+          "inspect-readonly"
+        ],
+        "observations": {
+          "gate-a": "fail",
+          "gate-b": "fail"
+        }
+      }
+    ],
+    "cost_options": [
+      {
+        "option_id": "gate-a",
+        "available_at": "2026-11-17T09:00:00Z",
+        "cost_samples_micros": {
+          "cold": [
+            600,
+            650,
+            700
+          ]
+        }
+      },
+      {
+        "option_id": "gate-b",
+        "available_at": "2026-11-17T09:00:00Z",
+        "cost_samples_micros": {
+          "cold": [
+            700,
+            750,
+            800
+          ]
+        }
+      }
+    ]
+  }
+}
