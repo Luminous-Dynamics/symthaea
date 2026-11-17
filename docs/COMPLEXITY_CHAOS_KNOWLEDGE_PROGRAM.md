@@ -373,3 +373,274 @@ References:
 7. Keep QHDC, HHLF cryptography and standardized PQC deployment in separate categories.
 
 **Status:** literature watch and research implications only. No result in this addendum has been reproduced by Symthaea.
+
+
+
+## Additional frontier findings — verified 2026-11-16
+
+These papers materially refine the benchmark baselines and acceptance criteria. Their results are claims from the cited studies, not reproduced Symthaea results.
+
+### A. Full Lyapunov-spectrum reliability — November 2026
+
+**A Framework for the Assessment of Lyapunov Spectrum Computation Methods for Nonlinear Systems of Increasing Dynamical Complexity**, *Communications in Nonlinear Science and Numerical Simulation* 163 (November 2026), DOI: [10.1016/j.cnsns.2026.110493](https://doi.org/10.1016/j.cnsns.2026.110493).
+
+The study proposes a reliability-oriented assessment using full-spectrum error, trace/divergence consistency error and determinant-consistency error. It classifies methods as reliable, conditionally reliable or diagnostic-only, and warns that agreement on the largest exponent may still coexist with a poor reconstruction of the full spectrum.
+
+**Immediate change to Symthaea's qualification contract:**
+
+- Compare every estimated exponent in the spectrum, not only the maximum.
+- For systems with a known Jacobian, compare the sum of exponents against the long-time average divergence (trace of the Jacobian) under matching conventions.
+- Check determinant/volume-evolution consistency for the tangent propagator where a suitable reference is available.
+- Run QR/reorthogonalization sensitivity tests and report transient, timestep, window and initial-condition sensitivity.
+- Do not compute or publish Kaplan–Yorke dimension as qualified when the spectrum is only diagnostic.
+- Label results Reliable, ConditionallyReliable, DiagnosticOnly or Inconclusive, with machine-readable reasons.
+
+This is a particularly high-value addition to the existing chaos-dynamics audit.
+
+### B. Next-generation reservoir computing — January 2026
+
+Cestnik and Martens, **Next-generation reservoir computing for dynamical inference**, *Chaos* 36(1), 013115 (2026), DOI: [10.1063/5.0302319](https://doi.org/10.1063/5.0302319).
+
+The paper introduces a scalable NGRC implementation using pseudorandom nonlinear projections of time-delay embedded inputs. It reports attractor reconstruction and bifurcation-diagram estimation with partial/noisy measurements, and reports that small amounts of training noise can improve long-horizon autonomous stability.
+
+**Benchmark implication:** NGRC must become a mandatory baseline for Symthaea's CfC/LTC and reservoir experiments. Compare exact feature budgets, trainable parameter count, training data, inference cost, autonomous rollout stability and distributional fidelity. Test whether the noise-regularization benefit persists on held-out parameter regimes rather than only the authors' reported cases.
+
+### C. Complex Ginzburg–Landau reservoir — October 2026
+
+Chong, Sun and Xu, **Reservoir computing with complex Ginzburg–Landau lattice dynamics for chaotic time-series prediction**, *Chaos, Solitons & Fractals* 211 (October 2026), article 118873, DOI: [10.1016/j.chaos.2026.118873](https://doi.org/10.1016/j.chaos.2026.118873).
+
+The study reports a 16-complex-node CGLE lattice reservoir with R-squared greater than 0.999 on Lorenz next-step prediction. It compares with ESN, NGRC and linear AR, and notes that the Lorenz next-step task is near-linear. Its own ablations report task-dependent benefit from CGLE nonlinearity and a memory–responsiveness trade-off controlled by dissipation.
+
+**Benchmark implication:** add CGLE-reservoir results where reproducible implementation details are available, but do not let next-step Lorenz R-squared stand in for chaotic forecasting capability. Require autonomous rollout, forecast horizon in Lyapunov times, attractor/statistical fidelity, parameter extrapolation and non-Lorenz systems.
+
+### D. VSA for object-centric program synthesis — October 2026
+
+Joffe and Eliasmith, **Vector symbolic algebras for the Abstraction and Reasoning Corpus**, *npj Unconventional Computing* 3, article 54 (published 2026-10-01), [article](https://www.nature.com/articles/s44335-026-00100-5).
+
+The paper uses VSAs for object-centric program synthesis and reports 10.8% ARC-AGI-1 Train and 3.0% ARC-AGI-1 Eval, as well as 94.5% Sort-of-ARC, 83.1% 1D-ARC and 20.5% ConceptARC. The authors explicitly describe the ARC-AGI results as preliminary and far from state of the art; DSL coverage is a material limitation.
+
+**Benchmark implication:** this is a useful architectural comparator for Symthaea's HDC + symbolic/program reasoning, not an SOTA result to copy. Add object-centric scene decomposition, explicit transformation DSL coverage, compositional generalization, sample efficiency, search cost and held-out operator composition. Report the trade-off between interpretable symbolic programs and raw task coverage.
+
+### E. Hardware-aware sparse HDC — ISLPED 2026
+
+Oh et al., **HyperSPACE: Sparse-Adder-Compatible Encoding for Efficient Hyperdimensional Computing on Digital CIM Arrays**, ISLPED 2026, DOI: [10.1145/3816440.3818512](https://doi.org/10.1145/3816440.3818512).
+
+The reported design uses AND-binding, sparsity-tuned projection vectors and adaptive binary quantization on 128×64 digital SRAM compute-in-memory arrays. The authors report up to 13.03× lower encoding energy and up to +3.82% classification accuracy across four benchmarks.
+
+**Benchmark implication:** add sparse/quantized binding as an HDC hardware-efficiency axis. Compare recall/accuracy and robustness at equal memory and energy budgets; do not treat the paper's encoding-energy result as a general end-to-end energy improvement or as a software CPU result.
+
+### F. Generalized holographic reduced representations — distinguish the related papers
+
+Two closely related 2026 research outputs should be tracked separately:
+
+1. **Scalable Symbolic Reasoning with Matrix-Based Brain-Inspired Representations and Vector-Space Acceleration**, DATE 2026, DOI: [10.23919/DATE69613.2026.11539261](https://doi.org/10.23919/DATE69613.2026.11539261).
+2. Chung et al., **Vector-Space Projection and Unified Complex-Valued Acceleration for Scaling Matrix-Based Brain-Inspired Representations**, ISLPED 2026, DOI: [10.1145/3816440.3818598](https://doi.org/10.1145/3816440.3818598). An arXiv version was posted 2026-11-12: [arXiv:2611.16363](https://arxiv.org/abs/2611.16363).
+
+Both explore non-commutative matrix binding for ordered/graph/hierarchical structures and vector-space/hardware acceleration approaches. Keep their venues, claims and baselines distinct when citing or reproducing them.
+
+### G. Quantum HDC — physical feasibility is not quantum advantage
+
+Cumbo et al., **Quantum hyperdimensional computing: a foundational paradigm for quantum neuromorphic architectures**, *npj Unconventional Computing* 3, 21 (published 2026-05-04), DOI: [10.1038/s44335-026-00064-6](https://doi.org/10.1038/s44335-026-00064-6).
+
+The work reports a QHDC implementation tested on a 156-qubit IBM Heron r3 processor. Its own hardware-noise discussion is important: at dimension 128, the physical execution averaged 54.75% weighted F1 with a transpiled Hadamard-test depth of 510; a hardware-aware dimension-32 configuration achieved 68.59% weighted F1 with depth 126, but still required about 52 minutes of QPU time per reported execution. The authors explicitly state that the primary result is physical feasibility of the mapping, not an immediate performance advantage over mature classical HDC.
+
+**Benchmark implication:** treat QHDC as a separate hardware research axis. Compare it with strong classical HDC and conventional ML on identical tasks, including total wall time, QPU time, circuit depth, shots, error mitigation, energy and result quality. Do not infer PQC security or general quantum advantage.
+
+### Updated baseline matrix
+
+| Symthaea research task | Required comparison set |
+|---|---|
+| Full Lyapunov spectrum | Independent Benettin/QR, variational equations, trace/divergence and determinant/volume checks |
+| Chaotic forecasting | Persistence, AR, ESN, NGRC, CGLE reservoir where reproducible, current CfC/LTC, strong recurrent/state-space models |
+| HDC representation | HRR, FHRR, MAP/BSC/TPR, GHRR, sparse/quantized HyperSPACE-like encoding, conventional learned embeddings |
+| Symbolic / object-centric reasoning | Explicit DSL/program synthesis, VSA-based scene/object representations, strong conventional neurosymbolic and task-specific baselines |
+| Quantum HDC | Classical HDC and ML, plus hardware-noise and resource accounting; never quantum baselines alone |
+| Critical transitions | Persistence/trend, CSD-only, nonlinear diagnostics, network cascade models and ensemble warning approaches |
+
+**Updated principle:** compare the strongest available baseline under a matched experimental budget. A new architecture should be retained only when its contribution survives ablation, held-out regimes, uncertainty analysis and independent reproduction.
+
+
+
+## Applied multiscale systems: architected materials and modular structural grammars
+
+Symthaea's complexity knowledge should include engineered multiscale structures, not only cognitive/physical dynamics. This is a concrete application domain for HDC/VSA compositional reasoning and generative design.
+
+### Scientific framing
+
+Distinguish:
+- **Hierarchical architecture:** components nested across scales; no claim of scale invariance.
+- **Graded architecture:** density, topology, material or geometry varies spatially to meet local requirements.
+- **Modular metamaterial:** global mechanical response depends on module interfaces, contact and constraints as well as each cell's properties.
+- **Fractal geometry:** a statistically supported scaling regime over a stated scale interval; recursive construction alone is insufficient.
+- **Free-form modular structure:** a global continuous/irregular shape assembled from a bounded, repeatable interface vocabulary.
+
+The 2025 Nature Materials perspective identifies cross-scale design and characterization over multiple length and timescales as an important frontier. The 2026 generative-lattice review calls for process-aware, human-in-the-loop search combining physics-based constraints and data-driven acceleration. A September 2026 modular-metamaterial review emphasizes that inter-module interaction governs global mechanical response.
+
+### Symthaea research role
+
+- Encode module catalogs, connector families, orientation, allowed interfaces, assembly sequence and service constraints compositionally.
+- Benchmark HRR/FHRR/MAP/BSC/TPR and GHRR/non-commutative binding for assembly graphs, sequence constraints and held-out module compositions.
+- Explore hierarchical HDC for cell/panel/module/bay/system levels, retaining scale-specific state rather than collapsing it into one complexity score.
+- Propose diverse design candidates and explain constraint conflicts.
+- Use uncertainty-aware active learning to recommend the next Symtropy simulation or physical coupon experiment.
+- Keep human-authored expressive infill and accessibility preferences as explicit requirements; do not optimize inhabitants toward one aesthetic.
+
+### Required structural-design baselines
+
+- Hand-authored parametric grammars.
+- Conventional graph search and evolutionary optimization.
+- Topology optimization and robust multiobjective design.
+- Bayesian/surrogate-assisted optimization.
+- Conventional structural embeddings or graph-learning models where appropriate.
+- Standard connector/spaceframe and voxel assembly grammars.
+
+### Evidence boundary
+
+Symthaea may generate and rank candidate geometry, but it does not certify strength or safety. Symtropy must supply qualified physical/structural analysis, and physical coupons plus applicable inspection/qualification evidence are needed before real-world claims. Graph connectivity, cycle rank, HDC similarity and visual fractality are not substitutes for stress, buckling, fatigue, fracture, joint and manufacturing analysis.
+
+References:
+- 3D architected materials across scales (Nature Materials, 2025): https://www.nature.com/articles/s41563-025-02119-8
+- Generative lattice design for AM (Materials & Design, 2026): https://doi.org/10.1016/j.matdes.2026.115431
+- Modular discrete mechanical metamaterials (IJMS, 2026): https://doi.org/10.1016/j.ijmecsci.2026.111915
+- NASA ARMADAS: https://www.nasa.gov/automated-reconfigurable-mission-adaptive-digital-assembly-systems-armadas/
+- NASA modular in-space truss technology: https://technology.nasa.gov/patent/LAR-TOPS-359
+
+
+
+## Applied multiscale systems: free-flow modular structural grammars — 2026-11-16
+
+Symthaea should understand FFMFS as an applied multiscale-structure research domain. It should not treat generated geometry or HDC similarity as mechanical evidence.
+
+### Design representation
+
+Represent a candidate structurally as a typed, hierarchical graph:
+- module/bay identity and generation level;
+- member role, length class, orientation and section/material tag;
+- connector family, port orientation, tolerance and interface fit;
+- triangular face / multi-point attachment topology;
+- assembly parent, sequence, tool/grasp access and service ports;
+- environmental/pressure boundary, utility and occupant-authored infill as separate layers;
+- evidence links to geometry digest, solver assumptions, manufacturing process, inspection and coupon tests.
+
+HDC/VSA may encode and retrieve these structures, but the authoritative representation remains the typed graph and its verified constraints. Explore GHRR/non-commutative binding for ordered assembly and graph composition only as a comparative representation experiment.
+
+### Scientific guardrails
+
+- Connected graph, high cycle rank or visually complex morphology does not prove kinematic rigidity.
+- Face-attached tetrahedral cells are a candidate ideal pin-jointed rigid-module grammar: child cells attach through three shared non-collinear vertices. This removes a one-point hinge in the ideal bar model, but not real joint compliance, local stress, buckling, fatigue or manufacturing defects.
+- Structural claims must come from Symtropy's qualified analysis and physical evidence, not from HDC retrieval, fractal dimension or shape aesthetics.
+- Fractal geometry requires a statistically supported scaling regime over a stated interval. Recursive generation alone is not enough.
+- Preserve the distinction between primary structure, services, pressure/environmental boundary, secondary support and expressive infill.
+
+### Required competitive baselines
+
+Commercial tools already cover sophisticated implicit modeling, lattice generation, topology optimization and analysis:
+- nTop: implicit geometry, graph/TPMS/stochastic lattices, multi-objective topology optimization, structural/thermal analysis and CAD/CAE/AM integration.
+- Autodesk Fusion: generative design with manufacturing constraints such as additive, milling, 2-axis cutting and casting.
+- Altair Inspire: structural topology/topography/gauge optimization, FEA, motion and additive manufacturing analysis.
+- Materialise 3-matic/Magics: lattice and conformal mesh design, data optimization and AM preparation.
+- NASA ARMADAS and JPL modular truss projects: reusable voxel and self-aligning truss module assembly, including robot construction.
+
+Symthaea should not claim that its HDC generator beats these systems at generic lattice generation. The research hypothesis is whether a typed multiscale grammar plus interface reasoning, assembly planning, evidence links and occupant-controlled infill gives better system-level results.
+
+### Symthaea tasks
+
+1. Compare HRR/FHRR/MAP/BSC/TPR and GHRR for module/connector graph composition and ordered assembly reasoning.
+2. Compare parametric grammars, conventional graph search/evolutionary methods, topology optimization and Bayesian/surrogate-assisted design.
+3. Generate diverse Pareto candidates and expose constraint conflicts rather than returning one opaque optimum.
+4. Use uncertainty-aware active learning to select Symtropy simulations and physical coupons.
+5. Hold out entire topology families, connector families, load-case families and manufacturing process families to prevent leakage.
+6. Keep accessibility, egress, service access, acoustic/sensory choices, privacy, cultural expression and occupant agency as explicit design requirements.
+
+### Current research/engineering links
+
+- Symtropy programme: https://github.com/Luminous-Dynamics/symtropy/blob/main/docs/FREEFLOW_MODULAR_FRACTAL_STRUCTURES.md
+- Geometry and module grammar: https://github.com/Luminous-Dynamics/symtropy/tree/research/freeflow-modular-fractal-v0/research/freeflow-structure-lab
+- Linear-elastic truss reference evaluator: https://github.com/Luminous-Dynamics/symtropy/tree/research/freeflow-modular-fractal-v0/research/truss-fem-lab
+- Symthaea research issue: https://github.com/Luminous-Dynamics/symthaea/issues/12519
+
+**Evidence boundary:** Symthaea proposes and reasons over candidate grammars; Symtropy evaluates declared physical/structural models; physical coupons and applicable independent engineering qualification determine whether a result can be used in real structures.
+
+
+
+## Structural reasoning frontier — anisotropy, joint compliance and mass-matched evaluation (2026-11-17)
+
+### Current research signals
+
+- The 15 September 2026 review of modular discrete mechanical metamaterials states that inter-module contact, constraints and cooperative interactions shape global stiffness, strength, deformation and energy absorption. A cell-only representation is not enough when interfaces dominate: https://doi.org/10.1016/j.ijmecsci.2026.111915
+- The May 2026 review of anisotropic mechanical metamaterials covers deliberate control of directional response and the shift from intuitive designs toward data-driven unit-cell design: https://doi.org/10.1016/j.tws.2026.114719
+- The September 2026 mechano-X review examines multifunctional architectures and highlights manufacturability, robustness, standardization and sustainability as deployment challenges: https://doi.org/10.1016/j.cossms.2026.101272
+- NIST AM-Bench is moving toward higher-TRL component challenges in 2028 while maintaining lower-TRL modeling benchmarks. Its purpose is controlled measured data for validating manufacturing models, not scoring geometry generators: https://www.nist.gov/ambench
+
+### Updated Symthaea representation
+
+Represent the design as a typed, multilevel, attributed hypergraph with:
+- node/hub identity and connector port frames;
+- member identity, geometry, material, section and principal-axis orientation;
+- interface stiffness/compliance and tolerance distribution;
+- bay/cell relationships and shared-face attachments;
+- assembly/disassembly partial order and robot grasp/tool-access constraints;
+- services, inspection regions, and occupant-infll modules as separate typed layers;
+- links to manufacturing batch, metrology, solver assumptions and physical test receipts.
+
+A conventional graph is still useful, but a hyperedge or explicit interface object is preferable where an interface is shared by several members or cells. HDC/VSA can encode and retrieve this graph; the typed graph remains authoritative.
+
+### Model-fidelity ladder
+
+Symthaea must route candidate designs to the appropriate Symtropy model and explicitly record which physics are absent:
+
+1. Geometry and topological validity.
+2. Perfect-joint axial truss and kinematic mechanism detection.
+3. Axial joint-end compliance and tolerance/fit constraints.
+4. Member axial yield and elastic Euler screening.
+5. Beam/frame elements, rotational joint stiffness and global eigenvalue buckling.
+6. Imperfection-sensitive nonlinear response, contact, fatigue/fracture and damage progression.
+7. Physical coupons, metrology, NDE and mission-specific qualification.
+
+Do not train an HDC surrogate to return a single scalar "safe" label across these levels. Its response should be typed, scoped, and confidence-qualified, with unsupported extrapolation returned as unknown/inconclusive.
+
+### Matched-mass benchmark design
+
+A same-material/same-cross-section comparison can favor one topology simply because it contains more material. Compare candidate topologies under an agreed member-mass budget and fixed external problem definition:
+- same external envelope and attachment/support coordinates;
+- same load vectors, load combinations and constraints;
+- same material density, modulus, yield model and manufacturing route;
+- same member-mass budget and explicitly stated mass exclusions;
+- same solver fidelity, convergence tolerance and evaluation budget;
+- same damage scenarios and uncertainty distributions.
+
+Report member-only mass separately from connector/node/fastener/service mass. A member-mass-normalized axial truss comparison is not a whole-system mass comparison. Add joint, inspection, assembly, service and lifecycle mass before making system-level claims.
+
+### Multiobjective target vector
+
+Symthaea should generate Pareto-diverse candidates across:
+- directional stiffness/compliance tensor and displacement;
+- yield and elastic/inelastic member buckling indicators;
+- global stability and imperfection sensitivity when a validated model exists;
+- joint compliance, connector count, port crowding and tolerance closure;
+- single- and multi-member/joint failure response;
+- member, joint, connector and total-system mass;
+- manufacturing yield, inspection access and repair time;
+- assembly sequence complexity, tool changes, pose correction and replacement;
+- energy/environmental cost over the declared lifecycle;
+- occupant accessibility, privacy choice, sensory controllability and expressive configurability.
+
+### Required learning and search baselines
+
+- parametric grammar enumeration and constrained graph rewriting;
+- NSGA-II/III or other documented multiobjective evolutionary methods;
+- topology optimization with process-aware constraints;
+- Bayesian optimization / surrogate-assisted active learning;
+- graph neural networks and conventional latent graph representations where appropriate;
+- HDC/VSA families (HRR, FHRR, MAP, BSC, TPR, GHRR) for compositional representation;
+- human-authored candidate set.
+
+Hold out complete topology families, connector families, load cases, manufacturing process families and scale regimes. Use identical evaluation budgets and disclose failed/infeasible candidates; do not report only surviving Pareto points.
+
+### Competitive boundary
+
+nTop already offers implicit modeling, graph/TPMS/custom lattices, topology optimization, structural/thermal analysis and manufacturing-oriented export: https://www.ntop.com/software/capabilities/integrations/
+Autodesk Fusion already supports manufacturing-constrained generative design and multiple process choices: https://help.autodesk.com/cloudhelp/ENU/Fusion-GenerativeDesign/files/GD-DESIGN-CRITERIA.htm
+NASA and JPL are already exploring autonomous or supervised robotic assembly of modular space structures, including self-aligning structures and integrated power connections: https://www.nasa.gov/automated-reconfigurable-mission-adaptive-digital-assembly-systems-armadas/ and https://robotics.jpl.nasa.gov/what-we-do/research-tasks/risk-reduction-for-robotic-in-space-telescope-assembly-concept/
+
+Symthaea's defensible opportunity is not generic geometry generation. It is reasoning across module grammar, compliant interfaces, assembly, inspection, damage, repair, evidence and human-authored spatial variation, while Symtropy and physical tests remain the source of mechanical evidence.
