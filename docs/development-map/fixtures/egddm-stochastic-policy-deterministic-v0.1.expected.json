@@ -1,6 +1,10 @@
 {
   "scenario_id": "d6-17-2-1-adaptive-exact-two-gate-v0.1",
   "adjudication_status": "stochastic_joint_kernel_adaptive_policy_scoring",
+  "ambiguity_model": {
+    "cross_hypothesis_kernel_shape": "independent_per_hypothesis_product_set",
+    "assumption": "Each hypothesis-specific joint-kernel credal set may vary independently across hypotheses, alongside the bounded prior set. This assumption applies to robust leaf risk, aggregate coverage, unsafe-action mass and expected-cost envelopes. Shared latent coupling across hypotheses is not represented."
+  },
   "billing_currency": "USD",
   "world_count": 4,
   "joint_row_count": 4,
@@ -170,5 +174,5 @@
       }
     ]
   },
-  "claim_ceiling": "Exact evaluation of a submitted finite adaptive policy over the evaluator-owned finite joint-outcome credal kernels and bounded prior set. Branch event intervals and conditional expected costs are exact for the registered bounded-simplex sets; the outer expected-cost bound assumes kernel ambiguity sets are independent across hypotheses. It does not optimize over all policies, model stochastic execution costs, authenticate joint-kernel calibration, establish model completeness, or authorize production actions."
+  "claim_ceiling": "Exact evaluation of a submitted finite adaptive policy over the evaluator-owned finite joint-outcome credal kernels and bounded prior set. Branch event intervals and conditional expected costs are exact for the registered bounded-simplex sets. Robust leaf risk, aggregate coverage, unsafe-action mass and expected-cost envelopes assume kernel ambiguity sets are independent across hypotheses. It does not optimize over all policies, model stochastic execution costs, authenticate joint-kernel calibration, establish model completeness, or authorize production actions."
 }
