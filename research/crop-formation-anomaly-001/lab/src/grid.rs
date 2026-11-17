@@ -282,3 +282,63 @@ mod tests {
         assert_eq!(outcomes[1].spec.id, "vertical-reflection");
     }
 }
+
+    #[test]
+    fn every_dihedral_transform_has_the_expected_inverse() {
+        let original = BinaryGrid::new(
+            2,
+            3,
+            vec![true, false, true, false, true, false],
+        )
+        .expect("valid non-square grid");
+
+        let rotated_90 = BinaryGrid::new(
+            3,
+            2,
+            original.flatten(
+                GridTransform::Rotate90Clockwise,
+                TraversalOrder::RowMajor,
+            ),
+        )
+        .expect("valid rotated grid");
+        assert_eq!(
+            rotated_90.flatten(
+                GridTransform::Rotate270Clockwise,
+                TraversalOrder::RowMajor,
+            ),
+            original.flatten(GridTransform::Identity, TraversalOrder::RowMajor)
+        );
+
+        let rotated_180 = BinaryGrid::new(
+            2,
+            3,
+            original.flatten(GridTransform::Rotate180, TraversalOrder::RowMajor),
+        )
+        .expect("valid rotated grid");
+        assert_eq!(
+            rotated_180.flatten(GridTransform::Rotate180, TraversalOrder::RowMajor),
+            original.flatten(GridTransform::Identity, TraversalOrder::RowMajor)
+        );
+
+        for transform in [
+            GridTransform::ReflectHorizontal,
+            GridTransform::ReflectVertical,
+            GridTransform::Transpose,
+            GridTransform::AntiTranspose,
+        ] {
+            let (rows, columns) = match transform {
+                GridTransform::Transpose | GridTransform::AntiTranspose => (3, 2),
+                _ => (2, 3),
+            };
+            let once = BinaryGrid::new(
+                rows,
+                columns,
+                original.flatten(transform, TraversalOrder::RowMajor),
+            )
+            .expect("valid transformed grid");
+            assert_eq!(
+                once.flatten(transform, TraversalOrder::RowMajor),
+                original.flatten(GridTransform::Identity, TraversalOrder::RowMajor)
+            );
+        }
+    }
