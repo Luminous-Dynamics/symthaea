@@ -20,7 +20,7 @@ use material_regime::{
     TrapAndGasMeasurement,
 };
 use optical_health::{
-    ContaminantSpecies, DepositionEvent, DepositionTransfer, HealthAction,
+    DepositionEvent, DepositionTransfer, HealthAction,
     OpticalHealthError, OpticalHealthModel, OpticalHealthReading, OpticalHealthThresholds,
     SurfaceState,
 };
@@ -291,23 +291,22 @@ mod tests {
     }
 
     #[test]
-    fn rejected_optical_deposition_rolls_back_material_state() {
-        let mut world = CoupledCampaign::new(
-            material(),
-            optics(),
-            OpticalHealthThresholds {
-                minimum_process_transmission: [0.01; 4],
-                maximum_witness_loss: [0.99; 4],
-                maximum_qcm_mass_ug_cm2: 1.0e9,
-            },
-            DepositionTransfer {
-                process_optic_factor: 1.0,
-                optical_witness_factor: 0.5,
-                qcm_factor: 0.0,
-            },
-        )
-        .unwrap_err();
-        let _ = &mut world;
+    fn failed_deposition_rolls_back_material_state() {
+        let mut world = campaign();
+        let before = world.material_state().clone();
+        let result = world.apply_pulse(
+            "rollback",
+            100.0,
+            1.0,
+            1.0,
+            0.0,
+            &gas(),
+            -1.0,
+            7,
+        );
+        assert!(matches!(result, Err(CoupledError::Optical(_))));
+        assert_eq!(*world.material_state(), before);
+        assert_eq!(world.process_transmission(), [1.0; 4]);
     }
 
     #[test]
