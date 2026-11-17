@@ -531,7 +531,7 @@ mod tests {
 
     fn d4_action() -> FiniteActionV1 {
         let mut multiplication = vec![vec![0; 8]; 8];
-        for left in 0..8 {
+        for (left, multiplication_row) in multiplication.iter_mut().enumerate() {
             let left_rotation = left % 4;
             let left_reflection = left / 4;
             for right in 0..8 {
@@ -544,7 +544,7 @@ mod tests {
                 };
                 let product_rotation = (left_rotation + signed_rotation) % 4;
                 let product_reflection = left_reflection ^ right_reflection;
-                multiplication[left][right] = product_reflection * 4 + product_rotation;
+                multiplication_row[right] = product_reflection * 4 + product_rotation;
             }
         }
 
