@@ -71,3 +71,15 @@ cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Car
 The auditor refuses orphan source IDs, duplicate observation IDs, non-detection encoded as zero, unknown pressure coerced to ambient, ambient pressure without explicit zero, applied pressure without a positive value, and calculated/predicted values represented as experimentally detected. Negative controls exercise each refusal.
 
 This is an observation-level data contract. It does not verify the underlying source claim or establish scientific truth; production imports still require a source-pinned, rights-reviewed record and appropriate human adjudication.
+
+## Process history and metastable states
+
+Observation events may carry an ordered `process_history` separate from the conditions under which the property was measured. Each step records operation, intended target, execution state, actual values and—when sensor-verified—source-linked readback.
+
+For a pressure-quenched sample this allows a record to state:
+- treatment pressure and quench temperature during the process;
+- decompression to ambient pressure;
+- the final measurement pressure and temperature;
+- the measured Tc criterion and sample identity.
+
+The process history never overwrites or infers the measurement pressure. Planned/commanded steps cannot contain actual values; sensor-verified steps require a resolvable source and locator. Step IDs and sequence numbers must be unique/monotonic. Synthetic negative controls exercise those rules.
