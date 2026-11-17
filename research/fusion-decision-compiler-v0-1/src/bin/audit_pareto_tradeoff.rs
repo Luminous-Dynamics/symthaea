@@ -27,7 +27,7 @@ fn profile() -> ObjectiveComparisonProfile {
     }
 }
 
-fn candidate(id: &str, values: [f64; 7] -> CandidateObjectiveVector {
+fn candidate(id: &str, values: [f64; 7]) -> CandidateObjectiveVector {
     let [
         energy_mwh,
         whole_life_cost,
@@ -60,16 +60,7 @@ fn candidate(id: &str, values: [f64; 7] -> CandidateObjectiveVector {
 
 fn main() {
     let profile = profile();
-    let higher_qeng = candidate(
-        "higher-qeng",
-        8_000.0,
-        12_000.0,
-        0.95,
-        500.0,
-        300.0,
-        0.8,
-        25.0,
-    ;
+    let higher_qeng = candidate("higher-qeng", [8_000.0, 12_000.0, 0.95, 500.0, 300.0, 0.8, 25.0]);
     let higher_service = candidate(
         "higher-service",
         12_000.0,
@@ -79,11 +70,14 @@ fn main() {
         350.0,
         0.9,
         15.0,
-    ;
+    );
 
     let pair = compare_pair(&profile, &higher_qeng, &higher_service);
     println!("contract_version={}", pair.contract_version);
-    println!("higher_qeng_scalar_preference={:?}", pair.scalar_preference);
+    println!(
+        "higher_qeng_scalar_preference={:?}",
+        pair.scalar_preference
+    );
     println!("qeng_a={:.6}", pair.first_q_eng.unwrap().q_eng);
     println!("qeng_b={:.6}", pair.second_q_eng.unwrap().q_eng);
     println!("pareto_dominance={:?}", pair.dominance);
@@ -102,8 +96,20 @@ fn main() {
         std::process::exit(1);
     }
 
-    let strict_dominator = candidate("dominant", [13_000.0, 7_000.0, 0.97, 250.0, 150.0, 0.6, 10.0]);
-    let frontier = extract_pareto_front(&profile, &[higher_qeng, higher_service, strict_dominator]);
+    let strict_dominator = candidate(
+        "dominant",
+        13_000.0,
+        7_000.0,
+        0.97,
+        250.0,
+        150.0,
+        0.6,
+        10.0,
+    );
+    let frontier = extract_pareto_front(
+        &profile,
+        &[higher_qeng, higher_service, strict_dominator],
+    );
     println!("pareto_front={:?}", frontier.frontier_candidate_ids);
     println!(
         "non_dominated_statuses={}",
