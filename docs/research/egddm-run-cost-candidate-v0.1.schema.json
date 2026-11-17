@@ -41,7 +41,8 @@
           "run_started_at",
           "run_finished_at",
           "attempts",
-          "receipt_sha256"
+          "receipt_sha256",
+          "billing_currency"
         ],
         "properties": {
           "schema_version": {
@@ -305,9 +306,17 @@
           "receipt_sha256": {
             "type": "string",
             "pattern": "^[0-9a-fA-F]{64}$"
+          },
+          "billing_currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
           }
         }
       }
+    },
+    "billing_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
     }
   }
 }
