@@ -854,6 +854,11 @@
             "id": "effect",
             "kind": "effect-owner",
             "owner": "external-oracle"
+          },
+          {
+            "id": "provider-shared",
+            "kind": "model-provider",
+            "owner": "provider-operator"
           }
         ],
         "edges": [
@@ -906,6 +911,21 @@
             "from": "quorum",
             "to": "effect",
             "relation": "approval-proposal"
+          },
+          {
+            "from": "provider-shared",
+            "to": "agent-a",
+            "relation": "model-inference"
+          },
+          {
+            "from": "provider-shared",
+            "to": "agent-b",
+            "relation": "model-inference"
+          },
+          {
+            "from": "provider-shared",
+            "to": "agent-c",
+            "relation": "model-inference"
           }
         ]
       },
