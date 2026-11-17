@@ -50,6 +50,9 @@ jobs:
           grep -Fx 'release: 1.100.0' rustc-version.txt
           grep -E '^cargo 1\.100\.0 ' cargo-version.txt
 
+      - name: Validate workspace membership and tracked targets
+        run: bash scripts/check-workspace-targets.sh
+
       - name: Validate locked workspace metadata and Cargo policy
         run: cargo metadata --locked --no-deps --format-version 1 >/dev/null
 
