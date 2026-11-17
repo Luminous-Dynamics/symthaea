@@ -457,3 +457,12 @@ The registry now contains 12 sources, 8 candidate/material records and 8 benchma
 The GuidedMatDiffusion root directory was inspected: it contains a LICENSE file with the MIT text and a copyright notice naming Rui Jiao; its README is built on DiffCSP. This is stronger than relying on the README badge, but it still requires checking attribution and third-party component scope. The model checkpoint and dataset have independent terms that remain unresolved.
 
 The NEMAD model-index repository root was also inspected: it lists README.md and inference.py but no LICENSE file. The absence of a visible repository license means we should not infer reuse rights for code, model adapters or the underlying dataset. The public repository and model links are useful for reproduction discovery, not a license grant.
+
+
+## 24. Second hosted execution audit — 17 November 2026
+
+The next exact PR workflow run, ID 44106304742, reached the formatter step on head 9b? (exact checked-out PR head from the run is recorded by GitHub; see the workflow URL below) and failed only because the **metrics binary** had two Rust 1.96 formatting differences: serde_json import ordering and a multiline assertion. The registry auditor's rustfmt check passed in that run. Lock generation, both test suites, executable runs and clippy were skipped.
+
+Corrective change applied in commit `e8995d52206f2c8caef7a4112ad30e15ee9243b8`: normalize the import and assertion formatting. The exact failure output is retained in [workflow run 44106304742](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44106304742).
+
+Afterward, the registry was expanded with STGI, and the exact-count assertions were advanced to 12 sources / 8 candidates / 8 catalogs. Code, registry and documentation have since received later commits. The current PR head must therefore be re-evaluated; no compile/test/clippy pass is claimed for that new head. The earlier two failed formatting runs remain in the evidence history rather than being overwritten.
