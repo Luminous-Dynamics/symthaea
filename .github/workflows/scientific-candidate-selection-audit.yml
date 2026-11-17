@@ -49,6 +49,16 @@ jobs:
             .schema == "scientific_candidate_selection_audit_v0" and
             .task_id == "scilaws-real-candidate-selection-fixture" and
             .attempted_candidates == 4 and
+            .ready_attempts == 4 and
+            .generation_failed_attempts == 0 and
+            .execution_failed_attempts == 0 and
+            .timed_out_attempts == 0 and
+            .invalid_attempts == 0 and
+            .rejected_attempts == 0 and
+            .incomplete_attempts == 0 and
+            .distinct_model_artifact_count == 4 and
+            .selectable_candidate_count == 4 and
+            .exact_duplicate_candidate_attempts == 0 and
             .cost_unit_id == "fixture_cost_units" and
             .selection_cost_units == 3 and
             .budget_limit_cost_units == 5 and

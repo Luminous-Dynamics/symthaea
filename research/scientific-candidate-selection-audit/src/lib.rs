@@ -125,6 +125,22 @@ pub struct SelectorPacket {
     pub cost_unit_id: String,
     pub budget_limit_cost_units: f64,
     pub permitted_evidence: Vec<PermittedEvidence>,
+    /// Complete generation/execution attempt rows. They remain in the audit
+    /// denominator, but exact-artifact aliases are not separate selector choices.
+    pub candidates: Vec<SelectorCandidate>,
+}
+
+/// Canonical selector-visible projection. It contains one row per unique
+/// ready artifact digest; non-ready attempts and duplicate aliases are not
+/// exposed as separate candidates.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SelectorView {
+    pub task_id: String,
+    pub candidate_pool_sha256: String,
+    pub metric_mask: MetricMask,
+    pub cost_unit_id: String,
+    pub budget_limit_cost_units: f64,
+    pub permitted_evidence: Vec<PermittedEvidence>,
     pub candidates: Vec<SelectorCandidate>,
 }
 
@@ -134,8 +150,8 @@ pub enum SelectionDecision {
     Abstain { reason: String },
 }
 
-/// What a policy returns. It cannot receive evaluator outcomes because the
-/// trait method accepts only SelectorPacket.
+/// What a policy returns. It receives only a canonical SelectorView, never
+/// evaluator outcomes or the raw generation-attempt list.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectionObservation {
     pub decision: SelectionDecision,
@@ -145,7 +161,7 @@ pub struct SelectionObservation {
 
 pub trait CandidateSelectionPolicy {
     fn policy_id(&self) -> &str;
-    fn select(&self, packet: &SelectorPacket) -> Result<SelectionObservation, SelectionAuditError>;
+    fn select(&self, packet: &SelectorView) -> Result<SelectionObservation, SelectionAuditError>;
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -165,8 +181,8 @@ pub fn run_selector<P: CandidateSelectionPolicy>(
     policy: &P,
     packet: &SelectorPacket,
 ) -> Result<SelectionTrace, SelectionAuditError> {
-    validate_selector_packet(packet)?;
-    let observation = policy.select(packet)?;
+    let view = build_selector_view(packet)?;
+    let observation = policy.select(&view)?;
     let trace = SelectionTrace {
         task_id: packet.task_id.clone(),
         candidate_pool_sha256: packet.candidate_pool_sha256.clone(),
@@ -272,6 +288,16 @@ pub struct CandidateSelectionAudit {
     pub selection_cost_units: f64,
     pub budget_limit_cost_units: f64,
     pub attempted_candidates: usize,
+    pub ready_attempts: usize,
+    pub generation_failed_attempts: usize,
+    pub execution_failed_attempts: usize,
+    pub timed_out_attempts: usize,
+    pub invalid_attempts: usize,
+    pub rejected_attempts: usize,
+    pub incomplete_attempts: usize,
+    pub distinct_model_artifact_count: usize,
+    pub selectable_candidate_count: usize,
+    pub exact_duplicate_candidate_attempts: usize,
     pub scored_candidates: usize,
     pub qualified_candidates: usize,
     pub unqualified_candidates: usize,
@@ -302,6 +328,7 @@ pub enum SelectionAuditError {
     InvalidArtifactDigest { evidence_id: String },
     InvalidModelDigest { candidate_id: String },
     MissingModelDigest { candidate_id: String },
+    ConflictingDuplicateArtifact { digest: String },
     DuplicateCandidateId(String),
     EmptyCandidateId,
     EmptyEvidenceId,
@@ -354,6 +381,10 @@ impl fmt::Display for SelectionAuditError {
             Self::MissingModelDigest { candidate_id } => write!(
                 f,
                 "ready candidate {candidate_id} is missing its canonical model artifact digest"
+            ),
+            Self::ConflictingDuplicateArtifact { digest } => write!(
+                f,
+                "exact duplicate artifact {digest} has conflicting development metrics, eligibility or evidence references"
             ),
             Self::DuplicateCandidateId(id) => write!(f, "duplicate candidate ID: {id}"),
             Self::EmptyCandidateId => write!(f, "candidate ID must not be empty"),
@@ -580,11 +611,68 @@ pub fn validate_selector_packet(packet: &SelectorPacket) -> Result<(), Selection
     Ok(())
 }
 
+/// Construct the selector-visible projection from the complete attempt
+/// packet. Exact SHA-256 duplicates collapse to one canonical candidate ID.
+/// Duplicate rows must have identical development metrics, eligibility and
+/// evidence references; disagreement fails closed rather than choosing the
+/// most favorable duplicate. Non-ready attempts remain evaluator-visible but
+/// are not selector choices.
+pub fn build_selector_view(packet: &SelectorPacket) -> Result<SelectorView, SelectionAuditError> {
+    validate_selector_packet(packet)?;
+    let mut by_digest: BTreeMap<String, SelectorCandidate> = BTreeMap::new();
+    for candidate in packet
+        .candidates
+        .iter()
+        .filter(|candidate| candidate.state == CandidateState::Ready)
+    {
+        let digest = candidate
+            .canonical_model_sha256
+            .as_ref()
+            .expect("ready candidate digest was validated");
+        match by_digest.get_mut(digest) {
+            Some(existing) => {
+                let mut left_evidence = existing.evidence_ids.clone();
+                let mut right_evidence = candidate.evidence_ids.clone();
+                left_evidence.sort();
+                right_evidence.sort();
+                if existing.eligibility != candidate.eligibility
+                    || existing.development != candidate.development
+                    || left_evidence != right_evidence
+                {
+                    return Err(SelectionAuditError::ConflictingDuplicateArtifact {
+                        digest: digest.clone(),
+                    });
+                }
+                if candidate.candidate_id < existing.candidate_id {
+                    existing.candidate_id = candidate.candidate_id.clone();
+                    existing.evidence_ids = right_evidence;
+                }
+            }
+            None => {
+                let mut canonical = candidate.clone();
+                canonical.evidence_ids.sort();
+                by_digest.insert(digest.clone(), canonical);
+            }
+        }
+    }
+    let mut candidates = by_digest.into_values().collect::<Vec<_>>();
+    candidates.sort_by(|left, right| left.candidate_id.cmp(&right.candidate_id));
+    Ok(SelectorView {
+        task_id: packet.task_id.clone(),
+        candidate_pool_sha256: packet.candidate_pool_sha256.clone(),
+        metric_mask: packet.metric_mask,
+        cost_unit_id: packet.cost_unit_id.clone(),
+        budget_limit_cost_units: packet.budget_limit_cost_units,
+        permitted_evidence: packet.permitted_evidence.clone(),
+        candidates,
+    })
+}
+
 pub fn validate_selection_trace(
     packet: &SelectorPacket,
     trace: &SelectionTrace,
 ) -> Result<(), SelectionAuditError> {
-    validate_selector_packet(packet)?;
+    let view = build_selector_view(packet)?;
     if trace.task_id != packet.task_id {
         return Err(SelectionAuditError::TraceTaskMismatch);
     }
@@ -623,18 +711,25 @@ pub fn validate_selection_trace(
 
     match &trace.decision {
         SelectionDecision::Select { candidate_id } => {
-            let candidate = packet
+            let attempt = packet
                 .candidates
                 .iter()
                 .find(|candidate| candidate.candidate_id == *candidate_id)
                 .ok_or_else(|| {
                     SelectionAuditError::UnknownSelectedCandidate(candidate_id.clone())
                 })?;
-            if candidate.state != CandidateState::Ready {
+            if attempt.state != CandidateState::Ready {
                 return Err(SelectionAuditError::SelectedCandidateUnavailable(
                     candidate_id.clone(),
                 ));
             }
+            let candidate = view
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == *candidate_id)
+                .ok_or_else(|| {
+                    SelectionAuditError::UnknownSelectedCandidate(candidate_id.clone())
+                })?;
             if candidate.eligibility != DevelopmentEligibility::Eligible {
                 return Err(SelectionAuditError::SelectedCandidateIneligible(
                     candidate_id.clone(),
@@ -713,15 +808,19 @@ pub fn audit_submission(
     trace: &SelectionTrace,
     outcomes: &[EvaluatorOutcome],
 ) -> Result<CandidateSelectionAudit, SelectionAuditError> {
+    let view = build_selector_view(packet)?;
     validate_selection_trace(packet, trace)?;
 
+    // Evaluator outcomes are scored once per canonical selectable artifact,
+    // not once per duplicate generation alias.
+    let selectable_ids = view
+        .candidates
+        .iter()
+        .map(|candidate| candidate.candidate_id.as_str())
+        .collect::<BTreeSet<_>>();
     let mut by_id: BTreeMap<&str, &EvaluatorOutcome> = BTreeMap::new();
     for outcome in outcomes {
-        if !packet
-            .candidates
-            .iter()
-            .any(|candidate| candidate.candidate_id == outcome.candidate_id)
-        {
+        if !selectable_ids.contains(outcome.candidate_id.as_str()) {
             return Err(SelectionAuditError::UnknownEvaluatorCandidate(
                 outcome.candidate_id.clone(),
             ));
@@ -788,10 +887,10 @@ pub fn audit_submission(
             EvaluatorStatus::Incomplete => incomplete += 1,
         }
     }
-    let missing = packet.candidates.len().saturating_sub(outcomes.len());
+    let missing = view.candidates.len().saturating_sub(outcomes.len());
 
     let mut frontier = Vec::new();
-    for candidate in &packet.candidates {
+    for candidate in &view.candidates {
         let Some(outcome) = by_id.get(candidate.candidate_id.as_str()) else {
             continue;
         };
@@ -800,7 +899,7 @@ pub fn audit_submission(
         {
             continue;
         }
-        let is_dominated = packet.candidates.iter().any(|other| {
+        let is_dominated = view.candidates.iter().any(|other| {
             if other.candidate_id == candidate.candidate_id {
                 return false;
             }
@@ -829,7 +928,7 @@ pub fn audit_submission(
     if let Some(submitted) = submitted_outcome
         && submitted.status == EvaluatorStatus::Scored
     {
-        for candidate in &packet.candidates {
+        for candidate in &view.candidates {
             if Some(candidate.candidate_id.as_str()) == submitted_id.as_deref() {
                 continue;
             }
@@ -856,6 +955,7 @@ pub fn audit_submission(
         },
     };
 
+    let identical_groups = identical_model_artifact_groups(&packet.candidates);
     Ok(CandidateSelectionAudit {
         task_id: packet.task_id.clone(),
         candidate_pool_sha256: packet.candidate_pool_sha256.clone(),
@@ -864,6 +964,52 @@ pub fn audit_submission(
         selection_cost_units: trace.selector_cost_units,
         budget_limit_cost_units: packet.budget_limit_cost_units,
         attempted_candidates: packet.candidates.len(),
+        ready_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::Ready)
+            .count(),
+        generation_failed_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::GenerationFailed)
+            .count(),
+        execution_failed_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::ExecutionFailed)
+            .count(),
+        timed_out_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::TimedOut)
+            .count(),
+        invalid_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::Invalid)
+            .count(),
+        rejected_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::Rejected)
+            .count(),
+        incomplete_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::Incomplete)
+            .count(),
+        distinct_model_artifact_count: packet
+            .candidates
+            .iter()
+            .filter_map(|candidate| candidate.canonical_model_sha256.as_deref())
+            .collect::<BTreeSet<_>>()
+            .len(),
+        selectable_candidate_count: view.candidates.len(),
+        exact_duplicate_candidate_attempts: identical_groups
+            .iter()
+            .map(|group| group.len().saturating_sub(1))
+            .sum(),
         scored_candidates: scored,
         qualified_candidates: qualified,
         unqualified_candidates: unqualified,
@@ -873,7 +1019,7 @@ pub fn audit_submission(
         invalid_candidates: invalid,
         incomplete_candidates: incomplete,
         missing_evaluator_outcomes: missing,
-        identical_model_artifact_groups: identical_model_artifact_groups(&packet.candidates),
+        identical_model_artifact_groups: identical_groups,
         submitted_candidate_id: submitted_id,
         submitted_status: submitted_outcome.map(|outcome| outcome.status),
         submitted_admissibility: submitted_outcome.map(|outcome| outcome.admissibility),
@@ -976,6 +1122,16 @@ impl CandidateSelectionAudit {
                 "\"selection_cost_units\":{:.8},",
                 "\"budget_limit_cost_units\":{:.8},",
                 "\"attempted_candidates\":{},",
+                "\"ready_attempts\":{},",
+                "\"generation_failed_attempts\":{},",
+                "\"execution_failed_attempts\":{},",
+                "\"timed_out_attempts\":{},",
+                "\"invalid_attempts\":{},",
+                "\"rejected_attempts\":{},",
+                "\"incomplete_attempts\":{},",
+                "\"distinct_model_artifact_count\":{},",
+                "\"selectable_candidate_count\":{},",
+                "\"exact_duplicate_candidate_attempts\":{},",
                 "\"scored_candidates\":{},",
                 "\"qualified_candidates\":{},",
                 "\"unqualified_candidates\":{},",
@@ -1005,6 +1161,16 @@ impl CandidateSelectionAudit {
             self.selection_cost_units,
             self.budget_limit_cost_units,
             self.attempted_candidates,
+            self.ready_attempts,
+            self.generation_failed_attempts,
+            self.execution_failed_attempts,
+            self.timed_out_attempts,
+            self.invalid_attempts,
+            self.rejected_attempts,
+            self.incomplete_attempts,
+            self.distinct_model_artifact_count,
+            self.selectable_candidate_count,
+            self.exact_duplicate_candidate_attempts,
             self.scored_candidates,
             self.qualified_candidates,
             self.unqualified_candidates,
@@ -1043,6 +1209,7 @@ mod tests {
     const MODEL_A: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const MODEL_B: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const MODEL_C: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    const MODEL_D: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
     const EVIDENCE_SHA: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
     fn candidate(id: &str, digest: &str) -> SelectorCandidate {
@@ -1121,7 +1288,7 @@ mod tests {
 
         fn select(
             &self,
-            packet: &SelectorPacket,
+            packet: &SelectorView,
         ) -> Result<SelectionObservation, SelectionAuditError> {
             assert!(
                 packet
@@ -1153,6 +1320,68 @@ mod tests {
             }
         );
         assert_eq!(trace.consumed_evidence_ids, vec!["dev-fold-1"]);
+    }
+
+    #[test]
+    fn exact_duplicate_artifacts_are_not_separate_selector_choices() {
+        let original = packet();
+        let mut duplicated = packet();
+        duplicated.candidates.push(candidate("a-copy", MODEL_A));
+
+        let original_view = build_selector_view(&original).unwrap();
+        let duplicate_view = build_selector_view(&duplicated).unwrap();
+        assert_eq!(original_view.candidates.len(), 3);
+        assert_eq!(duplicate_view.candidates.len(), 3);
+        assert_eq!(original_view.candidates, duplicate_view.candidates);
+        assert_eq!(
+            duplicate_view
+                .candidates
+                .iter()
+                .filter(|candidate| candidate.canonical_model_sha256.as_deref() == Some(MODEL_A))
+                .map(|candidate| candidate.candidate_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["a"]
+        );
+
+        let policy = FixedPolicy {
+            selected: "a".to_owned(),
+        };
+        let original_trace = run_selector(&policy, &original).unwrap();
+        let duplicate_trace = run_selector(&policy, &duplicated).unwrap();
+        assert_eq!(original_trace.decision, duplicate_trace.decision);
+    }
+
+    #[test]
+    fn selector_cannot_choose_a_noncanonical_duplicate_alias() {
+        let mut packet = packet();
+        packet.candidates.push(candidate("a-copy", MODEL_A));
+        let mut frozen = trace(SelectionDecision::Select {
+            candidate_id: "a-copy".to_owned(),
+        });
+        assert_eq!(
+            validate_selection_trace(&packet, &frozen),
+            Err(SelectionAuditError::UnknownSelectedCandidate(
+                "a-copy".to_owned()
+            ))
+        );
+        frozen.decision = SelectionDecision::Select {
+            candidate_id: "a".to_owned(),
+        };
+        validate_selection_trace(&packet, &frozen).unwrap();
+    }
+
+    #[test]
+    fn conflicting_duplicate_artifact_evidence_fails_closed() {
+        let mut packet = packet();
+        let mut duplicate = candidate("a-copy", MODEL_A);
+        duplicate.development.predictive_score = Some(0.81);
+        packet.candidates.push(duplicate);
+        assert_eq!(
+            build_selector_view(&packet),
+            Err(SelectionAuditError::ConflictingDuplicateArtifact {
+                digest: MODEL_A.to_owned()
+            })
+        );
     }
 
     #[test]
@@ -1281,7 +1510,7 @@ mod tests {
     #[test]
     fn evaluator_failures_and_missing_outcomes_stay_in_attempt_denominator() {
         let mut packet = packet();
-        packet.candidates.push(candidate("d", MODEL_C));
+        packet.candidates.push(candidate("d", MODEL_D));
         let frozen = trace(SelectionDecision::Select {
             candidate_id: "a".to_owned(),
         });
@@ -1333,12 +1562,17 @@ mod tests {
         });
         let outcomes = vec![
             real_outcome("a", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
-            real_outcome("a-copy", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
             real_outcome("b", 72.0, 82.0, EvaluatorAdmissibility::Qualified),
             real_outcome("c", 68.0, 83.0, EvaluatorAdmissibility::Qualified),
         ];
         let report = audit_submission(&packet, &frozen, &outcomes).unwrap();
         assert_eq!(report.attempted_candidates, 4);
+        assert_eq!(report.ready_attempts, 4);
+        assert_eq!(report.distinct_model_artifact_count, 3);
+        assert_eq!(report.selectable_candidate_count, 3);
+        assert_eq!(report.exact_duplicate_candidate_attempts, 1);
+        assert_eq!(report.scored_candidates, 3);
+        assert_eq!(report.missing_evaluator_outcomes, 0);
         assert_eq!(
             report.identical_model_artifact_groups,
             vec![vec!["a".to_owned(), "a-copy".to_owned()]]
@@ -1350,6 +1584,56 @@ mod tests {
         assert_eq!(
             replay.identical_model_artifact_groups,
             report.identical_model_artifact_groups
+        );
+    }
+
+    #[test]
+    fn failed_generation_attempts_remain_in_denominator_but_not_selector_view() {
+        let mut packet = packet();
+        let mut failed = candidate("failed-attempt", MODEL_A);
+        failed.state = CandidateState::GenerationFailed;
+        failed.canonical_model_sha256 = None;
+        failed.eligibility = DevelopmentEligibility::Unresolved;
+        packet.candidates.push(failed);
+
+        let view = build_selector_view(&packet).unwrap();
+        assert_eq!(view.candidates.len(), 3);
+        let frozen = trace(SelectionDecision::Select {
+            candidate_id: "a".to_owned(),
+        });
+        let report = audit_submission(
+            &packet,
+            &frozen,
+            &[
+                real_outcome("a", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
+                real_outcome("b", 75.0, 82.0, EvaluatorAdmissibility::Qualified),
+                real_outcome("c", 68.0, 84.0, EvaluatorAdmissibility::Qualified),
+            ],
+        )
+        .unwrap();
+        assert_eq!(report.attempted_candidates, 4);
+        assert_eq!(report.ready_attempts, 3);
+        assert_eq!(report.generation_failed_attempts, 1);
+        assert_eq!(report.selectable_candidate_count, 3);
+        assert_eq!(report.missing_evaluator_outcomes, 0);
+    }
+
+    #[test]
+    fn evaluator_outcome_for_duplicate_alias_is_rejected() {
+        let mut packet = packet();
+        packet.candidates.push(candidate("a-copy", MODEL_A));
+        let frozen = trace(SelectionDecision::Select {
+            candidate_id: "a".to_owned(),
+        });
+        let outcomes = vec![
+            real_outcome("a", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
+            real_outcome("a-copy", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
+        ];
+        assert_eq!(
+            audit_submission(&packet, &frozen, &outcomes),
+            Err(SelectionAuditError::UnknownEvaluatorCandidate(
+                "a-copy".to_owned()
+            ))
         );
     }
 

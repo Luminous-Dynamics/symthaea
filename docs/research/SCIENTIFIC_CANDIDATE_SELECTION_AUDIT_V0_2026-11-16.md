@@ -22,8 +22,10 @@ The live selector and evaluator audit have different information privileges.
 **Evaluator side:** held-out S_N, source-grounded S_V, Parallel S_S, hidden labels, adjudication results and post-submission oracle comparisons.
 
 The Rust API enforces this at the object-graph boundary:
-- CandidateSelectionPolicy::select accepts only &SelectorPacket.
-- SelectorPacket has no evaluator metric or hidden-truth field.
+- CandidateSelectionPolicy::select accepts only &SelectorView.
+- SelectorView contains one canonical row per exact ready-artifact SHA-256; the raw SelectorPacket retains all generation attempts, but duplicate artifact IDs are not separately exposed as selector choices.
+- Duplicate rows for the same exact artifact must agree on development metrics, eligibility and evidence references; otherwise canonicalization fails closed.
+- SelectorView has no evaluator metric or hidden-truth field.
 - SelectionTrace binds task ID, frozen candidate-pool digest, policy ID, consumed evidence IDs, selected candidate/abstention and selector-only cost.
 - A task-declared cost-unit ID and hard scalar cap are bound to the trace; cost above the cap or a unit mismatch fails closed. This is one task-native meter, not a conversion of heterogeneous resource vectors into a weighted sum. Wall time, CPU/GPU time, peak memory, energy, tokens and tool calls remain distinct resource dimensions under the existing multi-resource allocator (#9338).
 - audit_submission accepts evaluator outcomes only after the trace is frozen.
@@ -71,7 +73,7 @@ The executable reference intentionally chooses candidate A using a development-o
 - candidate D timed out and remains in the attempt denominator.
 
 The resulting receipt should report:
-- four attempted candidates;
+- four attempted candidates and four distinct exact artifacts;
 - three scored / qualified;
 - one timeout;
 - candidate A submitted and strictly dominated by B;
@@ -114,6 +116,12 @@ After interface qualification:
 
 Proposed target: reduce evaluator-dominated submissions by at least 50% versus the frozen incumbent without degrading any declared metric beyond preregistered task-cluster uncertainty. This is a target, not a result.
 
-## 8. Claim ceiling
+## 8. Exact-artifact multiplicity follow-up
+
+The selector now receives a canonical view rather than the raw attempt packet. Two ready rows with the same exact model-artifact digest collapse to the lexicographically smallest candidate ID, and the remaining row data must agree exactly on development metrics, eligibility and permitted evidence. A policy cannot select a noncanonical alias ID. Evaluator outcomes are supplied once per canonical artifact; outcomes attached only to a duplicate alias are rejected. The raw attempt packet remains intact for evaluator accounting, and the report separately records total attempted rows, ready/generation-failed/execution-failed/timed-out/invalid/rejected/incomplete attempt counts, distinct artifact count, selectable candidate count and exact duplicate-attempt count. Missing evaluator outcomes are counted against distinct selectable artifacts, not duplicate aliases.
+
+This rule applies only to exact SHA-256 identity. It does not merge different byte artifacts that are functionally or scientifically equivalent. Such equivalence requires an independent scientific test and remains a separate endpoint.
+
+## 9. Claim ceiling
 
 Passing this package qualifies only the API boundary, evaluator audit and deterministic fixture. It does not prove a live selector has improved, that the actual Symthaea policy uses this interface, that held-out benchmark scores have improved, or that a new scientific law has been discovered. The upstream data has varied per-task licenses and evaluator-only answer files; no upstream dataset is vendored here.
