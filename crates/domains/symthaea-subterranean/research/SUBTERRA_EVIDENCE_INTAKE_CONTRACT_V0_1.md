@@ -154,7 +154,7 @@ Contents:
 - 21 site/network tests, 6 profile tests, 39 science-return tests and 17 standards-attestation tests (83 adapter cases total); 19 site-disjoint likelihood-calibration tests and 47 dependence-auditor tests in their separate packages.
 - Pinned upstream schema/fixture manifest and explicit local verification script for the six nested Cargo packages.
 
-Across the complete current Symthaea Subterra PR, the six standalone packages have 180 authored Rust unit tests (10 EVSI + 11 survival + 10 robust EVSI + 21 site/network + 6 profile + 39 science-return + 19 likelihood calibration + 47 dependence audit). This is a source count only; none has been compiled or executed in the current environment.
+Across the complete current Symthaea Subterra PR, the six standalone packages have 183 authored Rust unit tests (10 EVSI + 11 survival + 10 robust EVSI + 21 site/network + 6 profile + 39 science-return + 19 likelihood calibration + 47 dependence audit). This is a source count only; none has been compiled or executed in the current environment.
 
 ### Verification status
 
@@ -217,3 +217,6 @@ The COSE verifier also rejects COSE security fields placed only in unprotected h
 ### Independent SCITT interoperability fixture
 
 A fixed tag-18 COSE_Sign1/in-toto Statement vector is pinned from an independent producer: Python `cryptography 46.0.4` Ed25519 plus a separate minimal canonical-CBOR encoder. The Rust test verifies the fixed binary against the independently recorded public key, issuer, subject, key ID and payload. This adds an independent producer/consumer conformance test; it does not replace compiled Rust execution or third-party SCITT conformance certification.
+
+
+The Subterra profile further requires the SCITT CWT sub claim to be the canonical observation URN derived from the signed in-toto predicate site and observation IDs. Each component is UTF-8 percent-encoded independently (only RFC 3986 unreserved bytes remain literal), preventing delimiter ambiguity. Both creation and verification enforce this identity relation; a cryptographically valid statement bound to a different subject is not accepted for the requested observation.

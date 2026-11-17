@@ -511,3 +511,12 @@ The independent Signed_Statement vector is pinned by SHA-256 `464b541e1c0918d672
 
 
 The independent conformance fixture has two additional immutable controls: exact binary SHA-256/length and a final-signature-byte mutation that must fail strict verification. This prevents unnoticed fixture replacement and gives a deterministic negative control independent of the Rust signer.
+
+
+### Subject-to-predicate identity integrity
+
+| Benchmark | Required property | Proposed gate |
+|---|---|---|
+| CanonicalObservationUrnBench | Site and observation identifiers are encoded independently as canonical URI components | One canonical output per input pair |
+| CwtSubjectPredicateBindingBench | CWT sub equals the canonical URN derived from the signed in-toto predicate | Zero validly signed but misbound subject/predicate pairs accepted |
+| SubjectDelimiterInjectionBench | Delimiters, spaces and UTF-8 bytes cannot collide across site/observation boundaries | 100% adversarial identifiers remain unambiguous |

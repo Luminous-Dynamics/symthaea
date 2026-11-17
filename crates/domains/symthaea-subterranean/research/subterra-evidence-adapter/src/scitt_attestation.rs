@@ -85,6 +85,7 @@ pub enum ScittAttestationError {
     InvalidCwtClaims,
     IssuerMismatch,
     SubjectMismatch,
+    SubjectDoesNotMatchPredicateIdentity { expected: String, actual: String },
     InvalidPublicKey,
     InvalidSignature,
     WrongInTotoStatementType,
@@ -115,6 +116,33 @@ fn valid_absolute_uri(value: &str) -> bool {
     nonempty(value)
         && value.contains(':')
         && !value.chars().any(char::is_whitespace)
+}
+
+
+fn encode_urn_component(value: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut encoded = String::new();
+    for byte in value.as_bytes() {
+        if byte.is_ascii_alphanumeric() || matches!(*byte, b'-' | b'.' | b'_' | b'~') {
+            encoded.push(char::from(*byte));
+        } else {
+            encoded.push('%');
+            encoded.push(char::from(HEX[(byte >> 4) as usize]));
+            encoded.push(char::from(HEX[(byte & 0x0f) as usize]));
+        }
+    }
+    encoded
+}
+
+/// Canonical SCITT subject identifier for exactly one Subterra observation.
+/// Identifier components are percent-encoded independently to avoid delimiter
+/// ambiguity and URI injection.
+pub fn canonical_observation_subject_uri(site_id: &str, observation_id: &str) -> String {
+    format!(
+        "urn:subterra:site:{}:observation:{}",
+        encode_urn_component(site_id),
+        encode_urn_component(observation_id)
+    )
 }
 
 fn sha256_hex(bytes: &[u8]) -> String {
@@ -243,6 +271,14 @@ pub fn create_scitt_signed_science_return_statement(
     if !valid_absolute_uri(issuer_uri) || !valid_absolute_uri(subject_uri) {
         return Err(ScittAttestationError::EmptyIssuerOrSubjectUri);
     }
+    let expected_subject =
+        canonical_observation_subject_uri(&record.site_id, &record.observation_id);
+    if subject_uri != expected_subject {
+        return Err(ScittAttestationError::SubjectDoesNotMatchPredicateIdentity {
+            expected: expected_subject,
+            actual: subject_uri.to_string(),
+        });
+    }
     if !nonempty(key_id) || key_id.len() > 256 {
         return Err(ScittAttestationError::InvalidKeyId);
     }
@@ -369,6 +405,16 @@ pub fn verify_scitt_signed_science_return_statement(
     }
     if statement.predicate_type != SUBTERRA_SCIENCE_RETURN_PREDICATE_V1 {
         return Err(ScittAttestationError::WrongPredicateType);
+    }
+    let expected_subject = canonical_observation_subject_uri(
+        &statement.predicate.site_id,
+        &statement.predicate.observation_id,
+    );
+    if trusted_subject_uri != expected_subject {
+        return Err(ScittAttestationError::SubjectDoesNotMatchPredicateIdentity {
+            expected: expected_subject,
+            actual: trusted_subject_uri.to_string(),
+        });
     }
     if statement.subject.len() != 1 {
         return Err(ScittAttestationError::WrongSubjectCount);
@@ -904,6 +950,72 @@ mod tests {
                 &INDEPENDENT_CONFORMANCE_PUBLIC_KEY,
             ),
             Err(ScittAttestationError::InvalidSignature)
+        );
+    }
+
+    #[test]
+    fn canonical_observation_urn_encodes_delimiters_and_utf8() {
+        assert_eq!(
+            canonical_observation_subject_uri("site:a /", "obs:β"),
+            "urn:subterra:site:site%3Aa%20%2F:observation:obs%3A%CE%B2"
+        );
+    }
+
+    #[test]
+    fn creator_rejects_subject_uri_not_bound_to_site_and_observation() {
+        assert_eq!(
+            create_scitt_signed_science_return_statement(
+                &valid_record(),
+                b"abc",
+                ISSUER_URI,
+                "urn:subterra:site:another-site:observation:obs-001",
+                KEY_ID,
+                &SigningKey::from_bytes(&[9_u8; 32]),
+            ),
+            Err(ScittAttestationError::SubjectDoesNotMatchPredicateIdentity {
+                expected: "urn:subterra:site:synthetic-site-a:observation:obs-001".into(),
+                actual: "urn:subterra:site:another-site:observation:obs-001".into()
+            })
+        );
+    }
+
+    #[test]
+    fn signed_predicate_cannot_claim_another_observation_under_the_trusted_subject() {
+        let signing_key = SigningKey::from_bytes(&[9_u8; 32]);
+        let (signed, public_key) = signed_fixture();
+        let Value::Tag(_, inner) = Value::from_slice(&signed).unwrap() else {
+            panic!("expected tag wrapper");
+        };
+        let mut sign1 = CoseSign1::from_cbor_value(*inner).unwrap();
+        let mut statement: InTotoStatementV1 =
+            serde_json::from_slice(sign1.payload.as_ref().unwrap()).unwrap();
+        statement.predicate.site_id = "another-site".into();
+        let payload = serde_json::to_vec(&statement).unwrap();
+        let resigned = CoseSign1Builder::new()
+            .protected(sign1.protected.clone())
+            .payload(payload)
+            .create_signature(&[], |to_be_signed| {
+                use ed25519_dalek::Signer;
+                signing_key.sign(to_be_signed).to_bytes().to_vec()
+            })
+            .build();
+        let tampered_identity = Value::Tag(
+            SCITT_COSE_SIGN1_TAG,
+            Box::new(resigned.to_cbor_value().unwrap())
+        ).to_vec().unwrap();
+        assert_eq!(
+            verify_scitt_signed_science_return_statement(
+                &tampered_identity,
+                b"abc",
+                ISSUER_URI,
+                SUBJECT_URI,
+                KEY_ID,
+                &public_key
+            ),
+            Err(ScittAttestationError::SubjectDoesNotMatchPredicateIdentity {
+                expected: "urn:subterra:site:another-site:observation:obs-001".into(),
+                actual: SUBJECT_URI.into()
+            })
         );
     }
 
