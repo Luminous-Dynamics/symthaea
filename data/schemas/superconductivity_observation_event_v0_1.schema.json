@@ -362,7 +362,8 @@
         "property_code",
         "origin",
         "detection_status",
-        "unit"
+        "unit",
+        "measurement_scope"
       ],
       "properties": {
         "property_code": {
@@ -1161,6 +1162,41 @@
             "required": [
               "measurement_scope"
             ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "property_code": {
+                "const": "Tc"
+              },
+              "origin": {
+                "const": "observed"
+              }
+            },
+            "required": [
+              "property_code",
+              "origin"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "assertion": {
+            "properties": {
+              "measurement_scope": {
+                "enum": [
+                  "mesoscopic",
+                  "bulk",
+                  "device"
+                ]
+              }
+            }
           }
         }
       }
