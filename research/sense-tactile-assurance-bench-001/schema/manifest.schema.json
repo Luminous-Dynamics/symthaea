@@ -1,0 +1,1194 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/sense-tactile-assurance-bench-001/schema/manifest.schema.json",
+  "title": "SENSE-TACTILE-ASSURANCE-BENCH-001 Run Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "benchmark_id",
+    "run_id",
+    "claim_class",
+    "artifact",
+    "comparator",
+    "sensor_context",
+    "experiment",
+    "splits",
+    "evidence",
+    "scorecards"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.2.0"
+    },
+    "benchmark_id": {
+      "const": "SENSE-TACTILE-ASSURANCE-BENCH-001"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "claim_class": {
+      "enum": [
+        "synthetic_benchmark",
+        "software_conformance_only",
+        "physical_measurement",
+        "paper_reported",
+        "protocol_compatible_reproduction"
+      ]
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "commit_sha",
+        "build_recipe_digest",
+        "toolchain"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "commit_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "workflow_run_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "build_recipe_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "toolchain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "binary_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "comparator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "reproduction_status",
+        "transfer_regime",
+        "dataset_rights",
+        "code_rights",
+        "checkpoint_rights"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paper_uri": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "paper_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reported_claim": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "code_uri": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "code_commit_sha": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "checkpoint_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dataset_uri": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "dataset_version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "dataset_license": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "reproduction_status": {
+          "enum": [
+            "paper_reported_only",
+            "artifact_available",
+            "local_reproduction",
+            "protocol_compatible_reproduction",
+            "unavailable",
+            "incompatible"
+          ]
+        },
+        "transfer_regime": {
+          "enum": [
+            "within_unit_heldout",
+            "cross_unit_zero_shot",
+            "frozen_encoder_few_shot",
+            "target_encoder_trained",
+            "cross_modality",
+            "cross_lot_revision",
+            "host_skin_mount_transfer",
+            "out_of_envelope"
+          ]
+        },
+        "dataset_rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_id",
+            "license_uri",
+            "commercial_use_authorized",
+            "noncommercial_use_authorized",
+            "training_use_authorized",
+            "redistribution_authorized",
+            "review_status",
+            "access_gate",
+            "review_receipt_id",
+            "notes"
+          ],
+          "properties": {
+            "license_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "license_uri": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uri"
+            },
+            "commercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "noncommercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "training_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "redistribution_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "review_status": {
+              "enum": [
+                "review_pending",
+                "permitted_for_use",
+                "restricted",
+                "denied",
+                "internal_generated",
+                "not_applicable",
+                "unknown"
+              ]
+            },
+            "access_gate": {
+              "enum": [
+                "none",
+                "approval_required",
+                "contact_info_required",
+                "gated_terms_acceptance",
+                "unknown",
+                "other"
+              ]
+            },
+            "review_receipt_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "code_rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_id",
+            "license_uri",
+            "commercial_use_authorized",
+            "noncommercial_use_authorized",
+            "training_use_authorized",
+            "redistribution_authorized",
+            "review_status",
+            "access_gate",
+            "review_receipt_id",
+            "notes"
+          ],
+          "properties": {
+            "license_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "license_uri": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uri"
+            },
+            "commercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "noncommercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "training_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "redistribution_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "review_status": {
+              "enum": [
+                "review_pending",
+                "permitted_for_use",
+                "restricted",
+                "denied",
+                "internal_generated",
+                "not_applicable",
+                "unknown"
+              ]
+            },
+            "access_gate": {
+              "enum": [
+                "none",
+                "approval_required",
+                "contact_info_required",
+                "gated_terms_acceptance",
+                "unknown",
+                "other"
+              ]
+            },
+            "review_receipt_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "checkpoint_rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_id",
+            "license_uri",
+            "commercial_use_authorized",
+            "noncommercial_use_authorized",
+            "training_use_authorized",
+            "redistribution_authorized",
+            "review_status",
+            "access_gate",
+            "review_receipt_id",
+            "notes"
+          ],
+          "properties": {
+            "license_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "license_uri": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uri"
+            },
+            "commercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "noncommercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "training_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "redistribution_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "review_status": {
+              "enum": [
+                "review_pending",
+                "permitted_for_use",
+                "restricted",
+                "denied",
+                "internal_generated",
+                "not_applicable",
+                "unknown"
+              ]
+            },
+            "access_gate": {
+              "enum": [
+                "none",
+                "approval_required",
+                "contact_info_required",
+                "gated_terms_acceptance",
+                "unknown",
+                "other"
+              ]
+            },
+            "review_receipt_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "sensor_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stage",
+        "sensor",
+        "electronics",
+        "skin",
+        "context_digest"
+      ],
+      "properties": {
+        "stage": {
+          "enum": [
+            "sensor_object",
+            "sensorized_body"
+          ]
+        },
+        "sensor": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "article_id",
+            "modality",
+            "transduction",
+            "model",
+            "geometry_digest"
+          ],
+          "properties": {
+            "article_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "manufacturer": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "model": {
+              "type": "string",
+              "minLength": 1
+            },
+            "modality": {
+              "enum": [
+                "piezoresistive_array",
+                "capacitive_array",
+                "magnetic_array",
+                "optical_visuotactile",
+                "discrete_optical",
+                "piezoelectric",
+                "hybrid",
+                "synthetic",
+                "other"
+              ]
+            },
+            "transduction": {
+              "type": "string",
+              "minLength": 1
+            },
+            "taxel_count": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "minimum": 1
+            },
+            "geometry_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "sensor_article_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "electronics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "revision",
+            "readout_profile_digest",
+            "firmware_revision"
+          ],
+          "properties": {
+            "revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "readout_profile_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "addressing_topology": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "mux_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "afe_revision": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "firmware_revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "channel_map_digest": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "skin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "article_id",
+            "revision",
+            "material_lot_id"
+          ],
+          "properties": {
+            "article_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "material": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "material_lot_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "thickness_mm": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        "host": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "required": [
+            "article_id",
+            "revision",
+            "mounting_revision",
+            "mount_interface_digest",
+            "compliance_profile_digest",
+            "preload_profile_digest"
+          ],
+          "properties": {
+            "article_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mounting_revision": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mount_interface_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "compliance_profile_digest": {
+              "type": "string",
+              "minLength": 1
+            },
+            "geometry_digest": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "preload_profile_digest": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "context_digest": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "stage": {
+                "const": "sensorized_body"
+              }
+            },
+            "required": [
+              "stage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "host": {
+                "type": "object"
+              }
+            },
+            "required": [
+              "host"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "stage": {
+                "const": "sensor_object"
+              }
+            },
+            "required": [
+              "stage"
+            ]
+          },
+          "then": {
+            "properties": {
+              "host": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "experiment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "protocol_id",
+        "protocol_revision",
+        "task_id",
+        "measurand",
+        "stimuli_digest",
+        "environment",
+        "seed",
+        "replicate_count"
+      ],
+      "properties": {
+        "protocol_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "protocol_revision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "task_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "measurand": {
+          "type": "string",
+          "minLength": 1
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stimuli_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "environment": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean",
+              "null"
+            ]
+          }
+        },
+        "seed": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "contact_episode_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "independent_reference_contact_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "active_taxel_site_excitations": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "operator_time_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "elapsed_setup_seconds": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "replicate_count": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "splits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "train_digest",
+        "validation_digest",
+        "test_digest",
+        "contact_episode_split_digest",
+        "physical_article_split_digest",
+        "target_encoder_trained"
+      ],
+      "properties": {
+        "train_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adaptation_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "validation_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contact_episode_split_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "physical_article_split_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manufacturing_lot_split_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "host_skin_mount_split_digest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "heldout_truth_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adaptation_contact_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "target_encoder_trained": {
+          "type": "boolean"
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_observation_digest",
+        "primary_reference_receipt_id",
+        "independent_check_reference_receipt_id",
+        "reference_ancestry_receipt_id",
+        "common_cause_analysis_receipt_id",
+        "calibration_disposition",
+        "observability_disposition",
+        "model_adequacy_disposition",
+        "lifecycle_applicability_disposition",
+        "receipt_verification_status"
+      ],
+      "properties": {
+        "raw_observation_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "primary_reference_receipt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "independent_check_reference_receipt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_ancestry_receipt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "common_cause_analysis_receipt_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "calibration_disposition": {
+          "enum": [
+            "qualified",
+            "unqualified",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "observability_disposition": {
+          "enum": [
+            "qualified",
+            "unobservable",
+            "partially_observable",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "model_adequacy_disposition": {
+          "enum": [
+            "qualified",
+            "misspecified",
+            "underidentified",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "lifecycle_applicability_disposition": {
+          "enum": [
+            "applicable",
+            "invalidated",
+            "maintenance_required",
+            "out_of_envelope",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "physical_validation_receipt_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "independent_heldout_evaluator_digest": {
+          "type": "string",
+          "minLength": 1
+        },
+        "receipt_verification_status": {
+          "enum": [
+            "unverified_references",
+            "cryptographically_verified",
+            "independently_audited"
+          ]
+        }
+      }
+    },
+    "scorecards": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "plane_a_physical_measurement",
+        "plane_b_representation_prediction",
+        "plane_c_decision_value",
+        "resources",
+        "evidence_integrity"
+      ],
+      "properties": {
+        "plane_a_physical_measurement": {
+          "$ref": "#/$defs/planeScore"
+        },
+        "plane_b_representation_prediction": {
+          "$ref": "#/$defs/planeScore"
+        },
+        "plane_c_decision_value": {
+          "$ref": "#/$defs/planeScore"
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status"
+          ],
+          "properties": {
+            "status": {
+              "enum": [
+                "measured",
+                "estimated",
+                "not_run",
+                "not_applicable"
+              ]
+            },
+            "latency_p50_ms": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "latency_p95_ms": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "latency_p99_ms": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "memory_peak_mb": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "energy_per_episode_j": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "measurement_boundary": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "evidence_integrity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "prediction_promoted_to_measurement",
+            "underidentified_cells_silently_qualified",
+            "stale_calibration_reused",
+            "critical_physical_violation_hidden"
+          ],
+          "properties": {
+            "prediction_promoted_to_measurement": {
+              "type": "boolean"
+            },
+            "underidentified_cells_silently_qualified": {
+              "type": "boolean"
+            },
+            "stale_calibration_reused": {
+              "type": "boolean"
+            },
+            "critical_physical_violation_hidden": {
+              "type": "boolean"
+            },
+            "false_independence_claim": {
+              "type": "boolean"
+            },
+            "leakage_negative_control_passed": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "planeScore": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "metrics"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "measured",
+            "synthetic_only",
+            "paper_reported_only",
+            "not_run",
+            "not_applicable",
+            "unqualified"
+          ]
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "name",
+              "value",
+              "unit"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "value": {
+                "type": [
+                  "number",
+                  "integer",
+                  "string",
+                  "boolean"
+                ]
+              },
+              "unit": {
+                "type": "string"
+              },
+              "horizon_steps": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "coverage": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 1
+              },
+              "lower_bound": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "upper_bound": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "baseline_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "paired_delta": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "confidence_interval": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "critical_violations": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "false_alarm_rate": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
