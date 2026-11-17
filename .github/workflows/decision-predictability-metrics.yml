@@ -49,6 +49,38 @@ jobs:
           grep -q '^# scope=within_trajectory_same_regime_continuation_only' forecast-report.csv
           grep -q ",ok" forecast-report.csv
 
+      - name: Summarize per-fixture forecast metrics
+        run: |
+          awk -F, '
+            $1 != "fixture" && $1 !~ /^#/ && NF >= 18 {
+              fixtures[$1] = 1
+              models[$4] = 1
+              if ($18 == "ok") successful++
+              else failures[$18]++
+            }
+            END {
+              for (fixture in fixtures) fixture_count++
+              for (model in models) model_count++
+              printf "fixture_families=%d\\n", fixture_count
+              printf "reported_models_including_status_rows=%d\\n", model_count
+              printf "successful_metric_rows=%d\\n", successful
+              for (status in failures) {
+                printf "rows_with_status_%s=%d\\n", status, failures[status]
+              }
+              if (fixture_count != 8 || successful == 0) exit 1
+            }
+          ' forecast-report.csv
+
+      - name: Upload reproducible generator and forecast report
+        uses: actions/upload-artifact@v4
+        with:
+          name: forecast-baseline-report-${{ github.sha }}
+          path: |
+            chaos-fixtures.csv
+            forecast-report.csv
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Checkout pinned chaos reference generator
         uses: actions/checkout@v4
         with:
