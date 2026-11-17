@@ -130,11 +130,17 @@ pub enum AttemptState {
 impl AttemptState {
     /// States in which this attempt still blocks a new mutation in its scope.
     pub const fn locks_scope(self) -> bool {
-        !matches!(self, Self::ReconciledNotExecuted | Self::ReworkSuperseded | Self::Closed)
+        !matches!(
+            self,
+            Self::ReconciledNotExecuted | Self::ReworkSuperseded | Self::Closed
+        )
     }
 
     pub const fn is_terminal_for_attempt(self) -> bool {
-        matches!(self, Self::ReconciledNotExecuted | Self::ReworkSuperseded | Self::Closed)
+        matches!(
+            self,
+            Self::ReconciledNotExecuted | Self::ReworkSuperseded | Self::Closed
+        )
     }
 }
 
@@ -338,7 +344,8 @@ impl VerificationReceipt {
             issues.push(VerificationIssue::CoordinateFrameMismatch);
         }
         if self.calibration_revision != spec.calibration_revision
-            || self.calibration_digest != spec.calibration_digest {
+            || self.calibration_digest != spec.calibration_digest
+        {
             issues.push(VerificationIssue::CalibrationMismatch);
         }
         if self.coverage_per_mille < spec.required_coverage_per_mille
@@ -351,7 +358,8 @@ impl VerificationReceipt {
         }
 
         let mut domains = BTreeSet::new();
-        if self.common_cause_domains.is_empty() || self.common_cause_domains.contains(&0)
+        if self.common_cause_domains.is_empty()
+            || self.common_cause_domains.contains(&0)
             || self
                 .common_cause_domains
                 .iter()
@@ -403,14 +411,20 @@ pub struct TransitionRecord {
 pub enum ContractError {
     InvalidSpecification,
     InvalidCommonCauseDeclaration,
-    EventSequenceGap { expected: u64, received: u64 },
+    EventSequenceGap {
+        expected: u64,
+        received: u64,
+    },
     EventSequenceExhausted,
     AttemptEventLimitExceeded,
     WorkPackageIdentityMismatch,
     StepRegression,
     WorkPackageRevisionMismatch,
     WorkPackageExpired,
-    InvalidTransition { from: AttemptState, event: &'static str },
+    InvalidTransition {
+        from: AttemptState,
+        event: &'static str,
+    },
     MissingDigest,
     IdempotencyKeyReused,
     CommandDigestMismatch,
@@ -421,7 +435,10 @@ pub enum ContractError {
     DuplicateEvidence,
     InvalidAuthorityRevision,
     DuplicateAttempt,
-    ScopeAlreadyLocked { scope_id: WorkScopeId, holder: AttemptId },
+    ScopeAlreadyLocked {
+        scope_id: WorkScopeId,
+        holder: AttemptId,
+    },
     UnknownAttempt(AttemptId),
 }
 
@@ -476,10 +493,7 @@ impl OperationAttempt {
         self.physical_delta.as_ref()
     }
 
-    pub fn apply(
-        &mut self,
-        stamped: StampedOperationEvent,
-    ) -> Result<AttemptState, ContractError> {
+    pub fn apply(&mut self, stamped: StampedOperationEvent) -> Result<AttemptState, ContractError> {
         if self.history.len() >= MAX_ATTEMPT_EVENTS {
             return Err(ContractError::AttemptEventLimitExceeded);
         }
@@ -662,7 +676,8 @@ impl OperationAttempt {
                     return Err(ContractError::CoordinateFrameMismatch);
                 }
                 if evidence.calibration_revision != self.spec.calibration_revision
-                    || evidence.calibration_digest != self.spec.calibration_digest {
+                    || evidence.calibration_digest != self.spec.calibration_digest
+                {
                     return Err(ContractError::CalibrationMismatch);
                 }
                 if !evidence.digest.is_present() {
@@ -680,7 +695,9 @@ impl OperationAttempt {
                 if self.seen_evidence.contains(&receipt.digest) {
                     return Err(ContractError::DuplicateEvidence);
                 }
-                let physical_delta = self.physical_delta.as_ref()
+                let physical_delta = self
+                    .physical_delta
+                    .as_ref()
                     .ok_or(ContractError::InvalidEvidenceSource)?;
                 let assessment = receipt.assess(&self.spec, physical_delta);
                 self.seen_evidence.insert(receipt.digest);
@@ -816,7 +833,9 @@ impl OperationRegistry {
         stamped: StampedOperationEvent,
     ) -> Result<AttemptState, ContractError> {
         let command_key = match &stamped.event {
-            OperationEvent::CommandIssued { idempotency_key, .. } => Some(*idempotency_key),
+            OperationEvent::CommandIssued {
+                idempotency_key, ..
+            } => Some(*idempotency_key),
             _ => None,
         };
         if command_key.is_some_and(|key| self.idempotency_keys.contains(&key)) {
@@ -840,9 +859,7 @@ impl OperationRegistry {
                 self.authorized_rework.insert(scope_id, authorization);
             }
         }
-        if !state.locks_scope()
-            && self.active_by_scope.get(&scope_id) == Some(&attempt_id)
-        {
+        if !state.locks_scope() && self.active_by_scope.get(&scope_id) == Some(&attempt_id) {
             self.active_by_scope.remove(&scope_id);
         }
         Ok(state)
@@ -1032,10 +1049,7 @@ mod tests {
         );
         assert!(registry.scope_lock_holder(WorkScopeId(7)).is_some());
         assert!(matches!(
-            registry.append(
-                AttemptId(11),
-                event(5, 6, OperationEvent::CloseAccepted)
-            ),
+            registry.append(AttemptId(11), event(5, 6, OperationEvent::CloseAccepted)),
             Err(ContractError::InvalidTransition { .. })
         ));
     }
@@ -1046,23 +1060,24 @@ mod tests {
         registry.begin_attempt(spec(), 1).unwrap();
         start_verification(&mut registry);
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(
-                    6,
-                    7,
-                    OperationEvent::VerificationSubmitted {
-                        receipt: verification(),
-                    },
-                ),
-            ).unwrap(),
+            registry
+                .append(
+                    AttemptId(11),
+                    event(
+                        6,
+                        7,
+                        OperationEvent::VerificationSubmitted {
+                            receipt: verification(),
+                        },
+                    ),
+                )
+                .unwrap(),
             AttemptState::Accepted
         );
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(7, 8, OperationEvent::CloseAccepted),
-            ).unwrap(),
+            registry
+                .append(AttemptId(11), event(7, 8, OperationEvent::CloseAccepted),)
+                .unwrap(),
             AttemptState::Closed
         );
         assert_eq!(registry.scope_lock_holder(WorkScopeId(7)), None);
@@ -1073,31 +1088,45 @@ mod tests {
         let mut registry = OperationRegistry::default();
         registry.begin_attempt(spec(), 1).unwrap();
         preflight(&mut registry);
-        registry.append(
-            AttemptId(11),
-            event(2, 3, OperationEvent::CommandIssued {
-                command_digest: digest(10),
-                idempotency_key: digest(11),
-            }),
-        ).unwrap();
-        registry.append(
-            AttemptId(11),
-            event(3, 4, OperationEvent::OutcomeTimedOut),
-        ).unwrap();
-        assert_eq!(registry.attempt(AttemptId(11)).unwrap().state(), AttemptState::OutcomeUnknown);
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    2,
+                    3,
+                    OperationEvent::CommandIssued {
+                        command_digest: digest(10),
+                        idempotency_key: digest(11),
+                    },
+                ),
+            )
+            .unwrap();
+        registry
+            .append(AttemptId(11), event(3, 4, OperationEvent::OutcomeTimedOut))
+            .unwrap();
+        assert_eq!(
+            registry.attempt(AttemptId(11)).unwrap().state(),
+            AttemptState::OutcomeUnknown
+        );
         let mut retry = spec();
         retry.attempt_id = AttemptId(12);
         assert!(matches!(
             registry.begin_attempt(retry.clone(), 5),
             Err(ContractError::ScopeAlreadyLocked { .. })
         ));
-        registry.append(
-            AttemptId(11),
-            event(4, 6, OperationEvent::ReconciledNotExecuted {
-                reconciler_id: 301,
-                evidence_digest: digest(15),
-            }),
-        ).unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    4,
+                    6,
+                    OperationEvent::ReconciledNotExecuted {
+                        reconciler_id: 301,
+                        evidence_digest: digest(15),
+                    },
+                ),
+            )
+            .unwrap();
         assert_eq!(registry.scope_lock_holder(WorkScopeId(7)), None);
         registry.begin_attempt(retry, 7).unwrap();
     }
@@ -1107,24 +1136,33 @@ mod tests {
         let mut registry = OperationRegistry::default();
         registry.begin_attempt(spec(), 1).unwrap();
         preflight(&mut registry);
-        registry.append(
-            AttemptId(11),
-            event(2, 3, OperationEvent::CommandIssued {
-                command_digest: digest(10),
-                idempotency_key: digest(11),
-            }),
-        ).unwrap();
-        registry.append(
-            AttemptId(11),
-            event(3, 4, OperationEvent::OutcomeTimedOut),
-        ).unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    2,
+                    3,
+                    OperationEvent::CommandIssued {
+                        command_digest: digest(10),
+                        idempotency_key: digest(11),
+                    },
+                ),
+            )
+            .unwrap();
+        registry
+            .append(AttemptId(11), event(3, 4, OperationEvent::OutcomeTimedOut))
+            .unwrap();
         assert_eq!(
             registry.append(
                 AttemptId(11),
-                event(4, 5, OperationEvent::ReconciledNotExecuted {
-                    reconciler_id: 100,
-                    evidence_digest: digest(15),
-                }),
+                event(
+                    4,
+                    5,
+                    OperationEvent::ReconciledNotExecuted {
+                        reconciler_id: 100,
+                        evidence_digest: digest(15),
+                    }
+                ),
             ),
             Err(ContractError::ReconcilerMustBeIndependent)
         );
@@ -1135,30 +1173,45 @@ mod tests {
         let mut registry = OperationRegistry::default();
         registry.begin_attempt(spec(), 1).unwrap();
         preflight(&mut registry);
-        registry.append(
-            AttemptId(11),
-            event(2, 3, OperationEvent::CommandIssued {
-                command_digest: digest(10),
-                idempotency_key: digest(11),
-            }),
-        ).unwrap();
-        registry.append(
-            AttemptId(11),
-            event(3, 4, OperationEvent::OutcomeTimedOut),
-        ).unwrap();
-        registry.append(
-            AttemptId(11),
-            event(4, 5, OperationEvent::ReconciledExecuted {
-                reconciler_id: 301,
-                evidence_digest: digest(15),
-            }),
-        ).unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    2,
+                    3,
+                    OperationEvent::CommandIssued {
+                        command_digest: digest(10),
+                        idempotency_key: digest(11),
+                    },
+                ),
+            )
+            .unwrap();
+        registry
+            .append(AttemptId(11), event(3, 4, OperationEvent::OutcomeTimedOut))
+            .unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    4,
+                    5,
+                    OperationEvent::ReconciledExecuted {
+                        reconciler_id: 301,
+                        evidence_digest: digest(15),
+                    },
+                ),
+            )
+            .unwrap();
         assert_eq!(
             registry.append(
                 AttemptId(11),
-                event(5, 6, OperationEvent::VerificationSubmitted {
-                    receipt: verification(),
-                }),
+                event(
+                    5,
+                    6,
+                    OperationEvent::VerificationSubmitted {
+                        receipt: verification(),
+                    }
+                ),
             ),
             Err(ContractError::InvalidTransition {
                 from: AttemptState::ReconciledExecutedAwaitingInspection,
@@ -1176,28 +1229,52 @@ mod tests {
         poor.coverage_per_mille = 800;
         poor.unobserved_required_regions = 2;
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(6, 7, OperationEvent::VerificationSubmitted { receipt: poor }),
-            ).unwrap(),
+            registry
+                .append(
+                    AttemptId(11),
+                    event(
+                        6,
+                        7,
+                        OperationEvent::VerificationSubmitted { receipt: poor }
+                    ),
+                )
+                .unwrap(),
             AttemptState::InsufficientEvidence
         );
-        assert!(registry.attempt(AttemptId(11)).unwrap().last_verification().unwrap().issues.contains(&VerificationIssue::CoverageInsufficient));
-        registry.append(
-            AttemptId(11),
-            event(7, 8, OperationEvent::AdditionalEvidenceReceived {
-                evidence_digest: digest(16),
-            }),
-        ).unwrap();
+        assert!(
+            registry
+                .attempt(AttemptId(11))
+                .unwrap()
+                .last_verification()
+                .unwrap()
+                .issues
+                .contains(&VerificationIssue::CoverageInsufficient)
+        );
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    7,
+                    8,
+                    OperationEvent::AdditionalEvidenceReceived {
+                        evidence_digest: digest(16),
+                    },
+                ),
+            )
+            .unwrap();
         let mut improved = verification();
         improved.digest = digest(18);
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(8, 9, OperationEvent::VerificationSubmitted {
-                    receipt: improved,
-                }),
-            ).unwrap(),
+            registry
+                .append(
+                    AttemptId(11),
+                    event(
+                        8,
+                        9,
+                        OperationEvent::VerificationSubmitted { receipt: improved }
+                    ),
+                )
+                .unwrap(),
             AttemptState::Accepted
         );
     }
@@ -1210,13 +1287,23 @@ mod tests {
         let mut receipt = verification();
         receipt.common_cause_domains = vec![2, 9];
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
-            ).unwrap(),
+            registry
+                .append(
+                    AttemptId(11),
+                    event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
+                )
+                .unwrap(),
             AttemptState::InsufficientEvidence
         );
-        assert!(registry.attempt(AttemptId(11)).unwrap().last_verification().unwrap().issues.contains(&VerificationIssue::CommonCauseOverlap));
+        assert!(
+            registry
+                .attempt(AttemptId(11))
+                .unwrap()
+                .last_verification()
+                .unwrap()
+                .issues
+                .contains(&VerificationIssue::CommonCauseOverlap)
+        );
     }
 
     #[test]
@@ -1228,15 +1315,29 @@ mod tests {
         receipt.verifier_id = 100;
         receipt.sensor_chain_id = 200;
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
-            ).unwrap(),
+            registry
+                .append(
+                    AttemptId(11),
+                    event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
+                )
+                .unwrap(),
             AttemptState::InsufficientEvidence
         );
-        let assessment = registry.attempt(AttemptId(11)).unwrap().last_verification().unwrap();
-        assert!(assessment.issues.contains(&VerificationIssue::VerifierIsExecutor));
-        assert!(assessment.issues.contains(&VerificationIssue::SensorChainShared));
+        let assessment = registry
+            .attempt(AttemptId(11))
+            .unwrap()
+            .last_verification()
+            .unwrap();
+        assert!(
+            assessment
+                .issues
+                .contains(&VerificationIssue::VerifierIsExecutor)
+        );
+        assert!(
+            assessment
+                .issues
+                .contains(&VerificationIssue::SensorChainShared)
+        );
     }
 
     #[test]
@@ -1246,38 +1347,51 @@ mod tests {
         assert_eq!(
             registry.append(
                 AttemptId(11),
-                event(1, 2, OperationEvent::PreflightAccepted {
-                    work_package_revision: 3,
-                    design_revision: 9,
-                    coordinate_frame_revision: 2,
-                    calibration_revision: 5,
-                    authority_revision: 6,
-                    work_package_digest: digest(20),
-                    design_digest: digest(21),
-                    coordinate_frame_digest: digest(22),
-                    calibration_digest: digest(23),
-                    authority_evidence_digest: digest(24),
-                }),
+                event(
+                    1,
+                    2,
+                    OperationEvent::PreflightAccepted {
+                        work_package_revision: 3,
+                        design_revision: 9,
+                        coordinate_frame_revision: 2,
+                        calibration_revision: 5,
+                        authority_revision: 6,
+                        work_package_digest: digest(20),
+                        design_digest: digest(21),
+                        coordinate_frame_digest: digest(22),
+                        calibration_digest: digest(23),
+                        authority_evidence_digest: digest(24),
+                    }
+                ),
             ),
             Err(ContractError::WorkPackageRevisionMismatch)
         );
-        assert_eq!(registry.attempt(AttemptId(11)).unwrap().state(), AttemptState::Approved);
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(1, 2, OperationEvent::PreflightAccepted {
-                    work_package_revision: 4,
-                    design_revision: 9,
-                    coordinate_frame_revision: 2,
-                    calibration_revision: 5,
-                    authority_revision: 6,
-                    work_package_digest: digest(20),
-                    design_digest: digest(21),
-                    coordinate_frame_digest: digest(22),
-                    calibration_digest: digest(23),
-                    authority_evidence_digest: digest(24),
-                }),
-            ).unwrap(),
+            registry.attempt(AttemptId(11)).unwrap().state(),
+            AttemptState::Approved
+        );
+        assert_eq!(
+            registry
+                .append(
+                    AttemptId(11),
+                    event(
+                        1,
+                        2,
+                        OperationEvent::PreflightAccepted {
+                            work_package_revision: 4,
+                            design_revision: 9,
+                            coordinate_frame_revision: 2,
+                            calibration_revision: 5,
+                            authority_revision: 6,
+                            work_package_digest: digest(20),
+                            design_digest: digest(21),
+                            coordinate_frame_digest: digest(22),
+                            calibration_digest: digest(23),
+                            authority_evidence_digest: digest(24),
+                        }
+                    ),
+                )
+                .unwrap(),
             AttemptState::PreflightAccepted
         );
     }
@@ -1290,30 +1404,50 @@ mod tests {
         assert_eq!(
             registry.append(
                 AttemptId(11),
-                event(3, 4, OperationEvent::CommandIssued {
-                    command_digest: digest(10),
-                    idempotency_key: digest(11),
-                }),
+                event(
+                    3,
+                    4,
+                    OperationEvent::CommandIssued {
+                        command_digest: digest(10),
+                        idempotency_key: digest(11),
+                    }
+                ),
             ),
-            Err(ContractError::EventSequenceGap { expected: 2, received: 3 })
+            Err(ContractError::EventSequenceGap {
+                expected: 2,
+                received: 3
+            })
         );
-        assert_eq!(registry.attempt(AttemptId(11)).unwrap().state(), AttemptState::PreflightAccepted);
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(2, 3, OperationEvent::CommandIssued {
-                    command_digest: digest(10),
-                    idempotency_key: digest(11),
-                }),
-            ).unwrap(),
+            registry.attempt(AttemptId(11)).unwrap().state(),
+            AttemptState::PreflightAccepted
+        );
+        assert_eq!(
+            registry
+                .append(
+                    AttemptId(11),
+                    event(
+                        2,
+                        3,
+                        OperationEvent::CommandIssued {
+                            command_digest: digest(10),
+                            idempotency_key: digest(11),
+                        }
+                    ),
+                )
+                .unwrap(),
             AttemptState::CommandIssued
         );
         assert_eq!(
             registry.append(
                 AttemptId(11),
-                event(3, 2, OperationEvent::DeviceAcknowledged {
-                    command_digest: digest(10),
-                }),
+                event(
+                    3,
+                    2,
+                    OperationEvent::DeviceAcknowledged {
+                        command_digest: digest(10),
+                    }
+                ),
             ),
             Err(ContractError::StepRegression)
         );
@@ -1327,71 +1461,106 @@ mod tests {
         let mut receipt = verification();
         receipt.postconditions_passed = false;
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
-            ).unwrap(),
+            registry
+                .append(
+                    AttemptId(11),
+                    event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
+                )
+                .unwrap(),
             AttemptState::Rejected
         );
-        registry.append(
-            AttemptId(11),
-            event(7, 8, OperationEvent::RecordReworkReview {
-                authority_revision: 6,
-                disposition_digest: digest(17),
-            }),
-        ).unwrap();
-        assert_eq!(registry.attempt(AttemptId(11)).unwrap().state(), AttemptState::ReworkReview);
-        assert_eq!(registry.scope_lock_holder(WorkScopeId(7)), Some(AttemptId(11)));
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    7,
+                    8,
+                    OperationEvent::RecordReworkReview {
+                        authority_revision: 6,
+                        disposition_digest: digest(17),
+                    },
+                ),
+            )
+            .unwrap();
+        assert_eq!(
+            registry.attempt(AttemptId(11)).unwrap().state(),
+            AttemptState::ReworkReview
+        );
+        assert_eq!(
+            registry.scope_lock_holder(WorkScopeId(7)),
+            Some(AttemptId(11))
+        );
     }
     #[test]
     fn idempotency_keys_cannot_be_reused_across_attempts() {
         let mut registry = OperationRegistry::default();
         registry.begin_attempt(spec(), 1).unwrap();
         preflight(&mut registry);
-        registry.append(
-            AttemptId(11),
-            event(2, 3, OperationEvent::CommandIssued {
-                command_digest: digest(10),
-                idempotency_key: digest(11),
-            }),
-        ).unwrap();
-        registry.append(
-            AttemptId(11),
-            event(3, 4, OperationEvent::OutcomeTimedOut),
-        ).unwrap();
-        registry.append(
-            AttemptId(11),
-            event(4, 5, OperationEvent::ReconciledNotExecuted {
-                reconciler_id: 301,
-                evidence_digest: digest(15),
-            }),
-        ).unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    2,
+                    3,
+                    OperationEvent::CommandIssued {
+                        command_digest: digest(10),
+                        idempotency_key: digest(11),
+                    },
+                ),
+            )
+            .unwrap();
+        registry
+            .append(AttemptId(11), event(3, 4, OperationEvent::OutcomeTimedOut))
+            .unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    4,
+                    5,
+                    OperationEvent::ReconciledNotExecuted {
+                        reconciler_id: 301,
+                        evidence_digest: digest(15),
+                    },
+                ),
+            )
+            .unwrap();
 
         let mut retry = spec();
         retry.attempt_id = AttemptId(12);
         registry.begin_attempt(retry, 6).unwrap();
-        registry.append(
-            AttemptId(12),
-            event(1, 7, OperationEvent::PreflightAccepted {
-                work_package_revision: 4,
-                design_revision: 9,
-                coordinate_frame_revision: 2,
-                calibration_revision: 5,
-                authority_revision: 6,
-                work_package_digest: digest(20),
-                design_digest: digest(21),
-                coordinate_frame_digest: digest(22),
-                calibration_digest: digest(23),
-                authority_evidence_digest: digest(24),
-            }),
-        ).unwrap();
+        registry
+            .append(
+                AttemptId(12),
+                event(
+                    1,
+                    7,
+                    OperationEvent::PreflightAccepted {
+                        work_package_revision: 4,
+                        design_revision: 9,
+                        coordinate_frame_revision: 2,
+                        calibration_revision: 5,
+                        authority_revision: 6,
+                        work_package_digest: digest(20),
+                        design_digest: digest(21),
+                        coordinate_frame_digest: digest(22),
+                        calibration_digest: digest(23),
+                        authority_evidence_digest: digest(24),
+                    },
+                ),
+            )
+            .unwrap();
         assert_eq!(
             registry.append(
                 AttemptId(12),
-                event(2, 8, OperationEvent::CommandIssued {
-                    command_digest: digest(30),
-                    idempotency_key: digest(11),
-                }),
+                event(
+                    2,
+                    8,
+                    OperationEvent::CommandIssued {
+                        command_digest: digest(30),
+                        idempotency_key: digest(11),
+                    }
+                ),
             ),
             Err(ContractError::IdempotencyKeyReused)
         );
@@ -1408,17 +1577,29 @@ mod tests {
         start_verification(&mut registry);
         let mut failed = verification();
         failed.postconditions_passed = false;
-        registry.append(
-            AttemptId(11),
-            event(6, 7, OperationEvent::VerificationSubmitted { receipt: failed }),
-        ).unwrap();
-        registry.append(
-            AttemptId(11),
-            event(7, 8, OperationEvent::RecordReworkReview {
-                authority_revision: 6,
-                disposition_digest: digest(31),
-            }),
-        ).unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    6,
+                    7,
+                    OperationEvent::VerificationSubmitted { receipt: failed },
+                ),
+            )
+            .unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    7,
+                    8,
+                    OperationEvent::RecordReworkReview {
+                        authority_revision: 6,
+                        disposition_digest: digest(31),
+                    },
+                ),
+            )
+            .unwrap();
 
         let mut premature_retry = spec();
         premature_retry.attempt_id = AttemptId(12);
@@ -1441,13 +1622,19 @@ mod tests {
             authority_evidence_digest: digest(34),
         };
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(8, 10, OperationEvent::AuthorizeRework {
-                    authorization: authorization.clone(),
-                    approval_digest: digest(35),
-                }),
-            ).unwrap(),
+            registry
+                .append(
+                    AttemptId(11),
+                    event(
+                        8,
+                        10,
+                        OperationEvent::AuthorizeRework {
+                            authorization: authorization.clone(),
+                            approval_digest: digest(35),
+                        }
+                    ),
+                )
+                .unwrap(),
             AttemptState::ReworkSuperseded
         );
         assert_eq!(registry.scope_lock_holder(WorkScopeId(7)), None);
@@ -1481,13 +1668,19 @@ mod tests {
         let mut registry = OperationRegistry::default();
         registry.begin_attempt(spec(), 1).unwrap();
         preflight(&mut registry);
-        registry.append(
-            AttemptId(11),
-            event(2, 3, OperationEvent::CommandIssued {
-                command_digest: digest(10),
-                idempotency_key: digest(11),
-            }),
-        ).unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    2,
+                    3,
+                    OperationEvent::CommandIssued {
+                        command_digest: digest(10),
+                        idempotency_key: digest(11),
+                    },
+                ),
+            )
+            .unwrap();
         let history = registry.attempt(AttemptId(11)).unwrap().history();
         assert_eq!(history.len(), 2);
         assert!(matches!(
@@ -1507,14 +1700,23 @@ mod tests {
         let mut receipt = verification();
         receipt.physical_delta_digest = digest(99);
         assert_eq!(
-            registry.append(
-                AttemptId(11),
-                event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
-            ).unwrap(),
+            registry
+                .append(
+                    AttemptId(11),
+                    event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
+                )
+                .unwrap(),
             AttemptState::InsufficientEvidence
         );
-        assert!(registry.attempt(AttemptId(11)).unwrap()
-            .last_verification().unwrap().issues.contains(&VerificationIssue::PhysicalDeltaMismatch));
+        assert!(
+            registry
+                .attempt(AttemptId(11))
+                .unwrap()
+                .last_verification()
+                .unwrap()
+                .issues
+                .contains(&VerificationIssue::PhysicalDeltaMismatch)
+        );
     }
 
 }
