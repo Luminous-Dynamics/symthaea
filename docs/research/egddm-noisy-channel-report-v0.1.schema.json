@@ -108,6 +108,7 @@
           "evidence_accepted",
           "calibration_valid",
           "factorization_qualified",
+          "dependence_mode",
           "temporal_valid",
           "actual_output_possible",
           "false_observation_count",
@@ -142,7 +143,8 @@
               "unmodeled_channel_outcome",
               "impossible_output_under_actual_hypothesis",
               "unqualified_dependence_or_factorization",
-              "zero_evidence_support"
+              "zero_evidence_support",
+              "accepted_with_frechet_dependence_bounds"
             ]
           },
           "evidence_accepted": {
@@ -230,6 +232,13 @@
           },
           "irreversible_action": {
             "type": "boolean"
+          },
+          "dependence_mode": {
+            "enum": [
+              "single_channel",
+              "within_group_frechet_and_exact_set_cross_group_product",
+              "unrestricted_frechet_joint_bounds"
+            ]
           }
         }
       }
