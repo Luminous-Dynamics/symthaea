@@ -140,7 +140,7 @@ Causal order:
 
 The material and optical models are cloned into staged state. If material processing or the subsequent deposition event fails, neither state is committed. A later pulse therefore sees the contamination caused by earlier pulses, not a static clean-optic assumption. The integration emits simulation-only receipts and cannot mint physical calibration, custody, assay or authority evidence.
 
-Regression cases cover progressive attenuation of the next pulse, distinct witness/QCM/process-optic observations, wet-purge analyzer bias without extra captured water, and rollback when the deposition/metrology stage rejects the event.
+Regression cases cover progressive attenuation of the next pulse, distinct witness/QCM/process-optic observations, wet-purge analyzer bias without extra captured water, rollback when the deposition/metrology stage rejects the event, cleaning downtime and cooling, successful fresh post-clean requalification, and failed requalification after incomplete cleaning. Failed post-clean inspections are retained while the optical system remains unqualified.
 
 This is a first coupled surrogate, not a validated transport model. In particular, the material model's estimated areal emission load and the optical model's transfer factors/extinction coefficients are calibration parameters. They must be fitted from representative geometry, temperature, species and wavelength measurements before any physical prediction claim.
 
