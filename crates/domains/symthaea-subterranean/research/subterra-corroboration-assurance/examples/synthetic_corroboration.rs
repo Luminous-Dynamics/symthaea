@@ -203,7 +203,9 @@ fn main() {
         dependency_graph_digest: "sha256:graph".into(),
         fault_domain_profile_digest: "sha256:profile".into(),
         assessment_digest: "sha256:assessment".into(),
+        verifier_id: "verifier-7".into(),
         verifier_receipt_digest: "sha256:portfolio-verifier".into(),
+        purpose: EvidencePurpose::AssetConditionInspection,
     };
     let report = admit_corroboration_portfolio(
         &CandidateCorroborationPortfolio { admitted_anchor: anchor, sources, assessment },
