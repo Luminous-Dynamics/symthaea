@@ -75,12 +75,8 @@ fn uint(v:&Value,key:&str,label:&str)->Result<u64,String>{
 fn time(raw:&str,label:&str)->Result<DateTime<FixedOffset>,String>{
  DateTime::parse_from_rfc3339(raw).map_err(|e|format!("{label} must be RFC 3339: {e}"))
 }
-fn probability(v:&Value,label:&str,kind:&str)->Result<Bounds,String>{
- let (lk,uk,nk)=if kind=="prior"{
-  ("lower_probability_bps","upper_probability_bps","nominal_probability_bps")
- }else{
-  ("lower_probability_bps","upper_probability_bps","nominal_probability_bps")
- };
+fn probability(v:&Value,label:&str)->Result<Bounds,String>{
+ let (lk,uk,nk)=("lower_probability_bps","upper_probability_bps","nominal_probability_bps");
  allowed(v,&[lk,uk,nk],label)?;
  let b=Bounds{lower:uint(v,lk,label)?,upper:uint(v,uk,label)?,nominal:uint(v,nk,label)?};
  if b.lower>b.nominal||b.nominal>b.upper||b.upper>SCALE{
@@ -97,7 +93,7 @@ fn parse_priors(candidate:&Value,oracle:&Value)->Result<BTreeMap<String,Bounds>,
   let label=format!("candidate_view.hypothesis_bounds[{i}]");
   allowed(row,&["hypothesis_id","lower_probability_bps","upper_probability_bps","nominal_probability_bps"],&label)?;
   let id=string(row,"hypothesis_id",&label)?;
-  let b=probability(row,&label,"prior")?;
+  let b=probability(row,&label)?;
   lower=lower.checked_add(b.lower).ok_or("prior lower mass overflow")?;
   upper=upper.checked_add(b.upper).ok_or("prior upper mass overflow")?;
   nominal=nominal.checked_add(b.nominal).ok_or("prior nominal mass overflow")?;
@@ -467,7 +463,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
  let mut leaf_paths:BTreeMap<String,LeafPath>=BTreeMap::new();
  let mut row_costs:BTreeMap<String,Vec<u64>>=BTreeMap::new();
  let mut max_path=0u64;
- let mut actual_row_leafs=Vec::new();
+ let mut actual_row_leafs:BTreeMap<usize,String>=BTreeMap::new();
  for (hypothesis,kernel) in &kernels{
   let mut costs=Vec::new();
   for (row_index,row) in kernel.rows.iter().enumerate(){
@@ -490,7 +486,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
      leaf_paths.get_mut(&node_id).ok_or("leaf insertion failed")?.world_row_count+=1;
      costs.push(path_cost);
      if row.probability.upper>0{max_path=max_path.max(path_cost);}
-     if hypothesis==&actual&&row.probability.nominal>0{actual_row_leafs.push((node_id.clone(),row_index,row.probability.nominal));}
+     if hypothesis==&actual&&row.probability.upper>0{actual_row_leafs.insert(row_index,node_id.clone());}
      break;
     }
     let option_id=node.option_id.as_ref().ok_or("acquire node lacks option")?;
@@ -532,7 +528,8 @@ fn evaluate(raw:&str)->Result<Value,String>{
   let action=&actions[&path.action_id];
   let justified=support>0&&robust<=action.max_risk&&(!action.hard_gate||robust==0);
   let within=path.path_cost<=budget;
-  if path.decision_kind=="act"&&(!justified||!within){risk_violations+=(!justified) as usize;budget_violations+=(!within) as usize;}
+  if path.decision_kind=="act"&&!justified{risk_violations+=1;}
+  if !within{budget_violations+=1;}
   let mut leaf_nominal_numerator=0u128;let mut leaf_unsafe_numerator=0u128;
   for (hypothesis,prior) in &priors{
    let probability=likelihoods[hypothesis].nominal as u128;
@@ -549,11 +546,6 @@ fn evaluate(raw:&str)->Result<Value,String>{
   }else{None};
   let actual_likelihood=likelihoods.get(&actual).ok_or("actual hypothesis likelihood missing")?;
   let actual_possible=actual_likelihood.upper>0;
-  let actual_unsafe=path.decision_kind=="act"&&actual_possible&&!safety[&actual].contains(&path.action_id);
-  if actual_unsafe{
-   actual_unsafe_nominal=actual_unsafe_nominal.checked_add(actual_likelihood.nominal).ok_or("actual unsafe nominal overflow")?;
-   actual_unsafe_upper=actual_unsafe_upper.checked_add(actual_likelihood.upper).ok_or("actual unsafe upper overflow")?;
-  }
   leaf_reports.push(json!({
    "leaf_node_id":leaf_id,"decision_kind":path.decision_kind,"action_id":path.action_id,
    "acquisition_options":path.option_ids,"joint_row_count":path.world_row_count,
@@ -564,6 +556,14 @@ fn evaluate(raw:&str)->Result<Value,String>{
    "target_action_counterfactual":target_risk.map(|(n,r,s)|json!({"nominal_risk_bps":n,"worst_case_risk_bps":r,"support_lower_bps":s}))
   }));
  }
+ let actual_kernel=kernels.get(&actual).ok_or("actual joint kernel missing")?;
+ let actual_unsafe_rows:BTreeSet<usize>=actual_row_leafs.iter().filter_map(|(row_index,leaf_id)|{
+  let path=leaf_paths.get(leaf_id)?;
+  if path.decision_kind=="act"&&!safety[&actual].contains(&path.action_id){Some(*row_index)}else{None}
+ }).collect();
+ let actual_unsafe_interval=event_bounds(&actual_kernel.rows,&actual_unsafe_rows)?;
+ actual_unsafe_nominal=actual_unsafe_interval.nominal;
+ actual_unsafe_upper=actual_unsafe_interval.upper;
  let coverage=(coverage_numerator/SCALE as u128).min(SCALE as u128) as u64;
  let unnecessary=(unnecessary_numerator/SCALE as u128).min(SCALE as u128) as u64;
  let unsafe_bps=(unsafe_numerator/SCALE as u128).min(SCALE as u128) as u64;
