@@ -853,4 +853,202 @@ mod tests {
             .collect();
         assert_eq!(ids, vec!["material-run", "qcm-witness"]);
     }
+    #[test]
+    fn assay_action_value_includes_terminal_decision_unlocked_by_pass_evidence() {
+        let mut candidate = problem();
+        candidate.actions = vec![ActionOption {
+            id: "independent-assay".to_string(),
+            kind: CampaignActionKind::IndependentAssay,
+            cost: ResourceCost {
+                energy_wh: 0.2,
+                elapsed_seconds: 1.0,
+                consumables_g: 0.1,
+                experiment_equivalents: 0.0,
+            },
+            required_gates: vec![
+                Gate::SampleIdentityValid,
+                Gate::InstrumentCalibrated,
+                Gate::IndependentAssayChainValid,
+            ],
+            outcomes: vec![
+                ObservationOutcome {
+                    id: "assay-pass".to_string(),
+                    likelihood_by_hypothesis: vec![0.97, 0.04],
+                    next_hypothesis_probability: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+                    gate_updates: vec![GateUpdate {
+                        gate: Gate::IndependentAssayPassed,
+                        satisfied: true,
+                    }],
+                },
+                ObservationOutcome {
+                    id: "assay-fail".to_string(),
+                    likelihood_by_hypothesis: vec![0.03, 0.96],
+                    next_hypothesis_probability: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+                    gate_updates: vec![GateUpdate {
+                        gate: Gate::IndependentAssayPassed,
+                        satisfied: false,
+                    }],
+                },
+            ],
+        }];
+        let result = DecisionDirectedPolicy { config: config() }
+            .evaluate(&candidate, &safety())
+            .unwrap();
+        assert_eq!(
+            result.selected_action_id.as_deref(),
+            Some("independent-assay")
+        );
+        let evaluation = &result.evaluations[0];
+        assert!(evaluation.expected_value_of_action.unwrap() > 2.0);
+    }
+
+    #[test]
+    fn cleaning_action_values_both_material_recovery_and_requalification() {
+        let mut candidate = problem();
+        candidate.decisions = vec![
+            DecisionOption {
+                id: "continue-qualified-process".to_string(),
+                loss_by_hypothesis: vec![0.0, 10.0],
+                required_gates: vec![Gate::OpticalPathQualified],
+            },
+            DecisionOption {
+                id: "pause-unqualified-process".to_string(),
+                loss_by_hypothesis: vec![2.0, 0.0],
+                required_gates: Vec::new(),
+            },
+        ];
+        candidate.actions = vec![ActionOption {
+            id: "clean-and-requalify".to_string(),
+            kind: CampaignActionKind::CleaningRequalification,
+            cost: ResourceCost {
+                energy_wh: 0.1,
+                elapsed_seconds: 1.0,
+                consumables_g: 0.1,
+                experiment_equivalents: 0.0,
+            },
+            required_gates: vec![Gate::CleaningProtocolQualified],
+            outcomes: vec![
+                ObservationOutcome {
+                    id: "requalified".to_string(),
+                    likelihood_by_hypothesis: vec![0.1, 0.8],
+                    next_hypothesis_probability: vec![
+                        vec![1.0, 0.0],
+                        vec![1.0, 0.0],
+                    ],
+                    gate_updates: vec![GateUpdate {
+                        gate: Gate::OpticalPathQualified,
+                        satisfied: true,
+                    }],
+                },
+                ObservationOutcome {
+                    id: "cleaning-incomplete".to_string(),
+                    likelihood_by_hypothesis: vec![0.9, 0.2],
+                    next_hypothesis_probability: vec![
+                        vec![1.0, 0.0],
+                        vec![0.0, 1.0],
+                    ],
+                    gate_updates: vec![GateUpdate {
+                        gate: Gate::OpticalPathQualified,
+                        satisfied: false,
+                    }],
+                },
+            ],
+        }];
+        let mut state = safety();
+        state.optical_path_qualified = false;
+        let result = DecisionDirectedPolicy { config: config() }
+            .evaluate(&candidate, &state)
+            .unwrap();
+        assert_eq!(
+            result.selected_action_id.as_deref(),
+            Some("clean-and-requalify")
+        );
+        assert_eq!(
+            result.current_best_decision_id,
+            "pause-unqualified-process"
+        );
+        assert!(result.evaluations[0].expected_value_of_action.unwrap() > 0.1);
+    }
+
+    #[test]
+    fn outcome_cannot_mint_a_hard_thermal_safety_gate() {
+        let mut candidate = problem();
+        candidate.actions = vec![ActionOption {
+            id: "reference".to_string(),
+            kind: CampaignActionKind::OpticalReference,
+            cost: ResourceCost {
+                energy_wh: 0.1,
+                elapsed_seconds: 1.0,
+                consumables_g: 0.0,
+                experiment_equivalents: 0.0,
+            },
+            required_gates: Vec::new(),
+            outcomes: vec![ObservationOutcome {
+                id: "looks-safe".to_string(),
+                likelihood_by_hypothesis: vec![1.0, 1.0],
+                next_hypothesis_probability: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+                gate_updates: vec![GateUpdate {
+                    gate: Gate::ThermalEnvelopeSafe,
+                    satisfied: true,
+                }],
+            }],
+        }];
+        let result = DecisionDirectedPolicy { config: config() }
+            .evaluate(&candidate, &safety());
+        assert_eq!(result, Err(PolicyError::ProtectedGateUpdate));
+    }
+
+    #[test]
+    fn action_cannot_update_a_gate_outside_its_evidence_scope() {
+        let mut candidate = problem();
+        candidate.actions = vec![ActionOption {
+            id: "reference".to_string(),
+            kind: CampaignActionKind::OpticalReference,
+            cost: ResourceCost {
+                energy_wh: 0.1,
+                elapsed_seconds: 1.0,
+                consumables_g: 0.0,
+                experiment_equivalents: 0.0,
+            },
+            required_gates: Vec::new(),
+            outcomes: vec![ObservationOutcome {
+                id: "assay-pass".to_string(),
+                likelihood_by_hypothesis: vec![1.0, 1.0],
+                next_hypothesis_probability: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
+                gate_updates: vec![GateUpdate {
+                    gate: Gate::IndependentAssayPassed,
+                    satisfied: true,
+                }],
+            }],
+        }];
+        let result = DecisionDirectedPolicy { config: config() }
+            .evaluate(&candidate, &safety());
+        assert_eq!(result, Err(PolicyError::InvalidGateUpdateForAction));
+    }
+
+    #[test]
+    fn transition_probabilities_must_be_normalized() {
+        let mut candidate = problem();
+        candidate.actions[0].outcomes[0].next_hypothesis_probability =
+            vec![vec![0.8, 0.3], vec![0.0, 1.0]];
+        let result = DecisionDirectedPolicy { config: config() }
+            .evaluate(&candidate, &safety());
+        assert_eq!(
+            result,
+            Err(PolicyError::TransitionProbabilitiesDoNotNormalize)
+        );
+    }
+
+    #[test]
+    fn measurement_only_identity_transition_preserves_ordinary_evsi() {
+        let result = DecisionDirectedPolicy { config: config() }
+            .evaluate(&problem(), &safety())
+            .unwrap();
+        let qcm = result
+            .evaluations
+            .iter()
+            .find(|evaluation| evaluation.action_id == "qcm-witness")
+            .unwrap();
+        assert!(qcm.expected_value_of_action.unwrap() > 0.0);
+    }
 }
