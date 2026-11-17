@@ -306,3 +306,15 @@ The dedicated workflow now tests both the evidence registry auditor and ranking-
 **Metric scope:** confidence intervals, probability calibration, OOD selective risk, cost-normalized comparisons, family/temporal splits, and prospective synthesis yield are not implemented by this small ranking executable. Those remain separate tournament requirements in #12634. The synthetic fixture is a plumbing check, not evidence of model quality or a materials discovery.
 
 The hosted source snapshot was pinned from the Hugging Face tree at verified revision ab53472 on 17 November 2026. The visible tree lists HTSC-2025.json (reported 166 kB), README.md and .gitattributes. This source revision is a locator for future reproduction, not permission to redistribute the data.
+
+
+## 14. First hosted execution audit — 17 November 2026
+
+The first dedicated registry workflow run, associated with earlier feature-branch head 9b37d856dc99c2bff845e323daa48c3c591d6b74 (run ID 44104543738), **failed** at the Rust formatting check.
+
+- Exact failure: rustfmt requested five formatting changes in the registry auditor (import ordering, function signature wrapping, error-return wrapping, and path-read wrapping).
+- Cargo lock generation, registry tests, metrics tests, both executable runs and clippy were skipped because the job failed at formatting.
+- The always-run environment receipt also initially failed because it unconditionally hashed Cargo.lock even though lock generation had been skipped. The artifact upload itself completed, but the missing lockfile was not uploaded.
+- Corrective changes: the five reported formatting deltas were applied in the registry auditor; the environment receipt now records cargo_lock=not-generated when Cargo.lock does not exist. The metrics runner is included in the updated test/format/clippy steps.
+
+The corrected source/workflow changes are present in later branch commits, but the next exact-head dedicated workflow result has not yet been observed here. Therefore no Rust build/test/clippy success is claimed. Preserve the first failure as part of the evidence chain.
