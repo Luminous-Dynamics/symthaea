@@ -128,6 +128,7 @@ pub enum RejectedOptionReason {
     RiskAssessmentFromFuture,
     RiskAssessmentExpired,
     RiskAssessmentStale,
+    InvalidRiskBound,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -188,6 +189,7 @@ pub enum PlanningError {
     EmptyVerifierDependencyClosure,
     EmptyExpectedContext,
     InvalidSearchNodeLimit,
+    InvalidRiskBudget,
 }
 
 fn missing(value: &str) -> bool {
@@ -258,6 +260,11 @@ fn option_rejection_reasons(
     }
     if missing(&option.source_id) {
         reasons.push(RejectedOptionReason::EmptySourceId);
+    }
+    if option.mission_interruption_upper_ppm > 1_000_000
+        || option.robot_loss_upper_ppm > 1_000_000
+    {
+        reasons.push(RejectedOptionReason::InvalidRiskBound);
     }
     match bundle_cost {
         None => reasons.push(RejectedOptionReason::MissingDeploymentBundleCost),
@@ -489,16 +496,12 @@ impl SearchState<'_> {
             ) else {
                 continue;
             };
-            let Some(next_interruption) =
-                interruption.checked_add(self.options[index].mission_interruption_upper_ppm)
-            else {
-                continue;
-            };
-            let Some(next_robot_loss) =
-                robot_loss.checked_add(self.options[index].robot_loss_upper_ppm)
-            else {
-                continue;
-            };
+            let next_interruption = interruption
+                .saturating_add(self.options[index].mission_interruption_upper_ppm)
+                .min(1_000_000);
+            let next_robot_loss = robot_loss
+                .saturating_add(self.options[index].robot_loss_upper_ppm)
+                .min(1_000_000);
             if !resources_within(&next_resources, &self.budget.resources)
                 || next_interruption > self.budget.mission_interruption_upper_ppm
                 || next_robot_loss > self.budget.robot_loss_upper_ppm
@@ -540,6 +543,11 @@ pub fn plan_independent_acquisition_portfolio(
     }
     if policy.maximum_search_nodes == 0 {
         return Err(PlanningError::InvalidSearchNodeLimit);
+    }
+    if budget.mission_interruption_upper_ppm > 1_000_000
+        || budget.robot_loss_upper_ppm > 1_000_000
+    {
+        return Err(PlanningError::InvalidRiskBudget);
     }
     if [
         expected.claim_id.as_str(),
@@ -994,6 +1002,73 @@ mod tests {
         assert!(report.rejected_options[0]
             .reasons
             .contains(&RejectedOptionReason::RiskAssessmentFromFuture));
+    }
+
+    #[test]
+    fn union_bound_risk_is_capped_at_one_million_ppm() {
+        let mut first = option("a", "source-a", vec![dep("robot", "a")]);
+        let mut second = option("b", "source-b", vec![dep("robot", "b")]);
+        first.mission_interruption_upper_ppm = 600_000;
+        second.mission_interruption_upper_ppm = 600_000;
+        let mut budget = budget();
+        budget.mission_interruption_upper_ppm = 1_000_000;
+        let report = plan_independent_acquisition_portfolio(
+            vec![first.clone(), second.clone()],
+            &bundle_costs(),
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget,
+        )
+        .unwrap();
+        assert_eq!(
+            report.pareto_frontier[0].mission_interruption_upper_ppm,
+            1_000_000
+        );
+
+        budget.mission_interruption_upper_ppm = 999_999;
+        let report = plan_independent_acquisition_portfolio(
+            vec![first, second],
+            &bundle_costs(),
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget,
+        )
+        .unwrap();
+        assert!(report.pareto_frontier.is_empty());
+    }
+
+    #[test]
+    fn risk_values_and_budgets_above_one_million_ppm_are_rejected() {
+        let mut invalid = option("invalid", "source-invalid", vec![dep("robot", "invalid")]);
+        invalid.robot_loss_upper_ppm = 1_000_001;
+        let report = plan_independent_acquisition_portfolio(
+            vec![invalid],
+            &bundle_costs(),
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        )
+        .unwrap();
+        assert!(report.rejected_options[0]
+            .reasons
+            .contains(&RejectedOptionReason::InvalidRiskBound));
+
+        let mut invalid_budget = budget();
+        invalid_budget.robot_loss_upper_ppm = 1_000_001;
+        assert_eq!(
+            plan_independent_acquisition_portfolio(
+                vec![],
+                &bundle_costs(),
+                &expected(),
+                &verifier(),
+                policy(),
+                &invalid_budget
+            ),
+            Err(PlanningError::InvalidRiskBudget)
+        );
     }
 
     #[test]
