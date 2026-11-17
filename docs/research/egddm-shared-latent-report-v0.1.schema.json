@@ -19,7 +19,8 @@
     "kernel_provenance",
     "marginal_checks",
     "pairwise_joint_checks",
-    "claim_ceiling"
+    "claim_ceiling",
+    "risk_queries"
   ],
   "properties": {
     "scenario_id": {
@@ -305,6 +306,106 @@
     "claim_ceiling": {
       "type": "string",
       "minLength": 1
+    },
+    "risk_queries": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "query_id",
+          "action_id",
+          "safe_hypotheses",
+          "observed_outcomes",
+          "support_lower_bps",
+          "nominal_posterior_risk_bps",
+          "shared_latent_worst_case_posterior_risk_bps",
+          "rectangular_hull_worst_case_posterior_risk_bps",
+          "rectangular_excess_risk_bps",
+          "per_hypothesis_likelihood_bounds"
+        ],
+        "properties": {
+          "query_id": {
+            "type": "string"
+          },
+          "action_id": {
+            "type": "string"
+          },
+          "safe_hypotheses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed_outcomes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "support_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "nominal_posterior_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "shared_latent_worst_case_posterior_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rectangular_hull_worst_case_posterior_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "rectangular_excess_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "per_hypothesis_likelihood_bounds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "hypothesis_id",
+                "lower",
+                "nominal",
+                "upper"
+              ],
+              "properties": {
+                "hypothesis_id": {
+                  "type": "string"
+                },
+                "lower": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "nominal": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "upper": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
