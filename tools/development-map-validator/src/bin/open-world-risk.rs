@@ -351,6 +351,35 @@ mod tests{
         candidate["open_world_policy"]=json!({"contamination_reserve_bps":0});
         assert!(evaluate_open_world_parts_json(&candidate.to_string(),&oracle.to_string()).unwrap_err().contains("unknown field"));
     }
+    #[test]fn contamination_reserve_scales_known_prior_and_adds_unknown_mass(){
+        let candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
+        let oracle:Value=serde_json::from_str(ORACLE).unwrap();
+        let policy=&oracle["open_world_policy"];
+        let unknown_id=policy["unknown_hypothesis_id"].as_str().unwrap();
+        let reserve=policy["contamination_reserve_bps"].as_u64().unwrap();
+        let safe=string_set(&policy["unknown_safe_action_ids"],"unknown safe actions").unwrap();
+        let rows:BTreeMap<String,Value>=policy["unknown_channel_likelihoods"].as_array().unwrap().iter().map(|row|{
+            (row["factor_id"].as_str().unwrap().to_owned(),json!({"hypothesis_id":unknown_id,"outcomes":row["outcomes"]}))
+        }).collect();
+        let closed=Value::Object(oracle.as_object().unwrap().iter()
+            .filter(|(key,_)|key.as_str()!="open_world_policy")
+            .map(|(k,v)|(k.clone(),v.clone())).collect());
+        let (candidate_aug,oracle_aug)=augment_candidate_and_oracle(&candidate,&closed,unknown_id,reserve,&safe,&rows).unwrap();
+        assert_eq!(candidate_aug["hypothesis_bounds"][0]["lower_probability_bps"],8100);
+        assert_eq!(candidate_aug["hypothesis_bounds"][0]["upper_probability_bps"],10000);
+        assert_eq!(candidate_aug["hypothesis_bounds"][0]["nominal_probability_bps"],9000);
+        assert_eq!(candidate_aug["hypothesis_bounds"][1]["upper_probability_bps"],1000);
+        assert_eq!(candidate_aug["hypothesis_bounds"][1]["nominal_probability_bps"],1000);
+        assert_eq!(candidate_aug["hypothesis_bounds"][0]["nominal_probability_bps"].as_u64().unwrap()
+            + candidate_aug["hypothesis_bounds"][1]["nominal_probability_bps"].as_u64().unwrap(),SCALE);
+        assert_eq!(candidate_aug["hypothesis_bounds"],oracle_aug["hypothesis_bounds"]);
+    }
+    #[test]fn unknown_safe_actions_must_be_in_evaluator_read_only_registry(){
+        let candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
+        let mut oracle:Value=serde_json::from_str(ORACLE).unwrap();
+        oracle["open_world_policy"]["unknown_safe_action_ids"]=json!(["deploy"]);
+        assert!(evaluate_open_world_parts_json(&candidate.to_string(),&oracle.to_string()).unwrap_err().contains("subset of evaluator read_only_action_ids"));
+    }
     #[test]fn invalid_unknown_channel_partition_fails_closed(){
         let candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
         let mut oracle:Value=serde_json::from_str(ORACLE).unwrap();
@@ -361,6 +390,6 @@ mod tests{
         let candidate:Value=serde_json::from_str(CANDIDATE).unwrap();
         let mut oracle:Value=serde_json::from_str(ORACLE).unwrap();
         oracle["open_world_policy"]["unknown_safe_action_ids"]=json!(["release"]);
-        assert!(evaluate_open_world_parts_json(&candidate.to_string(),&oracle.to_string()).unwrap_err().contains("only classify non-irreversible"));
+        assert!(evaluate_open_world_parts_json(&candidate.to_string(),&oracle.to_string()).unwrap_err().contains("subset of evaluator read_only_action_ids"));
     }
 }
