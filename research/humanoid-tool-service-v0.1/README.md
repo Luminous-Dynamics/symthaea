@@ -133,6 +133,21 @@ The mapping preserves all 43 raw named G1 joint positions, the derived 32-value 
 
 This is a **non-actuating software compatibility specification**. It does not map G1 joint targets onto Symthaea DMC21/Dexterous53 torques, does not connect to the current 21-joint PCA9685 HAL, and creates no UEC Applied/Measured receipt or actuation authority. The typed Rust adapter is deliberately dependent on the canonical UEC v2 APIs and their current qualification state.
 
+## Human-augmented repair is a parallel delivery path
+
+Symthaea should be useful before its humanoid is physically qualified to perform every repair itself.
+
+Compose the existing [HUMAN-TOOL-001 #7983](https://github.com/Luminous-Dynamics/symthaea/issues/7983) and draft [PR #7997](https://github.com/Luminous-Dynamics/symthaea/pull/7997) rather than duplicating its advisory diagnostic contract or repair-outcome evaluator.
+
+That programme compares:
+- A0 — human-only with current manuals/procedures;
+- A1 — human with structured checklist and the same instruments;
+- A2 — human + Symthaea evidence-linked advisory, which may rank hypotheses, surface contradictions/missing evidence, recommend a bounded next measurement, abstain or refer.
+
+The outcome is independently verified useful-function restoration, with failed/abandoned/referred/unknown cases retained. The advisory has no actuation authority and must not override safety interlocks. This is a **human-augmentation result**, not a humanoid dexterity result.
+
+Longer term, the two tracks can share validated tool semantics, fault knowledge and repair skill contracts, but neither may promote an unverified diagnosis or human demonstration directly into autonomous robot authority.
+
 ## Deliverables
 
 - `protocol-v0.1.md`: preregisterable comparison and claim-boundary protocol.
