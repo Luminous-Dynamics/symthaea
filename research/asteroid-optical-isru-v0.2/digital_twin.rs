@@ -41,7 +41,6 @@ impl StageKind {
             Self::Assay => SimulatedOutputKind::SimulatedIndependentAssay,
         }
     }
-
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -1025,9 +1024,7 @@ fn scaled_duration(seconds: u64, scale_permille: u64) -> u64 {
         .min(u64::MAX as u128) as u64
 }
 
-fn split_seeds(
-    seeds: Vec<CandidateSeed>,
-) -> Result<(CandidateMap, CandidateTruthMap), TwinError> {
+fn split_seeds(seeds: Vec<CandidateSeed>) -> Result<(CandidateMap, CandidateTruthMap), TwinError> {
     let mut candidates = BTreeMap::new();
     let mut truths = BTreeMap::new();
     for seed in seeds {
