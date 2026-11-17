@@ -253,15 +253,19 @@ report assembly and verdict calculation; only late-breach selection differs.
 The verified receipt binds the full-history replay to the ledger SHA-256 and
 progress/arrival/breach counts; this is in-memory ledger consistency, not source
 authentication. It additionally requires the receipt digest to match the
-current ledger snapshot before timing. Each case first times the four-batch event-arrival commit path, excluding
-event generation and initial source-progress setup. It reports total ingestion
-microseconds and nanoseconds per event as one diagnostic sample. It then
-records 51 indexed complete query samples and 31 linear-reference complete
-query samples (nearest-rank p50/p95/p99 for both), plus 15 verified replay
-samples (median and observed maximum), event-time index buckets visited,
+current ledger snapshot before timing. Each case times two matched event-arrival paths from the same progress-only
+state and identical four batches. The direct path preflights and appends without
+a whole-ledger clone; the reference path clones the full ledger before every
+batch, reproducing the prior commit strategy. Both exclude event generation and
+initial source-progress setup. Their final ledger SHA-256 digests must match
+before total ingestion microseconds, nanoseconds per event and clone/direct
+speedup are reported. These are single diagnostic samples, not percentiles.
+The case then records 51 indexed complete-query samples and 31 linear-reference
+complete-query samples (nearest-rank p50/p95/p99 for both), plus 15 verified
+replay samples (median and observed maximum), event-time index buckets visited,
 indexed receipt candidates examined, full linear scan receipts visited and
-matching breaches. The ingest timing separates write-side cost from query and
-full-history replay cost.
+matching breaches. Write, indexed read, linear read and full replay costs remain
+separate measurement boundaries.
 
 The hosted workflow retains CSV output with the exact commit, Rust toolchain,
 dependency lock, and fixture/source digests. This measures in-memory release
