@@ -780,7 +780,10 @@ fn cache_mismatch(branch: &PolicyBranch, probability: f64, posterior: Option<&[f
         return true;
     }
     let Some(expected) = posterior else {
-        return false;
+        // A zero-mass outcome has no defined posterior for this model. Any
+        // cached posterior supplied by a policy producer is therefore stale
+        // or belongs to another model and must be reported as a mismatch.
+        return !branch.posterior.is_empty();
     };
     branch.posterior.len() != expected.len()
         || branch
@@ -1572,6 +1575,52 @@ mod tests {
         .unwrap();
         assert!((report.per_model[0].robot_loss_probability).abs() < 1.0e-12);
         assert!((report.per_model[1].robot_loss_probability - 0.02).abs() < 1.0e-8);
+        assert!(
+            report.per_model[0].cached_branch_mismatches > 0,
+            "a cached posterior cannot be treated as valid when the outcome has zero model mass"
+        );
+    }
+
+    #[test]
+    fn same_policy_is_revalued_when_models_disagree_about_sensor_likelihoods() {
+        let mut model_a = problem(0.02, true);
+        model_a.actions[0].outcomes[0].likelihood_by_hypothesis = vec![0.9, 0.1, 0.5];
+        model_a.actions[0].outcomes[1].likelihood_by_hypothesis = vec![0.1, 0.9, 0.5];
+
+        let mut model_b = problem(0.02, true);
+        model_b.actions[0].outcomes[0].likelihood_by_hypothesis = vec![0.1, 0.9, 0.5];
+        model_b.actions[0].outcomes[1].likelihood_by_hypothesis = vec![0.9, 0.1, 0.5];
+
+        let shared_policy = policy();
+        let report = evaluate_policy_robustly(
+            &[
+                ModelScenario {
+                    model_id: "model-a".into(),
+                    problem: model_a,
+                },
+                ModelScenario {
+                    model_id: "model-b".into(),
+                    problem: model_b,
+                },
+            ],
+            &shared_policy,
+            config(),
+        )
+        .unwrap();
+
+        assert_eq!(report.model_count, 2);
+        assert!(
+            report.per_model[0].expected_decision_loss
+                < report.per_model[1].expected_decision_loss
+        );
+        assert_eq!(
+            report.worst_case_expected_total_value,
+            report.per_model[1].expected_total_value
+        );
+        assert_eq!(
+            report.disposition,
+            PolicyDisposition::AdmissibleAcrossSuppliedModels
+        );
     }
 
     #[test]
