@@ -61,6 +61,17 @@ jobs:
       - name: Format Aqua crate
         run: cargo fmt -p symthaea-aqua-bench -- --check
 
+      - name: Diagnose Cargo.lock drift without accepting it
+        run: |
+          cp Cargo.lock "$RUNNER_TEMP/Cargo.lock.before"
+          set +e
+          cargo test -p symthaea-aqua-bench
+          diagnostic_status=$?
+          set -e
+          echo "Diagnostic cargo test exit: ${diagnostic_status}"
+          echo "Cargo.lock diff produced by unlocked diagnostic:"
+          diff -u "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock || true
+          cp "$RUNNER_TEMP/Cargo.lock.before" Cargo.lock
       - name: Run Aqua adapter unit tests
         run: cargo test --locked -p symthaea-aqua-bench
 
