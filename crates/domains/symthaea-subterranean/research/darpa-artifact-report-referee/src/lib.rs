@@ -840,12 +840,30 @@ mod tests {
     }
 
     #[test]
+    fn darpa_crosswalk_preserves_exact_official_report_strings() {
+        let crosswalk = darpa_final_2021_crosswalk_v0_1();
+        assert_eq!(crosswalk.version, "darpa-finals-artifact-strings-2021-04-01-v0.1");
+        let cellphone = crosswalk
+            .mappings
+            .iter()
+            .find(|entry| entry.source_type == "cellphone")
+            .unwrap();
+        assert_eq!(cellphone.official_report_string, "Cell Phone");
+        let extinguisher = crosswalk
+            .mappings
+            .iter()
+            .find(|entry| entry.source_type == "fireextinguisher")
+            .unwrap();
+        assert_eq!(extinguisher.official_report_string, "Fire Extinguisher");
+    }
+
+    #[test]
     fn systems_preliminary_stream_allows_retry_but_rejects_post_success_duplicate() {
         let ground_truth = preliminary_truth();
         let reports = vec![
             report("r1-wrong-class", "gas", 0.0, 0.0, 0.0, 1),
-            report("r2-valid", "vent", 0.0, 0.0, 0.0, 2),
-            report("r3-duplicate", "vent", 0.0, 0.0, 0.0, 3),
+            report("r2-valid", "Vent", 0.0, 0.0, 0.0, 2),
+            report("r3-duplicate", "Vent", 0.0, 0.0, 0.0, 3),
         ];
         let result = evaluate_systems_final_stream(
             &ground_truth,
@@ -894,6 +912,7 @@ mod tests {
             SystemsFinalProfile {
                 round: SystemsFinalRound::Prize,
                 coordinate_frame_id: "darpa".into(),
+                type_crosswalk: darpa_final_2021_crosswalk_v0_1(),
             },
         )
         .unwrap();
