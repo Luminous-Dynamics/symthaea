@@ -1,12 +1,12 @@
 use std::{env, fs, path::PathBuf, process};
 
 use serde::Serialize;
+use symthaea_marine_geometry::AdmissionProfile;
 use symthaea_marine_geometry::full_envelope::FullEnvelopeSpec;
 use symthaea_marine_geometry::full_envelope_mesh::{
     FullEnvelopeMeshArtifact, FullEnvelopeMeshIssue, generate_full_envelope_mesh,
     verify_full_envelope_mesh_artifact,
 };
-use symthaea_marine_geometry::AdmissionProfile;
 
 const USAGE: &str = concat!(
     "Usage:\n",
@@ -72,7 +72,9 @@ fn run() -> Result<i32, String> {
 
     if args[0] == "--verify" {
         if args.len() != 4 {
-            return Err(format!("verification requires spec, profile and artifact paths\n{USAGE}"));
+            return Err(format!(
+                "verification requires spec, profile and artifact paths\n{USAGE}"
+            ));
         }
         let artifact_path = PathBuf::from(args.pop().unwrap());
         let profile_path = PathBuf::from(args.pop().unwrap());
@@ -82,7 +84,8 @@ fn run() -> Result<i32, String> {
         let specification: FullEnvelopeSpec = read_json(&spec_path, "full-envelope specification")?;
         let admission_profile: AdmissionProfile =
             read_json(&profile_path, "G0/G1 admission profile")?;
-        let artifact: FullEnvelopeMeshArtifact = read_json(&artifact_path, "full-envelope mesh artifact")?;
+        let artifact: FullEnvelopeMeshArtifact =
+            read_json(&artifact_path, "full-envelope mesh artifact")?;
         match verify_full_envelope_mesh_artifact(&specification, &admission_profile, &artifact) {
             Ok(()) => {
                 write_report(
@@ -123,10 +126,14 @@ fn run() -> Result<i32, String> {
             }
         }
         if positional.len() != 2 {
-            return Err(format!("generation requires spec and admission-profile paths\n{USAGE}"));
+            return Err(format!(
+                "generation requires spec and admission-profile paths\n{USAGE}"
+            ));
         }
-        let specification: FullEnvelopeSpec =
-            read_json(&PathBuf::from(&positional[0]), "full-envelope specification")?;
+        let specification: FullEnvelopeSpec = read_json(
+            &PathBuf::from(&positional[0]),
+            "full-envelope specification",
+        )?;
         let admission_profile: AdmissionProfile =
             read_json(&PathBuf::from(&positional[1]), "G0/G1 admission profile")?;
         match generate_full_envelope_mesh(&specification, &admission_profile) {
