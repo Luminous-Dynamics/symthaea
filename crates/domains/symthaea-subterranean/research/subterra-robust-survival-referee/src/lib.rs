@@ -1105,7 +1105,7 @@ pub fn evaluate_policy_robustly(
 mod tests {
     use super::*;
     use subterra_survival_reference::{
-        Hypothesis, MeasurementOutcome, PolicyBranch, PolicyNode, ResourceCost,
+        Hypothesis, MeasurementOutcome, MissionDecision, PolicyBranch, PolicyNode, ResourceCost,
     };
 
     fn hypotheses() -> Vec<Hypothesis> {
