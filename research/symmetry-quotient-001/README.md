@@ -61,7 +61,7 @@ Tests cover D4-to-C4 intersection (with witness records for the four excluded re
 
 The common-subgroup compiler above is the correct choice when one quotient must remain valid across the entire declared environment family. It may be conservative when the operating context is known before search.
 
-The new `compile_contextual_multi_environment_quotient` therefore constructs a separate, context-bound subgroup and quotient for each environment. Each certificate carries the exact `context_id`, its local task-preserving subgroup, and its own quotient certificate. The verifier recomputes and replays every local subgroup and quotient; relabelling one context's certificate for another is rejected.
+The new `compile_contextual_multi_environment_quotient` therefore constructs a separate, context-bound subgroup and quotient for each environment. Each certificate carries the exact `context_id`, its local task-preserving subgroup, and its own quotient certificate. The verifier recomputes and replays every local subgroup and quotient; relabelling one context's certificate for another is rejected. Work accounting is split across each local qualification, quotient compilation and replay stage, with checked arithmetic; multiplying the number of declared contexts cannot multiply the total declared budget.
 
 The hand-auditable D4 ordered-pair fixture now distinguishes:
 - isotropic context: D4 retained, 3 orbits over 16 candidates;
