@@ -80,6 +80,12 @@ pub struct WindBenchmarkResult {
     pub max_deviation: f64,
     /// Maximum deviation during gusts (baseline).
     pub baseline_max_deviation: f64,
+    /// Stable per-episode seeds shared by paired baseline/FEP runs.
+    /// These identify simulation trials, not physical flights or independent models.
+    pub episode_seeds: Vec<u64>,
+    /// Whether each FEP gust window recovered within the evaluated horizon.
+    /// A false value is a right-censored non-recovery, not a successful zero-step result.
+    pub recovery_success: Vec<bool>,
 }
 
 /// Physics backend selection for polymorphic benchmarks.
@@ -112,6 +118,33 @@ fn create_simulator(backend: &PhysicsBackend) -> Box<dyn PhysicsSimulator> {
     }
 }
 
+/// Derive a stable nonzero simulation-trial seed from the declared experiment phrase
+/// and the trial index. This is a reproducibility identifier, not a cryptographic ID.
+fn derive_episode_seed(base_phrase: &str, episode_index: usize) -> u64 {
+    let material = format!("{base_phrase}:wind-gust-evaluation:{episode_index}");
+    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+    for byte in material.bytes() {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    hash.max(1)
+}
+
+/// Apply every gust active at the beginning of the current plant interval.
+/// Call this before `PhysicsSimulator::step`; the simulator consumes and clears
+/// the accumulated force during that step.
+fn apply_active_gusts(
+    physics: &mut dyn PhysicsSimulator,
+    gusts: &[WindGust],
+    interval_start: f64,
+) {
+    for gust in gusts {
+        if interval_start >= gust.start_time && interval_start < gust.start_time + gust.duration {
+            physics.apply_external_force(gust.force);
+        }
+    }
+}
+
 /// Run the wind gust robustness benchmark with the default (Simple) backend.
 ///
 /// Compares a "frozen" baseline (no FEP modulation) against full Active Inference.
@@ -139,7 +172,6 @@ pub fn run_wind_benchmark_with_backend(
     config: &WindBenchmarkConfig,
     backend: &PhysicsBackend,
 ) -> WindBenchmarkResult {
-    let genesis = GenesisSeed::from_phrase(&config.flight_config.genesis_phrase);
     let setpoint = FlightSetpoint::hover();
     let dt = config.flight_config.motor_dt();
     let pd_gains = PdGains::default();
@@ -148,14 +180,26 @@ pub fn run_wind_benchmark_with_backend(
     let mut baseline_errors = Vec::new();
     let mut fep_errors = Vec::new();
     let mut recovery_steps = Vec::new();
+    let mut recovery_success = Vec::new();
+    let mut episode_seeds = Vec::with_capacity(config.eval_episodes);
     let mut max_dev_fep = 0.0f64;
     let mut max_dev_baseline = 0.0f64;
 
     for ep in 0..config.eval_episodes {
-        // ── Baseline: frozen FEP agent (no modulation) ──
+        // Both methods receive the same reset and controller initialization within
+        // an episode; different episode indices receive distinct deterministic seeds.
+        let episode_seed = derive_episode_seed(&config.flight_config.genesis_phrase, ep);
+        episode_seeds.push(episode_seed);
+        let episode_phrase = format!(
+            "{}:wind-gust-evaluation:{ep}",
+            config.flight_config.genesis_phrase
+        );
+        let genesis = GenesisSeed::from_phrase(&episode_phrase);
+
+        // ── Baseline: HDC controller without FEP modulation ──
         {
             let mut physics = create_simulator(backend);
-            physics.reset(0.1);
+            physics.reset_with_perturbation(0.1, 0.1, episode_seed);
             let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.flight_config.num_levels);
             let mut controller = FlightController::new(&genesis, &config.flight_config);
             let frozen_result = FlightFepResult::default();
@@ -166,16 +210,13 @@ pub fn run_wind_benchmark_with_backend(
                 let state = physics.state().clone();
                 let sensor_hv = encoder.encode(&state);
                 let command = controller.forward(&sensor_hv, dt as f32);
+                apply_active_gusts(&mut *physics, &config.gusts, time);
                 physics.step(&command, dt);
 
-                // Inject gusts
-                for gust in &config.gusts {
-                    if time >= gust.start_time && time < gust.start_time + gust.duration {
-                        physics.apply_external_force(gust.force);
-                    }
-                }
-
-                let err = setpoint.position_error_magnitude(&state);
+                // Metrics belong to the completed plant transition, not the
+                // pre-command observation used to generate the command.
+                let post_state = physics.state().clone();
+                let err = setpoint.position_error_magnitude(&post_state);
                 total_err += err;
                 max_dev_baseline = max_dev_baseline.max(err);
 
@@ -193,7 +234,7 @@ pub fn run_wind_benchmark_with_backend(
         // ── FEP: full Active Inference modulation ──
         {
             let mut physics = create_simulator(backend);
-            physics.reset(0.1);
+            physics.reset_with_perturbation(0.1, 0.1, episode_seed);
             let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.flight_config.num_levels);
             let mut controller = FlightController::new(&genesis, &config.flight_config);
             let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
@@ -218,28 +259,23 @@ pub fn run_wind_benchmark_with_backend(
                     command = command.with_noise(noise);
                 }
 
-                // Inject gusts
-                for gust in &config.gusts {
-                    if time >= gust.start_time && time < gust.start_time + gust.duration {
-                        physics.apply_external_force(gust.force);
-                    }
-                }
-
+                apply_active_gusts(&mut *physics, &config.gusts, time);
                 physics.step(&command, dt);
 
-                let err = setpoint.position_error_magnitude(&state);
+                let post_state = physics.state().clone();
+                let post_time = post_state.timestamp;
+                let err = setpoint.position_error_magnitude(&post_state);
                 total_err += err;
                 max_dev_fep = max_dev_fep.max(err);
 
-                // Track recovery
-                for (i, (end_time, recovered, count)) in gust_end_tracking.iter_mut().enumerate() {
-                    if time >= *end_time && !*recovered {
+                // Track recovery against the post-step plant time and state.
+                for (end_time, recovered, count) in &mut gust_end_tracking {
+                    if post_time >= *end_time && !*recovered {
                         *count += 1;
                         if err < 0.05 {
                             *recovered = true;
                         }
                     }
-                    let _ = i; // suppress unused warning
                 }
 
                 if step % config.flight_config.train_every == 0 {
@@ -262,8 +298,9 @@ pub fn run_wind_benchmark_with_backend(
 
             fep_errors.push(total_err / config.flight_config.steps_per_episode as f64);
 
-            for (_, _, count) in &gust_end_tracking {
+            for (_, recovered, count) in &gust_end_tracking {
                 recovery_steps.push(*count);
+                recovery_success.push(*recovered);
             }
 
             let _ = ep;
@@ -276,6 +313,8 @@ pub fn run_wind_benchmark_with_backend(
         recovery_steps,
         max_deviation: max_dev_fep,
         baseline_max_deviation: max_dev_baseline,
+        episode_seeds,
+        recovery_success,
     }
 }
 
@@ -1045,6 +1084,45 @@ mod tests {
         assert_eq!(result.fep_metrics.len(), 1);
         assert!(result.baseline_metrics[0].is_finite());
         assert!(result.fep_metrics[0].is_finite());
+        assert_eq!(result.episode_seeds.len(), 1);
+        assert_eq!(
+            result.episode_seeds[0],
+            derive_episode_seed(&config.flight_config.genesis_phrase, 0)
+        );
+        assert_eq!(result.recovery_steps.len(), 1);
+        assert_eq!(result.recovery_success.len(), 1);
+    }
+
+    #[test]
+    fn episode_trial_seeds_are_stable_nonzero_and_distinct() {
+        let seed_0 = derive_episode_seed("frozen-wind-campaign", 0);
+        let seed_1 = derive_episode_seed("frozen-wind-campaign", 1);
+        let seed_0_again = derive_episode_seed("frozen-wind-campaign", 0);
+
+        assert_ne!(seed_0, 0);
+        assert_ne!(seed_1, 0);
+        assert_ne!(seed_0, seed_1);
+        assert_eq!(seed_0, seed_0_again);
+    }
+
+    #[test]
+    fn active_gust_is_consumed_by_the_declared_plant_step() {
+        let mut sim = SimplePhysicsSimulator::new();
+        let hover = QuadrotorCommand::hover();
+        let gusts = [WindGust {
+            force: [0.1, 0.0, 0.0],
+            start_time: 0.0,
+            duration: 0.002,
+        }];
+
+        apply_active_gusts(&mut sim, &gusts, 0.0);
+        sim.step(&hover, 0.002);
+        assert!(sim.state().linear_velocity[0] > 0.0);
+
+        // The force is consumed once; it does not silently persist into later steps.
+        let velocity_after_gust = sim.state().linear_velocity[0];
+        sim.step(&hover, 0.002);
+        assert!(sim.state().linear_velocity[0] < velocity_after_gust);
     }
 
     #[test]
