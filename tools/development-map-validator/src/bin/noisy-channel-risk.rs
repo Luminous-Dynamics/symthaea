@@ -277,7 +277,7 @@ fn parse_factorization_certificates(value: &Value) -> Result<Vec<(String,Factori
         let groups = string_set(required_value(item,"dependence_groups",&at)?,&format!("{at}.dependence_groups"),false)?;
         if groups.len() < 2 { return Err(format!("{at}.dependence_groups must contain at least two groups")); }
         let factor_ids = string_set(required_value(item,"factor_ids",&at)?,&format!("{at}.factor_ids"),false)?;
-        if factor_ids.len() != groups.len() { return Err(format!("{at}: exact factor_ids and dependence_groups cardinalities must match")); }
+        if factor_ids.len() < groups.len() { return Err(format!("{at}: factor_ids must cover at least one factor in each dependence group")); }
         let conditioning_scope = string_set(required_value(item,"conditioning_scope",&at)?,&format!("{at}.conditioning_scope"),false)?;
         if !conditioning_scope.contains("hypothesis") { return Err(format!("{at}.conditioning_scope must include hypothesis")); }
         let action_ids = string_set(required_value(item,"action_ids",&at)?,&format!("{at}.action_ids"),false)?;
@@ -308,9 +308,10 @@ fn factorization_valid(
 ) -> bool {
     if acquired.len() <= 1 { return true; }
     let groups: BTreeSet<String> = acquired.iter().map(|f| f.group.clone()).collect();
-    // Two separate factors in the same dependence group must be represented
-    // by one joint channel model; source-name diversity is not independence.
-    if groups.len() != acquired.len() { return false; }
+    // Exact-set certificates qualify independence between dependence groups.
+    // Multiple factors inside one group remain dependent and are jointly bounded
+    // with Frechet inequalities before any certified cross-group product.
+    if groups.len() < 2 { return false; }
     let mut all_sources = BTreeSet::new();
     for factor in acquired {
         for source in &factor.source_ids {
@@ -331,20 +332,62 @@ fn factorization_valid(
     })
 }
 
+fn frechet_intersection(factors: &[&AcquiredFactor], hypothesis_id: &str) -> Bounds {
+    // Sharp lower/upper bounds for the intersection of events with known
+    // marginal intervals. No independence is assumed.
+    // The nominal product is retained only as a naive independence baseline.
+    let mut lower_sum = 0u64;
+    let mut upper = SCALE;
+    let mut nominal_product = SCALE;
+    for factor in factors {
+        let interval = &factor.likelihoods[hypothesis_id];
+        lower_sum = lower_sum.saturating_add(interval.lower);
+        upper = upper.min(interval.upper);
+        nominal_product = ((nominal_product as u128 * interval.nominal as u128)
+            / SCALE as u128) as u64;
+    }
+    let n_minus_one = factors.len().saturating_sub(1) as u64;
+    let lower = lower_sum.saturating_sub(n_minus_one.saturating_mul(SCALE));
+    Bounds { lower, upper, nominal: nominal_product }
+}
+
 fn compose_likelihoods(
     hypothesis_ids: &BTreeSet<String>,
-    acquired: &[AcquiredFactor]
+    acquired: &[AcquiredFactor],
+    use_exact_factorization: bool
 ) -> BTreeMap<String,Bounds> {
+    let mut groups: BTreeMap<String, Vec<&AcquiredFactor>> = BTreeMap::new();
+    for factor in acquired {
+        groups.entry(factor.group.clone()).or_default().push(factor);
+    }
     let mut out = BTreeMap::new();
     for hid in hypothesis_ids {
-        let mut lower=SCALE; let mut upper=SCALE; let mut nominal=SCALE;
-        for factor in acquired {
-            let next = &factor.likelihoods[hid];
-            lower = ((lower as u128 * next.lower as u128) / SCALE as u128) as u64;
-            upper = ((upper as u128 * next.upper as u128 + (SCALE-1) as u128) / SCALE as u128).min(SCALE as u128) as u64;
-            nominal = ((nominal as u128 * next.nominal as u128) / SCALE as u128) as u64;
-        }
-        out.insert(hid.clone(),Bounds{lower,upper,nominal});
+        let composed = if use_exact_factorization && groups.len() > 1 {
+            // Bound observations inside each dependence group without
+            // assuming within-group independence. Multiply only the group
+            // events covered by the exact-set mutual-independence certificate.
+            let group_bounds: Vec<Bounds> = groups.values()
+                .map(|members| frechet_intersection(members, hid))
+                .collect();
+            let mut lower = SCALE;
+            let mut upper = SCALE;
+            let mut nominal = SCALE;
+            for interval in group_bounds {
+                lower = ((lower as u128 * interval.lower as u128)
+                    / SCALE as u128) as u64;
+                upper = ((upper as u128 * interval.upper as u128 + (SCALE - 1) as u128)
+                    / SCALE as u128).min(SCALE as u128) as u64;
+                nominal = ((nominal as u128 * interval.nominal as u128)
+                    / SCALE as u128) as u64;
+            }
+            Bounds { lower, upper, nominal }
+        } else {
+            // Without an exact-set certificate, use unrestricted sharp Frechet
+            // bounds for the joint observed event across every acquired channel.
+            let all: Vec<&AcquiredFactor> = acquired.iter().collect();
+            frechet_intersection(&all, hid)
+        };
+        out.insert(hid.clone(), composed);
     }
     out
 }
@@ -503,10 +546,15 @@ fn evaluate_trace(
     }
 
     let factorization_ok=factorization_valid(&selected,&action_id,cutoff,certificates);
-    let evidence_accepted=temporal_valid && calibration_ok && output_known && actual_output_possible && factorization_ok;
+    // Unqualified dependence is not a reason to discard observations: use
+    // unrestricted Frechet bounds. Exact certificates only tighten this by
+    // allowing products between independently qualified dependence groups.
+    let evidence_accepted=temporal_valid && calibration_ok && output_known && actual_output_possible;
     let hypothesis_ids:BTreeSet<String>=priors.keys().cloned().collect();
     let neutral:BTreeMap<String,Bounds>=hypothesis_ids.iter().map(|id|(id.clone(),Bounds{lower:SCALE,upper:SCALE,nominal:SCALE})).collect();
-    let likelihoods=if evidence_accepted {compose_likelihoods(&hypothesis_ids,&selected)} else {neutral};
+    let likelihoods=if evidence_accepted {
+        compose_likelihoods(&hypothesis_ids,&selected,factorization_ok)
+    } else {neutral};
     let support=support_lower_bps(priors,&likelihoods);
     let nominal=nominal_risk_bps(priors,&likelihoods,safe_actions,&action_id);
     let point_priors:BTreeMap<String,Bounds>=priors.iter().map(|(id,p)| {
@@ -532,8 +580,8 @@ fn evaluate_trace(
         else if !calibration_ok {"invalid_or_stale_calibration"}
         else if !output_known {"unmodeled_channel_outcome"}
         else if !actual_output_possible {"impossible_output_under_actual_hypothesis"}
-        else if !factorization_ok {"unqualified_dependence_or_factorization"}
         else if support==0 {"zero_evidence_support"}
+        else if selected.len()>1 && !factorization_ok {"accepted_with_frechet_dependence_bounds"}
         else {"accepted"};
     Ok(json!({
         "trace_id":trace_id,
@@ -541,6 +589,7 @@ fn evaluate_trace(
         "evidence_accepted":evidence_accepted,
         "calibration_valid":calibration_ok,
         "factorization_qualified":factorization_ok,
+        "dependence_mode":if selected.len()<=1 {"single_channel"} else if factorization_ok {"within_group_frechet_and_exact_set_cross_group_product"} else {"unrestricted_frechet_joint_bounds"},
         "temporal_valid":temporal_valid,
         "actual_output_possible":actual_output_possible,
         "false_observation_count":false_observation_count,
