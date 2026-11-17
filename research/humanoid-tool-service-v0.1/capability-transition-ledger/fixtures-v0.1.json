@@ -1,0 +1,188 @@
+[
+  {
+    "schema_version": "0.1",
+    "episode_id": "ct-001",
+    "policy_id": "baseline-gru",
+    "split_id": "heldout-tool-v1",
+    "scenario_id": "BallMove",
+    "execution_level": "L1_STATIONARY_USE",
+    "tool_set_mode": "STANDARD",
+    "clock_domain_id": "sim-ct-001",
+    "source_id": "synthetic-event-recorder",
+    "events": {
+      "candidate_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 100
+      },
+      "correct_first_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 120
+      },
+      "correct_tool_lift": {
+        "status": "OCCURRED",
+        "timestamp_ns": 180
+      },
+      "tool_target_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 250
+      },
+      "task_success": {
+        "status": "OCCURRED",
+        "timestamp_ns": 400
+      }
+    }
+  },
+  {
+    "schema_version": "0.1",
+    "episode_id": "ct-002",
+    "policy_id": "baseline-gru",
+    "split_id": "heldout-tool-v1",
+    "scenario_id": "BallMove",
+    "execution_level": "L1_STATIONARY_USE",
+    "tool_set_mode": "STANDARD",
+    "clock_domain_id": "sim-ct-002",
+    "source_id": "synthetic-event-recorder",
+    "events": {
+      "candidate_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 100
+      },
+      "correct_first_contact": {
+        "status": "INSTRUMENTED_ABSENT"
+      },
+      "correct_tool_lift": {
+        "status": "NOT_INSTRUMENTED"
+      },
+      "tool_target_contact": {
+        "status": "NOT_INSTRUMENTED"
+      },
+      "task_success": {
+        "status": "INSTRUMENTED_ABSENT"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1",
+    "episode_id": "ct-003",
+    "policy_id": "hlb-memory",
+    "split_id": "heldout-tool-v1",
+    "scenario_id": "BallMove",
+    "execution_level": "L2_MOBILE_USE",
+    "tool_set_mode": "STANDARD",
+    "clock_domain_id": "sim-ct-003",
+    "source_id": "synthetic-event-recorder",
+    "events": {
+      "candidate_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 50
+      },
+      "correct_first_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 95
+      },
+      "correct_tool_lift": {
+        "status": "OCCURRED",
+        "timestamp_ns": 170
+      },
+      "tool_target_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 220
+      },
+      "task_success": {
+        "status": "INSTRUMENTED_ABSENT"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1",
+    "episode_id": "ct-004",
+    "policy_id": "hlb-memory",
+    "split_id": "heldout-tool-v1",
+    "scenario_id": "BallMove",
+    "execution_level": "L2_MOBILE_USE",
+    "tool_set_mode": "DECOY",
+    "clock_domain_id": "sim-ct-004",
+    "source_id": "synthetic-event-recorder",
+    "events": {
+      "candidate_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 70
+      },
+      "correct_first_contact": {
+        "status": "INSTRUMENTED_ABSENT"
+      },
+      "correct_tool_lift": {
+        "status": "NOT_INSTRUMENTED"
+      },
+      "tool_target_contact": {
+        "status": "NOT_INSTRUMENTED"
+      },
+      "task_success": {
+        "status": "INSTRUMENTED_ABSENT"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1",
+    "episode_id": "ct-005",
+    "policy_id": "baseline-gru",
+    "split_id": "heldout-tool-v1",
+    "scenario_id": "BallMove",
+    "execution_level": "L2_MOBILE_USE",
+    "tool_set_mode": "DECOY",
+    "clock_domain_id": "sim-ct-005",
+    "source_id": "synthetic-event-recorder",
+    "events": {
+      "candidate_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 20
+      },
+      "correct_first_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 80
+      },
+      "correct_tool_lift": {
+        "status": "OCCURRED",
+        "timestamp_ns": 150
+      },
+      "tool_target_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 140
+      },
+      "task_success": {
+        "status": "INSTRUMENTED_ABSENT"
+      }
+    }
+  },
+  {
+    "schema_version": "0.1",
+    "episode_id": "ct-006",
+    "policy_id": "hlb-memory",
+    "split_id": "heldout-tool-v1",
+    "scenario_id": "BallMove",
+    "execution_level": "L1_STATIONARY_USE",
+    "tool_set_mode": "DECOY",
+    "clock_domain_id": "sim-ct-006",
+    "source_id": "synthetic-event-recorder",
+    "events": {
+      "candidate_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 30
+      },
+      "correct_first_contact": {
+        "status": "OCCURRED",
+        "timestamp_ns": 75
+      },
+      "correct_tool_lift": {
+        "status": "OCCURRED",
+        "timestamp_ns": 130
+      },
+      "tool_target_contact": {
+        "status": "NOT_INSTRUMENTED"
+      },
+      "task_success": {
+        "status": "NOT_INSTRUMENTED"
+      }
+    }
+  }
+]
