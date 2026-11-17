@@ -10,7 +10,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use subterra_survival_reference::{
-    CostPrices, MeasurementAction, MissionDecision, OutcomeKind, PlanningProblem, PolicyBranch,
+    CostPrices, MeasurementAction, OutcomeKind, PlanningProblem, PolicyBranch,
     PolicyNode, ResourceBudget, RiskLimits,
 };
 
@@ -745,7 +745,7 @@ fn outcome_probability(posterior: &[f64], likelihood: &[f64]) -> Result<f64, Ref
         .zip(likelihood)
         .map(|(p, l)| p * l)
         .sum::<f64>();
-    if value.is_finite() && value >= 0.0 && value <= 1.0 + PROBABILITY_TOLERANCE {
+    if value.is_finite() && (0.0..=1.0 + PROBABILITY_TOLERANCE).contains(&value) {
         Ok(value.min(1.0))
     } else {
         Err(RefereeError::NumericalOverflow("outcome probability"))
