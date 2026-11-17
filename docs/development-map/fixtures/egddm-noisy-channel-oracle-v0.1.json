@@ -970,7 +970,17 @@
       "valid_from": "2026-11-01T00:00:00Z",
       "valid_until": "2026-12-01T00:00:00Z",
       "revoked_at": null,
-      "mutual_conditional_independence": true
+      "mutual_conditional_independence": true,
+      "factor_ids": [
+        "software-test",
+        "runtime-observer"
+      ],
+      "conditioning_scope": [
+        "hypothesis",
+        "deployment_configuration",
+        "shared_time_window",
+        "registered_common_cause_state"
+      ]
     },
     {
       "certificate_id": "pair-optical-build",
@@ -985,7 +995,17 @@
       "valid_from": "2026-11-01T00:00:00Z",
       "valid_until": "2026-12-01T00:00:00Z",
       "revoked_at": null,
-      "mutual_conditional_independence": true
+      "mutual_conditional_independence": true,
+      "factor_ids": [
+        "opt-a-only",
+        "software-test"
+      ],
+      "conditioning_scope": [
+        "hypothesis",
+        "deployment_configuration",
+        "shared_time_window",
+        "registered_common_cause_state"
+      ]
     },
     {
       "certificate_id": "pair-optical-runtime",
@@ -1000,7 +1020,17 @@
       "valid_from": "2026-11-01T00:00:00Z",
       "valid_until": "2026-12-01T00:00:00Z",
       "revoked_at": null,
-      "mutual_conditional_independence": true
+      "mutual_conditional_independence": true,
+      "factor_ids": [
+        "opt-a-only",
+        "runtime-observer"
+      ],
+      "conditioning_scope": [
+        "hypothesis",
+        "deployment_configuration",
+        "shared_time_window",
+        "registered_common_cause_state"
+      ]
     }
   ]
 }
