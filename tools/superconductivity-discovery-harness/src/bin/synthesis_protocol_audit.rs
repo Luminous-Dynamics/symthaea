@@ -35,7 +35,93 @@ fn has_locator(value: &Value) -> bool {
         })
 }
 
-fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, String> {
+fn load_observation_events(
+    observation_schema_bytes: &[u8],
+    observation_fixture_bytes: &[u8],
+    protocol_source_ids: &HashSet<String>,
+) -> Result<(HashMap<String, Value>, usize), String> {
+    let schema: Value = serde_json::from_slice(observation_schema_bytes)
+        .map_err(|error| format!("observation schema JSON parse failed: {error}"))?;
+    let fixture: Value = serde_json::from_slice(observation_fixture_bytes)
+        .map_err(|error| format!("observation fixture JSON parse failed: {error}"))?;
+
+    const DIALECT: &str = "https://json-schema.org/draft/2020-12/schema";
+    if schema.get("$schema").and_then(Value::as_str) != Some(DIALECT) {
+        return Err(format!("observation schema must declare {DIALECT}"));
+    }
+    if fixture.get("fixture_source_ids").is_none() {
+        return Err("observation fixture must declare fixture_source_ids".to_owned());
+    }
+    let declared_sources = fixture["fixture_source_ids"]
+        .as_array()
+        .ok_or_else(|| "fixture_source_ids must be an array".to_owned())?;
+    let mut observation_sources = HashSet::with_capacity(declared_sources.len());
+    for source in declared_sources {
+        let source_id = source
+            .as_str()
+            .filter(|text| !text.trim().is_empty())
+            .ok_or_else(|| "fixture_source_ids must contain non-empty strings".to_owned())?;
+        if !observation_sources.insert(source_id.to_owned()) {
+            return Err(format!("duplicate observation fixture source id: {source_id}"));
+        }
+        if !protocol_source_ids.contains(source_id) {
+            return Err(format!(
+                "observation fixture source {source_id} is not declared by the synthesis protocol"
+            ));
+        }
+    }
+
+    let validator = validator_for(&schema)
+        .map_err(|error| format!("observation schema compilation failed: {error}"))?;
+    let events = fixture
+        .get("observations")
+        .and_then(Value::as_array)
+        .ok_or_else(|| "observation fixture requires observations array".to_owned())?;
+    let mut event_map = HashMap::with_capacity(events.len());
+    for (index, event) in events.iter().enumerate() {
+        for error in validator.iter_errors(event) {
+            return Err(format!(
+                "observation fixture event[{index}] schema validation failed: {} at {}",
+                error,
+                error.instance_path()
+            ));
+        }
+        if event.get("fixture_only").and_then(Value::as_bool) != Some(true) {
+            return Err(format!("observation fixture event[{index}] is not fixture_only"));
+        }
+        let event_id = event
+            .get("observation_id")
+            .and_then(Value::as_str)
+            .filter(|text| !text.trim().is_empty())
+            .ok_or_else(|| format!("observation fixture event[{index}] requires observation_id"))?;
+        if event_map.insert(event_id.to_owned(), event.clone()).is_some() {
+            return Err(format!("duplicate observation event id: {event_id}"));
+        }
+        let source_id = event
+            .pointer("/source/source_id")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("{event_id}: source.source_id is required"))?;
+        if !observation_sources.contains(source_id) {
+            return Err(format!(
+                "{event_id}: source {source_id} is not declared in observation fixture sources"
+            ));
+        }
+        if !protocol_source_ids.contains(source_id) {
+            return Err(format!(
+                "{event_id}: source {source_id} is not declared by synthesis protocol"
+            ));
+        }
+    }
+
+    Ok((event_map, observation_sources.len()))
+}
+
+fn validate_protocol(
+    schema_bytes: &[u8],
+    fixture_bytes: &[u8],
+    observation_schema_bytes: &[u8],
+    observation_fixture_bytes: &[u8],
+) -> Result<Value, String> {
     let schema: Value = serde_json::from_slice(schema_bytes)
         .map_err(|error| format!("schema JSON parse failed: {error}"))?;
     let protocol: Value = serde_json::from_slice(fixture_bytes)
@@ -75,6 +161,11 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
             return Err(format!("duplicate protocol source id: {source_id}"));
         }
     }
+    let (observation_events, observation_source_count) = load_observation_events(
+        observation_schema_bytes,
+        observation_fixture_bytes,
+        &source_ids,
+    )?;
 
     let precursors = protocol
         .get("precursors")
@@ -313,6 +404,73 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
             ));
         }
 
+        let characterization_events = outcome
+            .get("characterization_event_ids")
+            .and_then(Value::as_array)
+            .ok_or_else(|| format!("{outcome_id}: characterization_event_ids must be an array"))?;
+        let sample_id = outcome
+            .get("sample_id")
+            .and_then(Value::as_str)
+            .filter(|text| !text.trim().is_empty());
+        let target_formula = protocol
+            .pointer("/target_material/formula_as_reported")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "target_material.formula_as_reported is required".to_owned())?;
+
+        let mut linked_events = HashSet::with_capacity(characterization_events.len());
+        for event_ref in characterization_events {
+            let event_id = event_ref
+                .as_str()
+                .filter(|text| !text.trim().is_empty())
+                .ok_or_else(|| format!("{outcome_id}: characterization event IDs must be non-empty strings"))?;
+            if !linked_events.insert(event_id.to_owned()) {
+                return Err(format!("{outcome_id}: duplicate characterization event id {event_id}"));
+            }
+            let event = observation_events.get(event_id).ok_or_else(|| {
+                format!("{outcome_id}: unresolved characterization event {event_id}")
+            })?;
+            let origin = event
+                .pointer("/assertion/origin")
+                .and_then(Value::as_str)
+                .ok_or_else(|| format!("{event_id}: assertion.origin is required"))?;
+            if origin != "observed" {
+                return Err(format!(
+                    "{outcome_id}: characterization event {event_id} is {origin}, not an experimental observation"
+                ));
+            }
+            let event_formula = event
+                .pointer("/material/formula_normalized")
+                .and_then(Value::as_str)
+                .filter(|text| !text.trim().is_empty())
+                .or_else(|| {
+                    event
+                        .pointer("/material/formula_as_reported")
+                        .and_then(Value::as_str)
+                        .filter(|text| !text.trim().is_empty())
+                })
+                .ok_or_else(|| format!("{event_id}: material formula is unresolved"))?;
+            if event_formula != target_formula {
+                return Err(format!(
+                    "{outcome_id}: event {event_id} belongs to {event_formula}, not protocol target {target_formula}"
+                ));
+            }
+            let event_sample_id = event
+                .pointer("/sample/sample_id")
+                .and_then(Value::as_str)
+                .filter(|text| !text.trim().is_empty());
+            if let (Some(expected), Some(actual)) = (sample_id, event_sample_id) {
+                if expected != actual {
+                    return Err(format!(
+                        "{outcome_id}: event {event_id} is from sample {actual}, not outcome sample {expected}"
+                    ));
+                }
+            } else {
+                return Err(format!(
+                    "{outcome_id}: characterization link requires resolved protocol and event sample IDs"
+                ));
+            }
+        }
+
         let phases = outcome
             .get("realized_phases")
             .and_then(Value::as_array)
@@ -343,6 +501,8 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
         "contract": "SC-SYNTHESIS-PROTOCOL-0.1",
         "protocol_id": protocol_id,
         "source_count": source_ids.len(),
+        "observation_source_count": observation_source_count,
+        "linked_characterization_event_count": observation_events.len(),
         "precursor_count": precursor_ids.len(),
         "planned_step_count": planned.len(),
         "execution_run_count": runs.len(),
@@ -364,6 +524,8 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
             "sensor_verified_steps_have_actual_source_evidence": true,
             "failed_attempts_preserved": true,
             "outcomes_resolve_to_runs": true,
+            "characterization_events_resolve_to_observed_records": true,
+            "characterization_events_match_material_and_sample": true,
             "phase_fractions_do_not_exceed_100_percent": true
         },
         "claim_ceiling": "Synthetic protocol-contract validation only; this is not an executed synthesis, validated recipe or material discovery."
@@ -372,7 +534,7 @@ fn validate_protocol(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value,
 
 fn usage(program: &str) {
     eprintln!(
-        "Usage: {program} --schema <protocol-schema.json> --fixture <protocol.json> [--out <receipt.json>]"
+        "Usage: {program} --schema <protocol-schema.json> --fixture <protocol.json> --observation-schema <observation-schema.json> --observations <observation-events.json> [--out <receipt.json>]"
     );
 }
 
@@ -387,12 +549,14 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     let mut schema_path: Option<PathBuf> = None;
     let mut fixture_path: Option<PathBuf> = None;
+    let mut observation_schema_path: Option<PathBuf> = None;
+    let mut observation_fixture_path: Option<PathBuf> = None;
     let mut output_path: Option<PathBuf> = None;
     let mut index = 1;
 
     while index < args.len() {
         match args[index].as_str() {
-            "--schema" | "--fixture" | "--out" => {
+            "--schema" | "--fixture" | "--observation-schema" | "--observations" | "--out" => {
                 if index + 1 >= args.len() {
                     usage(&args[0]);
                     process::exit(2);
@@ -401,6 +565,8 @@ fn main() {
                 match args[index].as_str() {
                     "--schema" => schema_path = Some(path),
                     "--fixture" => fixture_path = Some(path),
+                    "--observation-schema" => observation_schema_path = Some(path),
+                    "--observations" => observation_fixture_path = Some(path),
                     "--out" => output_path = Some(path),
                     _ => unreachable!(),
                 }
@@ -418,13 +584,31 @@ fn main() {
         }
     }
 
-    let (Some(schema_path), Some(fixture_path)) = (schema_path, fixture_path) else {
+    let (
+        Some(schema_path),
+        Some(fixture_path),
+        Some(observation_schema_path),
+        Some(observation_fixture_path),
+    ) = (
+        schema_path,
+        fixture_path,
+        observation_schema_path,
+        observation_fixture_path,
+    ) else {
         usage(&args[0]);
         process::exit(2);
     };
     let schema_bytes = read(&schema_path);
     let fixture_bytes = read(&fixture_path);
-    let receipt = validate_protocol(&schema_bytes, &fixture_bytes).unwrap_or_else(|error| {
+    let observation_schema_bytes = read(&observation_schema_path);
+    let observation_fixture_bytes = read(&observation_fixture_path);
+    let receipt = validate_protocol(
+        &schema_bytes,
+        &fixture_bytes,
+        &observation_schema_bytes,
+        &observation_fixture_bytes,
+    )
+    .unwrap_or_else(|error| {
         eprintln!("SC-SYNTHESIS-PROTOCOL-FAIL: {error}");
         process::exit(1);
     });
@@ -445,7 +629,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn committed_inputs() -> (Vec<u8>, Value) {
+    fn committed_inputs() -> (Vec<u8>, Value, Vec<u8>, Value) {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         let schema = fs::read(
             root.join("data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"),
@@ -455,31 +639,44 @@ mod tests {
             &fs::read(root.join("tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"))
                 .expect("protocol fixture should be readable")
         ).expect("protocol fixture should parse");
-        (schema, fixture)
+        let observation_schema = fs::read(
+            root.join("data/schemas/superconductivity_observation_event_v0_1.schema.json"),
+        )
+        .expect("observation schema should be readable");
+        let observations: Value = serde_json::from_slice(
+            &fs::read(root.join("tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json"))
+                .expect("observation fixture should be readable")
+        ).expect("observation fixture should parse");
+        (schema, fixture, observation_schema, observations)
     }
 
-    fn audit_mutated(fixture: Value) -> Result<Value, String> {
-        let (schema, _) = committed_inputs();
+    fn audit_mutated(fixture: Value, observations: Value) -> Result<Value, String> {
+        let (schema, _, observation_schema, _) = committed_inputs();
         let bytes = serde_json::to_vec(&fixture).unwrap();
-        validate_protocol(&schema, &bytes)
+        let observation_bytes = serde_json::to_vec(&observations).unwrap();
+        validate_protocol(&schema, &bytes, &observation_schema, &observation_bytes)
     }
 
     #[test]
     fn committed_protocol_fixture_passes() {
-        let (schema, fixture) = committed_inputs();
+        let (schema, fixture, observation_schema, observations) = committed_inputs();
         let bytes = serde_json::to_vec(&fixture).unwrap();
-        let receipt = validate_protocol(&schema, &bytes).unwrap();
+        let observation_bytes = serde_json::to_vec(&observations).unwrap();
+        let receipt =
+            validate_protocol(&schema, &bytes, &observation_schema, &observation_bytes).unwrap();
         assert_eq!(receipt["planned_step_count"], 2);
         assert_eq!(receipt["execution_run_count"], 1);
         assert_eq!(receipt["sensor_verified_step_count"], 2);
         assert_eq!(receipt["outcome_count"], 1);
+        assert_eq!(receipt["linked_characterization_event_count"], 5);
     }
 
     #[test]
     fn commanded_step_cannot_claim_actual_execution() {
         let (_, mut fixture) = committed_inputs();
         fixture["execution_runs"][0]["steps"][0]["execution_state"] = json!("commanded");
-        assert!(audit_mutated(fixture).is_err());
+        let (_, _, _, observations) = committed_inputs();
+        assert!(audit_mutated(fixture, observations).is_err());
     }
 
     #[test]
@@ -497,7 +694,8 @@ mod tests {
         fixture["execution_runs"][0]["steps"][0]["actual_evidence"] = Value::Null;
         fixture["execution_runs"][0]["steps"][0]["failure_reason"] = json!("synthetic failure");
         fixture["execution_runs"][0]["status"] = json!("failed");
-        let receipt = audit_mutated(fixture).unwrap();
+        let (_, _, _, observations) = committed_inputs();
+        let receipt = audit_mutated(fixture, observations).unwrap();
         assert_eq!(receipt["failed_or_aborted_step_count"], 1);
     }
 
@@ -521,6 +719,48 @@ mod tests {
         }));
         fixture["outcome_records"][0]["realized_phases"][0]["phase_fraction_percent"] = json!(70.0);
         assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn characterization_event_must_resolve_to_observation_fixture() {
+        let (_, mut fixture, _, observations) = committed_inputs();
+        fixture["outcome_records"][0]["characterization_event_ids"][0] =
+            json!("missing-observation");
+        assert!(audit_mutated(fixture, observations).is_err());
+    }
+
+    #[test]
+    fn prediction_cannot_be_used_as_experimental_characterization() {
+        let (_, fixture, _, mut observations) = committed_inputs();
+        let event = observations["observations"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|event| event["observation_id"] == "fixture-hg1223-pqp-onset-ambient")
+            .unwrap();
+        event["assertion"]["origin"] = json!("predicted");
+        assert!(audit_mutated(fixture, observations).is_err());
+    }
+
+    #[test]
+    fn characterization_event_must_match_outcome_sample() {
+        let (_, mut fixture, _, observations) = committed_inputs();
+        fixture["outcome_records"][0]["sample_id"] = json!("different-sample");
+        assert!(audit_mutated(fixture, observations).is_err());
+    }
+
+    #[test]
+    fn characterization_event_must_match_protocol_material() {
+        let (_, fixture, _, mut observations) = committed_inputs();
+        let event = observations["observations"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|event| event["observation_id"] == "fixture-hg1223-pqp-onset-ambient")
+            .unwrap();
+        event["material"]["formula_as_reported"] = json!("not-the-target");
+        event["material"]["formula_normalized"] = json!("not-the-target");
+        assert!(audit_mutated(fixture, observations).is_err());
     }
 
     #[test]
