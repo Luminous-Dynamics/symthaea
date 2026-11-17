@@ -79,6 +79,7 @@ pub mod sonata;
 pub mod spec;
 pub mod spelling;
 pub mod style;
+pub mod style_trajectory;
 pub mod voicing;
 
 pub use accompaniment::Accompaniment;
@@ -139,4 +140,9 @@ pub use sonata::{
 pub use spec::{Attitude, CompositionSpec, DrumPolicy, FormKind, ProgressionSpec, TextureSpec};
 pub use spelling::{Accidental, AlteredDegree, LetterName, SpelledPitchClass};
 pub use style::Style;
+pub use style_trajectory::{
+    STYLE_TRAJECTORY_SCHEMA_VERSION, StyleTrajectoryIssue, StyleTrajectoryPlanV1,
+    StyleTrajectorySegmentV1, StyleTrajectoryTransitionV1, StyleTransitionMode,
+    validate_style_trajectory,
+};
 pub use voicing::{lead_bass, lead_upper};
