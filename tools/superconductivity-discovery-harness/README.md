@@ -101,9 +101,13 @@ The Rust executable validates one synthetic protocol fixture:
 cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit
 cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit -- \
   --schema data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json \
-  --fixture tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json
+  --fixture tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json \
+  --observation-schema data/schemas/superconductivity_observation_event_v0_1.schema.json \
+  --observations tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json
 ```
 
 It refuses commanded setpoints represented as actual execution, unresolved sensor evidence, failed runs without failure reasons, execution steps absent from the plan, outcomes without a valid run, duplicate/non-monotonic planned steps and reported phase fractions above 100%.
 
 The synthetic fixture is an abstract pressure-hold/decompression example; it is not an experimental recipe, pressure-vessel instruction or materials result. A validated protocol record is not safety authorization.
+
+The synthesis auditor also validates the outcome-to-characterization edge. Each outcome event ID must resolve to the observation-event fixture, use an observed assertion, and match the same material formula and sample ID. This catches detached Tc records, prediction-as-characterization, specimen mismatches and wrong-material joins.
