@@ -330,3 +330,30 @@ The current branch closes that narrower gap:
 This is stronger than checking hash syntax, but it is not a general immutable profile-registry service. Custom/user-authored profile byte stores, signing, deprecation and historical revision retrieval remain future work. Profile digest schema and score digest schema are separate by design.
 
 **Validation status:** tests are authored; they have not been compiled or run here. No exact-head workflow success is inferred from the commit.
+
+
+## 12. M1 prototype implementation — shared-clock symbolic pair
+
+The current branch now contains the first executable realization path in `crates/domains/symthaea-muse/src/style_trajectory_m1.rs`, behind Muse's existing `theory` feature.
+
+The implementation is deliberately limited to Classical (`PeriodSentence`) → Minimalism (`ProcessAdditive`):
+
+- Calls each style's actual `compose_with_grammar_plan` route with one frozen `MusicalIntent` and seed; stores the resulting typed `GrammarPlanEvidence` and score-local `GrammarStructuralTrace` for each segment.
+- Rejects different realized tempo, meter **or key**. The current `Score` has one global key, tempo and meter; no score retiming or key-map fiction is introduced. The fixture arousal is 8/9, which both current tempo mappings resolve to 140 BPM; the code still compares the actual realized values.
+- Uses exact rational beat offsets and concatenates the two symbolic note arrays without altering pitch, duration, velocity, role, emphasis or PartId. The transition is an explicit hard boundary only.
+- Validates source and composed scores using the existing universal-invariant floor; the full validator report is retained, while style-dependent tonal judgments are not used as a universal acceptance gate.
+- Recomputes per-segment and composed-score digests; attaches the catalogue-backed profile configuration digests and calls the M0 source-bound admission path on the final composed score.
+- Runs the existing Muse Analyst `composer_trace_from_theory` and `verify_composer_trace` against a score-derived Listen projection for each segment. This independently checks trace event references, structural span ordering, motif/event references and obligation lifecycle consistency.
+- Emits explicit hard-boundary evidence: exact boundary beat, final source event end, first target event onset, left-tail/target-entry gaps, event counts in the adjacent four-beat windows and cross-boundary event count. This is descriptive score-domain evidence, not an aesthetic score.
+
+### Exact limit of this verification
+
+The existing Analyst v1 verifier checks trace references, lifecycle and annotations; it explicitly does not re-derive every grammar's musical semantics or harmonic cadence type. M1 therefore treats its Analyst result as **trace-integrity verification**, not as independent proof that a Period/Sentence or Additive Process has fulfilled every semantic obligation. The next semantic verifier work must reuse #9797 (score-side typed-obligation verification) and #9835 (typed grammar producer integration). In particular, only typed, source-and-target-bound obligations may be called semantically verified; labels, event existence and a composer-authored `Fulfilled` state are insufficient.
+
+### Part identity and cultural claims
+
+The current Minimalism engine still emits `PartId::UNASSIGNED` for its notes. The M1 output preserves that unknown identity and explicitly tests for its absence. No continuity claim is made about persistent parts, motif lineage, performer handoff, cultural authenticity, or listener preference. M2 must consume #11351 and #11284 rather than infer identity after generation.
+
+### Current test and execution state
+
+Four M1 unit tests have been authored (shared-clock typed pair, clock mismatch rejection, deterministic replay, exact segment-window containment) alongside the 19 M0 tests. These **23 tests are authored, not compiled or executed** in this environment. The M1 path is code on an open draft PR, not a demonstrated runtime success. Exact-head GitHub workflows are checked separately and skipped is not pass.
