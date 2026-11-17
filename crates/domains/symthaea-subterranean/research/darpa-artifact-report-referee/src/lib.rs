@@ -70,7 +70,7 @@ pub struct CandidateReport {
     pub submission_sequence: u64,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ReportProfile {
     /// All input coordinates must already be expressed in this exact frame.
     /// The evaluator does not apply or infer coordinate transformations.
@@ -83,12 +83,12 @@ pub struct ReportProfile {
 }
 
 impl ReportProfile {
-    pub fn validate(self) -> Result<Self, RefereeError> {
+    pub fn validate(&self) -> Result<(), RefereeError> {
         validate_identifier(&self.coordinate_frame_id, "profile.coordinate_frame_id")?;
         if !self.localization_tolerance_m.is_finite() || self.localization_tolerance_m < 0.0 {
             return Err(RefereeError::InvalidLocalizationTolerance);
         }
-        Ok(self)
+        Ok(())
     }
 }
 
