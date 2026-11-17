@@ -36,6 +36,46 @@
     }
   ],
   "source_type_alias_policy": "none; raw type strings preserved",
-  "official_scoring_rule_status": "not yet pinned; do not claim official score parity",
-  "data_bytes_vendored": false
+  "official_scoring_rule_status": "Systems Final report-scoring clauses and artifact strings pinned; time tie-breakers, command-post transport, course-exploration validation and Virtual rules are outside v0.1",
+  "data_bytes_vendored": false,
+  "official_rules": {
+    "title": "DARPA Subterranean Challenge Competition Rules, Final Event, Revision 1",
+    "date": "2021-05-25",
+    "url": "https://www.darpa.mil/sites/default/files/SubT_Challenge_Finals_Rules.pdf",
+    "sections": [
+      "7.3",
+      "8.3.5",
+      "10.1",
+      "10.3"
+    ],
+    "systems_preliminary": {
+      "expected_artifacts_per_run": 20,
+      "maximum_reports_per_run": 25
+    },
+    "systems_prize": {
+      "expected_artifacts_per_run": 40,
+      "maximum_reports_per_run": 45
+    },
+    "valid_report": "Exact official artifact report string and Euclidean 3-D error <= 5 m earns one point.",
+    "retry_and_duplicate_semantics": "Invalid reports may be corrected; after an artifact has been successfully reported, later duplicate reports are invalid but still count toward the report allowance.",
+    "virtual_competition_semantics": "Not implemented by the Systems Final stream evaluator."
+  },
+  "official_artifacts_specification": {
+    "title": "DARPA SubT Challenge Artifacts Specification, Final Event",
+    "date": "2021-04-01",
+    "url": "https://www.darpa.mil/sites/default/files/SubT_Finals_Artifacts_Specification.pdf",
+    "official_report_strings": [
+      "Survivor",
+      "Cell Phone",
+      "Backpack",
+      "Drill",
+      "Fire Extinguisher",
+      "Gas",
+      "Vent",
+      "Helmet",
+      "Rope",
+      "Cube"
+    ],
+    "crosswalk_version": "darpa-finals-artifact-strings-2021-04-01-v0.1"
+  }
 }
