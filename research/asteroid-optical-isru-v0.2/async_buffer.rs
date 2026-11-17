@@ -60,6 +60,17 @@ pub struct JobProposal {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ActualResult {
+    pub result_id: String,
+    pub observation_id: String,
+    pub value: f64,
+    pub observed_at_utc_s: i64,
+    pub calibration_receipt_id: String,
+    pub qualification_receipt_id: String,
+    pub recorded_at_utc_s: i64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct FantasyObservation {
     pub job_id: String,
     pub candidate: CandidateInstance,
@@ -485,46 +496,40 @@ impl AsyncScheduler {
     pub fn resolve_job(
         &mut self,
         job_id: &str,
-        result_id: &str,
-        observation_id: &str,
-        value: f64,
-        observed_at_utc_s: i64,
-        calibration_receipt_id: &str,
-        qualification_receipt_id: &str,
-        recorded_at_utc_s: i64,
+        result: ActualResult,
     ) -> Result<(), AsyncError> {
         self.ensure_open()?;
-        self.ensure_event_time(recorded_at_utc_s)?;
-        if !nonempty(result_id) {
+        self.ensure_event_time(result.recorded_at_utc_s)?;
+        if !nonempty(&result.result_id) {
             return Err(AsyncError::EmptyIdentity("result_id"));
         }
-        if !nonempty(observation_id) {
+        if !nonempty(&result.observation_id) {
             return Err(AsyncError::EmptyIdentity("observation_id"));
         }
-        if !value.is_finite() {
+        if !result.value.is_finite() {
             return Err(AsyncError::InvalidResult);
         }
-        if !nonempty(calibration_receipt_id) {
+        if !nonempty(&result.calibration_receipt_id) {
             return Err(AsyncError::MissingReceipt("calibration_receipt_id"));
         }
-        if !nonempty(qualification_receipt_id) {
+        if !nonempty(&result.qualification_receipt_id) {
             return Err(AsyncError::MissingReceipt("qualification_receipt_id"));
         }
-        if self.seen_result_ids.contains(result_id) {
-            return Err(AsyncError::DuplicateResult(result_id.to_string()));
+        if self.seen_result_ids.contains(&result.result_id) {
+            return Err(AsyncError::DuplicateResult(result.result_id.clone()));
         }
-        if self.actual_observations.contains_key(observation_id) {
-            return Err(AsyncError::DuplicateObservation(observation_id.to_string()));
+        if self.actual_observations.contains_key(&result.observation_id) {
+            return Err(AsyncError::DuplicateObservation(result.observation_id.clone()));
         }
 
         let job = self
             .active_jobs
             .get(job_id)
             .ok_or_else(|| AsyncError::UnknownJob(job_id.to_string()))?;
-        if observed_at_utc_s < job.launched_at_utc_s {
+        if result.observed_at_utc_s < job.launched_at_utc_s {
             return Err(AsyncError::ObservationBeforeLaunch(job_id.to_string()));
         }
-        if observed_at_utc_s > recorded_at_utc_s {
+        if result.observed_at_utc_s > result.recorded_at_utc_s {
             return Err(AsyncError::ObservationAfterReceipt(job_id.to_string()));
         }
 
@@ -536,29 +541,29 @@ impl AsyncScheduler {
         let new_reserved = subtract_resources(&self.reserved, &completed.proposal.resource_cost);
 
         let observation = ActualObservation {
-            result_id: result_id.to_string(),
-            observation_id: observation_id.to_string(),
+            result_id: result.result_id.clone(),
+            observation_id: result.observation_id.clone(),
             job_id: job_id.to_string(),
             candidate: completed.proposal.candidate.clone(),
-            observed_at_utc_s,
-            recorded_at_utc_s,
-            calibration_receipt_id: calibration_receipt_id.to_string(),
-            qualification_receipt_id: qualification_receipt_id.to_string(),
-            value_bits: value.to_bits(),
+            observed_at_utc_s: result.observed_at_utc_s,
+            recorded_at_utc_s: result.recorded_at_utc_s,
+            calibration_receipt_id: result.calibration_receipt_id,
+            qualification_receipt_id: result.qualification_receipt_id,
+            value_bits: result.value.to_bits(),
         };
 
         self.active_jobs.remove(job_id);
         self.reserved = new_reserved;
         self.spent = new_spent;
-        self.seen_result_ids.insert(result_id.to_string());
+        self.seen_result_ids.insert(result.result_id.clone());
         self.actual_observations
-            .insert(observation_id.to_string(), observation);
+            .insert(result.observation_id.clone(), observation);
         self.append_event(
-            recorded_at_utc_s,
+            result.recorded_at_utc_s,
             AsyncEventKind::JobResolved {
                 job_id: job_id.to_string(),
-                result_id: result_id.to_string(),
-                observation_id: observation_id.to_string(),
+                result_id: result.result_id,
+                observation_id: result.observation_id,
             },
         )
     }
@@ -873,25 +878,29 @@ mod tests {
         value
             .resolve_job(
                 "job-2",
-                "result-2",
-                "observation-2",
-                8.5,
-                12,
-                "calibration-2",
-                "qualification-2",
-                12,
+                ActualResult {
+                    result_id: "result-2".to_string(),
+                    observation_id: "observation-2".to_string(),
+                    value: 8.5,
+                    observed_at_utc_s: 12,
+                    calibration_receipt_id: "calibration-2".to_string(),
+                    qualification_receipt_id: "qualification-2".to_string(),
+                    recorded_at_utc_s: 12,
+                },
             )
             .unwrap();
         value
             .resolve_job(
                 "job-1",
-                "result-1",
-                "observation-1",
-                9.5,
-                11,
-                "calibration-1",
-                "qualification-1",
-                13,
+                ActualResult {
+                    result_id: "result-1".to_string(),
+                    observation_id: "observation-1".to_string(),
+                    value: 9.5,
+                    observed_at_utc_s: 11,
+                    calibration_receipt_id: "calibration-1".to_string(),
+                    qualification_receipt_id: "qualification-1".to_string(),
+                    recorded_at_utc_s: 13,
+                },
             )
             .unwrap();
 
@@ -976,11 +985,33 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            value.resolve_job("job-1", "result-1", "obs-1", 1.0, 9, "cal", "qual", 11),
+            value.resolve_job(
+                "job-1",
+                ActualResult {
+                    result_id: "result-1".to_string(),
+                    observation_id: "obs-1".to_string(),
+                    value: 1.0,
+                    observed_at_utc_s: 9,
+                    calibration_receipt_id: "cal".to_string(),
+                    qualification_receipt_id: "qual".to_string(),
+                    recorded_at_utc_s: 11,
+                },
+            ),
             Err(AsyncError::ObservationBeforeLaunch("job-1".to_string()))
         );
         assert_eq!(
-            value.resolve_job("job-1", "result-1", "obs-1", 1.0, 11, "", "qual", 12),
+            value.resolve_job(
+                "job-1",
+                ActualResult {
+                    result_id: "result-1".to_string(),
+                    observation_id: "obs-1".to_string(),
+                    value: 1.0,
+                    observed_at_utc_s: 11,
+                    calibration_receipt_id: String::new(),
+                    qualification_receipt_id: "qual".to_string(),
+                    recorded_at_utc_s: 12,
+                },
+            ),
             Err(AsyncError::MissingReceipt("calibration_receipt_id"))
         );
         assert_eq!(value.active_candidate_count(), 1);
@@ -1042,13 +1073,15 @@ mod tests {
         value
             .resolve_job(
                 "job-1",
-                "result-1",
-                "observation-1",
-                12.5,
-                11,
-                "cal",
-                "qual",
-                12,
+                ActualResult {
+                    result_id: "result-1".to_string(),
+                    observation_id: "observation-1".to_string(),
+                    value: 12.5,
+                    observed_at_utc_s: 11,
+                    calibration_receipt_id: "cal".to_string(),
+                    qualification_receipt_id: "qual".to_string(),
+                    recorded_at_utc_s: 12,
+                },
             )
             .unwrap();
         assert_eq!(value.actual_observations["observation-1"].value(), 12.5);
