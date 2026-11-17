@@ -1,0 +1,278 @@
+{
+  "schema_version": "0.1.0",
+  "fixture_id": "APPAREL-TWIN-SYNTH-0001",
+  "fixture_class": "synthetic",
+  "functional_unit": "one prototype woven overshirt for pattern/process-thread demonstration; no performance or safety claim",
+  "product": {
+    "product_id": "PROD-SYNTH-OVERSHIRT-001",
+    "product_family": "woven_overshirt",
+    "intended_use": "ordinary non-protective casual outerwear prototype",
+    "non_goals": [
+      "PPE",
+      "medical use",
+      "protective performance",
+      "commercial production qualification"
+    ],
+    "article_scope": "single_prototype"
+  },
+  "design": {
+    "design_id": "DESIGN-SYNTH-OVERSHIRT-001",
+    "revision": "A",
+    "requirements": [
+      {
+        "requirement_id": "REQ-DIM-001",
+        "statement": "Pattern pieces and garment dimensions must be traceable to one declared revision.",
+        "verification_method": "pattern/BOM/configuration identity conformance",
+        "status": "unverified"
+      },
+      {
+        "requirement_id": "REQ-SEAM-001",
+        "statement": "All declared join operations must resolve to named seam paths and construction steps.",
+        "verification_method": "seam topology and process-route inspection",
+        "status": "unverified"
+      }
+    ],
+    "release_state": "engineering_review"
+  },
+  "pattern": {
+    "pattern_id": "PATTERN-SYNTH-OVERSHIRT-001",
+    "revision": "A",
+    "units": "mm",
+    "coordinate_convention": "synthetic right-handed 2D pattern plane; x=width, y=length; grain direction declared per piece",
+    "pieces": [
+      {
+        "piece_id": "FRONT-L",
+        "grain_direction": "y+",
+        "notch_ids": [
+          "N-FL-01",
+          "N-FL-02"
+        ],
+        "seam_allowance_ref": "SA-FRONT-001",
+        "geometry_ref": "GEOM-FRONT-L-A"
+      },
+      {
+        "piece_id": "FRONT-R",
+        "grain_direction": "y+",
+        "notch_ids": [
+          "N-FR-01",
+          "N-FR-02"
+        ],
+        "seam_allowance_ref": "SA-FRONT-001",
+        "geometry_ref": "GEOM-FRONT-R-A"
+      },
+      {
+        "piece_id": "BACK",
+        "grain_direction": "y+",
+        "notch_ids": [
+          "N-BK-01",
+          "N-BK-02"
+        ],
+        "seam_allowance_ref": "SA-BACK-001",
+        "geometry_ref": "GEOM-BACK-A"
+      },
+      {
+        "piece_id": "SLEEVE-L",
+        "grain_direction": "y+",
+        "notch_ids": [
+          "N-SL-01"
+        ],
+        "seam_allowance_ref": "SA-SLEEVE-001",
+        "geometry_ref": "GEOM-SLEEVE-L-A"
+      },
+      {
+        "piece_id": "SLEEVE-R",
+        "grain_direction": "y+",
+        "notch_ids": [
+          "N-SR-01"
+        ],
+        "seam_allowance_ref": "SA-SLEEVE-001",
+        "geometry_ref": "GEOM-SLEEVE-R-A"
+      }
+    ],
+    "semantic_preservation": "complete_for_declared_profile"
+  },
+  "materials": [
+    {
+      "material_id": "MAT-SYNTH-WOVEN-001",
+      "material_kind": "woven_fabric",
+      "lot_id": "LOT-SYNTH-FABRIC-001",
+      "composition_state": "unknown",
+      "properties": [
+        {
+          "property_id": "areal_density",
+          "status": "unknown",
+          "value": null,
+          "unit": "g/m2",
+          "evidence_ref": null
+        },
+        {
+          "property_id": "warp_tensile_response",
+          "status": "not_performed",
+          "value": null,
+          "unit": null,
+          "evidence_ref": null
+        },
+        {
+          "property_id": "weft_tensile_response",
+          "status": "not_performed",
+          "value": null,
+          "unit": null,
+          "evidence_ref": null
+        },
+        {
+          "property_id": "bending_response",
+          "status": "unknown",
+          "value": null,
+          "unit": null,
+          "evidence_ref": null
+        },
+        {
+          "property_id": "surface_friction",
+          "status": "unknown",
+          "value": null,
+          "unit": null,
+          "evidence_ref": null
+        }
+      ]
+    },
+    {
+      "material_id": "MAT-SYNTH-THREAD-001",
+      "material_kind": "thread",
+      "lot_id": "LOT-SYNTH-THREAD-001",
+      "composition_state": "supplier_declared",
+      "properties": []
+    }
+  ],
+  "bom": [
+    {
+      "item_id": "BOM-FABRIC-001",
+      "material_id": "MAT-SYNTH-WOVEN-001",
+      "quantity": null,
+      "unit": "m2",
+      "lot_binding": "declared_only"
+    },
+    {
+      "item_id": "BOM-THREAD-001",
+      "material_id": "MAT-SYNTH-THREAD-001",
+      "quantity": null,
+      "unit": "m",
+      "lot_binding": "declared_only"
+    }
+  ],
+  "operations": [
+    {
+      "operation_id": "OP-CUT-001",
+      "operation_kind": "cut",
+      "sequence": 10,
+      "machine_capability_ref": "CAP-CUTTER-SYNTH-001",
+      "planned_state": "planned",
+      "actual_event_ref": null
+    },
+    {
+      "operation_id": "OP-JOIN-001",
+      "operation_kind": "sew",
+      "sequence": 20,
+      "machine_capability_ref": "CAP-SEWING-MACHINE-SYNTH-001",
+      "planned_state": "proposed",
+      "actual_event_ref": null
+    },
+    {
+      "operation_id": "OP-INSPECT-001",
+      "operation_kind": "inspect",
+      "sequence": 30,
+      "machine_capability_ref": null,
+      "planned_state": "proposed",
+      "actual_event_ref": null
+    }
+  ],
+  "geometry_projections": [
+    {
+      "projection_id": "PROJ-PATTERN-3D-001",
+      "source_revision": "A",
+      "projection_kind": "pattern_to_3d",
+      "model_profile_ref": null,
+      "evidence_class": "synthetic",
+      "status": "available"
+    },
+    {
+      "projection_id": "PROJ-DRAPE-001",
+      "source_revision": "A",
+      "projection_kind": "drape",
+      "model_profile_ref": null,
+      "evidence_class": "model_output",
+      "status": "incomplete"
+    },
+    {
+      "projection_id": "PROJ-FIT-001",
+      "source_revision": "A",
+      "projection_kind": "fit_envelope",
+      "model_profile_ref": null,
+      "evidence_class": "unknown",
+      "status": "not_performed"
+    }
+  ],
+  "physical_tests": [
+    {
+      "test_id": "TEST-ABRASION-001",
+      "method_ref": "method-to-be-selected-after-product-requirement-review",
+      "specimen_ref": "SPECIMEN-NOT-YET-MANUFACTURED",
+      "status": "not_performed",
+      "result": null,
+      "evidence_ref": null
+    },
+    {
+      "test_id": "TEST-SEAM-001",
+      "method_ref": "method-to-be-selected-after-product-requirement-review",
+      "specimen_ref": "SPECIMEN-NOT-YET-MANUFACTURED",
+      "status": "not_performed",
+      "result": null,
+      "evidence_ref": null
+    }
+  ],
+  "claims": [
+    {
+      "claim_id": "CLAIM-PATTERN-THREAD-001",
+      "statement": "The synthetic fixture preserves the declared pattern piece IDs, units and grain-direction fields.",
+      "claim_class": "design_intent",
+      "evidence_refs": [
+        "FIXTURE-SELF-CHECK-001"
+      ],
+      "disposition": "supported_within_scope"
+    },
+    {
+      "claim_id": "CLAIM-DRAPE-001",
+      "statement": "This overshirt has physically validated drape behavior.",
+      "claim_class": "physical_test",
+      "evidence_refs": [
+        "PROJ-DRAPE-001"
+      ],
+      "disposition": "unsupported"
+    },
+    {
+      "claim_id": "CLAIM-DURABILITY-001",
+      "statement": "This overshirt has passed abrasion and seam durability testing.",
+      "claim_class": "physical_test",
+      "evidence_refs": [],
+      "disposition": "blocked"
+    },
+    {
+      "claim_id": "CLAIM-PRODUCTION-001",
+      "statement": "The manufacturing process is qualified for all sizes and production batches.",
+      "claim_class": "lifecycle",
+      "evidence_refs": [],
+      "disposition": "unsupported"
+    }
+  ],
+  "expected_disposition": {
+    "thread_state": "structurally_complete",
+    "physical_qualification": "not_qualified",
+    "reason_codes": [
+      "SYNTHETIC_FIXTURE_ONLY",
+      "MATERIAL_PROPERTIES_UNKNOWN",
+      "NO_PHYSICAL_ARTICLE",
+      "TESTS_NOT_PERFORMED",
+      "MODEL_OUTPUT_NOT_PHYSICAL_EVIDENCE",
+      "SINGLE_PROTOTYPE_SCOPE"
+    ]
+  }
+}

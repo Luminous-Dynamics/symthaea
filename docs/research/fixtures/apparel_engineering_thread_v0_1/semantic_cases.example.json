@@ -1,0 +1,351 @@
+{
+  "schema_version": "0.1.0",
+  "corpus_id": "APPAREL-TWIN-SEMANTIC-CASES-001",
+  "fixture_class": "synthetic",
+  "purpose": "Cross-field semantic negative and positive controls for the apparel engineering digital thread. The Draft 2020-12 schema and selected high-risk mutations are executable in the Rust harness; remaining cases are explicitly tracked as not yet executed.",
+  "cases": [
+    {
+      "case_id": "SEM-001-PATTERN-REVISION-STALE-PROJECTION",
+      "case_type": "negative",
+      "mutation": "Change design.revision from A to B while leaving a fit/drape/3D geometry projection bound to pattern revision A.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "STALE_DEPENDENCY",
+        "REVISION_MISMATCH"
+      ],
+      "invariant": "A projection bound to revision A cannot support a claim about revision B without a qualified revalidation receipt."
+    },
+    {
+      "case_id": "SEM-002-BOM-UNKNOWN-MATERIAL",
+      "case_type": "negative",
+      "mutation": "Set a BOM item material_id to a value absent from the canonical materials list.",
+      "expected_disposition": "invalid",
+      "expected_reason_codes": [
+        "UNRESOLVED_MATERIAL_REFERENCE"
+      ],
+      "invariant": "Every BOM material reference resolves to an exact source identity."
+    },
+    {
+      "case_id": "SEM-003-DUPLICATE-PATTERN-PIECE",
+      "case_type": "negative",
+      "mutation": "Duplicate a pattern piece_id while preserving both records.",
+      "expected_disposition": "invalid",
+      "expected_reason_codes": [
+        "DUPLICATE_PATTERN_PIECE_ID"
+      ],
+      "invariant": "Pattern piece identity is unique within a declared pattern revision."
+    },
+    {
+      "case_id": "SEM-004-MEASURED-TEST-WITHOUT-RESULT-EVIDENCE",
+      "case_type": "negative",
+      "mutation": "Mark a physical test as measured while result or evidence_ref is null/empty.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "MEASURED_RESULT_WITHOUT_EVIDENCE"
+      ],
+      "invariant": "A measured test result requires an actual result and a resolvable evidence artifact."
+    },
+    {
+      "case_id": "SEM-005-MODEL-DRAPE-PROMOTED-TO-PHYSICAL",
+      "case_type": "negative",
+      "mutation": "Support a physical drape or fit claim using only a geometry projection whose evidence_class is model_output.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "MODEL_EVIDENCE_NOT_PHYSICAL_TEST"
+      ],
+      "invariant": "Simulation or model output cannot establish an independent physical test claim."
+    },
+    {
+      "case_id": "SEM-006-PROTOTYPE-PROMOTED-TO-PRODUCTION-CAPABILITY",
+      "case_type": "negative",
+      "mutation": "Use one prototype article with article_scope single_prototype to assert capability across production batches and sizes.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "SCOPE_EXCEEDS_EVIDENCE"
+      ],
+      "invariant": "One accepted prototype does not qualify every size, batch, machine or production shift."
+    },
+    {
+      "case_id": "SEM-007-MATERIAL-LOT-SUBSTITUTION-STALE-TEST",
+      "case_type": "negative",
+      "mutation": "Replace the fabric lot while retaining test evidence bound to the previous lot without applicability review.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "MATERIAL_LOT_CHANGED",
+        "TEST_APPLICABILITY_UNRESOLVED"
+      ],
+      "invariant": "A material-lot substitution triggers dependency analysis and invalidates only the affected claims until reviewed."
+    },
+    {
+      "case_id": "SEM-008-UNKNOWN-COMPOSITION-AS-CERTAIN",
+      "case_type": "negative",
+      "mutation": "Keep composition_state unknown but emit a supported claim that fibre blend is independently measured.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "COMPOSITION_EVIDENCE_MISSING"
+      ],
+      "invariant": "Unknown composition cannot be converted into a measured fibre identity."
+    },
+    {
+      "case_id": "SEM-009-VISUAL-GARMENT-CATEGORY-AS-FIBRE-COMPOSITION",
+      "case_type": "negative",
+      "mutation": "Use a TexSortML-style visual class such as jacket or shirt as evidence that the item is cotton, polyester or a specific blend.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "SENSOR_TASK_SEMANTIC_MISMATCH"
+      ],
+      "invariant": "Visual garment-family classification is not fibre-composition evidence."
+    },
+    {
+      "case_id": "SEM-010-RECOVERY-CLAIM-WITHOUT-PHYSICAL-OUTPUT-LOT",
+      "case_type": "negative",
+      "mutation": "Claim fibre-to-fibre recovery or qualified secondary material without an output lot, custody/transfer evidence, mass attribution and output-grade evidence.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "RECOVERY_OUTPUT_UNRESOLVED",
+        "MASS_ATTRIBUTION_MISSING",
+        "SECONDARY_GRADE_UNKNOWN"
+      ],
+      "invariant": "A reported recovery event is not proof of a physically qualified secondary-material output."
+    },
+    {
+      "case_id": "SEM-011-EXPIRED-NIR-CALIBRATION",
+      "case_type": "negative",
+      "mutation": "Admit a spectral composition estimate from an instrument whose calibration profile was expired or changed after acquisition.",
+      "expected_disposition": "unknown",
+      "expected_reason_codes": [
+        "CALIBRATION_NOT_CURRENT",
+        "SENSOR_RESULT_NOT_ADMISSIBLE"
+      ],
+      "invariant": "A sensor result outside its qualified calibration/currentness envelope must abstain, not silently pass."
+    },
+    {
+      "case_id": "SEM-012-LOT-OVERALLOCATION",
+      "case_type": "negative",
+      "mutation": "Allocate the same physical material lot quantity to two products or recovery pathways beyond the available measured quantity.",
+      "expected_disposition": "invalid",
+      "expected_reason_codes": [
+        "PHYSICAL_LOT_OVERALLOCATION",
+        "MASS_BALANCE_FAILURE"
+      ],
+      "invariant": "Physical lot identity and quantity cannot be double-counted across BOM, inventory, reuse and recovery."
+    },
+    {
+      "case_id": "SEM-013-UNIT-CONVERSION-WITHOUT-BASIS",
+      "case_type": "negative",
+      "mutation": "Convert geometry or mass units between source and projection without an explicit conversion rule, source unit and preserved precision/uncertainty.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "UNIT_BASIS_MISSING",
+        "SEMANTIC_LOSS_UNRESOLVED"
+      ],
+      "invariant": "Unit conversion must be explicit, reproducible and bounded by declared precision and uncertainty."
+    },
+    {
+      "case_id": "SEM-014-SYNTHETIC-EVIDENCE-AS-PHYSICAL",
+      "case_type": "negative",
+      "mutation": "Use a synthetic fixture or simulated run as evidence for a physical material test, article inspection or factory execution claim.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "EVIDENCE_CLASS_MISMATCH"
+      ],
+      "invariant": "Synthetic/model evidence cannot be promoted into physical observation or production execution evidence."
+    },
+    {
+      "case_id": "SEM-015-RESTRICTED-SUPPLIER-DATA-IN-PUBLIC-PROJECTION",
+      "case_type": "negative",
+      "mutation": "Include restricted supplier, process or lot evidence in a public passport projection without an explicit disclosure grant.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "DISCLOSURE_NOT_AUTHORIZED"
+      ],
+      "invariant": "Evidence availability to the local system does not imply permission to disclose it."
+    },
+    {
+      "case_id": "SEM-016-REPAIR-WITHOUT-REQUALIFICATION",
+      "case_type": "negative",
+      "mutation": "Record a repair or replacement of a load-bearing/seam-critical component while leaving dependent inspection/test claims current without impact analysis.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "CHANGE_IMPACT_UNRESOLVED",
+        "REQUALIFICATION_REQUIRED"
+      ],
+      "invariant": "A repair is a lifecycle event; dependent engineering evidence must be evaluated for applicability."
+    },
+    {
+      "case_id": "POS-001-SINGLE-ARTICLE-TRACEABLE",
+      "case_type": "positive",
+      "mutation": "Bind one manufactured article to an exact design revision, material lots, process events, measured inspections and physical-test artifacts, with no broader batch claim.",
+      "expected_disposition": "supported_within_scope",
+      "expected_reason_codes": [],
+      "invariant": "A single article may be qualified for its tested configuration and conditions without extrapolation."
+    },
+    {
+      "case_id": "POS-002-UNKNOWN-SENSOR-ABSTENTION",
+      "case_type": "positive",
+      "mutation": "A spectral sensor reports an out-of-domain or expired-calibration condition and the system marks composition unknown and requests an admissible remeasurement.",
+      "expected_disposition": "supported_within_scope",
+      "expected_reason_codes": [],
+      "invariant": "Correct abstention is a valid outcome and is preferable to an unsupported composition assertion."
+    },
+    {
+      "case_id": "SEM-017-INVERSE-DESIGN-OUT-OF-DOMAIN",
+      "case_type": "negative",
+      "mutation": "A candidate fabric architecture lies outside the calibrated construction/material domain, but the surrogate emits a supported property claim without uncertainty or abstention.",
+      "expected_disposition": "unknown",
+      "expected_reason_codes": [
+        "MODEL_DOMAIN_EXCEEDED",
+        "UNCERTAINTY_UNQUALIFIED"
+      ],
+      "invariant": "An inverse-design model must abstain or request a new physical experiment outside its validated domain."
+    },
+    {
+      "case_id": "SEM-018-PREDICTED-PROPERTY-AS-MEASURED",
+      "case_type": "negative",
+      "mutation": "A surrogate-predicted tensile/drape/thermal value is recorded as an independent physical measurement.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "MODEL_EVIDENCE_NOT_PHYSICAL_TEST"
+      ],
+      "invariant": "Predictions can rank candidates; they cannot become measured properties."
+    },
+    {
+      "case_id": "SEM-019-CANDIDATE-MANUFACTURABILITY-UNKNOWN",
+      "case_type": "negative",
+      "mutation": "An inverse-designed weave/yarn structure is released for production although the target loom/knitting/finishing capability and process envelope are unknown.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "MANUFACTURABILITY_NOT_ESTABLISHED"
+      ],
+      "invariant": "A property-optimal material candidate is not releasable unless a declared manufacturing route can produce it within its process limits."
+    },
+    {
+      "case_id": "SEM-020-UNCERTAINTY-HIDDEN-BY-SCALAR-SCORE",
+      "case_type": "negative",
+      "mutation": "An optimization pipeline picks one candidate using predicted mean only and hides uncertainty, hard-constraint risk and Pareto trade-offs.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "UNCERTAINTY_SUPPRESSED",
+        "HARD_CONSTRAINT_COMPENSATION"
+      ],
+      "invariant": "A scalar weighted objective cannot compensate for unresolved hard gates or conceal a candidate's uncertainty."
+    },
+    {
+      "case_id": "SEM-021-HELDOUT-SPECIMEN-LEAKAGE",
+      "case_type": "negative",
+      "mutation": "Spectra, pixels, physical replicates or frames from the same physical specimen/garment are split across training and held-out evaluation.",
+      "expected_disposition": "invalid",
+      "expected_reason_codes": [
+        "SPECIMEN_SPLIT_LEAKAGE"
+      ],
+      "invariant": "Splits must be grouped by physical specimen/garment and, where possible, source lot/material family."
+    },
+    {
+      "case_id": "SEM-022-VISUAL-CATEGORY-AS-COMPOSITION",
+      "case_type": "negative",
+      "mutation": "A visual category such as jacket/shirt or silhouette is used to support a fibre composition claim.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "SENSOR_TASK_SEMANTIC_MISMATCH"
+      ],
+      "invariant": "Visual garment-family evidence and spectral/material-composition evidence are separate claim types."
+    },
+    {
+      "case_id": "SEM-023-SORTABILITY-RULE-PROFILE-MISMATCH",
+      "case_type": "negative",
+      "mutation": "A design is labelled suitable for a recycling route using a sorting-rule profile for a different sensor, plant or process route.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "SORTING_PROFILE_SCOPE_MISMATCH"
+      ],
+      "invariant": "Sortability is route-, sensor-, calibration- and plant-specific, not a universal product property."
+    },
+    {
+      "case_id": "SEM-024-HIDDEN-MATERIAL-OMITTED",
+      "case_type": "negative",
+      "mutation": "The BOM omits a membrane, coating, lining, adhesive or low-share component present in the physical garment while the product is marked composition-complete.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "BOM_PHYSICAL_COMPONENT_MISMATCH",
+        "COMPOSITION_INCOMPLETE"
+      ],
+      "invariant": "Surface appearance or a main-shell label cannot stand in for complete component-level material identity."
+    },
+    {
+      "case_id": "SEM-025-DISASSEMBLY-DAMAGE-IGNORED",
+      "case_type": "negative",
+      "mutation": "A product passes design-for-disassembly although the declared separation operation damages the recovered textile or makes it fail its secondary functional profile.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "RECOVERY_DAMAGE_UNASSESSED",
+        "SECONDARY_FUNCTION_NOT_ACCEPTED"
+      ],
+      "invariant": "A separable component is not a successful recovery output unless damage and downstream function are assessed."
+    },
+    {
+      "case_id": "SEM-026-RECYCLABILITY-WITHOUT-PLANT-ACCEPTANCE",
+      "case_type": "negative",
+      "mutation": "A generic composition rule declares a garment recyclable even though no named downstream plant/process accepts its actual material blend, finish and component mix.",
+      "expected_disposition": "blocked",
+      "expected_reason_codes": [
+        "DOWNSTREAM_ROUTE_UNRESOLVED"
+      ],
+      "invariant": "A rule-level compatibility result must bind to a declared downstream process route and its actual acceptance envelope."
+    },
+    {
+      "case_id": "POS-003-OUT-OF-DOMAIN-EXPERIMENT",
+      "case_type": "positive",
+      "mutation": "An inverse-design surrogate detects an out-of-domain candidate, marks the property unresolved and selects a physical coupon test that can reduce the relevant uncertainty.",
+      "expected_disposition": "supported_within_scope",
+      "expected_reason_codes": [],
+      "invariant": "Abstention plus informative physical experiment selection is a successful model outcome."
+    },
+    {
+      "case_id": "POS-004-ROUTE-SPECIFIC-DESIGN-FOR-SORTING",
+      "case_type": "positive",
+      "mutation": "A garment design satisfies a versioned, sensor- and plant-specific sorting/disassembly profile, with all components, detection limits, join methods and downstream output acceptance explicitly bound.",
+      "expected_disposition": "supported_within_scope",
+      "expected_reason_codes": [],
+      "invariant": "A route-scoped compatibility assessment may pass without asserting universal recyclability or environmental benefit."
+    }
+  ],
+  "claim_ceiling": "Synthetic semantic test intentions only. No validator implementation, physical testing, dataset evaluation or product qualification is implied.",
+  "revision": "2026-11-12-r2",
+  "execution_coverage": {
+    "executable_case_ids": [
+      "SEM-001-PATTERN-REVISION-STALE-PROJECTION",
+      "SEM-002-BOM-UNKNOWN-MATERIAL",
+      "SEM-003-DUPLICATE-PATTERN-PIECE",
+      "SEM-004-MEASURED-TEST-WITHOUT-RESULT-EVIDENCE",
+      "SEM-005-MODEL-DRAPE-PROMOTED-TO-PHYSICAL",
+      "SEM-006-PROTOTYPE-PROMOTED-TO-PRODUCTION-CAPABILITY",
+      "SEM-014-SYNTHETIC-EVIDENCE-AS-PHYSICAL",
+      "SEM-018-PREDICTED-PROPERTY-AS-MEASURED"
+    ],
+    "not_yet_executed_case_ids": [
+      "SEM-007-MATERIAL-LOT-SUBSTITUTION-STALE-TEST",
+      "SEM-008-UNKNOWN-COMPOSITION-AS-CERTAIN",
+      "SEM-009-VISUAL-GARMENT-CATEGORY-AS-FIBRE-COMPOSITION",
+      "SEM-010-RECOVERY-CLAIM-WITHOUT-PHYSICAL-OUTPUT-LOT",
+      "SEM-011-EXPIRED-NIR-CALIBRATION",
+      "SEM-012-LOT-OVERALLOCATION",
+      "SEM-013-UNIT-CONVERSION-WITHOUT-BASIS",
+      "SEM-015-RESTRICTED-SUPPLIER-DATA-IN-PUBLIC-PROJECTION",
+      "SEM-016-REPAIR-WITHOUT-REQUALIFICATION",
+      "POS-001-SINGLE-ARTICLE-TRACEABLE",
+      "POS-002-UNKNOWN-SENSOR-ABSTENTION",
+      "SEM-017-INVERSE-DESIGN-OUT-OF-DOMAIN",
+      "SEM-019-CANDIDATE-MANUFACTURABILITY-UNKNOWN",
+      "SEM-020-UNCERTAINTY-HIDDEN-BY-SCALAR-SCORE",
+      "SEM-021-HELDOUT-SPECIMEN-LEAKAGE",
+      "SEM-022-VISUAL-CATEGORY-AS-COMPOSITION",
+      "SEM-023-SORTABILITY-RULE-PROFILE-MISMATCH",
+      "SEM-024-HIDDEN-MATERIAL-OMITTED",
+      "SEM-025-DISASSEMBLY-DAMAGE-IGNORED",
+      "SEM-026-RECYCLABILITY-WITHOUT-PLANT-ACCEPTANCE",
+      "POS-003-OUT-OF-DOMAIN-EXPERIMENT",
+      "POS-004-ROUTE-SPECIFIC-DESIGN-FOR-SORTING"
+    ],
+    "note": "Coverage records whether a corresponding mutation is executed by the current Rust harness. It does not imply that every semantic rule in the case corpus is implemented or physically validated."
+  }
+}

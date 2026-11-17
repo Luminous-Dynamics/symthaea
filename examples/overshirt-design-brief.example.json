@@ -1,0 +1,83 @@
+{
+  "schema_version": "0.1.0",
+  "brief_id": "GDB-OVERSHIRT-STARTER-001",
+  "title": "Everyday overshirt — user-editable example",
+  "garment": {
+    "family": "top",
+    "subtype": "woven overshirt",
+    "intended_use": ["everyday layering", "casual use"],
+    "service_profile": "everyday"
+  },
+  "intent": {
+    "description": "A practical overshirt with clean lines, useful pockets and a relaxed but controlled silhouette. This is a synthetic design brief, not a production pattern.",
+    "style_tags": ["minimal", "utility", "layerable", "user-directed"],
+    "silhouette": "Relaxed straight body; sleeve and length remain editable",
+    "color_direction": ["charcoal", "stone", "deep olive"],
+    "avoid": ["unrequested logos", "unverified performance claims"]
+  },
+  "fit": {
+    "basis": "not_selected",
+    "fit_intent": "relaxed",
+    "ease_preferences": [
+      {"region": "shoulder", "preference": "free_movement", "confidence": "user_preference"},
+      {"region": "chest", "preference": "roomy", "confidence": "user_preference"},
+      {"region": "sleeve", "preference": "neutral", "confidence": "user_preference"}
+    ],
+    "postures": ["standing", "sitting", "reaching"],
+    "movement_requirements": ["Raise arms without unacceptable restriction", "Allow a base layer underneath"]
+  },
+  "component_choices": [
+    {"component": "collar", "choice": "Open-point or simple shirt collar; compare both", "source": "user", "locked": false},
+    {"component": "closure", "choice": "Buttons or a user-selected alternative", "source": "user", "locked": false},
+    {"component": "pockets", "choice": "Two useful front pockets; position to be evaluated", "source": "user", "locked": true},
+    {"component": "hem", "choice": "Straight hem with optional side vents", "source": "preset", "locked": false}
+  ],
+  "hard_constraints": [
+    {"id": "H-001", "path": "branding.logos", "operator": "eq", "value": "none", "acceptance_basis": "user_confirmation", "failure_policy": "reject_candidate"}
+  ],
+  "objectives": [
+    {"id": "O-001", "metric": "comfort_preference", "direction": "maximize", "weight": 90, "measurement_basis": "user_preference"},
+    {"id": "O-002", "metric": "appearance_preference", "direction": "maximize", "weight": 90, "measurement_basis": "user_preference"},
+    {"id": "O-003", "metric": "durability", "direction": "maximize", "weight": 80, "measurement_basis": "not_defined"},
+    {"id": "O-004", "metric": "affordability", "direction": "minimize", "weight": 75, "measurement_basis": "not_defined"},
+    {"id": "O-005", "metric": "repairability", "direction": "maximize", "weight": 70, "measurement_basis": "not_defined"}
+  ],
+  "material_preferences": [
+    {"preference": "Woven fabric; compare multiple candidate constructions", "status": "preferred", "evidence_state": "unknown"},
+    {"preference": "Avoid wool unless the user explicitly changes this preference", "status": "avoided", "evidence_state": "unknown"}
+  ],
+  "accessibility": {
+    "requirements": [
+      {"id": "A-001", "need": "Closure must be easy for the intended wearer to operate", "verification_state": "unknown"}
+    ]
+  },
+  "manufacturing": {
+    "preferred_route": "local_maker",
+    "budget": {"amount": 750, "currency": "ZAR", "basis": "finished_garment"},
+    "available_equipment": [],
+    "allowed_operations": []
+  },
+  "circularity": {
+    "repairability_preference": "high",
+    "replaceable_components": ["buttons", "pocket bags"],
+    "disassembly_preference": "easy",
+    "care_constraints": ["Care instructions must be based on the selected fabric and trims"]
+  },
+  "tradeoff_policy": {
+    "show_pareto_alternatives": true,
+    "hard_constraints_are_non_compensatory": true,
+    "require_approval_for_locked_feature_changes": true,
+    "require_approval_for_material_substitution": true
+  },
+  "privacy": {
+    "body_profile_storage": "local_only",
+    "raw_scan_policy": "not_used",
+    "design_sharing": "private",
+    "training_use": "never"
+  },
+  "evidence_policy": {
+    "unknowns_must_remain_explicit": true,
+    "simulation_is_not_physical_test": true,
+    "supplier_declaration_is_not_measurement": true
+  }
+}

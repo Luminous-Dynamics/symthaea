@@ -1,0 +1,125 @@
+name: Apparel Engineering and Atelier Qualification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "tools/apparel-benchmark-harness/**"
+      - "tools/atelier-brief-core/**"
+      - "tools/atelier-wardrobe-core/**"
+      - "tools/atelier-sewing-plan-core/**"
+      - "schemas/sewing-assembly-plan.schema.json"
+      - "examples/sewing-assembly-plan.overshirt.example.json"
+      - "docs/SEWING_PLAN_BENCHMARK_V0_1.md"
+      - "docs/research/APPAREL_ENGINEERING_DIGITAL_THREAD_001.md"
+      - "docs/research/fixtures/apparel_engineering_thread_v0_1/**"
+      - "docs/PARADIGM_SHIFT_AND_BENCHMARKS_2026-11-14.md"
+      - "docs/IMPLEMENTATION_STATUS_2026-11-14.md"
+      - ".github/workflows/apparel-engineering-fixtures.yml"
+  pull_request:
+    paths:
+      - "tools/apparel-benchmark-harness/**"
+      - "tools/atelier-brief-core/**"
+      - "tools/atelier-wardrobe-core/**"
+      - "docs/SEWING_PLAN_BENCHMARK_V0_1.md"
+      - "examples/sewing-assembly-plan.overshirt.example.json"
+      - "schemas/sewing-assembly-plan.schema.json"
+      - "tools/atelier-sewing-plan-core/**"
+      - "docs/research/APPAREL_ENGINEERING_DIGITAL_THREAD_001.md"
+      - "docs/research/fixtures/apparel_engineering_thread_v0_1/**"
+      - "docs/PARADIGM_SHIFT_AND_BENCHMARKS_2026-11-14.md"
+      - "docs/IMPLEMENTATION_STATUS_2026-11-14.md"
+      - ".github/workflows/apparel-engineering-fixtures.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apparel-atelier-qualification-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  apparel-atelier-contracts:
+    name: Apparel digital thread and Atelier contract qualification
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      QUALIFIED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - name: Checkout exact qualification subject
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ env.QUALIFIED_SHA }}
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Assert exact qualification subject
+        run: test "$(git rev-parse HEAD)" = "$QUALIFIED_SHA"
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@e97e2d8cc328f1b50210efc529dca0028893a2d9 # master @ 2025-08-23
+        with:
+          toolchain: 1.96.0
+          components: rustfmt, clippy
+
+      - name: Assert Rust toolchain identity
+        run: test "$(rustc +1.96.0 --version)" = "rustc 1.96.0 (ac68faa20 2026-05-25)"
+
+      - name: Generate isolated harness lock
+        run: cargo generate-lockfile --manifest-path tools/apparel-benchmark-harness/Cargo.toml
+
+      - name: Assert locked harness dependency graph
+        run: cargo metadata --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --no-deps --format-version 1 > /dev/null
+
+      - name: Format focused auditors
+        run: |
+          rustfmt --edition 2024 --check tools/apparel-benchmark-harness/src/main.rs
+          rustfmt --edition 2024 --check tools/apparel-benchmark-harness/src/textile_dataset_audit.rs
+
+      - name: Test apparel engineering schema and semantic contract
+        run: cargo test --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin apparel_thread_audit
+
+      - name: Test textile specimen-level dataset auditor
+        run: cargo test --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin textile_dataset_audit
+
+      - name: Clippy focused auditors
+        run: |
+          cargo clippy --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin apparel_thread_audit -- -D warnings
+          cargo clippy --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin textile_dataset_audit -- -D warnings
+
+      - name: Format Atelier Rust contracts
+        run: |
+          cargo fmt --manifest-path tools/atelier-brief-core/Cargo.toml -- --check
+          cargo fmt --manifest-path tools/atelier-wardrobe-core/Cargo.toml -- --check
+
+      - name: Test Atelier brief guardrails
+        run: cargo test --manifest-path tools/atelier-brief-core/Cargo.toml --locked
+
+      - name: Test Atelier wardrobe exact oracle
+        run: cargo test --manifest-path tools/atelier-wardrobe-core/Cargo.toml --locked
+
+      - name: Test Atelier sewing plan graph validator
+        run: cargo test --manifest-path tools/atelier-sewing-plan-core/Cargo.toml --locked
+
+      - name: Clippy Atelier Rust contracts
+        run: |
+          cargo clippy --manifest-path tools/atelier-brief-core/Cargo.toml --locked --all-targets -- -D warnings
+          cargo clippy --manifest-path tools/atelier-wardrobe-core/Cargo.toml --locked --all-targets -- -D warnings
+          cargo clippy --manifest-path tools/atelier-sewing-plan-core/Cargo.toml --locked --all-targets -- -D warnings
+
+      - name: Emit exact-head apparel receipt
+        run: |
+          cargo run --manifest-path tools/apparel-benchmark-harness/Cargo.toml --locked --bin apparel_thread_audit -- \
+            --expected-head "$QUALIFIED_SHA" \
+            --out "$RUNNER_TEMP/apparel-engineering-receipt.json"
+          cat "$RUNNER_TEMP/apparel-engineering-receipt.json"
+
+      - name: Upload exact-head receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: apparel-atelier-qualification-${{ env.QUALIFIED_SHA }}
+          path: ${{ runner.temp }}/apparel-engineering-receipt.json
