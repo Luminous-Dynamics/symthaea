@@ -9,7 +9,7 @@
 //! for task-graph grounding, exact module admission and resource scheduling.
 
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub const MEAL_PROPOSAL_SCHEMA_VERSION: u32 = 1;
 pub const MEAL_PROPOSAL_CLAIM_CEILING: &str =
@@ -246,12 +246,13 @@ pub enum MealProposalViolationCodeV1 {
     InvalidDurationWindow,
     DuplicateFactId,
     UnknownFactIngredient,
+    UnknownFactReference,
+    DependencyCycle,
     MissingFactSource,
     InvalidFactTimeWindow,
     UnknownFactReference,
     DuplicateUncertainty,
     ClaimCeilingMismatch,
-    HardwareBindingForbidden,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -326,7 +327,11 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
         );
     }
     if let Some(digest) = &proposal.source.content_digest_sha256 {
-        if digest.len() != 64 || !digest.bytes().all(|b| b.is_ascii_hexdigit()) {
+        if digest.len() != 64
+            || !digest
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
+        {
             violation(
                 &mut violations,
                 MealProposalViolationCodeV1::InvalidSourceDigest,
@@ -534,6 +539,67 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
         }
     }
 
+    for ingredient in &proposal.ingredients {
+        for fact_ref in &ingredient.fact_refs {
+            if !fact_ids.contains(fact_ref.as_str()) {
+                violation(
+                    &mut violations,
+                    MealProposalViolationCodeV1::UnknownFactReference,
+                    Some(&ingredient.ingredient_id),
+                    format!("ingredient references unknown fact: {fact_ref}"),
+                );
+            }
+        }
+    }
+    for task in &proposal.tasks {
+        for fact_ref in &task.evidence_refs {
+            if !fact_ids.contains(fact_ref.as_str()) {
+                violation(
+                    &mut violations,
+                    MealProposalViolationCodeV1::UnknownFactReference,
+                    Some(&task.task_id),
+                    format!("task references unknown fact: {fact_ref}"),
+                );
+            }
+        }
+    }
+
+    let mut remaining: BTreeSet<&str> = task_ids.iter().copied().collect();
+    let mut resolved = BTreeSet::new();
+    loop {
+        let ready: Vec<&str> = remaining
+            .iter()
+            .copied()
+            .filter(|task_id| {
+                proposal
+                    .tasks
+                    .iter()
+                    .find(|task| task.task_id == *task_id)
+                    .is_some_and(|task| {
+                        task.depends_on.iter().all(|dependency| {
+                            !task_ids.contains(dependency.as_str())
+                                || resolved.contains(dependency.as_str())
+                        })
+                    })
+            })
+            .collect();
+        if ready.is_empty() {
+            break;
+        }
+        for task_id in ready {
+            remaining.remove(task_id);
+            resolved.insert(task_id);
+        }
+    }
+    if !remaining.is_empty() {
+        violation(
+            &mut violations,
+            MealProposalViolationCodeV1::DependencyCycle,
+            None,
+            "task dependency graph contains a cycle",
+        );
+    }
+
     let mut uncertainty_paths = BTreeSet::new();
     for item in &proposal.uncertainties {
         if !nonempty(&item.field_path)
@@ -704,6 +770,26 @@ mod tests {
         }));
         assert!(report.violations.iter().any(|v| {
             v.code == MealProposalViolationCodeV1::UnknownTaskDependency
+        }));
+    }
+
+    #[test]
+    fn unknown_fact_references_are_rejected() {
+        let mut proposal = valid_proposal();
+        proposal.ingredients[0].fact_refs.push("fact:missing".to_owned());
+        let report = validate_meal_proposal(&proposal);
+        assert!(report.violations.iter().any(|v| {
+            v.code == MealProposalViolationCodeV1::UnknownFactReference
+        }));
+    }
+
+    #[test]
+    fn cyclic_task_graph_is_rejected() {
+        let mut proposal = valid_proposal();
+        proposal.tasks[0].depends_on.push("cook".to_owned());
+        let report = validate_meal_proposal(&proposal);
+        assert!(report.violations.iter().any(|v| {
+            v.code == MealProposalViolationCodeV1::DependencyCycle
         }));
     }
 
