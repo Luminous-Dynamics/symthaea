@@ -61,3 +61,47 @@ Nine authored Rust tests cover:
 - minimum draw count.
 
 All tests run in the isolated Rust 1.96 workflow. The synthetic fixture is a software test only; it is not a physical process benchmark.
+
+
+## v0.2 implementation increment — Monte Carlo confidence and baseline suite
+
+The v0.2 branch `research/plasma-pathway-decision-v0-2` adds decision-report diagnostics without changing the v0.1 feasibility or abstention policy.
+
+### Sampling uncertainty
+
+Each route reports:
+- feasibility probability with successes/trials;
+- Monte Carlo standard error;
+- 95% Wilson score interval;
+- probability of robust-Pareto membership with its own interval;
+- mean regret plus Monte Carlo standard error and p95 regret.
+
+Each pairwise dominance estimate reports the joint-feasibility denominator, Monte Carlo standard error and Wilson interval. Pairwise intervals are conditional on draws in which both routes satisfy their hard constraints. Pareto-membership events use all configured draws, so the estimate includes both feasibility and non-domination.
+
+These intervals quantify numerical Monte Carlo sampling uncertainty under the declared synthetic distribution and pseudorandom draw construction. They do **not** validate triangular input bands, model uncertainty, physical calibration or transfer to unseen devices/campaigns. More draws narrow Monte Carlo intervals but do not repair a bad input distribution.
+
+### Diagnostic baseline suite
+
+For the same sampled route outcomes and robustly feasible candidate set, the report now includes four diagnostic rankings:
+
+1. `BEST_QUALIFIED_NON_PLASMA_INCUMBENT_BY_MEAN_COST` — the best robustly feasible non-plasma incumbent by conditional mean cost.
+2. `FIXED_EQUAL_WEIGHT_NORMALIZED_SUM` — a deliberately simple equal-weight normalized diagnostic, not an approved preference model.
+3. `TOPSIS_EQUAL_METRIC_DIRECTION` — equal-direction TOPSIS over cost, grid energy and GHG.
+4. `CENTRAL_MEAN_NONDOMINATED_SORT` — deterministic non-dominated sorting on conditional mean metrics. This is not NSGA-II and is not a stochastic optimizer.
+
+Every baseline is marked `diagnostic_only=true`; none can override missing service comparability, a failed hard constraint, the robust Pareto output or an abstention disposition. The central-mean baseline is explicitly named so it cannot be misreported as NSGA-II.
+
+### v0.2 tests added
+
+Six tests check Wilson interval behavior, interval narrowing with more draws, all-success/all-failure limits, pairwise joint-feasible denominators, baseline metadata, and preservation of abstention under failed hard constraints.
+
+### Remaining v0.2 work
+
+Not yet implemented:
+- empirical/joint input distributions and dependence models;
+- independent seed/draw-count sensitivity reports;
+- TOPSIS/weighted/NSGA-II head-to-head regret on a sealed validation corpus;
+- empirical calibration, false-feasible estimates and prospective holdouts;
+- value-of-information experiment selection.
+
+The current 10,000-draw pathway fixture remains synthetic software-test input. The real NH3, methane and biogas-to-hydrogen source groups remain `NOT_YET_MATCHED` and correctly abstain. Do not interpret the synthetic baselines or probability intervals as a physical route ranking.
