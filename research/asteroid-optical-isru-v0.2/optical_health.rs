@@ -534,9 +534,7 @@ impl OpticalHealthModel {
     }
 }
 
-fn validate_thresholds(
-    thresholds: &OpticalHealthThresholds,
-) -> Result<(), OpticalHealthError> {
+fn validate_thresholds(thresholds: &OpticalHealthThresholds) -> Result<(), OpticalHealthError> {
     if thresholds
         .minimum_process_transmission
         .iter()
@@ -548,9 +546,7 @@ fn validate_thresholds(
     {
         return Err(OpticalHealthError::InvalidThreshold("spectral_thresholds"));
     }
-    if !thresholds.maximum_qcm_mass_ug_cm2.is_finite()
-        || thresholds.maximum_qcm_mass_ug_cm2 < 0.0
-    {
+    if !thresholds.maximum_qcm_mass_ug_cm2.is_finite() || thresholds.maximum_qcm_mass_ug_cm2 < 0.0 {
         return Err(OpticalHealthError::InvalidThreshold("qcm_mass"));
     }
     Ok(())
@@ -574,9 +570,7 @@ fn evaluate_health_thresholds(
         .iter()
         .zip(thresholds.maximum_witness_loss.iter())
         .any(|(observed, maximum_loss)| (1.0 - observed) > *maximum_loss);
-    if witness_loss_exceeded
-        || reading.qcm_areal_mass_ug_cm2 > thresholds.maximum_qcm_mass_ug_cm2
-    {
+    if witness_loss_exceeded || reading.qcm_areal_mass_ug_cm2 > thresholds.maximum_qcm_mass_ug_cm2 {
         return Ok(HealthAction::RequestIndependentInspection);
     }
 
