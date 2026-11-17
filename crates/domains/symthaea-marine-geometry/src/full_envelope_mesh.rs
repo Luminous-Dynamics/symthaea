@@ -715,21 +715,17 @@ fn append_side_interval(
             });
             continue;
         }
-        let target = match region {
-            ProfileRegion::Bottom => bottom_faces,
-            ProfileRegion::Topsides => topsides_faces,
-            _ => {
-                issues.push(FullEnvelopeMeshIssue {
-                    code: "unsupported_surface_segment".into(),
-                    level: FullEnvelopeMeshIssueLevel::Incomplete,
-                    detail: format!(
-                        "profile segment {point_index} from station {} to {} is not a supported bottom/topside region",
-                        left.station_id, right.station_id
-                    ),
-                });
-                continue;
-            }
-        };
+        if !matches!(region, ProfileRegion::Bottom | ProfileRegion::Topsides) {
+            issues.push(FullEnvelopeMeshIssue {
+                code: "unsupported_surface_segment".into(),
+                level: FullEnvelopeMeshIssueLevel::Incomplete,
+                detail: format!(
+                    "profile segment {point_index} from station {} to {} is not a supported bottom/topside region",
+                    left.station_id, right.station_id
+                ),
+            });
+            continue;
+        }
         let a = left.starboard[point_index];
         let b = right.starboard[point_index];
         let c = right.starboard[point_index + 1];
@@ -739,20 +735,25 @@ fn append_side_interval(
         let port_c = right.port[point_index + 1];
         let port_d = left.port[point_index + 1];
 
-        if right_collapsed {
-            target.extend([
+        let triangles = if right_collapsed {
+            [
                 [a, b, d],
                 [b, c, d],
                 [port_a, port_d, port_b],
                 [port_d, port_c, port_b],
-            ]);
+            ]
         } else {
-            target.extend([
+            [
                 [a, b, c],
                 [a, c, d],
                 [port_a, port_c, port_b],
                 [port_a, port_d, port_c],
-            ]);
+            ]
+        };
+        match region {
+            ProfileRegion::Bottom => bottom_faces.extend(triangles),
+            ProfileRegion::Topsides => topsides_faces.extend(triangles),
+            _ => unreachable!("region was restricted to bottom or topsides"),
         }
     }
 }
