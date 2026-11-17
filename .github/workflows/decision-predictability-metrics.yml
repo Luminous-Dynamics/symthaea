@@ -41,8 +41,8 @@ jobs:
       - name: Run all tests
         run: cargo test --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --all-targets
 
-      - name: Verify committed dependency lock is honored
-        run: cargo metadata --locked --offline --manifest-path research/decision-predictability-benchmark/Cargo.toml --format-version 1 > cargo-metadata.json
+      - name: Verify locked package metadata
+        run: cargo metadata --locked --manifest-path research/decision-predictability-benchmark/Cargo.toml --format-version 1 > cargo-metadata.json
 
 
       - name: Validate held-out split manifest fixture
