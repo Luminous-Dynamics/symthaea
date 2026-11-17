@@ -405,3 +405,15 @@ Public artifacts inspected:
 The repo README lists LoRA adapters for classification, composition-only Tc, crystal system/space group, CIF and inverse-design tasks, but checkpoint and underlying data release/license/split completeness require further audit. The NEMAD data record count is preserved as two paper-reported counts pending exact data inspection.
 
 See [NEMAD-SC-REPRO-001 #12648](https://github.com/Luminous-Dynamics/symthaea/issues/12648). These data must be overlap-audited against AutoSuperCon, NIMS and BEE-NET-derived experiment records rather than naively merged.
+
+
+## 21. Expanded benchmark register — 17 November 2026
+
+The current v0.1 registry now contains:
+- 11 source records;
+- 8 candidate/material records;
+- 7 benchmark catalog records.
+
+The three new benchmark tracks added in this revision are GuidedMatDiffusion (generation + DFT + synthesis outcome), ElementsClaw (agentic LAM + LLM + experimental follow-up), and NEMAD (experimental/non-SC literature database + LLM classification/regression/inverse design). Their raw data and model weights are not copied into Symthaea; each child issue specifies source access, revisions, licensing, split integrity and evidence qualification gates.
+
+The registry audit test assertions were updated to expect exactly 11 sources, 8 candidates and 7 benchmark catalogs. The candidate-level observed / calculated / predicted Tc fields remain separate.
