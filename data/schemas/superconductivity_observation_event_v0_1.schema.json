@@ -698,6 +698,331 @@
         }
       },
       "additionalProperties": false
+    },
+    "process_history": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "step_id",
+          "sequence",
+          "operation",
+          "execution_state",
+          "target",
+          "actual",
+          "actual_source"
+        ],
+        "properties": {
+          "step_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "operation": {
+            "enum": [
+              "pressure_load",
+              "pressure_hold",
+              "decompression",
+              "temperature_ramp",
+              "temperature_hold",
+              "heat",
+              "cool",
+              "quench",
+              "anneal",
+              "thermal_cycle",
+              "mix",
+              "mill",
+              "deposit",
+              "sinter",
+              "other"
+            ]
+          },
+          "execution_state": {
+            "enum": [
+              "planned",
+              "commanded",
+              "executed_unverified",
+              "sensor_verified",
+              "failed",
+              "aborted"
+            ]
+          },
+          "target": {
+            "type": "object",
+            "properties": {
+              "pressure_gpa": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "temperature_k": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "duration_s": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "pressure_change_rate_gpa_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "temperature_ramp_k_min": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "atmosphere": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "actual": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "pressure_gpa": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "temperature_k": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "duration_s": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "pressure_change_rate_gpa_s": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "temperature_ramp_k_min": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "atmosphere": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "notes": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          "actual_source": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "source_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "measurement_status": {
+                "enum": [
+                  "sensor_measured",
+                  "controller_readback",
+                  "operator_recorded",
+                  "unknown"
+                ]
+              },
+              "locator": {
+                "type": "object",
+                "properties": {
+                  "page": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 1
+                  },
+                  "section": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "table": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "figure": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "row_or_record_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "source_id",
+              "measurement_status",
+              "locator"
+            ],
+            "additionalProperties": false
+          },
+          "failure_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "completed_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "execution_state": {
+                  "enum": [
+                    "planned",
+                    "commanded"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "actual": {
+                  "type": "null"
+                },
+                "actual_source": {
+                  "type": "null"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "execution_state": {
+                  "const": "sensor_verified"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "actual": {
+                  "type": "object"
+                },
+                "actual_source": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "execution_state": {
+                  "const": "executed_unverified"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "actual": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "execution_state": {
+                  "enum": [
+                    "failed",
+                    "aborted"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "failure_reason"
+              ],
+              "properties": {
+                "failure_reason": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          }
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false
