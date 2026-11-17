@@ -395,6 +395,42 @@ impl BenchmarkManifest {
             }
         }
 
+        if let Some(baseline) = self
+            .metric_registry
+            .iter()
+            .find(|metric| metric.candidate_id == "B0" && metric.metric_id == "added_mass")
+        {
+            let _ = baseline;
+        }
+        for candidate in self.matched_candidates.iter().filter(|candidate| {
+            candidate.candidate_id != "B0" && candidate.comparability == "matched"
+        }) {
+            for metric_id in REQUIRED_METRICS {
+                let baseline_metric = self.metric_registry.iter().find(|metric| {
+                    metric.candidate_id == "B0" && metric.metric_id == metric_id
+                });
+                let candidate_metric = self.metric_registry.iter().find(|metric| {
+                    metric.candidate_id == candidate.candidate_id && metric.metric_id == metric_id
+                });
+                if let (Some(baseline), Some(current)) = (baseline_metric, candidate_metric) {
+                    if baseline.unit != current.unit
+                        || baseline.measurement_boundary != current.measurement_boundary
+                        || baseline.comparison_direction != current.comparison_direction
+                    {
+                        push(
+                            &mut findings,
+                            "matched_metric_contract_mismatch",
+                            "metric_registry",
+                            format!(
+                                "Candidate {} metric {} does not share B0's unit, measurement boundary and comparison direction.",
+                                candidate.candidate_id, metric_id
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+
         for candidate_id in CANDIDATE_IDS {
             for metric_id in REQUIRED_METRICS {
                 if !metric_keys.contains(&(candidate_id, metric_id)) {
@@ -735,6 +771,16 @@ impl BenchmarkManifest {
                         &candidate.candidate_id,
                         self.test_runs.as_slice(),
                     )
+                    && has_matched_physical_run(
+                        "B0",
+                        &candidate.candidate_id,
+                        self.test_runs.as_slice(),
+                    )
+                    && metric_contract_matches(
+                        "B0",
+                        &candidate.candidate_id,
+                        self.metric_registry.as_slice(),
+                    )
                     && !has_adverse_test_result(
                         &candidate.candidate_id,
                         self.test_runs.as_slice(),
@@ -785,6 +831,45 @@ fn has_passed_physical_stage(candidate_id: &str, runs: &[TestRun]) -> bool {
             && !run.calibration_refs.is_empty()
             && run.raw_data_digest.as_deref().is_some_and(is_sha256_digest)
             && run.acceptance_rule_ref.is_some()
+    })
+}
+
+fn has_matched_physical_run(baseline_id: &str, candidate_id: &str, runs: &[TestRun]) -> bool {
+    runs.iter()
+        .filter(|baseline| {
+            baseline.candidate_id == baseline_id
+                && matches!(baseline.stage.as_str(), "module" | "integrated_robot")
+                && baseline.status == "passed"
+        })
+        .any(|baseline| {
+            runs.iter().any(|candidate| {
+                candidate.candidate_id == candidate_id
+                    && candidate.status == "passed"
+                    && candidate.stage == baseline.stage
+                    && candidate.protocol_revision == baseline.protocol_revision
+                    && candidate.instrument_refs == baseline.instrument_refs
+                    && candidate.calibration_refs == baseline.calibration_refs
+                    && candidate.acceptance_rule_ref == baseline.acceptance_rule_ref
+            })
+        })
+}
+
+fn metric_contract_matches(baseline_id: &str, candidate_id: &str, metrics: &[Metric]) -> bool {
+    REQUIRED_METRICS.iter().all(|metric_id| {
+        let baseline = metrics.iter().find(|metric| {
+            metric.candidate_id == baseline_id && metric.metric_id == *metric_id
+        });
+        let candidate = metrics.iter().find(|metric| {
+            metric.candidate_id == candidate_id && metric.metric_id == *metric_id
+        });
+        match (baseline, candidate) {
+            (Some(base), Some(current)) => {
+                base.unit == current.unit
+                    && base.measurement_boundary == current.measurement_boundary
+                    && base.comparison_direction == current.comparison_direction
+            }
+            _ => false,
+        }
     })
 }
 
@@ -883,7 +968,7 @@ mod tests {
             instrument_refs: vec!["instrument:reference-load-cell".into()],
             calibration_refs: vec!["calibration:current".into()],
             raw_data_digest: Some(format!("sha256:{}", "a".repeat(64))),
-            acceptance_rule_ref: Some(format!("acceptance:{candidate_id}:module")),
+            acceptance_rule_ref: Some("acceptance:lightshell-module-v0.1".into()),
             deviation_notes: None,
         });
     }
@@ -933,6 +1018,40 @@ mod tests {
         let report = manifest.validate();
         assert!(report.is_valid(), "{:#?}", report.findings);
         assert_eq!(report.rankable_candidates, vec!["L1".to_string()]);
+    }
+
+    #[test]
+    fn different_measurement_units_prevent_matched_candidate_ranking() {
+        let mut manifest = manifest();
+        qualify_candidate(&mut manifest, "B0");
+        qualify_candidate(&mut manifest, "L1");
+        let metric = manifest
+            .metric_registry
+            .iter_mut()
+            .find(|metric| metric.candidate_id == "L1" && metric.metric_id == "joint_energy_delta")
+            .unwrap();
+        metric.unit = "kWh/trajectory".into();
+        let report = manifest.validate();
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == "matched_metric_contract_mismatch"
+        }));
+        assert!(!report.can_rank("L1"));
+    }
+
+    #[test]
+    fn different_physical_protocols_prevent_matched_ranking() {
+        let mut manifest = manifest();
+        qualify_candidate(&mut manifest, "B0");
+        qualify_candidate(&mut manifest, "L1");
+        let run = manifest
+            .test_runs
+            .iter_mut()
+            .find(|run| run.candidate_id == "L1")
+            .unwrap();
+        run.protocol_revision = Some("different-protocol-v2".into());
+        let report = manifest.validate();
+        assert!(report.is_valid(), "{:#?}", report.findings);
+        assert!(!report.can_rank("L1"));
     }
 
     #[test]
