@@ -1,0 +1,1108 @@
+//! Bounded physical-operation state machine for Subterra.
+//!
+//! This crate is a dependency-free reference contract. It validates local
+//! state transitions and evidence metadata; it does not authenticate
+//! signatures, control hardware, prove physical truth, or replace an
+//! independent engineering verifier.
+//!
+//! The central rule is that command receipt, actuator response, measured
+//! physical change, and independently accepted postconditions are distinct.
+
+#![forbid(unsafe_code)]
+
+use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct WorkScopeId(pub u64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct AttemptId(pub u64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct WorkPackageId(pub u64);
+
+/// Opaque evidence identifier. This type does not calculate or authenticate a
+/// digest; callers must supply one from a reviewed digest/signature layer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct EvidenceDigest(pub [u8; 32]);
+
+impl EvidenceDigest {
+    pub const ZERO: Self = Self([0; 32]);
+
+    pub const fn is_present(self) -> bool {
+        let mut index = 0;
+        while index < self.0.len() {
+            if self.0[index] != 0 {
+                return true;
+            }
+            index += 1;
+        }
+        false
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct OperationSpec {
+    pub scope_id: WorkScopeId,
+    pub attempt_id: AttemptId,
+    pub work_package_id: WorkPackageId,
+    pub work_package_revision: u64,
+    pub design_revision: u64,
+    pub coordinate_frame_revision: u64,
+    pub calibration_revision: u64,
+    pub authority_revision: u64,
+    pub executor_id: u64,
+    pub executor_sensor_chain_id: u64,
+    /// Declared common-cause domains for the executor's sensing/evidence path.
+    pub executor_common_cause_domains: Vec<u64>,
+    /// Required fraction of the declared inspection surface/volume, in 0..=1000.
+    pub required_coverage_per_mille: u16,
+    pub expires_at_step: u64,
+}
+
+impl OperationSpec {
+    pub fn validate(&self, now_step: u64) -> Result<(), ContractError> {
+        if self.scope_id.0 == 0
+            || self.attempt_id.0 == 0
+            || self.work_package_id.0 == 0
+            || self.work_package_revision == 0
+            || self.design_revision == 0
+            || self.coordinate_frame_revision == 0
+            || self.calibration_revision == 0
+            || self.authority_revision == 0
+            || self.executor_id == 0
+            || self.executor_sensor_chain_id == 0
+            || self.required_coverage_per_mille == 0
+            || self.required_coverage_per_mille > 1000
+            || self.expires_at_step < now_step
+        {
+            return Err(ContractError::InvalidSpecification);
+        }
+
+        let mut domains = BTreeSet::new();
+        if self.executor_common_cause_domains.contains(&0)
+            || self
+                .executor_common_cause_domains
+                .iter()
+                .any(|domain| !domains.insert(*domain))
+        {
+            return Err(ContractError::InvalidCommonCauseDeclaration);
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttemptState {
+    Approved,
+    PreflightAccepted,
+    CommandIssued,
+    Acknowledged,
+    ActuationObserved,
+    OutcomeUnknown,
+    ReconciledNotExecuted,
+    ReconciledExecutedAwaitingInspection,
+    PhysicalDeltaObserved,
+    VerificationPending,
+    InsufficientEvidence,
+    Accepted,
+    Rejected,
+    ReworkReview,
+    Closed,
+}
+
+impl AttemptState {
+    /// States in which this attempt still blocks a new mutation in its scope.
+    pub const fn locks_scope(self) -> bool {
+        !matches!(self, Self::ReconciledNotExecuted | Self::Closed)
+    }
+
+    pub const fn is_terminal_for_attempt(self) -> bool {
+        matches!(self, Self::ReconciledNotExecuted | Self::Closed)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OperationEvent {
+    PreflightAccepted {
+        work_package_revision: u64,
+        design_revision: u64,
+        coordinate_frame_revision: u64,
+        calibration_revision: u64,
+        authority_revision: u64,
+    },
+    CommandIssued {
+        command_digest: EvidenceDigest,
+        idempotency_key: EvidenceDigest,
+    },
+    DeviceAcknowledged {
+        command_digest: EvidenceDigest,
+    },
+    ActuatorTelemetryObserved {
+        command_digest: EvidenceDigest,
+        telemetry_digest: EvidenceDigest,
+        calibration_revision: u64,
+    },
+    OutcomeTimedOut,
+    ReconciledNotExecuted {
+        reconciler_id: u64,
+        evidence_digest: EvidenceDigest,
+    },
+    ReconciledExecuted {
+        reconciler_id: u64,
+        evidence_digest: EvidenceDigest,
+    },
+    PhysicalDeltaObserved {
+        evidence: PhysicalDeltaEvidence,
+    },
+    VerificationSubmitted {
+        receipt: VerificationReceipt,
+    },
+    AdditionalEvidenceReceived {
+        evidence_digest: EvidenceDigest,
+    },
+    CloseAccepted,
+    RecordReworkReview {
+        authority_revision: u64,
+        disposition_digest: EvidenceDigest,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PhysicalDeltaEvidence {
+    pub source_robot_id: u64,
+    pub sensor_chain_id: u64,
+    pub coordinate_frame_revision: u64,
+    pub calibration_revision: u64,
+    pub coverage_per_mille: u16,
+    pub unobserved_required_regions: u32,
+    pub digest: EvidenceDigest,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationReceipt {
+    pub verifier_id: u64,
+    pub sensor_chain_id: u64,
+    pub coordinate_frame_revision: u64,
+    pub calibration_revision: u64,
+    pub coverage_per_mille: u16,
+    pub unobserved_required_regions: u32,
+    pub common_cause_domains: Vec<u64>,
+    pub postconditions_passed: bool,
+    pub digest: EvidenceDigest,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum VerificationIssue {
+    MissingDigest,
+    VerifierIsExecutor,
+    SensorChainShared,
+    CoordinateFrameMismatch,
+    CalibrationMismatch,
+    CoverageInsufficient,
+    RequiredRegionUnobserved,
+    CommonCauseOverlap,
+    InvalidCommonCauseDeclaration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VerificationAssessment {
+    pub issues: Vec<VerificationIssue>,
+    pub accepted: bool,
+    pub rejected: bool,
+}
+
+impl VerificationReceipt {
+    pub fn assess(&self, spec: &OperationSpec) -> VerificationAssessment {
+        let mut issues = Vec::new();
+
+        if !self.digest.is_present() {
+            issues.push(VerificationIssue::MissingDigest);
+        }
+        if self.verifier_id == 0 || self.verifier_id == spec.executor_id {
+            issues.push(VerificationIssue::VerifierIsExecutor);
+        }
+        if self.sensor_chain_id == 0 || self.sensor_chain_id == spec.executor_sensor_chain_id {
+            issues.push(VerificationIssue::SensorChainShared);
+        }
+        if self.coordinate_frame_revision != spec.coordinate_frame_revision {
+            issues.push(VerificationIssue::CoordinateFrameMismatch);
+        }
+        if self.calibration_revision != spec.calibration_revision {
+            issues.push(VerificationIssue::CalibrationMismatch);
+        }
+        if self.coverage_per_mille < spec.required_coverage_per_mille
+            || self.coverage_per_mille > 1000
+        {
+            issues.push(VerificationIssue::CoverageInsufficient);
+        }
+        if self.unobserved_required_regions != 0 {
+            issues.push(VerificationIssue::RequiredRegionUnobserved);
+        }
+
+        let mut domains = BTreeSet::new();
+        if self.common_cause_domains.contains(&0)
+            || self
+                .common_cause_domains
+                .iter()
+                .any(|domain| !domains.insert(*domain))
+        {
+            issues.push(VerificationIssue::InvalidCommonCauseDeclaration);
+        } else if self
+            .common_cause_domains
+            .iter()
+            .any(|domain| spec.executor_common_cause_domains.contains(domain))
+        {
+            issues.push(VerificationIssue::CommonCauseOverlap);
+        }
+
+        let qualified = issues.is_empty();
+        VerificationAssessment {
+            issues,
+            accepted: qualified && self.postconditions_passed,
+            rejected: qualified && !self.postconditions_passed,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StampedOperationEvent {
+    /// Strictly increasing per-attempt event sequence, beginning at one.
+    pub sequence: u64,
+    /// Monotonic mission step; wall-clock timestamps are intentionally not used
+    /// as causal proof by this local reference contract.
+    pub observed_at_step: u64,
+    pub work_package_revision: u64,
+    pub event: OperationEvent,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransitionRecord {
+    pub sequence: u64,
+    pub observed_at_step: u64,
+    pub from: AttemptState,
+    pub to: AttemptState,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContractError {
+    InvalidSpecification,
+    InvalidCommonCauseDeclaration,
+    EventSequenceGap { expected: u64, received: u64 },
+    StepRegression,
+    WorkPackageRevisionMismatch,
+    WorkPackageExpired,
+    InvalidTransition { from: AttemptState, event: &'static str },
+    MissingDigest,
+    IdempotencyKeyReused,
+    CommandDigestMismatch,
+    CalibrationMismatch,
+    CoordinateFrameMismatch,
+    InvalidEvidenceSource,
+    ReconcilerMustBeIndependent,
+    DuplicateEvidence,
+    InvalidAuthorityRevision,
+    DuplicateAttempt,
+    ScopeAlreadyLocked { scope_id: WorkScopeId, holder: AttemptId },
+    UnknownAttempt(AttemptId),
+}
+
+#[derive(Debug, Clone)]
+pub struct OperationAttempt {
+    spec: OperationSpec,
+    state: AttemptState,
+    next_sequence: u64,
+    last_observed_at_step: u64,
+    command_digest: Option<EvidenceDigest>,
+    idempotency_key: Option<EvidenceDigest>,
+    physical_delta: Option<PhysicalDeltaEvidence>,
+    last_verification: Option<VerificationAssessment>,
+    seen_evidence: BTreeSet<EvidenceDigest>,
+    history: Vec<TransitionRecord>,
+}
+
+impl OperationAttempt {
+    pub fn new(spec: OperationSpec, now_step: u64) -> Result<Self, ContractError> {
+        spec.validate(now_step)?;
+        Ok(Self {
+            spec,
+            state: AttemptState::Approved,
+            next_sequence: 1,
+            last_observed_at_step: now_step,
+            command_digest: None,
+            idempotency_key: None,
+            physical_delta: None,
+            last_verification: None,
+            seen_evidence: BTreeSet::new(),
+            history: Vec::new(),
+        })
+    }
+
+    pub const fn state(&self) -> AttemptState {
+        self.state
+    }
+
+    pub fn spec(&self) -> &OperationSpec {
+        &self.spec
+    }
+
+    pub fn history(&self) -> &[TransitionRecord] {
+        &self.history
+    }
+
+    pub fn last_verification(&self) -> Option<&VerificationAssessment> {
+        self.last_verification.as_ref()
+    }
+
+    pub fn physical_delta(&self) -> Option<&PhysicalDeltaEvidence> {
+        self.physical_delta.as_ref()
+    }
+
+    pub fn apply(
+        &mut self,
+        stamped: StampedOperationEvent,
+    ) -> Result<AttemptState, ContractError> {
+        if stamped.sequence != self.next_sequence {
+            return Err(ContractError::EventSequenceGap {
+                expected: self.next_sequence,
+                received: stamped.sequence,
+            });
+        }
+        if stamped.observed_at_step < self.last_observed_at_step {
+            return Err(ContractError::StepRegression);
+        }
+        if stamped.work_package_revision != self.spec.work_package_revision {
+            return Err(ContractError::WorkPackageRevisionMismatch);
+        }
+        if stamped.observed_at_step > self.spec.expires_at_step
+            && !matches!(
+                stamped.event,
+                OperationEvent::OutcomeTimedOut
+                    | OperationEvent::ReconciledNotExecuted { .. }
+                    | OperationEvent::ReconciledExecuted { .. }
+                    | OperationEvent::PhysicalDeltaObserved { .. }
+                    | OperationEvent::VerificationSubmitted { .. }
+                    | OperationEvent::AdditionalEvidenceReceived { .. }
+                    | OperationEvent::CloseAccepted
+                    | OperationEvent::RecordReworkReview { .. }
+            )
+        {
+            return Err(ContractError::WorkPackageExpired);
+        }
+
+        let from = self.state;
+        let to = self.transition(&stamped.event)?;
+        self.state = to;
+        self.last_observed_at_step = stamped.observed_at_step;
+        self.next_sequence = self.next_sequence.saturating_add(1);
+        self.history.push(TransitionRecord {
+            sequence: stamped.sequence,
+            observed_at_step: stamped.observed_at_step,
+            from,
+            to,
+        });
+        Ok(to)
+    }
+
+    fn transition(&mut self, event: &OperationEvent) -> Result<AttemptState, ContractError> {
+        match event {
+            OperationEvent::PreflightAccepted {
+                work_package_revision,
+                design_revision,
+                coordinate_frame_revision,
+                calibration_revision,
+                authority_revision,
+            } if self.state == AttemptState::Approved => {
+                if *work_package_revision != self.spec.work_package_revision
+                    || *design_revision != self.spec.design_revision
+                    || *coordinate_frame_revision != self.spec.coordinate_frame_revision
+                    || *calibration_revision != self.spec.calibration_revision
+                {
+                    return Err(ContractError::WorkPackageRevisionMismatch);
+                }
+                if *authority_revision != self.spec.authority_revision {
+                    return Err(ContractError::InvalidAuthorityRevision);
+                }
+                Ok(AttemptState::PreflightAccepted)
+            }
+            OperationEvent::CommandIssued {
+                command_digest,
+                idempotency_key,
+            } if self.state == AttemptState::PreflightAccepted => {
+                if !command_digest.is_present() || !idempotency_key.is_present() {
+                    return Err(ContractError::MissingDigest);
+                }
+                if self.idempotency_key.is_some() {
+                    return Err(ContractError::IdempotencyKeyReused);
+                }
+                self.command_digest = Some(*command_digest);
+                self.idempotency_key = Some(*idempotency_key);
+                Ok(AttemptState::CommandIssued)
+            }
+            OperationEvent::DeviceAcknowledged { command_digest }
+                if self.state == AttemptState::CommandIssued =>
+            {
+                if Some(*command_digest) != self.command_digest {
+                    return Err(ContractError::CommandDigestMismatch);
+                }
+                Ok(AttemptState::Acknowledged)
+            }
+            OperationEvent::ActuatorTelemetryObserved {
+                command_digest,
+                telemetry_digest,
+                calibration_revision,
+            } if self.state == AttemptState::Acknowledged => {
+                if Some(*command_digest) != self.command_digest {
+                    return Err(ContractError::CommandDigestMismatch);
+                }
+                if !telemetry_digest.is_present() {
+                    return Err(ContractError::MissingDigest);
+                }
+                if *calibration_revision != self.spec.calibration_revision {
+                    return Err(ContractError::CalibrationMismatch);
+                }
+                Ok(AttemptState::ActuationObserved)
+            }
+            OperationEvent::OutcomeTimedOut
+                if matches!(
+                    self.state,
+                    AttemptState::CommandIssued
+                        | AttemptState::Acknowledged
+                        | AttemptState::ActuationObserved
+                ) =>
+            {
+                Ok(AttemptState::OutcomeUnknown)
+            }
+            OperationEvent::ReconciledNotExecuted {
+                reconciler_id,
+                evidence_digest,
+            } if self.state == AttemptState::OutcomeUnknown => {
+                self.validate_reconciliation(*reconciler_id, *evidence_digest)?;
+                Ok(AttemptState::ReconciledNotExecuted)
+            }
+            OperationEvent::ReconciledExecuted {
+                reconciler_id,
+                evidence_digest,
+            } if self.state == AttemptState::OutcomeUnknown => {
+                self.validate_reconciliation(*reconciler_id, *evidence_digest)?;
+                Ok(AttemptState::ReconciledExecutedAwaitingInspection)
+            }
+            OperationEvent::PhysicalDeltaObserved { evidence }
+                if matches!(
+                    self.state,
+                    AttemptState::ActuationObserved
+                        | AttemptState::ReconciledExecutedAwaitingInspection
+                ) =>
+            {
+                if evidence.source_robot_id != self.spec.executor_id
+                    || evidence.sensor_chain_id != self.spec.executor_sensor_chain_id
+                {
+                    return Err(ContractError::InvalidEvidenceSource);
+                }
+                if evidence.coordinate_frame_revision != self.spec.coordinate_frame_revision {
+                    return Err(ContractError::CoordinateFrameMismatch);
+                }
+                if evidence.calibration_revision != self.spec.calibration_revision {
+                    return Err(ContractError::CalibrationMismatch);
+                }
+                if !evidence.digest.is_present() {
+                    return Err(ContractError::MissingDigest);
+                }
+                self.physical_delta = Some(evidence.clone());
+                self.seen_evidence.insert(evidence.digest);
+                Ok(AttemptState::VerificationPending)
+            }
+            OperationEvent::VerificationSubmitted { receipt }
+                if self.state == AttemptState::VerificationPending =>
+            {
+                if self.seen_evidence.contains(&receipt.digest) {
+                    return Err(ContractError::DuplicateEvidence);
+                }
+                let assessment = receipt.assess(&self.spec);
+                self.seen_evidence.insert(receipt.digest);
+                let next = if assessment.accepted {
+                    AttemptState::Accepted
+                } else if assessment.rejected {
+                    AttemptState::Rejected
+                } else {
+                    AttemptState::InsufficientEvidence
+                };
+                self.last_verification = Some(assessment);
+                Ok(next)
+            }
+            OperationEvent::AdditionalEvidenceReceived { evidence_digest }
+                if self.state == AttemptState::InsufficientEvidence =>
+            {
+                if !evidence_digest.is_present() {
+                    return Err(ContractError::MissingDigest);
+                }
+                if !self.seen_evidence.insert(*evidence_digest) {
+                    return Err(ContractError::DuplicateEvidence);
+                }
+                Ok(AttemptState::VerificationPending)
+            }
+            OperationEvent::CloseAccepted if self.state == AttemptState::Accepted => {
+                Ok(AttemptState::Closed)
+            }
+            OperationEvent::RecordReworkReview {
+                authority_revision,
+                disposition_digest,
+            } if self.state == AttemptState::Rejected => {
+                if *authority_revision != self.spec.authority_revision
+                    || !disposition_digest.is_present()
+                {
+                    return Err(ContractError::InvalidAuthorityRevision);
+                }
+                Ok(AttemptState::ReworkReview)
+            }
+            _ => Err(ContractError::InvalidTransition {
+                from: self.state,
+                event: event.name(),
+            }),
+        }
+    }
+
+    fn validate_reconciliation(
+        &mut self,
+        reconciler_id: u64,
+        evidence_digest: EvidenceDigest,
+    ) -> Result<(), ContractError> {
+        if reconciler_id == 0 || reconciler_id == self.spec.executor_id {
+            return Err(ContractError::ReconcilerMustBeIndependent);
+        }
+        if !evidence_digest.is_present() {
+            return Err(ContractError::MissingDigest);
+        }
+        if !self.seen_evidence.insert(evidence_digest) {
+            return Err(ContractError::DuplicateEvidence);
+        }
+        Ok(())
+    }
+}
+
+impl OperationEvent {
+    const fn name(&self) -> &'static str {
+        match self {
+            Self::PreflightAccepted { .. } => "PreflightAccepted",
+            Self::CommandIssued { .. } => "CommandIssued",
+            Self::DeviceAcknowledged { .. } => "DeviceAcknowledged",
+            Self::ActuatorTelemetryObserved { .. } => "ActuatorTelemetryObserved",
+            Self::OutcomeTimedOut => "OutcomeTimedOut",
+            Self::ReconciledNotExecuted { .. } => "ReconciledNotExecuted",
+            Self::ReconciledExecuted { .. } => "ReconciledExecuted",
+            Self::PhysicalDeltaObserved { .. } => "PhysicalDeltaObserved",
+            Self::VerificationSubmitted { .. } => "VerificationSubmitted",
+            Self::AdditionalEvidenceReceived { .. } => "AdditionalEvidenceReceived",
+            Self::CloseAccepted => "CloseAccepted",
+            Self::RecordReworkReview { .. } => "RecordReworkReview",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct OperationRegistry {
+    attempts: BTreeMap<AttemptId, OperationAttempt>,
+    active_by_scope: BTreeMap<WorkScopeId, AttemptId>,
+}
+
+impl OperationRegistry {
+    pub fn begin_attempt(
+        &mut self,
+        spec: OperationSpec,
+        now_step: u64,
+    ) -> Result<(), ContractError> {
+        if self.attempts.contains_key(&spec.attempt_id) {
+            return Err(ContractError::DuplicateAttempt);
+        }
+        if let Some(holder) = self.active_by_scope.get(&spec.scope_id) {
+            return Err(ContractError::ScopeAlreadyLocked {
+                scope_id: spec.scope_id,
+                holder: *holder,
+            });
+        }
+        let scope_id = spec.scope_id;
+        let attempt_id = spec.attempt_id;
+        let attempt = OperationAttempt::new(spec, now_step)?;
+        self.attempts.insert(attempt_id, attempt);
+        self.active_by_scope.insert(scope_id, attempt_id);
+        Ok(())
+    }
+
+    pub fn append(
+        &mut self,
+        attempt_id: AttemptId,
+        stamped: StampedOperationEvent,
+    ) -> Result<AttemptState, ContractError> {
+        let attempt = self
+            .attempts
+            .get_mut(&attempt_id)
+            .ok_or(ContractError::UnknownAttempt(attempt_id))?;
+        let scope_id = attempt.spec.scope_id;
+        let state = attempt.apply(stamped)?;
+        if !state.locks_scope()
+            && self.active_by_scope.get(&scope_id) == Some(&attempt_id)
+        {
+            self.active_by_scope.remove(&scope_id);
+        }
+        Ok(state)
+    }
+
+    pub fn attempt(&self, attempt_id: AttemptId) -> Option<&OperationAttempt> {
+        self.attempts.get(&attempt_id)
+    }
+
+    pub fn scope_lock_holder(&self, scope_id: WorkScopeId) -> Option<AttemptId> {
+        self.active_by_scope.get(&scope_id).copied()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn digest(byte: u8) -> EvidenceDigest {
+        EvidenceDigest([byte; 32])
+    }
+
+    fn spec() -> OperationSpec {
+        OperationSpec {
+            scope_id: WorkScopeId(7),
+            attempt_id: AttemptId(11),
+            work_package_id: WorkPackageId(3),
+            work_package_revision: 4,
+            design_revision: 9,
+            coordinate_frame_revision: 2,
+            calibration_revision: 5,
+            authority_revision: 6,
+            executor_id: 100,
+            executor_sensor_chain_id: 200,
+            executor_common_cause_domains: vec![1, 2],
+            required_coverage_per_mille: 950,
+            expires_at_step: 100,
+        }
+    }
+
+    fn event(sequence: u64, step: u64, event: OperationEvent) -> StampedOperationEvent {
+        StampedOperationEvent {
+            sequence,
+            observed_at_step: step,
+            work_package_revision: 4,
+            event,
+        }
+    }
+
+    fn preflight(registry: &mut OperationRegistry) {
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    1,
+                    2,
+                    OperationEvent::PreflightAccepted {
+                        work_package_revision: 4,
+                        design_revision: 9,
+                        coordinate_frame_revision: 2,
+                        calibration_revision: 5,
+                        authority_revision: 6,
+                    },
+                ),
+            )
+            .unwrap();
+    }
+
+    fn command_and_actuation(registry: &mut OperationRegistry) {
+        preflight(registry);
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    2,
+                    3,
+                    OperationEvent::CommandIssued {
+                        command_digest: digest(10),
+                        idempotency_key: digest(11),
+                    },
+                ),
+            )
+            .unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    3,
+                    4,
+                    OperationEvent::DeviceAcknowledged {
+                        command_digest: digest(10),
+                    },
+                ),
+            )
+            .unwrap();
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    4,
+                    5,
+                    OperationEvent::ActuatorTelemetryObserved {
+                        command_digest: digest(10),
+                        telemetry_digest: digest(12),
+                        calibration_revision: 5,
+                    },
+                ),
+            )
+            .unwrap();
+    }
+
+    fn physical_delta() -> PhysicalDeltaEvidence {
+        PhysicalDeltaEvidence {
+            source_robot_id: 100,
+            sensor_chain_id: 200,
+            coordinate_frame_revision: 2,
+            calibration_revision: 5,
+            coverage_per_mille: 900,
+            unobserved_required_regions: 1,
+            digest: digest(13),
+        }
+    }
+
+    fn verification() -> VerificationReceipt {
+        VerificationReceipt {
+            verifier_id: 300,
+            sensor_chain_id: 400,
+            coordinate_frame_revision: 2,
+            calibration_revision: 5,
+            coverage_per_mille: 1000,
+            unobserved_required_regions: 0,
+            common_cause_domains: vec![3, 4],
+            postconditions_passed: true,
+            digest: digest(14),
+        }
+    }
+
+    fn start_verification(registry: &mut OperationRegistry) {
+        command_and_actuation(registry);
+        registry
+            .append(
+                AttemptId(11),
+                event(
+                    5,
+                    6,
+                    OperationEvent::PhysicalDeltaObserved {
+                        evidence: physical_delta(),
+                    },
+                ),
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn acknowledgement_and_actuator_telemetry_do_not_close_physical_work() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        command_and_actuation(&mut registry);
+        assert_eq!(
+            registry.attempt(AttemptId(11)).unwrap().state(),
+            AttemptState::ActuationObserved
+        );
+        assert!(registry.scope_lock_holder(WorkScopeId(7)).is_some());
+        assert!(matches!(
+            registry.append(
+                AttemptId(11),
+                event(5, 6, OperationEvent::CloseAccepted)
+            ),
+            Err(ContractError::InvalidTransition { .. })
+        ));
+    }
+
+    #[test]
+    fn normal_operation_requires_independent_verified_postconditions() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        start_verification(&mut registry);
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(
+                    6,
+                    7,
+                    OperationEvent::VerificationSubmitted {
+                        receipt: verification(),
+                    },
+                ),
+            ).unwrap(),
+            AttemptState::Accepted
+        );
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(7, 8, OperationEvent::CloseAccepted),
+            ).unwrap(),
+            AttemptState::Closed
+        );
+        assert_eq!(registry.scope_lock_holder(WorkScopeId(7)), None);
+    }
+
+    #[test]
+    fn timeout_locks_scope_until_independent_reconciliation() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        preflight(&mut registry);
+        registry.append(
+            AttemptId(11),
+            event(2, 3, OperationEvent::CommandIssued {
+                command_digest: digest(10),
+                idempotency_key: digest(11),
+            }),
+        ).unwrap();
+        registry.append(
+            AttemptId(11),
+            event(3, 4, OperationEvent::OutcomeTimedOut),
+        ).unwrap();
+        assert_eq!(registry.attempt(AttemptId(11)).unwrap().state(), AttemptState::OutcomeUnknown);
+        let mut retry = spec();
+        retry.attempt_id = AttemptId(12);
+        assert!(matches!(
+            registry.begin_attempt(retry.clone(), 5),
+            Err(ContractError::ScopeAlreadyLocked { .. })
+        ));
+        registry.append(
+            AttemptId(11),
+            event(4, 6, OperationEvent::ReconciledNotExecuted {
+                reconciler_id: 301,
+                evidence_digest: digest(15),
+            }),
+        ).unwrap();
+        assert_eq!(registry.scope_lock_holder(WorkScopeId(7)), None);
+        registry.begin_attempt(retry, 7).unwrap();
+    }
+
+    #[test]
+    fn executor_cannot_reconcile_its_own_ambiguous_command() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        preflight(&mut registry);
+        registry.append(
+            AttemptId(11),
+            event(2, 3, OperationEvent::CommandIssued {
+                command_digest: digest(10),
+                idempotency_key: digest(11),
+            }),
+        ).unwrap();
+        registry.append(
+            AttemptId(11),
+            event(3, 4, OperationEvent::OutcomeTimedOut),
+        ).unwrap();
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(4, 5, OperationEvent::ReconciledNotExecuted {
+                    reconciler_id: 100,
+                    evidence_digest: digest(15),
+                }),
+            ),
+            Err(ContractError::ReconcilerMustBeIndependent)
+        );
+    }
+
+    #[test]
+    fn reconciled_execution_requires_physical_observation_before_verification() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        preflight(&mut registry);
+        registry.append(
+            AttemptId(11),
+            event(2, 3, OperationEvent::CommandIssued {
+                command_digest: digest(10),
+                idempotency_key: digest(11),
+            }),
+        ).unwrap();
+        registry.append(
+            AttemptId(11),
+            event(3, 4, OperationEvent::OutcomeTimedOut),
+        ).unwrap();
+        registry.append(
+            AttemptId(11),
+            event(4, 5, OperationEvent::ReconciledExecuted {
+                reconciler_id: 301,
+                evidence_digest: digest(15),
+            }),
+        ).unwrap();
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(5, 6, OperationEvent::VerificationSubmitted {
+                    receipt: verification(),
+                }),
+            ),
+            Err(ContractError::InvalidTransition {
+                from: AttemptState::ReconciledExecutedAwaitingInspection,
+                event: "VerificationSubmitted",
+            })
+        );
+    }
+
+    #[test]
+    fn insufficient_coverage_is_not_accepted_and_can_be_reinspected() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        start_verification(&mut registry);
+        let mut poor = verification();
+        poor.coverage_per_mille = 800;
+        poor.unobserved_required_regions = 2;
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(6, 7, OperationEvent::VerificationSubmitted { receipt: poor }),
+            ).unwrap(),
+            AttemptState::InsufficientEvidence
+        );
+        assert!(registry.attempt(AttemptId(11)).unwrap().last_verification().unwrap().issues.contains(&VerificationIssue::CoverageInsufficient));
+        registry.append(
+            AttemptId(11),
+            event(7, 8, OperationEvent::AdditionalEvidenceReceived {
+                evidence_digest: digest(16),
+            }),
+        ).unwrap();
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(8, 9, OperationEvent::VerificationSubmitted {
+                    receipt: verification(),
+                }),
+            ).unwrap(),
+            AttemptState::Accepted
+        );
+    }
+
+    #[test]
+    fn common_cause_overlap_prevents_independent_acceptance() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        start_verification(&mut registry);
+        let mut receipt = verification();
+        receipt.common_cause_domains = vec![2, 9];
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
+            ).unwrap(),
+            AttemptState::InsufficientEvidence
+        );
+        assert!(registry.attempt(AttemptId(11)).unwrap().last_verification().unwrap().issues.contains(&VerificationIssue::CommonCauseOverlap));
+    }
+
+    #[test]
+    fn verifier_must_not_reuse_executor_or_its_sensor_chain() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        start_verification(&mut registry);
+        let mut receipt = verification();
+        receipt.verifier_id = 100;
+        receipt.sensor_chain_id = 200;
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
+            ).unwrap(),
+            AttemptState::InsufficientEvidence
+        );
+        let assessment = registry.attempt(AttemptId(11)).unwrap().last_verification().unwrap();
+        assert!(assessment.issues.contains(&VerificationIssue::VerifierIsExecutor));
+        assert!(assessment.issues.contains(&VerificationIssue::SensorChainShared));
+    }
+
+    #[test]
+    fn stale_preflight_and_frame_or_calibration_mismatches_fail_closed() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(1, 2, OperationEvent::PreflightAccepted {
+                    work_package_revision: 3,
+                    design_revision: 9,
+                    coordinate_frame_revision: 2,
+                    calibration_revision: 5,
+                    authority_revision: 6,
+                }),
+            ),
+            Err(ContractError::WorkPackageRevisionMismatch)
+        );
+        assert_eq!(registry.attempt(AttemptId(11)).unwrap().state(), AttemptState::Approved);
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(1, 2, OperationEvent::PreflightAccepted {
+                    work_package_revision: 4,
+                    design_revision: 9,
+                    coordinate_frame_revision: 2,
+                    calibration_revision: 5,
+                    authority_revision: 6,
+                }),
+            ).unwrap(),
+            AttemptState::PreflightAccepted
+        );
+    }
+
+    #[test]
+    fn duplicate_or_out_of_order_events_do_not_mutate_the_attempt() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        preflight(&mut registry);
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(3, 4, OperationEvent::CommandIssued {
+                    command_digest: digest(10),
+                    idempotency_key: digest(11),
+                }),
+            ),
+            Err(ContractError::EventSequenceGap { expected: 2, received: 3 })
+        );
+        assert_eq!(registry.attempt(AttemptId(11)).unwrap().state(), AttemptState::PreflightAccepted);
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(2, 3, OperationEvent::CommandIssued {
+                    command_digest: digest(10),
+                    idempotency_key: digest(11),
+                }),
+            ).unwrap(),
+            AttemptState::CommandIssued
+        );
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(3, 2, OperationEvent::DeviceAcknowledged {
+                    command_digest: digest(10),
+                }),
+            ),
+            Err(ContractError::StepRegression)
+        );
+    }
+
+    #[test]
+    fn failed_postcondition_requires_rework_review_and_keeps_scope_locked() {
+        let mut registry = OperationRegistry::default();
+        registry.begin_attempt(spec(), 1).unwrap();
+        start_verification(&mut registry);
+        let mut receipt = verification();
+        receipt.postconditions_passed = false;
+        assert_eq!(
+            registry.append(
+                AttemptId(11),
+                event(6, 7, OperationEvent::VerificationSubmitted { receipt }),
+            ).unwrap(),
+            AttemptState::Rejected
+        );
+        registry.append(
+            AttemptId(11),
+            event(7, 8, OperationEvent::RecordReworkReview {
+                authority_revision: 6,
+                disposition_digest: digest(17),
+            }),
+        ).unwrap();
+        assert_eq!(registry.attempt(AttemptId(11)).unwrap().state(), AttemptState::ReworkReview);
+        assert_eq!(registry.scope_lock_holder(WorkScopeId(7)), Some(AttemptId(11)));
+    }
+}
