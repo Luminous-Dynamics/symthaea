@@ -147,7 +147,7 @@ fn parse_nodes(tree:&Value,options:&BTreeMap<String,OptionDef>,factor_outcomes:&
    if decision=="defer"{
     let policy=&actions[&action];
     if !policy.read_only||policy.irreversible||policy.hard_gate||policy.max_risk!=0{
-     return Err("defer must use a non-irreversible, non-hard-gated zero-risk action".to_owned());
+     return Err("defer must use an explicitly read-only, non-irreversible, non-hard-gated zero-risk action".to_owned());
     }
    }
    Node{id:id.clone(),kind:kind.clone(),option_id:None,at:None,branches:BTreeMap::new(),decision_kind:Some(decision),action_id:Some(action),claimed}
@@ -304,7 +304,8 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
   let acts=path.decision_kind=="act";
   let risk_ok=risk["evidence_accepted"].as_bool()==Some(true)
    &&risk["robust_action_justified"].as_bool()==Some(true)
-   &&(!action_policy.hard_gate||risk["worst_case_posterior_risk_bps"].as_u64()==Some(0));
+   &&(!action_policy.hard_gate||risk["worst_case_posterior_risk_bps"].as_u64()==Some(0))
+   &&(acts||action_policy.read_only);
   let within=path.cost<=budget;
   if !risk_ok{robust_violations+=1;}if !within{budget_violations+=1;}
   leaf_feasible.insert(path.leaf_id.clone(),risk_ok&&within);
