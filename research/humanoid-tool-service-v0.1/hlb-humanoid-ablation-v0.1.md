@@ -49,6 +49,21 @@ Do not silently treat the legacy bridge, the training simulator, the 21-actuator
 - #1276: cognitive readiness may restrict goal-directed action, but cannot positively establish plant safety; local fallback must remain independent of HLB.
 - #11231: audit benchmark validity, split leakage and external comparator protocol.
 
+
+### 2.5 HLB primitive maturity and ROS2 integration boundary
+
+The robot should reuse HLB components where they have measured, typed semantics, but the existence of a named HLB primitive is not evidence that a full multimodal embodied model is already integrated.
+
+**Liquid Holocell** (`crates/core/symthaea-core/src/hdc/liquid_holocell.rs`) currently stores a `ContinuousHV`, scalar `tau`, dimensionality tier and pressure. Its `step` is a first-order leaky-state update:
+`H_new = H_old * exp(-dt/tau) + input * (1-exp(-dt/tau))`.
+Its current `dilate` path expands by tiling permuted copies of the existing vector and contracts by averaging chunks. This changes vector length but does not, by itself, create new independent information or prove increased representational capacity. Treat dilation as a representation-size transform until orthogonality, retrieval, task accuracy and information-retention experiments establish a stronger claim. The `simulate` helper advances a cloned cell with hard-coded `dt=0.1` and maps state dissimilarity to a [0,1] surprise/load score; it is not a physical power meter, calibrated energy forecast or contact-dynamics simulator.
+
+**Predictive HDC encoder** (`crates/core/symthaea-core/src/hdc/predictive_encoder.rs`) currently accepts `&str`, uses a text encoder and primitive-name detection, compares against a prediction supplied externally via `set_prediction`, and adjusts primitive attention from prediction error. This is useful as a language/semantic predictive primitive. It is not yet a camera, tactile, force/torque or joint-state encoder, nor a full action-conditioned physical world model. Build typed modality-specific encoders and align them by timestamp, frame, calibration and sensor provenance; do not stringify physical readings as the sole multimodal interface.
+
+**ROS2 bridge** (`crates/bridges/symthaea-ros-bridge/src/lib.rs`) is a legacy integration path, not the UEC v2 qualified G1 adapter. The source describes the node as a placeholder; the convenience state conversion injects assumed root pose / heights and zero extremity data, while the current ROS2 state path estimates linear velocity as IMU acceleration multiplied by a fixed 0.025 factor. The command conversion maps humanoid torques to ROS trajectory effort. Its publishing path uses a peak-effort interlock and, under the ROS2 feature, scales efforts using a Phi-derived gain scheduler. These are not substitutes for typed fresh sensor evidence, morphology/calibration-specific constraints, independent `PlantSafetyDecision`, UEC v2 requested/projected/applied receipts, watchdog guarantees or platform-specific fallback qualification. Keep direct actuator publication outside this research branch and do not treat this bridge as production-ready humanoid actuation.
+
+**Integration consequence:** the near-term HLB experiment should first reuse the modern humanoid trainer's existing state encoder + HDC-LTC residual + hierarchical controller, while measuring each contribution separately. The next integration tranche should introduce a typed multimodal observation encoder and predictive state model over measured robot/task variables; it should not attempt to wire the whole HLB monograph or legacy ROS2 bridge directly into a motor loop.
+
 ## 3. Proposed architecture: cognition over control, not cognition instead of control
 
 ```text
