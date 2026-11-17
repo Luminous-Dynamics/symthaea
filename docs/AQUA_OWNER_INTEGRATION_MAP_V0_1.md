@@ -63,3 +63,12 @@ This integration map and adapter do not establish matched physical experiments, 
 - ISO 21542:2021 is an accessibility/usability design reference; local building/accessibility professionals determine applicability and approval.
 
 The room-mode contract records the required evidence and return-to-ready state for shower, bath, accessible bathing, sauna, steam, plunge/whirlpool, pool, cleaning and maintenance. It does not become a new scheduler or safety controller.
+
+
+## Wet-path cleanability and exposure integration
+
+- Symthaea [AQUA-WETPATH-HYGIENE-001 #12703](https://github.com/Luminous-Dynamics/symthaea/issues/12703) owns product-side wetted-path topology, retained-volume mapping, inspectability, drainability, cleaning-cycle design, maintenance burden and the sampling/exposure protocol proposal for independent specialist review.
+- Mycelix #6100 remains authoritative for source/sample/method/intended-use/time-scoped water assessment. Mycelix metrology owners remain authoritative for instrument admission and uncertainty.
+- Independent laboratory/exposure specialists decide biological endpoints, sampling media, detection limits, methods and acceptance criteria. Aqua must not convert internal process signals or visual clarity into a hygiene pass.
+- Symtropy #2152/#4978 remain resource closure and deterministic water-service accounting owners; all cleaning/purge resource burden is included through owner-native receipts.
+
