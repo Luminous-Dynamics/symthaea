@@ -22,13 +22,6 @@ const CONTEXT_FIELDS:[&str;14]=[
 const CLAIM_CEILING:&str="Validates receipt structure, SHA-256 content/event-chain consistency, evaluator-approved execution context, chronology, retry links, and empirical quantiles over complete supplied run trajectories. Hashes do not authenticate the receipt producer or billing provider. It does not validate runner honesty, reconcile external invoices, estimate population tails from small samples, prove agent quality, authorize actions, or establish production reliability.";
 
 #[derive(Clone,Debug)]
-struct Attempt{
- event_id:String,option_id:String,attempt_no:u64,mode:String,status:String,result:String,
- queued_at:DateTime<FixedOffset>,started_at:Option<DateTime<FixedOffset>>,
- completed_at:Option<DateTime<FixedOffset>>,elapsed_ms:Option<u64>,price_micros:Option<u64>,
- event_sha256:String
-}
-#[derive(Clone,Debug)]
 struct RunMetrics{
  run_id:String,task_family:String,paired_seed:u64,
  cost_micros:Option<u64>,wall_ms:Option<u64>,queue_delay_ms:Option<u64>,
@@ -158,6 +151,7 @@ fn validate_attempts(
   }
   if !["pass","fail","unknown","not_applicable"].contains(&result.as_str()){return Err(format!("{l}.result is invalid"));}
   let event_queued=timestamp(&string(row,"queued_at",&l)?,&format!("{l}.queued_at"))?;
+  if event_queued<receipt_queued_at{return Err(format!("{l}.queued_at precedes run receipt queued_at"));}
   if previous_queue.is_some_and(|previous|event_queued<previous){return Err(format!("{label} attempt queue times regress"));}
   previous_queue=Some(event_queued);
   let started=optional_time(row,"started_at",&l)?;
@@ -322,12 +316,9 @@ fn evaluate(raw:&str)->Result<Value,String>{
   let finished_at=optional_time(receipt,"run_finished_at",&label)?;
   if started_at.is_some_and(|x|x<queued_at){return Err(format!("{label}.run_started_at precedes queued_at"));}
   if finished_at.is_some_and(|x|started_at.is_none_or(|start|x<start)){return Err(format!("{label}.run_finished_at requires nondecreasing run_started_at"));}
-  let (attempts,mut m)=validate_attempts(receipt,&option_ids,started_at,finished_at,&label)?;
-  let calculated=checked_digest(receipt,"receipt_sha256",&label)?;
-  let _=calculated;
-  let queue_delay=started_at.map(|x|(x-queued_at).num_milliseconds().max(0) as u64);
-  m.run_id=run_id;m.task_family=task_family;m.paired_seed=paired_seed;m.queue_delay_ms=queue_delay;
-  let _=attempts;
+  let mut m=validate_attempts(receipt,&option_ids,started_at,finished_at,queued_at,&label)?;
+  let _receipt_digest=checked_digest(receipt,"receipt_sha256",&label)?;
+  m.run_id=run_id;m.task_family=task_family;m.paired_seed=paired_seed;
   metrics.push(m);
  }
  let complete_cost:Vec<u64>=metrics.iter().filter_map(|m|m.cost_micros).collect();
