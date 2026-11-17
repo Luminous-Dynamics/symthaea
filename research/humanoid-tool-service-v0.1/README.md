@@ -144,6 +144,9 @@ AMP1 (arXiv:2611.09892, 6 Nov 2026) reports:
 
 Sources: [AMP paper](https://arxiv.org/abs/2611.09892), [AMP results](https://apple-aiml-research.github.io/ml-amp/), [NVIDIA RoboLab leaderboard](https://research.nvidia.com/labs/srl/projects/robolab/leaderboard.html?family=all), [RoboDojo Agent Track](https://robodojo-benchmark.com/leaderboard?bench=sim).
 
+
+The 17 November NVIDIA RoboLab snapshot also lists SenseNova-RoboRSI at 57.1% (685/1,200 episodes), Lakeside at 51.0% (1,531/3,000), BiMind v0.5 at 49.2% (590/1,200), Praxis-1 at 46.2%, FLUX 3 Action at 42.9%, and Cosmic at 42.3%. Several comparators use 10 episodes/task while AMP1 uses 25, so report denominators and uncertainty and do not interpret this as a paired significance test. RoboLab is a separate simulation suite, not a G1 tool-use or physical humanoid qualification benchmark. The full row-by-row snapshot is pinned in §3C.1 of [protocol-v0.1.md](protocol-v0.1.md).
+
 RoboDojo's 17 Nov public snapshot distinguishes its standard policy leaderboard from the Agent track. The 14 Nov rules mark some earlier entries with an asterisk because they were tested before the updated Agent Track rules; do not treat these as compliant submissions or compare Agent Track averages directly with standard policy results or HumanoidToolBench percentages.
 
 The AMP agent harness uses a persistent Python interpreter, active perception and checked/refused motion calls. Two limitations are particularly relevant to Symthaea: the authors note slow model reasoning and inability to replan an executing trajectory; the RoboLab walkthrough pauses simulation while the model reasons. Our architecture should combine a slow planner with a qualified local fast loop that can stop/hold/recover during contact changes without waiting for another model turn. Report both benchmark-motion time and end-to-end wall-clock time, charging API cost, compute, retries, energy and human intervention.
