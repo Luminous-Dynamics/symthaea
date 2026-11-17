@@ -58,6 +58,38 @@ BEHAVIOR: https://behavior.stanford.edu/
 
 Vendor results are vendor-reported. Exact checkpoints, evaluation splits, task criteria and trial counts must be rechecked when freezing an external comparator. No proprietary Figure or Gemini checkpoint availability is assumed.
 
+## 3A. Complementary dexterity and tactile-world-model baselines
+
+HumanoidToolBench is the humanoid-specific tool-use anchor, but it does not fully isolate functional transfer or tactile prediction. Include these complementary tracks where task and hardware semantics match:
+
+| Research | Reported scope/result | What Symthaea should test |
+|---|---|---|
+| Evo-DexBench (15 Oct 2026) | 30 tasks across six functional families; 1,248 multimodal demonstrations using simulated Shadow Hands with 123 taxels; best reported method averages 38.5% success. | Core-to-Gen transfer: train on related functional interactions, then evaluate a novel task in the same family with few target demonstrations. Measure functional transfer rather than trajectory memorization. |
+| DexTouch-WM (17 Sep 2026) | Keeps five hours of robot supervision fixed while scaling compatible human tactile interaction from 0 to 100 hours; reports improved held-out visual, geometric and contact prediction. | Test action-conditioned tactile forecasting and sensor-topology transfer. Treat the shared tactile layout and action retargeting as explicit prerequisites, not a free transfer assumption. |
+| PhysCanvas (20 Oct 2026) | On four real manipulation tasks, reports world-model/real-success correlation increasing from 0.602 to 0.885 with state-reward supervision; reports π0.5 real success increasing from 59.1% SFT to 70.8% after world-model post-training. | Require state-consistent predictions: predicted contact, object motion, tactile state and task outcome must agree. Evaluate whether simulated rollouts predict real policy ranking, not just visually plausible frames. |
+| Tabero (ICML 2026) | Multimodal gentle manipulation benchmark; reports over 70% reduction in average grip force under gentle instructions while maintaining task success. | Add physical-interaction-quality measures alongside task success: force/pressure envelope, deformation, slip, stability and correct force modulation. Do not equate this result with humanoid tool performance. |
+| World Models for Robotic Manipulation survey (31 Aug 2026) | Organizes world models by predicted future representation, action conditioning and use in the learning/control pipeline; highlights contact modeling, hallucination control, action alignment and closed-loop evaluation as open challenges. | Audit prediction fidelity and downstream decision value separately. Do not use generated rollouts as ground truth or allow a reward model to certify its own predictions. |
+
+Sources:
+- Evo-DexBench: https://arxiv.org/abs/2610.21180
+- DexTouch-WM: https://arxiv.org/abs/2609.20649
+- PhysCanvas: https://arxiv.org/abs/2610.28613
+- Tabero (PMLR 306, ICML 2026): https://proceedings.mlr.press/v306/wu26cb.html
+- World Models for Robotic Manipulation: https://doi.org/10.1002/smb2.70053
+
+These are paper-reported reference results, not Symthaea results and not numerically comparable across task suites. Confirm each paper's released source, checkpoint, dataset rights and exact evaluation before attempting reproduction.
+
+### Resulting benchmark portfolio
+
+Keep five distinct scorecards:
+1. Humanoid tool selection → stationary use → mobile use.
+2. Dexterous functional transfer (Core-to-Gen).
+3. Tactile/contact prediction and post-contact recovery.
+4. Gentle/quality-aware manipulation.
+5. Verified service restoration and operational utility.
+
+A generalist claim requires evidence across the relevant scorecards; success on one cannot compensate for failure on another.
+
 ## 4. Matched baseline ladder
 
 Evaluate the following arms only when the exact artifact and interface are available:
