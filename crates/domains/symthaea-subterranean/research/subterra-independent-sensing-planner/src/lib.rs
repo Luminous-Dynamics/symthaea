@@ -5,7 +5,7 @@
 //! The objective is a Pareto frontier over declared physical resource and risk
 //! dimensions; no arbitrary scalarization or additive per-sensor EVSI is used.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use subterra_corroboration_assurance::{DependencyIdentity, InventoryDisposition};
 use subterra_inspection_campaign::ResourceVector;
@@ -147,6 +147,7 @@ pub enum PlanningError {
     EmptyRequiredSourceCount,
     DuplicateOptionId(String),
     DuplicateSourceId(String),
+    ConflictingDeploymentBundleDigest(String),
     EmptyVerifierIdentity,
     IncompleteVerifierInventory,
     UnknownVerifierInventory,
@@ -449,6 +450,19 @@ pub fn plan_independent_acquisition_portfolio(
         .map_err(|_| PlanningError::EmptyVerifierDependencyClosure)?;
 
     options.sort_by(|a, b| a.option_id.cmp(&b.option_id));
+    let mut bundle_digests = BTreeMap::new();
+    for option in &options {
+        if let Some(existing) = bundle_digests.insert(
+            option.deployment_bundle_id.as_str(),
+            option.deployment_bundle_digest.as_str(),
+        ) {
+            if existing != option.deployment_bundle_digest {
+                return Err(PlanningError::ConflictingDeploymentBundleDigest(
+                    option.deployment_bundle_id.clone(),
+                ));
+            }
+        }
+    }
     let mut option_ids = BTreeSet::new();
     let mut source_ids = BTreeSet::new();
     for option in &options {
@@ -896,6 +910,29 @@ mod tests {
                 &budget()
             ),
             Err(PlanningError::DuplicateSourceId("same-source".into()))
+        );
+    }
+
+    #[test]
+    fn same_deployment_bundle_id_must_pin_one_digest() {
+        let mut second = option("b", "source-b", vec![dep("robot", "b")]);
+        second.deployment_bundle_id = "bundle-1".into();
+        second.deployment_bundle_digest = "sha256:conflicting-bundle".into();
+        let result = plan_independent_acquisition_portfolio(
+            vec![
+                option("a", "source-a", vec![dep("robot", "a")]),
+                second,
+            ],
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        );
+        assert_eq!(
+            result,
+            Err(PlanningError::ConflictingDeploymentBundleDigest(
+                "bundle-1".into()
+            ))
         );
     }
 
