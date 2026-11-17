@@ -1,0 +1,49 @@
+name: Symmetry discovery benchmark fixture validation
+
+on:
+  push:
+    branches: [research/symm-qualification-benchmark-v0-1]
+    paths:
+      - "research/symmetry-discovery-benchmark-001/**"
+      - ".github/workflows/symmetry-discovery-benchmark-fixtures.yml"
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    paths:
+      - "research/symmetry-discovery-benchmark-001/**"
+      - ".github/workflows/symmetry-discovery-benchmark-fixtures.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: symmetry-discovery-benchmark-fixtures-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-fixtures:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout exact triggering revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Validate Draft 2020-12 schema and manifest
+        run: |
+          python3 -m pip install --disable-pip-version-check jsonschema==4.26.0
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from jsonschema import Draft202012Validator
+
+          root = Path("research/symmetry-discovery-benchmark-001")
+          schema = json.loads((root / "schemas/case_manifest.schema.json").read_text())
+          manifest = json.loads((root / "fixtures/v0.1/cases.json").read_text())
+          Draft202012Validator.check_schema(schema)
+          Draft202012Validator(schema).validate(manifest)
+          PY
+      - name: Validate exact group axioms, point stabilizers and polynomial invariance
+        run: python3 -I research/symmetry-discovery-benchmark-001/tools/validate_fixtures.py
