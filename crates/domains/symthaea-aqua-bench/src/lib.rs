@@ -1,338 +1,467 @@
-//! Deterministic resource accounting for Luminous Aqua service benchmarks.
+//! Product-level benchmark adapter for Luminous Aqua.
 //!
-//! This crate performs arithmetic and input validation only. It is not a water-quality
-//! authority, hygiene assessor, plumbing controller, safety interlock, hydraulic solver,
-//! certification tool, or proof of physical performance. Missing measurements are errors
-//! for whole-service calculations; callers must not turn unknown values into zero.
+//! This crate validates matched test context and binds an Aqua run to canonical owner
+//! evidence. It deliberately does not calculate water/energy ledgers, hydraulic or
+//! thermal states, water quality, metrology admission, safety, hygiene, or comfort.
+//! Symtropy, Mycelix, Sol-Atlas, and independent endpoint assessors remain authoritative
+//! for those results. Missing evidence is an error; it must never be replaced by zero.
 
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 
-pub const LEDGER_VERSION: &str = "0.1.0";
+pub const CONTRACT_VERSION: &str = "0.1.0";
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum LedgerError {
-    MissingMeasurement { field: &'static str },
-    NonFiniteMeasurement { field: &'static str },
-    NegativeMeasurement { field: &'static str },
-    NonPositiveControl { field: &'static str },
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EvidenceOwner {
+    SymtropyWaterServiceT0,
+    SymtropyResourceClosure,
+    MycelixMetrology,
+    MycelixWaterQuality,
+    IndependentTaskOutcome,
 }
 
-impl Display for LedgerError {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidenceRef {
+    pub owner: EvidenceOwner,
+    pub record_id: String,
+    pub sha256: String,
+}
+
+impl EvidenceRef {
+    fn validate(
+        &self,
+        field: &'static str,
+        expected_owner: EvidenceOwner,
+    ) -> Result<(), ContractError> {
+        if self.owner != expected_owner {
+            return Err(ContractError::WrongEvidenceOwner { field });
+        }
+        if self.record_id.trim().is_empty() {
+            return Err(ContractError::MissingField { field });
+        }
+        if !is_sha256(&self.sha256) {
+            return Err(ContractError::InvalidDigest { field });
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ContractError {
+    MissingField { field: &'static str },
+    InvalidDigest { field: &'static str },
+    WrongEvidenceOwner { field: &'static str },
+    ZeroDuration,
+    SameRunCompared,
+    ContextMismatch { field: &'static str },
+    MissingEnergyReceipt,
+}
+
+impl Display for ContractError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::MissingMeasurement { field } => write!(f, "missing required measurement: {field}"),
-            Self::NonFiniteMeasurement { field } => write!(f, "non-finite measurement: {field}"),
-            Self::NegativeMeasurement { field } => write!(f, "negative measurement: {field}"),
-            Self::NonPositiveControl { field } => write!(f, "control must be greater than zero: {field}"),
-        }
-    }
-}
-
-impl Error for LedgerError {}
-
-fn nonnegative(field: &'static str, value: Option<f64>) -> Result<f64, LedgerError> {
-    let value = value.ok_or(LedgerError::MissingMeasurement { field })?;
-    if !value.is_finite() {
-        return Err(LedgerError::NonFiniteMeasurement { field });
-    }
-    if value < 0.0 {
-        return Err(LedgerError::NegativeMeasurement { field });
-    }
-    Ok(value)
-}
-
-fn signed_finite(field: &'static str, value: Option<f64>) -> Result<f64, LedgerError> {
-    let value = value.ok_or(LedgerError::MissingMeasurement { field })?;
-    if !value.is_finite() {
-        return Err(LedgerError::NonFiniteMeasurement { field });
-    }
-    Ok(value)
-}
-
-/// Whole-service water ledger, from request through post-use ready state.
-///
-/// All values are litres. `recirculated_delivery_l` is reported separately and is never
-/// added to fresh-water consumption: it is an internal transfer within the session.
-/// `periodic_cleaning_allocated_l` is the measured periodic-cleaning burden allocated
-/// to this service using a declared allocation rule.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct WaterServiceLedger {
-    pub startup_l: Option<f64>,
-    pub priming_l: Option<f64>,
-    pub active_fresh_l: Option<f64>,
-    pub post_use_cleaning_l: Option<f64>,
-    pub purge_l: Option<f64>,
-    pub periodic_cleaning_allocated_l: Option<f64>,
-    pub retry_recovery_l: Option<f64>,
-    pub recirculated_delivery_l: Option<f64>,
-}
-
-impl WaterServiceLedger {
-    /// Returns complete fresh-water burden. Every component must be measured, including
-    /// explicit zero values for operations that do not apply.
-    pub fn fresh_water_l(&self) -> Result<f64, LedgerError> {
-        let values = [
-            ("startup_l", self.startup_l),
-            ("priming_l", self.priming_l),
-            ("active_fresh_l", self.active_fresh_l),
-            ("post_use_cleaning_l", self.post_use_cleaning_l),
-            ("purge_l", self.purge_l),
-            ("periodic_cleaning_allocated_l", self.periodic_cleaning_allocated_l),
-            ("retry_recovery_l", self.retry_recovery_l),
-        ];
-        values.into_iter().try_fold(0.0, |sum, (field, value)| {
-            let total = sum + nonnegative(field, value)?;
-            if total.is_finite() {
-                Ok(total)
-            } else {
-                Err(LedgerError::NonFiniteMeasurement { field: "fresh_water_total_l" })
+            Self::MissingField { field } => write!(f, "missing required Aqua field: {field}"),
+            Self::InvalidDigest { field } => write!(f, "invalid SHA-256 digest for: {field}"),
+            Self::WrongEvidenceOwner { field } => {
+                write!(f, "evidence owner mismatch for: {field}")
             }
-        })
-    }
-
-    /// Returns the internally recirculated delivery volume as a separate quantity.
-    pub fn recirculated_delivery_l(&self) -> Result<f64, LedgerError> {
-        nonnegative("recirculated_delivery_l", self.recirculated_delivery_l)
-    }
-}
-
-/// Returns fresh-water savings against a matched control service.
-///
-/// The caller is responsible for ensuring equal task, duration, operating conditions,
-/// output quality, and complete accounting boundaries. This function cannot establish
-/// comparability or service quality.
-pub fn water_savings_percent(
-    control: &WaterServiceLedger,
-    candidate: &WaterServiceLedger,
-) -> Result<f64, LedgerError> {
-    let control_l = control.fresh_water_l()?;
-    if control_l <= 0.0 {
-        return Err(LedgerError::NonPositiveControl { field: "control_fresh_water_l" });
-    }
-    let candidate_l = candidate.fresh_water_l()?;
-    let savings = 100.0 * (1.0 - candidate_l / control_l);
-    if !savings.is_finite() {
-        return Err(LedgerError::NonFiniteMeasurement { field: "water_savings_percent" });
-    }
-    Ok(savings)
-}
-
-/// Purchased energy ledger. Values are kWh; fuel and electricity remain separately
-/// visible. Useful recovered heat is reported, not subtracted from purchased energy,
-/// which avoids mixing a thermal output with purchased input or double-crediting it.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct EnergyServiceLedger {
-    pub heater_electricity_kwh: Option<f64>,
-    pub pump_electricity_kwh: Option<f64>,
-    pub treatment_electricity_kwh: Option<f64>,
-    pub controls_electricity_kwh: Option<f64>,
-    pub cleaning_electricity_kwh: Option<f64>,
-    pub allocated_room_electricity_kwh: Option<f64>,
-    pub heater_fuel_input_kwh: Option<f64>,
-    pub recovered_useful_heat_kwh: Option<f64>,
-}
-
-impl EnergyServiceLedger {
-    pub fn purchased_electricity_kwh(&self) -> Result<f64, LedgerError> {
-        let values = [
-            ("heater_electricity_kwh", self.heater_electricity_kwh),
-            ("pump_electricity_kwh", self.pump_electricity_kwh),
-            ("treatment_electricity_kwh", self.treatment_electricity_kwh),
-            ("controls_electricity_kwh", self.controls_electricity_kwh),
-            ("cleaning_electricity_kwh", self.cleaning_electricity_kwh),
-            ("allocated_room_electricity_kwh", self.allocated_room_electricity_kwh),
-        ];
-        values.into_iter().try_fold(0.0, |sum, (field, value)| {
-            let total = sum + nonnegative(field, value)?;
-            if total.is_finite() {
-                Ok(total)
-            } else {
-                Err(LedgerError::NonFiniteMeasurement { field: "purchased_electricity_kwh" })
+            Self::ZeroDuration => write!(f, "task duration must be greater than zero"),
+            Self::SameRunCompared => write!(f, "a run cannot be compared with itself"),
+            Self::ContextMismatch { field } => {
+                write!(f, "matched benchmark context differs at: {field}")
             }
-        })
-    }
-
-    pub fn purchased_fuel_kwh(&self) -> Result<f64, LedgerError> {
-        nonnegative("heater_fuel_input_kwh", self.heater_fuel_input_kwh)
-    }
-
-    pub fn purchased_energy_kwh(&self) -> Result<f64, LedgerError> {
-        let total = self.purchased_electricity_kwh()? + self.purchased_fuel_kwh()?;
-        if !total.is_finite() {
-            return Err(LedgerError::NonFiniteMeasurement { field: "purchased_energy_kwh" });
+            Self::MissingEnergyReceipt => {
+                write!(f, "energy comparison requires a Symtropy resource-closure receipt")
+            }
         }
-        Ok(total)
-    }
-
-    pub fn recovered_useful_heat_kwh(&self) -> Result<f64, LedgerError> {
-        nonnegative("recovered_useful_heat_kwh", self.recovered_useful_heat_kwh)
     }
 }
 
-/// Whole-boundary water balance for a completed shower service.
+impl Error for ContractError {}
+
+fn is_sha256(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn require_nonempty(field: &'static str, value: &str) -> Result<(), ContractError> {
+    if value.trim().is_empty() {
+        return Err(ContractError::MissingField { field });
+    }
+    Ok(())
+}
+
+fn require_digest(field: &'static str, value: &str) -> Result<(), ContractError> {
+    if !is_sha256(value) {
+        return Err(ContractError::InvalidDigest { field });
+    }
+    Ok(())
+}
+
+/// Conditions that must be identical for a matched control/candidate comparison.
 ///
-/// Internal recirculation is intentionally excluded because it is not an external
-/// source or sink. `storage_change_l` is end-minus-start storage (positive means
-/// accumulation, negative means depletion). All other output streams are nonnegative.
-#[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub struct WaterBalance {
-    pub source_input_l: Option<f64>,
-    pub end_use_discharge_l: Option<f64>,
-    pub cleaning_purge_discharge_l: Option<f64>,
-    pub reject_discharge_l: Option<f64>,
-    pub evaporative_or_aerosol_loss_l: Option<f64>,
-    pub storage_change_l: Option<f64>,
-    pub expanded_uncertainty_l: Option<f64>,
+/// Digests bind the full versioned profiles and their source data. The adapter checks
+/// equality and syntax only; it does not validate the underlying physical observations.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BenchmarkConditions {
+    pub task_profile_id: String,
+    pub duration_seconds: u32,
+    pub inlet_water_profile_sha256: String,
+    pub delivery_conditions_sha256: String,
+    pub room_conditions_sha256: String,
+    pub measurement_protocol_sha256: String,
+    pub accounting_boundary_sha256: String,
 }
 
-impl WaterBalance {
-    /// Positive residual means measured source input exceeds measured outputs and
-    /// retained storage. Negative residual means measured outputs/storage exceed input.
-    pub fn closure_residual_l(&self) -> Result<f64, LedgerError> {
-        let input = nonnegative("source_input_l", self.source_input_l)?;
-        let end_use = nonnegative("end_use_discharge_l", self.end_use_discharge_l)?;
-        let cleaning = nonnegative("cleaning_purge_discharge_l", self.cleaning_purge_discharge_l)?;
-        let reject = nonnegative("reject_discharge_l", self.reject_discharge_l)?;
-        let loss = nonnegative("evaporative_or_aerosol_loss_l", self.evaporative_or_aerosol_loss_l)?;
-        let storage_change = signed_finite("storage_change_l", self.storage_change_l)?;
-        let residual = input - end_use - cleaning - reject - loss - storage_change;
-        if !residual.is_finite() {
-            return Err(LedgerError::NonFiniteMeasurement { field: "water_balance_residual_l" });
+impl BenchmarkConditions {
+    pub fn validate(&self) -> Result<(), ContractError> {
+        require_nonempty("task_profile_id", &self.task_profile_id)?;
+        if self.duration_seconds == 0 {
+            return Err(ContractError::ZeroDuration);
         }
-        Ok(residual)
+        require_digest("inlet_water_profile_sha256", &self.inlet_water_profile_sha256)?;
+        require_digest("delivery_conditions_sha256", &self.delivery_conditions_sha256)?;
+        require_digest("room_conditions_sha256", &self.room_conditions_sha256)?;
+        require_digest("measurement_protocol_sha256", &self.measurement_protocol_sha256)?;
+        require_digest("accounting_boundary_sha256", &self.accounting_boundary_sha256)?;
+        Ok(())
     }
 
-    pub fn closes_within_uncertainty(&self) -> Result<bool, LedgerError> {
-        let uncertainty = nonnegative("expanded_uncertainty_l", self.expanded_uncertainty_l)?;
-        Ok(self.closure_residual_l()?.abs() <= uncertainty)
+    fn compare_with(&self, other: &Self) -> Result<(), ContractError> {
+        if self.task_profile_id != other.task_profile_id {
+            return Err(ContractError::ContextMismatch { field: "task_profile_id" });
+        }
+        if self.duration_seconds != other.duration_seconds {
+            return Err(ContractError::ContextMismatch { field: "duration_seconds" });
+        }
+        if self.inlet_water_profile_sha256 != other.inlet_water_profile_sha256 {
+            return Err(ContractError::ContextMismatch {
+                field: "inlet_water_profile_sha256",
+            });
+        }
+        if self.delivery_conditions_sha256 != other.delivery_conditions_sha256 {
+            return Err(ContractError::ContextMismatch {
+                field: "delivery_conditions_sha256",
+            });
+        }
+        if self.room_conditions_sha256 != other.room_conditions_sha256 {
+            return Err(ContractError::ContextMismatch {
+                field: "room_conditions_sha256",
+            });
+        }
+        if self.measurement_protocol_sha256 != other.measurement_protocol_sha256 {
+            return Err(ContractError::ContextMismatch {
+                field: "measurement_protocol_sha256",
+            });
+        }
+        if self.accounting_boundary_sha256 != other.accounting_boundary_sha256 {
+            return Err(ContractError::ContextMismatch {
+                field: "accounting_boundary_sha256",
+            });
+        }
+        Ok(())
     }
+}
+
+/// Device-specific identity. Configuration and cleaning protocol may differ between
+/// comparators; they must be recorded and bound to each run, not forced to be identical.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceConfiguration {
+    pub market_variant_id: String,
+    pub hardware_configuration_sha256: String,
+    pub installation_sha256: String,
+    pub cleaning_protocol_sha256: String,
+    pub firmware_revision: Option<String>,
+}
+
+impl DeviceConfiguration {
+    pub fn validate(&self) -> Result<(), ContractError> {
+        require_nonempty("market_variant_id", &self.market_variant_id)?;
+        require_digest(
+            "hardware_configuration_sha256",
+            &self.hardware_configuration_sha256,
+        )?;
+        require_digest("installation_sha256", &self.installation_sha256)?;
+        require_digest("cleaning_protocol_sha256", &self.cleaning_protocol_sha256)?;
+        if let Some(revision) = &self.firmware_revision {
+            require_nonempty("firmware_revision", revision)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AquaRunEvidence {
+    pub water_service_t0: EvidenceRef,
+    pub metrology_admission: EvidenceRef,
+    pub water_quality_assessment: EvidenceRef,
+    pub task_outcome_assessment: EvidenceRef,
+    pub energy_resource_closure: Option<EvidenceRef>,
+}
+
+impl AquaRunEvidence {
+    pub fn validate(&self, scope: ComparisonScope) -> Result<(), ContractError> {
+        self.water_service_t0.validate(
+            "water_service_t0",
+            EvidenceOwner::SymtropyWaterServiceT0,
+        )?;
+        self.metrology_admission.validate(
+            "metrology_admission",
+            EvidenceOwner::MycelixMetrology,
+        )?;
+        self.water_quality_assessment.validate(
+            "water_quality_assessment",
+            EvidenceOwner::MycelixWaterQuality,
+        )?;
+        self.task_outcome_assessment.validate(
+            "task_outcome_assessment",
+            EvidenceOwner::IndependentTaskOutcome,
+        )?;
+
+        match (&self.energy_resource_closure, scope) {
+            (Some(receipt), _) => receipt.validate(
+                "energy_resource_closure",
+                EvidenceOwner::SymtropyResourceClosure,
+            )?,
+            (None, ComparisonScope::WaterAndEnergy) => {
+                return Err(ContractError::MissingEnergyReceipt);
+            }
+            (None, ComparisonScope::WaterServiceOnly) => {}
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ComparisonScope {
+    WaterServiceOnly,
+    WaterAndEnergy,
+}
+
+/// One Aqua test run bound to canonical subsystem and independent outcome evidence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AquaRunRecord {
+    pub run_id: String,
+    pub conditions: BenchmarkConditions,
+    pub device: DeviceConfiguration,
+    pub evidence: AquaRunEvidence,
+}
+
+impl AquaRunRecord {
+    pub fn validate(&self, scope: ComparisonScope) -> Result<(), ContractError> {
+        require_nonempty("run_id", &self.run_id)?;
+        self.conditions.validate()?;
+        self.device.validate()?;
+        self.evidence.validate(scope)
+    }
+}
+
+/// Check whether two independently evidenced runs are suitable for a matched comparison.
+///
+/// This returns no performance score and does not certify non-inferiority. It only checks
+/// that the task, duration, supply, room, measurement protocol, and accounting boundary
+/// match, and that both runs carry the required owner receipts for the requested scope.
+pub fn validate_matched_comparison(
+    control: &AquaRunRecord,
+    candidate: &AquaRunRecord,
+    scope: ComparisonScope,
+) -> Result<(), ContractError> {
+    control.validate(scope)?;
+    candidate.validate(scope)?;
+    if control.run_id == candidate.run_id {
+        return Err(ContractError::SameRunCompared);
+    }
+    control.conditions.compare_with(&candidate.conditions)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn fully_measured_water(active: f64, clean: f64) -> WaterServiceLedger {
-        WaterServiceLedger {
-            startup_l: Some(0.0),
-            priming_l: Some(0.0),
-            active_fresh_l: Some(active),
-            post_use_cleaning_l: Some(clean),
-            purge_l: Some(0.0),
-            periodic_cleaning_allocated_l: Some(0.0),
-            retry_recovery_l: Some(0.0),
-            recirculated_delivery_l: Some(0.0),
+    fn digest(byte: char) -> String {
+        std::iter::repeat_n(byte, 64).collect()
+    }
+
+    fn evidence(owner: EvidenceOwner, id: &str, byte: char) -> EvidenceRef {
+        EvidenceRef {
+            owner,
+            record_id: id.to_owned(),
+            sha256: digest(byte),
+        }
+    }
+
+    fn run(run_id: &str, market_variant_id: &str, cleaning_digest: char) -> AquaRunRecord {
+        AquaRunRecord {
+            run_id: run_id.to_owned(),
+            conditions: BenchmarkConditions {
+                task_profile_id: "STANDARD_SHOWER".to_owned(),
+                duration_seconds: 600,
+                inlet_water_profile_sha256: digest('a'),
+                delivery_conditions_sha256: digest('b'),
+                room_conditions_sha256: digest('c'),
+                measurement_protocol_sha256: digest('d'),
+                accounting_boundary_sha256: digest('e'),
+            },
+            device: DeviceConfiguration {
+                market_variant_id: market_variant_id.to_owned(),
+                hardware_configuration_sha256: digest('f'),
+                installation_sha256: digest('1'),
+                cleaning_protocol_sha256: digest(cleaning_digest),
+                firmware_revision: Some("1.0.0".to_owned()),
+            },
+            evidence: AquaRunEvidence {
+                water_service_t0: evidence(
+                    EvidenceOwner::SymtropyWaterServiceT0,
+                    "water-run",
+                    '2',
+                ),
+                metrology_admission: evidence(
+                    EvidenceOwner::MycelixMetrology,
+                    "metrology-run",
+                    '3',
+                ),
+                water_quality_assessment: evidence(
+                    EvidenceOwner::MycelixWaterQuality,
+                    "quality-run",
+                    '4',
+                ),
+                task_outcome_assessment: evidence(
+                    EvidenceOwner::IndependentTaskOutcome,
+                    "outcome-run",
+                    '5',
+                ),
+                energy_resource_closure: Some(evidence(
+                    EvidenceOwner::SymtropyResourceClosure,
+                    "energy-run",
+                    '6',
+                )),
+            },
         }
     }
 
     #[test]
-    fn counts_post_use_cleaning_in_fresh_water_total() {
-        // KOHLER's stated 5 US gal session + 0.75 US gal Rapid Clean example.
-        let session_l = 5.0 * 3.785_411_784;
-        let cleaning_l = 0.75 * 3.785_411_784;
-        let ledger = fully_measured_water(session_l, cleaning_l);
-        let total = ledger.fresh_water_l().expect("complete ledger");
-        assert!((total - 21.766_117_758).abs() < 1e-9);
-    }
-
-    #[test]
-    fn calculates_boundary_normalized_savings() {
-        let control = fully_measured_water(25.0 * 3.785_411_784, 0.0);
-        let candidate = fully_measured_water(5.0 * 3.785_411_784, 0.75 * 3.785_411_784);
-        let savings = water_savings_percent(&control, &candidate).expect("valid comparison arithmetic");
-        assert!((savings - 77.0).abs() < 1e-10);
-    }
-
-    #[test]
-    fn internal_recirculation_is_not_counted_as_fresh_water() {
-        let mut ledger = fully_measured_water(20.0, 0.0);
-        ledger.recirculated_delivery_l = Some(80.0);
-        assert_eq!(ledger.fresh_water_l().expect("fresh water"), 20.0);
-        assert_eq!(ledger.recirculated_delivery_l().expect("recirculated delivery"), 80.0);
-    }
-
-    #[test]
-    fn rejects_overflow_in_derived_fresh_water_total() {
-        let ledger = fully_measured_water(f64::MAX, f64::MAX);
+    fn allows_matched_task_conditions_with_different_device_and_cleaning_profiles() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let candidate = run("candidate-001", "aqua-test-article", '8');
         assert_eq!(
-            ledger.fresh_water_l(),
-            Err(LedgerError::NonFiniteMeasurement { field: "fresh_water_total_l" })
+            validate_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterAndEnergy,
+            ),
+            Ok(())
         );
     }
 
     #[test]
-    fn missing_cleaning_measurement_rejects_whole_service_total() {
-        let mut ledger = fully_measured_water(20.0, 0.0);
-        ledger.post_use_cleaning_l = None;
+    fn rejects_different_task_profiles() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.conditions.task_profile_id = "HAIR_WASH".to_owned();
         assert_eq!(
-            ledger.fresh_water_l(),
-            Err(LedgerError::MissingMeasurement { field: "post_use_cleaning_l" })
+            validate_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+            ),
+            Err(ContractError::ContextMismatch {
+                field: "task_profile_id",
+            })
         );
     }
 
     #[test]
-    fn rejects_negative_and_non_finite_measurements() {
-        let mut ledger = fully_measured_water(20.0, 0.0);
-        ledger.active_fresh_l = Some(-0.1);
-        assert_eq!(ledger.fresh_water_l(), Err(LedgerError::NegativeMeasurement { field: "active_fresh_l" }));
-        ledger.active_fresh_l = Some(f64::NAN);
-        assert_eq!(ledger.fresh_water_l(), Err(LedgerError::NonFiniteMeasurement { field: "active_fresh_l" }));
-    }
-
-    #[test]
-    fn zero_control_cannot_produce_savings_percentage() {
-        let control = fully_measured_water(0.0, 0.0);
-        let candidate = fully_measured_water(1.0, 0.0);
+    fn rejects_different_delivery_conditions() {
+        let control = run("control-001", "incumbent-shower", '7');
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.conditions.delivery_conditions_sha256 = digest('9');
         assert_eq!(
-            water_savings_percent(&control, &candidate),
-            Err(LedgerError::NonPositiveControl { field: "control_fresh_water_l" })
+            validate_matched_comparison(
+                &control,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+            ),
+            Err(ContractError::ContextMismatch {
+                field: "delivery_conditions_sha256",
+            })
         );
     }
 
     #[test]
-    fn water_balance_excludes_internal_recirculation_and_checks_uncertainty() {
-        let balance = WaterBalance {
-            source_input_l: Some(100.0),
-            end_use_discharge_l: Some(90.0),
-            cleaning_purge_discharge_l: Some(5.0),
-            reject_discharge_l: Some(1.0),
-            evaporative_or_aerosol_loss_l: Some(2.0),
-            storage_change_l: Some(2.0),
-            expanded_uncertainty_l: Some(0.1),
-        };
-        assert_eq!(balance.closure_residual_l().expect("complete balance"), 0.0);
-        assert!(balance.closes_within_uncertainty().expect("uncertainty supplied"));
+    fn rejects_zero_duration() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.conditions.duration_seconds = 0;
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterServiceOnly),
+            Err(ContractError::ZeroDuration)
+        );
     }
 
     #[test]
-    fn unresolved_water_balance_is_not_marked_closed() {
-        let balance = WaterBalance {
-            source_input_l: Some(100.0),
-            end_use_discharge_l: Some(90.0),
-            cleaning_purge_discharge_l: Some(5.0),
-            reject_discharge_l: Some(1.0),
-            evaporative_or_aerosol_loss_l: Some(2.0),
-            storage_change_l: Some(2.5),
-            expanded_uncertainty_l: Some(0.1),
-        };
-        assert!(!balance.closes_within_uncertainty().expect("complete balance"));
+    fn rejects_missing_water_service_receipt() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.evidence.water_service_t0.record_id.clear();
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterServiceOnly),
+            Err(ContractError::MissingField {
+                field: "water_service_t0",
+            })
+        );
     }
 
     #[test]
-    fn recovered_heat_is_reported_not_subtracted_from_purchased_energy() {
-        let ledger = EnergyServiceLedger {
-            heater_electricity_kwh: Some(1.0),
-            pump_electricity_kwh: Some(0.1),
-            treatment_electricity_kwh: Some(0.2),
-            controls_electricity_kwh: Some(0.05),
-            cleaning_electricity_kwh: Some(0.05),
-            allocated_room_electricity_kwh: Some(0.1),
-            heater_fuel_input_kwh: Some(0.5),
-            recovered_useful_heat_kwh: Some(2.0),
-        };
-        assert!((ledger.purchased_electricity_kwh().expect("electricity") - 1.5).abs() < 1e-12);
-        assert!((ledger.purchased_energy_kwh().expect("purchased") - 2.0).abs() < 1e-12);
-        assert_eq!(ledger.recovered_useful_heat_kwh().expect("recovered heat"), 2.0);
+    fn rejects_wrong_evidence_owner() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.evidence.metrology_admission.owner = EvidenceOwner::MycelixWaterQuality;
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterServiceOnly),
+            Err(ContractError::WrongEvidenceOwner {
+                field: "metrology_admission",
+            })
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_sha256_reference() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.evidence.water_quality_assessment.sha256 = "not-a-digest".to_owned();
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterServiceOnly),
+            Err(ContractError::InvalidDigest {
+                field: "water_quality_assessment",
+            })
+        );
+    }
+
+    #[test]
+    fn energy_comparison_requires_canonical_resource_receipt() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.evidence.energy_resource_closure = None;
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterAndEnergy),
+            Err(ContractError::MissingEnergyReceipt)
+        );
+    }
+
+    #[test]
+    fn water_only_comparison_does_not_require_energy_receipt() {
+        let mut candidate = run("candidate-001", "aqua-test-article", '8');
+        candidate.evidence.energy_resource_closure = None;
+        assert_eq!(
+            candidate.validate(ComparisonScope::WaterServiceOnly),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn rejects_comparing_a_run_to_itself() {
+        let candidate = run("same-run", "aqua-test-article", '8');
+        assert_eq!(
+            validate_matched_comparison(
+                &candidate,
+                &candidate,
+                ComparisonScope::WaterServiceOnly,
+            ),
+            Err(ContractError::SameRunCompared)
+        );
     }
 }
