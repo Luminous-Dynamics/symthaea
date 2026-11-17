@@ -1,0 +1,395 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Failure-to-skill promotion qualification corpus",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "programme_id",
+    "evidence_class",
+    "status",
+    "source_subject",
+    "evaluator_contract",
+    "skill_families",
+    "cases",
+    "metrics",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "programme_id": {
+      "const": "HUM-FAILURE-TO-SKILL-001"
+    },
+    "evidence_class": {
+      "const": "synthetic_protocol_fixture"
+    },
+    "status": {
+      "const": "protocol_only_not_executed"
+    },
+    "source_subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "parent_issue",
+        "child_issue",
+        "agentic_issue",
+        "branch"
+      ],
+      "properties": {
+        "repository": {
+          "const": "Luminous-Dynamics/symthaea"
+        },
+        "parent_issue": {
+          "const": 12657
+        },
+        "child_issue": {
+          "const": 12706
+        },
+        "agentic_issue": {
+          "const": 12685
+        },
+        "branch": {
+          "const": "research/humanoid-tool-service-v0-1"
+        }
+      }
+    },
+    "evaluator_contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_count",
+        "skill_family_count",
+        "variants_per_family",
+        "principle",
+        "oracle_separation",
+        "promotion_gate",
+        "data_note"
+      ],
+      "properties": {
+        "case_count": {
+          "const": 30
+        },
+        "skill_family_count": {
+          "const": 6
+        },
+        "variants_per_family": {
+          "const": 5
+        },
+        "principle": {
+          "type": "string",
+          "minLength": 1
+        },
+        "oracle_separation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "promotion_gate": {
+          "type": "string",
+          "minLength": 1
+        },
+        "data_note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "skill_families": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "skill_family_id",
+          "name",
+          "representative_failure",
+          "protected_skill"
+        ],
+        "properties": {
+          "skill_family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "representative_failure": {
+            "type": "string",
+            "minLength": 1
+          },
+          "protected_skill": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 30,
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "skill_family_id",
+          "skill_family",
+          "split",
+          "initial_skill",
+          "candidate_visible_episode",
+          "hidden_evaluator_oracle",
+          "candidate_budget",
+          "required_promotion_evidence",
+          "expected_disposition",
+          "oracle_seed"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "skill_family_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "skill_family": {
+            "type": "string",
+            "minLength": 1
+          },
+          "split": {
+            "type": "string",
+            "minLength": 1
+          },
+          "initial_skill": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "skill_id",
+              "version",
+              "status",
+              "applicability_profile",
+              "protected_skill_id"
+            ],
+            "properties": {
+              "skill_id": {
+                "type": "string"
+              },
+              "version": {
+                "const": 1
+              },
+              "status": {
+                "const": "previously_qualified_synthetic_skill"
+              },
+              "applicability_profile": {
+                "type": "string"
+              },
+              "protected_skill_id": {
+                "type": "string"
+              }
+            }
+          },
+          "candidate_visible_episode": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "task_description",
+              "failure_trace_description",
+              "visible_observations",
+              "evidence_integrity",
+              "allowed_candidate_outputs",
+              "candidate_must_not_receive"
+            ],
+            "properties": {
+              "task_description": {
+                "type": "string"
+              },
+              "failure_trace_description": {
+                "type": "string"
+              },
+              "visible_observations": {
+                "type": "array",
+                "minItems": 5,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "evidence_integrity": {
+                "type": "string"
+              },
+              "allowed_candidate_outputs": {
+                "type": "array",
+                "minItems": 5,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "candidate_must_not_receive": {
+                "type": "array",
+                "minItems": 5,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "hidden_evaluator_oracle": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "causal_failure_description",
+              "true_correction_or_non_correction",
+              "counterfactual_confounds",
+              "poisoned_evidence",
+              "applicability_mismatch",
+              "protected_skill_regression",
+              "expected_disposition",
+              "independent_replay_condition",
+              "transfer_condition",
+              "retention_condition"
+            ],
+            "properties": {
+              "causal_failure_description": {
+                "type": "string"
+              },
+              "true_correction_or_non_correction": {
+                "type": "string"
+              },
+              "counterfactual_confounds": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "poisoned_evidence": {
+                "type": "boolean"
+              },
+              "applicability_mismatch": {
+                "type": "boolean"
+              },
+              "protected_skill_regression": {
+                "type": "boolean"
+              },
+              "expected_disposition": {
+                "type": "string"
+              },
+              "independent_replay_condition": {
+                "type": "string"
+              },
+              "transfer_condition": {
+                "type": "string"
+              },
+              "retention_condition": {
+                "type": "string"
+              }
+            }
+          },
+          "candidate_budget": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "max_failure_replays",
+              "max_counterfactual_tests",
+              "max_heldout_transfer_tests",
+              "max_protected_skill_tests",
+              "max_active_observations",
+              "max_plan_revisions",
+              "max_candidate_skill_versions"
+            ],
+            "properties": {
+              "max_failure_replays": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_counterfactual_tests": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_heldout_transfer_tests": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_protected_skill_tests": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_active_observations": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_plan_revisions": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "max_candidate_skill_versions": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "required_promotion_evidence": {
+            "type": "array",
+            "minItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected_disposition": {
+            "type": "string",
+            "minLength": 1
+          },
+          "oracle_seed": {
+            "type": "integer",
+            "minimum": 51000,
+            "maximum": 51029
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "minItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "claim_ceiling": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "synthetic_contract_only",
+        "physical_skill_learning_established",
+        "live_skill_promotion_authorized",
+        "robot_capability_improvement_established",
+        "safety_qualification_established"
+      ],
+      "properties": {
+        "synthetic_contract_only": {
+          "const": true
+        },
+        "physical_skill_learning_established": {
+          "const": false
+        },
+        "live_skill_promotion_authorized": {
+          "const": false
+        },
+        "robot_capability_improvement_established": {
+          "const": false
+        },
+        "safety_qualification_established": {
+          "const": false
+        }
+      }
+    }
+  }
+}
