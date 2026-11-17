@@ -4,12 +4,7 @@ use subterra_inspection_campaign::{
     optimize_campaign,
 };
 
-fn option(
-    option_id: &str,
-    decision_id: &str,
-    value: u64,
-    energy: u64,
-) -> InspectionOption {
+fn option(option_id: &str, decision_id: &str, value: u64, energy: u64) -> InspectionOption {
     InspectionOption {
         option_id: option_id.into(),
         decision_id: decision_id.into(),
@@ -32,8 +27,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let problem = CampaignProblem {
         campaign_id: "synthetic-west-corridor".into(),
         decisions: vec![
-            DecisionRequirement { decision_id: "pipe-segment-14".into(), mandatory: false },
-            DecisionRequirement { decision_id: "cable-support-08".into(), mandatory: false },
+            DecisionRequirement {
+                decision_id: "pipe-segment-14".into(),
+                mandatory: false,
+            },
+            DecisionRequirement {
+                decision_id: "cable-support-08".into(),
+                mandatory: false,
+            },
         ],
         deployment_bundles: vec![DeploymentBundle {
             bundle_id: "west_corridor_mobilization".into(),
