@@ -163,6 +163,109 @@ pub struct GridDecodeOutcome {
     pub result: Result<DecodedPayload, DecodeError>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ManifestError {
+    EmptyProtocolId,
+    ZeroVersion,
+    EmptySpecificationList,
+    EmptySpecificationId,
+    DuplicateSpecificationId(String),
+    EmptyDecoderId { specification_id: String },
+}
+
+impl std::fmt::Display for ManifestError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::EmptyProtocolId => write!(f, "protocol id must not be empty"),
+            Self::ZeroVersion => write!(f, "protocol version must be greater than zero"),
+            Self::EmptySpecificationList => {
+                write!(f, "decoder manifest must contain at least one specification")
+            }
+            Self::EmptySpecificationId => {
+                write!(f, "decoder specification id must not be empty")
+            }
+            Self::DuplicateSpecificationId(id) => {
+                write!(f, "duplicate decoder specification id: {id}")
+            }
+            Self::EmptyDecoderId { specification_id } => write!(
+                f,
+                "decoder id for specification {specification_id} must not be empty"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for ManifestError {}
+
+/// Immutable-in-use declaration of the complete decoder search family.
+///
+/// The manifest does not prove when it was created. Persist its canonical
+/// representation, timestamp and digest in the external evidence receipt
+/// before inspecting a challenge case.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GridDecoderManifest {
+    protocol_id: String,
+    version: u32,
+    specifications: Vec<GridDecoderSpec>,
+}
+
+impl GridDecoderManifest {
+    pub fn new(
+        protocol_id: impl Into<String>,
+        version: u32,
+        specifications: Vec<GridDecoderSpec>,
+    ) -> Result<Self, ManifestError> {
+        let protocol_id = protocol_id.into();
+        if protocol_id.trim().is_empty() {
+            return Err(ManifestError::EmptyProtocolId);
+        }
+        if version == 0 {
+            return Err(ManifestError::ZeroVersion);
+        }
+        if specifications.is_empty() {
+            return Err(ManifestError::EmptySpecificationList);
+        }
+
+        let mut identifiers = std::collections::HashSet::with_capacity(specifications.len());
+        for specification in &specifications {
+            let id = specification.id.trim();
+            if id.is_empty() {
+                return Err(ManifestError::EmptySpecificationId);
+            }
+            if !identifiers.insert(id.to_owned()) {
+                return Err(ManifestError::DuplicateSpecificationId(id.to_owned()));
+            }
+            if specification.decoder.id.trim().is_empty() {
+                return Err(ManifestError::EmptyDecoderId {
+                    specification_id: id.to_owned(),
+                });
+            }
+        }
+
+        Ok(Self {
+            protocol_id,
+            version,
+            specifications,
+        })
+    }
+
+    pub fn protocol_id(&self) -> &str {
+        &self.protocol_id
+    }
+
+    pub const fn version(&self) -> u32 {
+        self.version
+    }
+
+    pub fn specifications(&self) -> &[GridDecoderSpec] {
+        &self.specifications
+    }
+
+    pub fn run(&self, grid: &BinaryGrid) -> Vec<GridDecodeOutcome> {
+        run_grid_tournament(grid, &self.specifications)
+    }
+}
+
 /// Execute every supplied grid interpretation and preserve all outcomes.
 /// The caller must freeze this complete list before looking at a challenge case.
 pub fn run_grid_tournament(
@@ -341,4 +444,55 @@ mod tests {
                 original.flatten(GridTransform::Identity, TraversalOrder::RowMajor)
             );
         }
+    }
+
+    #[test]
+    fn manifest_rejects_duplicate_and_incomplete_search_families() {
+        let spec = GridDecoderSpec {
+            id: "identity-row-major".to_string(),
+            transform: GridTransform::Identity,
+            traversal: TraversalOrder::RowMajor,
+            decoder: DecoderSpec::ascii7("ascii7-msb", BitOrder::MostSignificantFirst),
+        };
+        assert_eq!(
+            GridDecoderManifest::new("crop-intel-v1", 1, vec![]),
+            Err(ManifestError::EmptySpecificationList)
+        );
+        assert_eq!(
+            GridDecoderManifest::new("crop-intel-v1", 1, vec![spec.clone(), spec]),
+            Err(ManifestError::DuplicateSpecificationId(
+                "identity-row-major".to_string()
+            ))
+        );
+        assert_eq!(
+            GridDecoderManifest::new(" ", 1, vec![GridDecoderSpec {
+                id: "id".to_string(),
+                transform: GridTransform::Identity,
+                traversal: TraversalOrder::RowMajor,
+                decoder: DecoderSpec::ascii7("ascii7", BitOrder::MostSignificantFirst),
+            }]),
+            Err(ManifestError::EmptyProtocolId)
+        );
+    }
+
+    #[test]
+    fn manifest_runs_only_its_declared_specifications() {
+        let bits = encode_ascii7("A", BitOrder::MostSignificantFirst)
+            .expect("known ASCII positive control");
+        let grid = BinaryGrid::new(1, 7, bits).expect("valid grid");
+        let manifest = GridDecoderManifest::new(
+            "crop-intel-positive-control",
+            1,
+            vec![GridDecoderSpec {
+                id: "identity-row-major".to_string(),
+                transform: GridTransform::Identity,
+                traversal: TraversalOrder::RowMajor,
+                decoder: DecoderSpec::ascii7("ascii7-msb", BitOrder::MostSignificantFirst),
+            }],
+        )
+        .expect("valid manifest");
+
+        assert_eq!(manifest.protocol_id(), "crop-intel-positive-control");
+        assert_eq!(manifest.version(), 1);
+        assert_eq!(manifest.run(&grid).len(), 1);
     }
