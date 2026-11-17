@@ -156,18 +156,14 @@ impl ReplayOracle {
             return Err(ReplayError::BudgetExhausted);
         }
 
-        let measurable_candidates =
-            unique_candidates(measurable_candidates)?;
-        let holdout_candidates =
-            unique_candidates(holdout_candidates)?;
+        let measurable_candidates = unique_candidates(measurable_candidates)?;
+        let holdout_candidates = unique_candidates(holdout_candidates)?;
         let public_outcomes = unique_public_outcomes(public_outcomes)?;
         let sealed_holdout = unique_holdout_outcomes(sealed_holdout)?;
 
         for candidate_id in measurable_candidates.keys() {
             if !public_outcomes.contains_key(candidate_id) {
-                return Err(ReplayError::CandidateOutcomeMismatch(
-                    candidate_id.clone(),
-                ));
+                return Err(ReplayError::CandidateOutcomeMismatch(candidate_id.clone()));
             }
             if holdout_candidates.contains_key(candidate_id) {
                 return Err(ReplayError::CandidateOverlap(candidate_id.clone()));
@@ -175,16 +171,12 @@ impl ReplayOracle {
         }
         for candidate_id in public_outcomes.keys() {
             if !measurable_candidates.contains_key(candidate_id) {
-                return Err(ReplayError::CandidateOutcomeMismatch(
-                    candidate_id.clone(),
-                ));
+                return Err(ReplayError::CandidateOutcomeMismatch(candidate_id.clone()));
             }
         }
         for candidate_id in holdout_candidates.keys() {
             if !sealed_holdout.contains_key(candidate_id) {
-                return Err(ReplayError::HoldoutOutcomeMismatch(
-                    candidate_id.clone(),
-                ));
+                return Err(ReplayError::HoldoutOutcomeMismatch(candidate_id.clone()));
             }
             if public_outcomes.contains_key(candidate_id) {
                 return Err(ReplayError::CandidateOverlap(candidate_id.clone()));
@@ -192,9 +184,7 @@ impl ReplayOracle {
         }
         for candidate_id in sealed_holdout.keys() {
             if !holdout_candidates.contains_key(candidate_id) {
-                return Err(ReplayError::HoldoutOutcomeMismatch(
-                    candidate_id.clone(),
-                ));
+                return Err(ReplayError::HoldoutOutcomeMismatch(candidate_id.clone()));
             }
         }
         if holdout_candidates.len() < 3 {
@@ -225,10 +215,7 @@ impl ReplayOracle {
 
     /// The evaluator is separate from the agent-facing port. Production B0
     /// should run it in a custodian-controlled process after agent closeout.
-    pub fn grade_discovery(
-        &self,
-        threshold: f64,
-    ) -> Result<DiscoveryScore, ReplayError> {
+    pub fn grade_discovery(&self, threshold: f64) -> Result<DiscoveryScore, ReplayError> {
         if !self.state.closed {
             return Err(ReplayError::CampaignNotClosed);
         }
@@ -270,11 +257,12 @@ impl ReplayOracle {
                 || !prediction.interval_upper.is_finite()
                 || prediction.interval_lower > prediction.interval_upper
             {
-                return Err(ReplayError::InvalidPrediction(
-                    prediction.candidate_id,
-                ));
+                return Err(ReplayError::InvalidPrediction(prediction.candidate_id));
             }
-            if !self.holdout_candidates.contains_key(&prediction.candidate_id) {
+            if !self
+                .holdout_candidates
+                .contains_key(&prediction.candidate_id)
+            {
                 return Err(ReplayError::UnexpectedHoldoutPrediction(
                     prediction.candidate_id,
                 ));
@@ -287,9 +275,7 @@ impl ReplayOracle {
 
         for candidate_id in self.holdout_candidates.keys() {
             if !by_id.contains_key(candidate_id) {
-                return Err(ReplayError::MissingHoldoutPrediction(
-                    candidate_id.clone(),
-                ));
+                return Err(ReplayError::MissingHoldoutPrediction(candidate_id.clone()));
             }
         }
 
@@ -362,9 +348,7 @@ impl ReplayAgentApi<'_> {
             if previous.candidate_id == candidate_id {
                 return Ok(previous.clone());
             }
-            return Err(ReplayError::IdempotencyConflict(
-                request_id.to_string(),
-            ));
+            return Err(ReplayError::IdempotencyConflict(request_id.to_string()));
         }
 
         if self.holdout_candidates.contains_key(candidate_id) {
@@ -379,9 +363,7 @@ impl ReplayAgentApi<'_> {
             return Err(ReplayError::BudgetExhausted);
         }
         if self.state.observed_candidates.contains(candidate_id) {
-            return Err(ReplayError::DuplicateMeasurement(
-                candidate_id.to_string(),
-            ));
+            return Err(ReplayError::DuplicateMeasurement(candidate_id.to_string()));
         }
 
         let outcome = self
@@ -580,7 +562,10 @@ mod tests {
                 max_experiments: 2,
             },
             vec![candidate("train-a"), candidate("train-b")],
-            vec![public_outcome("train-a", 0.25), public_outcome("train-b", 0.85)],
+            vec![
+                public_outcome("train-a", 0.25),
+                public_outcome("train-b", 0.85),
+            ],
             vec![
                 candidate("holdout-a"),
                 candidate("holdout-b"),
@@ -627,9 +612,7 @@ mod tests {
         agent.measure("request-1", "train-a").unwrap();
         assert_eq!(
             agent.measure("request-1", "train-b"),
-            Err(ReplayError::IdempotencyConflict(
-                "request-1".to_string()
-            ))
+            Err(ReplayError::IdempotencyConflict("request-1".to_string()))
         );
     }
 
@@ -640,9 +623,7 @@ mod tests {
         agent.measure("request-1", "train-a").unwrap();
         assert_eq!(
             agent.measure("request-2", "train-a"),
-            Err(ReplayError::DuplicateMeasurement(
-                "train-a".to_string()
-            ))
+            Err(ReplayError::DuplicateMeasurement("train-a".to_string()))
         );
     }
 
@@ -754,9 +735,7 @@ mod tests {
         };
         assert_eq!(
             value.grade_learning(vec![prediction.clone(), prediction]),
-            Err(ReplayError::DuplicatePrediction(
-                "holdout-a".to_string()
-            ))
+            Err(ReplayError::DuplicatePrediction("holdout-a".to_string()))
         );
         assert!(matches!(
             value.grade_learning(vec![HoldoutPrediction {
@@ -794,11 +773,7 @@ mod tests {
             manifest.clone(),
             vec![candidate("same")],
             vec![public_outcome("same", 0.5)],
-            vec![
-                candidate("same"),
-                candidate("h2"),
-                candidate("h3"),
-            ],
+            vec![candidate("same"), candidate("h2"), candidate("h3")],
             vec![
                 holdout_outcome("same", 0.4),
                 holdout_outcome("h2", 0.5),
@@ -814,11 +789,7 @@ mod tests {
             manifest,
             vec![candidate("train")],
             Vec::new(),
-            vec![
-                candidate("h1"),
-                candidate("h2"),
-                candidate("h3"),
-            ],
+            vec![candidate("h1"), candidate("h2"), candidate("h3")],
             vec![
                 holdout_outcome("h1", 0.1),
                 holdout_outcome("h2", 0.2),
@@ -827,9 +798,7 @@ mod tests {
         );
         assert_eq!(
             missing.err(),
-            Some(ReplayError::CandidateOutcomeMismatch(
-                "train".to_string()
-            ))
+            Some(ReplayError::CandidateOutcomeMismatch("train".to_string()))
         );
     }
 
@@ -841,7 +810,10 @@ mod tests {
     #[test]
     fn non_finite_outcomes_and_invalid_intervals_are_rejected() {
         let bad = unique_public_outcomes(vec![public_outcome("bad", f64::NAN)]);
-        assert_eq!(bad.err(), Some(ReplayError::InvalidUtility("bad".to_string())));
+        assert_eq!(
+            bad.err(),
+            Some(ReplayError::InvalidUtility("bad".to_string()))
+        );
 
         let mut value = oracle();
         value.agent_api().close_campaign().unwrap();
