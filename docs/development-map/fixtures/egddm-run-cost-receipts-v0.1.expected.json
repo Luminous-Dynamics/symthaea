@@ -1,0 +1,72 @@
+{
+  "adjudication_status": "run_level_cost_receipt_validation",
+  "billing_currency": "USD",
+  "quantile_method": "nearest_rank",
+  "run_count": 2,
+  "complete_cost_run_count": 2,
+  "complete_wall_run_count": 2,
+  "censored_or_incomplete_run_count": 0,
+  "executed_attempt_count": 4,
+  "queued_attempt_count": 0,
+  "skipped_attempt_count": 0,
+  "failed_attempt_count": 0,
+  "timeout_attempt_count": 0,
+  "cancelled_attempt_count": 0,
+  "unknown_execution_count": 0,
+  "retry_count": 0,
+  "full_run_cost_micros": {
+    "sample_count": 2,
+    "p50": 100,
+    "p95": 100,
+    "p99": 100
+  },
+  "full_run_wall_ms": {
+    "sample_count": 2,
+    "p50": 12000,
+    "p95": 12000,
+    "p99": 12000
+  },
+  "queue_delay_ms": {
+    "sample_count": 2,
+    "p50": 3000,
+    "p95": 3000,
+    "p99": 3000
+  },
+  "marginal_option_cost_p95_micros": [
+    {
+      "option_id": "gate-a",
+      "sample_count": 2,
+      "p95_cost_micros": 90
+    },
+    {
+      "option_id": "gate-b",
+      "sample_count": 2,
+      "p95_cost_micros": 90
+    }
+  ],
+  "sum_of_marginal_option_p95_micros": 180,
+  "tail_quantile_warning": "The sum of marginal per-option p95 values is a descriptive comparator, not generally a p95 guarantee for the sum of correlated run costs. Full-run p50/p95/p99 are computed directly from complete trajectory receipts.",
+  "run_samples": [
+    {
+      "run_id": "run-001",
+      "task_family": "adaptive-gate-policy",
+      "paired_seed": 17,
+      "full_run_cost_micros": 100,
+      "full_run_wall_ms": 12000,
+      "queue_delay_ms": 3000,
+      "cost_complete": true,
+      "wall_complete": true
+    },
+    {
+      "run_id": "run-002",
+      "task_family": "adaptive-gate-policy",
+      "paired_seed": 17,
+      "full_run_cost_micros": 100,
+      "full_run_wall_ms": 12000,
+      "queue_delay_ms": 3000,
+      "cost_complete": true,
+      "wall_complete": true
+    }
+  ],
+  "claim_ceiling": "Validates receipt structure, SHA-256 content/event-chain consistency, evaluator-approved execution context, chronology, retry links, and empirical quantiles over complete supplied run trajectories. Hashes do not authenticate the receipt producer or billing provider. It does not validate runner honesty, reconcile external invoices, estimate population tails from small samples, prove agent quality, authorize actions, or establish production reliability."
+}

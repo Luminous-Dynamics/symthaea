@@ -1,0 +1,303 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-run-cost-report-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.3 complete-trajectory cost report v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "adjudication_status",
+    "billing_currency",
+    "quantile_method",
+    "run_count",
+    "complete_cost_run_count",
+    "complete_wall_run_count",
+    "censored_or_incomplete_run_count",
+    "executed_attempt_count",
+    "queued_attempt_count",
+    "skipped_attempt_count",
+    "failed_attempt_count",
+    "timeout_attempt_count",
+    "cancelled_attempt_count",
+    "unknown_execution_count",
+    "retry_count",
+    "full_run_cost_micros",
+    "full_run_wall_ms",
+    "queue_delay_ms",
+    "marginal_option_cost_p95_micros",
+    "sum_of_marginal_option_p95_micros",
+    "tail_quantile_warning",
+    "run_samples",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "adjudication_status": {
+      "const": "run_level_cost_receipt_validation"
+    },
+    "run_count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000
+    },
+    "complete_cost_run_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "complete_wall_run_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "censored_or_incomplete_run_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "executed_attempt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "queued_attempt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "skipped_attempt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "failed_attempt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "timeout_attempt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cancelled_attempt_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "unknown_execution_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "retry_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "full_run_cost_micros": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_count",
+        "p50",
+        "p95",
+        "p99"
+      ],
+      "properties": {
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p50": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p95": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p99": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "full_run_wall_ms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_count",
+        "p50",
+        "p95",
+        "p99"
+      ],
+      "properties": {
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p50": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p95": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p99": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "queue_delay_ms": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_count",
+        "p50",
+        "p95",
+        "p99"
+      ],
+      "properties": {
+        "sample_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p50": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p95": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "p99": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        }
+      }
+    },
+    "marginal_option_cost_p95_micros": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "option_id",
+          "sample_count",
+          "p95_cost_micros"
+        ],
+        "properties": {
+          "option_id": {
+            "type": "string"
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "p95_cost_micros": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "sum_of_marginal_option_p95_micros": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "tail_quantile_warning": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "task_family",
+          "paired_seed",
+          "full_run_cost_micros",
+          "full_run_wall_ms",
+          "queue_delay_ms",
+          "cost_complete",
+          "wall_complete"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "task_family": {
+            "type": "string"
+          },
+          "paired_seed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "full_run_cost_micros": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "full_run_wall_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "queue_delay_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "cost_complete": {
+            "type": "boolean"
+          },
+          "wall_complete": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    },
+    "billing_currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "quantile_method": {
+      "const": "nearest_rank"
+    }
+  }
+}
