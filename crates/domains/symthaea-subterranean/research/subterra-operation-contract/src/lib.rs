@@ -376,7 +376,7 @@ impl OperationAttempt {
         }
         if stamped.observed_at_step > self.spec.expires_at_step
             && !matches!(
-                stamped.event,
+                &stamped.event,
                 OperationEvent::OutcomeTimedOut
                     | OperationEvent::ReconciledNotExecuted { .. }
                     | OperationEvent::ReconciledExecuted { .. }
@@ -963,11 +963,13 @@ mod tests {
                 evidence_digest: digest(16),
             }),
         ).unwrap();
+        let mut improved = verification();
+        improved.digest = digest(18);
         assert_eq!(
             registry.append(
                 AttemptId(11),
                 event(8, 9, OperationEvent::VerificationSubmitted {
-                    receipt: verification(),
+                    receipt: improved,
                 }),
             ).unwrap(),
             AttemptState::Accepted
