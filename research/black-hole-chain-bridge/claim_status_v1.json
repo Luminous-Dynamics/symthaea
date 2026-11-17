@@ -1,0 +1,106 @@
+{
+  "schema": "luminous.chain_theory_black_hole_claim_audit.v1",
+  "id": "BH-CHAIN-TO-CONTINUUM-001",
+  "status": "source_audit_protocol_only",
+  "created_utc": "2026-11-17",
+  "source_branch": "research/bh-chain-continuum-bridge-2026-11-17",
+  "parent_issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12604",
+  "source_revision_status": "source_pdfs_and_lean_to_be_digest_pinned_before_reproduction",
+  "claims": [
+    {
+      "id": "CT-ALPHA-ALGEBRA",
+      "source": "ChainTheoryAlpha.pdf",
+      "source_location": "main text and supplement",
+      "status": "finite_model_exact_computation",
+      "statement": "The stated definitions yield an exact algebraic candidate; inverse approximately 137.03599918956616.",
+      "next_test": "Independent exact arithmetic and reconstruction of the 172-record census.",
+      "not_established": "Physical identification with alpha(0)."
+    },
+    {
+      "id": "CT-PHOTON-ALPHA-MAP",
+      "source": "ChainTheoryAlpha.pdf",
+      "source_location": "Conjecture 1",
+      "status": "conjecture",
+      "statement": "The qutrit-qubit link is identified with an elementary photon link and the internal readout with alpha(0).",
+      "next_test": "Derive operational propagator, zero-transfer pole and independent measurable consequence.",
+      "not_established": "The conjecture is not proved by the exact arithmetic or Lean kernel."
+    },
+    {
+      "id": "CT-LEAN-SCOPE",
+      "source": "ChainAlpha.lean",
+      "source_location": "source comments and theorem declarations",
+      "status": "formal_scope_limitation",
+      "statement": "Lean checks selected exact finite constructions and computation.",
+      "next_test": "Map each public mathematical statement to exact theorem/axiom dependencies.",
+      "not_established": "That definitions are physical, that named literature theorems hold, full unitary-group claims, or the alpha physical identification."
+    },
+    {
+      "id": "CT-HORIZON-AREA",
+      "source": "ChainTheoryCompendium.pdf",
+      "source_location": "§98.1, approx. pp. 242-243",
+      "status": "open_result",
+      "statement": "The tested horizon cut does not establish the expected area proportionality; correspondence is described as by name.",
+      "next_test": "Independent finite census, cut/refinement sensitivity and exact ratio audit.",
+      "not_established": "Bekenstein-Hawking S=A/(4G)."
+    },
+    {
+      "id": "CT-CURVATURE-OPERATOR",
+      "source": "ChainTheoryCompendium.pdf",
+      "source_location": "§I.24.1, approx. pp. 703-704",
+      "status": "open_result",
+      "statement": "Washed graph-Laplacian and (2,2)-link-count second-difference candidates disagree in the tested corpus.",
+      "next_test": "Independent operator reconstruction, counterexamples and refinement family.",
+      "not_established": "A continuum curvature tensor."
+    },
+    {
+      "id": "CT-HORIZON-FIELD-EQUATION",
+      "source": "ChainTheoryCompendium.pdf",
+      "source_location": "horizon construction discussion",
+      "status": "open_result",
+      "statement": "The field equation at the counting face is left open.",
+      "next_test": "Derive a dynamical law with a well-defined continuum limit and conservation identities.",
+      "not_established": "Einstein or Weyl gravitational field equations."
+    },
+    {
+      "id": "CT-CONTINUUM-GEOMETRY",
+      "source": "ChainTheoryCompendium.pdf",
+      "source_location": "Lorentz, curvature and horizon construction sections",
+      "status": "physical_correspondence_unresolved",
+      "statement": "Finite algebraic/group structures are associated with Lorentzian and geometric concepts.",
+      "next_test": "Controlled refinement yielding metric, causal order, connection, curvature, action and matter coupling.",
+      "not_established": "A validated Lorentzian spacetime model."
+    }
+  ],
+  "required_bridges": [
+    "finite_tensor_factor_semantics",
+    "independent_finite_operator_reproduction",
+    "physical_causal_order_not_construction_order",
+    "controlled_refinement_family",
+    "local_lorentzian_metric_and_light_cones",
+    "local_lorentz_and_diffeomorphism_covariance",
+    "connection_and_curvature_invariants",
+    "continuum_action_and_matter_coupling",
+    "conservation_identities",
+    "horizon_as_causal_boundary",
+    "entropy_area_law_and_first_law",
+    "held_out_observable_distinct_from_standard_baselines"
+  ],
+  "comparison_baselines": [
+    "exact_Haar_and_Page",
+    "Hayden_Preskill_decoupling_and_recovery",
+    "tensor_networks_PE​​PS_and_holographic_codes",
+    "Ryu_Takayanagi_and_quantum_extremal_surfaces",
+    "Jacobson_entanglement_equilibrium",
+    "causal_sets",
+    "spin_networks_and_loop_quantum_gravity",
+    "GR_GR_EFT_pure_Weyl_and_scalar_conformal_gravity"
+  ],
+  "prohibitions": [
+    "formal_theorem_does_not_imply_physical_mapping",
+    "graph_laplacian_does_not_imply_curvature_tensor",
+    "graph_cut_does_not_imply_causal_horizon",
+    "construction_order_does_not_imply_physical_time",
+    "finite_Page_curve_does_not_imply_black_hole_evaporation",
+    "classical_graph_grammar_result_does_not_validate_quantum_postulates"
+  ]
+}
