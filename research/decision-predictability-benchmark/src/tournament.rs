@@ -122,7 +122,11 @@ impl fmt::Display for TournamentError {
                     "line {line} changes the regime for an existing fixture"
                 )
             }
-            Self::NonContiguousStep { line, expected, actual } => write!(
+            Self::NonContiguousStep {
+                line,
+                expected,
+                actual,
+            } => write!(
                 formatter,
                 "line {line} has step {actual}; expected contiguous step {expected}"
             ),
