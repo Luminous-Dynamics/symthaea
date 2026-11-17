@@ -71,6 +71,10 @@
           "arxiv_id": {
             "type": "string",
             "minLength": 1
+          },
+          "repository_url": {
+            "type": "string",
+            "format": "uri"
           }
         },
         "additionalProperties": true,
@@ -94,6 +98,17 @@
               "arxiv_id": {
                 "type": "string",
                 "minLength": 1
+              }
+            }
+          },
+          {
+            "required": [
+              "repository_url"
+            ],
+            "properties": {
+              "repository_url": {
+                "type": "string",
+                "format": "uri"
               }
             }
           }
