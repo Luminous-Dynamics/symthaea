@@ -13,7 +13,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::manifest::{Scenario, ScenarioGroup, SplitRole, ValidatedManifest};
+use crate::manifest::{ScenarioGroup, SplitRole, ValidatedManifest};
 
 pub const CANDIDATE_PACKET_SCHEMA_V1: &str =
     "luminous.decision-transfer.candidate-packet.v1";
