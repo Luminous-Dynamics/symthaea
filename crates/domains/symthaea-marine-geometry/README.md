@@ -240,3 +240,27 @@ The current A0/A1 domain is bounded to absolute pitch and roll of at most 0.5235
 Synthetic box-hull A0/A1 known answer at upright attitude: displacement 12,000 m³, displaced mass 12,300 tonnes at 1,025 kg/m³, CB (50, 0, 3) m and zero mass/moment residual for CG (50, 0, 3) m. Additional analytic pure-roll and pure-pitch checks verify oblique section clipping and longitudinal integration. These are mathematical fixtures, not vessel measurements.
 
 **Scope boundary:** A0/A1 evaluates a trial pose; it does not solve the three-variable equilibrium root. A zero mass/moment residual at one trial pose is not proof of stable equilibrium. No GM/GZ, free-surface, tank, downflooding, intact/damage stability, class or seaworthiness claim is made. The safeguarded offset/pitch/roll solver belongs to A2, with independent receipt verification A3 and Maxsurf/NAPA plus G2c polyhedral comparisons A4.
+
+## A2 bounded static-attitude equilibrium solver
+
+A2 reuses the A0/A1 static-attitude trial-pose evaluator; it does not implement a second hydrostatics integrator. It solves the three coupled unknowns waterplane offset, pitch and roll with:
+- a caller-declared finite offset/pitch/roll domain;
+- central finite-difference Jacobian in scaled variables;
+- explicit mass and two moment residual tolerances;
+- pivoted 3×3 Gauss-Jordan solve and infinity-norm condition estimate;
+- maximum scaled step and bounded backtracking line search;
+- retained per-attempt iteration traces and typed stop reasons;
+- multiple explicit initial seeds, with distinct converged roots reported rather than silently choosing one;
+- BLAKE3 request/receipt digests and full deterministic recomputation verification.
+
+Example:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-static-attitude-equilibrium-solve -- docs/research/marine/fixtures/marine-static-attitude-equilibrium-box-001.json --output /tmp/equilibrium-receipt.json
+
+Verify the exact receipt:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-static-attitude-equilibrium-solve -- docs/research/marine/fixtures/marine-static-attitude-equilibrium-box-001.json --verify /tmp/equilibrium-receipt.json
+
+Exit codes: 0 one converged candidate (not a proof of uniqueness), 1 multiple distinct roots observed across declared starts, 2 no converged root, 3 invalid request/CLI/I/O, 4 receipt verification failed.
+
+**Important:** A converged equilibrium is not proof of stable equilibrium. A2 does not compute GZ/GM, free-surface corrections, tank states, intact/damage stability, flooding survival, structural adequacy, seakeeping, resistance, manoeuvring, class compliance or seaworthiness. A single converged root is a candidate only; the solver cannot prove that no other root exists outside the declared starts/domain.
