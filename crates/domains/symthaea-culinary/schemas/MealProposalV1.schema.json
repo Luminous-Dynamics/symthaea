@@ -448,7 +448,7 @@
         "depends_on",
         "estimated_duration_min_ms",
         "estimated_duration_max_ms",
-        "evidence_refs"
+        "fact_refs"
       ],
       "properties": {
         "task_id": {
@@ -499,7 +499,7 @@
           ],
           "minimum": 0
         },
-        "evidence_refs": {
+        "fact_refs": {
           "type": "array",
           "uniqueItems": true,
           "items": {
