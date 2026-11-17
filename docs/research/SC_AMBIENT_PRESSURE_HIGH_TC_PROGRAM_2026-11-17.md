@@ -289,3 +289,18 @@ The 29 October 2026 *Scientific Reports* early-access paper reports a 53,196-rec
 Child work package: [GENOME-SC-AI-REPRO-001 #12636](https://github.com/Luminous-Dynamics/symthaea/issues/12636). Before admitting it, require original data artifacts, data rights, label provenance, exact splits, candidate list, checkpoints, code and training environment. Plutonium candidates remain computational-only for the general programme pending specialist institutional radiological review.
 
 The programme now has separate reproducibility tracks for BEE-NET (#12619), HTSC-2025 (#12635) and genome-inspired AI (#12636). Their tasks and label spaces remain distinct.
+
+
+## 13. Budgeted discovery metrics runner — 17 November 2026
+
+A deterministic ranking-metrics executable was added to the standalone Rust harness:
+
+- source: tools/superconductivity-discovery-harness/src/bin/discovery_metrics.rs
+- binary: sc_discovery_metrics
+- test-only plumbing fixture: tools/superconductivity-discovery-harness/fixtures/discovery_metrics_smoke_v0_1.json
+
+It accepts a frozen list of candidate IDs, finite ranking scores and outcome labels. It computes precision@K, recall@K, random-prevalence expectation, enrichment over random, average precision and an input SHA-256. Equal scores use candidate-ID ordering for deterministic replay; duplicate candidate IDs and invalid candidate budgets fail closed. Scores are explicitly ranking-only and cannot be interpreted as calibrated probabilities. No-positive test sets produce null recall/enrichment rather than an invented value.
+
+The dedicated workflow now tests both the evidence registry auditor and ranking-metrics runner, executes the runner only on a clearly synthetic plumbing fixture, generates an isolated Cargo.lock, runs subsequent Cargo commands with --locked, and retains the lockfile, toolchain versions, source digests and machine-readable receipts as a run artifact.
+
+**Metric scope:** confidence intervals, probability calibration, OOD selective risk, cost-normalized comparisons, family/temporal splits, and prospective synthesis yield are not implemented by this small ranking executable. Those remain separate tournament requirements in #12634. The synthetic fixture is a plumbing check, not evidence of model quality or a materials discovery.
