@@ -7,7 +7,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use super::cross_solver_comparison::ApplicabilityState;
 use super::decision_envelope::{
     DecisionEnvelopeDisposition, DecisionEnvelopePlan, ThresholdDirection,
     evaluate_decision_envelope,
@@ -323,14 +322,19 @@ pub fn evaluate_empirical_holdout_stress(
     } else {
         None
     };
-    let min_lower = reports
-        .iter()
-        .map(|model| model.stress_lower)
-        .reduce(f64::min);
-    let max_upper = reports
-        .iter()
-        .map(|model| model.stress_upper)
-        .reduce(f64::max);
+    let stress_complete = diagnostics.is_empty() && reports.len() == model_map.len();
+    let min_lower = stress_complete.then(|| {
+        reports
+            .iter()
+            .map(|model| model.stress_lower)
+            .fold(f64::INFINITY, f64::min)
+    });
+    let max_upper = stress_complete.then(|| {
+        reports
+            .iter()
+            .map(|model| model.stress_upper)
+            .fold(f64::NEG_INFINITY, f64::max)
+    });
 
     let evidence_disposition = if !diagnostics.is_empty() {
         EmpiricalStressEvidenceDisposition::IncompleteOrNotComparable
@@ -524,13 +528,18 @@ fn validate_receipt_binding(
     if !receipt.validation_domain_admissible {
         diagnostics.push(EmpiricalStressDiagnostic::ValidationDomainNotAdmissible);
     }
-    if receipt.required_slices != stress_profile.required_slice_ids {
-        let mut expected = stress_profile.required_slice_ids.clone();
-        let mut actual = receipt.required_slices.clone();
-        expected.sort();
-        actual.sort();
-        if expected != actual {
+    let mut expected_slices = stress_profile.required_slice_ids.clone();
+    let mut receipt_slices = receipt.required_slices.clone();
+    expected_slices.sort();
+    receipt_slices.sort();
+    if expected_slices != receipt_slices {
+        let expected: BTreeSet<&str> = expected_slices.iter().map(String::as_str).collect();
+        let actual: BTreeSet<&str> = receipt_slices.iter().map(String::as_str).collect();
+        if expected.difference(&actual).next().is_some() {
             diagnostics.push(EmpiricalStressDiagnostic::MissingRequiredSlice);
+        }
+        if actual.difference(&expected).next().is_some() {
+            diagnostics.push(EmpiricalStressDiagnostic::UnexpectedSlice);
         }
     }
     if receipt.holdout_metric_result == HoldoutMetricResult::FailedDeclaredMetricPolicy {
@@ -570,6 +579,12 @@ fn build_model_report(
         }
         if !slice.in_declared_domain {
             diagnostics.push(EmpiricalStressDiagnostic::SliceOutOfDomain);
+        }
+        if slice.facility_id.trim().is_empty()
+            || slice.operating_point_id.trim().is_empty()
+            || slice.case_family_id.trim().is_empty()
+        {
+            diagnostics.push(EmpiricalStressDiagnostic::MissingExternalReference);
         }
         if slice.sample_count < stress_profile.minimum_sample_count_per_slice {
             diagnostics.push(EmpiricalStressDiagnostic::InsufficientSliceSamples);
@@ -746,8 +761,9 @@ fn aggregate_stress_decision(reports: &[ModelEmpiricalStressReport]) -> Empirica
         EmpiricalStressDecision::AllModelsStressFail
     } else if passes > 0 && fails > 0 {
         EmpiricalStressDecision::StressDecisionSplit
+    } else if ambiguous > 0 {
+        EmpiricalStressDecision::StressAmbiguous
     } else {
-        let _ = ambiguous;
         EmpiricalStressDecision::StressAmbiguous
     }
 }
@@ -759,6 +775,7 @@ fn is_sha256(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::cross_solver_comparison::{ApplicabilityState, ConvergenceState};
     use crate::decision_envelope::{DecisionEnvelopeProfile, ModelEnvelopeInput};
     use crate::evidence_dependence::{DependencyIdentity, DependencyKind, ObservableDependency, RunDependencyManifest};
 
