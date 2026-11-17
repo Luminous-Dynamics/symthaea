@@ -1,0 +1,42 @@
+name: Subterra Robust Survival Referee
+
+on:
+  pull_request:
+    paths:
+      - 'crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**'
+      - '.github/workflows/subterra-robust-survival-referee.yml'
+  push:
+    branches:
+      - 'research/subterra-robust-survival-referee-v0-1'
+    paths:
+      - 'crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**'
+      - '.github/workflows/subterra-robust-survival-referee.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Format, tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml -- --check
+
+      - name: Run referee tests
+        run: cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml --all-targets
+
+      - name: Strict Clippy
+        run: cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml --all-targets -- -D warnings
+
+      - name: Preserve claim ceiling
+        run: echo 'PASS applies only to the standalone finite-model referee tests; it is not physical, analogue, flight or planetary qualification.'
