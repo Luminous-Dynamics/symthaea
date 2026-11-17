@@ -74,6 +74,7 @@ pub enum ProcessRealizationAuditError {
     InvalidCycleWindow {
         cycle_index: usize,
     },
+    NoMelodyEvents,
     MelodyEventOutsideTrajectory {
         event_index: usize,
         onset: Duration,
@@ -181,11 +182,7 @@ pub fn verify_additive_process_score_v1(
         .filter(|note| note.role == VoiceRole::Melody)
         .collect();
     if melody.is_empty() {
-        return Err(ProcessRealizationAuditError::CyclePrefixLengthMismatch {
-            cycle_index: 0,
-            expected: plan.prefix_lengths[0],
-            actual: 0,
-        });
+        return Err(ProcessRealizationAuditError::NoMelodyEvents);
     }
 
     let mut cycle_events: Vec<Vec<(usize, &ScoreNote)>> =
@@ -567,6 +564,28 @@ mod tests {
         realization.score.notes[changed_note].duration =
             realization.score.notes[changed_note].duration + Duration::eighth();
         assert!(verify_additive_process_score_v1(&realization.plan, &realization.score).is_err());
+    }
+
+
+    #[test]
+    fn score_side_audit_rejects_a_pitch_that_breaks_the_repeated_cell_prefix() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let melody_indices: Vec<usize> = realization
+            .score
+            .notes
+            .iter()
+            .enumerate()
+            .filter_map(|(index, note)| (note.role == VoiceRole::Melody).then_some(index))
+            .collect();
+        let changed_note = melody_indices[realization.plan.prefix_lengths[0]];
+        realization.score.notes[changed_note].pitch = crate::pitch::Pitch::from_midi(0);
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::PrefixContentMismatch { .. })
+        ));
     }
 
     #[test]
