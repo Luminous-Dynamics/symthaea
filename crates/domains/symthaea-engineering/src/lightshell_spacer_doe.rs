@@ -270,15 +270,39 @@ impl SpacerDoeManifest {
             }
         }
 
-        let declared_factor_levels = |factor_id: &str| -> Option<HashSet<&str>> {
-            self.factors
+        for required_factor in [
+            "inlay_architecture",
+            "spacer_frequency",
+            "transition_geometry",
+        ] {
+            if !self
+                .factors
                 .iter()
-                .find(|factor| factor.factor_id == factor_id)
-                .map(|factor| factor.levels.iter().map(String::as_str).collect())
-        };
-        let inlay_levels = declared_factor_levels("inlay_architecture");
-        let frequency_levels = declared_factor_levels("spacer_frequency");
-        let transition_levels = declared_factor_levels("transition_geometry");
+                .any(|factor| factor.factor_id == required_factor)
+            {
+                push(
+                    &mut findings,
+                    "missing_required_factor",
+                    "factors",
+                    format!("Required factor {required_factor} is missing."),
+                );
+            }
+        }
+        let inlay_levels: Option<HashSet<String>> = self
+            .factors
+            .iter()
+            .find(|factor| factor.factor_id == "inlay_architecture")
+            .map(|factor| factor.levels.iter().cloned().collect());
+        let frequency_levels: Option<HashSet<String>> = self
+            .factors
+            .iter()
+            .find(|factor| factor.factor_id == "spacer_frequency")
+            .map(|factor| factor.levels.iter().cloned().collect());
+        let transition_levels: Option<HashSet<String>> = self
+            .factors
+            .iter()
+            .find(|factor| factor.factor_id == "transition_geometry")
+            .map(|factor| factor.levels.iter().cloned().collect());
 
         let mut screen_cells = HashSet::new();
         let mut refinement_cells = HashSet::new();
@@ -325,7 +349,7 @@ impl SpacerDoeManifest {
                 );
             }
             if let Some(levels) = inlay_levels.as_ref() {
-                if !levels.contains(candidate.inlay_architecture.as_str()) {
+                if !levels.contains(&candidate.inlay_architecture) {
                     push(
                         &mut findings,
                         "undeclared_inlay_level",
@@ -335,7 +359,7 @@ impl SpacerDoeManifest {
                 }
             }
             if let Some(levels) = frequency_levels.as_ref() {
-                if !levels.contains(candidate.spacer_frequency.as_str()) {
+                if !levels.contains(&candidate.spacer_frequency) {
                     push(
                         &mut findings,
                         "undeclared_frequency_level",
@@ -345,7 +369,7 @@ impl SpacerDoeManifest {
                 }
             }
             if let Some(levels) = transition_levels.as_ref() {
-                if !levels.contains(candidate.transition_geometry.as_str()) {
+                if !levels.contains(&candidate.transition_geometry) {
                     push(
                         &mut findings,
                         "undeclared_transition_level",
@@ -658,6 +682,18 @@ mod tests {
         let report = manifest.validate();
         assert!(report.findings.iter().any(|finding| {
             finding.code == "duplicate_or_empty_candidate_id"
+        }));
+    }
+
+    #[test]
+    fn required_factor_definition_cannot_be_omitted() {
+        let mut manifest = manifest();
+        manifest
+            .factors
+            .retain(|factor| factor.factor_id != "spacer_frequency");
+        let report = manifest.validate();
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == "missing_required_factor"
         }));
     }
 
