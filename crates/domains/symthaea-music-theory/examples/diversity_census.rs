@@ -55,7 +55,9 @@ use symthaea_music_theory::fingerprint::{
 };
 use symthaea_music_theory::{MusicalIntent, PitchClass, Style};
 
-const STYLES: &[Style] = &[
+// Keep the historical pilot roster fixed so its old results remain comparable.
+// The main causal-diversity pass uses Style::ALL so every new preset is tested.
+const LEGACY_PILOT_STYLES: &[Style] = &[
     Style::Classical,
     Style::Waltz,
     Style::Folk,
@@ -86,6 +88,7 @@ const STYLES: &[Style] = &[
     Style::IrishTraditional,
     Style::HindustaniInspired,
 ];
+const STYLES: &[Style] = &Style::ALL;
 
 /// (valence, arousal, energy, bars) — a small spread of expressive intents,
 /// not an exhaustive sweep.
@@ -650,11 +653,11 @@ fn print_pilot_style_report(r: &CorpusReport) {
 
 fn main() {
     // ============================================================
-    // PASS 1: original Phase A pilot, UNCHANGED — kept for
-    // continuity/reproducibility of the original result.
+    // PASS 1: original Phase A pilot, unchanged and intentionally restricted
+    // to the legacy 29-style roster for reproducibility.
     // ============================================================
     let mut pilot_pieces: Vec<Piece> = Vec::new();
-    for &style in STYLES {
+    for &style in LEGACY_PILOT_STYLES {
         for seed in 0..SEEDS_PER_STYLE {
             for variation_idx in 0..VARIATIONS.len() {
                 let tonic = ((seed * 7) % 12) as i32;
@@ -665,13 +668,13 @@ fn main() {
     eprintln!(
         "[pilot] Composed {} pieces ({} styles x {SEEDS_PER_STYLE} seeds x {} variations).",
         pilot_pieces.len(),
-        STYLES.len(),
+        LEGACY_PILOT_STYLES.len(),
         VARIATIONS.len()
     );
     let pilot_report = analyze_corpus(&pilot_pieces, "Phase A pilot (tonic derived from seed)");
 
     println!("# Muse diversity census\n");
-    println!("## Pass 1 — Phase A pilot (unchanged, for continuity)\n");
+    println!("## Pass 1 — Phase A pilot (historical 29-style roster)\n");
     print_pilot_style_report(&pilot_report);
 
     // ============================================================
@@ -926,11 +929,15 @@ fn main() {
     // JSON dump for programmatic follow-up.
     let json = serde_json::json!({
         "pilot": {
+            "style_count": LEGACY_PILOT_STYLES.len(),
+            "styles": LEGACY_PILOT_STYLES.iter().map(|style| format!("{style:?}")).collect::<Vec<_>>(),
             "n_pieces": pilot_report.n,
             "exact_dup_rate": pilot_report.exact_dup_rate,
             "near_dup_rate": pilot_report.near_dup_rate,
         },
         "v2": {
+            "style_count": STYLES.len(),
+            "styles": STYLES.iter().map(|style| format!("{style:?}")).collect::<Vec<_>>(),
             "n_pieces": v2_report.n,
             "tonics_per_style": tonics_per_style,
             "seeds_per_tonic": seeds_per_tonic,
@@ -952,5 +959,21 @@ fn main() {
         std::fs::write(&path, serde_json::to_string_pretty(&json).unwrap())
             .expect("write census JSON");
         eprintln!("Wrote {path}");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn causal_census_tracks_the_canonical_style_registry() {
+        assert_eq!(STYLES, &Style::ALL[..]);
+        assert_eq!(STYLES.len(), Style::ALL.len());
+        assert_eq!(LEGACY_PILOT_STYLES.len(), 29);
+        assert!(STYLES.len() > LEGACY_PILOT_STYLES.len());
+        for style in LEGACY_PILOT_STYLES {
+            assert!(STYLES.contains(style), "legacy style {style:?} disappeared");
+        }
     }
 }

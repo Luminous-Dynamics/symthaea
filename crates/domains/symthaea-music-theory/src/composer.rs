@@ -613,7 +613,11 @@ fn compose_with_spec_and_form_and_grammar_impl(
         tx.cadential_harmonic_rhythm,
         spec.development != crate::spec::DevelopmentDna::Classic,
     );
-    realize_harmony(
+    // Section-level texture changes are declarative CompositionSpec data.
+    // For Minuet-and-Trio this preserves quarter-note A/ReturnA and gives B
+    // eighth-note arpeggiated harmony after the opening thinning.
+    let section_pattern_overrides = &spec.texture.section_accompaniment_overrides;
+    realize_harmony_with_section_pattern(
         &mut score,
         &form,
         meter_beats,
@@ -623,6 +627,7 @@ fn compose_with_spec_and_form_and_grammar_impl(
         tx.thin_departure,
         tx.cadential_harmonic_rhythm,
         tx.seventh_chords,
+        section_pattern_overrides,
     );
     if tx.hook_cell {
         apply_hidden_bass_quote(
@@ -4258,6 +4263,35 @@ pub(crate) fn realize_harmony(
     cadential_split: bool,
     seventh_chords: bool,
 ) {
+    realize_harmony_with_section_pattern(
+        score,
+        form,
+        meter_beats,
+        intent,
+        prev_upper,
+        pattern,
+        thin_departure,
+        cadential_split,
+        seventh_chords,
+        &[],
+    );
+}
+
+fn realize_harmony_with_section_pattern(
+    score: &mut Score,
+    form: &Form,
+    meter_beats: f64,
+    intent: &MusicalIntent,
+    prev_upper: &mut Vec<Pitch>,
+    pattern: crate::accompaniment::Accompaniment,
+    thin_departure: bool,
+    cadential_split: bool,
+    seventh_chords: bool,
+    section_pattern_overrides: &[(
+        crate::form::SectionRole,
+        crate::accompaniment::Accompaniment,
+    )],
+) {
     let mut measure: i64 = 0;
     for section in &form.sections {
         let mut degrees = section.period.antecedent.progression.clone();
@@ -4275,6 +4309,11 @@ pub(crate) fn realize_harmony(
         } else {
             (&degrees[..], measure)
         };
+        let section_pattern = section_pattern_overrides
+            .iter()
+            .find(|(role, _)| *role == section.role)
+            .map(|(_, section_pattern)| *section_pattern)
+            .unwrap_or(pattern);
         realize_harmony_measures(
             score,
             realized,
@@ -4284,7 +4323,7 @@ pub(crate) fn realize_harmony(
             prev_upper,
             local_start,
             section.role.intensity(),
-            pattern,
+            section_pattern,
             cadential_split,
             seventh_chords,
         );
@@ -5197,6 +5236,65 @@ mod tests {
             half_notes * 2 > counter.len(),
             "half-note gait must dominate: {half_notes}/{}",
             counter.len()
+        );
+    }
+
+    #[test]
+    fn minuet_trio_arpeggiates_only_the_middle_section_harmony() {
+        use crate::form::SectionRole;
+        use crate::style::Style;
+
+        let intent = MusicalIntent {
+            bars: 4,
+            arousal: 0.4,
+            energy: 0.4,
+            ..MusicalIntent::default()
+        };
+        let spec = Style::MinuetAndTrio.spec();
+        let (score, form) = compose_with_spec_and_form(&intent, &spec);
+        let form = form.expect("Minuet and Trio must realize explicit sections");
+        assert_eq!(
+            form.sections.iter().map(|section| section.role).collect::<Vec<_>>(),
+            vec![SectionRole::A, SectionRole::B, SectionRole::ReturnA]
+        );
+
+        let meter = score.meter as f64;
+        let intro_beats = spec.texture.intro_bars as f64 * meter;
+        let mut start_bar = 0_i64;
+        let mut section_metrics = Vec::new();
+        for section in &form.sections {
+            let section_bars = (section.period.antecedent.progression.len()
+                + section.period.consequent.progression.len()) as i64;
+            let start = intro_beats + start_bar as f64 * meter;
+            let end = intro_beats + (start_bar + section_bars) as f64 * meter;
+            let harmony: Vec<f64> = score
+                .notes
+                .iter()
+                .filter(|note| note.role == VoiceRole::Harmony)
+                .filter(|note| note.onset.beats() >= start - 1e-9 && note.onset.beats() < end - 1e-9)
+                .map(|note| note.onset.beats())
+                .collect();
+            let offbeat_eighths = harmony
+                .iter()
+                .filter(|onset| (**onset - onset.round()).abs() > 1e-6)
+                .count();
+            section_metrics.push((section.role, harmony.len(), offbeat_eighths));
+            start_bar += section_bars;
+        }
+
+        assert!(section_metrics[0].1 > 0, "Minuet A must retain its quarter-note harmony");
+        assert_eq!(
+            section_metrics[0].2, 0,
+            "Minuet A should not inherit the Trio's eighth-note arpeggiation"
+        );
+        assert!(
+            section_metrics[1].2 > 0,
+            "Trio B must contain real offbeat/eighth-note harmony events"
+        );
+        assert!(section_metrics[2].1 > 0, "da-capo return must restore harmony");
+        assert_eq!(
+            section_metrics[2].2, 0,
+            "da-capo return must restore the Minuet's measured quarter-note texture"
         );
     }
 
