@@ -15,8 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::manifest::{ScenarioGroup, SplitRole, ValidatedManifest};
 
-pub const CANDIDATE_PACKET_SCHEMA_V1: &str =
-    "luminous.decision-transfer.candidate-packet.v1";
+pub const CANDIDATE_PACKET_SCHEMA_V1: &str = "luminous.decision-transfer.candidate-packet.v1";
 const MAX_FRAMES: usize = 1_000_000;
 const MAX_CANDIDATE_PACKET_BYTES: usize = 16 * 1024 * 1024;
 
@@ -61,19 +60,34 @@ impl fmt::Display for CandidateViewError {
             }
             Self::NonFiniteValue(field) => write!(formatter, "{field} must be finite"),
             Self::NonIncreasingObservationTime => {
-                write!(formatter, "observation timestamps must be strictly increasing")
+                write!(
+                    formatter,
+                    "observation timestamps must be strictly increasing"
+                )
             }
             Self::ObservationAfterAsOfTime => {
-                write!(formatter, "candidate packet contains an observation after its as-of time")
+                write!(
+                    formatter,
+                    "candidate packet contains an observation after its as-of time"
+                )
             }
             Self::DuplicateTicket => {
-                write!(formatter, "candidate ticket is already bound in this evaluator run")
+                write!(
+                    formatter,
+                    "candidate ticket is already bound in this evaluator run"
+                )
             }
             Self::UnknownScenario => {
-                write!(formatter, "scenario ID is not present in the validated manifest")
+                write!(
+                    formatter,
+                    "scenario ID is not present in the validated manifest"
+                )
             }
             Self::TaskContractMismatch => {
-                write!(formatter, "candidate task contract digest does not match the validated manifest")
+                write!(
+                    formatter,
+                    "candidate task contract digest does not match the validated manifest"
+                )
             }
         }
     }
@@ -200,9 +214,16 @@ impl CandidatePacketV1 {
                 return Err(CandidateViewError::ObservationAfterAsOfTime);
             }
             if frame.values.len() != self.channel_names.len() {
-                return Err(CandidateViewError::InvalidField("observation channel width"));
+                return Err(CandidateViewError::InvalidField(
+                    "observation channel width",
+                ));
             }
-            if frame.values.iter().flatten().any(|value| !value.is_finite()) {
+            if frame
+                .values
+                .iter()
+                .flatten()
+                .any(|value| !value.is_finite())
+            {
                 return Err(CandidateViewError::NonFiniteValue("observation value"));
             }
             previous_time = frame.timestamp;
@@ -320,9 +341,9 @@ fn is_sha256(value: &str) -> bool {
 fn is_safe_label(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.')
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
 }
 
 #[cfg(test)]
@@ -331,9 +352,7 @@ mod tests {
     use crate::manifest::parse_and_validate;
 
     const TICKET: &str = "0123456789abcdef0123456789abcdef";
-    const DIGEST: &str =
-        "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-
+    const DIGEST: &str = "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
     fn validated_manifest() -> ValidatedManifest {
         parse_and_validate(include_bytes!("../fixtures/split-manifest-v1.json")).unwrap()
@@ -367,7 +386,8 @@ mod tests {
         let manifest = validated_manifest();
         let scenario_id = manifest.manifest().scenarios[2].scenario_id.clone();
         let packet = packet(TICKET);
-        book.bind_from_manifest(&packet, &manifest, &scenario_id).unwrap();
+        book.bind_from_manifest(&packet, &manifest, &scenario_id)
+            .unwrap();
 
         let json = serde_json::to_value(&packet).unwrap();
         let object = json.as_object().unwrap();
@@ -384,7 +404,10 @@ mod tests {
         ] {
             assert!(!object.contains_key(field), "candidate JSON leaked {field}");
         }
-        assert_eq!(book.binding_for(TICKET).unwrap().split_role(), SplitRole::ConfirmatoryTest);
+        assert_eq!(
+            book.binding_for(TICKET).unwrap().split_role(),
+            SplitRole::ConfirmatoryTest
+        );
         assert_eq!(book.binding_for(TICKET).unwrap().scenario_id(), scenario_id);
     }
 
@@ -392,14 +415,20 @@ mod tests {
     fn rejects_observations_after_as_of_time() {
         let mut packet = packet(TICKET);
         packet.observations[1].timestamp = 2.1;
-        assert_eq!(packet.validate(), Err(CandidateViewError::ObservationAfterAsOfTime));
+        assert_eq!(
+            packet.validate(),
+            Err(CandidateViewError::ObservationAfterAsOfTime)
+        );
     }
 
     #[test]
     fn rejects_duplicate_channels_and_action_ids() {
         let mut packet = packet(TICKET);
         packet.channel_names[1] = packet.channel_names[0].clone();
-        assert_eq!(packet.validate(), Err(CandidateViewError::DuplicateValue("channel_names")));
+        assert_eq!(
+            packet.validate(),
+            Err(CandidateViewError::DuplicateValue("channel_names"))
+        );
 
         let mut packet = packet(TICKET);
         packet.allowed_action_ids[1] = packet.allowed_action_ids[0].clone();
@@ -413,10 +442,10 @@ mod tests {
     fn rejects_unknown_candidate_packet_fields() {
         let packet = packet(TICKET);
         let mut value = serde_json::to_value(packet).unwrap();
-        value
-            .as_object_mut()
-            .unwrap()
-            .insert("split_role".to_owned(), serde_json::json!("confirmatory_test"));
+        value.as_object_mut().unwrap().insert(
+            "split_role".to_owned(),
+            serde_json::json!("confirmatory_test"),
+        );
         let bytes = serde_json::to_vec(&value).unwrap();
         assert_eq!(
             CandidatePacketV1::parse_and_validate(&bytes),
@@ -498,6 +527,9 @@ mod tests {
 
         let mut packet = packet(TICKET);
         packet.observations[0].values[0] = Some(f64::NAN);
-        assert_eq!(packet.validate(), Err(CandidateViewError::NonFiniteValue("observation value")));
+        assert_eq!(
+            packet.validate(),
+            Err(CandidateViewError::NonFiniteValue("observation value"))
+        );
     }
 }
