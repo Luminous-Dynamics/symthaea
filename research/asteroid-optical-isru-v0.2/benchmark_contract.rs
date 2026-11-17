@@ -113,14 +113,29 @@ impl BenchmarkManifest {
             ("task_id", self.task_id.as_str()),
             ("task_version", self.task_version.as_str()),
             ("candidate_pool_digest", self.candidate_pool_digest.as_str()),
-            ("feasible_action_set_digest", self.feasible_action_set_digest.as_str()),
+            (
+                "feasible_action_set_digest",
+                self.feasible_action_set_digest.as_str(),
+            ),
             ("starting_state_digest", self.starting_state_digest.as_str()),
-            ("objective_contract_digest", self.objective_contract_digest.as_str()),
-            ("resource_budget_digest", self.resource_budget_digest.as_str()),
+            (
+                "objective_contract_digest",
+                self.objective_contract_digest.as_str(),
+            ),
+            (
+                "resource_budget_digest",
+                self.resource_budget_digest.as_str(),
+            ),
             ("evidence_gate_digest", self.evidence_gate_digest.as_str()),
             ("safety_gate_digest", self.safety_gate_digest.as_str()),
-            ("hidden_oracle_commitment", self.hidden_oracle_commitment.as_str()),
-            ("development_set_digest", self.development_set_digest.as_str()),
+            (
+                "hidden_oracle_commitment",
+                self.hidden_oracle_commitment.as_str(),
+            ),
+            (
+                "development_set_digest",
+                self.development_set_digest.as_str(),
+            ),
             ("statistical_plan_id", self.statistical_plan_id.as_str()),
         ] {
             if value.trim().is_empty() {
@@ -241,7 +256,10 @@ impl EfficiencyMetrics {
             ("assay_cost", self.assay_cost),
             ("maintenance_minutes", self.maintenance_minutes),
             ("consumables_g", self.consumables_g),
-            ("operator_intervention_minutes", self.operator_intervention_minutes),
+            (
+                "operator_intervention_minutes",
+                self.operator_intervention_minutes,
+            ),
         ] {
             if !value.is_finite() || value < 0.0 {
                 return Err(ContractError::InvalidMetric(name));
@@ -250,10 +268,7 @@ impl EfficiencyMetrics {
         Ok(())
     }
 
-    pub fn accepted_products_per_wall_hour(
-        &self,
-        accepted_products: u64,
-    ) -> Option<f64> {
+    pub fn accepted_products_per_wall_hour(&self, accepted_products: u64) -> Option<f64> {
         if self.elapsed_wall_seconds <= 0.0 {
             return None;
         }
@@ -302,10 +317,24 @@ impl BenchmarkRun {
         self.efficiency.validate()?;
         for (name, value) in [
             ("accepted_utility", self.discovery.accepted_utility),
-            ("held_out_rank_correlation", self.learning.held_out_rank_correlation.unwrap_or(0.0)),
-            ("predictive_interval_coverage", self.learning.predictive_interval_coverage.unwrap_or(0.0)),
-            ("predictive_log_score", self.learning.predictive_log_score.unwrap_or(0.0)),
-            ("proxy_to_final_calibration_error", self.learning.proxy_to_final_calibration_error.unwrap_or(0.0)),
+            (
+                "held_out_rank_correlation",
+                self.learning.held_out_rank_correlation.unwrap_or(0.0),
+            ),
+            (
+                "predictive_interval_coverage",
+                self.learning.predictive_interval_coverage.unwrap_or(0.0),
+            ),
+            (
+                "predictive_log_score",
+                self.learning.predictive_log_score.unwrap_or(0.0),
+            ),
+            (
+                "proxy_to_final_calibration_error",
+                self.learning
+                    .proxy_to_final_calibration_error
+                    .unwrap_or(0.0),
+            ),
         ] {
             if !value.is_finite() {
                 return Err(ContractError::InvalidMetric(name));
@@ -341,10 +370,7 @@ pub enum ContractError {
     MissingPhysicalRandomization,
 }
 
-pub fn compare_pair(
-    left: &BenchmarkRun,
-    right: &BenchmarkRun,
-) -> Result<(), ContractError> {
+pub fn compare_pair(left: &BenchmarkRun, right: &BenchmarkRun) -> Result<(), ContractError> {
     left.validate()?;
     right.validate()?;
     if left.comparability_key() != right.comparability_key() {
@@ -384,10 +410,7 @@ pub fn wall_clock_acceleration_factor(
 
 /// Enhancement factor compares positive improvement over the same fixed
 /// baseline outcome, at the same experiment-count or wall-clock budget.
-pub fn enhancement_factor(
-    candidate_gain: f64,
-    reference_gain: f64,
-) -> Result<f64, ContractError> {
+pub fn enhancement_factor(candidate_gain: f64, reference_gain: f64) -> Result<f64, ContractError> {
     if !candidate_gain.is_finite() || candidate_gain < 0.0 {
         return Err(ContractError::InvalidPolicyGain);
     }
@@ -677,10 +700,7 @@ mod tests {
             statistical_plan_id: "plan".to_string(),
             paired_seeds: vec![1, 2, 3, 3],
         };
-        assert_eq!(
-            plan.validate(),
-            Err(ContractError::DuplicatePairedSeed(3))
-        );
+        assert_eq!(plan.validate(), Err(ContractError::DuplicatePairedSeed(3)));
     }
 
     #[test]
@@ -697,19 +717,13 @@ mod tests {
             power_analysis_id: String::new(),
             ..plan
         };
-        assert_eq!(
-            missing.validate(),
-            Err(ContractError::MissingPowerAnalysis)
-        );
+        assert_eq!(missing.validate(), Err(ContractError::MissingPowerAnalysis));
     }
 
     #[test]
     fn accepted_product_rate_uses_end_to_end_elapsed_time() {
         let efficiency = run(Algorithm::LuminousWorkflowPlanner, "policy").efficiency;
-        assert_eq!(
-            efficiency.accepted_products_per_wall_hour(4),
-            Some(2.0)
-        );
+        assert_eq!(efficiency.accepted_products_per_wall_hour(4), Some(2.0));
     }
 
     #[test]
