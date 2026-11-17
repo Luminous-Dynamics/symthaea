@@ -1,0 +1,797 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/crop-formation-anomaly-001/schema/formation-event.schema.json",
+  "title": "CROP-INTEL-001 Formation Event",
+  "description": "A provenance-preserving registry record for a reported crop-formation event. Assertions remain distinct from measured or independently adjudicated facts.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "record_status",
+    "source_assertions"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "event_id": {
+      "type": "string",
+      "pattern": "^CFE-[A-Za-z0-9._-]{1,96}$"
+    },
+    "record_status": {
+      "enum": [
+        "draft",
+        "in_review",
+        "reviewed",
+        "superseded"
+      ]
+    },
+    "reported_name": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 256
+    },
+    "discovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "first_reported_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "last_reported_at": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "alleged_formation_interval": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/time_interval"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "temporal_precision": {
+          "enum": [
+            "exact_timestamp",
+            "date_only",
+            "bounded_interval",
+            "year_only",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "first_reported_at",
+        "last_reported_at",
+        "alleged_formation_interval",
+        "temporal_precision"
+      ]
+    },
+    "geolocation": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "precision",
+            "country_code"
+          ],
+          "properties": {
+            "precision": {
+              "enum": [
+                "exact_field",
+                "approximate_field",
+                "locality_centroid",
+                "unknown"
+              ]
+            },
+            "country_code": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "pattern": "^[A-Z]{2}$"
+            },
+            "locality": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 256
+            },
+            "latitude": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": -90,
+              "maximum": 90
+            },
+            "longitude": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": -180,
+              "maximum": 180
+            },
+            "horizontal_uncertainty_m": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "minimum": 0
+            },
+            "coordinate_reference_system": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 128
+            },
+            "source_assertion_ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      ]
+    },
+    "crop": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "species_state",
+        "species",
+        "cultivar",
+        "phenological_stage"
+      ],
+      "properties": {
+        "species_state": {
+          "$ref": "#/$defs/value_state"
+        },
+        "species": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "cultivar": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "phenological_stage": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        }
+      }
+    },
+    "footprint": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "value_state",
+            "value",
+            "unit",
+            "uncertainty"
+          ],
+          "properties": {
+            "value_state": {
+              "$ref": "#/$defs/value_state"
+            },
+            "value": {
+              "type": [
+                "number",
+                "null"
+              ],
+              "exclusiveMinimum": 0
+            },
+            "unit": {
+              "enum": [
+                "m",
+                "m2",
+                "ha",
+                "unknown"
+              ]
+            },
+            "uncertainty": {
+              "$ref": "#/$defs/uncertainty"
+            }
+          }
+        }
+      ]
+    },
+    "source_assertions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/source_assertion"
+      }
+    },
+    "image_assets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/image_asset"
+      },
+      "uniqueItems": true
+    },
+    "geometry_reconstructions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/geometry_reconstruction"
+      }
+    },
+    "environmental_observations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/environmental_observation"
+      }
+    },
+    "specimen_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "dispositions": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "authorship": {
+          "enum": [
+            "documented_human",
+            "probable_human",
+            "unknown",
+            "conflicting",
+            "other_supported"
+          ]
+        },
+        "formation_mechanism": {
+          "enum": [
+            "mechanical_flattening",
+            "weather_or_lodging",
+            "other_supported",
+            "mixed",
+            "unresolved",
+            "not_assessed"
+          ]
+        },
+        "plant_response": {
+          "enum": [
+            "no_difference_detected",
+            "difference_detected",
+            "inconclusive",
+            "not_sampled",
+            "not_assessed"
+          ]
+        },
+        "information_content": {
+          "enum": [
+            "S0_observed_structure",
+            "S1_mathematical_regularity",
+            "S2_code_like_structure",
+            "S3_semantic_payload",
+            "not_assessable"
+          ]
+        }
+      }
+    },
+    "supersedes_event_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "notes": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 10000
+    }
+  },
+  "$defs": {
+    "value_state": {
+      "enum": [
+        "unknown",
+        "not_observed",
+        "not_applicable",
+        "conflicting",
+        "measured",
+        "asserted"
+      ]
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "value",
+        "unit"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "quantified",
+            "qualitative",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "value": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "method": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 512
+        }
+      }
+    },
+    "time_interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "start",
+        "end",
+        "timezone",
+        "precision"
+      ],
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "timezone": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "precision": {
+          "enum": [
+            "exact",
+            "approximate",
+            "source_asserted"
+          ]
+        }
+      }
+    },
+    "source_assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assertion_id",
+        "source_name",
+        "source_url",
+        "assertion_type",
+        "record_state",
+        "asserted_value"
+      ],
+      "properties": {
+        "assertion_id": {
+          "type": "string",
+          "pattern": "^CFA-[A-Za-z0-9._-]{1,96}$"
+        },
+        "source_name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "author_or_reporter": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "original_record_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "retrieved_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "assertion_type": {
+          "enum": [
+            "date",
+            "location",
+            "crop",
+            "measurement",
+            "witness",
+            "authorship",
+            "interpretation",
+            "sample",
+            "other"
+          ]
+        },
+        "record_state": {
+          "$ref": "#/$defs/value_state"
+        },
+        "asserted_value": {},
+        "source_wording": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4000
+        },
+        "reviewer_assessment": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4000
+        }
+      }
+    },
+    "image_asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "asset_id",
+        "source_url",
+        "rights_state",
+        "attribution_state",
+        "capture_time_state"
+      ],
+      "properties": {
+        "asset_id": {
+          "type": "string",
+          "pattern": "^CFAI-[A-Za-z0-9._-]{1,96}$"
+        },
+        "source_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-fA-F0-9]{64}$"
+        },
+        "photographer_or_publisher": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 256
+        },
+        "credit_text": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 1024
+        },
+        "rights_state": {
+          "enum": [
+            "redistributable",
+            "display_link_only",
+            "analysis_permitted",
+            "permission_required",
+            "unknown",
+            "prohibited"
+          ]
+        },
+        "attribution_state": {
+          "enum": [
+            "known",
+            "missing",
+            "unknown",
+            "not_applicable"
+          ]
+        },
+        "capture_time_state": {
+          "enum": [
+            "verified",
+            "asserted",
+            "unknown"
+          ]
+        },
+        "captured_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "published_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "pixel_width": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "pixel_height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "derived_from_asset_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "geometry_reconstruction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "geometry_id",
+        "parent_asset_ids",
+        "coordinate_space",
+        "unit",
+        "method",
+        "review_state",
+        "primitives"
+      ],
+      "properties": {
+        "geometry_id": {
+          "type": "string",
+          "pattern": "^CFEG-[A-Za-z0-9._-]{1,96}$"
+        },
+        "parent_asset_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "coordinate_space": {
+          "enum": [
+            "image_pixel",
+            "field_local",
+            "geographic",
+            "unknown"
+          ]
+        },
+        "unit": {
+          "enum": [
+            "px",
+            "m",
+            "degree",
+            "unknown"
+          ]
+        },
+        "image_to_field_transform": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "method": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "method_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "review_state": {
+          "enum": [
+            "single_annotator",
+            "independently_reconstructed",
+            "adjudicated",
+            "unreviewed"
+          ]
+        },
+        "primitives": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/geometry_primitive"
+          }
+        },
+        "uncertainty_notes": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2000
+        }
+      }
+    },
+    "geometry_primitive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "primitive_id",
+        "kind",
+        "parameters",
+        "confidence_state"
+      ],
+      "properties": {
+        "primitive_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "kind": {
+          "enum": [
+            "circle",
+            "arc",
+            "line",
+            "polygon",
+            "region_mask",
+            "centreline",
+            "graph_edge",
+            "other"
+          ]
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "confidence_state": {
+          "enum": [
+            "quantified",
+            "qualitative",
+            "unknown"
+          ]
+        },
+        "uncertainty": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/uncertainty"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "environmental_observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "observation_id",
+        "observation_type",
+        "value_state",
+        "value",
+        "unit",
+        "observed_at",
+        "source_url"
+      ],
+      "properties": {
+        "observation_id": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "observation_type": {
+          "enum": [
+            "weather",
+            "soil",
+            "terrain",
+            "agricultural_management",
+            "remote_sensing",
+            "other"
+          ]
+        },
+        "value_state": {
+          "$ref": "#/$defs/value_state"
+        },
+        "value": {},
+        "unit": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "uncertainty": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/uncertainty"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observed_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        },
+        "source_url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "uri"
+        },
+        "representativeness_notes": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 2000
+        }
+      }
+    }
+  }
+}
