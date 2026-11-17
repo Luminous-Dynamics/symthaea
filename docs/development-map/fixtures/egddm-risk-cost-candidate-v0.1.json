@@ -169,5 +169,47 @@
         "three-group-certificate-mismatch"
       ]
     }
+  ],
+  "cost_estimates": [
+    {
+      "option_id": "optical-primary",
+      "estimated_cost_upper_micros": 350
+    },
+    {
+      "option_id": "optical-secondary",
+      "estimated_cost_upper_micros": 500
+    },
+    {
+      "option_id": "optical-joint",
+      "estimated_cost_upper_micros": 650
+    },
+    {
+      "option_id": "software-test",
+      "estimated_cost_upper_micros": 950
+    },
+    {
+      "option_id": "runtime-check",
+      "estimated_cost_upper_micros": 700
+    },
+    {
+      "option_id": "stale-check",
+      "estimated_cost_upper_micros": 150
+    },
+    {
+      "option_id": "revoked-check",
+      "estimated_cost_upper_micros": 150
+    },
+    {
+      "option_id": "impossible-check",
+      "estimated_cost_upper_micros": 300
+    },
+    {
+      "option_id": "weak-check",
+      "estimated_cost_upper_micros": 100
+    },
+    {
+      "option_id": "drift-check",
+      "estimated_cost_upper_micros": 450
+    }
   ]
 }
