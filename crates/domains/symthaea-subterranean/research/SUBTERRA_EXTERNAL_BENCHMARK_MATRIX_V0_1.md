@@ -149,6 +149,8 @@ The ground-truth source repository does not expose a clear SPDX dataset licence 
 
 ### B0.6 — decision and report value under bounded evidence
 
+Selective-reporting follow-on: [#12603 — SUBTERRA-SELECTIVE-REPORTING-001](https://github.com/Luminous-Dynamics/symthaea/issues/12603). This owns the candidate-proposal and calibrated slot-allocation layer; [#12599](https://github.com/Luminous-Dynamics/symthaea/pull/12599) remains the independent ground-truth referee.
+
 Use the B0.5 artifact truth to generate a *frozen* synthetic evidence/action ledger: each candidate report is tied to an observation provenance record, sensor/pose uncertainty, class hypothesis and optional unknown/abstain disposition. Compare a fixed-priority reporter, confidence-threshold reporter, entropy/IG reporter, EVSI reporter, and the survival-conditioned/refereed policy under identical report and resource budgets.
 
 The key metric is **accepted correct reports per scarce report slot / robot-hour**, subject to zero false acceptance in the seeded critical negative-control cases. The report score must not be a proxy for safety, and the synthetic evidence ledger is not a substitute for raw field sensor data.
