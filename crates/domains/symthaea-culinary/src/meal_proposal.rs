@@ -162,7 +162,7 @@ pub struct ProposedTaskV1 {
     pub depends_on: Vec<String>,
     pub estimated_duration_min_ms: Option<u64>,
     pub estimated_duration_max_ms: Option<u64>,
-    pub evidence_refs: Vec<String>,
+    pub fact_refs: Vec<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -250,6 +250,10 @@ pub enum MealProposalViolationCodeV1 {
     DependencyCycle,
     MissingFactSource,
     InvalidFactTimeWindow,
+    InvalidFactValue,
+    MissingFactUnitOrBasis,
+    MissingFactMarket,
+    InvalidAllergenFactScope,
     UnknownFactReference,
     DuplicateUncertainty,
     ClaimCeilingMismatch,
@@ -539,6 +543,61 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
                 "fact validity end precedes observation time",
             );
         }
+        if fact.value.is_null() {
+            violation(
+                &mut violations,
+                MealProposalViolationCodeV1::InvalidFactValue,
+                Some(&fact.fact_id),
+                "fact value cannot be null; represent missing facts as absent with an uncertainty record",
+            );
+        }
+        if matches!(
+            fact.kind,
+            CulinaryFactKindV1::Price
+                | CulinaryFactKindV1::Nutrient
+                | CulinaryFactKindV1::Quality
+                | CulinaryFactKindV1::ProcessProperty
+        ) && (fact.unit.as_deref().is_none_or(|value| !nonempty(value))
+            || fact.basis.as_deref().is_none_or(|value| !nonempty(value)))
+        {
+            violation(
+                &mut violations,
+                MealProposalViolationCodeV1::MissingFactUnitOrBasis,
+                Some(&fact.fact_id),
+                "numeric price/nutrient/quality/process facts require an explicit unit and basis",
+            );
+        }
+        if fact.kind == CulinaryFactKindV1::Price
+            && fact.market_ref.as_deref().is_none_or(|value| !nonempty(value))
+        {
+            violation(
+                &mut violations,
+                MealProposalViolationCodeV1::MissingFactMarket,
+                Some(&fact.fact_id),
+                "price facts require an explicit market reference",
+            );
+        }
+        if fact.kind == CulinaryFactKindV1::Availability
+            && (fact.market_ref.as_deref().is_none_or(|value| !nonempty(value))
+                || fact.valid_until_epoch_ms.is_none())
+        {
+            violation(
+                &mut violations,
+                MealProposalViolationCodeV1::MissingFactMarket,
+                Some(&fact.fact_id),
+                "availability facts require a market and explicit validity end",
+            );
+        }
+        if fact.kind == CulinaryFactKindV1::AllergenDeclaration
+            && !matches!(fact.scope, FactScopeV1::ProductSku | FactScopeV1::SupplierLot)
+        {
+            violation(
+                &mut violations,
+                MealProposalViolationCodeV1::InvalidAllergenFactScope,
+                Some(&fact.fact_id),
+                "allergen declarations must be scoped to an exact product SKU or supplier lot",
+            );
+        }
         if let Some(ingredient_id) = &fact.ingredient_id {
             if !ingredient_ids.contains(ingredient_id.as_str()) {
                 violation(
@@ -564,7 +623,68 @@ pub fn validate_meal_proposal(proposal: &MealProposalV1) -> MealProposalValidati
         }
     }
     for task in &proposal.tasks {
-        for fact_ref in &task.evidence_refs {
+        for fact_ref in &task.fact_refs {
+            if !fact_ids.contains(fact_ref.as_str()) {
+                violation(
+                    &mut violations,
+                    MealProposalViolationCodeV1::UnknownFactReference,
+                    Some(&task.task_id),
+                    format!("task references unknown fact: {fact_ref}"),
+                );
+            }
+        }
+    }
+
+    let mut remaining: BTreeSet<&str> = task_ids.iter().copied().collect();
+    let mut resolved = BTreeSet::new();
+    loop {
+        let ready: Vec<&str> = remaining
+            .iter()
+            .copied()
+            .filter(|task_id| {
+                proposal
+                    .tasks
+                    .iter()
+                    .find(|task| task.task_id == *task_id)
+                    .is_some_and(|task| {
+                        task.depends_on.iter().all(|dependency| {
+                            !task_ids.contains(dependency.as_str())
+                                || resolved.contains(dependency.as_str())
+                        })
+                    })
+            })
+            .collect();
+        if ready.is_empty() {
+            break;
+        }
+        for task_id in ready {
+            remaining.remove(task_id);
+            resolved.insert(task_id);
+        }
+    }
+    if !remaining.is_empty() {
+        violation(
+            &mut violations,
+            MealProposalViolationCodeV1::DependencyCycle,
+            None,
+            "task dependency graph contains a cycle",
+        );
+    }
+
+    for ingredient in &proposal.ingredients {
+        for fact_ref in &ingredient.fact_refs {
+            if !fact_ids.contains(fact_ref.as_str()) {
+                violation(
+                    &mut violations,
+                    MealProposalViolationCodeV1::UnknownFactReference,
+                    Some(&ingredient.ingredient_id),
+                    format!("ingredient references unknown fact: {fact_ref}"),
+                );
+            }
+        }
+    }
+    for task in &proposal.tasks {
+        for fact_ref in &task.fact_refs {
             if !fact_ids.contains(fact_ref.as_str()) {
                 violation(
                     &mut violations,
@@ -792,6 +912,61 @@ mod tests {
         let report = validate_meal_proposal(&proposal);
         assert!(report.violations.iter().any(|v| {
             v.code == MealProposalViolationCodeV1::UnknownFactReference
+        }));
+    }
+
+    #[test]
+    fn price_fact_requires_market_unit_and_basis() {
+        let mut proposal = valid_proposal();
+        proposal.facts.push(CulinaryFactV1 {
+            fact_id: "fact:price-1".to_owned(),
+            ingredient_id: Some("rice".to_owned()),
+            kind: CulinaryFactKindV1::Price,
+            scope: FactScopeV1::ProductSku,
+            value: serde_json::json!({"minor_units": 2500}),
+            unit: None,
+            basis: None,
+            source_ref: "fixture:retailer".to_owned(),
+            source_record_id: "sku-01".to_owned(),
+            source_version: "2026-11-17".to_owned(),
+            evidence_class: ProposalEvidenceClassV1::Observed,
+            observed_at_epoch_ms: 200,
+            valid_until_epoch_ms: Some(300),
+            market_ref: None,
+            license_ref: None,
+        });
+        let report = validate_meal_proposal(&proposal);
+        assert!(report.violations.iter().any(|v| {
+            v.code == MealProposalViolationCodeV1::MissingFactUnitOrBasis
+        }));
+        assert!(report.violations.iter().any(|v| {
+            v.code == MealProposalViolationCodeV1::MissingFactMarket
+        }));
+    }
+
+    #[test]
+    fn allergen_declaration_must_be_product_or_lot_scoped() {
+        let mut proposal = valid_proposal();
+        proposal.facts.push(CulinaryFactV1 {
+            fact_id: "fact:allergen-generic".to_owned(),
+            ingredient_id: Some("rice".to_owned()),
+            kind: CulinaryFactKindV1::AllergenDeclaration,
+            scope: FactScopeV1::GenericIngredient,
+            value: serde_json::json!({"contains": []}),
+            unit: None,
+            basis: None,
+            source_ref: "fixture:label".to_owned(),
+            source_record_id: "label-01".to_owned(),
+            source_version: "v1".to_owned(),
+            evidence_class: ProposalEvidenceClassV1::VendorDeclared,
+            observed_at_epoch_ms: 100,
+            valid_until_epoch_ms: None,
+            market_ref: None,
+            license_ref: None,
+        });
+        let report = validate_meal_proposal(&proposal);
+        assert!(report.violations.iter().any(|v| {
+            v.code == MealProposalViolationCodeV1::InvalidAllergenFactScope
         }));
     }
 
