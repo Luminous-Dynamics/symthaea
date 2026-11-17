@@ -65,6 +65,13 @@ fn parse_options(candidate:&Value,oracle:&Value)->Result<BTreeMap<String,OptionD
  let cv=val(candidate,"options","candidate_view")?.as_array().ok_or("candidate options must be an array")?;
  let ov=val(oracle,"cost_options","oracle")?.as_array().ok_or("oracle cost_options must be an array")?;
  if cv.len()!=ov.len()||cv.is_empty()||cv.len()>MAX_OPTIONS{return Err("candidate options and oracle cost_options must have the same 1..=6 entries".to_owned());}
+ let mut oracle_ids=BTreeSet::new();
+ for row in ov{
+  let id=s(row,"option_id","oracle cost option")?;
+  if !oracle_ids.insert(id){return Err("duplicate oracle cost option ID".to_owned());}
+ }
+ let candidate_ids:BTreeSet<String>=cv.iter().map(|row|s(row,"option_id","candidate option")).collect::<Result<_,_>>()?;
+ if candidate_ids!=oracle_ids{return Err("candidate and oracle cost option IDs differ".to_owned());}
  let mut out=BTreeMap::new();
  for (i,co) in cv.iter().enumerate(){
   let l=format!("candidate options[{i}]");allowed(co,&["option_id","available_at","factor_id"],&l)?;
@@ -91,7 +98,7 @@ fn parse_worlds(oracle:&Value,ids:&BTreeSet<String>,option_ids:&BTreeSet<String>
   let safe=w["safe_actions"].as_array().ok_or("world.safe_actions must be an array")?;
   let mut safe_set=BTreeSet::new();for a in safe{let a=a.as_str().ok_or("safe action must be string")?;if !actions.contains_key(a){return Err(format!("world references unknown action {a:?}"));}safe_set.insert(a.to_owned());}
   let obs=object(val(w,"observations",&l)?,&format!("{l}.observations"))?;
-  if obs.keys().cloned().collect::<BTreeSet<_>>()!=*option_ids{return Err(format!("world {id:?} observation option set mismatch"));}
+  if obs.keys().cloned().collect::<BTreeSet<_>>()!=option_ids.clone(){return Err(format!("world {id:?} observation option set mismatch"));}
   let observations=obs.iter().map(|(k,v)|Ok((k.clone(),v.as_str().ok_or("observation must be string")?.to_owned()))).collect::<Result<BTreeMap<_,_>,String>>()?;
   if out.insert(id.clone(),World{safe_actions:safe_set,observations}).is_some(){return Err(format!("duplicate world {id:?}"));}
  }
@@ -120,7 +127,7 @@ fn parse_nodes(tree:&Value,options:&BTreeMap<String,OptionDef>,factor_outcomes:&
    let raw=object(val(v,"branches",&l)?,&format!("{l}.branches"))?;
    let branches=raw.iter().map(|(k,x)|Ok((k.clone(),x.as_str().ok_or("branch target must be string")?.to_owned()))).collect::<Result<BTreeMap<_,_>,String>>()?;
    let factor=factor_outcomes.get(&opt.factor_id).ok_or_else(||format!("missing factor outcome set for {:?}",opt.factor_id))?;
-   if branches.keys().cloned().collect::<BTreeSet<_>>()!=*factor{return Err(format!("{l}.branches must cover every factor outcome exactly"));}
+   if branches.keys().cloned().collect::<BTreeSet<_>>()!=factor.clone(){return Err(format!("{l}.branches must cover every factor outcome exactly"));}
    Node{id:id.clone(),kind:kind.clone(),option_id:Some(option),at:Some(at),branches,decision_kind:None,action_id:None,claimed:0}
   }else if kind=="stop"{
    allowed(v,&["node_id","kind","decision_kind","action_id","claimed_residual_risk_bps"],&l)?;
@@ -191,7 +198,25 @@ fn parse_candidate_oracle(candidate:&Value,oracle:&Value)->Result<(BTreeMap<Stri
  }
  let actual=s(oracle,"actual_hypothesis_id","oracle")?;if !worlds.contains_key(&actual){return Err("actual_hypothesis_id is not a world".to_owned());}
  let outcomes=factor_outcomes(candidate)?;
- for (id,w) in &worlds{for (opt,outcome) in &w.observations{let factor=&options[opt].factor_id;if !outcomes[factor].contains(outcome){return Err(format!("world {id:?} has unknown outcome {outcome:?} for {opt:?}"));}}}
+ let factor_rows=candidate["factors"].as_array().ok_or("candidate factors must be array")?;
+ for (id,world) in &worlds{
+  for (option_id,outcome) in &world.observations{
+   let factor_id=&options[option_id].factor_id;
+   if !outcomes[factor_id].contains(outcome){
+    return Err(format!("world {id:?} has unknown outcome {outcome:?} for {option_id:?}"));
+   }
+   let factor=factor_rows.iter().find(|f|f["factor_id"].as_str()==Some(factor_id.as_str()))
+    .ok_or_else(||format!("missing factor {factor_id:?}"))?;
+   let row=factor["likelihoods"].as_array().ok_or("factor likelihoods must be array")?.iter()
+    .find(|r|r["hypothesis_id"].as_str()==Some(id.as_str()))
+    .ok_or_else(||format!("factor {factor_id:?} missing likelihood for world {id:?}"))?;
+   let upper=row["outcomes"][outcome]["upper_likelihood_bps"].as_u64()
+    .ok_or_else(||format!("factor {factor_id:?} outcome {outcome:?} is invalid"))?;
+   if upper==0{
+    return Err(format!("world {id:?} emits outcome {outcome:?} despite zero likelihood in factor {factor_id:?}"));
+   }
+  }
+ }
  Ok((bounds,actions,options,worlds,outcomes,actual,budget,max_depth))
 }
 fn nearest_rank_expected_cost(bounds:&BTreeMap<String,Bounds>,costs:&BTreeMap<String,u64>)->Result<u64,String>{
