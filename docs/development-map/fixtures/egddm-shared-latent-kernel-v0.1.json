@@ -343,6 +343,29 @@
             "option_id": "gate-b",
             "cost_micros": 200
           }
+        ],
+        "action_constraints": [
+          {
+            "action_id": "release",
+            "read_only": false,
+            "irreversible": false,
+            "hard_gate": false,
+            "max_residual_risk_bps": 4500,
+            "safe_hypotheses": [
+              "safe-world"
+            ]
+          },
+          {
+            "action_id": "inspect-readonly",
+            "read_only": true,
+            "irreversible": false,
+            "hard_gate": false,
+            "max_residual_risk_bps": 0,
+            "safe_hypotheses": [
+              "common-cause-hazard",
+              "safe-world"
+            ]
+          }
         ]
       }
     ]
