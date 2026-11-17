@@ -11,9 +11,11 @@ The initial target is a compact, rights-aware adapter for the historical DARPA S
 ## Contract
 
 Inputs:
-- ground-truth artifact ID, original source type string and x/y/z coordinates;
-- candidate report ID, original source type string, x/y/z estimate and caller-provided priority;
-- explicit localization tolerance and optional maximum report count.
+- ground-truth artifact ID, exact coordinate-frame ID, original source type string and x/y/z coordinates;
+- candidate report ID, exact coordinate-frame ID, original source type string, x/y/z estimate and caller-provided priority;
+- an expected coordinate-frame ID, explicit localization tolerance and optional maximum report count.
+
+All coordinates must already be expressed in the exact expected frame and in metres. Frame mismatches reject; the evaluator never guesses CRS, axis order, units or transforms.
 
 Evaluation:
 - selects at most the configured report budget, highest priority first, stable lexical ID tie-break;
