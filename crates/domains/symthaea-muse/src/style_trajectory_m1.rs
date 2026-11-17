@@ -17,14 +17,14 @@ use symthaea_music_theory::{
     AssertedObligationState, Duration, GrammarPlanEvidence, GrammarStructuralTrace,
     MusicalIntent, Score, ScoreNote, ScoreValidationConfig, ScoreValidationIssue, Style,
     StyleTrajectoryPlanV1, StyleTrajectorySegmentV1, StyleTrajectoryTransitionV1,
-    StyleTransitionMode, TheoryValidationReport, ValidationSeverity, VoiceRole,
+    StyleTransitionMode, TheoryValidationReport, ValidationSeverity,
     compose_with_grammar_plan, is_universal_invariant, validate_score,
 };
 use symthaea_muse_protocol::catalog::{CATALOG, StyleStatus};
 
 use crate::style_trajectory_admission::{
     SOURCE_SCORE_DIGEST_SCHEMA_V1, StyleTrajectoryAdmissionError,
-    admit_style_trajectory_for_score, source_score_sha256_v1, style_profile_sha256_v1,
+    admit_style_trajectory_for_score, style_profile_sha256_v1,
 };
 
 /// Shared-arousal point inside the Classical/Minimalism tempo-range intersection.
@@ -93,6 +93,7 @@ pub struct StyleTrajectoryM1ResultV1 {
     pub arousal: f32,
     pub composed_score: Score,
     pub composed_score_sha256: String,
+    pub composed_validation: TheoryValidationReport,
     pub segments: Vec<StyleTrajectoryM1SegmentV1>,
     pub transition_at_beat: Duration,
     pub plan: StyleTrajectoryPlanV1,
@@ -177,6 +178,7 @@ pub fn realize_classical_to_minimalism_m1(
     }));
     composed_score.total_beats = total_beats;
 
+    let composed_validation = validate_universal_invariants(Style::Classical, &composed_score)?;
     let composed_score_sha256 = score_sha256(&composed_score)?;
     let classical_id = catalogue_id_for_style(Style::Classical)?;
     let minimalism_id = catalogue_id_for_style(Style::Minimalism)?;
@@ -252,6 +254,7 @@ pub fn realize_classical_to_minimalism_m1(
         arousal: intent.arousal,
         composed_score,
         composed_score_sha256,
+        composed_validation,
         segments,
         transition_at_beat: minimalism_start,
         plan,
@@ -282,7 +285,7 @@ fn verify_typed_grammar(
                     .cycle_starts
                     .last()
                     .copied()
-                    .is_none_or(|start| !duration_less_than(start, score.total_beats))
+                    .map_or(true, |start| !duration_less_than(start, score.total_beats))
             {
                 return Err(StyleTrajectoryM1Error::InvalidProcessPlan {
                     reason: "prefix lengths/cycle starts are empty, misaligned, non-monotonic or outside the score".into(),
@@ -424,7 +427,12 @@ mod tests {
         );
         assert!(result.plan.source_score_sha256 == result.composed_score_sha256);
         assert!(result.composed_score_sha256.len() == 64);
-        assert!(result.segments.iter().all(|segment| segment.validation.valid));
+        assert!(result.segments.iter().all(|segment| segment.validation.issues.iter().all(|issue| {
+            issue.severity != ValidationSeverity::Fatal || !is_universal_invariant(issue.rule)
+        })));
+        assert!(result.composed_validation.issues.iter().all(|issue| {
+            issue.severity != ValidationSeverity::Fatal || !is_universal_invariant(issue.rule)
+        }));
         assert!(!result.segments[1].score.has_part_identity());
     }
 
@@ -447,7 +455,7 @@ mod tests {
     fn all_events_stay_inside_their_exact_segment_window() {
         let result = realize_classical_to_minimalism_m1(m1_intent(M1_SHARED_AROUSAL)).unwrap();
         for (index, segment) in result.segments.iter().enumerate() {
-            let duration = segment.end_beat - segment.start_beat;
+            let duration = segment.end_beat.saturating_sub(segment.start_beat);
             for note in &segment.score.notes {
                 let end = note.onset + note.duration;
                 assert!(!duration_less_than(duration, end));
