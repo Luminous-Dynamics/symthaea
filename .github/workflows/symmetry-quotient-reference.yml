@@ -5,11 +5,13 @@ on:
     types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
     paths:
       - "research/symmetry-quotient-001/**"
+      - "research/symmetry-query-semantics-001/**"
       - ".github/workflows/symmetry-quotient-reference.yml"
   push:
     branches: [main]
     paths:
       - "research/symmetry-quotient-001/**"
+      - "research/symmetry-query-semantics-001/**"
       - ".github/workflows/symmetry-quotient-reference.yml"
   workflow_dispatch:
 
@@ -40,3 +42,9 @@ jobs:
         run: cargo test --locked --manifest-path research/symmetry-quotient-001/Cargo.toml
       - name: Strict Clippy
         run: cargo clippy --locked --manifest-path research/symmetry-quotient-001/Cargo.toml --all-targets -- -D warnings
+      - name: Format query semantics
+        run: cargo fmt --manifest-path research/symmetry-query-semantics-001/Cargo.toml --all -- --check
+      - name: Test query semantics
+        run: cargo test --locked --manifest-path research/symmetry-query-semantics-001/Cargo.toml
+      - name: Strict Clippy query semantics
+        run: cargo clippy --locked --manifest-path research/symmetry-query-semantics-001/Cargo.toml --all-targets -- -D warnings
