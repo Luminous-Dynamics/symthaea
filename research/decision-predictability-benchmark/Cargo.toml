@@ -10,3 +10,7 @@ description = "Dependency-free metric contracts for decision-relevant dynamical 
 
 [lib]
 path = "src/lib.rs"
+
+[[bin]]
+name = "forecast-fixtures"
+path = "src/bin/forecast-fixtures.rs"
