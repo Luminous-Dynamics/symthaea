@@ -293,7 +293,7 @@ pub fn evaluate_quotient_query(
         };
 
         let additive_contribution = match query.kind {
-            QueryKindV1::Exists => Some(i128::from(included)),
+            QueryKindV1::Exists => Some(included as i128),
             QueryKindV1::Count if included => Some(
                 i128::try_from(orbit.members.len())
                     .map_err(|_| QueryErrorV1::ArithmeticOverflow)?,
@@ -586,7 +586,7 @@ mod tests {
 
     fn fixture() -> (SearchProblemV1, FiniteActionV1, QuotientCertificateV1) {
         let candidate_ids: Vec<String> = (0..16)
-            .map(|index| format!("pair-{:02}", index / 4, ))
+            .map(|index| format!("pair-{index:02}"))
             .collect();
         let semantics = CandidateSemanticsV1 {
             in_search_domain: true,
