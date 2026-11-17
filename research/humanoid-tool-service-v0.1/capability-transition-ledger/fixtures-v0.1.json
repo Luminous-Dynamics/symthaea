@@ -30,7 +30,8 @@
         "status": "OCCURRED",
         "timestamp_ns": 400
       }
-    }
+    },
+    "independent_verifier_id": "synthetic-independent-task-oracle"
   },
   {
     "schema_version": "0.1",
@@ -59,7 +60,8 @@
       "task_success": {
         "status": "INSTRUMENTED_ABSENT"
       }
-    }
+    },
+    "independent_verifier_id": "synthetic-independent-task-oracle"
   },
   {
     "schema_version": "0.1",
@@ -91,7 +93,8 @@
       "task_success": {
         "status": "INSTRUMENTED_ABSENT"
       }
-    }
+    },
+    "independent_verifier_id": "synthetic-independent-task-oracle"
   },
   {
     "schema_version": "0.1",
@@ -120,7 +123,8 @@
       "task_success": {
         "status": "INSTRUMENTED_ABSENT"
       }
-    }
+    },
+    "independent_verifier_id": "synthetic-independent-task-oracle"
   },
   {
     "schema_version": "0.1",
@@ -152,7 +156,8 @@
       "task_success": {
         "status": "INSTRUMENTED_ABSENT"
       }
-    }
+    },
+    "independent_verifier_id": "synthetic-independent-task-oracle"
   },
   {
     "schema_version": "0.1",
@@ -183,6 +188,7 @@
       "task_success": {
         "status": "NOT_INSTRUMENTED"
       }
-    }
+    },
+    "independent_verifier_id": "synthetic-independent-task-oracle"
   }
 ]
