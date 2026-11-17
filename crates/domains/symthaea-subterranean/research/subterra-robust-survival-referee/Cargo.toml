@@ -1,0 +1,16 @@
+[package]
+name = "subterra-robust-survival-referee"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Independent finite-model referee for shared Subterra survival policy trees"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+subterra-survival-reference = { path = "../subterra-survival-planner" }
+
+[workspace]
