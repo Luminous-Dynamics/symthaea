@@ -152,7 +152,7 @@ fn validate_attempts(
   if !["pass","fail","unknown","not_applicable"].contains(&result.as_str()){return Err(format!("{l}.result is invalid"));}
   let event_queued=timestamp(&string(row,"queued_at",&l)?,&format!("{l}.queued_at"))?;
   if event_queued<receipt_queued_at{return Err(format!("{l}.queued_at precedes run receipt queued_at"));}
-  if previous_queue.is_some_and(|previous|event_queued<previous){return Err(format!("{label} attempt queue times regress"));}
+  if previous_queue.as_ref().is_some_and(|previous|&event_queued<previous){return Err(format!("{label} attempt queue times regress"));}
   previous_queue=Some(event_queued);
   let started=optional_time(row,"started_at",&l)?;
   let completed=optional_time(row,"completed_at",&l)?;
@@ -161,15 +161,15 @@ fn validate_attempts(
   let cpu=uint(row,"cpu_ms",&l)?;let gpu=uint(row,"gpu_ms",&l)?;let network=uint(row,"network_bytes",&l)?;
   if let Some(start)=started{
    if start<event_queued{return Err(format!("{l}.started_at precedes attempt queued_at"));}
-   if run_started.is_some_and(|x|start<x){return Err(format!("{l}.started_at precedes run_started_at"));}
-   earliest_started=Some(earliest_started.map_or(start,|x|x.min(start)));
+   if run_started.as_ref().is_some_and(|x|&start<x){return Err(format!("{l}.started_at precedes run_started_at"));}
+   earliest_started=Some(earliest_started.as_ref().map_or(start.clone(),|x|x.min(start)));
   }
   if let Some(end)=completed{
    let start=started.ok_or_else(||format!("{l}.completed_at requires started_at"))?;
    if end<start{return Err(format!("{l}.completed_at precedes started_at"));}
-   if run_finished.is_some_and(|x|end>x){return Err(format!("{l}.completed_at follows run_finished_at"));}
-   latest_completed=Some(latest_completed.map_or(end,|x|x.max(end)));
-   let actual=(end-start).num_milliseconds().max(0) as u64;
+   if run_finished.as_ref().is_some_and(|x|&end>x){return Err(format!("{l}.completed_at follows run_finished_at"));}
+   latest_completed=Some(latest_completed.as_ref().map_or(end.clone(),|x|x.max(end)));
+   let actual=(end-start.clone()).num_milliseconds().max(0) as u64;
    if elapsed!=Some(actual){return Err(format!("{l}.elapsed_ms does not match the timestamp interval"));}
   }else if elapsed.is_some(){return Err(format!("{l}.elapsed_ms must be null when completed_at is null"));}
   let retry_of=nullable_string(row,"retry_of_event_id",&l)?;
@@ -251,21 +251,21 @@ fn validate_attempts(
   previous_hash=event_hash;
   event_state.insert(event_id,(option,attempt_no,status));
  }
- if let Some(start)=run_started{
+ if let Some(start)=run_started.as_ref(){
   if earliest_started.is_some_and(|x|x<start){return Err(format!("{label} run_started_at follows an attempt start"));}
  }else if earliest_started.is_some(){return Err(format!("{label} attempts started but run_started_at is null"));}
- if let Some(finish)=run_finished{
+ if let Some(finish)=run_finished.as_ref(){
   if finish<queued_at{return Err(format!("{label} run_finished_at precedes queued_at"));}
   if latest_completed.is_some_and(|x|x>finish){return Err(format!("{label} run_finished_at precedes an attempt completion"));}
  }else{
   cost_complete=false;wall_complete=false;
  }
  let cost_micros=if cost_complete{Some(total_cost)}else{None};
- let wall_ms=match(run_started,run_finished){
+ let wall_ms=match(run_started.as_ref(),run_finished.as_ref()){
   (Some(start),Some(finish)) if wall_complete&&finish>=start=>Some((finish-start).num_milliseconds() as u64),
   _=>None
  };
- let queue_delay_ms=run_started.map(|start|(start-queued_at).num_milliseconds().max(0) as u64);
+ let queue_delay_ms=run_started.as_ref().map(|start|(start-&queued_at).num_milliseconds().max(0) as u64);
  Ok(RunMetrics{
   run_id:String::new(),task_family:String::new(),paired_seed:0,
   cost_micros,wall_ms,queue_delay_ms,
@@ -314,9 +314,9 @@ fn evaluate(raw:&str)->Result<Value,String>{
   let queued_at=timestamp(&string(receipt,"queued_at",&label)?,&format!("{label}.queued_at"))?;
   let started_at=optional_time(receipt,"run_started_at",&label)?;
   let finished_at=optional_time(receipt,"run_finished_at",&label)?;
-  if started_at.is_some_and(|x|x<queued_at){return Err(format!("{label}.run_started_at precedes queued_at"));}
-  if finished_at.is_some_and(|x|started_at.is_none_or(|start|x<start)){return Err(format!("{label}.run_finished_at requires nondecreasing run_started_at"));}
-  let mut m=validate_attempts(receipt,&option_ids,started_at,finished_at,queued_at,&label)?;
+  if started_at.as_ref().is_some_and(|x|x<&queued_at){return Err(format!("{label}.run_started_at precedes queued_at"));}
+  if finished_at.as_ref().is_some_and(|x|started_at.as_ref().is_none_or(|start|x<start)){return Err(format!("{label}.run_finished_at requires nondecreasing run_started_at"));}
+  let mut m=validate_attempts(receipt,&option_ids,started_at.clone(),finished_at.clone(),queued_at,&label)?;
   let _receipt_digest=checked_digest(receipt,"receipt_sha256",&label)?;
   m.run_id=run_id;m.task_family=task_family;m.paired_seed=paired_seed;
   metrics.push(m);
