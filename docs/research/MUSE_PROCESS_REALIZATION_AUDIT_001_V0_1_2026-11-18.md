@@ -41,7 +41,7 @@ In particular, event-count growth is a structural fact, not a listener-experienc
 
 ## Adversarial fixtures authored
 
-Eight new tests are present in `process_grammar.rs`:
+Nine new tests are present in `process_grammar.rs`:
 
 - accept unmodified realizations for all four declared trajectory kinds;
 - reject a plan with a false cycle count / contour;
@@ -86,13 +86,13 @@ The differentiated proposition is **verifiable musical control**: a generator ca
 
 The next M1 integration should invoke this verifier on the Minimalism segment and retain its report beside the existing trace-integrity report. The verifier should remain narrowly scoped to ProcessAdditive until another grammar family has its own independent semantic contract. The MUSE Analyst typed-obligation work in #9797/#9835 remains the owner for general compositional obligations; this audit does not create a parallel obligation protocol.
 
-## Important limitation: source motif identity is not yet bound
+## Source process-cell binding and remaining provenance boundary
 
-The v1 audit compares each cycle against the maximal-prefix cell **observed in the supplied score**. It does not receive the original `Motif`, a source-cell digest, or an authenticated generation receipt. A coherent pitch transformation applied to every cycle therefore remains internally prefix-consistent and is accepted by this audit.
+The first draft used the maximum-prefix cycle observed in the score as the cell template. That checked internal repetition but could not detect a coherent transformation applied to every cycle. The current implementation improves this: ProcessPlan now carries an optional, serde-defaulted `process_cell` containing the exact post-filter/fallback Motif used by the generator. The verifier requires this field, checks that its length equals the maximum prefix, rejects rests in the normalized cell, and checks every realized pitch and duration against the corresponding source-cell event.
 
-A dedicated test now documents that behavior so this contract is not later overstated. This is intentional scope, not an accidental claim that motif preservation has been proven. The next stronger contract should bind the source cell explicitly (for example, a versioned source-cell digest plus a canonical pitch/rhythm representation) and independently verify each realized cycle against it. That work should reuse the source identity and event-mapping contracts rather than infer identity from `VoiceRole`, event order, or register.
+A test now requires a coherent whole-cell transposition to be rejected. A second test removes the new field from serialized JSON and confirms legacy ProcessPlan data still deserializes, while the source-cell audit returns `MissingProcessCellBinding` rather than silently upgrading legacy evidence.
 
-Likewise, this verifier assumes the supplied plan and score are the inputs being qualified; it does not authenticate their origin. A caller that needs provenance must bind both to an immutable generation receipt and exact pinned engine/input digests.
+This is **source process-cell consistency**, not complete provenance: the cell is a plan field, not a cryptographically authenticated claim about a musician-authored motif. A caller needing tamper evidence must pin the complete plan, score, input intent/spec and engine revision in an immutable receipt. The current generator's cell is derived from the selected CompositionSpec and frozen intent; it is not proof of preservation of some separate user-authored motif that was never supplied to this API.
 
 ## November 2026 external benchmark and product context
 
@@ -143,6 +143,6 @@ For deterministic structural invariants, the target should be 100% on frozen pos
 ## Validation status
 
 - Source authored on a branch based on current `main` at `67939c904adcfafd246848b74cd53c52a2cca244`.
-- Eight new Rust unit tests authored, including the 4,096-case deterministic holdout matrix.
+- Nine new Rust unit tests authored, including the 4,096-case deterministic holdout matrix.
 - Cargo/rustc/rustfmt execution unavailable in this environment; compilation, formatting and test results are pending.
 - No workflow pass, audio result, human preference result, or SOTA superiority is claimed.
