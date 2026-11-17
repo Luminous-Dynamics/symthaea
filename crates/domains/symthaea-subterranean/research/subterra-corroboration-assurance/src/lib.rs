@@ -418,6 +418,7 @@ pub fn admit_corroboration_portfolio(
             &mut reasons,
             missing(&source.observation_receipt_digest)
                 || missing(&source.calibration_receipt_digest)
+                || missing(&source.rights_receipt_digest)
                 || missing(&source.source_dataset_digest),
             RejectionReason::EmptyDigest,
         );
