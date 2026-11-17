@@ -1,0 +1,10 @@
+[package]
+name = "broca-mace-evaluator"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Separate scenario and evaluator for Broca MACE synthetic transfer benchmark"
+
+[dependencies]
+broca-mace-policy = { path = "../policy" }
