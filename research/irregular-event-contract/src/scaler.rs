@@ -445,7 +445,8 @@ mod tests {
         let samples = vec![
             sample(1, 1, 1, 1, 1.0), sample(2, 1, 1, 2, 3.0),
             sample(1, 1, 2, 3, 10.0), sample(2, 1, 2, 4, 20.0),
-            sample(101, 2, 1, 5, 100.0), sample(102, 2, 1, 6, 300.0),
+            sample_at(101, 2, 1, 5, 95, 100.0),
+            sample_at(102, 2, 1, 6, 195, 300.0),
         ];
         let scaler = TrainOnlyStandardizer::fit(&windows, &plan, &samples).unwrap();
         assert_eq!(scaler.scale(1, 1).unwrap().mean, 2.0);
