@@ -339,9 +339,9 @@ mod tests {
         let (schema, registry) = committed_inputs();
         let receipt = audit_registry(&schema, &registry).expect("registry must pass");
         assert_eq!(receipt["status"], "pass");
-        assert_eq!(receipt["source_count"], 7);
-        assert_eq!(receipt["candidate_count"], 5);
-        assert_eq!(receipt["benchmark_catalog_count"], 3);
+        assert_eq!(receipt["source_count"], 8);
+        assert_eq!(receipt["candidate_count"], 8);
+        assert_eq!(receipt["benchmark_catalog_count"], 4);
     }
 
     #[test]
