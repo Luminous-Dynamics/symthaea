@@ -200,3 +200,14 @@ Until those inputs are closed, the next work is CAD/ODD capture, candidate swatc
 - 3D woven/knitted spacer textile critical review (2024): https://doi.org/10.1177/15280837241253614
 - 1X NEO official product description: https://www.1x.tech/neo
 - ASP Protection robot cover range: https://www.asp-protection.eu/
+
+
+## 14. Candidate-scoped gates and evidence admission
+
+The companion contract is implemented in `symthaea-engineering::lightshell_qualification` and documented in `ROBOT_LIGHTSHELL_QUALIFICATION_CONTRACT_V0_1.md`.
+
+Every hard gate is now recorded per candidate (six candidates × nine gates), and each metric observation is candidate-scoped (six candidates × seven metrics in the seed fixture). One candidate's pass cannot discharge another candidate's gate. A failed or inconclusive run remains visible and blocks that candidate from ranking.
+
+Ranking eligibility requires an exact matched B0 baseline, a common coverage boundary, all candidate-scoped gates resolved acceptably, at least one evidence-complete passed module/integrated test, no adverse run, and observed core metrics with method and uncertainty references. The validator returns eligible candidate IDs only; it does not calculate Pareto dominance or claim superiority.
+
+The seed fixture remains `inputs_pending`: all gate states are unknown, all observed/target/baseline metric values are null, and no test runs exist. This remains an explicit non-result.
