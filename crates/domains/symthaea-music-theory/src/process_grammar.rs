@@ -36,6 +36,279 @@ pub struct ProcessRealization {
     pub plan: ProcessPlan,
 }
 
+
+/// Versioned score-side audit schema for additive-process realization.
+pub const PROCESS_REALIZATION_AUDIT_SCHEMA_VERSION: u16 = 1;
+
+/// A successful score-side audit of a planned additive process.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProcessRealizationAuditV1 {
+    pub schema_version: u16,
+    pub cycle_count: usize,
+    pub observed_melody_event_count: usize,
+    pub maximum_prefix_length: usize,
+}
+
+/// A fail-closed mismatch between an additive-process plan and its realized score.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProcessRealizationAuditError {
+    EmptyPlan,
+    CycleStartCountMismatch {
+        prefix_count: usize,
+        cycle_start_count: usize,
+    },
+    FirstCycleDoesNotStartAtZero {
+        actual: Duration,
+    },
+    NonPositivePrefixLength {
+        cycle_index: usize,
+    },
+    TrajectoryContourMismatch {
+        cycle_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    NonIncreasingCycleStart {
+        cycle_index: usize,
+    },
+    InvalidCycleWindow {
+        cycle_index: usize,
+    },
+    MelodyEventOutsideTrajectory {
+        event_index: usize,
+        onset: Duration,
+    },
+    MelodyEventCrossesCycleBoundary {
+        cycle_index: usize,
+        event_index: usize,
+    },
+    CycleStartDoesNotMatchFirstEvent {
+        cycle_index: usize,
+        expected: Duration,
+        actual: Duration,
+    },
+    CyclePrefixLengthMismatch {
+        cycle_index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    PrefixContentMismatch {
+        cycle_index: usize,
+        event_index: usize,
+    },
+    MelodySequenceHasGapOrOverlap {
+        previous_event_index: usize,
+        event_index: usize,
+    },
+    FinalMelodyEndMismatch {
+        expected: Duration,
+        actual: Duration,
+    },
+}
+
+/// Independently verify that the score actually realizes the declared
+/// additive-process trajectory.
+///
+/// This verifier does not trust structural-stage labels in GrammarStructuralTrace.
+/// It re-derives the canonical prefix contour from the declared trajectory kind
+/// and maximum prefix length, partitions the melody by the exact cycle starts,
+/// checks the note count and exact pitch/rhythm prefix in every cycle, and
+/// rejects gaps, overlaps, boundary-crossing notes or unplanned melody events.
+///
+/// The audit qualifies symbolic score realization only. It does not qualify
+/// timbre, renderer behavior, audible process perception or aesthetic quality.
+pub fn verify_additive_process_score_v1(
+    plan: &ProcessPlan,
+    score: &Score,
+) -> Result<ProcessRealizationAuditV1, ProcessRealizationAuditError> {
+    if plan.prefix_lengths.is_empty() {
+        return Err(ProcessRealizationAuditError::EmptyPlan);
+    }
+    if plan.prefix_lengths.len() != plan.cycle_starts.len() {
+        return Err(ProcessRealizationAuditError::CycleStartCountMismatch {
+            prefix_count: plan.prefix_lengths.len(),
+            cycle_start_count: plan.cycle_starts.len(),
+        });
+    }
+    if plan.cycle_starts[0] != Duration::zero() {
+        return Err(ProcessRealizationAuditError::FirstCycleDoesNotStartAtZero {
+            actual: plan.cycle_starts[0],
+        });
+    }
+    for (cycle_index, prefix_length) in plan.prefix_lengths.iter().enumerate() {
+        if *prefix_length == 0 {
+            return Err(ProcessRealizationAuditError::NonPositivePrefixLength { cycle_index });
+        }
+    }
+
+    let maximum_prefix_length = *plan.prefix_lengths.iter().max().expect("non-empty plan");
+    let expected_contour = independent_prefix_contour(plan.trajectory_kind, maximum_prefix_length);
+    for (cycle_index, actual) in plan.prefix_lengths.iter().copied().enumerate() {
+        let expected = expected_contour[cycle_index % expected_contour.len()];
+        if actual != expected {
+            return Err(ProcessRealizationAuditError::TrajectoryContourMismatch {
+                cycle_index,
+                expected,
+                actual,
+            });
+        }
+    }
+
+    for cycle_index in 1..plan.cycle_starts.len() {
+        if !process_duration_less_than(
+            plan.cycle_starts[cycle_index - 1],
+            plan.cycle_starts[cycle_index],
+        ) {
+            return Err(ProcessRealizationAuditError::NonIncreasingCycleStart { cycle_index });
+        }
+    }
+
+    let cycle_end = |cycle_index: usize| {
+        plan.cycle_starts
+            .get(cycle_index + 1)
+            .copied()
+            .unwrap_or(score.total_beats)
+    };
+    for cycle_index in 0..plan.cycle_starts.len() {
+        if !process_duration_less_than(plan.cycle_starts[cycle_index], cycle_end(cycle_index)) {
+            return Err(ProcessRealizationAuditError::InvalidCycleWindow { cycle_index });
+        }
+    }
+
+    let melody: Vec<&ScoreNote> = score
+        .notes
+        .iter()
+        .filter(|note| note.role == VoiceRole::Melody)
+        .collect();
+    if melody.is_empty() {
+        return Err(ProcessRealizationAuditError::CyclePrefixLengthMismatch {
+            cycle_index: 0,
+            expected: plan.prefix_lengths[0],
+            actual: 0,
+        });
+    }
+
+    let mut cycle_events: Vec<Vec<(usize, &ScoreNote)>> =
+        (0..plan.prefix_lengths.len()).map(|_| Vec::new()).collect();
+    for (event_index, note) in melody.iter().enumerate() {
+        let owner = (0..plan.cycle_starts.len()).find(|cycle_index| {
+            let start = plan.cycle_starts[*cycle_index];
+            let end = cycle_end(*cycle_index);
+            !process_duration_less_than(note.onset, start)
+                && process_duration_less_than(note.onset, end)
+        });
+        let Some(cycle_index) = owner else {
+            return Err(ProcessRealizationAuditError::MelodyEventOutsideTrajectory {
+                event_index,
+                onset: note.onset,
+            });
+        };
+        let note_end = note.onset + note.duration;
+        if process_duration_less_than(cycle_end(cycle_index), note_end) {
+            return Err(ProcessRealizationAuditError::MelodyEventCrossesCycleBoundary {
+                cycle_index,
+                event_index,
+            });
+        }
+        cycle_events[cycle_index].push((event_index, *note));
+    }
+
+    for (cycle_index, events) in cycle_events.iter().enumerate() {
+        let expected = plan.prefix_lengths[cycle_index];
+        if events.len() != expected {
+            return Err(ProcessRealizationAuditError::CyclePrefixLengthMismatch {
+                cycle_index,
+                expected,
+                actual: events.len(),
+            });
+        }
+        let actual_start = events[0].1.onset;
+        let expected_start = plan.cycle_starts[cycle_index];
+        if actual_start != expected_start {
+            return Err(ProcessRealizationAuditError::CycleStartDoesNotMatchFirstEvent {
+                cycle_index,
+                expected: expected_start,
+                actual: actual_start,
+            });
+        }
+    }
+
+    for (event_index, pair) in melody.windows(2).enumerate() {
+        if pair[0].onset + pair[0].duration != pair[1].onset {
+            return Err(ProcessRealizationAuditError::MelodySequenceHasGapOrOverlap {
+                previous_event_index: event_index,
+                event_index: event_index + 1,
+            });
+        }
+    }
+
+    let template_cycle_index = plan
+        .prefix_lengths
+        .iter()
+        .position(|length| *length == maximum_prefix_length)
+        .expect("maximum prefix has an index");
+    let template = &cycle_events[template_cycle_index];
+    for (cycle_index, events) in cycle_events.iter().enumerate() {
+        for event_index in 0..events.len() {
+            let observed = events[event_index].1;
+            let expected = template[event_index].1;
+            if observed.pitch != expected.pitch || observed.duration != expected.duration {
+                return Err(ProcessRealizationAuditError::PrefixContentMismatch {
+                    cycle_index,
+                    event_index,
+                });
+            }
+        }
+    }
+
+    let last = melody[melody.len() - 1];
+    let actual_end = last.onset + last.duration;
+    if actual_end != score.total_beats {
+        return Err(ProcessRealizationAuditError::FinalMelodyEndMismatch {
+            expected: score.total_beats,
+            actual: actual_end,
+        });
+    }
+
+    Ok(ProcessRealizationAuditV1 {
+        schema_version: PROCESS_REALIZATION_AUDIT_SCHEMA_VERSION,
+        cycle_count: cycle_events.len(),
+        observed_melody_event_count: melody.len(),
+        maximum_prefix_length,
+    })
+}
+
+/// A separately implemented definition of the four declared prefix contours.
+/// Keep this independent from the planner's construction so a planner drift
+/// cannot automatically make its own score audit pass.
+fn independent_prefix_contour(
+    trajectory_kind: ProcessTrajectoryKind,
+    cell_length: usize,
+) -> Vec<usize> {
+    match trajectory_kind {
+        ProcessTrajectoryKind::Arch => {
+            (1..=cell_length).chain((1..cell_length).rev()).collect()
+        }
+        ProcessTrajectoryKind::Terraced => (1..=cell_length)
+            .flat_map(|length| [length, length])
+            .chain((1..cell_length).rev().flat_map(|length| [length, length]))
+            .collect(),
+        ProcessTrajectoryKind::PeakHold => (1..=cell_length)
+            .chain(std::iter::repeat_n(cell_length, 3))
+            .chain((1..cell_length).rev())
+            .collect(),
+        ProcessTrajectoryKind::AcceleratingRelease => (1..=cell_length)
+            .chain((1..cell_length).rev().step_by(2))
+            .chain([1])
+            .collect(),
+    }
+}
+
+fn process_duration_less_than(left: Duration, right: Duration) -> bool {
+    (left.num() as i128) * (right.den() as i128)
+        < (right.num() as i128) * (left.den() as i128)
+}
+
 pub fn realize_additive_process(
     intent: &MusicalIntent,
     spec: &CompositionSpec,
@@ -242,4 +515,86 @@ mod tests {
             .collect();
         assert_eq!(kinds.len(), 4);
     }
+    #[test]
+    fn score_side_audit_accepts_all_four_declared_trajectory_kinds() {
+        for seed in 0..4 {
+            let intent = MusicalIntent {
+                bars: 4,
+                seed,
+                ..MusicalIntent::default()
+            };
+            let realization = realize_additive_process(&intent, &Style::Minimalism.spec());
+            let report = verify_additive_process_score_v1(&realization.plan, &realization.score)
+                .expect("the unmodified score should realize its declared process");
+            assert_eq!(report.schema_version, PROCESS_REALIZATION_AUDIT_SCHEMA_VERSION);
+            assert_eq!(report.cycle_count, realization.plan.prefix_lengths.len());
+            assert_eq!(
+                report.maximum_prefix_length,
+                *realization.plan.prefix_lengths.iter().max().unwrap()
+            );
+        }
+    }
+
+    #[test]
+    fn score_side_audit_rejects_a_plan_with_a_false_cycle_count() {
+        let realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let mut altered_plan = realization.plan.clone();
+        altered_plan.prefix_lengths[0] += 1;
+        assert!(matches!(
+            verify_additive_process_score_v1(&altered_plan, &realization.score),
+            Err(ProcessRealizationAuditError::TrajectoryContourMismatch { .. })
+                | Err(ProcessRealizationAuditError::CyclePrefixLengthMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn score_side_audit_rejects_mutated_note_content_inside_a_cycle() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let melody_indices: Vec<usize> = realization
+            .score
+            .notes
+            .iter()
+            .enumerate()
+            .filter_map(|(index, note)| (note.role == VoiceRole::Melody).then_some(index))
+            .collect();
+        let changed_note = melody_indices[realization.plan.prefix_lengths[0]];
+        realization.score.notes[changed_note].duration =
+            realization.score.notes[changed_note].duration + Duration::eighth();
+        assert!(verify_additive_process_score_v1(&realization.plan, &realization.score).is_err());
+    }
+
+    #[test]
+    fn score_side_audit_rejects_a_shifted_cycle_boundary() {
+        let realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let mut altered_plan = realization.plan.clone();
+        altered_plan.cycle_starts[1] =
+            altered_plan.cycle_starts[1] + Duration::eighth();
+        assert!(verify_additive_process_score_v1(&altered_plan, &realization.score).is_err());
+    }
+
+    #[test]
+    fn score_side_audit_rejects_missing_melody_events() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let remove_index = realization
+            .score
+            .notes
+            .iter()
+            .position(|note| note.role == VoiceRole::Melody)
+            .unwrap();
+        realization.score.notes.remove(remove_index);
+        assert!(verify_additive_process_score_v1(&realization.plan, &realization.score).is_err());
+    }
+
 }
