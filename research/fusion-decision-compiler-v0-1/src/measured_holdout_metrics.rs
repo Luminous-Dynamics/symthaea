@@ -568,14 +568,13 @@ fn validate_samples(
         {
             diagnostics.push(HoldoutEvaluationDiagnostic::NonFinitePrediction);
         }
-        if let Some(interval) = sample.prediction_interval {
-            if !interval.lower.is_finite()
+        if let Some(interval) = sample.prediction_interval
+            && (!interval.lower.is_finite()
                 || !interval.upper.is_finite()
                 || interval.lower > interval.upper
-                || sample.predicted_value.is_none()
-            {
-                diagnostics.push(HoldoutEvaluationDiagnostic::InvalidPredictionInterval);
-            }
+                || sample.predicted_value.is_none())
+        {
+            diagnostics.push(HoldoutEvaluationDiagnostic::InvalidPredictionInterval);
         }
     }
     let prediction_count = samples
