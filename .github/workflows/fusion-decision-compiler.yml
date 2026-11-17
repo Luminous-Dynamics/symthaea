@@ -52,3 +52,6 @@ jobs:
 
       - name: Run synthetic model decision-stability envelope
         run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_decision_envelope
+
+      - name: Run synthetic empirical holdout stress envelope
+        run: cargo run --manifest-path research/fusion-decision-compiler-v0-1/Cargo.toml --bin audit_empirical_holdout_stress
