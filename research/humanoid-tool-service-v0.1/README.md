@@ -53,6 +53,25 @@ The 53-DOF DAgger example currently configures the Stand task; its OOD correctio
 
 The benchmark's Unitree G1/Dex3 embodiment is a separate physical/configuration subject. **No direct morphology, actuator ordering, units, observation space or control-mode equivalence is assumed.** A compatibility adapter must be specified and tested before any comparison is called matched.
 
+## HLB in the humanoid: the recommended role
+
+**Use Symthaea's Holographic Liquid Brain as the persistent embodied-cognition substrate, not as the hard-real-time servo controller or safety authority.** The HLB hypothesis is that HDC composition, liquid temporal state, prediction, uncertainty, memory and active inference can make the robot better at long-horizon adaptation, tool use and recovery. It must earn that role through matched ablations; high-dimensional representations are not presumed superior.
+
+The current modern trainer already contains an HDC-LTC path: a 16,384-dimensional network feeds a 64-dimensional bottleneck and a morphology-sized learned residual. That residual is composed with task-specific PD baselines and the contact-aware hierarchical controller, then passes fall protection, deterministic safety projection and backend actuation adaptation. Current default trainer configuration is 40 Hz physics and 10 Hz FEP/cognitive cadence. Recurrent learning exists as an optional training path, but is disabled by default; recurrent parameter/state serialization and resume are explicitly blocked, and checkpoints truthfully mark recurrent state as absent.
+
+This is not the same as the legacy `HumanoidEmbodiment::step(thought_hv, dt, phi)` bridge, which consumes an external thought hypervector and uses the older Phi-derived motor tier. Do not conflate those paths or infer physical capability from the architecture.
+
+Recommended composition:
+
+- HLB: embodied belief, body+tool schema, temporal/contact prediction, calibrated uncertainty, active sensing, episodic/semantic/procedural memory and candidate skill learning.
+- Skill executive: typed bounded task-space goals, preconditions, progress, retries, recovery and independent postconditions.
+- Existing whole-body/contact controllers: balance, inverse dynamics, grasp and trajectory tracking.
+- Independent safety/local control: admission, watchdog, e-stop, force/collision limits and qualified fallback; cognition can restrict goal-directed authority but cannot establish plant safety.
+
+The proposed matched baseline matrix (deterministic baseline, MLP, GRU, static HDC, current HDC-LTC, checkpointable recurrent HDC-LTC, HLB memory variants, agentic planner, and planner+HLB hybrid), metrics and prospective targets are specified in [HLB humanoid ablation protocol v0.1](hlb-humanoid-ablation-v0.1.md). The experiment is prospective; it has not established an HLB performance gain.
+
+**Hard dependencies:** recurrent snapshot/restore #1269; cognitive/plant/transport time separation #1284; UEC v2 #1274 and qualification #1288; independent plant-safety/readiness split #1276. Reuse those owners rather than introducing a second recurrent-state, clock or safety contract.
+
 ## Ownership map
 
 This programme composes existing owners and must not duplicate them.
