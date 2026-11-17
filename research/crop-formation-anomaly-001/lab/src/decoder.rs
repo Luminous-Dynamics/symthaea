@@ -82,11 +82,15 @@ pub fn decode(bits: &[bool], spec: &DecoderSpec) -> Result<DecodedPayload, Decod
     if spec.id.trim().is_empty() {
         return Err(DecodeError::EmptyDecoderId);
     }
-    if spec.bits_per_symbol != 7 {
-        return Err(DecodeError::UnsupportedWidth {
-            requested: spec.bits_per_symbol,
-            expected: 7,
-        });
+    match spec.encoding {
+        PayloadEncoding::Ascii7 => {
+            if spec.bits_per_symbol != 7 {
+                return Err(DecodeError::UnsupportedWidth {
+                    requested: spec.bits_per_symbol,
+                    expected: 7,
+                });
+            }
+        }
     }
     if bits.is_empty() || bits.len() % 7 != 0 {
         return Err(DecodeError::IncompleteSymbol {
@@ -115,10 +119,17 @@ pub fn decode(bits: &[bool], spec: &DecoderSpec) -> Result<DecodedPayload, Decod
 
     let printable_count = bytes
         .iter()
-        .filter(|byte| (0x20..=0x7e).contains(byte) || matches!(**byte, b'\n' | b'\r' | b'\t'))
+        .filter(|byte| {
+            (0x20..=0x7e).contains(*byte) || matches!(**byte, b'\n' | b'\r' | b'\t')
+        })
         .count();
     let printable_ascii_fraction = printable_count as f64 / bytes.len() as f64;
-    let hex = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+
+    use std::fmt::Write as _;
+    let mut hex = String::with_capacity(bytes.len() * 2);
+    for byte in &bytes {
+        write!(&mut hex, "{byte:02x}").expect("writing into a String cannot fail");
+    }
 
     Ok(DecodedPayload {
         bytes,
@@ -233,6 +244,14 @@ mod tests {
                 requested: 8,
                 expected: 7
             })
+        );
+    }
+
+    #[test]
+    fn unicode_input_is_not_silently_truncated() {
+        assert_eq!(
+            encode_ascii7("Ā", BitOrder::MostSignificantFirst),
+            Err(DecodeError::NonAsciiInput { byte_index: 0 })
         );
     }
 }
