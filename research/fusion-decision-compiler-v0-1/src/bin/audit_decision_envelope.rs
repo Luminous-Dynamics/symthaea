@@ -77,7 +77,12 @@ fn main() {
             relative_spread_reference_scale: Some(100.0),
         },
         models: vec![
-            model("process-run-001", "PROCESS", 92.0, "shared-density-closure-v1"),
+            model(
+                "process-run-001",
+                "PROCESS",
+                92.0,
+                "shared-density-closure-v1",
+            ),
             model("saras-run-001", "SARAS", 108.0, "shared-density-closure-v1"),
         ],
     };
@@ -90,9 +95,18 @@ fn main() {
     println!("threshold={:.3} MWe", report.threshold_value);
     println!("decision_envelope={:?}", report.disposition);
     println!("spread_disposition={:?}", report.spread_disposition);
-    println!("minimum={:.3} MWe", report.minimum_value.unwrap_or(f64::NAN));
-    println!("maximum={:.3} MWe", report.maximum_value.unwrap_or(f64::NAN));
-    println!("absolute_range={:.3} MW", report.absolute_range.unwrap_or(f64::NAN));
+    println!(
+        "minimum={:.3} MWe",
+        report.minimum_value.unwrap_or(f64::NAN)
+    );
+    println!(
+        "maximum={:.3} MWe",
+        report.maximum_value.unwrap_or(f64::NAN)
+    );
+    println!(
+        "absolute_range={:.3} MW",
+        report.absolute_range.unwrap_or(f64::NAN)
+    );
     println!(
         "relative_range={:.3}",
         report.relative_range.unwrap_or(f64::NAN)
@@ -100,10 +114,7 @@ fn main() {
     for model in &report.model_decisions {
         println!(
             "model={},run={},value_side={:?},output={}",
-            model.solver_id,
-            model.run_id,
-            model.threshold_result,
-            model.output_sha256
+            model.solver_id, model.run_id, model.threshold_result, model.output_sha256
         );
     }
     for pair in &report.dependence_reports {
