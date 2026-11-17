@@ -54,6 +54,8 @@ impl Vec3 {
 #[derive(Debug, Clone, PartialEq)]
 pub struct GroundTruthArtifact {
     pub id: String,
+    /// Exact coordinate-frame identity of the source position.
+    pub coordinate_frame_id: String,
     /// Original source type label; never normalized in this crate.
     pub source_type: String,
     pub position: Vec3,
@@ -62,6 +64,8 @@ pub struct GroundTruthArtifact {
 #[derive(Debug, Clone, PartialEq)]
 pub struct CandidateReport {
     pub id: String,
+    /// Coordinate frame of the report; must exactly match the profile frame.
+    pub coordinate_frame_id: String,
     /// Original report type label; exact string match is required by v0.1.
     pub source_type: String,
     pub position: Vec3,
@@ -71,6 +75,9 @@ pub struct CandidateReport {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ReportProfile {
+    /// All input coordinates must already be expressed in this exact frame.
+    /// The evaluator does not apply or infer coordinate transformations.
+    pub coordinate_frame_id: String,
     /// Maximum number of candidate reports admitted to scoring. None means
     /// that the evaluator applies no report cap.
     pub maximum_reports: Option<usize>,
@@ -80,6 +87,7 @@ pub struct ReportProfile {
 
 impl ReportProfile {
     pub fn validate(self) -> Result<Self, RefereeError> {
+        validate_identifier(&self.coordinate_frame_id, "profile.coordinate_frame_id")?;
         if !self.localization_tolerance_m.is_finite()
             || self.localization_tolerance_m < 0.0
         {
@@ -141,6 +149,11 @@ pub enum RefereeError {
     NonFiniteCoordinate,
     NumericalOverflow,
     InvalidLocalizationTolerance,
+    CoordinateFrameMismatch {
+        record_id: String,
+        expected_frame: String,
+        actual_frame: String,
+    },
 }
 
 impl std::fmt::Display for RefereeError {
@@ -190,6 +203,14 @@ fn validate_inputs(
     let mut truth_ids = BTreeSet::new();
     for artifact in ground_truth {
         validate_identifier(&artifact.id, "ground_truth.id")?;
+        validate_identifier(&artifact.coordinate_frame_id, "ground_truth.coordinate_frame_id")?;
+        if artifact.coordinate_frame_id != profile.coordinate_frame_id {
+            return Err(RefereeError::CoordinateFrameMismatch {
+                record_id: artifact.id.clone(),
+                expected_frame: profile.coordinate_frame_id.clone(),
+                actual_frame: artifact.coordinate_frame_id.clone(),
+            });
+        }
         validate_type_label(&artifact.source_type)?;
         artifact.position.validate()?;
         if !truth_ids.insert(artifact.id.as_str()) {
@@ -200,6 +221,14 @@ fn validate_inputs(
     let mut report_ids = BTreeSet::new();
     for report in reports {
         validate_identifier(&report.id, "candidate_report.id")?;
+        validate_identifier(&report.coordinate_frame_id, "candidate_report.coordinate_frame_id")?;
+        if report.coordinate_frame_id != profile.coordinate_frame_id {
+            return Err(RefereeError::CoordinateFrameMismatch {
+                record_id: report.id.clone(),
+                expected_frame: profile.coordinate_frame_id.clone(),
+                actual_frame: report.coordinate_frame_id.clone(),
+            });
+        }
         validate_type_label(&report.source_type)?;
         report.position.validate()?;
         if !report_ids.insert(report.id.as_str()) {
@@ -411,6 +440,7 @@ mod tests {
     fn truth(id: &str, class: &str, x: f64, y: f64, z: f64) -> GroundTruthArtifact {
         GroundTruthArtifact {
             id: id.into(),
+            coordinate_frame_id: "darpa".into(),
             source_type: class.into(),
             position: Vec3::new(x, y, z),
         }
@@ -426,6 +456,7 @@ mod tests {
     ) -> CandidateReport {
         CandidateReport {
             id: id.into(),
+            coordinate_frame_id: "darpa".into(),
             source_type: class.into(),
             position: Vec3::new(x, y, z),
             priority,
@@ -434,6 +465,7 @@ mod tests {
 
     fn profile(tolerance: f64, maximum_reports: Option<usize>) -> ReportProfile {
         ReportProfile {
+            coordinate_frame_id: "darpa".into(),
             maximum_reports,
             localization_tolerance_m: tolerance,
         }
@@ -559,6 +591,17 @@ mod tests {
         assert!(matches!(
             evaluate_reports(&[truth("g1", "vent", 0.0, 0.0, 0.0)], &reports, profile(5.0, None)),
             Err(RefereeError::DuplicateCandidateReportId(_))
+        ));
+    }
+
+    #[test]
+    fn coordinate_frame_mismatch_is_rejected_without_implicit_transform() {
+        let gt = vec![truth("g1", "vent", 0.0, 0.0, 0.0)];
+        let mut reports = vec![report("r1", "vent", 0.0, 0.0, 0.0, 1)];
+        reports[0].coordinate_frame_id = "utm-16n".into();
+        assert!(matches!(
+            evaluate_reports(&gt, &reports, profile(5.0, None)),
+            Err(RefereeError::CoordinateFrameMismatch { .. })
         ));
     }
 
