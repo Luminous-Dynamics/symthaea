@@ -159,6 +159,16 @@ A 14-month field study of a commercial shower drain heat-recovery exchanger repo
 
 A 2026 shower-system review recommends assessing opportunistic pathogens across water, biofilms and aerosols and across hoses, heads and pipes. For that reason AQS-1 does not use a low-flow or clear-water appearance as a proxy for hygienic qualification; human-use recirculation remains out of scope until independent, use-specific exposure assessment is complete. [2026 review](https://doi.org/10.1016/j.jes.2026.02.034)
 
+
+
+### Competitive position: know which frontier we are and are not pursuing
+
+AQS-1's direct-flow first article is **not** expected to beat the leading recirculating shower on advertised fresh-water volume. At its 6.0 L/min target, a 10-minute active shower uses 60 L before warm-up or other service overhead. KOHLER publishes an EvoCycle example of 5 US gallons / 18.9 L fresh water for a 10-minute Cycle Mode session and a 0.75-US-gallon / 2.84 L Rapid Clean cycle recommended after each shower (about 21.8 L combined before periodic deep-clean inputs). That is a manufacturer-published claim, not independent field qualification, but the order of magnitude matters: direct-flow cannot honestly claim water-use superiority against that stated recirculation mode.
+
+The direct-flow AQS-1 wedge must therefore win on a different, measurable combination: low-pressure task quality, simple/inspectable water path, maintenance burden, lifecycle cost, repairability, thermal efficiency, privacy and reliable manual operation. Its 6.0 L/min target is a local performance hypothesis below the roughly 6.6 L/min mean reported for pressure-compensating products in the referenced South African sample; it is not proof of market leadership. A 4.5 L/min target is a stretch and only advances with full task non-inferiority.
+
+A separate recirculation research path may later compete on the water frontier, but only after independent water, biofilm, aerosol, component, cleaning, multi-session and failure-recovery qualification. No AQS-1 result inherits a recirculation claim or safety status.
+
 ## 8. Fault contract and stop conditions
 
 | Fault / unknown | Required immediate response | Requalification before return |
