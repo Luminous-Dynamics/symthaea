@@ -31,3 +31,7 @@ path = "src/bin/observation_event_audit.rs"
 [[bin]]
 name = "sc_synthesis_protocol_audit"
 path = "src/bin/synthesis_protocol_audit.rs"
+
+[[bin]]
+name = "sc_pair_coherence_audit"
+path = "src/bin/pair_coherence_audit.rs"
