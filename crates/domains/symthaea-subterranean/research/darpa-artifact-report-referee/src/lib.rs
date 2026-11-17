@@ -840,6 +840,47 @@ mod tests {
     }
 
     #[test]
+    fn systems_final_requires_a_source_label_mapping() {
+        let mut ground_truth = preliminary_truth();
+        ground_truth[0].source_type = "unmapped-source-type".into();
+        let reports = Vec::new();
+        let result = evaluate_systems_final_stream(
+            &ground_truth,
+            &reports,
+            SystemsFinalProfile {
+                round: SystemsFinalRound::Preliminary,
+                coordinate_frame_id: "darpa".into(),
+                type_crosswalk: darpa_final_2021_crosswalk_v0_1(),
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(RefereeError::MissingSourceTypeMapping(label))
+                if label == "unmapped-source-type"
+        ));
+    }
+
+    #[test]
+    fn systems_final_rejects_duplicate_crosswalk_entries() {
+        let ground_truth = preliminary_truth();
+        let mut crosswalk = darpa_final_2021_crosswalk_v0_1();
+        crosswalk.mappings.push(crosswalk.mappings[0].clone());
+        let result = evaluate_systems_final_stream(
+            &ground_truth,
+            &[],
+            SystemsFinalProfile {
+                round: SystemsFinalRound::Preliminary,
+                coordinate_frame_id: "darpa".into(),
+                type_crosswalk: crosswalk,
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(RefereeError::DuplicateSourceTypeMapping(_))
+        ));
+    }
+
+    #[test]
     fn darpa_crosswalk_preserves_exact_official_report_strings() {
         let crosswalk = darpa_final_2021_crosswalk_v0_1();
         assert_eq!(crosswalk.version, "darpa-finals-artifact-strings-2021-04-01-v0.1");
