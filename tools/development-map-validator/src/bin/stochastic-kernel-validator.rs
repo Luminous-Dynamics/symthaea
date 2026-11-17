@@ -144,6 +144,9 @@ fn parse_candidate(v:&Value)->Result<(String,String,BTreeMap<String,String>,BTre
  for (option,factor) in &options{if !factors.contains_key(factor){return Err(format!("option {option:?} references missing factor {factor:?}"));}}
  let referenced:BTreeSet<String>=options.values().cloned().collect();
  if referenced!=factors.keys().cloned().collect(){return Err("candidate factors must be referenced by the exact option factor set".to_owned());}
+ if options.values().collect::<BTreeSet<_>>().len()!=options.len(){
+  return Err("each acquisition option must reference a unique factor ID".to_owned());
+ }
  for factor in factors.values(){
   let hypotheses:Vec<String>=factor.likelihoods.keys().cloned().collect();
   for hypothesis in &hypotheses{
@@ -323,6 +326,11 @@ mod tests{
   assert_eq!(pair["frechet_lower_bps"],0);assert_eq!(pair["frechet_upper_bps"],6000);
  }
  #[test]fn nominal_marginals_match_registered_channel(){let r=report();assert_eq!(r["marginal_check_count"],4);}
+ #[test]fn two_options_cannot_alias_one_factor_id(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["candidate_view"]["options"][1]["factor_id"]=json!("gate-a-factor");
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("unique factor ID"));
+ }
  #[test]fn candidate_cannot_inject_oracle_fields(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["world_kernels"]=json!([]);assert!(evaluate(&b.to_string()).unwrap_err().contains("unknown field"));}
  #[test]fn duplicate_joint_outcome_vector_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();let row=b["oracle"]["world_kernels"][0]["joint_outcomes"][0].clone();b["oracle"]["world_kernels"][0]["joint_outcomes"].as_array_mut().unwrap().push(row);assert!(evaluate(&b.to_string()).unwrap_err().contains("duplicate joint outcome"));}
  #[test]fn missing_option_dimension_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["oracle"]["world_kernels"][0]["joint_outcomes"][0]["outcomes"].as_object_mut().unwrap().remove("gate-b");assert!(evaluate(&b.to_string()).unwrap_err().contains("cover every registered option"));}
