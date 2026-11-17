@@ -143,7 +143,7 @@ fn parse_candidate(candidate:&Value)->Result<(String,String,BTreeMap<String,Opti
    allowed(hypothesis,&["hypothesis_id","outcomes"],&hl)?;
    let hid=string(hypothesis,"hypothesis_id",&hl)?;
    if !local_hypotheses.insert(hid.clone()){return Err(format!("duplicate hypothesis {hid:?} in factor {factor_id:?}"));}
-   let raw=obj(get(hypothesis,"outcomes",&hl)?,&format!("{hl}.outcomes"))?;
+   let raw=object(get(hypothesis,"outcomes",&hl)?,&format!("{hl}.outcomes"))?;
    if raw.len()<2||raw.len()>4{return Err(format!("{hl}.outcomes must contain 2..=4 outcome categories"));}
    let names=raw.keys().cloned().collect::<BTreeSet<_>>();
    if !outcomes.is_empty()&&outcomes!=names{return Err(format!("{label} outcome categories differ across hypotheses"));}
@@ -232,7 +232,7 @@ fn parse_kernels(
   for (j,row) in joint.iter().enumerate(){
    let rl=format!("{label}.joint_outcomes[{j}]");
    allowed(row,&["outcomes","probability_bps"],&rl)?;
-   let raw=obj(get(row,"outcomes",&rl)?,&format!("{rl}.outcomes"))?;
+   let raw=object(get(row,"outcomes",&rl)?,&format!("{rl}.outcomes"))?;
    if raw.keys().cloned().collect::<BTreeSet<_>>()!=expected_options{return Err(format!("{rl}.outcomes must cover all registered options exactly"));}
    let mut outcomes=BTreeMap::new();
    for (option,raw_outcome) in raw{
@@ -470,7 +470,7 @@ fn parse_risk_queries(
   }
   bounded_simplex(&priors.values().cloned().collect::<Vec<_>>(),&format!("{label}.prior_bounds"))?;
   if priors.keys().cloned().collect::<BTreeSet<_>>()!=*hypotheses{return Err(format!("{label}.prior_bounds must cover exact hypothesis set"));}
-  let observed=obj(get(query,"observed_outcomes",&label)?,"observed_outcomes")?;
+  let observed=object(get(query,"observed_outcomes",&label)?,"observed_outcomes")?;
   if observed.keys().cloned().collect::<BTreeSet<_>>()!=option_ids{return Err(format!("{label}.observed_outcomes must cover every option exactly"));}
   for (option,value) in observed{
    let outcome=value.as_str().filter(|x|!x.trim().is_empty()).ok_or("observed outcome must be non-empty string")?;
