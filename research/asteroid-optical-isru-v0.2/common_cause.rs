@@ -73,6 +73,7 @@ pub enum CommonCauseFinding {
         disposition: CauseDisposition,
     },
     MissingQualificationEvent(String),
+    CauseEpochAfterMeasurement(String),
     MeasurementTimeInverted(String),
 }
 
@@ -120,6 +121,7 @@ pub enum CommonCauseError {
     UnknownMeasurement(String),
     IneligibleMeasurement(String),
     MeasurementTimeInverted(String),
+    MeasurementNotYetRecorded(String),
     EmptyMeasurementSet,
 }
 
@@ -268,6 +270,11 @@ impl CommonCauseModel {
                 measurement.claim_id.clone(),
             ));
         }
+        if measurement.recorded_at_utc_s > as_of_recorded_at_utc_s {
+            return Err(CommonCauseError::MeasurementNotYetRecorded(
+                measurement.claim_id.clone(),
+            ));
+        }
         let instrument = self
             .instruments
             .get(&measurement.instrument_id)
@@ -314,6 +321,11 @@ impl CommonCauseModel {
                 });
             }
 
+            if measurement.observed_at_utc_s < cause.reference_epoch_utc_s {
+                findings.push(CommonCauseFinding::CauseEpochAfterMeasurement(
+                    cause_id.clone(),
+                ));
+            }
             let elapsed = measurement
                 .observed_at_utc_s
                 .saturating_sub(cause.reference_epoch_utc_s) as f64;
@@ -770,6 +782,32 @@ mod tests {
         assert_eq!(
             value.common_cause_covariance(&left, &right, 200),
             Err(CommonCauseError::IneligibleMeasurement("left".to_string()))
+        );
+    }
+
+    #[test]
+    fn measurement_before_cause_reference_epoch_is_ineligible() {
+        let value = model();
+        let evaluated = value
+            .evaluate(&measurement("pre-epoch", "spectrometer-a", -10, 0), 0)
+            .unwrap();
+        assert!(!evaluated.eligible);
+        assert!(evaluated.findings.contains(
+            &CommonCauseFinding::CauseEpochAfterMeasurement(
+                "lamp-reference".to_string()
+            )
+        ));
+    }
+
+    #[test]
+    fn measurement_is_not_visible_before_its_recorded_time() {
+        let value = model();
+        let reading = measurement("not-yet-recorded", "spectrometer-a", 100, 101);
+        assert_eq!(
+            value.evaluate(&reading, 100),
+            Err(CommonCauseError::MeasurementNotYetRecorded(
+                "not-yet-recorded".to_string()
+            ))
         );
     }
 
