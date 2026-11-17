@@ -635,7 +635,7 @@ fn write_status_row(
         status.to_owned(),
     ];
     output.push_str(&fields.join(","));
-    output.push('\\n');
+    output.push('\n');
 }
 
 fn write_metric_row(
@@ -673,7 +673,7 @@ fn write_metric_row(
         "ok".to_owned(),
     ];
     output.push_str(&fields.join(","));
-    output.push('\\n');
+    output.push('\n');
 }
 
 fn format_optional(value: Option<f64>) -> String {
