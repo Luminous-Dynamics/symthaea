@@ -786,7 +786,7 @@ mod tests {
         let gate = frame
             .evaluate_decision_gate(&["temperature", "density"])
             .expect("valid required channels should evaluate");
-        let DecisionInputGate::Eligible(inputs) = gate else {
+        let DecisionInputGate::MeasuredInputsAvailable(inputs) = gate else {
             panic!("optional synthetic channel must not block required measured-input availability");
         };
         assert_eq!(inputs.values().len(), 2);
