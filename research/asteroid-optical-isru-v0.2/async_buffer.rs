@@ -243,11 +243,7 @@ fn over_budget(cost: &ResourceVector, budget: &ResourceVector) -> Vec<&'static s
 fn validate_policy(policy: PlaceholderPolicy) -> Result<(), AsyncError> {
     match policy {
         PlaceholderPolicy::NoPlaceholder | PlaceholderPolicy::RealisticMean => Ok(()),
-        PlaceholderPolicy::PessimisticBound { beta }
-            if beta.is_finite() && beta >= 0.0 =>
-        {
-            Ok(())
-        }
+        PlaceholderPolicy::PessimisticBound { beta } if beta.is_finite() && beta >= 0.0 => Ok(())
         PlaceholderPolicy::SeededUniform {
             seed,
             radius_multiplier,
@@ -418,9 +414,7 @@ impl AsyncScheduler {
             }
         }
         if launched_at_utc_s > recorded_at_utc_s {
-            return Err(AsyncError::ObservationAfterReceipt(
-                proposal.job_id.clone(),
-            ));
+            return Err(AsyncError::ObservationAfterReceipt(proposal.job_id.clone()));
         }
         if self.seen_job_ids.contains(&proposal.job_id) {
             return Err(AsyncError::DuplicateJob(proposal.job_id));
@@ -430,9 +424,7 @@ impl AsyncScheduler {
             .values()
             .any(|job| job.proposal.candidate == proposal.candidate)
         {
-            return Err(AsyncError::DuplicateInFlightCandidate(
-                proposal.candidate,
-            ));
+            return Err(AsyncError::DuplicateInFlightCandidate(proposal.candidate));
         }
 
         proposal
@@ -449,7 +441,10 @@ impl AsyncScheduler {
                 return Err(AsyncError::DuplicateResourceLock(resource.clone()));
             }
             let busy = self.active_jobs.values().any(|job| {
-                job.proposal.resource_locks.iter().any(|held| held == resource)
+                job.proposal
+                    .resource_locks
+                    .iter()
+                    .any(|held| held == resource)
             });
             if busy {
                 return Err(AsyncError::ResourceLockBusy {
@@ -493,11 +488,7 @@ impl AsyncScheduler {
 
     /// Resolve one in-flight job. Resolution order is independent of launch
     /// order; the event log records receipt time while preserving observation time.
-    pub fn resolve_job(
-        &mut self,
-        job_id: &str,
-        result: ActualResult,
-    ) -> Result<(), AsyncError> {
+    pub fn resolve_job(&mut self, job_id: &str, result: ActualResult) -> Result<(), AsyncError> {
         self.ensure_open()?;
         self.ensure_event_time(result.recorded_at_utc_s)?;
         if !nonempty(&result.result_id) {
@@ -518,8 +509,13 @@ impl AsyncScheduler {
         if self.seen_result_ids.contains(&result.result_id) {
             return Err(AsyncError::DuplicateResult(result.result_id.clone()));
         }
-        if self.actual_observations.contains_key(&result.observation_id) {
-            return Err(AsyncError::DuplicateObservation(result.observation_id.clone()));
+        if self
+            .actual_observations
+            .contains_key(&result.observation_id)
+        {
+            return Err(AsyncError::DuplicateObservation(
+                result.observation_id.clone(),
+            ));
         }
 
         let job = self
@@ -904,8 +900,14 @@ mod tests {
             )
             .unwrap();
 
-        assert_eq!(value.actual_observations["observation-1"].observed_at_utc_s, 11);
-        assert_eq!(value.actual_observations["observation-2"].observed_at_utc_s, 12);
+        assert_eq!(
+            value.actual_observations["observation-1"].observed_at_utc_s,
+            11
+        );
+        assert_eq!(
+            value.actual_observations["observation-2"].observed_at_utc_s,
+            12
+        );
         assert!(value.fantasies_for_model().is_empty());
         assert_eq!(value.reserved.rig_hours, 0.0);
         assert_eq!(value.spent.rig_hours, 2.0);
