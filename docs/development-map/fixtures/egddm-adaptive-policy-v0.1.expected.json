@@ -9,7 +9,6 @@
     "policy_feasible": true,
     "action_coverage_nominal_bps": 6000,
     "unnecessary_abstention_nominal_bps": 0,
-    "actual_unsafe_world_count": 0,
     "robust_risk_violation_leaf_count": 0,
     "over_budget_leaf_count": 0,
     "worst_case_path_cost_bound_micros": 1500,
@@ -82,7 +81,8 @@
         "leaf_node_id": "release-after-b-pass",
         "path_cost_bound_micros": 1500
       }
-    ]
+    ],
+    "unsafe_world_action_count": 0
   },
   "exact_oracle": {
     "search_complete": true,
