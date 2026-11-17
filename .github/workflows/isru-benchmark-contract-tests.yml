@@ -8,6 +8,7 @@ on:
       - 'research/asteroid-optical-isru-v0.2/digital_twin.rs'
       - 'research/asteroid-optical-isru-v0.2/optical_health.rs'
       - 'research/asteroid-optical-isru-v0.2/material_regime.rs'
+      - 'research/asteroid-optical-isru-v0.2/coupled_campaign.rs'
       - 'docs/research/OPTICAL_ISRU_SEALED_AUTONOMOUS_SCIENCE_BENCHMARK_V0_1.md'
       - 'docs/research/OPTICAL_ISRU_B1_DIGITAL_TWIN_AND_DYNAMIC_FOULING_V0_1.md'
       - '.github/workflows/isru-benchmark-contract-tests.yml'
@@ -35,6 +36,7 @@ jobs:
           rustfmt --edition 2021 --check research/asteroid-optical-isru-v0.2/digital_twin.rs
           rustfmt --edition 2021 --check research/asteroid-optical-isru-v0.2/optical_health.rs
           rustfmt --edition 2021 --check research/asteroid-optical-isru-v0.2/material_regime.rs
+          rustfmt --edition 2021 --check research/asteroid-optical-isru-v0.2/coupled_campaign.rs
 
       - name: Run standalone Clippy
         run: |
@@ -43,6 +45,7 @@ jobs:
           clippy-driver --edition=2021 --test research/asteroid-optical-isru-v0.2/digital_twin.rs -o /tmp/isru-digital-twin-clippy -D warnings
           clippy-driver --edition=2021 --test research/asteroid-optical-isru-v0.2/optical_health.rs -o /tmp/isru-optical-health-clippy -D warnings
           clippy-driver --edition=2021 --test research/asteroid-optical-isru-v0.2/material_regime.rs -o /tmp/isru-material-regime-clippy -D warnings
+          clippy-driver --edition=2021 --test research/asteroid-optical-isru-v0.2/coupled_campaign.rs -o /tmp/isru-coupled-campaign-clippy -D warnings
 
       - name: Compile and run exact standalone tests
         run: |
@@ -56,3 +59,5 @@ jobs:
           /tmp/isru-optical-health-tests
           rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/material_regime.rs -o /tmp/isru-material-regime-tests
           /tmp/isru-material-regime-tests
+          rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/coupled_campaign.rs -o /tmp/isru-coupled-campaign-tests
+          /tmp/isru-coupled-campaign-tests
