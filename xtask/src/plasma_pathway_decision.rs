@@ -71,29 +71,57 @@ pub struct DecisionReport {
     pub groups: Vec<GroupReport>,
 }
 #[derive(Debug, Clone, Serialize)]
+pub struct ProbabilityEstimate {
+    pub successes: u32,
+    pub trials: u32,
+    pub probability: f64,
+    pub monte_carlo_standard_error: f64,
+    pub ci95_lower: f64,
+    pub ci95_upper: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BaselineReport {
+    pub method: String,
+    pub ranked_route_ids: Vec<String>,
+    pub scores: BTreeMap<String, f64>,
+    pub eligible_route_count: usize,
+    pub diagnostic_only: bool,
+    pub note: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct GroupReport {
     pub group_id: String,
     pub disposition: String,
     pub reasons: Vec<String>,
     pub routes: Vec<RouteReport>,
     pub pairwise_dominance: Vec<PairReport>,
+    pub diagnostic_baselines: Vec<BaselineReport>,
 }
+
 #[derive(Debug, Clone, Serialize)]
 pub struct RouteReport {
     pub route_id: String,
     pub technology: String,
     pub feasibility_probability: f64,
+    pub feasibility_estimate: ProbabilityEstimate,
     pub robustly_feasible: bool,
     pub pareto_membership_probability: Option<f64>,
+    pub pareto_membership_estimate: Option<ProbabilityEstimate>,
     pub mean_regret: BTreeMap<String, Option<f64>>,
+    pub mean_regret_mcse: BTreeMap<String, Option<f64>>,
     pub p95_regret: BTreeMap<String, Option<f64>>,
 }
+
 #[derive(Debug, Clone, Serialize)]
 pub struct PairReport {
     pub route_a: String,
     pub route_b: String,
     pub a_dominates_b_probability: f64,
+    pub a_dominates_b_estimate: ProbabilityEstimate,
     pub b_dominates_a_probability: f64,
+    pub b_dominates_a_estimate: ProbabilityEstimate,
     pub jointly_feasible_draws: u32,
 }
 #[derive(Debug, Clone)]
@@ -127,6 +155,297 @@ fn dominates(a:&BTreeMap<String,f64>,b:&BTreeMap<String,f64>)->bool {
 fn p95(values:&mut [f64])->Option<f64>{
     if values.is_empty(){return None;} values.sort_by(f64::total_cmp);
     values.get(((values.len()-1) as f64*0.95).ceil() as usize).copied()
+}
+
+fn probability_estimate(successes: u32, trials: u32) -> ProbabilityEstimate {
+    if trials == 0 {
+        return ProbabilityEstimate {
+            successes,
+            trials,
+            probability: 0.0,
+            monte_carlo_standard_error: 0.0,
+            ci95_lower: 0.0,
+            ci95_upper: 1.0,
+        };
+    }
+
+    let n = f64::from(trials);
+    let p = f64::from(successes.min(trials)) / n;
+    let z = 1.959_963_984_540_054_f64;
+    let z2 = z * z;
+    let denominator = 1.0 + z2 / n;
+    let center = (p + z2 / (2.0 * n)) / denominator;
+    let half_width = z
+        * ((p * (1.0 - p) / n) + (z2 / (4.0 * n * n))).sqrt()
+        / denominator;
+    let standard_error = (p * (1.0 - p) / n).sqrt();
+
+    ProbabilityEstimate {
+        successes,
+        trials,
+        probability: p,
+        monte_carlo_standard_error: standard_error,
+        ci95_lower: (center - half_width).clamp(0.0, 1.0),
+        ci95_upper: (center + half_width).clamp(0.0, 1.0),
+    }
+}
+
+fn mean_and_mcse(values: &[f64]) -> (Option<f64>, Option<f64>) {
+    if values.is_empty() {
+        return (None, None);
+    }
+    let mean = values.iter().sum::<f64>() / values.len() as f64;
+    if values.len() < 2 {
+        return (Some(mean), None);
+    }
+    let sum_squared_deviation = values
+        .iter()
+        .map(|value| (value - mean).powi(2))
+        .sum::<f64>();
+    let sample_variance = sum_squared_deviation / (values.len() - 1) as f64;
+    (Some(mean), Some((sample_variance / values.len() as f64).sqrt()))
+}
+
+fn diagnostic_baselines(
+    group: &Group,
+    draws: &[Vec<Sample>],
+    qualified: &[usize],
+) -> Vec<BaselineReport> {
+    let mut means: BTreeMap<usize, BTreeMap<String, f64>> = BTreeMap::new();
+    for &index in qualified {
+        let feasible_values: Vec<&Sample> =
+            draws[index].iter().filter(|sample| sample.feasible).collect();
+        let mut metrics = BTreeMap::new();
+        for metric in OBJECTIVES {
+            let values: Vec<f64> = feasible_values
+                .iter()
+                .filter_map(|sample| sample.values.get(metric).copied())
+                .collect();
+            if !values.is_empty() {
+                metrics.insert(
+                    metric.to_owned(),
+                    values.iter().sum::<f64>() / values.len() as f64,
+                );
+            }
+        }
+        if OBJECTIVES.iter().all(|metric| metrics.contains_key(*metric)) {
+            means.insert(index, metrics);
+        }
+    }
+
+    let mut reports = Vec::new();
+    let eligible: Vec<usize> = qualified
+        .iter()
+        .copied()
+        .filter(|index| means.contains_key(index))
+        .collect();
+
+    let mut incumbents: Vec<usize> = eligible
+        .iter()
+        .copied()
+        .filter(|index| group.routes[*index].technology != "PLASMA")
+        .collect();
+    incumbents.sort_by(|a, b| {
+        means[a]["cost"]
+            .total_cmp(&means[b]["cost"])
+            .then_with(|| group.routes[*a].route_id.cmp(&group.routes[*b].route_id))
+    });
+    let incumbent_scores = incumbents
+        .iter()
+        .map(|index| (group.routes[*index].route_id.clone(), means[index]["cost"]))
+        .collect();
+    reports.push(BaselineReport {
+        method: "BEST_QUALIFIED_NON_PLASMA_INCUMBENT_BY_MEAN_COST".to_owned(),
+        ranked_route_ids: incumbents
+            .iter()
+            .map(|index| group.routes[*index].route_id.clone())
+            .collect(),
+        scores: incumbent_scores,
+        eligible_route_count: incumbents.len(),
+        diagnostic_only: true,
+        note: "Reference-only incumbent ranking among robustly feasible non-plasma routes; it does not select a plasma route or override the Pareto/abstention result.".to_owned(),
+    });
+
+    let mut weighted_scores = BTreeMap::new();
+    let mut topsis_scores = BTreeMap::new();
+    let mut normalized: BTreeMap<usize, BTreeMap<String, f64>> = BTreeMap::new();
+
+    for metric in OBJECTIVES {
+        let min = eligible
+            .iter()
+            .map(|index| means[index][metric])
+            .fold(f64::INFINITY, f64::min);
+        let max = eligible
+            .iter()
+            .map(|index| means[index][metric])
+            .fold(f64::NEG_INFINITY, f64::max);
+        let range = max - min;
+        for index in &eligible {
+            let value = if range.abs() <= f64::EPSILON {
+                0.5
+            } else {
+                (means[index][metric] - min) / range
+            };
+            normalized
+                .entry(*index)
+                .or_default()
+                .insert(metric.to_owned(), value);
+        }
+    }
+
+    for index in &eligible {
+        let score = OBJECTIVES
+            .iter()
+            .map(|metric| normalized[index][*metric])
+            .sum::<f64>()
+            / OBJECTIVES.len() as f64;
+        weighted_scores.insert(group.routes[*index].route_id.clone(), score);
+    }
+
+    let mut weighted_ranking = eligible.clone();
+    weighted_ranking.sort_by(|a, b| {
+        weighted_scores[&group.routes[*a].route_id]
+            .total_cmp(&weighted_scores[&group.routes[*b].route_id])
+            .then_with(|| group.routes[*a].route_id.cmp(&group.routes[*b].route_id))
+    });
+    reports.push(BaselineReport {
+        method: "FIXED_EQUAL_WEIGHT_NORMALIZED_SUM".to_owned(),
+        ranked_route_ids: weighted_ranking
+            .iter()
+            .map(|index| group.routes[*index].route_id.clone())
+            .collect(),
+        scores: weighted_scores,
+        eligible_route_count: eligible.len(),
+        diagnostic_only: true,
+        note: "Equal weights are a deliberately simple diagnostic baseline; normalization and weights are not a normative preference model.".to_owned(),
+    });
+
+    let norms: BTreeMap<String, f64> = OBJECTIVES
+        .iter()
+        .map(|metric| {
+            let norm = eligible
+                .iter()
+                .map(|index| means[index][*metric].powi(2))
+                .sum::<f64>()
+                .sqrt();
+            (metric.to_string(), norm)
+        })
+        .collect();
+    let mut normalized_vector: BTreeMap<usize, BTreeMap<String, f64>> = BTreeMap::new();
+    for index in &eligible {
+        for metric in OBJECTIVES {
+            let norm = norms[metric];
+            normalized_vector
+                .entry(*index)
+                .or_default()
+                .insert(
+                    metric.to_owned(),
+                    if norm <= f64::EPSILON {
+                        0.0
+                    } else {
+                        means[index][metric] / norm
+                    },
+                );
+        }
+    }
+    let ideals: BTreeMap<String, f64> = OBJECTIVES
+        .iter()
+        .map(|metric| {
+            (
+                metric.to_string(),
+                eligible
+                    .iter()
+                    .map(|index| normalized_vector[index][*metric])
+                    .fold(f64::INFINITY, f64::min),
+            )
+        })
+        .collect();
+    let anti_ideals: BTreeMap<String, f64> = OBJECTIVES
+        .iter()
+        .map(|metric| {
+            (
+                metric.to_string(),
+                eligible
+                    .iter()
+                    .map(|index| normalized_vector[index][*metric])
+                    .fold(f64::NEG_INFINITY, f64::max),
+            )
+        })
+        .collect();
+
+    for index in &eligible {
+        let distance_to_ideal = OBJECTIVES
+            .iter()
+            .map(|metric| {
+                (normalized_vector[index][*metric] - ideals[*metric]).powi(2)
+            })
+            .sum::<f64>()
+            .sqrt();
+        let distance_to_anti_ideal = OBJECTIVES
+            .iter()
+            .map(|metric| {
+                (normalized_vector[index][*metric] - anti_ideals[*metric]).powi(2)
+            })
+            .sum::<f64>()
+            .sqrt();
+        let denominator = distance_to_ideal + distance_to_anti_ideal;
+        let score = if denominator <= f64::EPSILON {
+            0.5
+        } else {
+            distance_to_anti_ideal / denominator
+        };
+        topsis_scores.insert(group.routes[*index].route_id.clone(), score);
+    }
+    let mut topsis_ranking = eligible.clone();
+    topsis_ranking.sort_by(|a, b| {
+        topsis_scores[&group.routes[*b].route_id]
+            .total_cmp(&topsis_scores[&group.routes[*a].route_id])
+            .then_with(|| group.routes[*a].route_id.cmp(&group.routes[*b].route_id))
+    });
+    reports.push(BaselineReport {
+        method: "TOPSIS_EQUAL_METRIC_DIRECTION".to_owned(),
+        ranked_route_ids: topsis_ranking
+            .iter()
+            .map(|index| group.routes[*index].route_id.clone())
+            .collect(),
+        scores: topsis_scores,
+        eligible_route_count: eligible.len(),
+        diagnostic_only: true,
+        note: "TOPSIS uses equal metric direction and vector normalization over cost, grid energy and GHG; preference assumptions are not validated.".to_owned(),
+    });
+
+    let mut dominator_counts: BTreeMap<usize, usize> =
+        eligible.iter().map(|index| (*index, 0)).collect();
+    for &candidate in &eligible {
+        for &other in &eligible {
+            if candidate != other && dominates(&means[&other], &means[&candidate]) {
+                *dominator_counts.get_mut(&candidate).unwrap() += 1;
+            }
+        }
+    }
+    let mut pareto_ranking = eligible.clone();
+    pareto_ranking.sort_by(|a, b| {
+        dominator_counts[a]
+            .cmp(&dominator_counts[b])
+            .then_with(|| group.routes[*a].route_id.cmp(&group.routes[*b].route_id))
+    });
+    let pareto_scores = dominator_counts
+        .iter()
+        .map(|(index, count)| (group.routes[*index].route_id.clone(), *count as f64))
+        .collect();
+    reports.push(BaselineReport {
+        method: "CENTRAL_MEAN_NONDOMINATED_SORT".to_owned(),
+        ranked_route_ids: pareto_ranking
+            .iter()
+            .map(|index| group.routes[*index].route_id.clone())
+            .collect(),
+        scores: pareto_scores,
+        eligible_route_count: eligible.len(),
+        diagnostic_only: true,
+        note: "Deterministic non-dominated sorting on conditional mean metrics; this is not NSGA-II and is not the robust stochastic Pareto result.".to_owned(),
+    });
+
+    reports
 }
 fn valid_group(g:&Group,min_feasibility:f64)->Result<(),Vec<String>>{
     let mut e=Vec::new();
@@ -176,10 +495,10 @@ fn constraint_passes(limit:&Limit,values:&BTreeMap<String,f64>)->bool{
 }
 fn evaluate_group(g:&Group,m:&Manifest)->GroupReport{
     if g.service_status!="MATCHED"{
-        return GroupReport{group_id:g.group_id.clone(),disposition:"ABSTAIN_NOT_COMPARABLE".to_owned(),reasons:vec!["routes lack a matched service contract; no ranking permitted".to_owned()],routes:vec![],pairwise_dominance:vec![]};
+        return GroupReport{group_id:g.group_id.clone(),disposition:"ABSTAIN_NOT_COMPARABLE".to_owned(),reasons:vec!["routes lack a matched service contract; no ranking permitted".to_owned()],routes:vec![],pairwise_dominance:vec![],diagnostic_baselines:vec![]};
     }
     if let Err(reasons)=valid_group(g,m.min_feasibility){
-        return GroupReport{group_id:g.group_id.clone(),disposition:"BLOCKED".to_owned(),reasons,routes:vec![],pairwise_dominance:vec![]};
+        return GroupReport{group_id:g.group_id.clone(),disposition:"BLOCKED".to_owned(),reasons,routes:vec![],pairwise_dominance:vec![],diagnostic_baselines:vec![]};
     }
     let n=g.routes.len();let mut draws:Vec<Vec<Sample>>=(0..n).map(|_|Vec::with_capacity(m.draws as usize)).collect();let mut ok=vec![0_u32;n];
     for d in 0..m.draws{
@@ -195,9 +514,28 @@ fn evaluate_group(g:&Group,m:&Manifest)->GroupReport{
     if qualified.len()<2{
         let routes=g.routes.iter().enumerate().map(|(i,r)|{
             let empty: BTreeMap<String, Option<f64>> = OBJECTIVES.iter().map(|x|(x.to_string(),None)).collect();
-            RouteReport{route_id:r.route_id.clone(),technology:r.technology.clone(),feasibility_probability:probs[i],robustly_feasible:robust[i],pareto_membership_probability:None,mean_regret:empty.clone(),p95_regret:empty}
+            RouteReport{
+                route_id:r.route_id.clone(),
+                technology:r.technology.clone(),
+                feasibility_probability:probs[i],
+                feasibility_estimate:probability_estimate(ok[i],m.draws),
+                robustly_feasible:robust[i],
+                pareto_membership_probability:None,
+                pareto_membership_estimate:None,
+                mean_regret:empty.clone(),
+                mean_regret_mcse:empty.clone(),
+                p95_regret:empty,
+            }
         }).collect();
-        return GroupReport{group_id:g.group_id.clone(),disposition:"ABSTAIN_INSUFFICIENT_FEASIBLE_ROUTES".to_owned(),reasons:vec!["fewer than two routes satisfy all hard constraints at the required probability".to_owned()],routes,pairwise_dominance:vec![]};
+        let diagnostic_baselines=diagnostic_baselines(g,&draws,&qualified);
+        return GroupReport{
+            group_id:g.group_id.clone(),
+            disposition:"ABSTAIN_INSUFFICIENT_FEASIBLE_ROUTES".to_owned(),
+            reasons:vec!["fewer than two routes satisfy all hard constraints at the required probability".to_owned()],
+            routes,
+            pairwise_dominance:vec![],
+            diagnostic_baselines,
+        };
     }
     let mut pareto=vec![0_u32;n];
     let mut regrets:Vec<BTreeMap<String,Vec<f64>>>=(0..n).map(|_|OBJECTIVES.iter().map(|x|(x.to_string(),Vec::new())).collect()).collect();
@@ -250,15 +588,61 @@ fn evaluate_group(g:&Group,m:&Manifest)->GroupReport{
         }
     }
     let routes=g.routes.iter().enumerate().map(|(i,r)|{
-        let mut mean=BTreeMap::new();let mut tail=BTreeMap::new();
-        for metric in OBJECTIVES{let values=regrets[i].get_mut(metric).unwrap();mean.insert(metric.to_owned(),if values.is_empty(){None}else{Some(values.iter().sum::<f64>()/values.len() as f64)});tail.insert(metric.to_owned(),p95(values));}
-        RouteReport{route_id:r.route_id.clone(),technology:r.technology.clone(),feasibility_probability:probs[i],robustly_feasible:robust[i],pareto_membership_probability:if robust[i]{Some(f64::from(pareto[i])/f64::from(m.draws))}else{None},mean_regret:mean,p95_regret:tail}
+        let mut mean=BTreeMap::new();
+        let mut mean_mcse=BTreeMap::new();
+        let mut tail=BTreeMap::new();
+        for metric in OBJECTIVES {
+            let values=regrets[i].get_mut(metric).unwrap();
+            let (average,mcse)=mean_and_mcse(values);
+            mean.insert(metric.to_owned(),average);
+            mean_mcse.insert(metric.to_owned(),mcse);
+            tail.insert(metric.to_owned(),p95(values));
+        }
+        let pareto_estimate=if robust[i] {
+            Some(probability_estimate(pareto[i],m.draws))
+        } else {
+            None
+        };
+        RouteReport{
+            route_id:r.route_id.clone(),
+            technology:r.technology.clone(),
+            feasibility_probability:probs[i],
+            feasibility_estimate:probability_estimate(ok[i],m.draws),
+            robustly_feasible:robust[i],
+            pareto_membership_probability:pareto_estimate.as_ref().map(|estimate|estimate.probability),
+            pareto_membership_estimate:pareto_estimate,
+            mean_regret:mean,
+            mean_regret_mcse:mean_mcse,
+            p95_regret:tail,
+        }
     }).collect();
-    let pairwise_dominance=pairs.into_iter().map(|((a,b),(joint,aw,bw))|PairReport{
-        route_a:g.routes[a].route_id.clone(),route_b:g.routes[b].route_id.clone(),
-        a_dominates_b_probability:f64::from(aw)/f64::from(joint),b_dominates_a_probability:f64::from(bw)/f64::from(joint),jointly_feasible_draws:joint
+    let pairwise_dominance=pairs.into_iter().map(|((a,b),(joint,aw,bw))|{
+        let a_estimate=probability_estimate(aw,joint);
+        let b_estimate=probability_estimate(bw,joint);
+        PairReport{
+            route_a:g.routes[a].route_id.clone(),
+            route_b:g.routes[b].route_id.clone(),
+            a_dominates_b_probability:a_estimate.probability,
+            a_dominates_b_estimate:a_estimate,
+            b_dominates_a_probability:b_estimate.probability,
+            b_dominates_a_estimate:b_estimate,
+            jointly_feasible_draws:joint
+        }
     }).collect();
-    GroupReport{group_id:g.group_id.clone(),disposition:"SYNTHETIC_PAIRED_PARETO_ANALYSIS".to_owned(),reasons:vec!["synthetic algorithm exercise only; no physical or commercial claim".to_owned(),"Pareto probability, pairwise dominance and per-metric regret are separate; no scalar score".to_owned()],routes,pairwise_dominance}
+    let diagnostic_baselines=diagnostic_baselines(g,&draws,&qualified);
+    GroupReport{
+        group_id:g.group_id.clone(),
+        disposition:"SYNTHETIC_PAIRED_PARETO_ANALYSIS".to_owned(),
+        reasons:vec![
+            "synthetic algorithm exercise only; no physical or commercial claim".to_owned(),
+            "Pareto probability, pairwise dominance and per-metric regret are separate; no scalar score".to_owned(),
+            "diagnostic baseline rankings are not authoritative and cannot override hard constraints or abstention".to_owned(),
+            "probability intervals quantify Monte Carlo sampling error under the declared synthetic distributions, not physical uncertainty or model validity".to_owned()
+        ],
+        routes,
+        pairwise_dominance,
+        diagnostic_baselines
+    }
 }
 
 pub fn evaluate_decision_manifest_json(source:&str)->Result<DecisionReport,String>{
@@ -323,6 +707,71 @@ mod tests{
     #[test] fn no_coproduct_credit_is_mandatory(){
         let mut v=fixture();v["groups"][0]["routes"][0]["credit_policy"]=serde_json::json!("AVOIDED_PRODUCT_CREDIT");let r=evaluate_decision_manifest_json(&v.to_string()).unwrap();assert_eq!(r.groups[0].disposition,"BLOCKED");
     }
+    #[test]
+    fn feasibility_probability_reports_wilson_interval_and_mcse() {
+        let report=evaluate_decision_manifest_json(FIXTURE).unwrap();
+        let estimate=&report.groups[0].routes[0].feasibility_estimate;
+        assert_eq!(estimate.trials,10_000);
+        assert_eq!(estimate.probability,report.groups[0].routes[0].feasibility_probability);
+        assert!(estimate.ci95_lower<=estimate.probability);
+        assert!(estimate.probability<=estimate.ci95_upper);
+        assert!(estimate.monte_carlo_standard_error>=0.0);
+    }
+
+    #[test]
+    fn wilson_interval_narrows_with_more_draws() {
+        let small=probability_estimate(900,1_000);
+        let large=probability_estimate(9_000,10_000);
+        let small_width=small.ci95_upper-small.ci95_lower;
+        let large_width=large.ci95_upper-large.ci95_lower;
+        assert!(large_width<small_width);
+    }
+
+    #[test]
+    fn wilson_interval_handles_all_success_and_all_failure_edges() {
+        let all_success=probability_estimate(100,100);
+        let all_failure=probability_estimate(0,100);
+        assert_eq!(all_success.probability,1.0);
+        assert_eq!(all_failure.probability,0.0);
+        assert!(all_success.ci95_upper<=1.0);
+        assert!(all_failure.ci95_lower>=0.0);
+        assert!(all_success.ci95_lower<1.0);
+        assert!(all_failure.ci95_upper>0.0);
+    }
+
+    #[test]
+    fn pairwise_dominance_reports_joint_feasible_confidence_denominator() {
+        let report=evaluate_decision_manifest_json(FIXTURE).unwrap();
+        let pair=&report.groups[0].pairwise_dominance[0];
+        assert!(pair.jointly_feasible_draws<=report.draws);
+        assert_eq!(pair.a_dominates_b_estimate.trials,pair.jointly_feasible_draws);
+        assert_eq!(pair.b_dominates_a_estimate.trials,pair.jointly_feasible_draws);
+    }
+
+    #[test]
+    fn baseline_rankings_are_diagnostic_only_and_do_not_override_pareto() {
+        let report=evaluate_decision_manifest_json(FIXTURE).unwrap();
+        let group=&report.groups[0];
+        assert_eq!(group.disposition,"SYNTHETIC_PAIRED_PARETO_ANALYSIS");
+        assert_eq!(group.diagnostic_baselines.len(),4);
+        assert!(group.diagnostic_baselines.iter().all(|baseline|baseline.diagnostic_only));
+        assert!(group.diagnostic_baselines.iter().any(|baseline|baseline.method=="TOPSIS_EQUAL_METRIC_DIRECTION"));
+        assert!(group.diagnostic_baselines.iter().any(|baseline|baseline.method=="FIXED_EQUAL_WEIGHT_NORMALIZED_SUM"));
+    }
+
+    #[test]
+    fn abstention_remains_authoritative_when_hard_constraints_fail() {
+        let mut value=fixture();
+        for route in value["groups"][0]["routes"].as_array_mut().unwrap() {
+            route["metrics"][3]["low"]=serde_json::json!(0.90);
+            route["metrics"][3]["mode"]=serde_json::json!(0.91);
+            route["metrics"][3]["high"]=serde_json::json!(0.92);
+        }
+        let report=evaluate_decision_manifest_json(&value.to_string()).unwrap();
+        assert_eq!(report.groups[0].disposition,"ABSTAIN_INSUFFICIENT_FEASIBLE_ROUTES");
+        assert!(report.groups[0].routes.iter().all(|route|!route.robustly_feasible));
+    }
+
     #[test] fn less_than_10000_draws_is_rejected(){
         let mut v=fixture();v["draws"]=serde_json::json!(9999);assert!(evaluate_decision_manifest_json(&v.to_string()).is_err());
     }
