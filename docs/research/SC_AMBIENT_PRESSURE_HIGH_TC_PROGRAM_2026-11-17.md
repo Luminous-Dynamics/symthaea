@@ -348,3 +348,20 @@ Reported validation includes R²=0.96 against NIMS SuperCon for 2,439 overlappin
 Source: https://arxiv.org/abs/2611.15627
 
 The new [AUTOSUPERCON-REPRO-001 #12642](https://github.com/Luminous-Dynamics/symthaea/issues/12642) requires official data rights/release, source-span audit, measurement condition completeness, specimen identity, extraction calibration and family-held-out reproduction before its records enter the tournament. The source register includes the paper's reported counts and metrics, but no AutoSuperCon raw data have been ingested or claimed as reproduced.
+
+
+## 17. Three-channel Tc evidence contract — 17 November 2026
+
+The BEE-NET experimental follow-up exposed a needed refinement in the registry model: a material may legitimately have both an experimentally measured transition and separate first-principles Tc calculations. Rejecting any record that contains both would erase valuable provenance; placing them in the same field would risk conflating prediction with measurement.
+
+The registry now uses three independent fields:
+
+- `tc_observations`: experimental/reported measurements such as resistive onset, zero resistance, diamagnetic onset, Meissner response or thermodynamic transition.
+- `tc_prediction`: machine-learning or other predictive estimates. The status must begin with `predicted`.
+- `tc_calculations`: first-principles or other computed estimates. The status must begin with `calculated`.
+
+The standalone auditor now enforces channel-specific status prefixes, refuses predicted/calculated values inside `tc_observations`, and permits experimental records to carry separate prediction/calculation fields. Negative controls cover calculation-to-observation promotion and calculation-to-prediction relabeling. This avoids both extremes: dropping calculated context and pretending a calculation was measured.
+
+The evidence registry now contains eight source records, eight material/candidate records and four benchmark catalogs, including the 2026 Be2Hf2Nb / Be2HfNb2 experimental follow-ups and the AutoSuperCon paper benchmark. The registry remains a small literature-grounded seed set, not a comprehensive database or training corpus.
+
+The schema and Rust harness have changed since the prior workflow head. Latest exact-head compiler, tests and clippy status must be read from the current PR run; no Rust pass is claimed until that run reports completed success.
