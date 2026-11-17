@@ -509,7 +509,6 @@ pub fn build_evidence_bound_campaign(
         deployment_bundles: config.deployment_bundles,
         options: admitted_options,
         budget: config.budget,
-        prices: Default::default(),
         assurance: config.assurance,
         maximum_search_nodes: config.maximum_search_nodes,
     };
