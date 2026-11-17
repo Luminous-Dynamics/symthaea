@@ -1,0 +1,86 @@
+{
+  "scenario_id": "d6.18-omitted-actual-hazard-v0.1",
+  "adjudication_status": "synthetic_known_answer_open_world_contamination_evaluation_only",
+  "unknown_hypothesis_id": "unknown-world",
+  "contamination_reserve_bps": 1000,
+  "policy_version": "d6.18-contamination-reserve-v0.1",
+  "actual_hypothesis_is_unknown": true,
+  "closed_world_comparison_available": false,
+  "unknown_world_safe_action_ids": [
+    "inspect-readonly"
+  ],
+  "closed_world_report": null,
+  "open_world_report": {
+    "scenario_id": "d6.18-omitted-actual-hazard-v0.1",
+    "adjudication_status": "synthetic_known_answer_noisy_channel_evaluation_only",
+    "hypothesis_count": 2,
+    "factor_count": 0,
+    "trace_count": 1,
+    "summary": {
+      "unsupported_action_trace_count": 1,
+      "actual_unsafe_action_trace_count": 1,
+      "hard_gate_violation_trace_count": 0,
+      "nominal_false_safe_trace_count": 0,
+      "unnecessary_abstention_trace_count": 0,
+      "invalid_calibration_trace_count": 0,
+      "unqualified_dependence_trace_count": 0,
+      "impossible_output_trace_count": 1,
+      "zero_support_trace_count": 0,
+      "false_observation_events": 1
+    },
+    "traces": [
+      {
+        "trace_id": "withheld-hazard-mimics-safe",
+        "evidence_status": "impossible_output_under_actual_hypothesis",
+        "evidence_accepted": false,
+        "calibration_valid": true,
+        "factorization_qualified": true,
+        "dependence_mode": "single_channel",
+        "temporal_valid": true,
+        "actual_output_possible": false,
+        "false_observation_count": 1,
+        "acquisition_count": 1,
+        "nominal_posterior_risk_bps": 1000,
+        "prior_only_robust_risk_bps": 1000,
+        "likelihood_only_robust_risk_bps": 1000,
+        "worst_case_posterior_risk_bps": 1000,
+        "evidence_support_lower_bps": 10000,
+        "max_residual_risk_bps": 500,
+        "nominal_action_justified": false,
+        "robust_action_justified": false,
+        "unsupported_action": true,
+        "actual_unsafe_action": true,
+        "hard_gate_violation": false,
+        "nominal_false_safe": false,
+        "unnecessary_abstention": false,
+        "claimed_residual_risk_bps": 0,
+        "claimed_risk_understatement": true,
+        "irreversible_action": false
+      }
+    ],
+    "claim_ceiling": "Synthetic evaluator over supplied bounded priors, likelihood intervals, calibration metadata and exact-set factorization certificates. It does not calibrate real sensors, authenticate evidence sources, prove arbitrary dependence bounds, establish real-world risk guarantees, or authorize production actions."
+  },
+  "summary": {
+    "closed_world_unadjudicable_actual_hypothesis": true,
+    "closed_world_false_assurance_trace_count": 0,
+    "closed_world_justified_trace_count": 0,
+    "open_world_justified_trace_count": 0,
+    "open_world_rejected_trace_count": 1
+  },
+  "traces": [
+    {
+      "trace_id": "withheld-hazard-mimics-safe",
+      "closed_world_risk_bps": null,
+      "open_world_risk_bps": 1000,
+      "open_world_risk_uplift_bps": null,
+      "closed_world_action_justified": null,
+      "open_world_action_justified": false,
+      "closed_world_false_assurance": false,
+      "actual_unsafe_action": true,
+      "open_world_evidence_status": "impossible_output_under_actual_hypothesis",
+      "open_world_evidence_support_lower_bps": 10000,
+      "decision_kind": "act"
+    }
+  ],
+  "claim_ceiling": "Synthetic evaluator that injects an evaluator-owned unknown-world hypothesis and contamination reserve into D6.17.1 robust risk evaluation. The reserve is an explicit stress assumption, not an estimated probability of all omitted hazards. It does not prove model completeness, estimate real-world contamination, authenticate unknown-world likelihood bounds, or authorize production actions."
+}
