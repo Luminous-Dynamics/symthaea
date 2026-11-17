@@ -445,10 +445,10 @@ fn validate_inputs(
 
 /// Select candidate reports under the declared budget. This operation is
 /// deterministic and does not inspect ground truth.
-fn select_reports<'a>(
-    reports: &'a [CandidateReport],
+fn select_reports(
+    reports: &[CandidateReport],
     maximum_reports: Option<usize>,
-) -> (Vec<&'a CandidateReport>, Vec<String>) {
+) -> (Vec<&CandidateReport>, Vec<String>) {
     let mut ordered = reports.iter().collect::<Vec<_>>();
     ordered.sort_by(|left, right| {
         left.submission_sequence
