@@ -279,13 +279,9 @@ impl ReplayOracle {
                     prediction.candidate_id,
                 ));
             }
-            if by_id
-                .insert(prediction.candidate_id.clone(), prediction)
-                .is_some()
-            {
-                return Err(ReplayError::DuplicatePrediction(
-                    by_id.keys().last().cloned().unwrap_or_default(),
-                ));
+            let candidate_id = prediction.candidate_id.clone();
+            if by_id.insert(candidate_id.clone(), prediction).is_some() {
+                return Err(ReplayError::DuplicatePrediction(candidate_id));
             }
         }
 
