@@ -1,0 +1,184 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "SENSE-TACTILE-ASSURANCE-BENCH-001",
+  "run_id": "symtropy-field-campaign-2026-11-17-seed-20261117",
+  "claim_class": "synthetic_benchmark",
+  "artifact": {
+    "repository": "https://github.com/Luminous-Dynamics/symtropy",
+    "commit_sha": "7be447267f7e3e5a334955d4eb3fd537bbf9f853",
+    "workflow_run_id": "44043140534",
+    "build_recipe_digest": "sha256:example-build-recipe",
+    "toolchain": "Rust 1.96 / Linux CI",
+    "binary_digest": null
+  },
+  "comparator": {
+    "name": "mechanics_kernel_no_smoothing",
+    "paper_uri": null,
+    "paper_version": null,
+    "reported_claim": null,
+    "code_uri": "https://github.com/Luminous-Dynamics/symtropy/pull/5723",
+    "code_commit_sha": "7be447267f7e3e5a334955d4eb3fd537bbf9f853",
+    "checkpoint_digest": null,
+    "dataset_uri": null,
+    "dataset_version": "paired-synthetic-113-taxel-v0.1",
+    "dataset_license": "internal synthetic fixture",
+    "reproduction_status": "local_reproduction",
+    "transfer_regime": "within_unit_heldout"
+  },
+  "sensor_context": {
+    "stage": "sensorized_body",
+    "sensor": {
+      "article_id": "synthetic-113-taxel-article",
+      "manufacturer": null,
+      "model": "synthetic-113-taxel-seven-module-array",
+      "modality": "synthetic",
+      "transduction": "generated_local_linear_coupling",
+      "taxel_count": 113,
+      "geometry_digest": "sha256:synthetic-113-taxel-layout",
+      "sensor_article_revision": "synthetic-r1"
+    },
+    "electronics": {
+      "revision": "synthetic-readout-r1",
+      "readout_profile_digest": "sha256:synthetic-readout-profile",
+      "addressing_topology": "synthetic-independent-channel",
+      "mux_revision": null,
+      "afe_revision": null,
+      "firmware_revision": "synthetic-fw-r1",
+      "channel_map_digest": "sha256:synthetic-channel-map"
+    },
+    "skin": {
+      "article_id": "synthetic-skin-article",
+      "revision": "synthetic-skin-r1",
+      "material": "synthetic",
+      "material_lot_id": "synthetic-lot-01",
+      "thickness_mm": null
+    },
+    "host": {
+      "article_id": "synthetic-host-article",
+      "revision": "synthetic-host-r1",
+      "mounting_revision": "synthetic-mount-r1",
+      "mount_interface_digest": "sha256:synthetic-interface",
+      "compliance_profile_digest": "sha256:synthetic-compliance",
+      "geometry_digest": "sha256:synthetic-host-geometry",
+      "preload_profile_digest": "sha256:synthetic-preload"
+    },
+    "context_digest": "sha256:synthetic-sensorized-body-context"
+  },
+  "experiment": {
+    "protocol_id": "PHRI-TAC-FIELD-001",
+    "protocol_revision": "0.1",
+    "task_id": "paired-113-taxel-field-reconstruction",
+    "measurand": "latent synthetic contact intensity",
+    "unit": "arbitrary synthetic units",
+    "stimuli_digest": "sha256:synthetic-field-and-mask-generator",
+    "action_digest": null,
+    "environment": {
+      "mode": "deterministic-synthetic",
+      "module_count": 7
+    },
+    "seed": 20261117,
+    "contact_episode_count": 50,
+    "independent_reference_contact_count": null,
+    "active_taxel_site_excitations": null,
+    "operator_time_seconds": null,
+    "elapsed_setup_seconds": null
+  },
+  "splits": {
+    "train_digest": "sha256:synthetic-training-patterns",
+    "adaptation_digest": null,
+    "validation_digest": "sha256:synthetic-validation-patterns",
+    "test_digest": "sha256:synthetic-heldout-fields",
+    "contact_episode_split_digest": "sha256:paired-50-seed-episodes",
+    "physical_article_split_digest": "sha256:synthetic-article-split",
+    "manufacturing_lot_split_digest": "sha256:synthetic-lot-split",
+    "host_skin_mount_split_digest": "sha256:synthetic-host-split",
+    "heldout_truth_digest": "sha256:synthetic-evaluator-truth",
+    "adaptation_contact_count": null,
+    "target_encoder_trained": false
+  },
+  "evidence": {
+    "raw_observation_digest": "sha256:synthetic-native-response-corpus",
+    "primary_reference_receipt_id": "receipt:synthetic-primary-generator",
+    "independent_check_reference_receipt_id": "receipt:synthetic-evaluator-generator",
+    "reference_ancestry_receipt_id": "receipt:synthetic-reference-ancestry",
+    "common_cause_analysis_receipt_id": "receipt:synthetic-common-cause",
+    "calibration_disposition": "not_applicable",
+    "observability_disposition": "partially_observable",
+    "model_adequacy_disposition": "underidentified",
+    "lifecycle_applicability_disposition": "not_applicable",
+    "physical_validation_receipt_id": null,
+    "independent_heldout_evaluator_digest": "sha256:synthetic-evaluator-truth",
+    "receipt_verification_status": "unverified_references"
+  },
+  "scorecards": {
+    "plane_a_physical_measurement": {
+      "status": "synthetic_only",
+      "metrics": [
+        {
+          "name": "mean_field_rmse",
+          "value": 0.07412244169239898,
+          "unit": "arbitrary synthetic units",
+          "notes": "Known mechanics kernel, no smoothing."
+        },
+        {
+          "name": "mean_sensitivity_support_ratio",
+          "value": 0.9998230088495574,
+          "unit": "fraction",
+          "notes": "Sensitivity support, not unique identifiability."
+        },
+        {
+          "name": "mean_native_data_identifiability_ratio",
+          "value": 0.00035398230088495576,
+          "unit": "fraction",
+          "notes": "Per-cell native-data estimability from the admitted response matrix."
+        },
+        {
+          "name": "mean_underidentified_cells",
+          "value": 112.94,
+          "unit": "taxel cells",
+          "notes": "Prior-free native data do not uniquely identify these cells."
+        }
+      ],
+      "baseline_id": "independent_taxel_inversion",
+      "paired_delta": 0.04354390371968091,
+      "confidence_interval": null,
+      "critical_violations": null,
+      "false_alarm_rate": null
+    },
+    "plane_b_representation_prediction": {
+      "status": "not_run",
+      "metrics": [],
+      "baseline_id": null,
+      "paired_delta": null,
+      "confidence_interval": null,
+      "critical_violations": null,
+      "false_alarm_rate": null
+    },
+    "plane_c_decision_value": {
+      "status": "not_run",
+      "metrics": [],
+      "baseline_id": null,
+      "paired_delta": null,
+      "confidence_interval": null,
+      "critical_violations": null,
+      "false_alarm_rate": null
+    },
+    "resources": {
+      "status": "measured",
+      "latency_p50_ms": null,
+      "latency_p95_ms": null,
+      "latency_p99_ms": null,
+      "memory_peak_mb": null,
+      "energy_per_episode_j": null,
+      "measurement_boundary": "Hosted unit-test execution only; no physical sensing-to-actuation path."
+    },
+    "evidence_integrity": {
+      "prediction_promoted_to_measurement": false,
+      "underidentified_cells_silently_qualified": false,
+      "stale_calibration_reused": false,
+      "critical_physical_violation_hidden": false,
+      "false_independence_claim": false,
+      "leakage_negative_control_passed": null
+    }
+  }
+}
