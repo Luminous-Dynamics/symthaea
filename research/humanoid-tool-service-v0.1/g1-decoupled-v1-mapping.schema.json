@@ -16,7 +16,8 @@
     "uec_v2_projection",
     "invariants",
     "negative_controls",
-    "claim_boundary"
+    "claim_boundary",
+    "golden_vectors"
   ],
   "properties": {
     "schema_version": {
@@ -181,6 +182,43 @@
               "unit": {
                 "const": "rad"
               }
+            }
+          }
+        },
+        "ordering_evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "expected_order_source",
+            "source_file",
+            "source_file_sha256",
+            "observed_mechanism",
+            "raw_joint_qpos_materialization_verified",
+            "caveat"
+          ],
+          "properties": {
+            "expected_order_source": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_file": {
+              "type": "string",
+              "minLength": 1
+            },
+            "source_file_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}$"
+            },
+            "observed_mechanism": {
+              "type": "string",
+              "minLength": 1
+            },
+            "raw_joint_qpos_materialization_verified": {
+              "const": false
+            },
+            "caveat": {
+              "type": "string",
+              "minLength": 1
             }
           }
         }
@@ -675,6 +713,12 @@
         },
         "live_hardware_backend": {
           "const": false
+        },
+        "raw_qpos_materialization_verified": {
+          "const": false
+        },
+        "adapter_conformance_status": {
+          "const": "blocked_pending_raw_joint_qpos_materialization_audit_and_UEC_v2_rust_adapter"
         }
       }
     },
@@ -704,7 +748,8 @@
         "physical_calibration",
         "safety_qualification",
         "actuation_authority",
-        "benchmark_execution_claimed"
+        "benchmark_execution_claimed",
+        "adapter_conformance_claimed"
       ],
       "properties": {
         "software_contract_conformance_only": {
@@ -727,6 +772,201 @@
         },
         "benchmark_execution_claimed": {
           "const": false
+        },
+        "adapter_conformance_claimed": {
+          "const": false
+        }
+      }
+    },
+    "golden_vectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose",
+        "raw_joint_qpos",
+        "flat_decoupled_action",
+        "hand_permutation"
+      ],
+      "properties": {
+        "purpose": {
+          "type": "string",
+          "minLength": 1
+        },
+        "raw_joint_qpos": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "source_order",
+            "input_values",
+            "expected_policy_state_values"
+          ],
+          "properties": {
+            "source_order": {
+              "const": "raw_joint_observation.order"
+            },
+            "input_values": {
+              "type": "array",
+              "minItems": 43,
+              "maxItems": 43,
+              "items": {
+                "type": "integer"
+              }
+            },
+            "expected_policy_state_values": {
+              "type": "array",
+              "minItems": 32,
+              "maxItems": 32,
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "flat_decoupled_action": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema_id",
+            "input_values",
+            "expected_named_goal"
+          ],
+          "properties": {
+            "schema_id": {
+              "const": "decoupled_v1"
+            },
+            "input_values": {
+              "type": "array",
+              "minItems": 36,
+              "maxItems": 36,
+              "items": {
+                "type": "number"
+              }
+            },
+            "expected_named_goal": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "left_hand_natural",
+                "right_hand_natural",
+                "left_arm",
+                "right_arm",
+                "torso_roll_pitch_yaw",
+                "base_height_command_m",
+                "navigation"
+              ],
+              "properties": {
+                "left_hand_natural": {
+                  "type": "array",
+                  "minItems": 7,
+                  "maxItems": 7,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "right_hand_natural": {
+                  "type": "array",
+                  "minItems": 7,
+                  "maxItems": 7,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "left_arm": {
+                  "type": "array",
+                  "minItems": 7,
+                  "maxItems": 7,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "right_arm": {
+                  "type": "array",
+                  "minItems": 7,
+                  "maxItems": 7,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "torso_roll_pitch_yaw": {
+                  "type": "array",
+                  "minItems": 3,
+                  "maxItems": 3,
+                  "items": {
+                    "type": "number"
+                  }
+                },
+                "base_height_command_m": {
+                  "type": "number"
+                },
+                "navigation": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "vx_m_s",
+                    "vy_m_s",
+                    "turn_flag",
+                    "target_yaw_rad"
+                  ],
+                  "properties": {
+                    "vx_m_s": {
+                      "type": "number"
+                    },
+                    "vy_m_s": {
+                      "type": "number"
+                    },
+                    "turn_flag": {
+                      "type": "number"
+                    },
+                    "target_yaw_rad": {
+                      "type": "number"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "hand_permutation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "flat_left_hand_values",
+            "expected_natural_order_values",
+            "flat_index_to_natural_source_index",
+            "inverse_is_same_permutation"
+          ],
+          "properties": {
+            "flat_left_hand_values": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "items": {
+                "type": "number"
+              }
+            },
+            "expected_natural_order_values": {
+              "type": "array",
+              "minItems": 7,
+              "maxItems": 7,
+              "items": {
+                "type": "number"
+              }
+            },
+            "flat_index_to_natural_source_index": {
+              "const": [
+                0,
+                1,
+                2,
+                5,
+                6,
+                3,
+                4
+              ]
+            },
+            "inverse_is_same_permutation": {
+              "const": true
+            }
+          }
         }
       }
     }
