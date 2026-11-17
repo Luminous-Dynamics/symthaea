@@ -196,9 +196,7 @@ uniqueness), then commits without cloning the full append-only ledger. The
 commit phase has no remaining typed-error branch; invalid batches leave the
 ledger digest and all indexes unchanged. This makes successful append work
 proportional to incoming batch size plus index insertion rather than total
-history size. The exact-head scaling benchmark records this arrival-path time
-separately from query and full-replay timings. The rollback guarantee is for
-typed validation errors; it is not a durable transaction or OOM-recovery claim.
+history size. The exact-head benchmark now runs a matched clone-per-transaction reference from the same progress-only state and same four generated batches. Both strategies must produce identical final ledger SHA-256 digests before their total ingestion time, ns/event and clone/direct speedup are recorded separately from query and full-replay timings. The rollback guarantee is for typed validation errors; it is not a durable transaction or OOM-recovery claim.
 
 ## Reproducible source-watermark scaling benchmark
 
