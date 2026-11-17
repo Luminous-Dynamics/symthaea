@@ -1,0 +1,29 @@
+name: Subterra inspection evidence admission
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/subterra-inspection-evidence-gate.yml"
+      - "crates/domains/symthaea-subterranean/research/subterra-inspection-evidence-gate/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+      - name: Install pinned Rust
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-evidence-gate/Cargo.toml -- --check
+      - name: Run tests
+        run: cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-evidence-gate/Cargo.toml --all-targets --offline
+      - name: Run synthetic evidence admission
+        run: cargo run --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-evidence-gate/Cargo.toml --example synthetic_admission --offline
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-inspection-evidence-gate/Cargo.toml --all-targets --offline -- -D warnings
