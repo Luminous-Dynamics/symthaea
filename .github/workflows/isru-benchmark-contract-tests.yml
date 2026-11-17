@@ -1,0 +1,34 @@
+name: ISRU Sealed Benchmark Contract Tests
+
+on:
+  pull_request:
+    paths:
+      - 'research/asteroid-optical-isru-v0.2/benchmark_contract.rs'
+      - '.github/workflows/isru-benchmark-contract-tests.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Format, Clippy and standalone Rust tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: clippy, rustfmt
+
+      - name: Check formatting
+        run: rustfmt --edition 2021 --check research/asteroid-optical-isru-v0.2/benchmark_contract.rs
+
+      - name: Run standalone Clippy
+        run: clippy-driver --edition=2021 --test research/asteroid-optical-isru-v0.2/benchmark_contract.rs -o /tmp/isru-benchmark-contract-clippy -D warnings
+
+      - name: Compile and run exact standalone tests
+        run: |
+          rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/benchmark_contract.rs -o /tmp/isru-benchmark-contract-tests
+          /tmp/isru-benchmark-contract-tests
