@@ -304,6 +304,19 @@
         }
       },
       "primary_claim_boundary": "External evidence library and API, not an independent validation authority. Public counts have different entity/scope/time bases; the API stats snapshot and website stats page reported different refresh times on 2026-11-17. Snapshot, licence, source revision, query conditions and evidence status must be preserved for every import."
+    },
+    {
+      "source_id": "synthesis_protocol_property_2026",
+      "doi": "10.1088/2515-7639/ae6e72",
+      "arxiv_id": "2605.00313",
+      "url": "https://doi.org/10.1088/2515-7639/ae6e72",
+      "published": "2026-05-29",
+      "source_type": "peer_reviewed_perspective_protocol_first_materials_discovery",
+      "title": "Beyond structure: revolutionising materials discovery via AI-driven synthesis protocol-property relationships",
+      "author": "Guillaume Lambard",
+      "nims_record": "https://mdr.nims.go.jp/datasets/db14c5de-27d9-4758-8395-d61a6204fe42",
+      "licence": "CC BY 4.0",
+      "primary_claim_boundary": "Perspective framework for synthesis-first materials discovery. The cited <2% realisation of >50,000 low-enthalpy phases is a literature-review estimate, not a measured superconductivity-specific synthesis rate. No superconducting recipe or independent experiment is validated by this paper."
     }
   ],
   "candidate_records": [
@@ -729,6 +742,16 @@
       },
       "metric_interpretation": "Scope and entity counts for a versioned external library; not independently verified experimental record counts, not a validated benchmark cohort, and not a count of independent experiments.",
       "local_reproducibility_status": "not_reproduced; audit snapshot/page/API count bases, source rights, same-record condition semantics and cross-library overlap under #12669"
+    },
+    {
+      "catalog_id": "Synthesis-Protocol-Property-2026",
+      "source_ids": [
+        "synthesis_protocol_property_2026"
+      ],
+      "reported_record_count": 0,
+      "reported_metric": null,
+      "metric_interpretation": "Framework and benchmark-design reference only; not an experimental dataset or performance leaderboard.",
+      "local_reproducibility_status": "not_applicable_as_performance_benchmark; protocol-first P->X->y programme tracked in #12671"
     }
   ],
   "required_future_fields": [
