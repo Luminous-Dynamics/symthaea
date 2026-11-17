@@ -110,7 +110,8 @@ pub struct WindGustRecoveryResult {
     /// Zero-based index into `WindBenchmarkConfig::gusts`.
     pub gust_index: usize,
     /// Number of simulated plant steps from gust end until first recovery crossing.
-    /// If `recovered_within_horizon` is false, this is right-censored at the horizon.
+    /// It is right-censored at the horizon for `NotRecoveredByHorizon`; other statuses
+    /// identify gust windows that were not fully observed.
     pub steps_after_gust_end: usize,
     /// Distinguishes completed non-recovery from incomplete or absent gust exposure.
     pub status: WindGustRecoveryStatus,
@@ -176,19 +177,30 @@ fn classify_gust_recovery(
     }
 }
 
-/// Apply every gust active at the beginning of the current plant interval.
-/// Call this before `PhysicsSimulator::step`; the simulator consumes and clears
-/// the accumulated force during that step.
+/// Apply the time-averaged force for every gust overlapping the current plant interval.
+/// Scaling by overlap fraction preserves the gust's impulse when its start/end is not
+/// aligned to a simulation timestep. Call before `PhysicsSimulator::step`.
 fn apply_active_gusts(
     physics: &mut dyn PhysicsSimulator,
     gusts: &[WindGust],
     interval_start: f64,
+    dt: f64,
 ) {
+    if !dt.is_finite() || dt <= 0.0 {
+        return;
+    }
+
+    let interval_end = interval_start + dt;
     for gust in gusts {
-        if interval_start >= gust.start_time
-            && interval_start < gust.start_time + gust.duration
-        {
-            physics.apply_external_force(gust.force);
+        let gust_end = gust.start_time + gust.duration;
+        let overlap = interval_end.min(gust_end) - interval_start.max(gust.start_time);
+        if overlap > 0.0 {
+            let fraction = (overlap / dt).clamp(0.0, 1.0);
+            physics.apply_external_force([
+                gust.force[0] * fraction,
+                gust.force[1] * fraction,
+                gust.force[2] * fraction,
+            ]);
         }
     }
 }
@@ -259,7 +271,7 @@ pub fn run_wind_benchmark_with_backend(
                 let time = state.timestamp;
                 let sensor_hv = encoder.encode(&state);
                 let command = controller.forward(&sensor_hv, dt as f32);
-                apply_active_gusts(&mut *physics, &config.gusts, time);
+                apply_active_gusts(&mut *physics, &config.gusts, time, dt);
                 physics.step(&command, dt);
 
                 // Metrics belong to the completed plant transition, not the
@@ -308,7 +320,7 @@ pub fn run_wind_benchmark_with_backend(
                     command = command.with_noise(noise);
                 }
 
-                apply_active_gusts(&mut *physics, &config.gusts, time);
+                apply_active_gusts(&mut *physics, &config.gusts, time, dt);
                 physics.step(&command, dt);
 
                 let post_state = physics.state().clone();
@@ -1200,16 +1212,19 @@ mod tests {
         let hover = QuadrotorCommand::hover();
         let gusts = [WindGust {
             force: [0.1, 0.0, 0.0],
-            start_time: 0.0,
-            duration: 0.002,
+            start_time: 0.001,
+            duration: 0.001,
         }];
 
-        apply_active_gusts(&mut sim, &gusts, 0.0);
+        // This gust overlaps half of the first 2 ms plant interval. Applying the
+        // overlap-scaled force preserves its impulse instead of shifting it a step.
+        apply_active_gusts(&mut sim, &gusts, 0.0, 0.002);
         sim.step(&hover, 0.002);
-        assert!(sim.state().linear_velocity[0] > 0.0);
+        let velocity_after_gust = sim.state().linear_velocity[0];
+        let expected_velocity = (0.1 * 0.5 / 0.027) * 0.002;
+        assert!((velocity_after_gust - expected_velocity).abs() < 1e-8);
 
         // The force is consumed once; it does not silently persist into later steps.
-        let velocity_after_gust = sim.state().linear_velocity[0];
         sim.step(&hover, 0.002);
         assert!(sim.state().linear_velocity[0] < velocity_after_gust);
     }
