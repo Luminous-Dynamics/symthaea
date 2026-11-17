@@ -884,8 +884,7 @@ mod tests {
                 && line.ends_with("constant_or_below_resolution_channel")
         }));
         assert!(!result.lines().any(|line| {
-            line.starts_with("ar_fixture,known_regime,x,")
-                && line.ends_with(",ok")
+            line.starts_with("ar_fixture,known_regime,x,") && line.ends_with(",ok")
         }));
     }
 
