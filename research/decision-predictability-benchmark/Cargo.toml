@@ -1,0 +1,12 @@
+[workspace]
+
+[package]
+name = "symthaea-decision-predictability"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Dependency-free metric contracts for decision-relevant dynamical predictability"
+
+[lib]
+path = "src/lib.rs"
