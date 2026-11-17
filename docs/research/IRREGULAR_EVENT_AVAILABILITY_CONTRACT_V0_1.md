@@ -2,7 +2,7 @@
 
 **Tracking:** NEURO-SILICON-011 / #9700  
 **Implementation:** `research/irregular-event-contract/`  
-**Status:** 81 Rust test functions authored. An earlier pinned Rust 1.96 whole-crate compile exposed and led to fixes for four type errors. The latest exact-head format/test/benchmark/Clippy workflow is pending; no test or benchmark pass is claimed.
+**Status:** 99 Rust test functions authored. An earlier pinned Rust 1.96 whole-crate compile exposed and led to fixes for four type errors. The latest exact-head format/test/benchmark/Clippy workflow is pending; no test or benchmark pass is claimed.
 
 ## 1. Event-time and availability-time contract
 
@@ -120,13 +120,13 @@ SHA-256 over the exact input bytes.
 
 ## 7. Authored test inventory and limits
 
-The current source contains 98 authored Rust test functions:
+The current source contains 99 authored Rust test functions:
 - 16 event-contract tests in `lib.rs`;
 - 12 bitemporal ledger tests in `lib.rs`;
 - 8 purged-split tests;
 - 10 train-only-scaler tests;
 - 10 Time-IMM adapter tests;
-- 25 source-watermark/completeness tests.
+- 26 source-watermark/completeness tests.
 
 No Cargo build, rustfmt, Clippy, unit test, dataset adapter execution or
 benchmark has run in this environment. The source and fixture inventory is
@@ -228,17 +228,19 @@ late-event densities 0/100/5,000/10,000 basis points (0%, 1%, 50%, 100%), and
 two historical knowledge cutoffs, for 216 workload configurations. Event-time
 keys are permuted relative to four receipt-time batches.
 
-Each workload first requires exact equality between the fast indexed report
+Each workload first requires exact semantic equality between the indexed
+query, the complete-query linear reference `completeness_linear_scan_reference`,
 and the report inside a distinct, non-forgeable `VerifiedCompletenessReport`.
-It also requires the indexed late-breach set to equal an independent linear
-scan over the append-only breach receipt vector. The verified receipt binds
-the full-history replay to the ledger SHA-256 and progress/arrival/breach
-counts; this is in-memory ledger consistency, not source authentication. It
-additionally requires the receipt digest to match the current ledger snapshot
-before timing. Each case records 51 indexed query samples and 31 linear-scan
-samples (nearest-rank p50/p95/p99 for both), plus 15 verified replay samples
-(median and observed maximum), event-time index buckets visited, indexed
-receipt candidates examined, total receipts scanned and matching breaches.
+The index and linear reference share interval/source validation, progress lookup,
+report assembly and verdict calculation; only late-breach selection differs.
+The verified receipt binds the full-history replay to the ledger SHA-256 and
+progress/arrival/breach counts; this is in-memory ledger consistency, not source
+authentication. It additionally requires the receipt digest to match the
+current ledger snapshot before timing. Each case records 51 indexed complete
+query samples and 31 linear-reference complete query samples (nearest-rank
+p50/p95/p99 for both), plus 15 verified replay samples (median and observed
+maximum), event-time index buckets visited, indexed receipt candidates
+examined, full linear scan receipts visited and matching breaches.
 
 The hosted workflow retains CSV output with the exact commit, Rust toolchain,
 dependency lock, and fixture/source digests. This measures in-memory release
