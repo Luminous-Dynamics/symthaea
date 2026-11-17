@@ -957,6 +957,28 @@ mod tests {
     }
 
     #[test]
+    fn missing_source_rights_receipt_rejects() {
+        let mut item = candidate();
+        item.sources[1].rights_receipt_digest.clear();
+        let report = admit_corroboration_portfolio(&item, &expected(), policy());
+        assert!(report.rejection_reasons.contains(&RejectionReason::EmptyDigest));
+        assert!(!report.accepted());
+    }
+
+    #[test]
+    fn unknown_common_cause_or_verifier_separation_rejects() {
+        let mut common_cause = candidate();
+        common_cause.assessment.common_cause = CommonCauseDisposition::Unknown;
+        let report = admit_corroboration_portfolio(&common_cause, &expected(), policy());
+        assert!(report.rejection_reasons.contains(&RejectionReason::CommonCauseUnknown));
+
+        let mut verifier = candidate();
+        verifier.assessment.verifier_separation = VerifierSeparationDisposition::Unknown;
+        let report = admit_corroboration_portfolio(&verifier, &expected(), policy());
+        assert!(report.rejection_reasons.contains(&RejectionReason::VerifierIndependenceUnknown));
+    }
+
+    #[test]
     fn expected_verifier_identity_and_purpose_are_pinned() {
         let mut item = candidate();
         item.assessment.verifier_id = "different-verifier".into();
