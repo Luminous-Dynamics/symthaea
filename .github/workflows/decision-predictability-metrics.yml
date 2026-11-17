@@ -47,4 +47,4 @@ jobs:
           test -s forecast-report.csv
           grep -q '^fixture,regime,channel,model,' forecast-report.csv
           grep -q '^# scope=within_trajectory_same_regime_continuation_only' forecast-report.csv
-          grep -q ',ok forecast-report.csv
+          grep -q ",ok" forecast-report.csv
