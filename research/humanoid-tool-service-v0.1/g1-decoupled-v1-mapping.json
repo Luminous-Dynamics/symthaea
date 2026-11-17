@@ -1,0 +1,952 @@
+{
+  "schema_version": "1.0.0",
+  "adapter_id": "humanoidtoolbench.g1_sonic.decoupled_v1.v1",
+  "status": "non_actuating_compatibility_specification",
+  "evidence_class": "source_pinned_interface_specification",
+  "source": {
+    "repository": "SNU-PI/HumanoidToolBench",
+    "commit": "3fec9bd36933a1648ff7f95468c983f3452243a0",
+    "files": [
+      {
+        "path": "src/humanoidtoolbench/robots/g1_sonic.py",
+        "blob_sha": "9865d7ad4fdac29691f3585d77e194c9cedc43c3"
+      },
+      {
+        "path": "src/humanoidtoolbench/actions/g1.py",
+        "blob_sha": "81b85f3e01cfa34587971e1d5bdeaf90e494ed1f"
+      },
+      {
+        "path": "src/humanoidtoolbench/policies/remote_humanoid.py",
+        "blob_sha": "de3d61da7acaf0d749fff250e66d8eb5dcc0780f"
+      }
+    ],
+    "code_license": "MIT",
+    "dataset_license": "CC-BY-NC-4.0",
+    "third_party_assets": "Separate licences apply; not relicensed by the evaluator MIT licence."
+  },
+  "scope": {
+    "embodiment": "Unitree G1 Sonic with Dex3 hands",
+    "simulator": "MuJoCo 3.11.0",
+    "policy_action_schema_id": "decoupled_v1",
+    "simulator_policy_observation_dimension": 32,
+    "simulator_policy_action_dimension": 36,
+    "real_g1_recording_action_dimension": 35,
+    "control_hz": 50,
+    "max_policy_steps_per_episode": 3000,
+    "this_manifest_is_not_a_hardware_driver": true
+  },
+  "raw_joint_observation": {
+    "dimension": 43,
+    "source": "observation.joint_qpos",
+    "quantity": "joint_position",
+    "unit": "rad",
+    "order": [
+      {
+        "source_qpos_index": 0,
+        "joint_name": "left_hip_pitch_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 1,
+        "joint_name": "left_hip_roll_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 2,
+        "joint_name": "left_hip_yaw_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 3,
+        "joint_name": "left_knee_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 4,
+        "joint_name": "left_ankle_pitch_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 5,
+        "joint_name": "left_ankle_roll_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 6,
+        "joint_name": "right_hip_pitch_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 7,
+        "joint_name": "right_hip_roll_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 8,
+        "joint_name": "right_hip_yaw_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 9,
+        "joint_name": "right_knee_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 10,
+        "joint_name": "right_ankle_pitch_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 11,
+        "joint_name": "right_ankle_roll_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 12,
+        "joint_name": "waist_yaw_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 13,
+        "joint_name": "waist_roll_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 14,
+        "joint_name": "waist_pitch_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 15,
+        "joint_name": "left_shoulder_pitch_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 16,
+        "joint_name": "left_shoulder_roll_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 17,
+        "joint_name": "left_shoulder_yaw_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 18,
+        "joint_name": "left_elbow_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 19,
+        "joint_name": "left_wrist_roll_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 20,
+        "joint_name": "left_wrist_pitch_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 21,
+        "joint_name": "left_wrist_yaw_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 22,
+        "joint_name": "right_shoulder_pitch_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 23,
+        "joint_name": "right_shoulder_roll_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 24,
+        "joint_name": "right_shoulder_yaw_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 25,
+        "joint_name": "right_elbow_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 26,
+        "joint_name": "right_wrist_roll_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 27,
+        "joint_name": "right_wrist_pitch_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 28,
+        "joint_name": "right_wrist_yaw_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 29,
+        "joint_name": "left_hand_thumb_0_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 30,
+        "joint_name": "left_hand_thumb_1_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 31,
+        "joint_name": "left_hand_thumb_2_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 32,
+        "joint_name": "left_hand_index_0_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 33,
+        "joint_name": "left_hand_index_1_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 34,
+        "joint_name": "left_hand_middle_0_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 35,
+        "joint_name": "left_hand_middle_1_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 36,
+        "joint_name": "right_hand_thumb_0_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 37,
+        "joint_name": "right_hand_thumb_1_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 38,
+        "joint_name": "right_hand_thumb_2_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 39,
+        "joint_name": "right_hand_index_0_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 40,
+        "joint_name": "right_hand_index_1_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 41,
+        "joint_name": "right_hand_middle_0_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      },
+      {
+        "source_qpos_index": 42,
+        "joint_name": "right_hand_middle_1_joint",
+        "quantity": "joint_position",
+        "unit": "rad"
+      }
+    ]
+  },
+  "policy_input": {
+    "state": {
+      "dimension": 32,
+      "dtype": "float32",
+      "shape": [
+        1,
+        32
+      ],
+      "mapping": [
+        {
+          "policy_state_index": 0,
+          "source_qpos_index": 29,
+          "joint_name": "left_hand_thumb_0_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 1,
+          "source_qpos_index": 30,
+          "joint_name": "left_hand_thumb_1_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 2,
+          "source_qpos_index": 31,
+          "joint_name": "left_hand_thumb_2_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 3,
+          "source_qpos_index": 34,
+          "joint_name": "left_hand_middle_0_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 4,
+          "source_qpos_index": 35,
+          "joint_name": "left_hand_middle_1_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 5,
+          "source_qpos_index": 32,
+          "joint_name": "left_hand_index_0_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 6,
+          "source_qpos_index": 33,
+          "joint_name": "left_hand_index_1_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 7,
+          "source_qpos_index": 36,
+          "joint_name": "right_hand_thumb_0_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 8,
+          "source_qpos_index": 37,
+          "joint_name": "right_hand_thumb_1_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 9,
+          "source_qpos_index": 38,
+          "joint_name": "right_hand_thumb_2_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 10,
+          "source_qpos_index": 39,
+          "joint_name": "right_hand_index_0_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 11,
+          "source_qpos_index": 40,
+          "joint_name": "right_hand_index_1_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 12,
+          "source_qpos_index": 41,
+          "joint_name": "right_hand_middle_0_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 13,
+          "source_qpos_index": 42,
+          "joint_name": "right_hand_middle_1_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 14,
+          "source_qpos_index": 15,
+          "joint_name": "left_shoulder_pitch_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 15,
+          "source_qpos_index": 16,
+          "joint_name": "left_shoulder_roll_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 16,
+          "source_qpos_index": 17,
+          "joint_name": "left_shoulder_yaw_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 17,
+          "source_qpos_index": 18,
+          "joint_name": "left_elbow_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 18,
+          "source_qpos_index": 19,
+          "joint_name": "left_wrist_roll_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 19,
+          "source_qpos_index": 20,
+          "joint_name": "left_wrist_pitch_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 20,
+          "source_qpos_index": 21,
+          "joint_name": "left_wrist_yaw_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 21,
+          "source_qpos_index": 22,
+          "joint_name": "right_shoulder_pitch_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 22,
+          "source_qpos_index": 23,
+          "joint_name": "right_shoulder_roll_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 23,
+          "source_qpos_index": 24,
+          "joint_name": "right_shoulder_yaw_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 24,
+          "source_qpos_index": 25,
+          "joint_name": "right_elbow_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 25,
+          "source_qpos_index": 26,
+          "joint_name": "right_wrist_roll_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 26,
+          "source_qpos_index": 27,
+          "joint_name": "right_wrist_pitch_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 27,
+          "source_qpos_index": 28,
+          "joint_name": "right_wrist_yaw_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 28,
+          "source_qpos_index": 13,
+          "joint_name": "waist_roll_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 29,
+          "source_qpos_index": 14,
+          "joint_name": "waist_pitch_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 30,
+          "source_qpos_index": 12,
+          "joint_name": "waist_yaw_joint",
+          "quantity": "joint_position",
+          "unit": "rad"
+        },
+        {
+          "policy_state_index": 31,
+          "source": "previous_command_history.base_height_command",
+          "quantity": "base_height_command",
+          "unit": "m",
+          "initial_value": 0.74,
+          "update_rule": "Set to base_height_command from the last row of the most recent returned action chunk; reset to 0.74 at episode reset.",
+          "evidence_class": "command_history_not_physical_measurement"
+        }
+      ],
+      "note": "Derived policy input, not the complete physical observation. Index 31 is previous command history, not a measurement."
+    },
+    "image": {
+      "request_field": "image.rgb_head_stereo_left",
+      "source_observation_field": "head_stereo_left",
+      "type": "RGB",
+      "dtype": "uint8",
+      "shape": [
+        360,
+        640,
+        3
+      ],
+      "modality": "image",
+      "transport": "separate from scalar ObservationValueV2 entries",
+      "freshness_required": true
+    },
+    "instruction": {
+      "request_field": "instruction",
+      "type": "UTF-8 string",
+      "source": "benchmark canonical task instruction"
+    },
+    "reset_history": {
+      "request_field": "history.reset",
+      "type": "boolean",
+      "semantics": "true on first policy query after episode reset; recurrent policy state must reset"
+    }
+  },
+  "policy_output": {
+    "dtype": "float32",
+    "shape": "(T,36)",
+    "minimum_rows": 1,
+    "maximum_rows": 3000,
+    "values_must_be_finite": true,
+    "semantics": "One 36-value decoupled_v1 G1 whole-body goal per row; one row is one 50 Hz control step.",
+    "action_mapping": [
+      {
+        "action_index": 0,
+        "address": "g1/left_hand_thumb_0_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_hand_thumb_0_joint"
+      },
+      {
+        "action_index": 1,
+        "address": "g1/left_hand_thumb_1_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_hand_thumb_1_joint"
+      },
+      {
+        "action_index": 2,
+        "address": "g1/left_hand_thumb_2_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_hand_thumb_2_joint"
+      },
+      {
+        "action_index": 3,
+        "address": "g1/left_hand_middle_0_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_hand_middle_0_joint"
+      },
+      {
+        "action_index": 4,
+        "address": "g1/left_hand_middle_1_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_hand_middle_1_joint"
+      },
+      {
+        "action_index": 5,
+        "address": "g1/left_hand_index_0_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_hand_index_0_joint"
+      },
+      {
+        "action_index": 6,
+        "address": "g1/left_hand_index_1_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_hand_index_1_joint"
+      },
+      {
+        "action_index": 7,
+        "address": "g1/right_hand_thumb_0_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_hand_thumb_0_joint"
+      },
+      {
+        "action_index": 8,
+        "address": "g1/right_hand_thumb_1_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_hand_thumb_1_joint"
+      },
+      {
+        "action_index": 9,
+        "address": "g1/right_hand_thumb_2_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_hand_thumb_2_joint"
+      },
+      {
+        "action_index": 10,
+        "address": "g1/right_hand_index_0_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_hand_index_0_joint"
+      },
+      {
+        "action_index": 11,
+        "address": "g1/right_hand_index_1_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_hand_index_1_joint"
+      },
+      {
+        "action_index": 12,
+        "address": "g1/right_hand_middle_0_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_hand_middle_0_joint"
+      },
+      {
+        "action_index": 13,
+        "address": "g1/right_hand_middle_1_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_hand_middle_1_joint"
+      },
+      {
+        "action_index": 14,
+        "address": "g1/left_shoulder_pitch_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_shoulder_pitch_joint"
+      },
+      {
+        "action_index": 15,
+        "address": "g1/left_shoulder_roll_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_shoulder_roll_joint"
+      },
+      {
+        "action_index": 16,
+        "address": "g1/left_shoulder_yaw_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_shoulder_yaw_joint"
+      },
+      {
+        "action_index": 17,
+        "address": "g1/left_elbow_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_elbow_joint"
+      },
+      {
+        "action_index": 18,
+        "address": "g1/left_wrist_roll_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_wrist_roll_joint"
+      },
+      {
+        "action_index": 19,
+        "address": "g1/left_wrist_pitch_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_wrist_pitch_joint"
+      },
+      {
+        "action_index": 20,
+        "address": "g1/left_wrist_yaw_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "left_wrist_yaw_joint"
+      },
+      {
+        "action_index": 21,
+        "address": "g1/right_shoulder_pitch_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_shoulder_pitch_joint"
+      },
+      {
+        "action_index": 22,
+        "address": "g1/right_shoulder_roll_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_shoulder_roll_joint"
+      },
+      {
+        "action_index": 23,
+        "address": "g1/right_shoulder_yaw_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_shoulder_yaw_joint"
+      },
+      {
+        "action_index": 24,
+        "address": "g1/right_elbow_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_elbow_joint"
+      },
+      {
+        "action_index": 25,
+        "address": "g1/right_wrist_roll_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_wrist_roll_joint"
+      },
+      {
+        "action_index": 26,
+        "address": "g1/right_wrist_pitch_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_wrist_pitch_joint"
+      },
+      {
+        "action_index": 27,
+        "address": "g1/right_wrist_yaw_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "right_wrist_yaw_joint"
+      },
+      {
+        "action_index": 28,
+        "address": "g1/waist_roll_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "waist_roll_joint"
+      },
+      {
+        "action_index": 29,
+        "address": "g1/waist_pitch_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "waist_pitch_joint"
+      },
+      {
+        "action_index": 30,
+        "address": "g1/waist_yaw_joint/position_target",
+        "quantity": "joint_position_target",
+        "unit": "rad",
+        "joint_name": "waist_yaw_joint"
+      },
+      {
+        "action_index": 31,
+        "address": "g1/base/height_command",
+        "quantity": "base_height_command",
+        "unit": "m"
+      },
+      {
+        "action_index": 32,
+        "address": "g1/base/navigation/vx",
+        "quantity": "linear_velocity_command",
+        "unit": "m/s"
+      },
+      {
+        "action_index": 33,
+        "address": "g1/base/navigation/vy",
+        "quantity": "linear_velocity_command",
+        "unit": "m/s"
+      },
+      {
+        "action_index": 34,
+        "address": "g1/base/navigation/turn_flag",
+        "quantity": "turn_flag",
+        "unit": "1",
+        "semantic": "Legacy field name vyaw is misleading: absolute value >= 0.1 requests a turn toward target_yaw; it is not a yaw rate."
+      },
+      {
+        "action_index": 35,
+        "address": "g1/base/navigation/target_yaw",
+        "quantity": "absolute_heading_target",
+        "unit": "rad"
+      }
+    ],
+    "left_hand_permutation": {
+      "source_named_order": [
+        "left_hand_thumb_0_joint",
+        "left_hand_thumb_1_joint",
+        "left_hand_thumb_2_joint",
+        "left_hand_index_0_joint",
+        "left_hand_index_1_joint",
+        "left_hand_middle_0_joint",
+        "left_hand_middle_1_joint"
+      ],
+      "flat_action_order": [
+        "left_hand_thumb_0_joint",
+        "left_hand_thumb_1_joint",
+        "left_hand_thumb_2_joint",
+        "left_hand_middle_0_joint",
+        "left_hand_middle_1_joint",
+        "left_hand_index_0_joint",
+        "left_hand_index_1_joint"
+      ],
+      "flat_index_to_named_source_index": [
+        0,
+        1,
+        2,
+        5,
+        6,
+        3,
+        4
+      ],
+      "apply_exactly_once": true
+    },
+    "torso_order": {
+      "flat_action_order": [
+        "waist_roll_joint",
+        "waist_pitch_joint",
+        "waist_yaw_joint"
+      ],
+      "raw_joint_qpos_order": [
+        "waist_yaw_joint",
+        "waist_roll_joint",
+        "waist_pitch_joint"
+      ]
+    },
+    "navigation": {
+      "vx": {
+        "action_index": 32,
+        "unit": "m/s"
+      },
+      "vy": {
+        "action_index": 33,
+        "unit": "m/s"
+      },
+      "turn_flag": {
+        "action_index": 34,
+        "unit": "1",
+        "threshold_abs": 0.1,
+        "not_yaw_rate": true
+      },
+      "target_yaw": {
+        "action_index": 35,
+        "unit": "rad",
+        "reference": "absolute heading"
+      }
+    }
+  },
+  "uec_v2_projection": {
+    "canonical_owner": "symthaea_core::embodiment_v2 (Universal Embodiment Contract v2)",
+    "upstream_implementation_dependency": "Symthaea #1274 and UEC v2 consumer pilot PR #7674; confirm merged/current exact API before Rust integration.",
+    "profile_id": "symthaea.external.humanoidtoolbench.g1_sonic.decoupled_v1.v1",
+    "platform_family_id": "unitree.g1",
+    "morphology_id": "unitree.g1_sonic.dex3",
+    "observation_schema_id": "humanoidtoolbench.g1_sonic.policy-input.v1",
+    "action_schema_id": "humanoidtoolbench.g1_sonic.decoupled_v1.action.v1",
+    "image_provider_separate": true,
+    "policy_state_derived_from_raw_joint_observations": true,
+    "action_stage_for_policy_output": "Requested",
+    "requested_action_only": true,
+    "transport_accepted_receipt_created": false,
+    "applied_receipt_created": false,
+    "measured_receipt_created": false,
+    "actuator_authority": false,
+    "live_hardware_backend": false
+  },
+  "invariants": [
+    "Do not map G1 joint position targets to Symthaea normalized torque or PWM values.",
+    "Do not route this profile to the current 21-joint PCA9685 HAL.",
+    "Do not infer G1-to-DMC21 or G1-to-Dexterous53 equivalence from dimensions or similar joint names.",
+    "Do not pad, truncate, reorder or drop missing joints.",
+    "Treat previous base-height command as command history, not a physical observation.",
+    "Keep RGB image as a separately typed modality; do not encode image bytes as scalar observations.",
+    "Only a Requested UEC action frame is produced; no physical execution or safety authority is implied.",
+    "Do not infer physical calibration, joint limits, thermal limits, actuator capability or human safety from the simulation profile."
+  ],
+  "negative_controls": [
+    "swapped_left_hand_middle_index",
+    "left_hand_permutation_applied_twice",
+    "swapped_waist_yaw_roll_pitch",
+    "missing_joint",
+    "extra_joint",
+    "duplicate_joint_name",
+    "reordered_joint_names_without_name_based_reindex",
+    "raw_joint_count_42",
+    "raw_joint_count_44",
+    "policy_state_count_31",
+    "policy_state_count_33",
+    "action_row_count_35",
+    "action_row_count_37",
+    "empty_action_chunk",
+    "oversized_action_chunk",
+    "nan_or_infinity_each_action_segment",
+    "base_height_history_mislabeled_as_sensor_measurement",
+    "turn_flag_mislabeled_as_yaw_rate",
+    "navigation_velocity_mislabeled_as_rad_per_second",
+    "wrong_source_commit",
+    "wrong_action_schema",
+    "wrong_profile_identity",
+    "dmc21_or_dexterous53_claimed_as_g1",
+    "requested_action_replayed_as_applied_or_measured",
+    "rgb_image_malformed_or_stale"
+  ],
+  "claim_boundary": {
+    "software_contract_conformance_only": true,
+    "robot_tool_competence": false,
+    "g1_hardware_compatibility": false,
+    "physical_calibration": false,
+    "safety_qualification": false,
+    "actuation_authority": false,
+    "benchmark_execution_claimed": false
+  }
+}
