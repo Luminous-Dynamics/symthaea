@@ -232,30 +232,40 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
  }
  let mut leaf_reports=Vec::new();let mut robust_violations=0usize;let mut budget_violations=0usize;let mut unnecessary=0u64;
  for path in leaf_paths.values(){
-  let representative=&path.world_ids[0];
+  let representative=path.world_ids.first().ok_or("leaf has no reachable worlds")?;
   let risk=risk_for_path(candidate,oracle,&path.steps,representative,&path.action_id,path.claimed)?;
-  let act=path.decision_kind=="act";
   let action_policy=&actions[&path.action_id];
-  let risk_ok=if !act{
-   !action_policy.irreversible&&!action_policy.hard_gate&&action_policy.max_risk==0
-     &&path.world_ids.iter().all(|id|worlds[id].safe_actions.contains(&path.action_id))
-  }else{
-   risk["evidence_accepted"]==true&&risk["robust_action_justified"]==true
-     &&(!action_policy.hard_gate||risk["worst_case_posterior_risk_bps"]==0)
-  };
+  let acts=path.decision_kind=="act";
+  let risk_ok=risk["evidence_accepted"].as_bool()==Some(true)
+   &&risk["robust_action_justified"].as_bool()==Some(true)
+   &&(!action_policy.hard_gate||risk["worst_case_posterior_risk_bps"].as_u64()==Some(0));
   let within=path.cost<=budget;
   if !risk_ok{robust_violations+=1;}if !within{budget_violations+=1;}
-  if path.decision_kind=="defer"{
-   let target_risk=risk_for_path(candidate,oracle,&path.steps,representative,target_action,10000)?;
-   if target_risk["evidence_accepted"]==true&&target_risk["robust_action_justified"]==true{
+  if !acts{
+   let target_risk=risk_for_path(candidate,oracle,&path.steps,representative,target_action,SCALE)?;
+   let target_justified=target_risk["evidence_accepted"].as_bool()==Some(true)
+    &&target_risk["robust_action_justified"].as_bool()==Some(true);
+   if target_justified{
     unnecessary=unnecessary.saturating_add(path.world_ids.iter().map(|id|bounds[id].nominal).sum::<u64>());
    }
   }
-  leaf_reports.push(json!({"leaf_node_id":path.leaf_id,"world_ids":path.world_ids,"decision_kind":path.decision_kind,"action_id":path.action_id,"nominal_risk_bps":risk["nominal_posterior_risk_bps"],"worst_case_posterior_risk_bps":risk["worst_case_posterior_risk_bps"],"risk_qualified":risk_ok,"path_cost_bound_micros":path.cost,"within_budget":within,"feasible":risk_ok&&within}));
+  leaf_reports.push(json!({
+   "leaf_node_id":path.leaf_id,
+   "world_ids":path.world_ids,
+   "decision_kind":path.decision_kind,
+   "action_id":path.action_id,
+   "nominal_risk_bps":risk["nominal_posterior_risk_bps"],
+   "worst_case_posterior_risk_bps":risk["worst_case_posterior_risk_bps"],
+   "risk_qualified":risk_ok,
+   "path_cost_bound_micros":path.cost,
+   "within_budget":within,
+   "feasible":risk_ok&&within
+  }));
  }
  let mut coverage=0u64;let mut unsafe_worlds=0usize;
  for (world_id,leaf_id) in &world_leaf{
-  let path=&leaf_paths[leaf_id];if path.decision_kind=="act"{
+  let path=&leaf_paths[leaf_id];
+  if path.decision_kind=="act"{
    if !worlds[world_id].safe_actions.contains(&path.action_id){unsafe_worlds+=1;}
    if path.action_id==target_action&&worlds[world_id].safe_actions.contains(target_action){coverage+=bounds[world_id].nominal;}
   }
