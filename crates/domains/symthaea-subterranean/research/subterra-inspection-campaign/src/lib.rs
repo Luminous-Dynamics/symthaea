@@ -469,8 +469,7 @@ impl PortfolioSearch<'_> {
         self.evaluated_nodes += 1;
 
         if state.index == self.groups.len() {
-            if self.best.as_ref().is_none_or(|best| better(&state, best))
-            {
+            if self.best.as_ref().is_none_or(|best| better(&state, best)) {
                 self.best = Some(state);
             }
             return Ok(());
