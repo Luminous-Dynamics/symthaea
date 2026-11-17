@@ -1,27 +1,42 @@
 # symthaea-aqua-bench
 
-Deterministic, dependency-free accounting primitives for Luminous Aqua benchmark runs.
+Product-level comparator-context adapter for Luminous Aqua.
 
 ## Scope
 
-This crate calculates complete-service fresh-water totals, purchased-energy totals, matched-control water savings, and water-balance closure against an explicit expanded measurement uncertainty.
+This crate does **not** implement a water ledger, energy ledger, hydraulic/thermal solver, water-quality assessment, metrology passport, safety interlock, hygiene assessor or comfort model.
 
-It deliberately does **not** assess microbiological quality, recirculation hygiene, shower comfort, spray performance, safety, regulatory compliance, or physical performance. It is not a hydraulic or thermal solver. Those claims remain with the relevant independent methods and existing Luminous subsystem owners.
+It checks that a pair of Aqua benchmark runs use matching:
+- task profile and duration;
+- inlet-water profile;
+- supply/delivery conditions;
+- room conditions;
+- measurement protocol;
+- complete-service accounting boundary.
 
-## Evidence semantics
+Each run must point to canonical owner evidence:
+- Symtropy water-service T0 receipt;
+- Mycelix metrology admission;
+- Mycelix intended-use water-quality assessment;
+- independent task-outcome assessment;
+- Symtropy resource-closure receipt when energy is compared.
 
-- Every quantity needed for a whole-service result is an `Option<f64>`; missing is not zero.
-- Explicit `Some(0.0)` records a measured zero for an operation that does not apply.
-- Startup, priming, active fresh water, post-use cleaning, purge, periodic-cleaning allocation, and retry/recovery water are all counted.
-- In-session recirculated delivery is recorded separately and is not counted as fresh water or external water input.
-- Electricity, fuel input, and useful recovered heat are reported separately. Recovered heat is not subtracted from purchased energy.
-- Internal recirculation is excluded from whole-boundary water source/output balance because it is an internal transfer.
-- Water-balance closure is accepted only when absolute residual is within the supplied expanded uncertainty. This arithmetic does not create instrument calibration or uncertainty authority.
+Device configuration and cleaning protocol are allowed to differ between comparators, but their exact digests must be recorded. That is essential: different filter/cleaning requirements are part of the product's real resource burden and must remain visible in the upstream receipts.
+
+## Non-duplication
+
+- Symtropy #4978 owns deterministic water-service T0 accounting/evaluation.
+- Symtropy #5364 owns household/community water-service continuity.
+- Symtropy #5425 owns water-specific lifecycle cost per verified service.
+- Symtropy #2152 owns physical resource stock/flow/energy/residual closure.
+- Mycelix #6025/#6029/#6034/#6048/#6054/#6057 own metrology, measurand, calibration, uncertainty, timebase and applicability.
+- Mycelix #6100 owns raw-water observation versus use-specific quality assessment.
+- Sol-Atlas #765/#766/#770/#772 own pool/water-feature thermal, evaporation and microclimate qualification.
+
+The Aqua adapter only binds the product comparison to those owner outputs. It cannot validate or replace them.
 
 ## Run
 
 ```sh
 cargo test -p symthaea-aqua-bench
 ```
-
-The crate is automatically a workspace member through the repository's `crates/domains/*` glob. Run the tests on the exact branch head before promoting any code claim.
