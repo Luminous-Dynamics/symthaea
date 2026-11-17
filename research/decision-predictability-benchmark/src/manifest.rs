@@ -53,6 +53,11 @@ pub enum ManifestError {
         axis: String,
         group: String,
     },
+    NestingRelationshipMismatch {
+        child_axis: String,
+        child_group: String,
+        parent_axis: String,
+    },
     InsufficientIndependentUnits {
         role: String,
         actual: usize,
@@ -98,6 +103,14 @@ impl fmt::Display for ManifestError {
             Self::UnreferencedDeclaredGroup { axis, group } => {
                 write!(f, "declared group {group} on {axis} has no scenario")
             }
+            Self::NestingRelationshipMismatch {
+                child_axis,
+                child_group,
+                parent_axis,
+            } => write!(
+                f,
+                "nested group {child_group} on {child_axis} maps to more than one parent {parent_axis}"
+            ),
             Self::InsufficientIndependentUnits {
                 role,
                 actual,
@@ -426,6 +439,10 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
 
     let mut scenario_ids = BTreeSet::new();
     let mut referenced_groups: BTreeMap<SplitAxisKind, BTreeSet<String>> = BTreeMap::new();
+    let mut parent_by_child: BTreeMap<
+        (SplitAxisKind, String),
+        (SplitAxisKind, String),
+    > = BTreeMap::new();
 
     for scenario in &manifest.scenarios {
         validate_opaque_id(&scenario.scenario_id, "scenario.scenario_id")?;
@@ -443,11 +460,13 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
         )?;
 
         let mut scenario_axes = BTreeSet::new();
+        let mut scenario_groups = BTreeMap::new();
         for membership in &scenario.groups {
             if !scenario_axes.insert(membership.axis) {
                 return Err(ManifestError::DuplicateValue("scenario.groups.axis"));
             }
             validate_opaque_id(&membership.group_id, "scenario.groups.group_id")?;
+            scenario_groups.insert(membership.axis, membership.group_id.as_str());
             // Only axes listed in split_axes impose a cross-role holdout.
             // Other declared group labels are contextual metadata and may be
             // shared across train/validation/test (e.g. parameter transfer
@@ -484,11 +503,45 @@ pub fn validate_manifest(manifest: &SplitManifestV1) -> Result<(), ManifestError
             }
         }
 
-        for axis in axes.keys() {
+        // Every axis in the declared outer-to-inner nesting path must be
+        // present on every scenario, including axes used only as context.
+        for axis in &manifest.sampling.nesting {
             if !scenario_axes.contains(axis) {
                 return Err(ManifestError::MissingAxisMembership {
                     scenario: scenario.scenario_id.clone(),
                     axis: axis.as_str().to_owned(),
+                });
+            }
+        }
+
+        // A child group represents one nested sampling unit and therefore
+        // cannot be attached to different parent groups in different
+        // scenarios. This catches structurally impossible manifests such as
+        // one parameter-cell ID reused across unrelated equation families.
+        for pair in manifest.sampling.nesting.windows(2) {
+            let parent_axis = pair[0];
+            let child_axis = pair[1];
+            let parent_group = scenario_groups
+                .get(&parent_axis)
+                .ok_or_else(|| ManifestError::MissingAxisMembership {
+                    scenario: scenario.scenario_id.clone(),
+                    axis: parent_axis.as_str().to_owned(),
+                })?;
+            let child_group = scenario_groups
+                .get(&child_axis)
+                .ok_or_else(|| ManifestError::MissingAxisMembership {
+                    scenario: scenario.scenario_id.clone(),
+                    axis: child_axis.as_str().to_owned(),
+                })?;
+            let key = (child_axis, (*child_group).to_owned());
+            let parent = (parent_axis, (*parent_group).to_owned());
+            if let Some(previous_parent) = parent_by_child.insert(key.clone(), parent.clone())
+                && previous_parent != parent
+            {
+                return Err(ManifestError::NestingRelationshipMismatch {
+                    child_axis: child_axis.as_str().to_owned(),
+                    child_group: key.1,
+                    parent_axis: parent_axis.as_str().to_owned(),
                 });
             }
         }
@@ -1024,6 +1077,48 @@ mod tests {
             Err(ManifestError::InvalidField(
                 "split policy is incompatible with its axis"
             ))
+        ));
+    }
+
+    #[test]
+    fn rejects_nested_group_reused_under_different_parent_groups() {
+        let mut value: serde_json::Value = serde_json::from_str(VALID).unwrap();
+        let axes = value["split_axes"].as_array_mut().unwrap();
+        axes.retain(|axis| axis["axis"] == "trajectory");
+        value["sampling"]["primary_independent_unit"] = serde_json::json!("trajectory");
+
+        let scenarios = value["scenarios"].as_array_mut().unwrap();
+        let train_groups = scenarios[0]["groups"].as_array().unwrap();
+        let train_parameter = train_groups
+            .iter()
+            .find(|group| group["axis"] == "parameter_cell")
+            .unwrap()["group_id"]
+            .clone();
+        let validation_groups = scenarios[1]["groups"].as_array_mut().unwrap();
+        let validation_parameter = validation_groups
+            .iter_mut()
+            .find(|group| group["axis"] == "parameter_cell")
+            .unwrap();
+        validation_parameter["group_id"] = train_parameter;
+
+        let bytes = serde_json::to_vec(&value).unwrap();
+        assert!(matches!(
+            parse_and_validate(&bytes),
+            Err(ManifestError::NestingRelationshipMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn requires_contextual_nesting_axis_membership_on_every_scenario() {
+        let mut value: serde_json::Value = serde_json::from_str(VALID).unwrap();
+        let scenarios = value["scenarios"].as_array_mut().unwrap();
+        let groups = scenarios[1]["groups"].as_array_mut().unwrap();
+        groups.retain(|group| group["axis"] != "equation_family");
+        let bytes = serde_json::to_vec(&value).unwrap();
+        assert!(matches!(
+            parse_and_validate(&bytes),
+            Err(ManifestError::MissingAxisMembership { axis, .. })
+                if axis == "equation_family"
         ));
     }
 
