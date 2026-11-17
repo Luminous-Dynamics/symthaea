@@ -368,6 +368,40 @@ fn validate_generation_profile(
     }
 
     for (station_index, station) in spec.stations.iter().enumerate() {
+        let is_longitudinal_end = station_index == 0 || station_index + 1 == spec.stations.len();
+        if !is_longitudinal_end {
+            let starboard_waterline = station
+                .starboard_profile
+                .iter()
+                .find(|point| point.role == crate::full_envelope::ProfilePointRole::Waterline);
+            if starboard_waterline.is_none_or(|point| point.y_m <= GEOMETRY_TOLERANCE_M) {
+                reject(
+                    &mut issues,
+                    "interior_station_zero_breadth",
+                    format!(
+                        "interior station {} must have positive starboard waterline breadth",
+                        station.station_id
+                    ),
+                );
+            }
+            if spec.symmetry == SymmetryPolicy::ExplicitPortAndStarboard {
+                let port_waterline = station.port_profile.as_ref().and_then(|profile| {
+                    profile
+                        .iter()
+                        .find(|point| point.role == crate::full_envelope::ProfilePointRole::Waterline)
+                });
+                if port_waterline.is_none_or(|point| point.y_m >= -GEOMETRY_TOLERANCE_M) {
+                    reject(
+                        &mut issues,
+                        "interior_station_zero_port_breadth",
+                        format!(
+                            "interior station {} must have negative port waterline breadth",
+                            station.station_id
+                        ),
+                    );
+                }
+            }
+        }
         for point in &station.starboard_profile {
             if point.region_to_next == ProfileRegion::Unsupported {
                 incomplete(
@@ -1236,6 +1270,43 @@ mod tests {
         assert_eq!(artifact.admission_report.metrics.boundary_edge_count, 0);
         assert_eq!(artifact.admission_report.metrics.non_manifold_edge_count, 0);
         assert_eq!(artifact.admission_report.metrics.non_manifold_vertex_link_count, 0);
+    }
+
+
+    #[test]
+    fn pointed_bow_and_pointed_stern_with_full_midbody_are_manifold() {
+        let mut spec = box_fixture();
+        let mut mid_station = spec.stations[0].clone();
+        mid_station.station_id = "ST-MID".into();
+        mid_station.x_over_length = 0.5;
+        for point in &mut mid_station.starboard_profile {
+            point.point_id = point.point_id.replace("BOW", "MID");
+        }
+        let mut mid_deck = spec.deck_surface.sections[0].clone();
+        mid_deck.station_id = "ST-MID".into();
+        for point in &mut mid_deck.points {
+            point.point_id = point.point_id.replace("BOW", "MID");
+        }
+        let mut mid_waterline = spec.design_waterline.station_intersections[0].clone();
+        mid_waterline.station_id = "ST-MID".into();
+        mid_waterline.starboard_point_id = "MID-WL-S".into();
+
+        spec.stations.insert(1, mid_station);
+        spec.deck_surface.sections.insert(1, mid_deck);
+        spec.design_waterline
+            .station_intersections
+            .insert(1, mid_waterline);
+        make_pointed_end(&mut spec, true);
+        make_pointed_end(&mut spec, false);
+
+        let artifact =
+            generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
+        assert_eq!(artifact.semantic_face_ranges[3].face_count, 0);
+        assert_eq!(artifact.semantic_face_ranges[4].face_count, 0);
+        assert_eq!(artifact.admission_report.metrics.boundary_edge_count, 0);
+        assert_eq!(artifact.admission_report.metrics.non_manifold_edge_count, 0);
+        assert_eq!(artifact.admission_report.metrics.non_manifold_vertex_link_count, 0);
+        assert!(artifact.admission_report.metrics.signed_volume_m3.unwrap() > 0.0);
     }
 
     #[test]
