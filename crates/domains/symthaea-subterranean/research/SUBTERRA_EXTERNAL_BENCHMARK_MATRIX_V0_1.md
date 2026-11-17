@@ -79,6 +79,28 @@ Srivastava et al. (9 September 2026) isolate the valuation layer in hazardous ro
 Source:
 - https://arxiv.org/abs/2609.10726
 
+### 2.5 DARPA Subterranean Challenge — artifact-reporting ground truth
+
+The public `subtchallenge/systems_finals_ground_truth` repository contains round-specific artifact type and x/y/z coordinate truth in the DARPA Cartesian frame, fiducials, round maps and a downsampled course point cloud.
+
+At the inspected repository tree commit `8276a16155eddf966e4458e40054bc53a31c8ac5`, the small tab-separated CSV artefacts contain:
+- Prelim 1: 20 rows;
+- Prelim 2: 20 rows;
+- Prize round: 40 rows;
+- Combined file: 80 rows across 10 type strings; all 80 x/y/z triples parsed as finite numbers.
+
+The CSV names/aliases are source-native and not canonicalized: for example, `cellphone` vs `cell_phone`, and `fireextinguisher` vs `fire_extinguisher`. Preserve raw strings and define any evaluation alias mapping in a separately versioned crosswalk. The source README names the coordinate frame as `darpa`, and describes a static transform to UTM zone 16N. Any transform must bind its exact source/target frame and operation; never infer it from coordinate magnitudes.
+
+**Use:** a compact, known-answer evaluator for correct artifact class, 3-D localization threshold, false/duplicate reports, finite report budgets, and abstention. Keep the official historical scoring rule separate from any locally reimplemented proxy. The DARPA challenge's published 5 m tolerance and report allowance are historical scoring semantics; the exact round/task rule must be pinned before claiming official-score parity.
+
+**Do not use it to claim:** contemporary SLAM accuracy, real-time perception performance, geotechnical safety, communications resilience, cave/planetary transfer, or operational site qualification. It is evaluator-only ground truth and must never be exposed to candidate report-generation code.
+
+Source:
+- Repository and README: https://github.com/subtchallenge/systems_finals_ground_truth
+- DARPA SubT programme: https://www.darpa.mil/research/programs/darpa-subterranean-challenge
+
+The repository metadata does not expose a clear SPDX licence for the data. Confirm reuse/redistribution rights before re-hosting CSVs, maps, PCD or derived binaries; metadata/commit/blob references can be used as a reproducibility manifest while that check remains open.
+
 ## 3. Matched benchmark ladder
 
 ### B0 — independent referee conformance
