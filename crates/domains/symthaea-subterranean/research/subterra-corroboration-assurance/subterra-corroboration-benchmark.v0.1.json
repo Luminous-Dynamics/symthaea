@@ -1,0 +1,182 @@
+{
+  "schema_version": "subterra-corroboration-benchmark.v0.1",
+  "status": "research_protocol_not_a_field_result",
+  "source_graph_owner": "Mycelix LEX-NET-030",
+  "fault_profile_owner": "Mycelix QUAL-001E",
+  "consumer_owner": "Symthaea",
+  "claim_boundary": "independence only within the complete declared transitive dependency and fault model",
+  "scenario_dimensions": {
+    "evidence_source_count": [1, 2, 3, 4, 5, 6, 7, 8],
+    "robot_count": [1, 2, 3, 4],
+    "modalities_per_robot": [1, 2, 3, 4],
+    "dependency_path_depth": [1, 2, 3, 4, 5],
+    "minimum_independent_sources": [1, 2, 3],
+    "inventory_dispositions": ["complete_within_declared_scope", "incomplete", "unknown"]
+  },
+  "claim_critical_fault_domain_dimensions": [
+    "robot_platform",
+    "power_bus",
+    "battery_and_charger",
+    "clock_and_time_sync",
+    "localization_and_map",
+    "compute_and_runtime",
+    "network_and_relay",
+    "fleet_manager_and_authority",
+    "sensor_firmware_and_hardware",
+    "calibration_lab_and_reference",
+    "training_data_and_annotation",
+    "verifier_and_ground_truth"
+  ],
+  "cases": [
+    {
+      "case_id": "CORR-001",
+      "name": "independent_modalities_and_verifier",
+      "source_count": 2,
+      "source_dependency_pattern": "disjoint_complete_transitive_closures",
+      "verifier_dependency_pattern": "disjoint_complete_transitive_closure",
+      "evidence_identity_pattern": "unique_source_observation_calibration_rights_receipts",
+      "expected": "admit_within_declared_model"
+    },
+    {
+      "case_id": "CORR-002",
+      "name": "rgb_and_depth_share_robot_power",
+      "source_count": 2,
+      "source_dependency_pattern": "shared_robot_and_power_bus",
+      "verifier_dependency_pattern": "disjoint_complete_transitive_closure",
+      "expected": "reject_false_independence"
+    },
+    {
+      "case_id": "CORR-003",
+      "name": "different_robots_share_transitive_map_anchor",
+      "source_count": 2,
+      "source_dependency_pattern": "different_immediate_localizers_share_one_upstream_map_anchor",
+      "verifier_dependency_pattern": "disjoint_complete_transitive_closure",
+      "expected": "reject_false_independence"
+    },
+    {
+      "case_id": "CORR-004",
+      "name": "different_vendors_share_calibration_lab",
+      "source_count": 2,
+      "source_dependency_pattern": "distinct_vendors_share_claim_critical_calibration_reference",
+      "verifier_dependency_pattern": "disjoint_complete_transitive_closure",
+      "expected": "reject_false_independence"
+    },
+    {
+      "case_id": "CORR-005",
+      "name": "different_models_share_training_and_annotation_lineage",
+      "source_count": 2,
+      "source_dependency_pattern": "different_model_digests_share_training_dataset_and_annotation_pipeline",
+      "verifier_dependency_pattern": "disjoint_complete_transitive_closure",
+      "expected": "reject_false_independence"
+    },
+    {
+      "case_id": "CORR-006",
+      "name": "distinct_receipts_wrap_same_observation",
+      "source_count": 2,
+      "source_dependency_pattern": "otherwise_disjoint",
+      "evidence_identity_pattern": "duplicate_underlying_observation_receipt",
+      "expected": "reject_duplicate_evidence"
+    },
+    {
+      "case_id": "CORR-007",
+      "name": "independent_verifier_shares_acquisition_clock",
+      "source_count": 2,
+      "source_dependency_pattern": "disjoint_source_closures",
+      "verifier_dependency_pattern": "shared_claim_critical_clock",
+      "expected": "reject_verifier_independence"
+    },
+    {
+      "case_id": "CORR-008",
+      "name": "known_sources_plus_unknown_dependency_remainder",
+      "source_count": 2,
+      "source_dependency_pattern": "one_source_inventory_unknown_with_known_subset",
+      "verifier_dependency_pattern": "complete",
+      "expected": "reject_insufficient_evidence"
+    },
+    {
+      "case_id": "CORR-009",
+      "name": "source_dependency_inventory_incomplete",
+      "source_count": 2,
+      "source_dependency_pattern": "one_source_inventory_incomplete",
+      "expected": "reject_insufficient_evidence"
+    },
+    {
+      "case_id": "CORR-010",
+      "name": "shared_upstream_host_transitive_through_distinct_services",
+      "source_count": 3,
+      "source_dependency_pattern": "three_distinct_services_share_one_claim_critical_upstream_host",
+      "expected": "reject_false_independence"
+    },
+    {
+      "case_id": "CORR-011",
+      "name": "verifier_identity_reuses_acquisition_source",
+      "source_count": 2,
+      "source_dependency_pattern": "otherwise_disjoint",
+      "verifier_dependency_pattern": "verifier_identity_equals_one_acquisition_source",
+      "expected": "reject_verifier_independence"
+    },
+    {
+      "case_id": "CORR-012",
+      "name": "stale_observation_and_expired_calibration",
+      "source_count": 2,
+      "source_dependency_pattern": "disjoint_complete_transitive_closures",
+      "evidence_identity_pattern": "stale_source_and_calibration_interval_expired",
+      "expected": "reject_stale_evidence"
+    },
+    {
+      "case_id": "CORR-013",
+      "name": "rights_expired_or_not_authorized_for_claim",
+      "source_count": 2,
+      "source_dependency_pattern": "disjoint_complete_transitive_closures",
+      "evidence_identity_pattern": "rights_unknown_denied_or_expired",
+      "expected": "reject_rights"
+    },
+    {
+      "case_id": "CORR-014",
+      "name": "wrong_asset_revision_frame_or_region",
+      "source_count": 2,
+      "source_dependency_pattern": "disjoint_complete_transitive_closures",
+      "evidence_identity_pattern": "one_source_context_mismatch",
+      "expected": "reject_scope_mismatch"
+    },
+    {
+      "case_id": "CORR-015",
+      "name": "unsupported_alternative_or_redundant_path_semantics",
+      "source_count": 2,
+      "source_dependency_pattern": "alternative_paths_not_represented_by_current_fault_semantics",
+      "expected": "reject_unsupported_semantics"
+    },
+    {
+      "case_id": "CORR-016",
+      "name": "reordered_and_duplicate_dependency_edges",
+      "source_count": 3,
+      "source_dependency_pattern": "same_transitive_closure_under_edge_reordering_and_duplicate_edges",
+      "expected": "identical_admission_and_rejection_set"
+    }
+  ],
+  "metrics": {
+    "false_independence_rate": "accepted_claims_with_planted_declared_common_cause / all_planted_common_cause_claims",
+    "common_cause_detection_recall": "rejected_planted_common_cause_claims / all_planted_common_cause_claims",
+    "false_dependence_rate": "rejected_complete_disjoint_claims / all_complete_disjoint_claims",
+    "unknown_inventory_acceptance_rate": "accepted_claims_with_incomplete_or_unknown_required_inventory / all_incomplete_or_unknown_claims",
+    "duplicate_observation_acceptance_rate": "accepted_claims_with_duplicate_underlying_observation / all_duplicate_observation_claims",
+    "verifier_overlap_acceptance_rate": "accepted_claims_with_verifier_acquisition_overlap / all_verifier_overlap_claims",
+    "rejection_reason_stability": "equality_of_sorted_rejection_sets_under_edge_order_and_duplicate-edge transformations",
+    "runtime_and_memory": "measured_by_source_count_dependency_count_and_transitive_path_depth"
+  },
+  "proposed_research_targets_not_results": {
+    "false_independence_rate_on_frozen_declared_synthetic_panel": 0.0,
+    "common_cause_detection_recall_on_frozen_planted_complete_panel": 1.0,
+    "unknown_inventory_acceptance_rate": 0.0,
+    "duplicate_observation_acceptance_rate": 0.0,
+    "verifier_overlap_acceptance_rate": 0.0,
+    "false_dependence_rate": "measure_and_report; do_not optimize by weakening completeness or identity checks"
+  },
+  "limitations": [
+    "A complete declared graph is not proof that all real dependencies were discovered.",
+    "Unique identifiers do not prove physical independence.",
+    "Pairwise or portfolio-level independence is conditional on the fault model and dependency semantics.",
+    "The benchmark does not establish physical sensor accuracy, POD/PFA, asset condition, safety clearance or intervention authority.",
+    "All source identities, dependencies, assessments and receipts in the v0.1 cases are synthetic."
+  ]
+}
