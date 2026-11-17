@@ -24,7 +24,6 @@ use optical_health::{
     OpticalHealthReading, OpticalHealthThresholds, SpectralBand, SurfaceState,
 };
 
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum CoupledError {
     Material(RegimeError),
