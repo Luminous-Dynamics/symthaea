@@ -593,3 +593,14 @@ New work package: [SC-PAIR-COHERENCE-001 #12677](https://github.com/Luminous-Dyn
 This is a distinct route to higher-temperature superconductivity: after identifying materials with strong pairing, engineer coherence without destroying the pairs. It must be tested against pair-breaking, interface disorder, charge-transfer, finite-size and parasitic normal-conduction effects.
 
 The source registry now includes the Science and bilayer theory papers as separate sources and benchmark catalogs; their evidence types and claim boundaries are kept distinct.
+
+
+## 34. End-to-end P→X→y evidence linkage
+
+The synthesis-protocol auditor now consumes the separate observation-event schema and fixture as explicit inputs. For every protocol outcome, each characterization-event ID must:
+- resolve to a unique observation event in the declared observation fixture;
+- originate from an observed measurement, not a model prediction or calculation;
+- refer to the same target material formula;
+- match the outcome's resolved specimen ID.
+
+This is a deliberately strict synthetic contract for the first end-to-end proof. Ambiguous sample identity is retained as unresolved in real records rather than guessed. The protocol smoke fixture now links its synthetic PQP run to the synthetic Hg1223 observation event with matching material and sample identity. This tests the data join only; it is not an experimental PQP reproduction.
