@@ -547,15 +547,15 @@ impl ClockCalibrationLedger {
     }
 
     pub fn append(&mut self, calibration: ClockCalibrationV1) -> Result<(), ClockCalibrationError> {
-        if let Some(previous) = self.last_transaction_time_knowledge_us {
-            if calibration.recorded_at_knowledge_us <= previous {
-                return Err(
-                    ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
-                        previous,
-                        actual: calibration.recorded_at_knowledge_us,
-                    },
-                );
-            }
+        if let Some(previous) = self.last_transaction_time_knowledge_us
+            && calibration.recorded_at_knowledge_us <= previous
+        {
+            return Err(
+                ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
+                    previous,
+                    actual: calibration.recorded_at_knowledge_us,
+                },
+            );
         }
         self.append_unchecked(calibration)?;
         self.last_transaction_time_knowledge_us = Some(calibration.recorded_at_knowledge_us);
@@ -578,15 +578,15 @@ impl ClockCalibrationLedger {
         {
             return Err(ClockCalibrationError::CalibrationBatchTimestampMismatch);
         }
-        if let Some(previous) = self.last_transaction_time_knowledge_us {
-            if transaction_time <= previous {
-                return Err(
-                    ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
-                        previous,
-                        actual: transaction_time,
-                    },
-                );
-            }
+        if let Some(previous) = self.last_transaction_time_knowledge_us
+            && transaction_time <= previous
+        {
+            return Err(
+                ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
+                    previous,
+                    actual: transaction_time,
+                },
+            );
         }
 
         let mut candidate = self.clone();
