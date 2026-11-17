@@ -285,7 +285,10 @@ impl fmt::Display for ClockCalibrationError {
                 source_domain, reference_domain
             ),
             Self::InvalidCalibrationHistory => {
-                write!(f, "clock calibration ledger history or indexes are inconsistent")
+                write!(
+                    f,
+                    "clock calibration ledger history or indexes are inconsistent"
+                )
             }
             Self::ReferenceDomainMismatch { expected, actual } => write!(
                 f,
@@ -464,16 +467,15 @@ impl ClockCalibrationLedger {
         &self.revisions
     }
 
-    pub fn append(
-        &mut self,
-        calibration: ClockCalibrationV1,
-    ) -> Result<(), ClockCalibrationError> {
+    pub fn append(&mut self, calibration: ClockCalibrationV1) -> Result<(), ClockCalibrationError> {
         if let Some(previous) = self.last_transaction_time_knowledge_us {
             if calibration.recorded_at_knowledge_us <= previous {
-                return Err(ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
-                    previous,
-                    actual: calibration.recorded_at_knowledge_us,
-                });
+                return Err(
+                    ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
+                        previous,
+                        actual: calibration.recorded_at_knowledge_us,
+                    },
+                );
             }
         }
         self.append_unchecked(calibration)?;
@@ -499,10 +501,12 @@ impl ClockCalibrationLedger {
         }
         if let Some(previous) = self.last_transaction_time_knowledge_us {
             if transaction_time <= previous {
-                return Err(ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
-                    previous,
-                    actual: transaction_time,
-                });
+                return Err(
+                    ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
+                        previous,
+                        actual: transaction_time,
+                    },
+                );
             }
         }
 
@@ -542,15 +546,14 @@ impl ClockCalibrationLedger {
         known_at_knowledge_us: i64,
     ) -> Result<&ClockCalibrationV1, ClockCalibrationError> {
         let key = (source_domain, reference_domain);
-        let chain = self
-            .revisions_by_domain_pair
-            .get(&key)
-            .ok_or(ClockCalibrationError::NoCalibrationKnownForSourceTime {
+        let chain = self.revisions_by_domain_pair.get(&key).ok_or(
+            ClockCalibrationError::NoCalibrationKnownForSourceTime {
                 source_domain,
                 reference_domain,
                 source_time_us,
                 known_at_knowledge_us,
-            })?;
+            },
+        )?;
         let visible_count = chain.partition_point(|index| {
             self.revisions[*index].recorded_at_knowledge_us <= known_at_knowledge_us
         });
@@ -853,9 +856,7 @@ mod tests {
         duplicate.recorded_at_knowledge_us = 100;
         assert_eq!(
             ledger.append_batch([first, duplicate]),
-            Err(ClockCalibrationError::DuplicateCalibrationId {
-                calibration_id: 7,
-            })
+            Err(ClockCalibrationError::DuplicateCalibrationId { calibration_id: 7 })
         );
         assert_eq!(ledger.revisions().len(), 0);
         assert_eq!(ledger.state_sha256(), before);
@@ -866,10 +867,12 @@ mod tests {
         earlier.recorded_at_knowledge_us = 99;
         assert_eq!(
             ledger.append(earlier),
-            Err(ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
-                previous: 100,
-                actual: 99,
-            })
+            Err(
+                ClockCalibrationError::NonIncreasingCalibrationTransactionTime {
+                    previous: 100,
+                    actual: 99,
+                }
+            )
         );
     }
 
