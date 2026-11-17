@@ -590,9 +590,12 @@ impl LeadTimeStats {
 // ── Evaluation Config ────────────────────────────────────────────────────────
 
 /// Configuration for the density-limit evaluation harness.
+///
+/// The configured training fraction is taken first; the held-out remainder is
+/// then stratified by discharge outcome and split into validation and final test.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationConfig {
-    /// Fraction of shots used for training (rest for test). Default: 0.8.
+    /// Fraction of shots used for training; the remainder is divided into validation and test. Default: 0.8.
     pub train_fraction: f64,
     /// Sliding window size for Phi-decline monitor. Default: 10.
     pub window_size: usize,
@@ -615,7 +618,7 @@ impl Default for EvaluationConfig {
 /// Complete evaluation report for the density-limit prediction task.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationReport {
-    /// Best free-energy threshold (maximizes F1).
+    /// Free-energy threshold selected by maximizing validation F1.
     pub best_threshold: f64,
     /// F1 score on the untouched final test partition at the validation-selected threshold.
     pub best_f1: f64,
@@ -641,7 +644,7 @@ pub struct EvaluationReport {
     pub phi_decline_cm: ConfusionMatrix,
     /// Normalization ranges used.
     pub normalization_ranges: NormalizationRanges,
-    /// All threshold sweep results: (threshold, f1, precision, recall).
+    /// Validation threshold sweep results: (threshold, f1, precision, recall).
     pub threshold_sweep: Vec<(f64, f64, f64, f64)>,
 }
 
@@ -928,12 +931,12 @@ fn stable_shot_split_key(shot_id: u64, seed: u64) -> u64 {
 
 /// Run the full evaluation pipeline on DL_DataFrame data.
 ///
-/// 1. Loads CSV and groups by shot
-/// 2. Splits into train/test by sorted shot_id (deterministic)
-/// 3. Builds encoder and reference HV from healthy training samples
-/// 4. Sweeps free-energy thresholds to find optimal F1
-/// 5. Computes ROC curve, AUC, and lead-time statistics
-/// 6. Evaluates Phi-decline method for comparison
+/// 1. Loads CSV and groups by complete discharge/shot
+/// 2. Creates a deterministic train/validation/test split without splitting shots
+/// 3. Fits encoder and reference HV using training shots only
+/// 4. Selects the free-energy threshold using validation F1 only
+/// 5. Evaluates the frozen threshold once on the final test partition
+/// 6. Computes test ROC/AUC, lead-time statistics, and Phi-decline comparison
 pub fn evaluate_density_limit(path: &Path, config: &EvaluationConfig) -> Result<EvaluationReport> {
     // 1. Load data
     let shots = load_density_limit_csv(path)?;
@@ -1050,7 +1053,7 @@ pub fn evaluate_density_limit(path: &Path, config: &EvaluationConfig) -> Result<
 /// Configuration for the improved V2 evaluation harness.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationConfigV2 {
-    /// Fraction of shots used for training (rest for test). Default: 0.8.
+    /// Fraction of shots used for training; the remainder is divided into validation and test. Default: 0.8.
     pub train_fraction: f64,
     /// Temporal window size (consecutive samples bundled into one HV). Default: 5.
     pub window_size: usize,
@@ -1364,7 +1367,7 @@ pub fn greenwald_fraction(density: f32, minor_radius: f32, plasma_current: f32) 
 /// Configuration for the V3 physics-informed evaluation harness.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EvaluationConfigV3 {
-    /// Fraction of shots used for training (rest for test). Default: 0.8.
+    /// Fraction of shots used for training; the remainder is divided into validation and test. Default: 0.8.
     pub train_fraction: f64,
     /// Temporal window size (consecutive samples bundled into one HV). Default: 5.
     pub window_size: usize,
