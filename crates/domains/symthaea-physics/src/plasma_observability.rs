@@ -355,8 +355,14 @@ impl MeasuredDecisionInputs {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+/// Result of a measurement-availability check.
+///
+/// MeasuredInputsAvailable means only that every declared required channel
+/// is represented by a validated direct measurement. It does NOT prove that
+/// the physical quantity of interest is identifiable, observable, calibrated
+/// for a machine/regime, or safe to use for actuation.
 pub enum DecisionInputGate {
-    Eligible(MeasuredDecisionInputs),
+    MeasuredInputsAvailable(MeasuredDecisionInputs),
     Abstain {
         frame_id: String,
         blocked_channels: Vec<BlockedChannel>,
@@ -555,7 +561,7 @@ impl PlasmaObservationFrame {
         }
 
         values.sort_by(|left, right| left.channel_id.cmp(&right.channel_id));
-        Ok(DecisionInputGate::Eligible(MeasuredDecisionInputs {
+        Ok(DecisionInputGate::MeasuredInputsAvailable(MeasuredDecisionInputs {
             frame_id: self.frame_id.clone(),
             shot_id: self.shot_id.clone(),
             frame_time_ns: self.frame_time_ns,
@@ -629,8 +635,8 @@ mod tests {
         let gate = frame
             .evaluate_decision_gate(&["density", "temperature"])
             .expect("valid frame should evaluate");
-        let DecisionInputGate::Eligible(inputs) = gate else {
-            panic!("measured channels should be eligible");
+        let DecisionInputGate::MeasuredInputsAvailable(inputs) = gate else {
+            panic!("measured channels should be available");
         };
         assert_eq!(inputs.get("density").expect("density").value(), 0.0);
         assert_eq!(inputs.values().len(), 2);
@@ -781,7 +787,7 @@ mod tests {
             .evaluate_decision_gate(&["temperature", "density"])
             .expect("valid required channels should evaluate");
         let DecisionInputGate::Eligible(inputs) = gate else {
-            panic!("optional synthetic channel must not block measured-only decision");
+            panic!("optional synthetic channel must not block required measured-input availability");
         };
         assert_eq!(inputs.values().len(), 2);
         assert!(inputs.get("radiated_power").is_none());
