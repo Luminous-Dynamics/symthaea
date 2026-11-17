@@ -260,3 +260,14 @@ If the target is not met, report the result and the Pareto frontier. Non-inferio
 ## Claim ceiling
 
 This matrix is a research and benchmark plan. It does not report reproduced external scores, CAVERS ingestion, SKiD-SLAM execution, NeBula integration, a field campaign, or a SOTA result. A finite synthetic PASS is not physical, mining, cave, planetary, safety or regulatory qualification.
+
+
+### B0.7 — verified construction and as-built state transitions
+
+New workstream: [#12606 — SUBTERRA-VERIFIED-CONSTRUCTION-001](https://github.com/Luminous-Dynamics/symthaea/issues/12606). This extends the survey and policy benchmarks from “what did the robot observe?” to “did the approved physical intervention produce the intended, independently verified state?”
+
+The first slice is one short synthetic tunnel segment, one excavation increment, one support-installation operation and one independent as-built inspection. It tests design revision/frame integrity, uncertain geology, no-contact utility zones, physical-versus-commanded outcomes, material reconciliation, common-mode sensor failures and unknown-outcome recovery. The evaluator must not receive planner-private state or hidden ground truth during execution.
+
+Matched baselines: scripted sequence, geometry-only twin, open-loop task completion, local closed-loop control, risk-aware MPC, robust shared policy, human-authored plan/inspection and verification-aware inspection scheduling. Report as-built tolerance, false-accept rate, defect detection, overbreak, utility incursions, material/energy balance, rework, inspection effort and exact evidence reconciliation separately. Proposed targets are in #12606; they are hypotheses, not measured results.
+
+Industry boundary: ISO 17757:2019 remains the reviewed-current autonomous earth-moving/mining machine safety reference. ISO 21423:2026 is now published for industrial mobile-robot communications/interoperability, but its scope explicitly excludes safety and navigation requirements. It is an interoperability reference, not a safety case. Neither benchmark PASS nor digital-twin agreement is equipment certification or geotechnical approval.
