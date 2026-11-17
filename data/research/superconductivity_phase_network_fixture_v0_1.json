@@ -1,0 +1,449 @@
+{
+  "contract": "SC-PHASE-NETWORK-0.1",
+  "instance_id": "synthetic-square-xy-4x4-periodic-v0",
+  "fixture_only": true,
+  "model": {
+    "kind": "classical_xy_phase_only",
+    "version": "0.1",
+    "pair_amplitude_mode": "fixed_not_simulated",
+    "boltzmann_constant_convention": "kB_equals_1",
+    "temperature_unit": "coupling_energy_units",
+    "notes": "Synthetic 4x4 square-lattice reference input; no simulation output is attached."
+  },
+  "graph": {
+    "spatial_dimension": 2,
+    "topology_family": "regular_square_lattice",
+    "embedding": "physical_coordinates",
+    "nodes": [
+      {
+        "node_id": "n00",
+        "position": [
+          0,
+          0
+        ]
+      },
+      {
+        "node_id": "n01",
+        "position": [
+          0,
+          1
+        ]
+      },
+      {
+        "node_id": "n02",
+        "position": [
+          0,
+          2
+        ]
+      },
+      {
+        "node_id": "n03",
+        "position": [
+          0,
+          3
+        ]
+      },
+      {
+        "node_id": "n10",
+        "position": [
+          1,
+          0
+        ]
+      },
+      {
+        "node_id": "n11",
+        "position": [
+          1,
+          1
+        ]
+      },
+      {
+        "node_id": "n12",
+        "position": [
+          1,
+          2
+        ]
+      },
+      {
+        "node_id": "n13",
+        "position": [
+          1,
+          3
+        ]
+      },
+      {
+        "node_id": "n20",
+        "position": [
+          2,
+          0
+        ]
+      },
+      {
+        "node_id": "n21",
+        "position": [
+          2,
+          1
+        ]
+      },
+      {
+        "node_id": "n22",
+        "position": [
+          2,
+          2
+        ]
+      },
+      {
+        "node_id": "n23",
+        "position": [
+          2,
+          3
+        ]
+      },
+      {
+        "node_id": "n30",
+        "position": [
+          3,
+          0
+        ]
+      },
+      {
+        "node_id": "n31",
+        "position": [
+          3,
+          1
+        ]
+      },
+      {
+        "node_id": "n32",
+        "position": [
+          3,
+          2
+        ]
+      },
+      {
+        "node_id": "n33",
+        "position": [
+          3,
+          3
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "e00r",
+        "source": "n00",
+        "target": "n01",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e00d",
+        "source": "n00",
+        "target": "n10",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e01r",
+        "source": "n01",
+        "target": "n02",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e01d",
+        "source": "n01",
+        "target": "n11",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e02r",
+        "source": "n02",
+        "target": "n03",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e02d",
+        "source": "n02",
+        "target": "n12",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e03r",
+        "source": "n03",
+        "target": "n00",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e03d",
+        "source": "n03",
+        "target": "n13",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e10r",
+        "source": "n10",
+        "target": "n11",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e10d",
+        "source": "n10",
+        "target": "n20",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e11r",
+        "source": "n11",
+        "target": "n12",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e11d",
+        "source": "n11",
+        "target": "n21",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e12r",
+        "source": "n12",
+        "target": "n13",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e12d",
+        "source": "n12",
+        "target": "n22",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e13r",
+        "source": "n13",
+        "target": "n10",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e13d",
+        "source": "n13",
+        "target": "n23",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e20r",
+        "source": "n20",
+        "target": "n21",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e20d",
+        "source": "n20",
+        "target": "n30",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e21r",
+        "source": "n21",
+        "target": "n22",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e21d",
+        "source": "n21",
+        "target": "n31",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e22r",
+        "source": "n22",
+        "target": "n23",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e22d",
+        "source": "n22",
+        "target": "n32",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e23r",
+        "source": "n23",
+        "target": "n20",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e23d",
+        "source": "n23",
+        "target": "n33",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e30r",
+        "source": "n30",
+        "target": "n31",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e30d",
+        "source": "n30",
+        "target": "n00",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e31r",
+        "source": "n31",
+        "target": "n32",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e31d",
+        "source": "n31",
+        "target": "n01",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e32r",
+        "source": "n32",
+        "target": "n33",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e32d",
+        "source": "n32",
+        "target": "n02",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e33r",
+        "source": "n33",
+        "target": "n30",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      },
+      {
+        "edge_id": "e33d",
+        "source": "n33",
+        "target": "n03",
+        "coupling_energy": 1,
+        "gauge_link_phase_rad": 0,
+        "physical_edge_length": 1,
+        "edge_class": "nearest_neighbor"
+      }
+    ]
+  },
+  "boundary_conditions": {
+    "kind": "periodic",
+    "periodic_axes": [
+      0,
+      1
+    ],
+    "twist_angle_rad": 0
+  },
+  "coupling_budget": {
+    "normalization": "sum_edge_couplings_divided_by_node_count",
+    "total_coupling_energy": 32,
+    "per_node_coupling_budget": 2,
+    "declared_nonlocal_edge_cost": 0
+  },
+  "disorder": {
+    "family": "none",
+    "strength": 0,
+    "spatial_correlation": null,
+    "generator_id": null
+  },
+  "random_seed": 0,
+  "source_references": [
+    "https://doi.org/10.1103/PhysRevB.60.11761",
+    "https://doi.org/10.1016/0378-4371(93)90131-M",
+    "https://doi.org/10.1103/PhysRevB.40.9122"
+  ],
+  "claim_ceiling": "Model input only; not a solved state, measured Tc, or experimental material result."
+}
