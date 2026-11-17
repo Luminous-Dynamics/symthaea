@@ -13,7 +13,8 @@ Rust metric contracts, a paired-world evaluator fixture, a transparent forecasti
 - Separate candidate-visible episode/observation types and evaluator-only mechanism/loss records.
 - Probe permission, remaining-budget and decision-deadline admission checks.
 - A **Decision-Relevant Predictability Horizon (DRPH)** contract that consumes independently qualified simultaneous upper bounds on decision regret and critical-event risk. It does not construct or certify those bounds.
-- Transparent univariate forecasting baselines: persistence, training-window mean, and recursive linear AR(p) fitted with Householder QR and optional ridge regularization.- A declared uniform-delay quadratic NG-RC reference arm with equally spaced taps and a QR-fitted polynomial readout; not a claim of NGRC-MDS reproduction.
+- Transparent univariate forecasting baselines: persistence, training-window mean, and recursive linear AR(p) fitted with Householder QR and optional ridge regularization.
+- A declared uniform-delay quadratic NG-RC reference arm with equally spaced taps and a QR-fitted polynomial readout; not a claim of NGRC-MDS reproduction.
 - A CSV adapter/runner that evaluates those baselines against the output contract of the independent chaos-reference generator.
 
 ## Run the focused crate
