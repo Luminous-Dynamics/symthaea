@@ -1127,13 +1127,21 @@ fn sample_job(
     (duration, failure_draw < stage.failure_probability_ppm)
 }
 
+/// Deterministic standard-normal approximation using a centered
+/// Irwin-Hall sum of twelve independent uniform draws. Its mean is zero and
+/// variance is one; it is not a substitute for a calibrated instrument-noise
+/// model, which belongs in the B2 qualification dataset.
 fn sample_noise(seed: u64, standard_deviation: f64) -> f64 {
     if standard_deviation == 0.0 {
         return 0.0;
     }
     let mut state = if seed == 0 { 0xa076_1d64_78bd_642f } else { seed };
-    let unit = (next_random(&mut state) >> 11) as f64 / ((1_u64 << 53) as f64);
-    (2.0 * unit - 1.0) * standard_deviation
+    let mut sum = 0.0;
+    for _ in 0..12 {
+        let uniform = (next_random(&mut state) >> 11) as f64 / ((1_u64 << 53) as f64);
+        sum += uniform;
+    }
+    (sum - 6.0) * standard_deviation
 }
 
 fn fouling_added(job: &InFlightJob, stages: &BTreeMap<StageKind, StageSpec>) -> u64 {
@@ -1522,6 +1530,21 @@ mod tests {
                 ));
             }
         }
+    }
+
+    #[test]
+    fn deterministic_noise_approximation_has_zero_mean_and_unit_variance() {
+        let values: Vec<f64> = (1..=10_000)
+            .map(|seed| sample_noise(seed, 1.0))
+            .collect();
+        let mean = values.iter().sum::<f64>() / values.len() as f64;
+        let variance = values
+            .iter()
+            .map(|value| (value - mean).powi(2))
+            .sum::<f64>()
+            / values.len() as f64;
+        assert!(mean.abs() < 0.04);
+        assert!((variance - 1.0).abs() < 0.06);
     }
 
     #[test]
