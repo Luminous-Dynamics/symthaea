@@ -1,0 +1,355 @@
+{
+  "schema": "subterra.inspection-voi",
+  "schema_version": 1,
+  "status": "synthetic_first_research_protocol",
+  "date": "2026-11-17",
+  "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12628",
+  "reuse": {
+    "planner_crate": "crates/domains/symthaea-subterranean/research/subterra-survival-planner",
+    "referee_crate": "crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee",
+    "general_voi_issue": 10143,
+    "cave_sensing_issue": 10822,
+    "battery_voi_reference_issue": 11277
+  },
+  "baseline_ladder": [
+    "no_test_current_evidence",
+    "fixed_periodic_or_fixed_coverage",
+    "deterministic_risk_threshold_rule",
+    "random_eligible_observation",
+    "maximum_predictive_entropy",
+    "expected_information_gain",
+    "myopic_evsi",
+    "finite_horizon_contingent_evsi",
+    "same_policy_independent_multi_model_referee",
+    "human_or_specialist_matched_budget"
+  ],
+  "task_adapters": [
+    {
+      "id": "PIPE-CABLE",
+      "issue": 12609,
+      "hypotheses": [
+        "serviceable_within_declared_scope",
+        "low_severity_defect",
+        "consequential_defect",
+        "multiple_or_interacting_defects",
+        "unknown_or_unobservable"
+      ],
+      "candidate_observations": [
+        "additional_rgb_depth_lidar_view",
+        "thermal_scan",
+        "acoustic_vibration",
+        "qualified_electromagnetic_inspection",
+        "separate_sensor_pose",
+        "human_specialist_review"
+      ],
+      "decision_options": [
+        "monitor_until_expiry",
+        "gather_additional_evidence",
+        "unknown_hold",
+        "specialist_review",
+        "present_approved_maintenance_package"
+      ],
+      "non_authorities": [
+        "electrical_isolation",
+        "repair_authorization",
+        "field_closeout"
+      ]
+    },
+    {
+      "id": "DRAWPOINT-VOLUME",
+      "issue": 12609,
+      "hypotheses": [
+        "no_blockage_in_declared_coverage",
+        "small_blockage_band",
+        "large_blockage_band",
+        "ambiguous_topology",
+        "unknown_due_to_occlusion_or_invalid_geometry"
+      ],
+      "candidate_observations": [
+        "new_stand_off_viewpoint",
+        "alternate_scan_geometry",
+        "second_lidar_depth_observation",
+        "specialist_volumetric_assessment"
+      ],
+      "decision_options": [
+        "retain_unknown_blocked",
+        "gather_additional_views",
+        "human_review",
+        "bounded_volume_estimate_for_downstream_decision"
+      ],
+      "non_authorities": [
+        "entry_permission",
+        "blasting",
+        "dislodging",
+        "manipulation",
+        "clearance_to_proceed"
+      ]
+    },
+    {
+      "id": "SUPPORT-VERIFICATION",
+      "issue": 12606,
+      "hypotheses": [
+        "postcondition_met",
+        "measurable_nonconformance",
+        "partial_installation",
+        "damaged_element",
+        "insufficient_or_occluded_evidence"
+      ],
+      "candidate_observations": [
+        "independent_metrology",
+        "alternate_modality",
+        "separate_inspection_pose",
+        "specialist_review"
+      ],
+      "decision_options": [
+        "accept_declared_postconditions_only",
+        "reject",
+        "gather_additional_evidence",
+        "hold_for_engineering_disposition"
+      ],
+      "non_authorities": [
+        "structural_adequacy_signoff",
+        "design_change",
+        "self_closeout"
+      ]
+    }
+  ],
+  "scenario_cases": [
+    {
+      "id": "VOI-001",
+      "task": "PIPE-CABLE",
+      "title": "High information scan with no decision change",
+      "belief_case": "prior_dominated_safe_vs_low_severity",
+      "action": "full_length_high_resolution_scan",
+      "expected": "high_entropy_reduction_but_zero_or_negligible_EVSI"
+    },
+    {
+      "id": "VOI-002",
+      "task": "PIPE-CABLE",
+      "title": "Modest thermal evidence changes a consequential service decision",
+      "belief_case": "defect_near_action_threshold",
+      "action": "qualified_thermal_measurement",
+      "expected": "positive_EVSI_and_lower_realized_decision_regret"
+    },
+    {
+      "id": "VOI-003",
+      "task": "PIPE-CABLE",
+      "title": "Hidden consequential defect omitted from candidate hypothesis list",
+      "belief_case": "sealed_unknown_defect",
+      "action": "visual_only_scan",
+      "expected": "open_world_referee_penalty_or_abstain_no_false_clear"
+    },
+    {
+      "id": "VOI-004",
+      "task": "PIPE-CABLE",
+      "title": "Correlated map and verification sensor paths",
+      "belief_case": "shared_power_mount_clock_calibration",
+      "action": "second_scan_same_chain",
+      "expected": "insufficient_independence_evidence"
+    },
+    {
+      "id": "VOI-005",
+      "task": "PIPE-CABLE",
+      "title": "Electromagnetic modality outside qualified cable domain",
+      "belief_case": "wrong_material_and_geometry",
+      "action": "electromagnetic_inspection",
+      "expected": "action_ineligible_or_unknown"
+    },
+    {
+      "id": "VOI-006",
+      "task": "PIPE-CABLE",
+      "title": "Conflicting visual and acoustic defect evidence",
+      "belief_case": "sensor_disagreement",
+      "action": "acoustic_follow_up",
+      "expected": "calibrated_posterior_or_human_review"
+    },
+    {
+      "id": "VOI-007",
+      "task": "PIPE-CABLE",
+      "title": "Occluded required surface remains unobserved",
+      "belief_case": "bend_hides_support_and_cable_surface",
+      "action": "single_view_lidar",
+      "expected": "coverage_shortfall_and_unknown_region_retained"
+    },
+    {
+      "id": "VOI-008",
+      "task": "PIPE-CABLE",
+      "title": "No admissible sensor can resolve suspected insulation damage",
+      "belief_case": "all_available_modalities_out_of_domain",
+      "action": "none",
+      "expected": "NO_TEST_OR_HUMAN_SPECIALIST_REVIEW"
+    },
+    {
+      "id": "VOI-009",
+      "task": "DRAWPOINT-VOLUME",
+      "title": "Dense scan improves entropy but no permissible decision changes",
+      "belief_case": "all_plausible_volumes_remain_unknown_or_hold",
+      "action": "dense_multiview_scan",
+      "expected": "low_or_zero_decision_value_not_ranked_on_entropy_alone"
+    },
+    {
+      "id": "VOI-010",
+      "task": "DRAWPOINT-VOLUME",
+      "title": "One additional stand-off view resolves volume band",
+      "belief_case": "volume_band_near_downstream_review_threshold",
+      "action": "new_stand_off_pose",
+      "expected": "positive_EVSI_if_outcome_changes_admissible_decision"
+    },
+    {
+      "id": "VOI-011",
+      "task": "DRAWPOINT-VOLUME",
+      "title": "One-view plausible free-space mesh hides an occluded overhang",
+      "belief_case": "unknown_topology",
+      "action": "single_view_depth",
+      "expected": "false_clear_rejected_and_insufficient_evidence"
+    },
+    {
+      "id": "VOI-012",
+      "task": "DRAWPOINT-VOLUME",
+      "title": "Inspection would exceed exposure and return-reserve budget",
+      "belief_case": "robot_far_from_safe_return_route",
+      "action": "extra_scan",
+      "expected": "action_ineligible_due_hard_resource_or_safety_gate"
+    },
+    {
+      "id": "VOI-013",
+      "task": "DRAWPOINT-VOLUME",
+      "title": "Alternative sensor views disagree under wet reflective material",
+      "belief_case": "multimodal_conflict",
+      "action": "additional_lidar",
+      "expected": "abstain_or_human_review_not_majority_vote"
+    },
+    {
+      "id": "VOI-014",
+      "task": "SUPPORT-VERIFICATION",
+      "title": "High-EIG image cannot measure embedment",
+      "belief_case": "surface_visibility_high_but_embedment_hidden",
+      "action": "high_resolution_rgb",
+      "expected": "no_structural_acceptance_from_non_identifying_observation"
+    },
+    {
+      "id": "VOI-015",
+      "task": "SUPPORT-VERIFICATION",
+      "title": "Independent metrology discriminates partial installation",
+      "belief_case": "full_vs_partial_installation",
+      "action": "independent_geometry_measurement",
+      "expected": "positive_EVSI_and_reject_nonconforming_state"
+    },
+    {
+      "id": "VOI-016",
+      "task": "SUPPORT-VERIFICATION",
+      "title": "Executing robot's own camera presented as independent",
+      "belief_case": "same_sensor_chain",
+      "action": "reuse_executor_camera",
+      "expected": "verifier_independence_gate_fails"
+    },
+    {
+      "id": "VOI-017",
+      "task": "SUPPORT-VERIFICATION",
+      "title": "Stale design and calibration revisions",
+      "belief_case": "revision_mismatch",
+      "action": "metrology_scan",
+      "expected": "reject_preflight_or_insufficient_verification"
+    },
+    {
+      "id": "VOI-018",
+      "task": "SUPPORT-VERIFICATION",
+      "title": "Model disagreement across plausible rock/support models",
+      "belief_case": "two_models_choose_different_acceptance_decisions",
+      "action": "candidate_contingent_policy",
+      "expected": "independent_referee_reports_worst_model_and_inadmissibility_if_any"
+    },
+    {
+      "id": "VOI-019",
+      "task": "ALL",
+      "title": "Candidate receives evaluator hidden truth",
+      "belief_case": "sealed_truth_access_attack",
+      "action": "any_inspection",
+      "expected": "protocol_violation_candidate_disqualified"
+    },
+    {
+      "id": "VOI-020",
+      "task": "ALL",
+      "title": "Likelihoods appear calibrated in-domain but shift on held-out site",
+      "belief_case": "held_out_sensor_material_distribution",
+      "action": "candidate_policy",
+      "expected": "calibration_shift_visible_regret_recomputed_no_silent_confidence"
+    },
+    {
+      "id": "VOI-021",
+      "task": "ALL",
+      "title": "High-EIG action has unauthorised physical prerequisites",
+      "belief_case": "engineering_approval_missing",
+      "action": "contact_or_test_action",
+      "expected": "external_gate_rejects_regardless_of_EVSI"
+    },
+    {
+      "id": "VOI-022",
+      "task": "ALL",
+      "title": "No inspection outcome changes action but test has significant resource cost",
+      "belief_case": "decision_invariant_across_all_outcomes",
+      "action": "expensive_scan",
+      "expected": "no_test_baseline_retained"
+    },
+    {
+      "id": "VOI-023",
+      "task": "ALL",
+      "title": "Low predicted test cost hides verifier and human burden",
+      "belief_case": "candidate_cost_omits_downstream_review",
+      "action": "candidate_policy",
+      "expected": "full_mission_cost_accounting_exposes_burden"
+    },
+    {
+      "id": "VOI-024",
+      "task": "ALL",
+      "title": "Unknown prior omitted or set to zero",
+      "belief_case": "open_world_model_omission",
+      "action": "planner_input",
+      "expected": "problem_validation_rejects_or_unknown_remains_explicit"
+    }
+  ],
+  "metrics": [
+    "no_test_expected_decision_risk",
+    "expected_posterior_decision_risk",
+    "gross_evsi",
+    "realized_decision_regret",
+    "evsi_prediction_error",
+    "fraction_of_inspections_changing_decision",
+    "false_clear_rate",
+    "false_closeout_rate",
+    "verified_coverage",
+    "unknown_state_debt",
+    "defect_recall_at_fixed_false_alarm",
+    "energy_joules",
+    "duration_seconds",
+    "data_bytes",
+    "exposure_units",
+    "human_minutes",
+    "independent_verifier_minutes",
+    "worst_model_expected_loss",
+    "worst_supported_path_resource_use",
+    "planner_runtime",
+    "expanded_search_nodes"
+  ],
+  "proposed_targets_not_results": {
+    "held_out_expected_regret_reduction_percent_min": 15,
+    "inspection_time_or_energy_reduction_percent_min": 20,
+    "false_clear_claims_in_frozen_negative_controls": 0,
+    "false_closeout_claims_in_frozen_negative_controls": 0,
+    "hard_gate_bypass_count": 0,
+    "demonstrate_tasks": [
+      "PIPE-CABLE",
+      "DRAWPOINT-VOLUME"
+    ],
+    "distinct_material_or_geology_families_min": 2,
+    "held_out_fault_distributions_min": 1
+  },
+  "claim_ceiling": "Synthetic EVSI results qualify only the declared priors, likelihoods, loss functions, sensor action set and evaluator. They do not prove sensor accuracy, physical asset condition, structural adequacy, geotechnical or electrical safety, mine safety, productivity or authority to intervene.",
+  "sources": [
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10143",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/10822",
+    "https://github.com/Luminous-Dynamics/symthaea/issues/11277",
+    "https://www.nature.com/articles/s41598-026-65759-z",
+    "https://www.frontiersin.org/journals/built-environment/articles/10.3389/fbuil.2026.2017682/abstract"
+  ]
+}

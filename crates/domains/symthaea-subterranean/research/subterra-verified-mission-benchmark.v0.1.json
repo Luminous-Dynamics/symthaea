@@ -1,0 +1,348 @@
+{
+  "schema": "subterra.verified-mission-benchmark",
+  "schema_version": 1,
+  "status": "research_protocol_frozen_for_review",
+  "date": "2026-11-17",
+  "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12621",
+  "composed_issues": [
+    12606,
+    12609,
+    12612
+  ],
+  "baseline_ladder": [
+    "scripted_open_loop",
+    "local_reactive_feedback",
+    "conventional_perception_task_planner",
+    "risk_aware_mpc",
+    "robust_shared_contingent_policy",
+    "verification_unaware_active_inspection",
+    "verification_aware_active_inspection",
+    "composable_verified_loop_system"
+  ],
+  "metric_groups": {
+    "physical_quality": [
+      "accepted_work_per_machine_hour",
+      "accepted_work_per_total_mission_hour",
+      "as_built_tolerance_error",
+      "first_pass_acceptance",
+      "defect_recall_at_fixed_false_alarm",
+      "false_acceptance",
+      "rework",
+      "no_contact_incursions"
+    ],
+    "observability": [
+      "verified_surface_volume_coverage",
+      "unknown_fraction",
+      "unknown_state_debt",
+      "3d_defect_localization_error",
+      "volume_error",
+      "brier_score",
+      "ece",
+      "risk_coverage",
+      "ood_abstention"
+    ],
+    "evidence": [
+      "verifier_independence_audit",
+      "common_cause_sensitivity",
+      "evidence_completeness",
+      "lineage_continuity",
+      "event_to_review_latency",
+      "verifier_minutes_per_accepted_unit"
+    ],
+    "operations": [
+      "energy",
+      "consumables",
+      "material_reconciliation_error",
+      "tool_wear",
+      "maintenance_downtime",
+      "human_intervention_time",
+      "inspection_time",
+      "inspection_energy",
+      "recovery_time"
+    ],
+    "integrity": [
+      "unauthorized_mutations",
+      "stale_work_package_rejection",
+      "design_frame_calibration_mismatch_rejection",
+      "duplicate_replay_rejection",
+      "unknown_outcome_lock_correctness",
+      "evidence_retention_after_partition_reboot"
+    ]
+  },
+  "hard_gates": [
+    "no_unauthorized_mutations",
+    "no_false_clear_from_unknown_or_occluded_region",
+    "no_false_closeout",
+    "no_new_mutation_while_outcome_unknown",
+    "no_duplicate_mutation_across_retries_or_handoffs",
+    "no_closeout_without_independent_postcondition_acceptance",
+    "no_stale_design_frame_or_calibration_acceptance"
+  ],
+  "scenarios": [
+    {
+      "id": "OP-001",
+      "family": "construction",
+      "title": "Command acknowledged but support not installed",
+      "faults": [
+        "missing_physical_actuation"
+      ],
+      "expected": "reject_closeout_and_keep_scope_open"
+    },
+    {
+      "id": "OP-002",
+      "family": "construction",
+      "title": "Partial support installation with insufficient embedment",
+      "faults": [
+        "partial_execution",
+        "out_of_tolerance"
+      ],
+      "expected": "reject_and_require_authorized_rework"
+    },
+    {
+      "id": "OP-003",
+      "family": "authority",
+      "title": "Stale work-package revision",
+      "faults": [
+        "stale_work_package"
+      ],
+      "expected": "reject_preflight"
+    },
+    {
+      "id": "OP-004",
+      "family": "coordinates",
+      "title": "Axis, units or coordinate-frame mismatch",
+      "faults": [
+        "frame_or_unit_mismatch"
+      ],
+      "expected": "reject_preflight_and_evidence"
+    },
+    {
+      "id": "OP-005",
+      "family": "calibration",
+      "title": "Expired or drifted calibration",
+      "faults": [
+        "stale_calibration"
+      ],
+      "expected": "reject_preflight_and_verification"
+    },
+    {
+      "id": "OP-006",
+      "family": "observability",
+      "title": "Occluded utility corridor falsely reported clear",
+      "faults": [
+        "occlusion",
+        "unknown_to_clear"
+      ],
+      "expected": "insufficient_evidence"
+    },
+    {
+      "id": "OP-007",
+      "family": "common_cause",
+      "title": "Planner and verifier share timebase, power or perception path",
+      "faults": [
+        "common_cause_sensor_failure"
+      ],
+      "expected": "reject_independence_claim"
+    },
+    {
+      "id": "OP-008",
+      "family": "execution",
+      "title": "Timeout before physical execution",
+      "faults": [
+        "lost_acknowledgement",
+        "unknown_execution"
+      ],
+      "expected": "lock_scope_then_independently_reconcile_not_executed"
+    },
+    {
+      "id": "OP-009",
+      "family": "execution",
+      "title": "Timeout after partial or complete physical execution",
+      "faults": [
+        "lost_acknowledgement",
+        "unknown_execution",
+        "partial_execution"
+      ],
+      "expected": "lock_scope_then_reconcile_and_inspect"
+    },
+    {
+      "id": "OP-010",
+      "family": "integrity",
+      "title": "Same command idempotency key reused by a retry robot",
+      "faults": [
+        "cross_robot_duplicate_key"
+      ],
+      "expected": "reject_duplicate_command"
+    },
+    {
+      "id": "OP-011",
+      "family": "communications",
+      "title": "Network partition while local hazard escalates",
+      "faults": [
+        "network_partition",
+        "hazard_event"
+      ],
+      "expected": "local_safety_preempts_and_fleet_does_not_expand_authority"
+    },
+    {
+      "id": "OP-012",
+      "family": "recovery",
+      "title": "Robot reboot after command with missing cloud receipt",
+      "faults": [
+        "reboot",
+        "delayed_evidence"
+      ],
+      "expected": "restore_history_and_keep_scope_locked_until_reconciliation"
+    },
+    {
+      "id": "OP-013",
+      "family": "resources",
+      "title": "Battery estimate omits return reserve",
+      "faults": [
+        "resource_model_error"
+      ],
+      "expected": "block_work_or_return"
+    },
+    {
+      "id": "OP-014",
+      "family": "distribution_shift",
+      "title": "Unseen geology and unexpected water ingress",
+      "faults": [
+        "ood_material",
+        "water_ingress"
+      ],
+      "expected": "abstain_probe_or_hold_within_envelope"
+    },
+    {
+      "id": "OP-015",
+      "family": "asset_observability",
+      "title": "Cable insulation damage under dust and variable lighting",
+      "faults": [
+        "dust",
+        "low_light",
+        "surface_occlusion"
+      ],
+      "expected": "calibrated_defect_report_or_unknown"
+    },
+    {
+      "id": "OP-016",
+      "family": "asset_observability",
+      "title": "Pipe support deformation hidden behind a bend",
+      "faults": [
+        "partial_view",
+        "occlusion"
+      ],
+      "expected": "unknown_region_retained"
+    },
+    {
+      "id": "OP-017",
+      "family": "drawpoint",
+      "title": "Hang-up volume estimated from one partial viewpoint",
+      "faults": [
+        "partial_view",
+        "ambiguous_geometry"
+      ],
+      "expected": "no_clearance_or_intervention_authority"
+    },
+    {
+      "id": "OP-018",
+      "family": "fleet_charging",
+      "title": "Charging station unavailable during assigned inspection route",
+      "faults": [
+        "charger_unavailable"
+      ],
+      "expected": "replan_without_return_reserve_violation"
+    },
+    {
+      "id": "OP-019",
+      "family": "rework",
+      "title": "Rework attempt uses mismatched replacement authority",
+      "faults": [
+        "stale_rework_revision"
+      ],
+      "expected": "keep_scope_locked_and_reject_retry"
+    },
+    {
+      "id": "OP-020",
+      "family": "degradation",
+      "title": "Tool wear and localization drift accumulate together",
+      "faults": [
+        "tool_wear",
+        "localization_drift"
+      ],
+      "expected": "derate_or_preempt_before_quality_claim"
+    },
+    {
+      "id": "OP-021",
+      "family": "temporal",
+      "title": "Delayed sensor packet arrives after plan expiry",
+      "faults": [
+        "observation_delay",
+        "stale_plan"
+      ],
+      "expected": "reject_stale_observation_for_current_acceptance"
+    },
+    {
+      "id": "OP-022",
+      "family": "adversarial",
+      "title": "Spoofed or duplicated calibration/evidence record",
+      "faults": [
+        "evidence_spoof",
+        "replay"
+      ],
+      "expected": "reject_or_quarantine_and_require_independent_reconciliation"
+    },
+    {
+      "id": "OP-023",
+      "family": "evidence",
+      "title": "Independent verifier cannot cover full required volume",
+      "faults": [
+        "insufficient_coverage"
+      ],
+      "expected": "insufficient_not_accepted"
+    },
+    {
+      "id": "OP-024",
+      "family": "rework",
+      "title": "Rejected intervention followed by new approved work package",
+      "faults": [
+        "prior_rejection",
+        "authorized_new_revision"
+      ],
+      "expected": "old_attempt_superseded_and_only_exact_new_package_admitted"
+    }
+  ],
+  "statistical_protocol": {
+    "split_unit": [
+      "site",
+      "asset",
+      "geology_or_material_family",
+      "sensor_campaign",
+      "time_period"
+    ],
+    "paired_seeds": true,
+    "common_fault_schedules": true,
+    "publish_raw_per_scenario_results": true,
+    "report_confidence_intervals_and_denominators": true,
+    "rule_of_three_approximation": {
+      "confidence": "95%",
+      "independent_zero_failure_trials_300": {
+        "upper_failure_bound_approx": 0.01
+      },
+      "independent_zero_failure_trials_3000": {
+        "upper_failure_bound_approx": 0.001
+      },
+      "warning": "These are trial-distribution statistics only; correlated seeds and fault templates are not independent, and synthetic evidence is not a field safety case."
+    }
+  },
+  "proposed_targets_not_results": {
+    "construction_rework_or_inspection_reduction_percent_min": 15,
+    "asset_inspection_time_or_energy_reduction_percent_min": 20,
+    "false_closeouts_in_frozen_negative_controls": 0,
+    "unauthorized_mutations": 0,
+    "correct_ambiguous_outcome_handling_percent": 100,
+    "held_out_geology_material_families_min": 2,
+    "held_out_fault_distributions_min": 1
+  },
+  "claim_ceiling": "Benchmark results qualify only declared synthetic or instrumented test-cell conditions and do not establish mine safety, geotechnical adequacy, equipment certification, regulatory compliance or field productivity."
+}
