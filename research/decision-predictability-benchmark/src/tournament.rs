@@ -770,7 +770,7 @@ mod tests {
         assert!(result.contains("persistence"));
         assert!(result.contains("mean"));
         assert!(result.contains("skill_vs_persistence"));
-        assert!(result.contains(",ok\\n"));
+        assert!(result.contains(",ok\n"));
     }
 
     #[test]
