@@ -175,7 +175,7 @@ fn factor_outcomes(candidate:&Value)->Result<BTreeMap<String,BTreeSet<String>>,S
   let id=s(f,"factor_id","factor")?;let rows=val(f,"likelihoods","factor")?.as_array().ok_or("likelihoods must be array")?;
   let first=rows.first().ok_or("factor has no likelihood rows")?;let names=object(val(first,"outcomes","likelihood")?,"outcomes")?.keys().cloned().collect();
   for row in rows{let names2=object(val(row,"outcomes","likelihood")?,"outcomes")?.keys().cloned().collect::<BTreeSet<_>>();if names2!=names{return Err(format!("factor {id:?} has inconsistent outcomes"));}}
-  out.insert(id,names);
+  if out.insert(id.clone(),names).is_some(){return Err(format!("duplicate factor ID {id:?}"));}
  }Ok(out)
 }
 fn parse_world_bounds(v:&Value)->Result<BTreeMap<String,Bounds>,String>{parse_bounds(val(v,"hypothesis_bounds","candidate_view")?)}
@@ -260,7 +260,11 @@ fn parse_candidate_oracle(candidate:&Value,oracle:&Value)->Result<(BTreeMap<Stri
  Ok((bounds,actions,options,worlds,outcomes,actual,budget,max_depth))
 }
 fn nearest_rank_expected_cost(bounds:&BTreeMap<String,Bounds>,costs:&BTreeMap<String,u64>)->Result<u64,String>{
- let mut rows:Vec<(String,u64,u64,u64,u64)>=bounds.iter().map(|(id,b)|(id.clone(),b.lower,b.upper,b.nominal,*costs.get(id).unwrap_or(&0))).collect();
+ let mut rows:Vec<(String,u64,u64,u64,u64)>=Vec::new();
+ for (id,bound) in bounds{
+  let cost=*costs.get(id).ok_or_else(||format!("missing path cost for world {id:?}"))?;
+  rows.push((id.clone(),bound.lower,bound.upper,bound.nominal,cost));
+ }
  let lower_sum:u64=rows.iter().map(|r|r.1).sum();let mut value:u128=rows.iter().map(|r|r.1 as u128*r.4 as u128).sum();
  let mut remaining=SCALE-lower_sum;rows.sort_by(|a,b|b.4.cmp(&a.4).then_with(||a.0.cmp(&b.0)));
  for row in &rows{let take=remaining.min(row.2-row.1);value+=take as u128*row.4 as u128;remaining-=take;if remaining==0{break;}}
@@ -351,10 +355,11 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
    }
   }
  }
- let nominal_cost:u128=bounds.iter().map(|(id,b)|{
-  b.nominal as u128*world_costs.get(id).copied().unwrap_or(0) as u128
- }).sum();
- let nominal_cost=((nominal_cost+SCALE as u128-1)/SCALE as u128) as u64;
+ let nominal_numerator=bounds.iter().try_fold(0u128,|sum,(id,b)|{
+  let cost=*world_costs.get(id).ok_or_else(||format!("missing path cost for world {id:?}"))?;
+  sum.checked_add(b.nominal as u128*cost as u128).ok_or_else(||"nominal expected cost overflow".to_owned())
+ })?;
+ let nominal_cost=((nominal_numerator+SCALE as u128-1)/SCALE as u128) as u64;
  let worst_expected=nearest_rank_expected_cost(bounds,&world_costs)?;
  let feasible=robust_violations==0&&budget_violations==0;
  let report=json!({
@@ -369,7 +374,10 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
   "worst_case_expected_cost_bound_micros":worst_expected,
   "budget_micros":budget,
   "leaf_reports":leaf_reports,
-  "world_paths":world_leaf.iter().map(|(id,leaf)|json!({"world_id":id,"leaf_node_id":leaf,"path_cost_bound_micros":world_costs[id]})).collect::<Vec<_>>()
+  "world_paths":world_leaf.iter().map(|(id,leaf)|{
+   let cost=world_costs.get(id).copied().unwrap_or(u64::MAX);
+   json!({"world_id":id,"leaf_node_id":leaf,"path_cost_bound_micros":cost})
+  }).collect::<Vec<_>>()
  });
  Ok(PolicyMetrics{report,coverage,worst_expected_cost:worst_expected,nominal_expected_cost:nominal_cost,max_path_cost:max_path,feasible})
 }
