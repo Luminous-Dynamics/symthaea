@@ -174,6 +174,10 @@ pub struct DerivedStyleReadiness {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HybridStyleSpec {
     pub structural_style_id: u16,
+    /// Optional melodic-DNA donor (motif rhythm/contour and ornament profile).
+    /// The structural owner continues to control form and long-range obligations.
+    #[serde(default)]
+    pub melodic_style_id: Option<u16>,
     pub rhythmic_style_id: Option<u16>,
     pub harmonic_style_id: Option<u16>,
     pub ensemble_style_id: Option<u16>,
@@ -198,6 +202,7 @@ impl HybridStyleSpec {
         };
         let mut layers = vec![format!("{} structure", name(self.structural_style_id))];
         for (id, layer) in [
+            (self.melodic_style_id, "melody"),
             (self.rhythmic_style_id, "rhythm"),
             (self.harmonic_style_id, "harmony"),
             (self.ensemble_style_id, "ensemble"),
@@ -215,6 +220,7 @@ impl HybridStyleSpec {
         let mut issues = Vec::new();
         let ids = [
             Some(self.structural_style_id),
+            self.melodic_style_id,
             self.rhythmic_style_id,
             self.harmonic_style_id,
             self.ensemble_style_id,
@@ -1202,6 +1208,7 @@ mod tests {
     fn hybrid_labels_are_honest_and_modal_conflicts_are_rejected() {
         let hybrid = HybridStyleSpec {
             structural_style_id: 89,
+            melodic_style_id: None,
             rhythmic_style_id: Some(65),
             harmonic_style_id: Some(1),
             ensemble_style_id: None,
@@ -1218,6 +1225,24 @@ mod tests {
         assert!(codes.contains(&"cultural_qualification_required".into()));
         assert!(codes.contains(&"free_time_cycle_transition_required".into()));
         assert!(codes.contains(&"pitch_hierarchy_conflict".into()));
+    }
+
+    #[test]
+    fn hybrid_label_discloses_melodic_donor_separately() {
+        let hybrid = HybridStyleSpec {
+            structural_style_id: 1,
+            melodic_style_id: Some(5),
+            rhythmic_style_id: None,
+            harmonic_style_id: None,
+            ensemble_style_id: None,
+            performance_style_id: None,
+            production_style_id: None,
+            culturally_qualified_sources_acknowledged: false,
+        };
+        let label = hybrid.honest_label();
+        assert!(label.contains("structure"));
+        assert!(label.contains("melody"));
+        assert!(label.starts_with("Hybrid — "));
     }
 
     #[test]
