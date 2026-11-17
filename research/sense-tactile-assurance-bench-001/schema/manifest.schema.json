@@ -83,7 +83,10 @@
       "required": [
         "name",
         "reproduction_status",
-        "transfer_regime"
+        "transfer_regime",
+        "dataset_rights",
+        "code_rights",
+        "checkpoint_rights"
       ],
       "properties": {
         "name": {
@@ -169,6 +172,270 @@
             "host_skin_mount_transfer",
             "out_of_envelope"
           ]
+        },
+        "dataset_rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_id",
+            "license_uri",
+            "commercial_use_authorized",
+            "noncommercial_use_authorized",
+            "training_use_authorized",
+            "redistribution_authorized",
+            "review_status",
+            "access_gate",
+            "review_receipt_id",
+            "notes"
+          ],
+          "properties": {
+            "license_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "license_uri": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uri"
+            },
+            "commercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "noncommercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "training_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "redistribution_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "review_status": {
+              "enum": [
+                "review_pending",
+                "permitted_for_use",
+                "restricted",
+                "denied",
+                "internal_generated",
+                "not_applicable",
+                "unknown"
+              ]
+            },
+            "access_gate": {
+              "enum": [
+                "none",
+                "approval_required",
+                "contact_info_required",
+                "gated_terms_acceptance",
+                "unknown",
+                "other"
+              ]
+            },
+            "review_receipt_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "code_rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_id",
+            "license_uri",
+            "commercial_use_authorized",
+            "noncommercial_use_authorized",
+            "training_use_authorized",
+            "redistribution_authorized",
+            "review_status",
+            "access_gate",
+            "review_receipt_id",
+            "notes"
+          ],
+          "properties": {
+            "license_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "license_uri": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uri"
+            },
+            "commercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "noncommercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "training_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "redistribution_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "review_status": {
+              "enum": [
+                "review_pending",
+                "permitted_for_use",
+                "restricted",
+                "denied",
+                "internal_generated",
+                "not_applicable",
+                "unknown"
+              ]
+            },
+            "access_gate": {
+              "enum": [
+                "none",
+                "approval_required",
+                "contact_info_required",
+                "gated_terms_acceptance",
+                "unknown",
+                "other"
+              ]
+            },
+            "review_receipt_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "checkpoint_rights": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "license_id",
+            "license_uri",
+            "commercial_use_authorized",
+            "noncommercial_use_authorized",
+            "training_use_authorized",
+            "redistribution_authorized",
+            "review_status",
+            "access_gate",
+            "review_receipt_id",
+            "notes"
+          ],
+          "properties": {
+            "license_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "license_uri": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "format": "uri"
+            },
+            "commercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "noncommercial_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "training_use_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "redistribution_authorized": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "review_status": {
+              "enum": [
+                "review_pending",
+                "permitted_for_use",
+                "restricted",
+                "denied",
+                "internal_generated",
+                "not_applicable",
+                "unknown"
+              ]
+            },
+            "access_gate": {
+              "enum": [
+                "none",
+                "approval_required",
+                "contact_info_required",
+                "gated_terms_acceptance",
+                "unknown",
+                "other"
+              ]
+            },
+            "review_receipt_id": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "notes": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
         }
       }
     },
