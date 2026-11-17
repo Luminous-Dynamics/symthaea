@@ -488,7 +488,17 @@ impl FusionDigitalTwin {
     pub fn set_reference_shot(&mut self, readings: &[PlasmaReading]) {
         let reference_hv = self.encoder.encode_window(readings);
         self.agent.set_reference(reference_hv);
-        self.reference_initialized = readings.iter().any(|reading| reading.value.is_finite());
+        let required_reference_sensors = [
+            PlasmaSensorType::ElectronDensity,
+            PlasmaSensorType::ElectronTemperature,
+            PlasmaSensorType::RadiatedPower,
+            PlasmaSensorType::SafetyFactor,
+        ];
+        self.reference_initialized = required_reference_sensors.iter().all(|sensor| {
+            readings
+                .iter()
+                .any(|reading| reading.sensor == *sensor && reading.value.is_finite())
+        });
     }
 
     /// Run one predictor cycle after a frame passes the direct-measurement gate.
@@ -499,13 +509,7 @@ impl FusionDigitalTwin {
     /// density (10^20 m^-3), temperature (keV), radiated power (MW), and
     /// safety factor (dimensionless).
     ///
-    /// The caller must provide one explicit channel-to-sensor binding per
-    /// required channel. Only the four sensor dimensions used by the current
-    /// fusion HDC encoder are accepted, with their native units:
-    /// density (10^20 m^-3), temperature (keV), radiated power (MW), and
-    /// safety factor (dimensionless).
-    ///
-    /// If the observation gate abstains, or no reference shot has been set,
+    /// If the observation gate abstains, or no complete finite reference shot has been set,
     /// the predictor state and cycle count are left unchanged. Even a
     /// MeasuredInputsProcessed result is only an evidence-qualified input
     /// projection into this research heuristic; it is not proof of physical
