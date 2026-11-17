@@ -54,6 +54,10 @@ Compare exact transition strategies against a matched conventional seam and a no
 
 Targets such as 20% lower peak strain or 2x seam fatigue are not set until the machine, materials, baseline and measurement system are frozen. The first target is zero false admission of unknown or unsupported manufacturing processes.
 
+## Simulation benchmark composition
+
+Use Symtropy [RGBENCH-REPRODUCE-001 #4870](https://github.com/Luminous-Dynamics/symtropy/issues/4870) as the cloth-simulation reproduction owner. RGBench is a real-garment manipulation and simulator-to-capture comparator; it is not a transition-strength, spacer-impact, robot-cover or lifecycle qualification benchmark. Preserve its published capture windows, coordinate transforms, mesh identities, simulator revisions and dataset licences. Lightshell transition tests add a separate robot-mounted interface layer and must not alter the upstream RGBench baseline.
+
 ## P0 source and fixtures
 
 The Rust validator and JSON Schema admit a synthetic five-zone portfolio with three proposed transitions: impact spacer to articulation gaiter, ventilated region to passive service textile, and sensor insert to passive textile. All manufacturing capability is unknown. Authored tests cover duplicate identities, unknown/self zone endpoints, unsupported strategies, missing strategy metrics, units, bounds, capability prerequisites, process strategy scope, construction identity and unknown fields.
