@@ -630,7 +630,7 @@ pub fn plan_independent_acquisition_portfolio(
     for option in options {
         let bundle_cost = bundle_indices
             .get(option.deployment_bundle_id.as_str())
-            .map(|index| &deployment_bundles[*index]);
+            .map(|index| &canonical_bundle_costs[*index]);
         let reasons =
             option_rejection_reasons(&option, bundle_cost, expected, policy, &verifier_dependencies);
         if !reasons.is_empty() {
@@ -1553,24 +1553,37 @@ mod tests {
 
     #[test]
     fn bundle_catalogue_order_does_not_change_selected_bundle_report() {
+        let mut second_option = option("b", "source-b", vec![dep("robot", "b")]);
+        second_option.deployment_bundle_id = "bundle-2".into();
+        second_option.deployment_bundle_digest = "sha256:bundle-2".into();
+        second_option.deployment_bundle_resource_model_digest =
+            "sha256:bundle-resource-model-2".into();
+        second_option.deployment_bundle_assessment_digest = "sha256:bundle-assessment-2".into();
         let options = vec![
             option("a", "source-a", vec![dep("robot", "a")]),
-            option("b", "source-b", vec![dep("robot", "b")]),
+            second_option,
         ];
+        let mut bundles = bundle_costs();
+        let mut second_bundle = bundles[0].clone();
+        second_bundle.bundle_id = "bundle-2".into();
+        second_bundle.bundle_digest = "sha256:bundle-2".into();
+        second_bundle.resource_model_digest = "sha256:bundle-resource-model-2".into();
+        second_bundle.assessment_digest = "sha256:bundle-assessment-2".into();
+        second_bundle.fixed_resources.energy_millijoules = 13;
+        bundles.push(second_bundle);
         let first = plan_independent_acquisition_portfolio(
             options.clone(),
-            &bundle_costs(),
+            &bundles,
             &expected(),
             &verifier(),
             policy(),
             &budget(),
         )
         .unwrap();
-        let mut reversed = bundle_costs();
-        reversed.reverse();
+        bundles.reverse();
         let second = plan_independent_acquisition_portfolio(
             options,
-            &reversed,
+            &bundles,
             &expected(),
             &verifier(),
             policy(),
