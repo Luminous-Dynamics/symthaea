@@ -681,13 +681,7 @@ mod tests {
         );
         let high_service = candidate(
             "high-service",
-            12_000.0,
-            8_000.0,
-            0.90,
-            650.0,
-            350.0,
-            0.9,
-            15.0,
+            [12_000.0, 8_000.0, 0.90, 650.0, 350.0, 0.9, 15.0],
         );
         let report = compare_pair(&profile, &high_qeng, &high_service);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
@@ -713,23 +707,11 @@ mod tests {
         let profile = profile();
         let lower_availability = candidate(
             "lower-availability",
-            8_000.0,
-            12_000.0,
-            0.80,
-            500.0,
-            300.0,
-            0.20,
-            25.0,
+            [8_000.0, 12_000.0, 0.80, 500.0, 300.0, 0.20, 25.0],
         );
         let higher_availability = candidate(
             "higher-availability",
-            12_000.0,
-            8_000.0,
-            0.95,
-            650.0,
-            350.0,
-            0.40,
-            15.0,
+            [12_000.0, 8_000.0, 0.95, 650.0, 350.0, 0.40, 15.0],
         );
         let report = compare_pair(&profile, &lower_availability, &higher_availability);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
