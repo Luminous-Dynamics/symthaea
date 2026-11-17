@@ -86,6 +86,23 @@ Two deliberately different cases are required:
 
 The benchmark must include both. Expected information gain is a diagnostic metric, not the optimization target.
 
+## 4.1 Frozen decision-boundary known-answer fixture
+
+The first executable adapter fixture in the stacked Symthaea research PR uses four synthetic hypotheses:
+- two harmless subtypes with combined prior 0.90;
+- one consequential defect with prior 0.08;
+- an explicit unknown state with prior 0.02.
+
+The no-test decision has Bayes risk 9.0 loss units.
+
+Two observations demonstrate why entropy is not the objective:
+- High-information harmless-subtype scan: expected information gain 0.6167159329 nats, but 0.0 gross EVSI because every possible observation preserves the same optimal decision.
+- Lower-information defect follow-up: expected information gain 0.0099459834 nats, but 1.09 gross EVSI because the defect-indicating branch changes the preferred decision.
+
+The finite-horizon planner selects the latter under the frozen synthetic loss/likelihood model. Its exact policy is then evaluated by the independent robust referee against both the nominal model and a shifted-prior model. The referee reports cached posterior/probability mismatches rather than trusting the planner's cached branch values.
+
+These are analytical known answers for software semantics only. They are not likelihood estimates for RGB, thermal, acoustic, LiDAR, electromagnetic, support-metrology or drawpoint sensors.
+
 ## 5. Task adapters
 
 ### A. Pipe/cable corridor
