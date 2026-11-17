@@ -1061,7 +1061,6 @@ pub fn verify_shared_additive_bias_receipt(
     Ok(())
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NoiseMinimaxBranchV1 {
     /// One possible categorical observation. Branches may overlap in their
@@ -1738,7 +1737,6 @@ mod tests {
         assert!(receipt.snapshots[2].active_hypothesis_ids.is_empty());
     }
 
-
     #[test]
     fn categorical_noise_minimax_guarantees_reduction_for_every_possible_outcome() {
         let problem = BoundedNoiseProblemV1 {
@@ -1750,9 +1748,21 @@ mod tests {
                 "H-D".to_owned(),
             ],
             probes: vec![
-                NoiseProbeV1 { probe_id: "p-overlap".to_owned(), cost: 1, admissible: true },
-                NoiseProbeV1 { probe_id: "p-balanced".to_owned(), cost: 2, admissible: true },
-                NoiseProbeV1 { probe_id: "p-unaffordable".to_owned(), cost: 99, admissible: true },
+                NoiseProbeV1 {
+                    probe_id: "p-overlap".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p-balanced".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p-unaffordable".to_owned(),
+                    cost: 99,
+                    admissible: true,
+                },
             ],
             allowed_outcomes_by_hypothesis: vec![
                 vec![vec![0, 1], vec![0], vec![0]],
@@ -1761,20 +1771,21 @@ mod tests {
                 vec![vec![1, 2], vec![1], vec![1]],
             ],
         };
-        let choice = choose_bounded_noise_minimax_probe(
-            &problem,
-            0b1111,
-            0b111,
-            2,
-        )
-        .unwrap()
-        .unwrap();
+        let choice = choose_bounded_noise_minimax_probe(&problem, 0b1111, 0b111, 2)
+            .unwrap()
+            .unwrap();
         assert_eq!(choice.probe_id, "p-balanced");
         assert_eq!(choice.worst_case_remaining, 2);
         assert_eq!(choice.active_hypothesis_count, 4);
         assert_eq!(choice.branches.len(), 2);
-        assert_eq!(choice.branches[0].surviving_hypothesis_ids, vec!["H-A", "H-B"]);
-        assert_eq!(choice.branches[1].surviving_hypothesis_ids, vec!["H-C", "H-D"]);
+        assert_eq!(
+            choice.branches[0].surviving_hypothesis_ids,
+            vec!["H-A", "H-B"]
+        );
+        assert_eq!(
+            choice.branches[1].surviving_hypothesis_ids,
+            vec!["H-C", "H-D"]
+        );
     }
 
     #[test]
@@ -1797,30 +1808,40 @@ mod tests {
             quantity_unit_id: "millimetre-integer".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned(), "H-C".to_owned()],
             probes: vec![
-                NoiseProbeV1 { probe_id: "p-overlap".to_owned(), cost: 1, admissible: true },
-                NoiseProbeV1 { probe_id: "p-separated".to_owned(), cost: 2, admissible: true },
+                NoiseProbeV1 {
+                    probe_id: "p-overlap".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p-separated".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
             ],
             predicted_intervals_by_hypothesis: vec![
-                vec![FixedIntervalV1::new(0, 20).unwrap(), FixedIntervalV1::new(0, 1).unwrap()],
-                vec![FixedIntervalV1::new(10, 30).unwrap(), FixedIntervalV1::new(9, 10).unwrap()],
-                vec![FixedIntervalV1::new(20, 40).unwrap(), FixedIntervalV1::new(19, 20).unwrap()],
+                vec![
+                    FixedIntervalV1::new(0, 20).unwrap(),
+                    FixedIntervalV1::new(0, 1).unwrap(),
+                ],
+                vec![
+                    FixedIntervalV1::new(10, 30).unwrap(),
+                    FixedIntervalV1::new(9, 10).unwrap(),
+                ],
+                vec![
+                    FixedIntervalV1::new(20, 40).unwrap(),
+                    FixedIntervalV1::new(19, 20).unwrap(),
+                ],
             ],
         };
-        let choice = choose_bounded_interval_minimax_probe(
-            &problem,
-            0b111,
-            0b11,
-            u64::MAX,
-            0,
-        )
-        .unwrap()
-        .unwrap();
+        let choice = choose_bounded_interval_minimax_probe(&problem, 0b111, 0b11, u64::MAX, 0)
+            .unwrap()
+            .unwrap();
         assert_eq!(choice.probe_id, "p-separated");
         assert_eq!(choice.worst_case_remaining, 1);
 
         assert_eq!(
-            choose_bounded_interval_minimax_probe(&problem, 0b111, 0b11, u64::MAX, 10)
-                .unwrap(),
+            choose_bounded_interval_minimax_probe(&problem, 0b111, 0b11, u64::MAX, 10).unwrap(),
             None
         );
     }
@@ -1851,8 +1872,7 @@ mod tests {
         );
         problem.probes[0].admissible = false;
         assert_eq!(
-            choose_bounded_interval_minimax_probe(&problem, 0b11, 1, u64::MAX, 0)
-                .unwrap(),
+            choose_bounded_interval_minimax_probe(&problem, 0b11, 1, u64::MAX, 0).unwrap(),
             None
         );
     }
