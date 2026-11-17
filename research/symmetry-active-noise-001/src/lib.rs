@@ -58,22 +58,45 @@ pub enum NoiseErrorV1 {
     TooManyProbes,
     EmptyProbeId,
     DuplicateProbeId,
-    ZeroProbeCost { probe_id: String },
+    ZeroProbeCost {
+        probe_id: String,
+    },
     BoundedHypothesisCountMismatch,
-    BoundedProbeCountMismatch { hypothesis_id: String },
-    EmptyAllowedOutcomeSet { hypothesis_id: String, probe_id: String },
-    DuplicateAllowedOutcome { hypothesis_id: String, probe_id: String },
+    BoundedProbeCountMismatch {
+        hypothesis_id: String,
+    },
+    EmptyAllowedOutcomeSet {
+        hypothesis_id: String,
+        probe_id: String,
+    },
+    DuplicateAllowedOutcome {
+        hypothesis_id: String,
+        probe_id: String,
+    },
     EmptyErrorStateSet,
     TooManyErrorStates,
     EmptyErrorStateId,
     DuplicateErrorStateId,
     PersistentHypothesisCountMismatch,
-    PersistentProbeCountMismatch { hypothesis_id: String },
-    PersistentErrorStateCountMismatch { hypothesis_id: String, probe_id: String },
-    UnknownProbe { probe_id: String },
-    InadmissibleProbe { probe_id: String },
-    EmptyObservedOutcomeSet { probe_id: String },
-    DuplicateObservedOutcome { probe_id: String },
+    PersistentProbeCountMismatch {
+        hypothesis_id: String,
+    },
+    PersistentErrorStateCountMismatch {
+        hypothesis_id: String,
+        probe_id: String,
+    },
+    UnknownProbe {
+        probe_id: String,
+    },
+    InadmissibleProbe {
+        probe_id: String,
+    },
+    EmptyObservedOutcomeSet {
+        probe_id: String,
+    },
+    DuplicateObservedOutcome {
+        probe_id: String,
+    },
     ReceiptMismatch,
     InvalidDeterministicInput,
 }
@@ -175,9 +198,7 @@ impl BoundedNoiseProblemV1 {
         if self.allowed_outcomes_by_hypothesis.len() != self.hypothesis_ids.len() {
             return Err(NoiseErrorV1::BoundedHypothesisCountMismatch);
         }
-        for (hypothesis_index, by_probe) in
-            self.allowed_outcomes_by_hypothesis.iter().enumerate()
-        {
+        for (hypothesis_index, by_probe) in self.allowed_outcomes_by_hypothesis.iter().enumerate() {
             if by_probe.len() != self.probes.len() {
                 return Err(NoiseErrorV1::BoundedProbeCountMismatch {
                     hypothesis_id: self.hypothesis_ids[hypothesis_index].clone(),
@@ -226,9 +247,7 @@ impl BoundedNoiseProblemV1 {
 
     /// Lift a deterministic experiment table into singleton allowed-outcome
     /// sets. This is the zero-noise bridge to the exact planner.
-    pub fn from_deterministic(
-        problem: &ActiveExperimentProblemV1,
-    ) -> Result<Self, NoiseErrorV1> {
+    pub fn from_deterministic(problem: &ActiveExperimentProblemV1) -> Result<Self, NoiseErrorV1> {
         if problem.hypotheses.is_empty()
             || problem.probes.is_empty()
             || problem
@@ -286,8 +305,7 @@ impl PersistentNoiseProblemV1 {
         if self.predicted_outcomes_by_hypothesis.len() != self.hypothesis_ids.len() {
             return Err(NoiseErrorV1::PersistentHypothesisCountMismatch);
         }
-        for (hypothesis_index, by_probe) in
-            self.predicted_outcomes_by_hypothesis.iter().enumerate()
+        for (hypothesis_index, by_probe) in self.predicted_outcomes_by_hypothesis.iter().enumerate()
         {
             if by_probe.len() != self.probes.len() {
                 return Err(NoiseErrorV1::PersistentProbeCountMismatch {
@@ -336,10 +354,7 @@ impl PersistentNoiseProblemV1 {
     }
 }
 
-fn resolve_probe(
-    probes: &[NoiseProbeV1],
-    probe_id: &str,
-) -> Result<usize, NoiseErrorV1> {
+fn resolve_probe(probes: &[NoiseProbeV1], probe_id: &str) -> Result<usize, NoiseErrorV1> {
     let index = probes
         .iter()
         .position(|probe| probe.probe_id == probe_id)
@@ -596,7 +611,7 @@ pub fn verify_persistent_noise_receipt(
 mod tests {
     use super::*;
     use symmetry_active_experiment_reference::{
-        ExperimentProbeV1, replay_observations, ActiveExperimentProblemV1,
+        ActiveExperimentProblemV1, ExperimentProbeV1, replay_observations,
     };
 
     fn bounded_fixture() -> BoundedNoiseProblemV1 {
@@ -604,8 +619,16 @@ mod tests {
             problem_id: "bounded-noise-four-hypothesis-v1".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned(), "H-C".to_owned()],
             probes: vec![
-                NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 1, admissible: true },
-                NoiseProbeV1 { probe_id: "p1".to_owned(), cost: 2, admissible: true },
+                NoiseProbeV1 {
+                    probe_id: "p0".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p1".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                },
             ],
             allowed_outcomes_by_hypothesis: vec![
                 vec![vec![0, 1], vec![0]],
@@ -620,8 +643,16 @@ mod tests {
             problem_id: "persistent-global-bias-two-hypothesis-v1".to_owned(),
             hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
             probes: vec![
-                NoiseProbeV1 { probe_id: "p-left".to_owned(), cost: 1, admissible: true },
-                NoiseProbeV1 { probe_id: "p-right".to_owned(), cost: 1, admissible: true },
+                NoiseProbeV1 {
+                    probe_id: "p-left".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
+                NoiseProbeV1 {
+                    probe_id: "p-right".to_owned(),
+                    cost: 1,
+                    admissible: true,
+                },
             ],
             error_state_ids: vec!["bias-low".to_owned(), "bias-high".to_owned()],
             predicted_outcomes_by_hypothesis: vec![
@@ -671,11 +702,20 @@ mod tests {
     fn repeated_bounded_probe_observations_intersect_one_per_probe_outcome() {
         let problem = bounded_fixture();
         let observations = vec![
-            NoiseObservationV1 { probe_id: "p0".to_owned(), outcomes: vec![1] },
-            NoiseObservationV1 { probe_id: "p0".to_owned(), outcomes: vec![0] },
+            NoiseObservationV1 {
+                probe_id: "p0".to_owned(),
+                outcomes: vec![1],
+            },
+            NoiseObservationV1 {
+                probe_id: "p0".to_owned(),
+                outcomes: vec![0],
+            },
         ];
         let receipt = replay_bounded_observations(&problem, &observations).unwrap();
-        assert_eq!(receipt.snapshots[1].active_hypothesis_ids, vec!["H-A", "H-B"]);
+        assert_eq!(
+            receipt.snapshots[1].active_hypothesis_ids,
+            vec!["H-A", "H-B"]
+        );
         assert!(receipt.snapshots[2].active_hypothesis_ids.is_empty());
         assert!(!receipt.snapshots[2].model_consistent);
     }
@@ -684,11 +724,20 @@ mod tests {
     fn persistent_bias_requires_one_shared_error_state_across_probes() {
         let problem = persistent_fixture();
         let observations = vec![
-            NoiseObservationV1 { probe_id: "p-left".to_owned(), outcomes: vec![0] },
-            NoiseObservationV1 { probe_id: "p-right".to_owned(), outcomes: vec![1] },
+            NoiseObservationV1 {
+                probe_id: "p-left".to_owned(),
+                outcomes: vec![0],
+            },
+            NoiseObservationV1 {
+                probe_id: "p-right".to_owned(),
+                outcomes: vec![1],
+            },
         ];
         let receipt = replay_persistent_observations(&problem, &observations).unwrap();
-        assert_eq!(receipt.snapshots[1].active_hypothesis_ids, vec!["H-A", "H-B"]);
+        assert_eq!(
+            receipt.snapshots[1].active_hypothesis_ids,
+            vec!["H-A", "H-B"]
+        );
         assert_eq!(receipt.final_active_hypothesis_ids, vec!["H-B"]);
         assert_eq!(
             receipt.snapshots[2].hypotheses[0].compatible_error_state_ids,
@@ -704,8 +753,14 @@ mod tests {
     fn repeating_a_persistent_probe_does_not_create_independent_evidence() {
         let problem = persistent_fixture();
         let observations = vec![
-            NoiseObservationV1 { probe_id: "p-left".to_owned(), outcomes: vec![0] },
-            NoiseObservationV1 { probe_id: "p-left".to_owned(), outcomes: vec![0] },
+            NoiseObservationV1 {
+                probe_id: "p-left".to_owned(),
+                outcomes: vec![0],
+            },
+            NoiseObservationV1 {
+                probe_id: "p-left".to_owned(),
+                outcomes: vec![0],
+            },
         ];
         let receipt = replay_persistent_observations(&problem, &observations).unwrap();
         assert_eq!(
@@ -726,7 +781,8 @@ mod tests {
             probe_id: "p0".to_owned(),
             outcomes: vec![1],
         };
-        let noise_receipt = replay_bounded_observations(&bounded, std::slice::from_ref(&observation)).unwrap();
+        let noise_receipt =
+            replay_bounded_observations(&bounded, std::slice::from_ref(&observation)).unwrap();
         let exact_survivors = replay_observations(
             &deterministic,
             &symmetry_active_experiment_reference::compile_active_experiment(
@@ -760,16 +816,26 @@ mod tests {
         assert_eq!(
             replay_bounded_observations(
                 &problem,
-                &[NoiseObservationV1 { probe_id: "p1".to_owned(), outcomes: vec![0] }]
+                &[NoiseObservationV1 {
+                    probe_id: "p1".to_owned(),
+                    outcomes: vec![0]
+                }]
             ),
-            Err(NoiseErrorV1::InadmissibleProbe { probe_id: "p1".to_owned() })
+            Err(NoiseErrorV1::InadmissibleProbe {
+                probe_id: "p1".to_owned()
+            })
         );
         assert_eq!(
             replay_bounded_observations(
                 &problem,
-                &[NoiseObservationV1 { probe_id: "missing".to_owned(), outcomes: vec![0] }]
+                &[NoiseObservationV1 {
+                    probe_id: "missing".to_owned(),
+                    outcomes: vec![0]
+                }]
             ),
-            Err(NoiseErrorV1::UnknownProbe { probe_id: "missing".to_owned() })
+            Err(NoiseErrorV1::UnknownProbe {
+                probe_id: "missing".to_owned()
+            })
         );
     }
 
@@ -789,9 +855,14 @@ mod tests {
         assert_eq!(
             replay_persistent_observations(
                 &persistent,
-                &[NoiseObservationV1 { probe_id: "p-left".to_owned(), outcomes: vec![] }]
+                &[NoiseObservationV1 {
+                    probe_id: "p-left".to_owned(),
+                    outcomes: vec![]
+                }]
             ),
-            Err(NoiseErrorV1::EmptyObservedOutcomeSet { probe_id: "p-left".to_owned() })
+            Err(NoiseErrorV1::EmptyObservedOutcomeSet {
+                probe_id: "p-left".to_owned()
+            })
         );
     }
 
@@ -826,11 +897,7 @@ mod tests {
         }];
         let persistent_receipt =
             replay_persistent_observations(&persistent, &persistent_observations).unwrap();
-        verify_persistent_noise_receipt(
-            &persistent,
-            &persistent_observations,
-            &persistent_receipt,
-        )
-        .unwrap();
+        verify_persistent_noise_receipt(&persistent, &persistent_observations, &persistent_receipt)
+            .unwrap();
     }
 }
