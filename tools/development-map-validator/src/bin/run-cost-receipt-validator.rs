@@ -27,7 +27,7 @@ struct RunMetrics{
  cost_micros:Option<u64>,wall_ms:Option<u64>,queue_delay_ms:Option<u64>,
  complete_cost:bool,complete_wall:bool,queued_attempts:u64,unknown_attempts:u64,
  retries:u64,skipped_attempts:u64,failed_attempts:u64,timeout_attempts:u64,cancelled_attempts:u64,executed_attempts:u64,
- option_costs:BTreeMap<String,Vec<u64>>
+ option_costs:BTreeMap<String,u64>
 }
 
 fn object<'a>(v:&'a Value,label:&str)->Result<&'a serde_json::Map<String,Value>,String>{
@@ -121,7 +121,7 @@ fn validate_attempts(
  let mut seen_ids=BTreeSet::new();
  let mut event_state:BTreeMap<String,(String,u64,String)>=BTreeMap::new();
  let mut attempt_numbers:BTreeMap<String,u64>=BTreeMap::new();
- let mut option_costs:BTreeMap<String,Vec<u64>>=BTreeMap::new();
+ let mut option_costs:BTreeMap<String,u64>=BTreeMap::new();
  let mut previous_hash=String::new();
  let mut previous_queue:Option<DateTime<FixedOffset>>=None;
  let mut queued_count=0u64;let mut unknown_count=0u64;let mut retry_count=0u64;
@@ -240,7 +240,8 @@ fn validate_attempts(
      digest_hex(&string(row,"billing_record_sha256",&l)?,&format!("{l}.billing_record_sha256"))?;
     }
     if ["completed","failed","timeout","cancelled"].contains(&status.as_str()){
-     option_costs.entry(option.clone()).or_default().push(cost);
+     let option_total=option_costs.entry(option.clone()).or_insert(0);
+     *option_total=option_total.checked_add(cost).ok_or_else(||format!("{label} per-option cost overflow for {option:?}"))?;
     }
    }
    let evidence=nullable_string(row,"evidence_digest_sha256",&l)?;
@@ -339,14 +340,17 @@ fn evaluate(raw:&str)->Result<Value,String>{
  let complete_wall:Vec<u64>=metrics.iter().filter_map(|m|m.wall_ms).collect();
  let queue:Vec<u64>=metrics.iter().filter_map(|m|m.queue_delay_ms).collect();
  let mut option_costs:BTreeMap<String,Vec<u64>>=BTreeMap::new();
- for option in &option_ids{option_costs.insert(option.clone(),Vec::new());}
+ for option in &option_ids{
+  let samples:Vec<u64>=metrics.iter().filter(|m|m.complete_cost)
+   .map(|m|m.option_costs.get(option).copied().unwrap_or(0)).collect();
+  option_costs.insert(option.clone(),samples);
+ }
  let mut retries=0u64;let mut queued=0u64;let mut unknown=0u64;
  let mut skipped=0u64;let mut failed=0u64;let mut timeouts=0u64;let mut cancelled=0u64;let mut executed=0u64;
  for m in &metrics{
   retries+=m.retries;queued+=m.queued_attempts;unknown+=m.unknown_attempts;
   skipped+=m.skipped_attempts;failed+=m.failed_attempts;timeouts+=m.timeout_attempts;
   cancelled+=m.cancelled_attempts;executed+=m.executed_attempts;
-  for (option,values) in &m.option_costs{option_costs.entry(option.clone()).or_default().extend(values);}
  }
  let mut marginal_p95=Vec::new();let mut marginal_sum=0u64;let mut all_options_sampled=true;
  for (option,values) in &option_costs{
