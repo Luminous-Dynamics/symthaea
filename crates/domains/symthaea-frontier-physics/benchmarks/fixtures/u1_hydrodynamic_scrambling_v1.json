@@ -1,0 +1,128 @@
+{
+  "schema": "luminous.black_hole_information.u1_hydrodynamic_scrambling.v1",
+  "status": "source_authored_tests_pending_rust_execution; independent fit contract",
+  "claim_ceiling": "Finite-size closed U(1)-conserving qubit-chain diagnostics. Effective diffusion coefficient, butterfly-front speeds and entanglement velocity are circuit- and window-dependent fitted quantities. They are not gravitational black-hole transport coefficients or universal constants.",
+  "model": {
+    "number_of_qubits": 8,
+    "total_excitations": 4,
+    "gate_family": "independent Haar U(1) x U(2) x U(1) nearest-neighbour two-qubit gates",
+    "topology": "alternating even/odd nearest-neighbour brickwork",
+    "entropy_units": "nats",
+    "depth_unit": "one brickwork layer",
+    "components": {
+      "charge_transport": {
+        "initial_state": "domain-wall product |11110000> (MSB-first)",
+        "observable": "ensemble-mean site occupations, bond currents and continuity residuals",
+        "density_gradient_width": "Var of absolute density gradient |n_(i+1)-n_i| over bond-centre positions",
+        "diffusion_fit": "width_variance(t)=intercept+2*D*t"
+      },
+      "operator_spreading": {
+        "initial_operator": "local Pauli X on source qubit 3",
+        "probe": "local Pauli Z on each site",
+        "observable": "normalized squared Frobenius commutator ||[O(t),Z_i]||_F^2/(2*2^N), in [0,2]",
+        "front": "furthest site on each side with ensemble mean above a frozen threshold"
+      },
+      "entanglement": {
+        "observable": "von Neumann entropy of the left 4-qubit subsystem from the domain-wall quench",
+        "normalization": "exact symmetry-resolved Page mean for N=8,K=4,A=4"
+      }
+    }
+  },
+  "preregistered_run": {
+    "domain_wall_ensemble": {
+      "sample_count": 32,
+      "first_seed_hex": "0xD1FF",
+      "depth": 12,
+      "required_layers": [
+        0,
+        1,
+        2,
+        4,
+        6,
+        8,
+        10,
+        12
+      ]
+    },
+    "operator_spreading_ensembles": {
+      "sample_count_per_depth": 32,
+      "seed_schedule": "first_seed(depth) = 0x0A70 + depth*101; each sample uses first_seed(depth)+sample_index",
+      "depths": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "source_qubit": 3
+    },
+    "analysis_config": {
+      "diffusion_start_layer": 2,
+      "diffusion_end_layer": 8,
+      "entanglement_start_layer": 1,
+      "entanglement_end_layer": 8,
+      "operator_front_start_depth": 0,
+      "operator_front_end_depth": 3,
+      "operator_front_threshold": 0.25
+    },
+    "reference": {
+      "symmetry_resolved_Page_mean_half_chain_entropy_nats": 2.206170090971405
+    },
+    "status": "contract_only; no Rust receipt at this branch head"
+  },
+  "fit_definitions": {
+    "effective_charge_diffusion_coefficient": "Half the least-squares slope of the density-gradient spatial variance versus brickwork layer",
+    "left_butterfly_speed": "Least-squares slope of left threshold-front distance from source versus depth",
+    "right_butterfly_speed": "Least-squares slope of right threshold-front distance from source versus depth",
+    "effective_entanglement_velocity": "Half-chain entropy slope in nats per layer divided by the exact symmetry-resolved Page mean in nats"
+  },
+  "acceptance": {
+    "density_continuity_max_residual": 1e-9,
+    "domain_wall_norm_drift": 1e-9,
+    "domain_wall_charge_drift": 1e-9,
+    "operator_hilbert_schmidt_norm_drift": 1e-9,
+    "r_squared_reported_for_all_fits": true,
+    "boundary_censored_fronts_excluded_from_velocity_fits": true,
+    "fit_windows_and_threshold_frozen_before_result_inspection": true,
+    "no_claim_of_universal_D_vB_or_vE_from_single_N": true
+  },
+  "negative_controls": [
+    "fit D after the front reflects from a boundary without marking the finite-size regime",
+    "include threshold-front observations pinned to a boundary in vB regressions",
+    "change the OTOC threshold after seeing results and present it as preregistered",
+    "use the unconstrained Page mean for the fixed-charge half-chain normalization",
+    "infer a black-hole diffusion coefficient or Hawking transport law from this spin-chain experiment",
+    "assert a universal inequality between D, vB and vE from one small register"
+  ],
+  "required_receipt_fields": [
+    "source_sha",
+    "N",
+    "K",
+    "brickwork_gate_family",
+    "domain_wall_seed_schedule",
+    "operator_seed_schedule",
+    "operator_source_qubit",
+    "operator_front_threshold",
+    "diffusion_fit_window",
+    "entanglement_fit_window",
+    "operator_front_fit_window",
+    "density_gradient_variance_by_layer",
+    "effective_D",
+    "D_fit_R_squared",
+    "left_front_positions_and_censor_flags",
+    "right_front_positions_and_censor_flags",
+    "left_vB",
+    "left_vB_R_squared",
+    "right_vB",
+    "right_vB_R_squared",
+    "half_chain_entropy_by_layer",
+    "Page_reference",
+    "vE",
+    "vE_R_squared",
+    "continuity_residual",
+    "charge_drift",
+    "state_norm_drift",
+    "operator_norm_drift",
+    "runtime",
+    "peak_memory"
+  ]
+}

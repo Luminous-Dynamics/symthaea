@@ -1,0 +1,65 @@
+{
+  "schema": "luminous.black_hole_information.hayden_preskill_single_emission.v1",
+  "status": "independent_numpy_comparator; Rust diagnostic source authored; Rust execution pending",
+  "claim_ceiling": "A four-qubit, one-step Hayden-Preskill-style decoupling diagnostic only. It does not implement a recovery decoder, establish efficient recoverability, model macroscopic black-hole evaporation, or derive a gravitational Page curve.",
+  "model": {
+    "register_order": "Q,M,B,R (most-significant-bit-first)",
+    "reference": "Q is maximally entangled with injected message qubit M",
+    "initial_black_hole": "B is maximally entangled with explicit early-radiation qubit R",
+    "initial_state": "Bell(Q,M) tensor Bell(B,R)",
+    "evolution": "A seeded Haar U(4) acts on M tensor B",
+    "output_partition": {
+      "outgoing_radiation_E": "the first output qubit of the acted-on M,B pair (register index 1)",
+      "remaining_black_hole_B_prime": "the second output qubit (register index 2)",
+      "accessible_system_A": "early radiation R tensor outgoing factor E"
+    },
+    "sample_seed_hex": "0x48A7",
+    "ensemble": {
+      "sample_count": 32,
+      "first_seed_hex": "0x4850",
+      "seed_schedule": "seed = first_seed + sample_index",
+      "independent_numpy_prng": "NumPy default_rng",
+      "haar_gate": "complex Ginibre QR with phase correction"
+    },
+    "observables": [
+      "S(Q)",
+      "S(B')",
+      "S(QB')",
+      "I(Q:B')",
+      "S(R,E)",
+      "S(Q,R,E)",
+      "I(Q:R,E)",
+      "I(Q:B') + I(Q:R,E) - 2*S(Q)"
+    ]
+  },
+  "exact_identities": {
+    "reference_entropy_nats": "ln(2)",
+    "information_balance_for_pure_Q_Bprime_A": "I(Q:B') + I(Q:A) = 2*S(Q)",
+    "state_norm_squared": 1
+  },
+  "independent_numpy_comparator": {
+    "sample_count": 32,
+    "mean_reference_remaining_black_hole_mutual_information_nats": 0.25186688180006556,
+    "standard_error_reference_remaining_black_hole_mutual_information_nats": 0.030137644577211534,
+    "mean_reference_accessible_radiation_mutual_information_nats": 1.1344274793198248,
+    "standard_error_reference_accessible_radiation_mutual_information_nats": 0.030137644577211502,
+    "mean_reference_entropy_nats": 0.6931471805599452,
+    "maximum_information_complementarity_residual_nats": 1.1102230246251565e-15,
+    "caveat": "Independent NumPy PRNG, QR unitary construction and reduced-state eigensolver. These are ensemble comparators, not Rust ChaCha20 bitstream results."
+  },
+  "rust_contract": {
+    "sample_api": "simulate_small_hayden_preskill_decoupling",
+    "ensemble_api": "sample_small_hayden_preskill_decoupling_ensemble",
+    "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+    "status": "source_authored_not_executed",
+    "tests_authored": 4
+  },
+  "negative_controls": [
+    "claim a decoder exists from small I(Q:B') alone",
+    "call the complementary mutual-information identity a recovery-fidelity result",
+    "let the decoder access remaining black-hole factor B'",
+    "claim efficient recovery without decoder gate count, depth, latency and fidelity",
+    "call this four-qubit one-step toy a macroscopic black-hole evaporation simulation"
+  ],
+  "required_next_step": "Implement a charge-aware recovery channel with explicit access restrictions; report entanglement fidelity, trace-distance error, decoder success, gate count/depth, runtime and memory. Compare exact optimal recovery and Petz baselines on small systems before claiming efficient decoding."
+}

@@ -16,6 +16,7 @@
 //! 9. **Holographic Principle** — ER=EPR, AdS/CFT, spacetime from entanglement
 //! 10. **Quantum Darwinism** — Emergence of classicality from decoherence
 
+pub mod black_hole_information;
 pub mod dmrg;
 pub mod holographic;
 pub mod information_geometry;

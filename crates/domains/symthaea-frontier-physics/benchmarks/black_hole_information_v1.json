@@ -1,0 +1,1015 @@
+{
+  "schema": "luminous.black_hole_information_benchmark.v1",
+  "programme": "BH-INFO-001",
+  "title": "Finite-dimensional black-hole information and Page-curve laboratory",
+  "created": "2026-11-11",
+  "status": "planned_replication_manifest",
+  "execution_status": "not_run",
+  "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/11631",
+  "repository": "Luminous-Dynamics/symthaea",
+  "owner": "symthaea-frontier-physics",
+  "claim_ceiling": "Finite-dimensional quantum-information model validation only. This manifest does not derive the island formula, model a four-dimensional evaporating black hole, or solve the black-hole information paradox.",
+  "model_ontology": {
+    "subsystems": [
+      {
+        "id": "B",
+        "name": "remaining black-hole register",
+        "meaning": "The degrees of freedom still acted on by the declared evaporation circuit."
+      },
+      {
+        "id": "R",
+        "name": "collected radiation",
+        "meaning": "The emitted register factors that are no longer acted on by later circuit layers."
+      },
+      {
+        "id": "Q",
+        "name": "reference",
+        "meaning": "Optional external system purifying or entangled with the initial black-hole state."
+      },
+      {
+        "id": "E",
+        "name": "bath or environment",
+        "meaning": "Optional explicit environment; never silently traced out."
+      }
+    ],
+    "factorization_status": "explicit_model_assumption",
+    "required_distinctions": [
+      "global unitary evolution versus reduced-state mixedness",
+      "partial trace versus fundamental non-unitary evolution",
+      "existence of a recovery map versus an efficient operational decoder",
+      "Page-curve reproduction versus microscopic gravitational explanation",
+      "HDC concept encoding versus density matrix or quantum entropy"
+    ]
+  },
+  "implementation_contract": {
+    "numeric_representation": "complex f64 initially; high-precision references are independent fixtures",
+    "qubit_ordering": "most-significant-bit-first, matching symthaea-core quantum_circuit.rs",
+    "entropy_units": "nats unless a case explicitly declares bits",
+    "required_error_states": [
+      "invalid_dimension",
+      "non_finite_state",
+      "normalization_error",
+      "non_hermitian_density_matrix",
+      "trace_error",
+      "non_positive_density_matrix",
+      "eigensolver_nonconvergence",
+      "ill_conditioned",
+      "unsupported_subsystem",
+      "unresolved",
+      "invalid_mutual_information",
+      "information_identity_error",
+      "invalid_squared_commutator"
+    ],
+    "forbidden_behaviors": [
+      "diagonal-only von Neumann entropy for non-diagonal density matrices",
+      "silent density-matrix projection onto the PSD cone",
+      "post-hoc state renormalization that hides accumulated drift",
+      "treating one random circuit draw as a Haar-ensemble expectation",
+      "treating circuit outputs as a gravitational path-integral calculation"
+    ],
+    "charge_symmetry": "U(1) excitation-number conservation for equal-gap qubits; each local gate is block diagonal on pair excitation sectors 0, 1, 2",
+    "emission_semantics": "After the boundary-pair unitary, one active tensor factor is appended to radiation and excluded from all later gates",
+    "complementarity": "For the closed globally pure register, calculate S(R) and S(B) independently at every nontrivial cut and report their absolute difference",
+    "energy_ledger": "For equal-gap qubits with H = hbar*omega*N, record N_R and N_B separately and verify N = N_R + N_B at every emission step; report per-emission occupation expectation.",
+    "symmetry_resolved_page_reference": "For a U(1)-conserving fixed-total-excitation model compare only with the exact Haar average inside that same charge sector; the unconstrained Page formula is an invalid equilibrium comparator unless symmetry breaking is explicitly part of the model.",
+    "symmetry_sector_reference": "A fixed-charge pure-state ensemble has a symmetry-resolved Page average; do not substitute the unconstrained Haar Page formula.",
+    "domain_wall_transport": "Measure site occupations and oriented bond currents at every nearest-neighbour brickwork layer. Enforce delta n_i = j_(i-1->i) - j_(i->i+1) and independently verify that integrated central-cut current equals the loss of charge from the left half. Entropy growth alone is not a transport diagnostic.",
+    "recoverability": "Separate reference-black-hole decoupling, information availability in accessible radiation, existence of a recovery map, and an efficient operational decoder. A small I(Q:B') is only a decoupling diagnostic; it does not by itself demonstrate a decoder or its cost.",
+    "decoder_evidence": "Any operational recovery claim requires the decoder's access set, channel convention, fidelity/error metric, success probability and resource cost. Decoupling is a necessary diagnostic in relevant models, not an implemented decoder.",
+    "operator_spreading": "Track operator evolution separately from state entanglement and conserved-charge transport. Use normalized Hilbert-Schmidt squared commutators with explicit operator and probe conventions; preserve norm and report finite-size/seed uncertainty."
+  },
+  "benchmark_ladder": [
+    {
+      "id": "QI-0",
+      "name": "known-state partial trace and entropy",
+      "status": "planned",
+      "fixtures": [
+        "product_state",
+        "bell_state",
+        "ghz_state",
+        "maximally_mixed_state",
+        "schmidt_rank_k_state",
+        "random_local_basis_rotation"
+      ],
+      "observables": [
+        "reduced_density_matrix",
+        "trace",
+        "hermiticity_residual",
+        "minimum_eigenvalue",
+        "purity",
+        "von_neumann_entropy",
+        "renyi_2_entropy",
+        "renyi_3_entropy"
+      ],
+      "acceptance": {
+        "small_well_conditioned_absolute_error": 1e-10,
+        "oracle": "independent small-matrix eigensolver or analytic spectrum",
+        "failure_policy": "typed rejection; do not silently repair invalid states"
+      },
+      "implementation_status": "partial_source_authored_not_executed"
+    },
+    {
+      "id": "QI-1",
+      "name": "pure-state bipartition identities",
+      "status": "planned",
+      "assertions": [
+        "global_pure_state_entropy_is_zero",
+        "complementary_reductions_have_equal_nonzero_spectra",
+        "complementary_reductions_have_equal_von_neumann_entropy",
+        "local_unitary_basis_change_preserves_subsystem_entropy",
+        "partial_trace_is_independent_of_environment_basis"
+      ],
+      "acceptance": {
+        "small_well_conditioned_absolute_error": 1e-10,
+        "independent_oracle": "Schmidt spectrum or analytic state"
+      },
+      "implementation_status": "partial_source_authored_not_executed"
+    },
+    {
+      "id": "QI-2",
+      "name": "Haar random-state Page benchmark",
+      "status": "planned",
+      "model": "finite-dimensional Haar-random pure bipartite state",
+      "reference": {
+        "expected_entropy_nats": "H_(m*n) - H_max(m,n) - (min(m,n)-1)/(2*max(m,n))",
+        "definitions": {
+          "m": "dimension of subsystem A",
+          "n": "dimension of subsystem B",
+          "H_k": "k-th harmonic number"
+        },
+        "source": "Page 1993; exact Haar average, not an evaporation Hamiltonian"
+      },
+      "observables": [
+        "mean_von_neumann_entropy",
+        "variance_von_neumann_entropy",
+        "mean_renyi_entropy",
+        "entanglement_spectrum",
+        "sample_count",
+        "confidence_interval"
+      ],
+      "acceptance": {
+        "ensemble_mean": "inside preregistered sampling confidence interval",
+        "single_sample_is_not_ensemble_claim": true,
+        "seeds": "frozen before evaluation"
+      },
+      "implementation_status": "Page reference formula and seeded ChaCha20 Haar-state ensemble sampler authored with Welford uncertainty; not executed in Rust"
+    },
+    {
+      "id": "QI-2S",
+      "name": "symmetry-resolved Haar/Page equilibrium for fixed U(1) charge",
+      "status": "source_authored_not_executed",
+      "model": "Haar-random pure state inside a fixed total-excitation sector K of N qubits",
+      "reference": {
+        "formula": "E[S_A] = H_D - sum_q (d_q/D) H_(d_q) + sum_q (d_q/D) Page(m_q,n_q)",
+        "definitions": {
+          "D": "binomial(N,K)",
+          "m_q": "binomial(A,q)",
+          "n_q": "binomial(N-A,K-q)",
+          "d_q": "m_q*n_q",
+          "q_range": "max(0,K-(N-A)) through min(K,A)",
+          "H_j": "j-th harmonic number",
+          "Page": "exact complex-Haar Page average for dimensions m_q and n_q"
+        },
+        "interpretation": "The charge blocks have Dirichlet-distributed weights with parameters d_q; each normalized block is an independent Haar bipartite state. This is the exact average for the stated finite-dimensional symmetry sector."
+      },
+      "observables": [
+        "symmetry_resolved_page_entropy",
+        "fixed_charge_haar_sample_mean",
+        "sample_variance_and_standard_error",
+        "charge_sector_dimension",
+        "charge_block_weights_and_dimensions"
+      ],
+      "acceptance": {
+        "ensemble_mean": "inside preregistered sampling confidence interval or within a declared standard-error threshold",
+        "unconstrained_Page_formula_is_not_used_as_U1_equilibrium": true,
+        "seeds_and_sample_count_frozen_before_evaluation": true,
+        "block_dimensions_sum_to_binomial_N_K": true,
+        "small_sector_known_answers": "N=2,K=1,A=1: 1/2; N=4,K=1,A=2: 7/12; N=4,K=2,A=2: 19/20 nats, from the stated charge-block Dirichlet/Page decomposition."
+      },
+      "implementation_status": "symmetry-resolved Page oracle and seeded fixed-charge Haar sampler source-authored; small analytic controls updated to charge-block results; Rust execution pending",
+      "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/fixed_charge_page_u1_v1.json",
+      "claim_ceiling": "Finite-dimensional Haar random states within an exact U(1) charge sector. No claim about gravitational evaporation, a local circuit reaching equilibrium, a Page island, or QES dominance.",
+      "analytic_controls": [
+        {
+          "N": 2,
+          "K": 1,
+          "A": 1,
+          "charge_block_dimensions": [
+            1,
+            1
+          ],
+          "exact_entropy_nats": 0.5
+        },
+        {
+          "N": 4,
+          "K": 1,
+          "A": 2,
+          "charge_block_dimensions": [
+            2,
+            2
+          ],
+          "exact_entropy_nats": 0.5833333333333334
+        },
+        {
+          "N": 4,
+          "K": 2,
+          "A": 2,
+          "charge_block_dimensions": [
+            1,
+            4,
+            1
+          ],
+          "exact_entropy_nats": 0.95
+        }
+      ]
+    },
+    {
+      "id": "QI-3",
+      "name": "sequential unitary evaporation toy model",
+      "status": "partial_source_authored_not_executed",
+      "model": "apply a declared scrambler only to remaining B, then move one output factor into R and never act on it again",
+      "ensembles": [
+        "all_to_all_random_two_qubit_circuits",
+        "one_dimensional_brickwork_random_circuits",
+        "energy_conserving_circuits_when_explicitly_implemented",
+        "U1_conserving_low_entanglement_product_state_sequential_boundary_emission",
+        "U1_conserving_finite_depth_random_circuits_from_fixed_charge_product_states",
+        "U1_conserving_1d_domain_wall_transport_quench"
+      ],
+      "observables": [
+        "radiation_von_neumann_entropy_by_emission_step",
+        "remaining_register_entropy",
+        "global_purity",
+        "radiation_purity",
+        "mutual_information",
+        "circuit_depth",
+        "two_qubit_gate_count",
+        "subsystem_von_neumann_entropy_by_depth",
+        "subsystem_purity_by_depth",
+        "seed_reproducibility",
+        "state_norm_drift",
+        "radiation_entropy_and_remaining_register_entropy_by_emission_step",
+        "complementary_entropy_residual",
+        "total_excitation_expectation_and_variance",
+        "emitted_register_immutability",
+        "charge_preserving_gate_commutator_residual",
+        "radiation_excitation_expectation_by_emission_step",
+        "remaining_register_excitation_expectation_by_emission_step",
+        "emitted_qubit_occupation_expectation",
+        "excitation_ledger_residual",
+        "symmetry_resolved_page_equilibrium_entropy",
+        "finite_depth_gap_to_symmetry_sector_equilibrium",
+        "subsystem_entropy_by_depth_and_topology",
+        "sample_variance_and_standard_error_by_depth",
+        "total_charge_expectation_and_variance",
+        "gap_to_symmetry_resolved_Page_equilibrium",
+        "site_excitation_density_profile_by_layer",
+        "oriented_nearest_neighbour_bond_currents",
+        "local_discrete_charge_continuity_residual",
+        "left_half_excitation_expectation",
+        "domain_wall_imbalance_decay",
+        "integrated_central_cut_transport",
+        "half_chain_entropy_and_purity_by_layer",
+        "independent_seed_density_profile_standard_error",
+        "independent_seed_transport_standard_error",
+        "independent_seed_entropy_standard_error",
+        "initial_product_state_excited_qubit_labels",
+        "initial_and_final_radiation_entropy_boundary_conditions"
+      ],
+      "acceptance": {
+        "global_unitarity_and_state_norm_drift_reported_per_step": true,
+        "emitted_subsystems_are_immutable_after_emission": true,
+        "late_complete_radiation_state_is_pure_for_closed_unitary_model": true,
+        "finite_size_variance_reported": true,
+        "charge_preserving_gate_commutator_frobenius_residual": 1e-12,
+        "total_excitation_expectation_drift": 1e-10,
+        "total_excitation_variance": 1e-10,
+        "complementary_entropy_residual_nats": 1e-9,
+        "excitation_ledger_residual": 1e-10,
+        "emitted_qubit_occupation_range": [
+          0,
+          1
+        ],
+        "symmetry_resolved_equilibrium_comparison": "required_for_U1_conserving_ensembles",
+        "finite_depth_equilibrium_claim_requires_depth_and_seed_convergence": true,
+        "u1_gate_charge_commutator_frobenius_residual": 1e-12,
+        "u1_circuit_charge_expectation_drift": 1e-10,
+        "u1_circuit_charge_variance": 1e-10,
+        "u1_circuit_norm_drift": 1e-10,
+        "u1_circuit_equilibrium_comparator": "symmetry_resolved_Page_for_same_(N,K,A); unconstrained_Page_is_invalid",
+        "u1_circuit_mixing_claim_requires": "depth sweep, independent seed ensembles, uncertainty intervals, and convergence/stationarity test",
+        "local_charge_continuity_max_residual": 1e-10,
+        "global_charge_expectation_drift": 1e-10,
+        "fixed_sector_charge_variance": 1e-10,
+        "integrated_cut_current_left_charge_ledger": 1e-10,
+        "density_profile_cross_implementation_error": 1e-8,
+        "transport_diffusion_exponent": "only claim exponent after multi-size, multi-seed, intermediate-time finite-size scaling; target 0.5 +/- 0.1 for diffusive domain-wall imbalance",
+        "initial_radiation_entropy_nats": 1e-12,
+        "final_complete_radiation_entropy_nats": 1e-10,
+        "initial_state_is_not_Haar_equilibrium": true,
+        "initial_charge_sector_exact": true,
+        "smaller_complementary_reduction": "For a globally pure state, construct only the smaller side of each B|R cut under the dense reduced-dimension cap. Use Schmidt-spectrum equality for S(B)=S(R) and equal subsystem purity; record the complementarity residual. This avoids materializing a reduced matrix larger than the backend cap."
+      },
+      "implementation_status": "product-state sequential factor transfer now evaluates the smaller complementary reduction only; Rust execution pending",
+      "source_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/random_circuit_scrambling_v1.json",
+      "claim_ceiling": "Finite-dimensional closed qubit-chain unitary circuits and tensor-factor transfer with exact excitation conservation and a symmetry-sector Haar reference. The sequential model starts from a low-entanglement product state. None of these are Hawking radiation, gravitational backreaction, a Page-island/QES calculation, or a four-dimensional black-hole evaporation derivation.",
+      "sequential_evaporation_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/sequential_evaporation_u1_v1.json",
+      "equilibrium_reference": {
+        "model": "Haar-random pure state restricted to the exact total-excitation sector",
+        "oracle": "symmetry_resolved_page_average_entropy_nats(N,K,|A|)",
+        "caveat": "The oracle is a kinematic equilibrium reference. The chosen local or boundary-emission circuit must independently demonstrate mixing toward it; no convergence is presumed."
+      },
+      "source_fixture_u1_circuit": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_scrambling_circuit_v1.json",
+      "initial_condition": {
+        "type": "computational_basis_product_state_in_a_fixed_total_excitation_sector",
+        "charge_sector": "exact Hamming weight K",
+        "preparation": "for 0<K<N, occupy qubit 0, leave qubit 1 empty, and choose K-1 occupied sites from {2,...,N-1} using the declared seeded PRNG; vacuum and fully-filled sectors are explicit trivial controls",
+        "rationale": "A Haar-random fixed-sector initial state is already at the symmetry-sector equilibrium ensemble, so it is not a valid low-entanglement initial condition for studying scrambling growth or an evaporation-like entropy history."
+      },
+      "source_fixture_sequential": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/sequential_evaporation_u1_v1.json"
+    },
+    {
+      "id": "QI-3T",
+      "name": "U(1) domain-wall transport and model-discriminating dynamic scaling",
+      "status": "source_authored_not_executed",
+      "model": "even-length half-filled 1D spin-1/2 chain, initial |111...1000...0> product state, nearest-neighbour brickwork gates sampled independently from U(1) x U(2) x U(1)",
+      "observables": [
+        "site_charge_density_profile",
+        "signed_bond_currents",
+        "discrete_local_continuity_residual",
+        "central_cut_integrated_transport",
+        "domain_wall_imbalance",
+        "half_chain_von_neumann_entropy",
+        "half_chain_purity",
+        "multi_seed_mean_and_standard_error",
+        "domain_wall_gradient_width_squared_by_layer",
+        "log_log_width_growth_exponent_alpha",
+        "dynamic_exponent_z_equals_2_over_alpha",
+        "leave_one_seed_out_jackknife_standard_error_and_confidence_interval",
+        "finite_size_depth_ratio"
+      ],
+      "acceptance": {
+        "maximum_local_continuity_residual": 1e-10,
+        "maximum_total_charge_drift": 1e-10,
+        "maximum_fixed_sector_charge_variance": 1e-10,
+        "integrated_central_current_matches_left_charge_loss": 1e-10,
+        "density_profile_matches_independent_implementation": 1e-8,
+        "diffusive_scaling_claim_requires": "N sweep, independent seed ensembles, predeclared intermediate-time window, finite-size control and uncertainty intervals",
+        "diffusive_domain_wall_imbalance_exponent_target": [
+          0.4,
+          0.6
+        ],
+        "dynamic_exponent_definition": "For gradient-width second moment w^2(t) proportional to t^alpha, estimate alpha by a preregistered log-log least-squares fit and report z=2/alpha.",
+        "seed_uncertainty": "Leave-one-seed-out jackknife for z; also report width-squared standard error at each layer.",
+        "finite_size_scaling_study": "Run N={6,8,10,12}, K=N/2, with the preregistered scaled window t/N in [0.5,2], 64 seeds per size, and exact source/seed/config receipts. Compare z(N) and confidence intervals; do not classify a universality class from one N.",
+        "regime_interpretation": {
+          "diffusive": "z approximately 2",
+          "ballistic": "z approximately 1",
+          "kpz_like_superdiffusive": "z approximately 1.5",
+          "classification_rule": "Only name a regime when confidence intervals and cross-size stability distinguish candidate exponents; otherwise report unresolved/anomalous."
+        },
+        "minimum_r_squared_for_universality_label": 0.9,
+        "universality_classification": "Require R-squared >=0.90, z intervals and finite-size stability over at least three largest N values; otherwise report effective finite-size z and unresolved classification."
+      },
+      "implementation": {
+        "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+        "APIs": [
+          "simulate_u1_domain_wall_transport",
+          "sample_u1_domain_wall_transport_ensemble"
+        ],
+        "status": "source_authored_and_independent_NumPy_equation_check; Rust execution pending",
+        "dynamic_scaling_api": "analyze_u1_domain_wall_dynamic_exponent",
+        "dynamic_scaling_status": "source_authored_not_executed",
+        "dynamic_scaling_uncertainty": "leave-one-seed-out jackknife",
+        "dynamic_scaling_fit": "log(mean per-seed gradient-width second moment) versus log(layer); z=2/slope"
+      },
+      "claim_ceiling": "A finite closed U(1)-conserving qubit-chain transport/scrambling benchmark. Not a black-hole evaporation model, a gravitational Page curve, a QES/island calculation or a recovery decoder.",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_domain_wall_dynamic_scaling_v1.json",
+      "exploratory_pilot_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_domain_wall_dynamic_scaling_v1.json",
+      "exploratory_pilot_interpretation": "An independent 8-seed NumPy pilot for N=6,8,10,12 has low R-squared and wide, size-drifting z estimates; it fails the proposed 0.90 regime-label gate. This is explicitly non-confirmatory and not Rust output."
+    },
+    {
+      "id": "QI-3O",
+      "name": "U(1)-conserving operator spreading and squared commutators",
+      "status": "source_authored_not_executed",
+      "model": "Local X operator evolved by O <- U O U^dagger under seeded nearest-neighbour U(1) brickwork gates; measure normalized squared commutators against local X and Z probes.",
+      "observables": [
+        "squared_commutator_profile_C_Z_by_site",
+        "squared_commutator_profile_C_X_by_site",
+        "operator_Hilbert_Schmidt_norm",
+        "operator_spread_front",
+        "seed_and_depth",
+        "gate_count",
+        "independent_seed_mean_squared_commutator_profile",
+        "per_site_commutator_standard_error",
+        "maximum_operator_norm_drift"
+      ],
+      "acceptance": {
+        "normalized_squared_commutator_range": [
+          0,
+          2
+        ],
+        "operator_Hilbert_Schmidt_norm_drift": 1e-10,
+        "depth_zero_Pauli_reference": "C_Z(source)=2; C_Z(other sites)=0; C_X(all sites)=0",
+        "independent_full_matrix_comparator_error": 1e-8,
+        "multi_seed_statistics_required_for_front_velocity": true,
+        "claim_ceiling": "Operator influence for the declared finite-depth circuit; not a recovery decoder, Page curve, or proof of thermalization.",
+        "independent_seed_standard_error_required": true
+      },
+      "implementation": {
+        "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+        "api": "simulate_u1_operator_spreading",
+        "dense_limit_qubits": 8,
+        "status": "single-seed and independent-seed operator-spreading APIs authored; Rust execution pending",
+        "ensemble_api": "sample_u1_operator_spreading_ensemble"
+      },
+      "claim_ceiling": "Finite-dimensional operator spreading under U(1)-conserving random circuits. No decoder or gravitational black-hole claim."
+    },
+    {
+      "id": "QI-4A",
+      "name": "one-step Hayden-Preskill decoupling diagnostic",
+      "status": "source_authored_not_executed",
+      "model": "four-qubit Bell(Q,M) tensor Bell(B,R), with seeded Haar U(4) on M tensor B; outputs are split into outgoing E and remaining B'",
+      "observables": [
+        "S_Q",
+        "S_B_prime",
+        "S_QB_prime",
+        "I_Q_B_prime",
+        "S_RE",
+        "S_QRE",
+        "I_Q_RE",
+        "pure_state_information_complementarity"
+      ],
+      "acceptance": {
+        "S_Q": "ln(2) within 1e-10",
+        "global_norm_drift": 1e-10,
+        "information_complementarity_residual": 1e-10,
+        "independent_seed_mean_and_standard_error": true,
+        "seed_reproducibility": true,
+        "decoder_claim": "prohibited; this stage implements no recovery channel",
+        "schmidt_complementary_entropy_identity": 1e-10,
+        "negative_mutual_information": "typed rejection if below declared tolerance",
+        "information_complementarity_failure": "dedicated information identity error"
+      },
+      "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_single_emission_v1.json",
+      "implementation_status": "one-step decoupling diagnostic and independent-seed ensemble summary authored; Rust execution pending",
+      "claim_ceiling": "Four-qubit single-step decoupling diagnostic only. No recovery decoder, efficiency claim, macroscopic black-hole evaporation or gravitational Page curve."
+    },
+    {
+      "id": "QI-4",
+      "name": "Hayden-Preskill decoupling and reference recovery",
+      "status": "QI-4A direct decoupling + QI-4P Petz recovery + QI-4O semidefinite-QEC-square-root optimality source authored; exact-head runner validation pending",
+      "model": "Reference Q is initially maximally entangled with injected message M; black-hole register B is initially entangled with explicit early radiation R; a declared scrambler acts on M tensor B; emitted factors E are made accessible while remaining B' is inaccessible to the decoder.",
+      "observables": [
+        "mutual_information_Q_Bprime",
+        "accessible_reference_radiation_mutual_information",
+        "entanglement_fidelity_after_recovery",
+        "average_message_state_fidelity",
+        "worst_case_recovery_error_or_declared_bound",
+        "decoder_success_probability",
+        "decoder_gate_count",
+        "decoder_depth",
+        "decoder_runtime",
+        "decoder_peak_memory",
+        "charge_sector_leakage",
+        "noise_sensitivity",
+        "quantum_Pinsker_upper_bound_and_slack",
+        "direct_decoupling_trace_distance_Q_Bprime",
+        "Petz_recovery_entanglement_fidelity",
+        "Petz_channel_trace_preservation_residual",
+        "Petz_inverse_square_root_residual",
+        "Petz_recovery_ensemble_mean_standard_error_minimum_and_maximum_fidelity",
+        "Petz_optimality_QEC_matrix_hermiticity_and_trace",
+        "Petz_optimality_commutator_Frobenius_norm",
+        "Petz_auxiliary_T_hermiticity",
+        "Petz_optimality_classification_by_theorem_criterion",
+        "Petz_optimality_ensemble_mean_and_standard_error",
+        "Petz_QEC_positive_square_root_residual",
+        "Petz_QEC_numerical_support_rank",
+        "rank_deficient_QEC_positive_square_root_control",
+        "negative_spectrum_rejected_without_flooring",
+        "rotated_Petz_entanglement_fidelity_by_modular_parameter",
+        "rotated_Petz_inverse_modular_power_residual",
+        "rotated_Petz_trace_preservation_residual"
+      ],
+      "decoder_baselines": [
+        "exact_small_dimension_optimal_recovery_via_SDP_or_channel_optimization",
+        "Petz_recovery",
+        "rotated_Petz_recovery",
+        "charge_sector_resolved_Petz_recovery",
+        "declared_approximate_decoder"
+      ],
+      "acceptance": {
+        "information_recovery_claim_requires_measured_fidelity_and_cost": true,
+        "existence_of_recovery_map_is_not_called_efficient_decoder": true,
+        "decoder_access_set": "R tensor emitted E only; never B' or its simulator memory",
+        "exact_baseline": "For small fixtures, compare with exact optimal recovery or a certified upper/lower bound",
+        "small_fixture_target": "Variational decoder entanglement fidelity within 1e-3 absolute of the exact optimum on preregistered small cases",
+        "finite_size": "Sweep message size, black-hole size, radiation fraction, seeds and conserved-charge sectors",
+        "symmetry": "For U(1) channels, decoder must declare whether it preserves charge and report sector leakage",
+        "generalization": "Train on separate scrambler seeds from held-out evaluation seeds; no decoder may receive hidden random seed/state amplitudes as side information",
+        "noise": "Report fidelity versus a declared local gate/noise model",
+        "null_controls": [
+          "decoder given access to B'",
+          "decoder given full global state or hidden simulator amplitudes",
+          "unrestricted recovery compared as if it preserved U(1)",
+          "recovery claim made using mutual information only",
+          "fidelity reported without gate count/depth/runtime"
+        ],
+        "direct_decoupling_measurement": "Compute 1/2||rho_QBprime - rho_Q tensor rho_Bprime||_1 from the signed Hermitian spectrum of the difference; do not infer trace distance from mutual information.",
+        "quantum_pinsker": "D_trace <= sqrt(I(Q:Bprime)/2) with mutual information in nats; violations beyond declared tolerance fail",
+        "no_decoder_claim_from_decoupling": true,
+        "pinsker_reference": "For natural-log mutual information in nats, require D_trace <= sqrt(I(Q:Bprime)/2), with declared numerical tolerance.",
+        "fixture": "hayden_preskill_decoupling_u4_v1.json records the Q,M,B,R register convention, accessible set A=E tensor R, direct trace-distance formula, and independent 32-seed NumPy comparator.",
+        "petz_input": "The decoder receives only the accessible 4-dimensional A=E tensor R register. The inaccessible B' is traced out as the environment and cannot be passed to the recovery map.",
+        "petz_completeness": "Require sum_i R_i^dagger R_i = I_A within tolerance; do not silently add trace-preserving repair operators.",
+        "petz_fidelity": "Report entanglement fidelity F_e = 1/4 sum_s |Tr L_s|^2 for composite Kraus L_s=R_i K_j.",
+        "petz_numerics": "Inverse-square-root uses unregularized 4x4 Hermitian Newton-Schulz iteration; report ||rho_A^(-1/2) rho_A rho_A^(-1/2)-I||_F; reject nonconvergence rather than floor eigenvalues.",
+        "decoder_cost_boundary": "Report dense arithmetic cost and memory for this small classical channel simulation separately from physical quantum gate counts. This implementation does not synthesize a fault-tolerant decoder circuit.",
+        "petz_ensemble": "Report per-seed entanglement fidelity, Welford mean/standard error, min/max, maximum inverse-square-root residual and maximum trace-preservation residual; freeze seed schedule before evaluation.",
+        "petz_identity_control": "U=I_4 must return entanglement fidelity 1 within 1e-10",
+        "petz_random_scrambler": "For each preregistered Haar U(4), report F_e in [0,1], inverse-square-root residual <1e-8, and trace-preservation residual <1e-8",
+        "petz_baseline": "Input-independent replacement decoder I/2 has qubit entanglement fidelity 1/4",
+        "petz_no_efficiency_claim": "A two-Kraus channel representation is not a physical circuit decomposition; do not claim decoder gate complexity or hardware efficiency.",
+        "petz_optimality_theorem": "For rho=sigma=I/2, evaluate [M_sigma, gamma tensor T]=0 with M_sigma[(i,k),(j,l)]=<i|sqrt(sigma)K_k^dagger K_l sqrt(sigma)|j>, gamma=sigma^(-1/2)rho, T=Tr_L[(gamma^dagger tensor I)sqrt(M_sigma)]. Petz is classified optimal only when the commutator residual is below a predeclared threshold.",
+        "petz_optimality_source": "Li et al., Phys. Rev. Lett. 134, 200602 (2025), DOI 10.1103/PhysRevLett.134.200602. The commutator criterion is the commuting-rho/sigma specialization; the general theorem uses sqrt(M_sigma)(gamma tensor T) >= 0.",
+        "petz_optimality_no_generalization": "This four-qubit channel uses rho=sigma=I/2. No result is claimed for noncommuting/non-maximally-mixed states or larger logical/environment dimensions.",
+        "petz_qec_square_root": "Use a Hermitian eigensystem square root sqrt(M_sigma) directly; support positive-semidefinite rank-deficient QEC matrices; reject material negative eigenvalues; do not floor small positive eigenvalues.",
+        "petz_qec_square_root_residual": "Report ||S*S-M_sigma||_F/max(1,||M_sigma||_F) and numerical support rank; exact small PSD controls include rank one and rank two.",
+        "petz_optimality_commutator": "The commuting-rho/sigma corollary checks [M_sigma,gamma tensor T]=0. The general theorem's condition is sqrt(M_sigma)(gamma tensor T) >= 0; do not infer general noncommuting optimality from the commutator test.",
+        "petz_optimality_numerics": "QEC square root is derived from an 8x8 real-symmetric embedding eigensystem with complex Gram-Schmidt reconstruction; tiny negative eigenvalues within tolerance are treated as zero; eigenvalues are not raised to a floor; the reconstructed S*S residual is reported.",
+        "petz_optimality_support_rank": "Report the numerical support rank at the declared eigenvalue tolerance; include rank-one and rank-two PSD controls.",
+        "rotated_petz_modular_power_identity": "||rho_A^(-1/2-it/2) rho_A rho_A^(-1/2+it/2) - I|| <= 1e-8",
+        "rotated_petz_trace_preservation_residual": 1e-8,
+        "rotated_petz_t_zero_matches_ordinary_petz": "same scrambler seed; fidelity absolute difference <=1e-8",
+        "rotated_petz_interpretation": "Compare fidelity across preregistered t values and seeds; do not infer the optimal recovery from a small parameter grid.",
+        "rotated_petz_status": "Rust 1.96 exact-head crate test suite passed all 148 tests, including four new rotated-Petz tests."
+      },
+      "implementation_status": "QI-4A direct decoupling, QI-4P ordinary Petz recovery, QI-4O theorem diagnostics, and QI-4RP modularly rotated Petz recovery source-authored; Rust 1.96 exact-head crate tests pass",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
+      "fixtures": [
+        "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_decoupling_u4_v1.json",
+        "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_petz_recovery_u4_v1.json",
+        "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_petz_optimality_u4_v1.json"
+      ],
+      "references": [
+        "https://arxiv.org/abs/2610.31501",
+        "https://doi.org/10.1103/PhysRevLett.134.200602"
+      ],
+      "baselines": [
+        "one_parameter_rotated_Petz_family_t_in_[-2,2]",
+        "ordinary_Petz_is_exact_t_equals_zero_control"
+      ],
+      "rotated_petz_api": "simulate_small_hayden_preskill_rotated_petz_recovery(seed,t,tolerance)",
+      "rotated_petz_ensemble_api": "sample_small_hayden_preskill_rotated_petz_ensemble(sample_count,first_seed,t,tolerance)",
+      "rotated_petz_fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/hayden_preskill_rotated_petz_v1.json",
+      "rotated_petz_execution": {
+        "source_commit": "7b20deace5f7586c552d1d91bd7d91b3d7fc9615",
+        "tested_pr_head": "847bff5a6e27dc3de43c09f1dcba791b43aa9a8d",
+        "workflow_run_id": 43308906962,
+        "result": "148 passed; 0 failed",
+        "scope": "Includes t=0 equivalence against ordinary Petz, nonzero modular parameter CPTP/fidelity tests, ensemble reproducibility and invalid input controls."
+      }
+    },
+    {
+      "id": "QI-5",
+      "name": "finite-size transition and ensemble diagnostics",
+      "status": "planned",
+      "comparators": [
+        "exact_haar_ensemble",
+        "finite_depth_all_to_all_circuit",
+        "finite_depth_local_circuit",
+        "energy_conserving_circuit",
+        "generalized_entropy_minimum_as_separate_analytic_model"
+      ],
+      "observables": [
+        "transition_width",
+        "higher_renyi_hierarchy",
+        "entanglement_spectrum",
+        "annealed_quenched_gap",
+        "seed_to_seed_variance",
+        "scrambling_depth"
+      ],
+      "acceptance": {
+        "model_assumptions_are_kept_separate": true,
+        "finite_n_effects_are_measured_not_assumed": true,
+        "island_saddle_is_not_inferred_from_random_circuit": true
+      },
+      "implementation_status": "not_implemented"
+    },
+    {
+      "id": "QI-6",
+      "name": "tensor-network scaling and truncation",
+      "status": "contract_authored; no tensor-network backend implemented",
+      "observables": [
+        "MPS bond dimension by bond and time",
+        "charge-block-resolved Schmidt spectrum",
+        "discarded Schmidt weight per truncation event",
+        "cumulative conservative state-vector error bound from local truncations",
+        "trace-distance and entropy error against exact dense reference",
+        "local density/current continuity residual",
+        "total charge expectation and variance drift",
+        "radiation entropy and operator-spreading profiles",
+        "runtime, peak memory, allocation volume, and energy if measured"
+      ],
+      "acceptance": {
+        "exact_dense_overlap_sizes": [
+          8,
+          10,
+          12
+        ],
+        "proposed_large_sizes": [
+          16,
+          24,
+          32,
+          48,
+          64
+        ],
+        "cost_comparison_at_matched_accuracy": true,
+        "per_truncation_discarded_weight_reported": true,
+        "charge_sectors_preserved_exactly": true,
+        "cumulative_state_error_bound": "Report a conservative sum of per-truncation vector-distance bounds; do not equate a local discarded weight to a global fidelity guarantee.",
+        "dense_vs_MPS_trace_distance_well_conditioned": 0.000001,
+        "dense_vs_MPS_entropy_absolute_error_nats": 0.00001,
+        "local_charge_continuity_residual": 1e-10,
+        "unresolved_or_over_bond_cap": "fail closed or explicitly return unresolved; never hide bond-dimension saturation",
+        "independent_comparator": "Quimb CircuitMPS/TEBD and a second declared tensor-network implementation at matched truncation policy",
+        "runtime_rule": "Compare wall time and peak memory only after matching output precision, bond cutoff, error, and physical gate ensemble",
+        "claim_ceiling": "Finite-dimensional unitary-circuit MPS benchmark. Not a gravity or QES result."
+      },
+      "implementation_status": "benchmark contract authored; Rust MPS/TEBD backend not implemented",
+      "model": "U(1)-symmetric MPS/TEBD simulation of finite-depth charge-conserving circuits and sequential product-state boundary emission, cross-checked against exact dense state vectors on overlapping small sizes and independent tensor-network implementations.",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/tensor_network_qualification_v1.json"
+    },
+    {
+      "id": "QI-7",
+      "name": "held-out model discrimination and abstention",
+      "status": "planned",
+      "holdouts": [
+        "circuit_seeds",
+        "system_sizes",
+        "initial_state_classes",
+        "scrambling_families",
+        "decoder_families"
+      ],
+      "observables": [
+        "model_identification_accuracy",
+        "uncertainty_calibration",
+        "false_discovery_rate",
+        "abstention_risk_coverage",
+        "OOD_error"
+      ],
+      "acceptance": {
+        "whole_circuit_instance_is_split_unit": true,
+        "heldout_seed_leakage_prohibited": true,
+        "unsupported_models_return_unresolved": true
+      },
+      "implementation_status": "not_implemented"
+    },
+    {
+      "id": "QI-3H",
+      "name": "joint U(1) hydrodynamic, operator-front and entanglement analysis",
+      "status": "source_authored_tests_pending_rust_execution",
+      "model": "Same fixed-charge local brickwork circuit family; domain-wall product-state density/current trajectories, local-X operator spreading measured with local-Z squared commutators, and half-chain entropy from the domain-wall quench",
+      "observables": [
+        "charge_density_gradient_second_moment_by_layer",
+        "effective_charge_diffusion_coefficient_D_from_gradient_width_slope_over_2",
+        "left_and_right_local_Z_OTOC_threshold_front_positions",
+        "left_and_right_butterfly_front_velocities_vB",
+        "half_chain_entropy_growth_rate",
+        "Page_normalized_entanglement_velocity_vE",
+        "linear_fit_R_squared_for_D_vB_left_vB_right_and_vE",
+        "boundary_censoring_of_operator_front_positions",
+        "charge_continuity_norm_and_operator_norm_residuals"
+      ],
+      "definitions": {
+        "diffusion_width": "Var of |n_(i+1)-n_i| over bond-centre positions, normalized by total absolute density gradient",
+        "diffusion_estimator": "Fit width_variance(t)=intercept+2*D*t over the preregistered layer interval",
+        "butterfly_front": "Furthest site on each side of the source where ensemble-mean normalized squared commutator with local Z exceeds the preregistered threshold; boundary-censored points excluded from velocity fits",
+        "entanglement_velocity": "Slope of half-chain entropy vs layer, divided by the exact symmetry-resolved Page mean for the same (N,K,A=N/2)"
+      },
+      "acceptance": {
+        "same_register_and_fixed_charge_for_all_three_observables": true,
+        "operator_front_threshold": "Frozen before examining depth-dependent front trajectories; range (0,2]",
+        "fit_windows": "Frozen before fitting; inclusive layer/depth intervals recorded in the receipt",
+        "no_boundary_censored_points_in_vB_fits": true,
+        "linear_fit_R_squared_reported_not_hidden": true,
+        "density_continuity_residual": 1e-9,
+        "domain_wall_norm_drift": 1e-9,
+        "domain_wall_charge_drift": 1e-9,
+        "operator_hilbert_schmidt_norm_drift": 1e-9,
+        "no_universal_claim_from_one_register_or_one_depth_window": true
+      },
+      "implementation_status": "joint analysis API, fit diagnostics, boundary-censoring and input validation tests authored; Rust execution pending",
+      "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+      "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/u1_hydrodynamic_scrambling_v1.json",
+      "claim_ceiling": "Finite-size random U(1)-conserving qubit-chain diagnostics. Fitted D, vB and vE are effective circuit-specific parameters; they are not black-hole transport coefficients, universal constants or gravitational observables."
+    }
+  ],
+  "negative_controls": [
+    "no_scrambling",
+    "no_reference_entanglement",
+    "reference_disconnected_from_emitted_degrees",
+    "wrong_radiation_subsystem",
+    "intentionally_non_unitary_channel",
+    "post_emission_interaction_with_collected_radiation",
+    "diagonal_entropy_proxy_on_coherent_state",
+    "non_positive_density_matrix",
+    "trace_not_equal_to_one",
+    "state_normalization_drift_hidden_by_renormalization",
+    "decoder_training_leakage_from_heldout_seed",
+    "Haar_formula_claimed_for_finite_depth_local_circuit_without_sampling_validation",
+    "island_saddle_claimed_from_random_circuit_output",
+    "charge_nonconserving_two_qubit_gate",
+    "emitted_register_reinteracted_after_emission",
+    "initial_state_outside_declared_microcanonical_sector",
+    "radiation_black_hole_entropy_complementarity_failure",
+    "energy_partition_ledger_mismatch",
+    "unconstrained_Haar_Page_reference_used_for_fixed_charge_ensemble",
+    "fixed_charge_equilibrium_claim_without_depth_and_seed_convergence",
+    "fixed_charge_Haar_sample_compared_to_unconstrained_Page_mean",
+    "initialize finite-depth scrambling run from an already-Haar-random fixed-charge state and misinterpret invariant entropy as scrambling growth",
+    "use the symmetry-resolved Page mean as a hard entropy ceiling for individual samples rather than as an ensemble mean",
+    "report a domain-wall diffusion exponent without multi-size finite-size scaling and uncertainty",
+    "infer charge transport from entanglement entropy alone",
+    "omit the central-cut charge ledger while reporting integrated current",
+    "compare 1D domain-wall transport against all-to-all gates as though both had the same spatial metric",
+    "declare message recovery from a low reference-black-hole mutual information without constructing a decoder",
+    "report mutual-information complementarity as entanglement recovery fidelity",
+    "allow recovery decoder to inspect the remaining black-hole register",
+    "declare efficient recovery from the existence of a Petz map without evaluating its implementation cost",
+    "evaluate a decoder on the same scrambler seeds used for training without held-out evaluation",
+    "claim a charge-preserving recovery while silently allowing sector leakage",
+    "infer message recovery from a large squared commutator or OTOC alone",
+    "compare normalized squared commutators with different operator conventions without conversion",
+    "infer asymptotic operator-front velocity from one system size or one random seed",
+    "initialize the sequential-emission scrambling benchmark from a Haar-random fixed-charge state and then claim entropy growth from a low-entropy black hole",
+    "call QI-4A mutual-information decoupling a successful recovery decoder",
+    "substitute Pinsker's mutual-information upper bound for the directly measured trace distance",
+    "fit diffusion coefficient after late-time finite-size reflection without reporting fit-window sensitivity",
+    "include boundary-censored OTOC fronts in butterfly velocity regression",
+    "call an OTOC threshold velocity a universal butterfly velocity without threshold and time-window sensitivity",
+    "compare entanglement growth across different N,K or local gate ensembles without matching Page normalization and gate schedule",
+    "infer gravitational black-hole diffusion, Hawking information flow or a universal vB/vE relation from a small closed spin chain",
+    "assume linear width-squared growth and report diffusion before estimating the log-log dynamic exponent",
+    "fit a time window selected after looking at z and call the result preregistered",
+    "report one-size z as a thermodynamic-limit universality class",
+    "ignore finite-size saturation or seed uncertainty",
+    "compare rotated-Petz fidelities at different scrambler seeds rather than matching each t to the same seed",
+    "infer exact optimality from the best t in a finite grid",
+    "repair a trace-preservation miss by eigenvalue flooring or Kraus renormalization",
+    "give rotated-Petz decoder access to B-prime or hidden simulator amplitudes"
+  ],
+  "competitive_baselines": [
+    {
+      "name": "Page Haar-random bipartite-state theorem",
+      "role": "analytic ensemble-mean reference",
+      "not_a": "microscopic evaporation dynamics"
+    },
+    {
+      "name": "Hayden-Preskill random-unitary model",
+      "role": "scrambling and operational information-release reference",
+      "not_a": "complete model of gravitational evaporation"
+    },
+    {
+      "name": "local and all-to-all random unitary circuits",
+      "role": "finite-depth and locality-sensitive scrambling comparators",
+      "not_a": "gravitational path-integral calculation"
+    },
+    {
+      "name": "JT gravity with bath and island/QES calculations",
+      "role": "generalized-entropy and replica-saddle comparator",
+      "not_a": "same model or observable as a closed random circuit"
+    },
+    {
+      "name": "MPS/tensor-network methods",
+      "role": "scaling comparator with truncation and discarded-weight accounting",
+      "not_a": "exact result unless truncation error is controlled"
+    },
+    {
+      "name": "Petz recovery and binary-hypothesis-testing bounds (Can–Wilde 2026)",
+      "role": "one-shot operational recovery-fidelity comparator; use finite-size and support-aware bounds",
+      "not_a": "a black-hole gravitational model or a scalable quantum circuit"
+    }
+  ],
+  "references": [
+    {
+      "id": "page-1993",
+      "citation": "Page, Information in black hole radiation, Physical Review Letters 71 (1993) 3743",
+      "url": "https://doi.org/10.1103/PhysRevLett.71.3743",
+      "role": "Haar/Page entropy reference"
+    },
+    {
+      "id": "hayden-preskill-2007",
+      "citation": "Hayden and Preskill, Black holes as mirrors: quantum information in random subsystems, JHEP 09 (2007) 120",
+      "url": "https://arxiv.org/abs/0708.4025",
+      "role": "random-unitary decoding and scrambling"
+    },
+    {
+      "id": "harlow-2016",
+      "citation": "Harlow, Jerusalem lectures on black holes and quantum information, Reviews of Modern Physics 88 (2016) 015002",
+      "url": "https://doi.org/10.1103/RevModPhys.88.015002",
+      "role": "review and conceptual framework"
+    },
+    {
+      "id": "miyata-ugajin-2026",
+      "citation": "Miyata and Ugajin, Black hole interior and quantum error correction with dynamical gravity, JHEP (2026) 68",
+      "url": "https://doi.org/10.1007/JHEP08(2026)068",
+      "role": "dynamical-gravity QEC comparator"
+    },
+    {
+      "id": "zhong-2026",
+      "citation": "Zhong, An algebraic description of the Page transition, JHEP (2026) 160",
+      "url": "https://doi.org/10.1007/JHEP04(2026)160",
+      "role": "channel-recovery and algebraic formulation comparator"
+    },
+    {
+      "id": "corbeel-deharo-2026",
+      "citation": "Corbeel and De Haro, Black Holes are about Quantum Information, arXiv:2610.28185 (2026)",
+      "url": "https://arxiv.org/abs/2610.28185",
+      "role": "current review of Page, circuit models and Hayden-Preskill assumptions"
+    },
+    {
+      "id": "saha-finite-n-2026",
+      "citation": "Saha, Non-perturbative transitions in the island formula: A finite-N resolution of the Page curve kink, Physics Letters B 882 (2026) 140981",
+      "url": "https://doi.org/10.1016/j.physletb.2026.140981",
+      "role": "recent finite-N smoothing proposal; reproduce independently, not treated as universal ground truth"
+    },
+    {
+      "id": "can-wilde-petz-2026",
+      "citation": "Can and Wilde, One-shot entanglement generation and distillation via Petz recovery and binary hypothesis testing, arXiv:2610.31501 (22 October 2026)",
+      "url": "https://arxiv.org/abs/2610.31501",
+      "role": "one-shot Petz decoder fidelity bounds through binary hypothesis testing; general quantum-channel theory, not a black-hole model"
+    },
+    {
+      "id": "quimb-mps-docs",
+      "citation": "Quimb tensor-network and MPS circuit simulator documentation, current development documentation accessed 12 November 2026",
+      "url": "https://quimb.readthedocs.io/en/latest/autoapi/quimb/tensor/circuit/mps/index.html",
+      "role": "external MPS/TEBD implementation comparator with explicit bond dimension and truncation cutoffs"
+    },
+    "https://doi.org/10.1103/PhysRevResearch.7.023032",
+    "https://doi.org/10.3390/quantum8030090"
+  ],
+  "provenance": {
+    "code_refs": [
+      "crates/core/symthaea-core/src/hdc/quantum_circuit.rs",
+      "crates/core/symthaea-core/src/physics/quantum_gravity.rs",
+      "crates/domains/symthaea-continuum-physics/src/open_quantum.rs",
+      "crates/domains/symthaea-frontier-physics/src/dmrg.rs",
+      "crates/domains/symthaea-frontier-physics/src/tensor_networks.rs",
+      "crates/domains/symthaea-frontier-physics/src/quantum_darwinism.rs"
+    ],
+    "code_execution": "not_run",
+    "rust_tests": "authored_not_run",
+    "ci": {
+      "status": "not_verified_after_latest_source_changes",
+      "passed_check_runs": 0,
+      "failure_claimed": false
+    },
+    "results_claimed": false,
+    "independent_algorithm_cross_check": {
+      "status": "python_numpy_cross_check_only",
+      "method": "real_symmetric_embedding_plus_cyclic_jacobi_compared_with_numpy_linalg_eigvalsh",
+      "positive_density_matrix_dimensions": [
+        2,
+        4,
+        8,
+        16,
+        32,
+        64
+      ],
+      "maximum_observed_absolute_eigenvalue_difference": "<7e-16",
+      "rust_source_executed": false,
+      "statistical_cross_check": {
+        "status": "independent_numpy_replication_only",
+        "bipartition_dimensions": [
+          2,
+          8
+        ],
+        "sample_count": 4096,
+        "sample_mean_entropy_nats": 0.5994341731689636,
+        "page_theorem_mean_nats": 0.6003718503718503,
+        "sample_variance_nats_squared": 0.004913813626482819,
+        "standard_error_nats": 0.001095290614359053,
+        "normalized_mean_deviation": -0.8560990029439228,
+        "rust_sampler_executed": false
+      },
+      "random_circuit_comparator": {
+        "status": "python_numpy_reference_only",
+        "fixture": "crates/domains/symthaea-frontier-physics/benchmarks/fixtures/random_circuit_scrambling_v1.json",
+        "interpretation": "six-qubit 3+3 finite-depth test: 1D brickwork mean 0.89935 nats, all-to-all matching 1.40608 nats, Haar/Page mean 1.58853 nats; one small sample/seed ensemble only, no universal topology ranking",
+        "rust_source_executed": false
+      }
+    }
+  },
+  "implementation_progress": {
+    "source_status": "Rust 1.96 exact-head format, Clippy and focused frontier-physics tests passed at 79859caf77ff5b3214e8074fc8324d4bc5dfa615; re-confirmed after manifest-only update at c86955874e7c1b3324f153905770dff509a221b2",
+    "modules": [
+      "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs"
+    ],
+    "authored_capabilities": {
+      "QI-0_partial_trace_and_density_diagnostics": "authored_not_executed",
+      "QI-0_complex_hermitian_spectrum": "authored_not_executed",
+      "QI-0_von_neumann_entropy": "authored_not_executed",
+      "QI-0_renyi_2_and_3": "authored_not_executed",
+      "QI-1_complementary_subsystem_identity_controls": "authored_not_executed",
+      "QI-2_page_haar_average_reference_formula": "authored_not_executed",
+      "QI-2_seeded_haar_random_state_sampler_and_ensemble_statistics": "authored_not_executed",
+      "QI-3_seeded_local_and_all_to_all_random_two_qubit_scramblers": "partial_source_authored_not_executed",
+      "QI_3_U1_conserving_sequential_register_transfer": "source_authored_not_executed",
+      "QI_3_sequential_emission_energy_ledger": "source_authored_not_executed",
+      "QI_3_symmetry_resolved_Page_equilibrium_oracle": "source_authored_not_executed",
+      "QI_2S_symmetry_resolved_Page_oracle": "source_authored_not_executed",
+      "QI_2S_seeded_fixed_charge_Haar_sampler": "source_authored_not_executed",
+      "QI_3_U1_finite_depth_scrambling": "source_authored_not_executed",
+      "QI_3T_U1_domain_wall_transport": "source_authored_not_executed",
+      "QI_4A_single_emission_decoupling": "source_authored_not_executed",
+      "QI_4A_information_error_taxonomy": "source_authored_not_executed",
+      "QI_3O_U1_operator_spreading": "source_authored_not_executed",
+      "QI_3O_operator_error_taxonomy": "source_authored_not_executed",
+      "QI_3_sequential_product_state_initialization": "source_authored_not_executed",
+      "QI_4A_direct_decoupling_trace_distance": "source_authored_not_executed",
+      "QI_4A_quantum_Pinsker_consistency": "source_authored_not_executed",
+      "QI_3H_joint_U1_hydrodynamic_scrambling_analysis": "source_authored_tests_pending_rust_execution",
+      "QI_4P_one_step_Petz_recovery": "Rust 1.96 exact-head validated; five dedicated Petz tests passed",
+      "QI_4P_unregularized_Hermitian_inverse_square_root": "Rust 1.96 exact-head validated; independent NumPy eigensolver agreement also recorded",
+      "QI_4P_Petz_recovery_ensemble_statistics": "Rust 1.96 exact-head validated; independent-seed ensemble and uncertainty tests passed",
+      "QI_4P_identity_channel_analytic_control": "Rust 1.96 exact-head validated; identity channel entanglement fidelity 1 regression passed",
+      "QI_3_sequential_smaller_complementary_reduction": "source_authored_not_executed; only the smaller subsystem is materialized for each pure-state cut; complementary entropy and purity are reported via Schmidt-spectrum equality",
+      "QI_2S_unequal_block_analytic_control": "source_authored_not_executed; N=4 K=1 A=1 and A=3 return 11/24 nats",
+      "QI_4O_Petz_optimality_commutator_criterion": "source_authored_5_tests_added_runner_pending",
+      "QI_4O_QEC_matrix_and_auxiliary_T": "source_authored_independent_numpy_crosscheck_runner_pending",
+      "QI_4O_support_aware_QEC_square_root": "source_authored_not_executed",
+      "QI_3T_seed_jackknife_dynamic_exponent": "source_authored_not_executed",
+      "QI_4RP_rotated_Petz_recovery": "Rust_source_and_tests_passed_exact_head_847bff5a"
+    },
+    "not_implemented_or_not_qualified": {
+      "haar_state_sampler": "seeded_ChaCha20_complex_Gaussian_Haar_sampler_authored_not_executed",
+      "finite_depth_random_circuit_ensembles": "seeded_Haar_U4_brickwork_and_all_to_all_matching_source_authored_not_executed; sequential_evaporation_and_energy_conserving_variants_not_implemented",
+      "sequential_unitary_evaporation_model": "U(1)-conserving sequential factor-transfer source uses a seeded low-entanglement product state in a fixed Hamming-weight sector; only the smaller complementary subsystem is materialized under the 64-dimensional dense limit; Rust execution pending",
+      "hayden_preskill_recovery_decoders": "A one-step Petz recovery channel is implemented and exact-head Rust tested for the N=4 toy channel. Exact optimal SDP, rotated-Petz, charge-sector-resolved recovery, physical circuit synthesis, gate/depth cost, fault tolerance, and noisy/hardware decoder evaluation remain unimplemented.",
+      "mps_entropy_from_validated_schmidt_spectrum": "not_qualified",
+      "island_or_qes_calculation": "not_implemented",
+      "energy_conserving_circuits": "U(1)-conserving equal-gap qubit gate family and sequential factor-transfer toy model authored; Rust execution pending",
+      "QI_3H_thermodynamic_limit_scaling": "no cross-N finite-size scaling or thermodynamic-limit coefficient qualification yet",
+      "QI_4O_general_noncommuting_Petz_optimality": "not implemented; current theorem criterion uses rho=sigma=I/2 and commuting-state corollary only",
+      "exact_optimal_recovery_SDP": "not implemented; use the theorem criterion for cases it covers, and a separately qualified SDP/certified bound where it does not",
+      "rotated_Petz_ensemble": "not implemented",
+      "gate_level_quantum_decoder_cost": "not implemented",
+      "QI_4O_general_noncommuting_optimality": "The code tests only the commuting rho=sigma=I/2 corollary. The general theorem's positive-semidefinite B criterion for noncommuting rho,sigma remains unimplemented.",
+      "rotated_Petz_optimality": "the finite-t grid and Petz candidates are validated as CPTP recovery maps, but exact small-instance SDP/optimal recovery, optimal t selection and rotated-Petz averaging remain unimplemented"
+    },
+    "resource_limits": {
+      "dense_state_qubits_max": 20,
+      "dense_reduced_dimension_max": 64,
+      "page_harmonic_reference_total_dimension_max": 1048576,
+      "max_sequential_evaporation_qubits": 12
+    },
+    "runner_status": {
+      "latest_formatter_head": "497ee59652a1948c1e0fdc918ca848f86736ab18",
+      "formatter": "pinned Rust 1.96 rustfmt normalization succeeded",
+      "focused_rust_checks": "success at exact head c86955874e7c1b3324f153905770dff509a221b2: Rust 1.96 format pass, Clippy pass, 132 crate tests passed, 0 failed",
+      "test_inventory": {
+        "black_hole_information_authored_tests": 68,
+        "frontier_physics_crate_tests_passed": 132,
+        "petz_recovery_tests_passed": 5
+      },
+      "claim_ceiling": "No Rust build, Clippy pass, or Rust test pass is claimed at this head.",
+      "latest_source_head": "c86955874e7c1b3324f153905770dff509a221b2",
+      "last_green_source_head": "1bbb97c95a21b9024c181c6c519bd252463580bf",
+      "last_green_focused_job": "43232825852",
+      "last_green_frontier_physics_tests": "127 passed; 0 failed at the prior exact head; does not cover the five new Petz tests",
+      "latest_focused_run": "43259393357",
+      "latest_focused_job": "131326291486",
+      "pending_QI_4O_tests": 5
+    },
+    "claim_ceiling": "The one-step Petz recovery map is a mathematically explicit finite-dimensional channel A=E tensor R -> Mhat. A theorem-backed commutator test now evaluates whether it is entanglement-fidelity optimal for the maximally-mixed toy channel. Neither result establishes an efficient quantum circuit, larger-scale black-hole recovery, fault tolerance, or QES/island physics."
+  },
+  "benchmark_policy": {
+    "claim_boundary": "Petz recovery fidelity, Haar/Page equilibrium, finite-depth scrambling, U(1) transport and gravitational QES/island calculations are distinct model classes. A successful recovery toy model is not an evaporation result.",
+    "separate_entropy_from_reconstruction_support": true,
+    "hardware_comparison_requires_matched_circuit_noise_and_measurement": true,
+    "no_decoder_cost_claim_from_Petz_channel_fidelity": true,
+    "current_dense_simulation_scale_ceiling": "Use each backend's explicit resource ceiling; current dense domain-wall and reduced-density paths are not a matched N=20 stabilizer benchmark."
+  },
+  "competitive_reference_map": [
+    {
+      "system": "Hayden-Preskill recovery and OTOC measurements on 20-qubit trapped-ion quantum processors (Phys. Rev. Research 7, 023032, 10 April 2025)",
+      "reference": "https://doi.org/10.1103/PhysRevResearch.7.023032",
+      "strength": "Experimental implementation of a Hayden-Preskill recovery protocol and interferometric OTOC measurement on a 20-qubit trapped-ion processor using a geometrically local kicked-Ising circuit.",
+      "matched_comparison": "Use the same circuit family, message/reference placement, accessible radiation, OTOC operator convention and noise assumptions before comparing recovery signal, OTOC decay/front, circuit depth and shot cost.",
+      "symthaea_position": "Our current Petz result is a four-qubit classical channel simulation, not a hardware result. The 20-qubit experiment is a hardware-facing scale target; do not compare raw qubit count without matching dynamics, noise, readout and observable definitions.",
+      "status": "published experimental reference; matched replication not implemented"
+    },
+    {
+      "system": "Reconstruction Support and Island Dominance in Black-Hole Information Recovery (Quantum Reports 8(3), 90, published 6 September 2026)",
+      "reference": "https://doi.org/10.3390/quantum8030090",
+      "strength": "Separates QES/Page-entropy saddle dominance from operational reconstruction support and decoder implementation cost; reports a random-Clifford evaporation study at N=12,16,20 with 256 seeded realizations per size/ensemble.",
+      "matched_comparison": "Compare entropy Page-transition location, reference-qubit correlations, stricter decoupling, multipartite correlation diagnostics and actual decoder support/fidelity as distinct measurements. Keep QES/entropy saddle claims separate from operational reconstruction.",
+      "symthaea_position": "Our current dense state-vector and Petz baselines are smaller and use different ensembles. Add a stabilizer/tensor-network path before claiming a matched N=12,16,20 replication or scaling advantage.",
+      "status": "published 2026 reference; matched replication not implemented"
+    }
+  ]
+}

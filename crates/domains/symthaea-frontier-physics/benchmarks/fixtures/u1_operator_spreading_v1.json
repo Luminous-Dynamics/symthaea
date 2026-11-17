@@ -1,0 +1,178 @@
+{
+  "schema": "luminous.black_hole_information.u1_operator_spreading.v1",
+  "status": "independent_numpy_full_matrix_comparator; Rust source authored; Rust execution pending",
+  "claim_ceiling": "Finite-dimensional operator spreading under a declared U(1)-conserving random circuit. Squared commutators quantify operator influence for the chosen probes; they do not demonstrate message recovery, efficient decoding, black-hole evaporation, or thermalization.",
+  "model": {
+    "number_of_qubits": 6,
+    "source_qubit": 2,
+    "initial_operator": "Pauli X at site 2, identity on all other sites",
+    "circuit": "nearest-neighbour 1D brickwork with independent Haar U(1) x U(2) x U(1) two-qubit gates",
+    "operator_convention": "O <- U O U^dagger in circuit application order",
+    "observable_convention": "C_V(j,t) = ||[O(t),V_j]||_F^2 / (2*2^N), with V_j in {X_j,Z_j}",
+    "normalized_range": [
+      0,
+      2
+    ],
+    "seed_schedule": {
+      "first_seed_hex": "0x07C0",
+      "sample_count": 16,
+      "rule": "seed = first_seed + sample_index"
+    },
+    "time_unit": "brickwork matching layers"
+  },
+  "independent_numpy_comparator": {
+    "implementation": "full 2^N x 2^N complex operator matrices, explicit embedded local U(1) gates, dense matrix conjugation O <- U O U^dagger, Frobenius commutators and normalized Hilbert-Schmidt norm",
+    "first_seed_sample": {
+      "seed_hex": "0x07C0",
+      "depth": 8,
+      "operator_norm_squared": 0.9999999999999998,
+      "squared_commutator_z": [
+        0.7641083637020759,
+        0.9111879265052546,
+        0.8839515666703626,
+        0.9235803286382698,
+        1.0143408809726295,
+        0.794204283248497
+      ],
+      "squared_commutator_x": [
+        1.0881579900369232,
+        0.9234947436625573,
+        1.0971845950224952,
+        1.0540583734755065,
+        0.9926964552760146,
+        0.9039332757935152
+      ]
+    },
+    "ensemble_summary_by_depth": {
+      "0": {
+        "mean_C_Z": [
+          0,
+          0,
+          2,
+          0,
+          0,
+          0
+        ],
+        "mean_C_X": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "max_operator_norm_drift": 0
+      },
+      "1": {
+        "mean_C_Z": [
+          0,
+          0,
+          0.7332019191047491,
+          1.2667980808952506,
+          0,
+          0
+        ],
+        "mean_C_X": [
+          0,
+          0,
+          0.7747753827582619,
+          1.176853570981771,
+          0,
+          0
+        ],
+        "max_operator_norm_drift": 8.881784197001252e-16
+      },
+      "2": {
+        "mean_C_Z": [
+          0,
+          0.4986118578041438,
+          0.5436192066749066,
+          0.609919191687906,
+          0.9971859006592012,
+          0
+        ],
+        "mean_C_X": [
+          0,
+          0.5686273056385857,
+          0.5919050222064631,
+          0.9539509684460378,
+          0.9552868330293395,
+          0
+        ],
+        "max_operator_norm_drift": 1.4432899320127035e-15
+      },
+      "4": {
+        "mean_C_Z": [
+          0.34007549982647234,
+          0.6958759438370733,
+          0.7123645898707874,
+          0.8524099771089529,
+          0.8279401542604925,
+          0.5481932783540574
+        ],
+        "mean_C_X": [
+          0.3890152907522494,
+          0.7416565752859008,
+          0.8248343607576543,
+          0.888065088039969,
+          0.953713679582064,
+          0.6276368794557833
+        ],
+        "max_operator_norm_drift": 1.9984014443252818e-15
+      },
+      "8": {
+        "mean_C_Z": [
+          0.6078030441955526,
+          0.8229644701953535,
+          0.7726473992171675,
+          0.8753980340753279,
+          0.8503285295943513,
+          0.8150966556354191
+        ],
+        "mean_C_X": [
+          0.7271958357449901,
+          0.9200311108650436,
+          0.9092081005697693,
+          0.9450155820737842,
+          0.9868366636864897,
+          0.9260226867485324
+        ],
+        "max_operator_norm_drift": 1.9984014443252818e-15
+      },
+      "16": {
+        "mean_C_Z": [
+          0.8734280238835206,
+          0.8824581738645815,
+          0.8717785443917454,
+          0.8875641960743824,
+          0.8618041546033325,
+          0.8954349931493946
+        ],
+        "mean_C_X": [
+          0.9690250906293536,
+          0.987159490697723,
+          1.0039742241938607,
+          0.985025021720169,
+          0.9921720126937205,
+          1.0046291937627232
+        ],
+        "max_operator_norm_drift": 3.9968028886505635e-15
+      }
+    },
+    "caveat": "Independent NumPy PRNG and QR gate implementation. These are ensemble comparators, not bitwise outputs for the Rust ChaCha20 sequence."
+  },
+  "rust_contract": {
+    "api": "simulate_u1_operator_spreading",
+    "source": "crates/domains/symthaea-frontier-physics/src/black_hole_information.rs",
+    "tests_authored": 3,
+    "dense_operator_qubit_limit": 8,
+    "status": "source_authored_not_executed"
+  },
+  "interpretation": [
+    "At depth zero, the local X operator anticommutes with Z at its source (normalized C_Z=2), and commutes with all other local X/Z probes.",
+    "Under the U(1)-conserving brickwork circuit, the probe commutator profiles spread across the chain while the operator Hilbert-Schmidt norm remains conserved.",
+    "This provides an independent operator-growth measurement alongside state entanglement entropy and domain-wall charge transport.",
+    "The six-site, 16-seed comparator is not an asymptotic front-velocity or thermalization result."
+  ],
+  "required_next_step": "Extend to independent size/depth/seed sweeps and compare the operator front to charge-density hydrodynamics; do not infer recovery or decoder efficiency from OTOCs alone."
+}

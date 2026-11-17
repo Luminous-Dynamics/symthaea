@@ -1,0 +1,114 @@
+{
+  "schema": "luminous.black_hole_information.random_circuit_scrambling.v1",
+  "status": "benchmark_contract_authored_rust_not_executed",
+  "observable": "von_neumann_entropy_of_reduced_subsystem_A_nats",
+  "state_convention": "pure_state_vector_msb_first",
+  "gate_ensemble": "independent_Haar_random_U4_from_complex_Ginibre_gram_schmidt",
+  "gate_basis": [
+    "00",
+    "01",
+    "10",
+    "11"
+  ],
+  "circuit_topologies": {
+    "brickwork_1d": "alternate even and odd nearest-neighbour pair matchings",
+    "all_to_all_matching": "fresh seeded random disjoint matching of qubit pairs per layer"
+  },
+  "negative_controls": [
+    "depth_zero_preserves_product_state_entropy_zero_and_purity_one",
+    "every_gate_unitary_residual_below_1e-12",
+    "state_norm_drift_below_1e-10",
+    "seed_reproducibility_exact",
+    "partial_trace_retained_qubit_order_frozen"
+  ],
+  "cases": [
+    {
+      "id": "RC-001",
+      "qubits": 6,
+      "depth": 0,
+      "topology": "brickwork_1d",
+      "retained_qubits": [
+        0,
+        1,
+        2
+      ],
+      "seed": 42,
+      "expected_entropy_nats": 0,
+      "expected_purity": 1
+    },
+    {
+      "id": "RC-002",
+      "qubits": 6,
+      "depth": 0,
+      "topology": "all_to_all_matching",
+      "retained_qubits": [
+        0,
+        1,
+        2
+      ],
+      "seed": 42,
+      "expected_entropy_nats": 0,
+      "expected_purity": 1
+    },
+    {
+      "id": "RC-003",
+      "qubits": 6,
+      "depth": 4,
+      "topology": "brickwork_1d",
+      "retained_qubits": [
+        0,
+        1,
+        2
+      ],
+      "seed": 100,
+      "sampling_policy": "repeat over seeds 100..115"
+    },
+    {
+      "id": "RC-004",
+      "qubits": 6,
+      "depth": 4,
+      "topology": "all_to_all_matching",
+      "retained_qubits": [
+        0,
+        1,
+        2
+      ],
+      "seed": 100,
+      "sampling_policy": "repeat over seeds 100..115"
+    }
+  ],
+  "exact_haar_reference": {
+    "subsystem_dimensions": [
+      8,
+      8
+    ],
+    "mean_von_neumann_entropy_nats": 1.5885337608486263,
+    "formula": "H_(mn)-H_max(m,n)-(min(m,n)-1)/(2*max(m,n))",
+    "note": "finite-depth random circuits are compared against this ensemble reference; they are not assumed to have reached Haar equilibrium"
+  },
+  "independent_python_comparator": {
+    "status": "python_reference_only_not_rust_execution",
+    "method": "independent NumPy complex-Gaussian Haar U(4) gates, 16 independent seeds per topology",
+    "qubits": 6,
+    "depth": 4,
+    "subsystem_dimensions": [
+      8,
+      8
+    ],
+    "sample_count_per_topology": 16,
+    "brickwork_1d": {
+      "mean_entropy_nats": 0.8993544522319825,
+      "sample_variance_nats_squared": 0.01841622159184285,
+      "standard_error_nats": 0.03392659501762855,
+      "standardized_deviation_from_haar_mean": -20.313836630482378
+    },
+    "all_to_all_matching": {
+      "mean_entropy_nats": 1.4060796773299906,
+      "sample_variance_nats_squared": 0.02536044763243011,
+      "standard_error_nats": 0.0398124098369702,
+      "standardized_deviation_from_haar_mean": -4.582844501645992
+    },
+    "interpretation": "At this finite depth and register size the chosen all-to-all ensemble scrambles the half-register more than the local brickwork ensemble; neither has equilibrated to the Haar/Page mean. This is one small-system comparator, not a universal topology ranking."
+  },
+  "claim_ceiling": "This benchmark measures finite-depth random-unitary circuit entanglement. It is not an evaporation model, a physical black-hole Hamiltonian, a gravitational Page curve, an island/QES computation, or evidence resolving the information problem."
+}

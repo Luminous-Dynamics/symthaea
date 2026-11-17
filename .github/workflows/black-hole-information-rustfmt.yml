@@ -1,0 +1,51 @@
+name: Black-hole information rustfmt normalization
+
+on:
+  push:
+    branches:
+      - research/bh-info-page-curve-benchmark
+    paths:
+      - crates/domains/symthaea-frontier-physics/src/black_hole_information.rs
+      - crates/domains/symthaea-frontier-physics/Cargo.toml
+      - Cargo.toml
+      - Cargo.lock
+      - .github/workflows/black-hole-information-rustfmt.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: black-hole-information-rustfmt-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  normalize:
+    name: Apply pinned rustfmt to black-hole information module
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: research/bh-info-page-curve-benchmark
+          fetch-depth: 0
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.96.0
+          components: rustfmt
+      - name: Resolve and record the workspace lockfile
+        run: cargo metadata --manifest-path crates/domains/symthaea-frontier-physics/Cargo.toml --format-version 1 > /dev/null
+      - name: Format scoped Rust module
+        run: rustfmt --edition 2024 crates/domains/symthaea-frontier-physics/src/black_hole_information.rs
+      - name: Commit formatter output
+        run: |
+          FILE=crates/domains/symthaea-frontier-physics/src/black_hole_information.rs
+          if git diff --quiet -- Cargo.lock "$FILE"; then
+            echo "Black-hole information module is already rustfmt-normalized."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Cargo.lock "$FILE"
+          git commit -m "style(black-hole): apply pinned rustfmt to information module"
+          git pull --rebase origin research/bh-info-page-curve-benchmark
+          git push origin HEAD:research/bh-info-page-curve-benchmark
