@@ -401,7 +401,7 @@ mod tests {
             .map(|value| value as f32 * 0.125 - 1.0)
             .collect();
         let goal = decode_action(&flat).unwrap();
-        assert_eq!(encode_action(&goal), flat.as_slice());
+        assert_eq!(encode_action(&goal).as_slice(), flat.as_slice());
     }
 
     #[test]
