@@ -412,6 +412,35 @@ mod tests {
     }
 
     #[test]
+    fn arxiv_only_source_identifier_is_accepted() {
+        let (schema, registry) = committed_inputs();
+        let value: Value = serde_json::from_slice(&registry).unwrap();
+        let auto = value["source_register"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|source| source["source_id"] == "autosupercon_2026")
+            .unwrap();
+        assert!(auto.get("arxiv_id").is_some());
+        assert!(auto.get("doi").is_none());
+        assert!(audit_registry(&schema, &registry).is_ok());
+    }
+
+    #[test]
+    fn source_without_doi_or_arxiv_id_fails_schema_validation() {
+        let (schema, registry) = committed_inputs();
+        let mut value: Value = serde_json::from_slice(&registry).unwrap();
+        let sources = value["source_register"].as_array_mut().unwrap();
+        let auto = sources
+            .iter_mut()
+            .find(|source| source["source_id"] == "autosupercon_2026")
+            .unwrap();
+        auto.as_object_mut().unwrap().remove("arxiv_id");
+        let mutated = serde_json::to_vec(&value).unwrap();
+        assert!(audit_registry(&schema, &mutated).is_err());
+    }
+
+    #[test]
     fn external_schema_references_are_refused() {
         let schema = json!({
             "$schema": "https://json-schema.org/draft/2020-12/schema",
