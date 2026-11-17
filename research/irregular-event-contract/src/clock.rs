@@ -126,6 +126,85 @@ impl MappedExclusiveWatermark {
     }
 }
 
+/// Relationship between a mapped event-time interval and a mapped exclusive
+/// watermark interval. Ambiguity is explicit: interval overlap is never forced
+/// into an on-time/late binary classification.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum EventWatermarkOrdering {
+    /// Every possible event time is strictly before every possible watermark.
+    DefinitelyLate,
+    /// Every possible event time is at or after every possible watermark.
+    DefinitelyNotLate,
+    /// The uncertainty intervals overlap and do not establish an ordering.
+    Ambiguous,
+}
+
+/// Non-forgeable comparison preserving both mapped intervals and their
+/// calibration identities. Consumers must not discard an Ambiguous outcome.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct EventWatermarkComparisonV1 {
+    ordering: EventWatermarkOrdering,
+    event_time: MappedClockTime,
+    watermark: MappedExclusiveWatermark,
+}
+
+impl EventWatermarkComparisonV1 {
+    pub fn ordering(&self) -> EventWatermarkOrdering {
+        self.ordering
+    }
+
+    pub fn event_time(&self) -> MappedClockTime {
+        self.event_time
+    }
+
+    pub fn watermark(&self) -> MappedExclusiveWatermark {
+        self.watermark
+    }
+}
+
+/// Compare an uncertain mapped event timestamp against an uncertain mapped
+/// exclusive watermark.
+///
+/// If both values use the same source clock and exact calibration revision,
+/// monotonicity lets us compare their source-local coordinates directly. For
+/// different source clocks or calibration revisions, only disjoint mapped
+/// intervals establish an ordering. Overlap returns Ambiguous, because
+/// choosing either endpoint or midpoint could invent lateness/timeliness.
+pub fn compare_event_time_to_exclusive_watermark(
+    event_time: MappedClockTime,
+    watermark: MappedExclusiveWatermark,
+) -> Result<EventWatermarkComparisonV1, ClockCalibrationError> {
+    if event_time.reference_domain != watermark.reference_domain {
+        return Err(ClockCalibrationError::ReferenceDomainMismatch {
+            expected: watermark.reference_domain,
+            actual: event_time.reference_domain,
+        });
+    }
+
+    let ordering = if event_time.source_domain == watermark.source_domain
+        && event_time.calibration_id == watermark.calibration_id
+        && event_time.calibration_sha256 == watermark.calibration_sha256
+    {
+        if event_time.source_time_us < watermark.source_exclusive_watermark_us {
+            EventWatermarkOrdering::DefinitelyLate
+        } else {
+            EventWatermarkOrdering::DefinitelyNotLate
+        }
+    } else if event_time.latest_reference_us < watermark.earliest_reference_bound_us {
+        EventWatermarkOrdering::DefinitelyLate
+    } else if event_time.earliest_reference_us >= watermark.latest_reference_bound_us {
+        EventWatermarkOrdering::DefinitelyNotLate
+    } else {
+        EventWatermarkOrdering::Ambiguous
+    };
+
+    Ok(EventWatermarkComparisonV1 {
+        ordering,
+        event_time,
+        watermark,
+    })
+}
+
 /// Conservative meet of mapped exclusive watermarks from all required
 /// sources, expressed in exactly one reference clock domain.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -683,6 +762,72 @@ mod tests {
             recorded_at_knowledge_us: 100,
             policy_sha256: [0xA5; 32],
         }
+    }
+
+    #[test]
+    fn same_calibration_preserves_exclusive_watermark_equality_semantics() {
+        let clock = calibration();
+        let equal_event = clock.map_time(ClockDomainId(1), 1_000, 100).unwrap();
+        let watermark = clock.map_exclusive_watermark(1_000, 100).unwrap();
+        let equal = compare_event_time_to_exclusive_watermark(equal_event, watermark).unwrap();
+        assert_eq!(equal.ordering(), EventWatermarkOrdering::DefinitelyNotLate);
+        assert_eq!(equal.event_time().calibration_sha256(), watermark.calibration_sha256());
+
+        let earlier_event = clock.map_time(ClockDomainId(1), 999, 100).unwrap();
+        let earlier =
+            compare_event_time_to_exclusive_watermark(earlier_event, watermark).unwrap();
+        assert_eq!(earlier.ordering(), EventWatermarkOrdering::DefinitelyLate);
+    }
+
+    #[test]
+    fn different_calibration_intervals_produce_definite_or_ambiguous_ordering() {
+        let first = calibration();
+        let watermark = first.map_exclusive_watermark(1_000, 100).unwrap();
+
+        let earlier_event = first.map_time(ClockDomainId(1), 900, 100).unwrap();
+        assert_eq!(
+            compare_event_time_to_exclusive_watermark(earlier_event, watermark)
+                .unwrap()
+                .ordering(),
+            EventWatermarkOrdering::DefinitelyLate
+        );
+
+        let later_event = first.map_time(ClockDomainId(1), 1_100, 100).unwrap();
+        assert_eq!(
+            compare_event_time_to_exclusive_watermark(later_event, watermark)
+                .unwrap()
+                .ordering(),
+            EventWatermarkOrdering::DefinitelyNotLate
+        );
+
+        let mut revised = calibration();
+        revised.calibration_id = 8;
+        revised.offset_lower_us = -5;
+        revised.offset_upper_us = 5;
+        let uncertain_event = revised.map_time(ClockDomainId(1), 1_000, 100).unwrap();
+        let comparison =
+            compare_event_time_to_exclusive_watermark(uncertain_event, watermark).unwrap();
+        assert_eq!(comparison.ordering(), EventWatermarkOrdering::Ambiguous);
+        assert_eq!(comparison.event_time().calibration_id(), 8);
+        assert_eq!(comparison.watermark().calibration_id(), 7);
+    }
+
+    #[test]
+    fn mapped_event_and_watermark_must_share_reference_domain() {
+        let event = calibration()
+            .map_time(ClockDomainId(1), 1_000, 100)
+            .unwrap();
+        let mut other_clock = calibration();
+        other_clock.reference_domain = ClockDomainId(3);
+        let watermark = other_clock.map_exclusive_watermark(1_000, 100).unwrap();
+
+        assert_eq!(
+            compare_event_time_to_exclusive_watermark(event, watermark),
+            Err(ClockCalibrationError::ReferenceDomainMismatch {
+                expected: ClockDomainId(3),
+                actual: ClockDomainId(2),
+            })
+        );
     }
 
     #[test]
