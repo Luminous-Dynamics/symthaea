@@ -770,16 +770,21 @@ mod tests {
         assert!(result.contains("persistence"));
         assert!(result.contains("mean"));
         assert!(result.contains("skill_vs_persistence"));
-        assert!(result.contains(",ok,"));
+        assert!(result.contains(",ok\\n"));
     }
 
     #[test]
     fn constant_channels_are_not_misreported_as_successful_forecasts() {
         let values: Vec<f64> = (0..120).map(|index| (index as f64 * 0.07).sin()).collect();
         let result = evaluate_fixture_csv(&csv_for(&values)).unwrap();
-        assert!(result.contains("ar_fixture,known_regime,y,none,,,,"));
-        assert!(result.contains("constant_or_unscaled_channel"));
-        assert!(result.contains("ar_fixture,known_regime,z,none,,,,"));
+        assert!(result.lines().any(|line| {
+            line.starts_with("ar_fixture,known_regime,y,none,")
+                && line.ends_with("constant_or_unscaled_channel")
+        }));
+        assert!(result.lines().any(|line| {
+            line.starts_with("ar_fixture,known_regime,z,none,")
+                && line.ends_with("constant_or_unscaled_channel")
+        }));
     }
 
     #[test]
