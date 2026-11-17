@@ -330,6 +330,68 @@ Sources:
 **Matched baseline addition:** include ULTRA's released G1 controller, where checkpoint, data rights and runtime can be qualified, as an independent learned whole-body baseline. Compare it against the existing Symthaea hierarchy on matched G1 tasks and sensors, then compare both with and without the same HLB/agentic skill executive. Keep controller policy, planner, sensor access and safety stack factors separable. If full reproduction is not feasible, record ULTRA as a paper/project reference and mark the runtime baseline unavailable rather than substituting a different policy.
 
 
+
+## 3E. Physical humanoid frontier and the capability-transition insight (17 November 2026)
+
+### Industry and research frontier
+
+| System | Public evidence as of 17 Nov 2026 | Proper comparison and caveat |
+|---|---|---|
+| Figure Helix 2.5 | Figure reports one Index-pretrained foundation model adapted to three whole-body behaviors (living-room tidy, towel folding, bed making) and evaluated with a fixed checkpoint in 30 unseen Bay Area homes. The company reports 56% zero-shot task success versus 9% from scratch with the same task-specific data. | A strong real-humanoid generalization reference. "Zero-shot" means no data/fine-tuning in evaluation homes or manipulated objects; the behaviors were specified with task data collected elsewhere. It is a vendor report, not a HumanoidToolBench tool-use score. |
+| Gemini Robotics 2.5 + Apptronik Apollo 2 | Google DeepMind reports evaluation across 200+ distinct tasks and a 96% success rate in a Mercedes-Benz automotive-kitting proof-of-concept using Apollo 2. Its described system pairs Gemini Robotics ER for workflow reasoning with Gemini Robotics 2.5 for hand/arm actions. | A valuable industrial reliability reference, but the 96% is for one partner pilot/task definition, not universal humanoid capability or an independent benchmark. Vendor/partner-reported. |
+| ULTRA (IROS 2026) | Unified multimodal whole-body controller evaluated in simulation and on a real Unitree G1, supporting dense reference tracking and sparse goal-conditioned loco-manipulation from egocentric inputs. | Direct G1 controller baseline; no comparable HumanoidToolBench aggregate score is published in its project/paper summary. |
+| HumanoidToolBench | 18 tasks, 55 tool assets, 3,094 trajectories (3,003 simulation and 91 real-G1 demonstrations); seven policies in simulation and three on G1. | Direct tool selection/use benchmark. Separate selection, stationary use, mobile use, standard/decoy conditions and event markers. |
+| AMP1 / RoboLab-120 | Live NVIDIA snapshot lists AMP1 at 86.0% ±2.5 pp (2,579/3,000, 25 episodes/task); next listed SenseNova-RoboRSI is 57.1% ±5.7 pp (685/1,200, 10 episodes/task). | Agent-as-policy benchmark reference, not a humanoid or physical G1 tool-use result. Episode denominators differ; do not treat row rank as a paired significance test. |
+
+Sources: [Figure Helix 2.5](https://www.figure.ai/news/helix-2-5-zero-shot-30-home-generalization), [Google DeepMind Gemini Robotics 2.5](https://deepmind.google/blog/gemini-robotics-2-5-accelerates-real-world-physical-intelligence/), [ULTRA](https://ultrahumanoid.github.io/), [ULTRA paper](https://arxiv.org/abs/2603.03279), [HumanoidToolBench](https://arxiv.org/abs/2610.02089), [NVIDIA RoboLab leaderboard](https://research.nvidia.com/labs/srl/projects/robolab/leaderboard.html).
+
+All headline numbers above refer to different task distributions, checkpoints, embodiments, trial counts and evaluation protocols. They are a portfolio of capability references, not a single cross-system ranking. The commercial reports are vendor-reported; independently reproduce exact protocols before making superiority claims.
+
+### HumanoidToolBench exposes a deeper failure than tool recognition
+
+The benchmark explicitly logs five events: candidate contact, correct first contact, correct-tool lift, tool-target contact and terminal task success. It separates L0 selection/pickup, L1 stationary use and L2 mobile use, and includes decoy sets. The robot is a Unitree G1 with 29 body joints, Dex3 hands and a head camera; lower-body locomotion components are executed by pretrained GR00T Balance/Walk controllers. Consequently, this benchmark measures a coupled policy-plus-controller system, not an isolated policy that learns all locomotion from scratch.
+
+A useful public result from the benchmark analysis: FastWAM's standard BallMove success falls from 76% in L1 to 9% in L2. The paper reports an L1-to-L2 decline for every policy with non-zero L1 success, but L2 also changes target layout; this does not isolate locomotion as the sole cause. Secondary extraction of the paper's event table reports that, averaged over L1/L2 and the three scenarios in standard mode, FastWAM contacts a candidate in 99.8% of episodes, lifts the suitable tool in 89.2%, contacts the target in 88.2%, but completes only 52.8%; GR00T N1.7 reports 99.7%, 90.0%, 79.8% and 36.0% for those same stages. These aggregate values are not a strict sequential funnel, and the averages hide task-cell differences.
+
+Sources: [primary paper](https://arxiv.org/abs/2610.02089), [paper table/event analysis](https://www.alphaxiv.org/abs/2610.02089v1), [secondary event-table extraction](https://mekawire.com/papers/humanoidtoolbench-benchmarking-humanoid-tool-use-from-selection-to-mob-2610-02089).
+
+### Paradigm shift: evaluate the capability transition graph, not only terminal success
+
+A single binary success score cannot distinguish a perception failure from a grasp failure, tool-orientation error, failed physical interaction, mobility problem or failure to verify the actual task outcome. Preserve the five event timestamps/occurrence markers and derive a per-episode transition graph:
+
+```text
+candidate contact
+       |
+correct first contact
+       |
+correct-tool lift
+       |
+tool-target contact
+       |
+verified task completion
+```
+
+This is an analysis graph, not an assumption that events always form a strict funnel. Retain event ordering, repeated contacts, missing instrumentation and out-of-order recovery actions. Compute, per task cell and split:
+
+- event incidence among episodes where that event was actually instrumented;
+- event-to-event conversion conditional on both events being captured;
+- time from event to next event and total task time;
+- stage-specific failure / recovery cause;
+- intervention, regrasp, reorientation, reposition and retry cost;
+- decoy penalty and held-out tool-property generalization;
+- L1/L2 paired difference, with layout and route-distance changes exposed as confounders.
+
+The new controller hypothesis is stage-conditioned intervention: HLB should infer *which transition is failing* and select the least-cost, risk-bounded next action. Wrong first contact should trigger reinspection or affordance probing; correct lift without target contact should trigger grasp/tool-frame reorientation or whole-body repositioning; target contact without completion should trigger contact/load prediction and a bounded adjustment; L1-to-L2 degradation should trigger explicit carrying, balance, route and tool-frame reasoning. The low-level whole-body and safety layers remain independent.
+
+### New prospective targets — not current results
+
+1. Reduce the largest preregistered stage-transition failure rate by at least 30% relative to the strongest matched baseline, without degrading earlier event quality or safety.
+2. Close at least 30% of the paired L1-to-L2 success gap on the same task families, using a controlled extension that separates locomotion demand from target-layout changes.
+3. Achieve at least 2× the strongest baseline in the weakest held-out mobile/decoy task cell, with confidence intervals and all 18 cells reported.
+4. Preserve zero false success/false task-completion acceptance in frozen negative controls; task completion must be independently verified rather than inferred from tool-target contact alone.
+
+These goals are prospective. They should be frozen only after exact upstream policy/checkpoint, episode seeds, controller version, task geometry, event instrumentation and statistical power are pinned.
+
 ## 4. Matched baseline ladder
 
 Evaluate the following arms only when the exact artifact and interface are available:
