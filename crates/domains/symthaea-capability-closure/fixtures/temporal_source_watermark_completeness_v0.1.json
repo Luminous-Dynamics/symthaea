@@ -219,6 +219,12 @@
       "name": "mapped-event-watermark-reference-domain-mismatch",
       "expect": "reject",
       "safety": "no_cross-clock-comparison_without_common_reference"
+    },
+    {
+      "id": "WM-025",
+      "name": "indexed_breach_result_matches_independent_linear_scan",
+      "expect": "exact_ordered_breach_receipt_equality_before_timing",
+      "safety": "index_speed_claim_is_tied_to_independent_scan_oracle"
     }
   ],
   "metrics": {
@@ -251,7 +257,11 @@
       "verified_report_ledger_digest_mismatch_count",
       "verified_report_record_count_mismatch_count",
       "verified_report_ledger_digest_mismatch_count",
-      "verified_report_record_count_mismatch_count"
+      "verified_report_record_count_mismatch_count",
+      "linear_scan_breach_query_p50_p95_p99_us",
+      "linear_scan_receipt_count",
+      "indexed_vs_linear_scan_breach_mismatch_count",
+      "indexed_vs_linear_scan_speedup"
     ]
   },
   "qualification_targets": {
@@ -291,7 +301,9 @@
       "known_at_us",
       "indexed_event_time_buckets_visited",
       "indexed_receipt_candidates_examined",
+      "scan_receipts_examined",
       "matching_breaches",
+      "scan_p50_p95_p99_us",
       "indexed_p50_p95_p99_us",
       "verified_p50_us",
       "verified_max_us",
@@ -300,8 +312,8 @@
       "verified_event_arrival_count",
       "verified_late_breach_count"
     ],
-    "known_answer": "indexed_report_equals_verified_receipt.report; verified_receipt.ledger_sha256_equals_current_ledger_state_sha256",
-    "correctness_gate": "exact_report_equality_and_current_ledger_digest_match_before_timing",
+    "known_answer": "indexed_report_equals_verified_receipt.report; indexed_late_breaches_equals_linear_scan_breaches; verified_receipt.ledger_sha256_equals_current_ledger_state_sha256",
+    "correctness_gate": "exact_indexed_verified_report_equality_and_indexed_linear_scan_breach_set_equality_and_current_ledger_digest_match_before_timing",
     "measurement_boundary": "in_memory_release_build_cpu_query_and_replay_time_only",
     "energy_measurement": "not_measured",
     "source_counts": [
@@ -328,13 +340,14 @@
     ],
     "availability_time": "equal_to_each_event_arrival_transaction_and_after_generated_event_time",
     "event_time": "zero_based_per_source_permuted_microsecond_values_below_declared_watermark",
-    "statistical_note": "51 indexed timing samples report nearest-rank p50/p95/p99; 15 full replay samples report median and observed maximum only",
+    "statistical_note": "51 indexed and 31 linear-scan timing samples report nearest-rank p50/p95/p99; 15 full replay samples report median and observed maximum only",
     "late_rate_basis_points": [
       0,
       100,
       5000,
       10000
-    ]
+    ],
+    "scan_query_repetitions": 31
   },
   "clock_calibration_contract": {
     "module": "research/irregular-event-contract/src/clock.rs",
