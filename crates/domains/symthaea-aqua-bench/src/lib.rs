@@ -378,11 +378,7 @@ mod tests {
         let mut candidate = run("candidate-001", "aqua-test-article", '8');
         candidate.conditions.delivery_conditions_sha256 = digest('9');
         assert_eq!(
-            validate_matched_comparison(
-                &control,
-                &candidate,
-                ComparisonScope::WaterServiceOnly,
-            ),
+            validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly,),
             Err(ContractError::ContextMismatch {
                 field: "delivery_conditions_sha256",
             })
@@ -459,11 +455,7 @@ mod tests {
     fn rejects_comparing_a_run_to_itself() {
         let candidate = run("same-run", "aqua-test-article", '8');
         assert_eq!(
-            validate_matched_comparison(
-                &candidate,
-                &candidate,
-                ComparisonScope::WaterServiceOnly,
-            ),
+            validate_matched_comparison(&candidate, &candidate, ComparisonScope::WaterServiceOnly,),
             Err(ContractError::SameRunCompared)
         );
     }
