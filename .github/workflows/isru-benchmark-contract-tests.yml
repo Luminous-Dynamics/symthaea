@@ -14,6 +14,7 @@ on:
       - 'docs/research/OPTICAL_ISRU_SEALED_AUTONOMOUS_SCIENCE_BENCHMARK_V0_1.md'
       - 'docs/research/OPTICAL_ISRU_B1_DIGITAL_TWIN_AND_DYNAMIC_FOULING_V0_1.md'
       - 'docs/research/OPTICAL_ISRU_DECISION_DIRECTED_POLICY_V0_1.md'
+      - 'docs/research/OPTICAL_ISRU_THERMAL_COLUMN_V0_1.md'
       - '.github/workflows/isru-benchmark-contract-tests.yml'
   workflow_dispatch:
 
