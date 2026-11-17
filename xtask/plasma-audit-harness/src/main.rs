@@ -49,8 +49,7 @@ fn main() -> anyhow::Result<()> {
     let voi = xtask::plasma_experiment_voi::evaluate_manifest_json(&voi_fixture)
         .map_err(anyhow::Error::msg)?;
     println!(
-        "SYNTHETIC EXPERIMENT VOI: {} / {} measurements; selected={:?}; prior_loss={:.4}; no physical result",
-        voi.measurements.len(),
+        "SYNTHETIC EXPERIMENT VOI: {} candidate measurements; selected={:?}; prior_loss={:.4}; no physical result",
         voi.measurements.len(),
         voi.selected_measurement,
         voi.prior_expected_loss
