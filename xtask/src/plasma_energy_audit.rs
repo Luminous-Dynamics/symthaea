@@ -1120,6 +1120,9 @@ fn audit_source_value(root: &Value, display_name: &str) -> Result<SourceManifest
         if case_id == "NH3-CRACK-MW-RESONATOR-DYNAMIC-2026" {
             validate_nh3_crack_dynamic_response_case(case, display_name)?;
         }
+        if case_id == "CH4-PULSED-PLASMA-ENERGY-DEPOSITION-TIMESCALE-2026" {
+            validate_ch4_pulse_timescale_case(case, display_name)?;
+        }
         if case_id == "CH4-PLASMA-PULSED-HEATING-REGEN-2026" {
             validate_ch4_pph_operating_points(case, display_name)?;
         }
@@ -2012,6 +2015,109 @@ fn required_f64(object: &Value, key: &str, context: &str) -> Result<f64> {
         .and_then(Value::as_f64)
         .filter(|value| value.is_finite())
         .with_context(|| format!("{context}: missing/non-finite numeric field {key}"))
+}
+
+fn validate_ch4_pulse_timescale_case(case: &Value, display_name: &str) -> Result<()> {
+    let context = format!("{display_name}: pulsed methane timescale/source-point audit");
+    let points = case
+        .get("operating_points")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: operating_points array is missing"))?;
+    ensure!(
+        points.len() == 1,
+        "{context}: the source register must preserve the single 100 microsecond energy point"
+    );
+    let point = &points[0];
+    ensure!(
+        point.get("operating_point_id").and_then(Value::as_str)
+            == Some("CH4-PULSE-100US-SPECIFIC-ENERGY"),
+        "{context}: 100 microsecond energy operating-point identity is missing"
+    );
+    ensure!(
+        close_f64(required_f64(point, "pulse_width_us", &context)?, 100.0),
+        "{context}: source-specific energy figures must remain attached to the 100 microsecond point"
+    );
+    ensure!(
+        close_f64(
+            required_f64(point, "methane_conversion_energy_cost_kJ_per_mol_CH4", &context)?,
+            377.0
+        ),
+        "{context}: methane conversion energy cost must retain its CH4 molar denominator"
+    );
+    ensure!(
+        close_f64(required_f64(point, "acetylene_specific_energy_kWh_per_kg", &context)?, 15.0),
+        "{context}: acetylene specific energy must remain 15 kWh/kg C2H2"
+    );
+    ensure!(
+        close_f64(required_f64(point, "hydrogen_specific_energy_kWh_per_kg", &context)?, 40.0),
+        "{context}: hydrogen specific energy must remain 40 kWh/kg H2"
+    );
+
+    let observations = case
+        .get("regime_observations")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: regime_observations array is missing"))?;
+    let nanosecond = observations
+        .iter()
+        .find(|observation| {
+            observation.get("observation_id").and_then(Value::as_str)
+                == Some("CH4-PULSE-NANOSECOND-C2-SELECTIVITY")
+        })
+        .with_context(|| format!("{context}: nanosecond selectivity observation is missing"))?;
+    ensure!(
+        nanosecond.get("pulse_regime").and_then(Value::as_str) == Some("nanosecond"),
+        "{context}: C2 selectivity observation must retain nanosecond regime identity"
+    );
+    ensure!(
+        close_f64(
+            required_f64(nanosecond, "overall_C2_selectivity_lower_bound_fraction", &context)?,
+            0.70
+        ) && close_f64(
+            required_f64(nanosecond, "ethylene_selectivity_upper_reported_fraction", &context)?,
+            0.20
+        ),
+        "{context}: nanosecond C2-selectivity source values are inconsistent"
+    );
+    ensure!(
+        nanosecond.get("acetylene_specific_energy_kWh_per_kg").is_none()
+            && nanosecond.get("hydrogen_specific_energy_kWh_per_kg").is_none(),
+        "{context}: 100 microsecond energy values must not be borrowed by the nanosecond selectivity observation"
+    );
+
+    let longer = observations
+        .iter()
+        .find(|observation| {
+            observation.get("observation_id").and_then(Value::as_str)
+                == Some("CH4-PULSE-LONGER-PULSE-THERMAL-DOMINANCE")
+        })
+        .with_context(|| format!("{context}: longer-pulse chemistry observation is missing"))?;
+    ensure!(
+        longer.get("pulse_regime").and_then(Value::as_str)
+            == Some("longer_pulses_up_to_millisecond")
+            && longer.get("chemistry_character").and_then(Value::as_str)
+                == Some("predominantly thermal"),
+        "{context}: longer-pulse thermal-dominance observation must retain its regime/chemistry scope"
+    );
+
+    let config = case
+        .get("configuration")
+        .with_context(|| format!("{context}: configuration is missing"))?;
+    let pulse_energy = config
+        .get("pulse_energy_range_mJ")
+        .and_then(Value::as_array)
+        .with_context(|| format!("{context}: pulse-energy range is missing"))?;
+    ensure!(
+        pulse_energy.len() == 2
+            && pulse_energy[0].as_f64().is_some_and(|value| close_f64(value, 10.0))
+            && pulse_energy[1].as_f64().is_some_and(|value| close_f64(value, 50.0)),
+        "{context}: pulse-energy sweep must retain the source-reported 10–50 mJ range"
+    );
+    ensure!(
+        case.get("luminous_reproduction").and_then(Value::as_bool) == Some(false),
+        "{context}: source record must not claim a Luminous reproduction"
+    );
+
+    Ok(())
 }
 
 fn validate_ch4_pph_operating_points(case: &Value, display_name: &str) -> Result<()> {
@@ -3455,11 +3561,51 @@ mod tests {
     }
 
     #[test]
+    fn methane_pulse_timescale_source_keeps_nanosecond_and_100us_points_separate() {
+        let case = frozen_case("CH4-PULSED-PLASMA-ENERGY-DEPOSITION-TIMESCALE-2026");
+        validate_ch4_pulse_timescale_case(&case, "ch4-pulse.json").unwrap();
+    }
+
+    #[test]
+    fn methane_pulse_timescale_rejects_swapped_product_energy_denominators() {
+        let mut case = frozen_case("CH4-PULSED-PLASMA-ENERGY-DEPOSITION-TIMESCALE-2026");
+        case["operating_points"][0]["acetylene_specific_energy_kWh_per_kg"] =
+            serde_json::json!(40.0);
+        let error = validate_ch4_pulse_timescale_case(&case, "ch4-pulse.json").unwrap_err();
+        assert!(error.to_string().contains("acetylene specific energy"));
+    }
+
+    #[test]
+    fn methane_pulse_timescale_rejects_energy_borrowed_by_nanosecond_selectivity() {
+        let mut case = frozen_case("CH4-PULSED-PLASMA-ENERGY-DEPOSITION-TIMESCALE-2026");
+        case["regime_observations"][0]["hydrogen_specific_energy_kWh_per_kg"] =
+            serde_json::json!(40.0);
+        let error = validate_ch4_pulse_timescale_case(&case, "ch4-pulse.json").unwrap_err();
+        assert!(error.to_string().contains("must not be borrowed"));
+    }
+
+    #[test]
+    fn methane_pulse_timescale_rejects_missing_longer_pulse_control() {
+        let mut case = frozen_case("CH4-PULSED-PLASMA-ENERGY-DEPOSITION-TIMESCALE-2026");
+        case["regime_observations"].as_array_mut().unwrap().remove(1);
+        let error = validate_ch4_pulse_timescale_case(&case, "ch4-pulse.json").unwrap_err();
+        assert!(error.to_string().contains("longer-pulse chemistry observation"));
+    }
+
+    #[test]
+    fn methane_pulse_timescale_rejects_energy_point_relabelled_as_nanosecond() {
+        let mut case = frozen_case("CH4-PULSED-PLASMA-ENERGY-DEPOSITION-TIMESCALE-2026");
+        case["operating_points"][0]["pulse_width_us"] = serde_json::json!(10.0);
+        let error = validate_ch4_pulse_timescale_case(&case, "ch4-pulse.json").unwrap_err();
+        assert!(error.to_string().contains("100 microsecond point"));
+    }
+
+    #[test]
     fn source_manifest_accepts_new_nh3_synthesis_and_co2_cases() {
         let source = frozen_source_manifest();
         let summary = audit_source_value(&source, "frozen-plasma-energy.json").unwrap();
-        assert_eq!(summary.case_count, 66);
-        assert_eq!(summary.benchmark_target_count, 15);
+        assert_eq!(summary.case_count, 67);
+        assert_eq!(summary.benchmark_target_count, 16);
         assert!(source["cases"].as_array().unwrap().iter().any(|case|
             case.get("case_id").and_then(Value::as_str) == Some("CO2-CYCLIC-REFORMING-GASIFICATION-2026")
         ));
