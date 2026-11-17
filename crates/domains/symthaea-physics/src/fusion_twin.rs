@@ -395,6 +395,22 @@ pub struct PlasmaSensorBinding {
     pub sensor: PlasmaSensorType,
 }
 
+/// Provenance retained for one channel admitted by the direct-measurement gate.
+///
+/// This is a traceability record, not a signature or proof that the source
+/// itself is trustworthy. Source and calibration trust remain registry policy.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmittedChannelEvidence {
+    pub channel_id: String,
+    pub diagnostic_system_id: String,
+    pub units: String,
+    pub source_id: String,
+    pub source_digest: String,
+    pub calibration_id: String,
+    pub calibration_revision: String,
+    pub observed_at_ns: u64,
+}
+
 /// Why a measurement-gated fusion-twin step did not run.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum FusionTwinAbstentionReason {
@@ -414,6 +430,7 @@ pub enum FusionTwinEvidenceOutcome {
         frame_id: String,
         shot_id: String,
         frame_time_ns: u64,
+        admitted_channels: Vec<AdmittedChannelEvidence>,
         output: FusionTwinOutput,
     },
     Abstained {
@@ -617,6 +634,20 @@ impl FusionDigitalTwin {
             ));
         }
 
+        let admitted_channels = inputs
+            .values()
+            .iter()
+            .map(|measured| AdmittedChannelEvidence {
+                channel_id: measured.channel_id().to_owned(),
+                diagnostic_system_id: measured.diagnostic_system_id().to_owned(),
+                units: measured.units().to_owned(),
+                source_id: measured.source_id().to_owned(),
+                source_digest: measured.source_digest().to_owned(),
+                calibration_id: measured.calibration_id().to_owned(),
+                calibration_revision: measured.calibration_revision().to_owned(),
+                observed_at_ns: measured.observed_at_ns(),
+            })
+            .collect();
         let frame_id = inputs.frame_id().to_owned();
         let shot_id = inputs.shot_id().to_owned();
         let frame_time_ns = inputs.frame_time_ns();
@@ -625,6 +656,7 @@ impl FusionDigitalTwin {
             frame_id,
             shot_id,
             frame_time_ns,
+            admitted_channels,
             output,
         })
     }
@@ -870,10 +902,25 @@ mod tests {
         let processed = twin
             .step_with_measurement_evidence(&frame, &requirements, &bindings, 0.001)
             .expect("measured frame should be processed");
-        assert!(matches!(
-            processed,
-            FusionTwinEvidenceOutcome::MeasuredInputsProcessed { .. }
-        ));
+        let FusionTwinEvidenceOutcome::MeasuredInputsProcessed {
+            admitted_channels,
+            frame_id,
+            shot_id,
+            frame_time_ns,
+            ..
+        } = processed
+        else {
+            panic!("complete measured frame should be processed");
+        };
+        assert_eq!(frame_id, "frame-evidence-test");
+        assert_eq!(shot_id, "synthetic-shot-evidence-test");
+        assert_eq!(frame_time_ns, 1_000_000_000);
+        assert_eq!(admitted_channels.len(), 4);
+        assert!(admitted_channels.iter().all(|channel| {
+            channel.source_digest == "a".repeat(64)
+                && channel.calibration_revision == "rev-1"
+                && channel.observed_at_ns == frame_time_ns
+        }));
         assert_eq!(twin.cycle_count(), 1);
     }
 
