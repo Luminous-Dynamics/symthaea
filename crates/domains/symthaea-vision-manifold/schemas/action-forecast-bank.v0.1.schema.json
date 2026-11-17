@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/vision-action-forecast-bank-v0.1.json",
+  "title": "Symthaea action-conditioned visual forecast bank",
+  "description": "Serialized prediction-only bank for one frozen observed visual history, a canonical action manifest, one target frame and a shared joint-draw manifest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "history_sha256",
+    "action_manifest_sha256",
+    "joint_draw_manifest_sha256",
+    "model_sha256",
+    "bank_sha256",
+    "source_frame_sequence",
+    "issued_at_seconds",
+    "horizon_seconds",
+    "target_frame_sequence",
+    "target_time_seconds",
+    "action_ids",
+    "joint_draw_ids",
+    "coupling",
+    "persistence_belief",
+    "samples"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "history_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "action_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "joint_draw_manifest_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "model_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "bank_sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_frame_sequence": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "issued_at_seconds": {
+      "type": "number",
+      "minimum": 0
+    },
+    "horizon_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "target_frame_sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "target_time_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "action_ids": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "joint_draw_ids": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "coupling": {
+      "enum": [
+        "shared_posterior_and_world_noise",
+        "paired_exogenous_disturbance",
+        "deterministic_shared_latent"
+      ]
+    },
+    "persistence_belief": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "number"
+      }
+    },
+    "samples": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "action_id",
+          "joint_draw_id",
+          "branch_id",
+          "predicted_belief"
+        ],
+        "properties": {
+          "action_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "joint_draw_id": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "branch_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "predicted_belief": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "number"
+            }
+          }
+        }
+      }
+    }
+  },
+  "x-rust-invariants": [
+    "target_frame_sequence is greater than source_frame_sequence",
+    "target_time_seconds - issued_at_seconds equals horizon_seconds within the declared floating-point tolerance",
+    "samples form the complete Cartesian product of action_ids and joint_draw_ids exactly once",
+    "every branch_id is non-empty and unique",
+    "all beliefs are finite, non-empty, non-zero vectors of equal dimension",
+    "action_manifest_sha256 is recomputed from action IDs and canonical action descriptors",
+    "joint_draw_manifest_sha256 is recomputed from sorted joint draw IDs and coupling",
+    "bank_sha256 is recomputed from exact canonical action/draw/branch/vector content; row order is not semantic",
+    "forecast outputs remain Predicted and never become Observed memory"
+  ]
+}
