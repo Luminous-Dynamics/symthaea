@@ -236,6 +236,32 @@
       "reported_unique_compositions": 19058,
       "primary_claim_boundary": "Literature-extracted experimental and non-superconductor records with multiple LLM tasks. GNoME Tc>10 K candidates remain predictions. The exact count, row provenance, data license and train/test split require reconciliation.",
       "repository_readme_blob_sha": "71ec1b961a6231b21c6745b63dc8f774cd7ecbed"
+    },
+    {
+      "source_id": "stgi_translation_gap_2026",
+      "doi": "10.1016/j.nxmate.2026.103138",
+      "url": "https://doi.org/10.1016/j.nxmate.2026.103138",
+      "published": "2026-10",
+      "source_type": "peer_reviewed_engineering_translation_review",
+      "title": "From critical temperature to engineering reality: A quantitative framework for assessing the translation gap in superconducting materials",
+      "benchmark_name": "Superconductor Translation Gap Index (STGI)",
+      "axes": [
+        "temperature_margin_at_target_field",
+        "in_field_engineering_current_density",
+        "cryogenic_accessibility_and_pressure",
+        "mechanical_and_manufacturing_robustness"
+      ],
+      "reported_scores": {
+        "rebco_power_grid_77k": 76,
+        "rebco_high_field_magnet_20k": 64,
+        "hydrides_without_conductor_form": 0
+      },
+      "application_classes": [
+        "high_field_magnets",
+        "power_grid",
+        "electric_aircraft_propulsion"
+      ],
+      "primary_claim_boundary": "Composite scores depend on review-specific weights, application requirements and source data; reproduce inputs and sensitivity before treating as a ranking."
     }
   ],
   "candidate_records": [
@@ -625,6 +651,22 @@
       },
       "metric_interpretation": "paper-reported literature database and LLM baselines; 28% novel relative to training set only. Record count is inconsistent between abstract/method text.",
       "local_reproducibility_status": "not_reproduced; data release/rights, record count, checkpoint revisions and split manifests tracked in #12648"
+    },
+    {
+      "catalog_id": "STGI-Translation-Gap-2026",
+      "source_ids": [
+        "stgi_translation_gap_2026"
+      ],
+      "reported_record_count": 7,
+      "reported_metric": {
+        "name": "STGI",
+        "scale": "0-100",
+        "rebco_power_grid_77k": 76,
+        "rebco_high_field_magnet_20k": 64,
+        "hydrides_without_conductor_form": 0
+      },
+      "metric_interpretation": "paper-reported application-specific translation index, not independently reproduced; reproduce exact weights, hard viability gate and source values, then sensitivity/Pareto extensions.",
+      "local_reproducibility_status": "not_reproduced; reconstruct article data and source conditions tracked in #12651"
     }
   ],
   "required_future_fields": [
