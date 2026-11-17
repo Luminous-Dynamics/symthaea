@@ -167,6 +167,7 @@
         "additionalProperties": false,
         "required": [
           "candidate_id",
+          "stage",
           "inlay_architecture",
           "spacer_frequency",
           "transition_geometry",
@@ -228,6 +229,12 @@
           "replicate_plan": {
             "type": "string",
             "minLength": 1
+          },
+          "stage": {
+            "enum": [
+              "screen",
+              "transition_refinement"
+            ]
           }
         }
       }
