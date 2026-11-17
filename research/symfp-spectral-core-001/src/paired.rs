@@ -107,10 +107,12 @@ fn outward_square(value: f64) -> Result<f64, PairedSymFpErrorV1> {
     }
 }
 
-/// Derive an outward-rounded Frobenius upper bound from the exact f64 entries
-/// of an observed-minus-reference matrix. Since ||A||₂ <= ||A||F, this is a
-/// valid operator-norm envelope for the supplied finite matrix values. Every
-/// square and accumulation is rounded upward by one representable f64 value.
+/// Derive an outward-rounded Frobenius upper bound from nonnegative
+/// entrywise upper bounds on an observed-minus-reference matrix. Since
+/// ||A||₂ <= ||A||F, this is a valid operator-norm envelope. Every square,
+/// accumulation and final square root is rounded upward by one representable
+/// f64 value. The paired wrapper also rounds each subtraction outward before
+/// calling this function.
 pub fn frobenius_operator_norm_upper_bound(
     delta_values: &[f64],
 ) -> Result<f64, PairedSymFpErrorV1> {
@@ -130,6 +132,26 @@ pub fn frobenius_operator_norm_upper_bound(
         return Err(PairedSymFpErrorV1::PerturbationOverflow);
     }
     let upper = root.next_up();
+    if upper.is_finite() {
+        Ok(upper)
+    } else {
+        Err(PairedSymFpErrorV1::PerturbationOverflow)
+    }
+}
+
+/// Return an outward-rounded bound on the exact real difference of two
+/// supplied finite f64 values. Subtraction itself is rounded to nearest, so
+/// advance its absolute result by one representable value before norm
+/// accumulation. Identical input values retain an exact zero difference.
+fn outward_abs_difference(left: f64, right: f64) -> Result<f64, PairedSymFpErrorV1> {
+    let difference = left - right;
+    if !difference.is_finite() {
+        return Err(PairedSymFpErrorV1::PerturbationOverflow);
+    }
+    if left == right {
+        return Ok(0.0);
+    }
+    let upper = difference.abs().next_up();
     if upper.is_finite() {
         Ok(upper)
     } else {
@@ -228,11 +250,7 @@ fn validate_paired_blocks(
             .iter()
             .zip(paired.reference_values.iter())
         {
-            let delta = observed - reference;
-            if !delta.is_finite() {
-                return Err(PairedSymFpErrorV1::PerturbationOverflow);
-            }
-            delta_values.push(delta);
+            delta_values.push(outward_abs_difference(*observed, *reference)?);
         }
         let frobenius_upper_bound = frobenius_operator_norm_upper_bound(&delta_values)?;
         bounds.push(SpectralOperatorBoundV1 {
@@ -362,6 +380,12 @@ mod tests {
         assert_eq!(result.derived_operator_bounds.iter().map(|bound| bound.frobenius_upper_bound).collect::<Vec<_>>(), vec![0.0; 10]);
         assert_eq!(result.classification.guaranteed_nearest_template, Some("C2"));
         verify_paired_robust_symfp_receipt(&result).unwrap();
+    }
+
+    #[test]
+    fn subtraction_roundoff_is_expanded_before_norm_accumulation() {
+        let upper = outward_abs_difference(1.0, 2.0_f64.powi(-54)).unwrap();
+        assert_eq!(upper.to_bits(), 1.0_f64.next_up().to_bits());
     }
 
     #[test]
