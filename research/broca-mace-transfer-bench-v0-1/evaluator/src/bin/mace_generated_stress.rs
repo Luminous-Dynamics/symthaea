@@ -4,7 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use broca_mace_policy::{
-    decide, is_qualified, Action, Experience, Objective, Policy, Query, Regime, Scope,
+    decide, is_qualified, is_transfer_qualified, Action, Experience, Objective, Policy, Query,
+    Regime, Scope,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -132,7 +133,7 @@ impl Rng {
 }
 
 fn generated_worlds(clusters: u64) -> Vec<Case> {
-    let mut cases = Vec::with_capacity(clusters as usize * 11);
+    let mut cases = Vec::with_capacity(clusters as usize * 13);
     let baseline = Scope {
         regime: Regime::Baseline,
         objective: Objective::Quality,
@@ -207,6 +208,46 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             cost,
             0.12,
             0.88,
+            None,
+            true,
+        ));
+
+        let mut invariant_memory = pair(
+            baseline,
+            id + 200,
+            family + 4,
+            0.92,
+            0.32,
+        );
+        invariant_memory.push(exp(id + 204, family + 8, shifted, Action::A, 0.91));
+        invariant_memory.push(exp(id + 205, family + 9, shifted, Action::B, 0.33));
+        cases.push(case(
+            cluster,
+            "invariant_transport_few_shot",
+            invariant_memory,
+            shifted,
+            1.0,
+            0.0,
+            Some(Action::A),
+            false,
+        ));
+
+        let mut broken_memory = pair(
+            baseline,
+            id + 210,
+            family + 10,
+            0.94,
+            0.32,
+        );
+        broken_memory.push(exp(id + 214, family + 14, shifted, Action::A, 0.25));
+        broken_memory.push(exp(id + 215, family + 15, shifted, Action::B, 0.86));
+        cases.push(case(
+            cluster,
+            "mechanism_break_after_shift",
+            broken_memory,
+            shifted,
+            0.0,
+            1.0,
             None,
             true,
         ));
@@ -372,10 +413,14 @@ fn evaluate(policy: Policy, cases: &[Case]) -> Score {
             .iter()
             .map(|entry| (entry.event_id, entry))
             .collect();
+        let evidence_is_eligible = |entry: &&Experience| match policy {
+            Policy::InvariantTransport => is_transfer_qualified(entry, item.query),
+            _ => is_qualified(entry, item.query),
+        };
         if decision.evidence_ids.iter().any(|id| {
             by_id
                 .get(id)
-                .is_none_or(|entry| !is_qualified(entry, item.query))
+                .is_none_or(|entry| !evidence_is_eligible(entry))
         }) {
             score.invalid_refs += 1;
         }
@@ -566,11 +611,42 @@ mod tests {
     use super::*;
 
     #[test]
+    fn invariant_transport_wins_few_shot_but_abstains_on_mechanism_break() {
+        let cases = generated_worlds(1);
+        let invariant = cases
+            .iter()
+            .find(|item| item.family == "invariant_transport_few_shot")
+            .unwrap();
+        let broken = cases
+            .iter()
+            .find(|item| item.family == "mechanism_break_after_shift")
+            .unwrap();
+
+        assert_eq!(
+            decide(Policy::CausalQualified, &invariant.memory, invariant.query).action,
+            None
+        );
+        assert_eq!(
+            decide(
+                Policy::InvariantTransport,
+                &invariant.memory,
+                invariant.query,
+            )
+            .action,
+            Some(Action::A)
+        );
+        assert_eq!(
+            decide(Policy::InvariantTransport, &broken.memory, broken.query).action,
+            None
+        );
+    }
+
+    #[test]
     fn generated_worlds_are_deterministic_and_rotate_source_families() {
         let first = generated_worlds(8);
         let second = generated_worlds(8);
         assert_eq!(format!("{first:?}"), format!("{second:?}"));
-        assert_eq!(first.len(), 88);
+        assert_eq!(first.len(), 104);
         assert_eq!(first[0].cluster, 1);
         assert_eq!(first[8].cluster, 2);
         assert_ne!(
@@ -597,7 +673,7 @@ mod tests {
     fn qualified_policy_has_no_generated_fixture_overclaims_or_invalid_reuse() {
         let cases = generated_worlds(16);
         let score = evaluate(Policy::CausalQualified, &cases);
-        assert_eq!(score.count, 176);
+        assert_eq!(score.count, 208);
         assert_eq!(score.overclaims, 0);
         assert_eq!(score.invalid_refs, 0);
         assert_eq!(score.unsupported_a, 0);

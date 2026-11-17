@@ -4,7 +4,8 @@
 use std::collections::BTreeMap;
 
 use broca_mace_policy::{
-    decide, is_qualified, Action, Decision, Experience, Objective, Policy, Query, Regime, Scope,
+    decide, is_qualified, is_transfer_qualified, Action, Decision, Experience, Objective,
+    Policy, Query, Regime, Scope,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -278,6 +279,34 @@ fn cases() -> Vec<Scenario> {
             false,
         ),
         scenario(
+            "invariant_transport_few_shot",
+            {
+                let mut memory = valid_pair(baseline_quality, 140, 300, 0.92, 0.32);
+                memory.push(experience(144, 304, shifted_quality, Action::A, 0.91));
+                memory.push(experience(145, 305, shifted_quality, Action::B, 0.33));
+                memory
+            },
+            Query { scope: shifted_quality },
+            1.0,
+            0.0,
+            Some(Action::A),
+            false,
+        ),
+        scenario(
+            "mechanism_break_after_regime_shift",
+            {
+                let mut memory = valid_pair(baseline_quality, 150, 310, 0.94, 0.32);
+                memory.push(experience(154, 314, shifted_quality, Action::A, 0.25));
+                memory.push(experience(155, 315, shifted_quality, Action::B, 0.86));
+                memory
+            },
+            Query { scope: shifted_quality },
+            0.0,
+            1.0,
+            None,
+            true,
+        ),
+        scenario(
             "shifted_regime_positive_control",
             shifted_identified,
             Query { scope: shifted_quality },
@@ -332,10 +361,14 @@ fn evaluate(policy: Policy, scenarios: &[Scenario]) -> Metrics {
             .map(|item| (item.event_id, item))
             .collect();
 
+        let evidence_is_eligible = |item: &&Experience| match policy {
+            Policy::InvariantTransport => is_transfer_qualified(item, case.session_b),
+            _ => is_qualified(item, case.session_b),
+        };
         if decision.evidence_ids.iter().any(|id| {
             by_id
                 .get(id)
-                .is_none_or(|item| !is_qualified(item, case.session_b))
+                .is_none_or(|item| !evidence_is_eligible(item))
         }) {
             metrics.invalid_evidence_reuse += 1;
         }

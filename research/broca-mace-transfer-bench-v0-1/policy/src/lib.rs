@@ -65,6 +65,7 @@ pub enum Policy {
     FrequencyOnly,
     ScopeAware,
     CausalQualified,
+    InvariantTransport,
 }
 
 impl Policy {
@@ -73,6 +74,7 @@ impl Policy {
         Policy::FrequencyOnly,
         Policy::ScopeAware,
         Policy::CausalQualified,
+        Policy::InvariantTransport,
     ];
 
     pub fn name(self) -> &'static str {
@@ -81,6 +83,7 @@ impl Policy {
             Self::FrequencyOnly => "frequency_only",
             Self::ScopeAware => "scope_aware",
             Self::CausalQualified => "causal_qualified",
+            Self::InvariantTransport => "invariant_transport",
         }
     }
 }
@@ -113,6 +116,7 @@ pub fn decide(policy: Policy, memory: &[Experience], query: Query) -> Decision {
         Policy::FrequencyOnly => frequency_policy(memory),
         Policy::ScopeAware => scope_aware_policy(memory, query),
         Policy::CausalQualified => causal_qualified_policy(memory, query),
+        Policy::InvariantTransport => invariant_transport_policy(memory, query),
     }
 }
 
@@ -244,6 +248,100 @@ fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
     }
 }
 
+/// Candidate evidence eligibility for a cross-regime transport test.
+/// The optimization objective remains exact; regime compatibility is checked
+/// separately by the invariant-transport policy.
+pub fn is_transfer_qualified(item: &Experience, query: Query) -> bool {
+    item.scope.objective == query.scope.objective
+        && item.observed_utility.is_finite()
+        && (0.0..=1.0).contains(&item.observed_utility)
+        && item.intervention
+        && item.prediction_pre_registered
+        && item.outcome_reconciled
+        && item.source_trusted
+        && !item.source_retracted
+        && item.confounders_controlled
+        && item.delayed_horizon_complete
+}
+
+const INVARIANCE_TOLERANCE: f64 = 0.12;
+
+fn invariant_transport_policy(memory: &[Experience], query: Query) -> Decision {
+    let mut event_frequency: BTreeMap<u32, usize> = BTreeMap::new();
+    for item in memory {
+        *event_frequency.entry(item.event_id).or_default() += 1;
+    }
+
+    let mut groups: BTreeMap<(Regime, Action), QualifiedGroup> = BTreeMap::new();
+    for item in memory.iter().filter(|item| {
+        event_frequency.get(&item.event_id) == Some(&1)
+            && is_transfer_qualified(item, query)
+    }) {
+        groups
+            .entry((item.scope.regime, item.action))
+            .or_default()
+            .add(item);
+    }
+
+    let pool_action = |action: Action| -> Option<QualifiedGroup> {
+        let target = groups.get(&(query.scope.regime, action))?;
+        if target.count == 0 || target.source_families.is_empty() {
+            return None;
+        }
+
+        let mut pooled = target.clone();
+        let mut validated_source_regimes = 0usize;
+
+        for ((regime, candidate_action), source) in &groups {
+            if *candidate_action != action
+                || *regime == query.scope.regime
+                || !source.is_qualified()
+            {
+                continue;
+            }
+
+            if !source.source_families.is_disjoint(&target.source_families) {
+                return None;
+            }
+
+            if (source.mean() - target.mean()).abs() > INVARIANCE_TOLERANCE {
+                return None;
+            }
+
+            pooled.sum += source.sum;
+            pooled.count += source.count;
+            pooled.evidence_ids.extend(source.evidence_ids.iter().copied());
+            pooled
+                .source_families
+                .extend(source.source_families.iter().copied());
+            pooled
+                .source_events
+                .extend(source.source_events.iter().copied());
+            validated_source_regimes += 1;
+        }
+
+        (validated_source_regimes > 0).then_some(pooled)
+    };
+
+    let Some(a) = pool_action(Action::A) else {
+        return Decision::abstain();
+    };
+    let Some(b) = pool_action(Action::B) else {
+        return Decision::abstain();
+    };
+
+    let action = if a.mean() > b.mean() { Action::A } else { Action::B };
+    let difference = (a.mean() - b.mean()).abs();
+    let mut evidence_ids = a.evidence_ids;
+    evidence_ids.extend(b.evidence_ids);
+
+    Decision {
+        action: Some(action),
+        causal_claim: (difference >= 0.05).then_some(action),
+        evidence_ids,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -326,6 +424,92 @@ mod tests {
         assert_eq!(frequency.action, Some(Action::A));
         assert_eq!(qualified.action, Some(Action::B));
         assert_eq!(qualified.evidence_ids, vec![8, 9]);
+    }
+
+    fn transport_case(
+        event_id: u32,
+        family: u16,
+        regime: Regime,
+        action: Action,
+        utility: f64,
+    ) -> Experience {
+        sample(
+            event_id,
+            family,
+            action,
+            utility,
+            Scope {
+                regime,
+                objective: Objective::Quality,
+            },
+        )
+    }
+
+    #[test]
+    fn invariant_effects_can_transport_into_a_few_shot_target_regime() {
+        let memory = vec![
+            transport_case(1, 10, Regime::Baseline, Action::A, 0.92),
+            transport_case(2, 11, Regime::Baseline, Action::A, 0.90),
+            transport_case(3, 20, Regime::Baseline, Action::B, 0.32),
+            transport_case(4, 21, Regime::Baseline, Action::B, 0.34),
+            transport_case(5, 30, Regime::Shifted, Action::A, 0.91),
+            transport_case(6, 31, Regime::Shifted, Action::B, 0.33),
+        ];
+        let query = Query {
+            scope: Scope {
+                regime: Regime::Shifted,
+                objective: Objective::Quality,
+            },
+        };
+        let exact = decide(Policy::CausalQualified, &memory, query);
+        let transported = decide(Policy::InvariantTransport, &memory, query);
+
+        assert_eq!(exact.action, None);
+        assert_eq!(transported.action, Some(Action::A));
+        assert_eq!(transported.evidence_ids.len(), 6);
+    }
+
+    #[test]
+    fn invariant_transport_abstains_when_the_effect_changes_across_regimes() {
+        let memory = vec![
+            transport_case(1, 10, Regime::Baseline, Action::A, 0.95),
+            transport_case(2, 11, Regime::Baseline, Action::A, 0.92),
+            transport_case(3, 20, Regime::Baseline, Action::B, 0.32),
+            transport_case(4, 21, Regime::Baseline, Action::B, 0.35),
+            transport_case(5, 30, Regime::Shifted, Action::A, 0.25),
+            transport_case(6, 31, Regime::Shifted, Action::B, 0.86),
+        ];
+        let query = Query {
+            scope: Scope {
+                regime: Regime::Shifted,
+                objective: Objective::Quality,
+            },
+        };
+        let transported = decide(Policy::InvariantTransport, &memory, query);
+        assert_eq!(transported.action, None);
+        assert!(transported.evidence_ids.is_empty());
+    }
+
+    #[test]
+    fn invariant_transport_refuses_cross_regime_source_family_overlap() {
+        let memory = vec![
+            transport_case(1, 10, Regime::Baseline, Action::A, 0.92),
+            transport_case(2, 11, Regime::Baseline, Action::A, 0.90),
+            transport_case(3, 20, Regime::Baseline, Action::B, 0.32),
+            transport_case(4, 21, Regime::Baseline, Action::B, 0.34),
+            transport_case(5, 10, Regime::Shifted, Action::A, 0.91),
+            transport_case(6, 20, Regime::Shifted, Action::B, 0.33),
+        ];
+        let query = Query {
+            scope: Scope {
+                regime: Regime::Shifted,
+                objective: Objective::Quality,
+            },
+        };
+        assert_eq!(
+            decide(Policy::InvariantTransport, &memory, query).action,
+            None
+        );
     }
 
     #[test]

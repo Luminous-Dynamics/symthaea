@@ -108,7 +108,7 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 
 ## Generated stress tranche (MACE v0.2 development)
 
-A second evaluator binary adds **256 deterministic clusters × 11 scenario families = 2,816 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime shift, objective shift, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing and qualified negative experience.
+A second evaluator binary adds **256 deterministic clusters × 13 scenario families = 3,328 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime and objective shifts, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing, qualified negative experience, few-shot invariant transport and a mechanism-break negative control.
 
 Run it independently:
 
@@ -120,3 +120,11 @@ cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p
 The candidate gate requires at least two unique event IDs as well as two declared source families; every repeated event ID is excluded from its qualified evidence set, even when assigned multiple family labels. The runner reports aggregate and per-family accuracy, utility, regret, abstention, causal overclaims and invalid-evidence reuse. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
+
+## Invariant transport experiment (MACE v0.3 research)
+
+The candidate crate adds an `invariant_transport` policy alongside exact-scope `causal_qualified`. It may pool prior-regime experience only when the objective matches exactly, the target regime has evidence for both actions, a prior regime has at least two unique qualified events from two source families for each action, source/target families are disjoint, and per-action utility means remain within a fixed 0.12 tolerance.
+
+The generated suite includes a few-shot invariant positive control and a mechanism-break negative control. Exact-scope policy should abstain on the positive few-shot case; invariant transport may transfer. It must abstain when action effects move beyond the tolerance or source families overlap.
+
+This is a transparent empirical-invariance heuristic, not a general transportability proof. The 0.12 tolerance is an uncalibrated prototype parameter. Future work should use preregistered equivalence margins, uncertainty intervals, explicit causal assumptions and independent target-regime witnesses.
