@@ -22,6 +22,8 @@ M1 starts with deterministic semantic and authority-boundary cases, not a new co
 
 The core biological hypothesis is **distributed sensing with hierarchical coordination**. Local sensing and bounded reflexes may reduce response latency and communication load; a slower supervisory layer may coordinate task-level behavior. We do not assume that an octopus, insect, or vertebrate circuit can be copied directly into a robot.
 
+A separate physical-mechanism owner is [Symtropy #5991 — MORPH-PHYS-COMPUTE-001](https://github.com/Luminous-Dynamics/symtropy/issues/5991). It tests whether compliance, material geometry, distributed sensing and mechanical coupling perform task-useful filtering/routing/switching or physical-reservoir computation. This supplies a body-mechanism ablation to the HLB study; it does not add another manipulator controller, tactile calibration pipeline or world model.
+
 ## 2. Source audit: exact facts to preserve
 
 Source was fetched from the public `main` branch on 18 November 2026. These SHAs identify the inspected blobs, not a claim that the runtime is qualified.
@@ -145,6 +147,16 @@ These suites answer different questions. Their scores must remain separate.
 | LIBERO-RECOVER | September 2026 preprint: 1,000+ recovery scenarios across action retry, action adaptation, object-state recovery and environmental recovery. | Recovery after execution failure rather than success from ideal initial states. | Use its four recovery levels as a separate challenge family; preserve natural and injected failures in separate strata. |
 | Morphology-conditioned QWM | CoRL 2026 morphology-conditioned quadruped world model with zero-shot transfer bounded to the studied quadruped family. | Dynamics transfer conditioned on explicit morphology. | Compare quadruped prediction and locomotion on held-out morphology combinations and fault × morphology strata; do not describe this as universal transfer. |
 | Octopus-inspired distributed soft arm | Nature Machine Intelligence, 12 May 2026: ten sensorized suction cups, local reflexes and hierarchical global grasp coordination; reported force/direction results are specific to its sensor and still-water experiments. | Distributed tactile observation and peripheral control. | Use as a mechanism comparator for local-vs-central-vs-hybrid sensing/control, not as a direct rigid-manipulator leaderboard score. |
+
+### Evaluation coverage gap: prediction must lead to executed, measured decisions
+
+The final snapshot of *A Survey of World Model Benchmarks* (Preprints.org v2, 14 September 2026; corpus checked 18 October and coding finalized 8 November) catalogs 130 representative benchmarks and separates evaluation target, protocol, metric family and data source. Its taxonomy reports 98 open-loop evaluation tracks and 13 closed-loop interaction tracks; 99 tracks use prediction-level metrics and 14 include downstream-outcome metrics. For control fidelity/interactive dynamics, only 6 of 74 tracks include closed-loop interaction and 4 include outcome-level metrics. For interactive action fidelity, the corresponding counts are 3 of 22 and 2 of 22. Functional utility is more often closed-loop: 13 of 15 tracks include closed-loop interaction and outcome metrics. Source: https://world-model-benchmarks.github.io/World-Model-Benchmarks/.
+
+A separate survey, *Do World Models Make Better Robots?* (arXiv:2609.29669, 30 August 2026), uses a different 160-benchmark corpus and reports 11 explicit VLA-vs-world-model contrasts and four prediction-to-action benchmark suites. **These are separate surveys and denominators; do not merge their counts or present them as one statistic.**
+
+This creates a concrete Luminous benchmark opportunity: predict candidate action consequences, select a candidate, execute it through the independently controlled plant, measure the outcome, then compare the predicted ranking with realized outcomes. Prediction accuracy, counterfactual fidelity, policy-ranking agreement, net decision lift, model exploitability and physical-envelope violations remain separate result planes.
+
+Compose with Symthaea #9010 (general matched world-model decision value), #12548 (tactile action-conditioned futures), and #11880 (anticipatory reflex/time-to-boundary). #12735 supplies the contact-rich manipulator profile; do not fork their world model or reflex owners.
 
 ### Concrete competitive targets
 
