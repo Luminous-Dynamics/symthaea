@@ -1353,6 +1353,7 @@ mod tests {
         ];
         let receipt = replay_bounded_intervals(&problem, &observations).unwrap();
         assert_eq!(receipt.final_active_hypothesis_ids, Vec::<String>::new());
+        assert_eq!(receipt.snapshots.len(), observations.len() + 1);
         assert!(!receipt.snapshots[2].model_consistent);
     }
 
