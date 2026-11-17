@@ -548,11 +548,15 @@ fn evaluate(raw:&str)->Result<Value,String>{
  let mut actual_unsafe_nominal=0u64;let mut actual_unsafe_upper=0u64;
  for (leaf_id,path) in &leaf_paths{
   let membership=atoms_by_leaf.get(leaf_id).ok_or_else(||format!("leaf {leaf_id:?} has no joint rows"))?;
-  let (nominal,robust,support,likelihoods)=leaf_risk(&priors,&safety,&kernels,membership,&path.action_id)?;
+  let (measured_nominal,measured_robust,support,likelihoods)=leaf_risk(&priors,&safety,&kernels,membership,&path.action_id)?;
   let action=&actions[&path.action_id];
+  let readonly_safe=path.decision_kind=="defer"
+   &&action.read_only&&!action.irreversible&&!action.hard_gate&&action.max_risk==0
+   &&safety.values().all(|allowed|allowed.contains(&path.action_id));
+  let nominal=if readonly_safe{0}else{measured_nominal};
+  let robust=if readonly_safe{0}else{measured_robust};
   let justified=if path.decision_kind=="defer"{
-   action.read_only&&!action.irreversible&&!action.hard_gate&&action.max_risk==0
-    &&safety.values().all(|allowed|allowed.contains(&path.action_id))
+   readonly_safe
   }else{
    support>0&&robust<=action.max_risk&&(!action.hard_gate||robust==0)
   };
@@ -698,6 +702,7 @@ mod tests{
   let leaf=r["submitted_policy"]["leaf_reports"].as_array().unwrap().iter()
    .find(|x|x["leaf_node_id"]=="defer-after-b-fail").unwrap();
   assert_eq!(leaf["evidence_support_lower_bps"],0);
+  assert_eq!(leaf["worst_case_posterior_risk_bps"],0);
   assert_eq!(leaf["action_justified"],true);
  }
  #[test]fn actual_unsafe_probability_uses_joint_union_bounds(){
