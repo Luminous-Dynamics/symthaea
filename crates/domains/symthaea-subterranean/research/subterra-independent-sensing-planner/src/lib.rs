@@ -568,8 +568,10 @@ pub fn plan_independent_acquisition_portfolio(
         .map_err(|_| PlanningError::EmptyVerifierDependencyClosure)?;
 
     options.sort_by(|a, b| a.option_id.cmp(&b.option_id));
+    let mut canonical_bundle_costs = deployment_bundles.to_vec();
+    canonical_bundle_costs.sort_by(|a, b| a.bundle_id.cmp(&b.bundle_id));
     let mut bundle_indices = BTreeMap::new();
-    for (index, bundle) in deployment_bundles.iter().enumerate() {
+    for (index, bundle) in canonical_bundle_costs.iter().enumerate() {
         if bundle_indices.insert(bundle.bundle_id.as_str(), index).is_some() {
             return Err(PlanningError::DuplicateDeploymentBundleId(bundle.bundle_id.clone()));
         }
@@ -646,7 +648,7 @@ pub fn plan_independent_acquisition_portfolio(
         options: &valid_options,
         dependency_sets: &valid_dependency_sets,
         option_bundle_indices: &valid_bundle_indices,
-        bundle_costs: deployment_bundles,
+        bundle_costs: &canonical_bundle_costs,
         budget,
         required_count: policy.required_independent_sources,
         maximum_nodes: policy.maximum_search_nodes,
@@ -1109,24 +1111,35 @@ mod tests {
     }
 
     #[test]
-    fn same_bundle_cost_is_not_omitted_or_double_charged_for_multiple_sources() {
+    fn distinct_deployment_bundles_are_each_charged_once() {
         let mut second = option("b", "source-b", vec![dep("robot", "b")]);
-        second.deployment_bundle_id = "bundle-1".into();
-        let options = vec![
-            option("a", "source-a", vec![dep("robot", "a")]),
-            second,
-        ];
+        second.deployment_bundle_id = "bundle-2".into();
+        second.deployment_bundle_digest = "sha256:bundle-2".into();
+        second.deployment_bundle_resource_model_digest = "sha256:bundle-resource-model-2".into();
+        second.deployment_bundle_assessment_digest = "sha256:bundle-assessment-2".into();
+        let mut bundles = bundle_costs();
+        let mut second_bundle = bundles[0].clone();
+        second_bundle.bundle_id = "bundle-2".into();
+        second_bundle.bundle_digest = "sha256:bundle-2".into();
+        second_bundle.resource_model_digest = "sha256:bundle-resource-model-2".into();
+        second_bundle.assessment_digest = "sha256:bundle-assessment-2".into();
+        bundles.push(second_bundle);
         let report = plan_independent_acquisition_portfolio(
-            options,
-            &bundle_costs(),
+            vec![
+                option("a", "source-a", vec![dep("robot", "a")]),
+                second,
+            ],
+            &bundles,
             &expected(),
             &verifier(),
             policy(),
             &budget(),
         )
         .unwrap();
-        assert_eq!(report.pareto_frontier[0].selected_deployment_bundles.len(), 1);
-        assert_eq!(report.pareto_frontier[0].resources.energy_millijoules, 25);
+        assert_eq!(report.pareto_frontier[0].selected_deployment_bundles.len(), 2);
+        assert_eq!(report.pareto_frontier[0].variable_resources.energy_millijoules, 20);
+        assert_eq!(report.pareto_frontier[0].shared_fixed_resources.energy_millijoules, 10);
+        assert_eq!(report.pareto_frontier[0].resources.energy_millijoules, 30);
     }
 
     #[test]
@@ -1154,12 +1167,104 @@ mod tests {
     }
 
     #[test]
+    fn bundle_catalogue_order_does_not_change_selected_bundle_report() {
+        let options = vec![
+            option("a", "source-a", vec![dep("robot", "a")]),
+            option("b", "source-b", vec![dep("robot", "b")]),
+        ];
+        let first = plan_independent_acquisition_portfolio(
+            options.clone(),
+            &bundle_costs(),
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        )
+        .unwrap();
+        let mut reversed = bundle_costs();
+        reversed.reverse();
+        let second = plan_independent_acquisition_portfolio(
+            options,
+            &reversed,
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        )
+        .unwrap();
+        assert_eq!(first.pareto_frontier, second.pareto_frontier);
+    }
+
+    #[test]
+    fn bundle_catalogue_order_does_not_change_selected_bundle_report() {
+        let options = vec![
+            option("a", "source-a", vec![dep("robot", "a")]),
+            option("b", "source-b", vec![dep("robot", "b")]),
+        ];
+        let first = plan_independent_acquisition_portfolio(
+            options.clone(),
+            &bundle_costs(),
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        )
+        .unwrap();
+        let mut reversed = bundle_costs();
+        reversed.reverse();
+        let second = plan_independent_acquisition_portfolio(
+            options,
+            &reversed,
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        )
+        .unwrap();
+        assert_eq!(first.pareto_frontier, second.pareto_frontier);
+    }
+
+    #[test]
+    fn mismatched_or_stale_bundle_assessment_rejects_candidate() {
+        let mut mismatched = option("a", "source-a", vec![dep("robot", "a")]);
+        mismatched.deployment_bundle_assessment_digest = "sha256:other-bundle-assessment".into();
+        let report = plan_independent_acquisition_portfolio(
+            vec![mismatched],
+            &bundle_costs(),
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        )
+        .unwrap();
+        assert!(report.rejected_options[0]
+            .reasons
+            .contains(&RejectedOptionReason::DeploymentBundleDigestMismatch));
+
+        let mut stale_catalogue = bundle_costs();
+        stale_catalogue[0].assessed_at_unix_ms = NOW - 3_600_001;
+        let report = plan_independent_acquisition_portfolio(
+            vec![option("a", "source-a", vec![dep("robot", "a")])],
+            &stale_catalogue,
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        )
+        .unwrap();
+        assert!(report.rejected_options[0]
+            .reasons
+            .contains(&RejectedOptionReason::DeploymentBundleAssessmentStale));
+    }
+
+    #[test]
     fn verifier_inventory_must_be_complete() {
         let mut verifier = verifier();
         verifier.inventory = InventoryDisposition::Unknown;
         assert_eq!(
             plan_independent_acquisition_portfolio(
                 vec![],
+                &bundle_costs(),
                 &expected(),
                 &verifier,
                 policy(),
