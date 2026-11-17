@@ -790,15 +790,19 @@ pub fn audit_submission(
     trace: &SelectionTrace,
     outcomes: &[EvaluatorOutcome],
 ) -> Result<CandidateSelectionAudit, SelectionAuditError> {
+    let view = build_selector_view(packet)?;
     validate_selection_trace(packet, trace)?;
 
+    // Evaluator outcomes are scored once per canonical selectable artifact,
+    // not once per duplicate generation alias.
+    let selectable_ids = view
+        .candidates
+        .iter()
+        .map(|candidate| candidate.candidate_id.as_str())
+        .collect::<BTreeSet<_>>();
     let mut by_id: BTreeMap<&str, &EvaluatorOutcome> = BTreeMap::new();
     for outcome in outcomes {
-        if !packet
-            .candidates
-            .iter()
-            .any(|candidate| candidate.candidate_id == outcome.candidate_id)
-        {
+        if !selectable_ids.contains(outcome.candidate_id.as_str()) {
             return Err(SelectionAuditError::UnknownEvaluatorCandidate(
                 outcome.candidate_id.clone(),
             ));
@@ -865,10 +869,10 @@ pub fn audit_submission(
             EvaluatorStatus::Incomplete => incomplete += 1,
         }
     }
-    let missing = packet.candidates.len().saturating_sub(outcomes.len());
+    let missing = view.candidates.len().saturating_sub(outcomes.len());
 
     let mut frontier = Vec::new();
-    for candidate in &packet.candidates {
+    for candidate in &view.candidates {
         let Some(outcome) = by_id.get(candidate.candidate_id.as_str()) else {
             continue;
         };
@@ -877,7 +881,7 @@ pub fn audit_submission(
         {
             continue;
         }
-        let is_dominated = packet.candidates.iter().any(|other| {
+        let is_dominated = view.candidates.iter().any(|other| {
             if other.candidate_id == candidate.candidate_id {
                 return false;
             }
@@ -906,7 +910,7 @@ pub fn audit_submission(
     if let Some(submitted) = submitted_outcome
         && submitted.status == EvaluatorStatus::Scored
     {
-        for candidate in &packet.candidates {
+        for candidate in &view.candidates {
             if Some(candidate.candidate_id.as_str()) == submitted_id.as_deref() {
                 continue;
             }
@@ -933,6 +937,7 @@ pub fn audit_submission(
         },
     };
 
+    let identical_groups = identical_model_artifact_groups(&packet.candidates);
     Ok(CandidateSelectionAudit {
         task_id: packet.task_id.clone(),
         candidate_pool_sha256: packet.candidate_pool_sha256.clone(),
@@ -941,14 +946,49 @@ pub fn audit_submission(
         selection_cost_units: trace.selector_cost_units,
         budget_limit_cost_units: packet.budget_limit_cost_units,
         attempted_candidates: packet.candidates.len(),
+        ready_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::Ready)
+            .count(),
+        generation_failed_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::GenerationFailed)
+            .count(),
+        execution_failed_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::ExecutionFailed)
+            .count(),
+        timed_out_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::TimedOut)
+            .count(),
+        invalid_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::Invalid)
+            .count(),
+        rejected_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::Rejected)
+            .count(),
+        incomplete_attempts: packet
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.state == CandidateState::Incomplete)
+            .count(),
         distinct_model_artifact_count: packet
             .candidates
             .iter()
             .filter_map(|candidate| candidate.canonical_model_sha256.as_deref())
             .collect::<BTreeSet<_>>()
             .len(),
-        selectable_candidate_count: build_selector_view(packet)?.candidates.len(),
-        exact_duplicate_candidate_attempts: identical_model_artifact_groups(&packet.candidates)
+        selectable_candidate_count: view.candidates.len(),
+        exact_duplicate_candidate_attempts: identical_groups
             .iter()
             .map(|group| group.len().saturating_sub(1))
             .sum(),
@@ -961,7 +1001,7 @@ pub fn audit_submission(
         invalid_candidates: invalid,
         incomplete_candidates: incomplete,
         missing_evaluator_outcomes: missing,
-        identical_model_artifact_groups: identical_model_artifact_groups(&packet.candidates),
+        identical_model_artifact_groups: identical_groups,
         submitted_candidate_id: submitted_id,
         submitted_status: submitted_outcome.map(|outcome| outcome.status),
         submitted_admissibility: submitted_outcome.map(|outcome| outcome.admissibility),
