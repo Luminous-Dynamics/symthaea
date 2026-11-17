@@ -695,7 +695,7 @@ impl TwinWorld {
             .get_mut(instrument_id)
             .expect("instrument presence checked");
         instrument_state.busy_job_id = Some(job_id.to_string());
-        instrument_state.jobs_since_calibration += 1;
+        instrument_state.jobs_since_calibration = instrument_state.jobs_since_calibration.saturating_add(1);
         self.active_jobs.insert(job_id.to_string(), job);
         self.append_event(TwinEventKind::JobLaunched {
             job_id: job_id.to_string(),
@@ -730,7 +730,7 @@ impl TwinWorld {
         instrument.busy_job_id = None;
         instrument.fouling_ppm = instrument
             .fouling_ppm
-            .saturating_add(removed_fouling(&job, &self.stages));
+            .saturating_add(fouling_added(&job, &self.stages));
 
         let duration = job
             .finish_at_seconds
@@ -1053,7 +1053,7 @@ fn stage_from_index(index: usize) -> StageKind {
 }
 
 fn scaled_duration(seconds: u64, scale_permille: u64) -> u64 {
-    ((seconds as u128 * scale_permille as u128 + 999) / 1000)
+    ((seconds as u128 * scale_permille as u128).saturating_add(999) / 1000)
         .max(1)
         .min(u64::MAX as u128) as u64
 }
@@ -1116,6 +1116,8 @@ fn sample_job(
     let mut state = if seed == 0 { 0xa076_1d64_78bd_642f } else { seed };
     let jitter = if stage.duration_jitter_seconds == 0 {
         0
+    } else if stage.duration_jitter_seconds == u64::MAX {
+        next_random(&mut state)
     } else {
         next_random(&mut state) % (stage.duration_jitter_seconds + 1)
     };
@@ -1559,6 +1561,74 @@ mod tests {
         let score = world.grade_discovery(0.1).unwrap();
         assert_eq!(score.candidates_assayed, 1);
         assert!(score.passed);
+    }
+
+    #[test]
+    fn active_candidate_cannot_start_two_concurrent_stages() {
+        let mut world = world(69, 0, 10, 10_000);
+        let mut api = world.agent_api();
+        api.launch_stage(
+            "job-first",
+            "train-a",
+            StageKind::Characterization,
+            "spectrometer-a",
+        )
+        .unwrap();
+        assert_eq!(
+            api.launch_stage(
+                "job-second",
+                "train-a",
+                StageKind::Characterization,
+                "spectrometer-b",
+            ),
+            Err(TwinError::CandidateAlreadyActive("train-a".to_string()))
+        );
+    }
+
+    #[test]
+    fn stage_launch_is_refused_when_worst_case_duration_exceeds_wall_budget() {
+        let mut world = world(70, 0, 10, 10_000);
+        world.manifest.max_wall_seconds = 5;
+        let mut api = world.agent_api();
+        assert_eq!(
+            api.launch_stage(
+                "too-long",
+                "train-a",
+                StageKind::Characterization,
+                "spectrometer-b",
+            ),
+            Err(TwinError::TimeBudgetExceeded)
+        );
+    }
+
+    #[test]
+    fn retry_after_failed_stage_uses_new_attempt_and_does_not_advance_progress() {
+        let mut world = world(72, PPM_SCALE, 10, 100_000);
+        let mut api = world.agent_api();
+        api.launch_stage(
+            "failure-one",
+            "train-a",
+            StageKind::Characterization,
+            "spectrometer-a",
+        )
+        .unwrap();
+        assert!(matches!(
+            api.advance_next_event().unwrap(),
+            Some(TwinTransition::Failed { .. })
+        ));
+        assert_eq!(
+            api.next_stage("train-a"),
+            Ok(Some(StageKind::Characterization))
+        );
+        assert_eq!(
+            api.launch_stage(
+                "failure-one",
+                "train-a",
+                StageKind::Characterization,
+                "spectrometer-a",
+            ),
+            Err(TwinError::DuplicateJob("failure-one".to_string()))
+        );
     }
 
     #[test]
