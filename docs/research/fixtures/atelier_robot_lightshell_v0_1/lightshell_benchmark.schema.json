@@ -223,12 +223,14 @@
         "additionalProperties": false,
         "required": [
           "metric_id",
+          "candidate_id",
           "unit",
           "measurement_boundary",
           "comparison_direction",
           "target_value",
           "baseline_value",
-          "hard_gate"
+          "hard_gate",
+          "observed_value"
         ],
         "properties": {
           "metric_id": {
@@ -306,6 +308,22 @@
               "string",
               "null"
             ]
+          },
+          "candidate_id": {
+            "enum": [
+              "B0",
+              "B1",
+              "B2",
+              "L1",
+              "L2",
+              "L3"
+            ]
+          },
+          "observed_value": {
+            "type": [
+              "number",
+              "null"
+            ]
           }
         }
       }
@@ -317,6 +335,7 @@
         "additionalProperties": false,
         "required": [
           "gate_id",
+          "candidate_id",
           "condition",
           "state",
           "acceptance_rule_ref"
@@ -357,6 +376,16 @@
             "type": [
               "string",
               "null"
+            ]
+          },
+          "candidate_id": {
+            "enum": [
+              "B0",
+              "B1",
+              "B2",
+              "L1",
+              "L2",
+              "L3"
             ]
           }
         }
