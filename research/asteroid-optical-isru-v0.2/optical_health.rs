@@ -235,6 +235,7 @@ pub struct OpticalHealthModel {
     source_power_w: f64,
     sensor_noise_stddev: f64,
     last_event_time_seconds: u64,
+    last_observation_time_seconds: u64,
     seen_deposition_events: BTreeMap<String, u64>,
     requalification_required: bool,
     qualified: bool,
@@ -286,6 +287,7 @@ impl OpticalHealthModel {
             source_power_w,
             sensor_noise_stddev,
             last_event_time_seconds: 0,
+            last_observation_time_seconds: 0,
             seen_deposition_events: BTreeMap::new(),
             requalification_required: false,
             qualified: true,
@@ -304,7 +306,9 @@ impl OpticalHealthModel {
                 event.event_id,
             ));
         }
-        if event.recorded_at_seconds < self.last_event_time_seconds {
+        if event.recorded_at_seconds < self.last_event_time_seconds
+            || event.recorded_at_seconds < self.last_observation_time_seconds
+        {
             return Err(OpticalHealthError::TimeWentBackwards);
         }
         event.transfer.validate()?;
@@ -356,7 +360,7 @@ impl OpticalHealthModel {
     }
 
     pub fn inspect(
-        &self,
+        &mut self,
         reading_id: &str,
         observed_at_seconds: u64,
         seed: u64,
@@ -364,7 +368,9 @@ impl OpticalHealthModel {
         if reading_id.trim().is_empty() {
             return Err(OpticalHealthError::EmptyIdentity("reading_id"));
         }
-        if observed_at_seconds < self.last_event_time_seconds {
+        if observed_at_seconds < self.last_event_time_seconds
+            || observed_at_seconds < self.last_observation_time_seconds
+        {
             return Err(OpticalHealthError::TimeWentBackwards);
         }
 
@@ -401,7 +407,7 @@ impl OpticalHealthModel {
         let qcm_mass = self.qcm.total_loading_ug_cm2()
             * (1.0 + deterministic_noise(seed ^ 0x4444, self.sensor_noise_stddev));
 
-        Ok(OpticalHealthReading {
+        let reading = OpticalHealthReading {
             reading_id: reading_id.to_string(),
             source_reference_power_w: source_reference,
             process_channel_power_w: process_channel,
@@ -410,7 +416,9 @@ impl OpticalHealthModel {
             qcm_areal_mass_ug_cm2: qcm_mass.max(0.0),
             observed_at_seconds,
             simulation_only: true,
-        })
+        };
+        self.last_observation_time_seconds = observed_at_seconds;
+        Ok(reading)
     }
 
     pub fn decide(
@@ -450,7 +458,7 @@ impl OpticalHealthModel {
             .zip(thresholds.minimum_process_transmission.iter())
             .any(|(observed, minimum)| observed < minimum);
         if process_below_limit {
-            return Ok(HealthAction::PauseCampaign);
+            return Ok(HealthAction::CleanAndRequalify);
         }
 
         let witness_loss_exceeded = reading
@@ -490,7 +498,9 @@ impl OpticalHealthModel {
                 "invalid_cost_or_removal_fraction",
             ));
         }
-        if at_seconds < self.last_event_time_seconds {
+        if at_seconds < self.last_event_time_seconds
+            || at_seconds < self.last_observation_time_seconds
+        {
             return Err(OpticalHealthError::TimeWentBackwards);
         }
 
@@ -782,7 +792,7 @@ mod tests {
         let reading = value.inspect("reading-1", 10, 9).unwrap();
         let mut tight = thresholds();
         tight.minimum_process_transmission = [0.95; BAND_COUNT];
-        assert_eq!(value.decide(&reading, &tight), Ok(HealthAction::PauseCampaign));
+        assert_eq!(value.decide(&reading, &tight), Ok(HealthAction::CleanAndRequalify));
     }
 
     #[test]
@@ -867,6 +877,28 @@ mod tests {
             Err(OpticalHealthError::RequalificationFailed)
         );
         assert!(!value.qualified());
+    }
+
+    #[test]
+    fn deposition_cannot_be_backdated_before_an_already_observed_reading() {
+        let mut value = model();
+        let reading = value.inspect("reading-1", 20, 4).unwrap();
+        assert_eq!(reading.observed_at_seconds, 20);
+        assert_eq!(
+            value.apply_deposition(event("late-event", 19)),
+            Err(OpticalHealthError::TimeWentBackwards)
+        );
+        value.apply_deposition(event("valid-event", 21)).unwrap();
+    }
+
+    #[test]
+    fn inspection_time_cannot_move_backwards() {
+        let mut value = model();
+        value.inspect("reading-1", 20, 4).unwrap();
+        assert_eq!(
+            value.inspect("reading-2", 19, 4),
+            Err(OpticalHealthError::TimeWentBackwards)
+        );
     }
 
     #[test]
