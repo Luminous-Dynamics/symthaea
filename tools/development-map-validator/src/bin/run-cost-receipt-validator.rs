@@ -313,7 +313,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
    "repository_full_name","branch","commit_sha","worktree_digest_sha256",
    "model_provider","model_version","model_config_digest_sha256",
    "harness_digest_sha256","toolset_digest_sha256","permissions_digest_sha256",
-   "runner_class","hardware_class","runner_image_digest_sha256","region",
+   "runner_class","hardware_class","runner_image_digest_sha256","region","billing_currency",
    "runner_identity","runner_attestation_ref","runner_attestation_digest_sha256",
    "queued_at","run_started_at","run_finished_at","attempts","receipt_sha256"
   ],&label)?;
@@ -356,7 +356,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
   marginal_p95.push(json!({"option_id":option,"sample_count":values.len(),"p95_cost_micros":p95}));
  }
  Ok(json!({
-  "adjudication_status":"synthetic_known_answer_run_level_cost_receipt_validation",
+  "adjudication_status":"run_level_cost_receipt_validation",
   "billing_currency":currency,
   "quantile_method":"nearest_rank",
   "run_count":metrics.len(),
