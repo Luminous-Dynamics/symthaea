@@ -304,3 +304,5 @@ It accepts a frozen list of candidate IDs, finite ranking scores and outcome lab
 The dedicated workflow now tests both the evidence registry auditor and ranking-metrics runner, executes the runner only on a clearly synthetic plumbing fixture, generates an isolated Cargo.lock, runs subsequent Cargo commands with --locked, and retains the lockfile, toolchain versions, source digests and machine-readable receipts as a run artifact.
 
 **Metric scope:** confidence intervals, probability calibration, OOD selective risk, cost-normalized comparisons, family/temporal splits, and prospective synthesis yield are not implemented by this small ranking executable. Those remain separate tournament requirements in #12634. The synthetic fixture is a plumbing check, not evidence of model quality or a materials discovery.
+
+The hosted source snapshot was pinned from the Hugging Face tree at verified revision ab53472 on 17 November 2026. The visible tree lists HTSC-2025.json (reported 166 kB), README.md and .gitattributes. This source revision is a locator for future reproduction, not permission to redistribute the data.
