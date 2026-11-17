@@ -158,3 +158,8 @@ cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Car
 \`\`\`
 
 The fixture uses synthetic local pairing-energy and bulk stiffness observations on one synthetic specimen. It does not represent the Science paper or any physical measurement, and it does not infer a pairing temperature or a new Tc.
+
+
+## Current seed-registry inventory
+
+The current v0.1 registry contains 23 source records, 13 candidate/material references and 18 benchmark catalogs. This is a source inventory, not 23 independent experiments or 13 validated new superconductors. The new metallic-screening, single-plane, spatial-coherence and stiffness-metrology sources are separately represented, and the source-level measurement/claim boundaries are preserved.
