@@ -31,6 +31,13 @@ The package is an isolated Cargo workspace. Metric and baseline code is standard
 
 The uniform-delay NG-RC implementation is a transparent local reference variant: it fixes the delay count/spacing and includes all linear taps plus pairwise quadratic terms. It is not a faithful reproduction of NGRC-MDS and does not replace the separate paper-parity work in #12624.
 
+The chronological tournament selects the declared NG-RC arm on the validation prefix only:
+- delay count ∈ {1, 2, 3, 4};
+- uniform spacing ∈ {1, 2};
+- ridge penalty ∈ {0, 10⁻⁸, 10⁻⁵}.
+
+It minimizes full validation free-running NRMSE with deterministic tie-breaking (score, delay count, spacing, penalty), then refits the selected feature/readout configuration on the 70% development prefix and forecasts the 30% test suffix recursively from one fixed origin. No test-time observations are assimilated. The CSV reports the selected configuration in the model name and the validation NRMSE; the `ar_order` column remains empty for NG-RC. This is a small reproducible baseline search, not a broad hyperparameter sweep or an assertion that this configuration is optimal for every dynamical system.
+
 ## Held-out split-manifest V1
 
 The manifest module is the first executable R0/R1 handoff for [issue #12608](https://github.com/Luminous-Dynamics/symthaea/issues/12608).
