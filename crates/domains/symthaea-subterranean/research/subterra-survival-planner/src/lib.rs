@@ -342,7 +342,6 @@ impl ExpectedResources {
         .validate()?;
         Ok(result)
     }
-
 }
 
 #[derive(Debug, Clone, PartialEq)]
