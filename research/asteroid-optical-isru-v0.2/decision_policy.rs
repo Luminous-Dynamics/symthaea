@@ -67,6 +67,25 @@ impl SafetyState {
             Gate::IndependentAssayPassed => self.independent_assay_passed,
         }
     }
+
+    fn with_updates(&self, updates: &[GateUpdate]) -> Self {
+        let mut next = *self;
+        for update in updates {
+            match update.gate {
+                Gate::InstrumentCalibrated => next.instrument_calibrated = update.satisfied,
+                Gate::OpticalPathQualified => next.optical_path_qualified = update.satisfied,
+                Gate::ReferenceChannelValid => next.reference_channel_valid = update.satisfied,
+                Gate::QcmWitnessChainValid => next.qcm_witness_chain_valid = update.satisfied,
+                Gate::IndependentAssayPassed => next.independent_assay_passed = update.satisfied,
+                Gate::SampleIdentityValid
+                | Gate::ThermalEnvelopeSafe
+                | Gate::CleaningProtocolQualified
+                | Gate::CalibrationStandardValid
+                | Gate::IndependentAssayChainValid => {}
+            }
+        }
+        next
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -84,11 +103,23 @@ pub struct DecisionOption {
     pub required_gates: Vec<Gate>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GateUpdate {
+    pub gate: Gate,
+    pub satisfied: bool,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ObservationOutcome {
     pub id: String,
-    /// P(this outcome | each hypothesis), in hypothesis order.
+    /// P(this outcome | each current hypothesis), in hypothesis order.
     pub likelihood_by_hypothesis: Vec<f64>,
+    /// Conditional P(next hypothesis | current hypothesis, outcome).
+    /// Rows index current hypotheses; columns index next hypotheses.
+    /// Measurement-only actions use an identity matrix.
+    pub next_hypothesis_probability: Vec<Vec<f64>>,
+    /// Only action-specific evidence gates may be updated by an outcome.
+    pub gate_updates: Vec<GateUpdate>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -156,6 +187,11 @@ pub enum PolicyError {
     InvalidLoss,
     InvalidLikelihood,
     OutcomeLikelihoodsDoNotNormalize,
+    InvalidTransition,
+    TransitionProbabilitiesDoNotNormalize,
+    DuplicateGateUpdate,
+    ProtectedGateUpdate,
+    InvalidGateUpdateForAction,
     InvalidCost,
     InvalidCostWeights,
     InvalidPolicyConfig,
@@ -169,7 +205,7 @@ pub struct ActionEvaluation {
     pub eligible: bool,
     pub blockers: Vec<Gate>,
     pub weighted_cost_units: Option<f64>,
-    pub expected_value_of_sample_information: Option<f64>,
+    pub expected_value_of_action: Option<f64>,
     pub gross_value_per_cost: Option<f64>,
     pub net_value: Option<f64>,
     pub net_value_per_cost: Option<f64>,
@@ -241,7 +277,7 @@ impl DecisionDirectedPolicy {
                     eligible: false,
                     blockers,
                     weighted_cost_units: None,
-                    expected_value_of_sample_information: None,
+                    expected_value_of_action: None,
                     gross_value_per_cost: None,
                     net_value: None,
                     net_value_per_cost: None,
@@ -251,15 +287,15 @@ impl DecisionDirectedPolicy {
             }
 
             let cost_units = action.cost.weighted_units(self.config.cost_weights);
-            let evsi = expected_value_of_sample_information(
+            let action_value = expected_value_of_action(
                 &prior,
                 baseline_risk,
                 &problem.decisions,
-                &eligible_decisions,
+                safety,
                 &action.outcomes,
-            );
-            let gross_value_per_cost = evsi / cost_units;
-            let net_value = evsi - self.config.cost_loss_weight * cost_units;
+            )?;
+            let gross_value_per_cost = action_value / cost_units;
+            let net_value = action_value - self.config.cost_loss_weight * cost_units;
             let net_value_per_cost = net_value / cost_units;
 
             if net_value > self.config.minimum_net_value
@@ -284,7 +320,7 @@ impl DecisionDirectedPolicy {
                 eligible: true,
                 blockers: Vec::new(),
                 weighted_cost_units: Some(cost_units),
-                expected_value_of_sample_information: Some(evsi),
+                expected_value_of_action: Some(action_value),
                 gross_value_per_cost: Some(gross_value_per_cost),
                 net_value: Some(net_value),
                 net_value_per_cost: Some(net_value_per_cost),
@@ -418,9 +454,50 @@ fn validate_problem(problem: &CampaignProblem, weights: CostWeights) -> Result<(
             if !outcome_ids.insert(outcome.id.as_str()) {
                 return Err(PolicyError::DuplicateIdentifier);
             }
-            if outcome.likelihood_by_hypothesis.len() != hypothesis_count {
-                return Err(PolicyError::InvalidLikelihood);
+            if outcome.likelihood_by_hypothesis.len() != hypothesis_count
+                || outcome.next_hypothesis_probability.len() != hypothesis_count
+            {
+                return Err(PolicyError::InvalidTransition);
             }
+
+            let mut updated_gates = BTreeSet::new();
+            for update in &outcome.gate_updates {
+                if !updated_gates.insert(update.gate) {
+                    return Err(PolicyError::DuplicateGateUpdate);
+                }
+                if matches!(
+                    update.gate,
+                    Gate::SampleIdentityValid
+                        | Gate::ThermalEnvelopeSafe
+                        | Gate::CleaningProtocolQualified
+                        | Gate::CalibrationStandardValid
+                        | Gate::IndependentAssayChainValid
+                ) {
+                    return Err(PolicyError::ProtectedGateUpdate);
+                }
+                let permitted = match action.kind {
+                    CampaignActionKind::MaterialExperiment => false,
+                    CampaignActionKind::OpticalReference => {
+                        update.gate == Gate::ReferenceChannelValid
+                    }
+                    CampaignActionKind::QcmWitnessInspection => {
+                        update.gate == Gate::QcmWitnessChainValid
+                    }
+                    CampaignActionKind::Calibration => {
+                        update.gate == Gate::InstrumentCalibrated
+                    }
+                    CampaignActionKind::CleaningRequalification => {
+                        update.gate == Gate::OpticalPathQualified
+                    }
+                    CampaignActionKind::IndependentAssay => {
+                        update.gate == Gate::IndependentAssayPassed
+                    }
+                };
+                if !permitted {
+                    return Err(PolicyError::InvalidGateUpdateForAction);
+                }
+            }
+
             for (hypothesis_index, likelihood) in
                 outcome.likelihood_by_hypothesis.iter().enumerate()
             {
@@ -428,6 +505,23 @@ fn validate_problem(problem: &CampaignProblem, weights: CostWeights) -> Result<(
                     return Err(PolicyError::InvalidLikelihood);
                 }
                 likelihood_sums[hypothesis_index] += likelihood;
+
+                let transition_row = &outcome.next_hypothesis_probability[hypothesis_index];
+                if transition_row.len() != hypothesis_count {
+                    return Err(PolicyError::InvalidTransition);
+                }
+                let transition_sum: f64 = transition_row.iter().sum();
+                if transition_row
+                    .iter()
+                    .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
+                {
+                    return Err(PolicyError::InvalidTransition);
+                }
+                if !transition_sum.is_finite()
+                    || (transition_sum - 1.0).abs() > PROBABILITY_TOLERANCE
+                {
+                    return Err(PolicyError::TransitionProbabilitiesDoNotNormalize);
+                }
             }
         }
         if likelihood_sums
@@ -476,14 +570,17 @@ fn expected_loss(probabilities: &[f64], losses: &[f64]) -> f64 {
         .sum()
 }
 
-fn expected_value_of_sample_information(
+/// Expected reduction in terminal decision risk, including observation,
+/// action-conditioned hypothesis transitions and permitted evidence-gate changes.
+/// With identity transitions and no gate updates this reduces to ordinary EVSI.
+fn expected_value_of_action(
     prior: &[f64],
     baseline_risk: f64,
     decisions: &[DecisionOption],
-    eligible_decisions: &[usize],
+    safety: &SafetyState,
     outcomes: &[ObservationOutcome],
-) -> f64 {
-    let mut expected_posterior_risk = 0.0;
+) -> Result<f64, PolicyError> {
+    let mut expected_next_risk = 0.0;
 
     for outcome in outcomes {
         let outcome_probability = prior
@@ -496,25 +593,63 @@ fn expected_value_of_sample_information(
             continue;
         }
 
-        let posterior: Vec<f64> = prior
+        let hypothesis_count = prior.len();
+        let mut next_hypothesis_mass = vec![0.0; hypothesis_count];
+        for current_index in 0..hypothesis_count {
+            let current_mass =
+                prior[current_index] * outcome.likelihood_by_hypothesis[current_index];
+            for (next_index, transition_probability) in outcome
+                .next_hypothesis_probability[current_index]
+                .iter()
+                .enumerate()
+            {
+                next_hypothesis_mass[next_index] += current_mass * transition_probability;
+            }
+        }
+
+        let next_posterior: Vec<f64> = next_hypothesis_mass
             .iter()
-            .zip(&outcome.likelihood_by_hypothesis)
-            .map(|(probability, likelihood)| probability * likelihood / outcome_probability)
+            .map(|mass| mass / outcome_probability)
+            .collect();
+        let next_safety = safety.with_updates(&outcome.gate_updates);
+        let eligible_next_decisions: Vec<usize> = decisions
+            .iter()
+            .enumerate()
+            .filter_map(|(index, decision)| {
+                decision
+                    .required_gates
+                    .iter()
+                    .all(|gate| next_safety.satisfies(*gate))
+                    .then_some(index)
+            })
             .collect();
 
-        let (_, posterior_risk) = best_decision(&posterior, decisions, eligible_decisions)
-            .expect("baseline validation guarantees an eligible decision");
-        expected_posterior_risk += outcome_probability * posterior_risk;
+        let (_, next_risk) =
+            best_decision(&next_posterior, decisions, &eligible_next_decisions)
+                .ok_or(PolicyError::NoEligibleTerminalDecision)?;
+        expected_next_risk += outcome_probability * next_risk;
     }
 
-    // Information cannot worsen Bayes risk when the decision-maker may ignore it.
-    // Clamp floating-point residue, but surface any material violation in tests.
-    (baseline_risk - expected_posterior_risk).max(0.0)
+    Ok((baseline_risk - expected_next_risk).max(0.0))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn observation(id: &str, likelihood_by_hypothesis: Vec<f64>) -> ObservationOutcome {
+        let count = likelihood_by_hypothesis.len();
+        let mut transition = vec![vec![0.0; count]; count];
+        for (index, row) in transition.iter_mut().enumerate() {
+            row[index] = 1.0;
+        }
+        ObservationOutcome {
+            id: id.to_string(),
+            likelihood_by_hypothesis,
+            next_hypothesis_probability: transition,
+            gate_updates: Vec::new(),
+        }
+    }
 
     fn weights() -> CostWeights {
         CostWeights {
@@ -595,14 +730,8 @@ mod tests {
                         Gate::ReferenceChannelValid,
                     ],
                     outcomes: vec![
-                        ObservationOutcome {
-                            id: "high-proxy".to_string(),
-                            likelihood_by_hypothesis: vec![0.75, 0.25],
-                        },
-                        ObservationOutcome {
-                            id: "low-proxy".to_string(),
-                            likelihood_by_hypothesis: vec![0.25, 0.75],
-                        },
+                        observation("high-proxy", vec![0.75, 0.25]),
+                        observation("low-proxy", vec![0.25, 0.75]),
                     ],
                 },
                 ActionOption {
@@ -616,14 +745,8 @@ mod tests {
                     },
                     required_gates: vec![Gate::InstrumentCalibrated, Gate::QcmWitnessChainValid],
                     outcomes: vec![
-                        ObservationOutcome {
-                            id: "clean-reading".to_string(),
-                            likelihood_by_hypothesis: vec![0.95, 0.05],
-                        },
-                        ObservationOutcome {
-                            id: "fouled-reading".to_string(),
-                            likelihood_by_hypothesis: vec![0.05, 0.95],
-                        },
+                        observation("clean-reading", vec![0.95, 0.05]),
+                        observation("fouled-reading", vec![0.05, 0.95]),
                     ],
                 },
             ],
@@ -689,17 +812,14 @@ mod tests {
                 experiment_equivalents: 0.0,
             },
             required_gates: Vec::new(),
-            outcomes: vec![ObservationOutcome {
-                id: "same".to_string(),
-                likelihood_by_hypothesis: vec![1.0, 1.0],
-            }],
+            outcomes: vec![observation("same", vec![1.0, 1.0])],
         }];
         let result = DecisionDirectedPolicy { config: config() }
             .evaluate(&candidate, &safety())
             .unwrap();
         assert_eq!(result.selected_action_id, None);
         assert_eq!(
-            result.evaluations[0].expected_value_of_sample_information,
+            result.evaluations[0].expected_value_of_action,
             Some(0.0)
         );
     }
