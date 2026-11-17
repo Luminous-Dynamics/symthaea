@@ -4,7 +4,12 @@
 //! dispositions from separately governed services; it does not authenticate
 //! signatures, determine legal rights, calibrate sensors, or validate EVSI.
 
-use subterra_inspection_campaign::InspectionOption;
+use std::collections::{BTreeMap, BTreeSet};
+
+use subterra_inspection_campaign::{
+    AssuranceBindings, CampaignBudget, CampaignError, CampaignProblem, CampaignReport,
+    DecisionRequirement, DeploymentBundle, InspectionOption, optimize_campaign,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EvidencePurpose {
@@ -369,6 +374,147 @@ pub fn admit_candidate(
     }
 }
 
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RejectedCampaignCandidate {
+    pub candidate_id: String,
+    pub option_id: String,
+    pub reasons: Vec<RejectionReason>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CampaignAdmissionError {
+    EmptyCandidateSet,
+    DuplicateContextOptionId(String),
+    DuplicateCandidateOptionId(String),
+    MissingContextForOption(String),
+    RejectedCandidates(Vec<RejectedCampaignCandidate>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidenceBoundCampaignReport {
+    pub campaign: CampaignReport,
+    /// All admitted manifests, including candidates not selected by the optimizer.
+    pub candidate_evidence: Vec<EvidenceManifest>,
+    /// Manifests corresponding exactly to options selected by the optimizer.
+    pub selected_evidence: Vec<EvidenceManifest>,
+}
+
+/// Campaign wrapper that can only be constructed through evidence admission.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EvidenceBoundCampaign {
+    problem: CampaignProblem,
+    evidence_manifests: Vec<EvidenceManifest>,
+}
+
+impl EvidenceBoundCampaign {
+    pub fn candidate_count(&self) -> usize {
+        self.problem.options.len()
+    }
+
+    pub fn optimize(&self) -> Result<EvidenceBoundCampaignReport, CampaignError> {
+        let campaign = optimize_campaign(&self.problem)?;
+        let selected_ids = campaign
+            .selection
+            .selected_option_ids
+            .iter()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>();
+        let selected_evidence = self
+            .evidence_manifests
+            .iter()
+            .filter(|manifest| selected_ids.contains(manifest.option_id.as_str()))
+            .cloned()
+            .collect();
+
+        Ok(EvidenceBoundCampaignReport {
+            campaign,
+            candidate_evidence: self.evidence_manifests.clone(),
+            selected_evidence,
+        })
+    }
+}
+
+/// Build a campaign only when every supplied candidate is admitted by its
+/// exact frozen context. A single rejected candidate aborts the whole build;
+/// callers cannot accidentally continue with a partial, silently filtered set.
+pub fn build_evidence_bound_campaign(
+    mut candidates: Vec<CandidateInspectionOption>,
+    expected_contexts: &[ExpectedInspectionContext],
+    decisions: Vec<DecisionRequirement>,
+    deployment_bundles: Vec<DeploymentBundle>,
+    budget: CampaignBudget,
+    assurance: AssuranceBindings,
+    maximum_search_nodes: u64,
+) -> Result<EvidenceBoundCampaign, CampaignAdmissionError> {
+    if candidates.is_empty() {
+        return Err(CampaignAdmissionError::EmptyCandidateSet);
+    }
+
+    let mut contexts = BTreeMap::new();
+    for context in expected_contexts {
+        if contexts
+            .insert(context.option_id.as_str(), context)
+            .is_some()
+        {
+            return Err(CampaignAdmissionError::DuplicateContextOptionId(
+                context.option_id.clone(),
+            ));
+        }
+    }
+
+    candidates.sort_by(|a, b| a.option.option_id.cmp(&b.option.option_id));
+    let mut seen_options = BTreeSet::new();
+    let mut admitted_options = Vec::with_capacity(candidates.len());
+    let mut evidence_manifests = Vec::with_capacity(candidates.len());
+    let mut rejected = Vec::new();
+
+    for candidate in &candidates {
+        let option_id = candidate.option.option_id.as_str();
+        if !seen_options.insert(option_id) {
+            return Err(CampaignAdmissionError::DuplicateCandidateOptionId(
+                option_id.to_string(),
+            ));
+        }
+        let Some(context) = contexts.get(option_id) else {
+            return Err(CampaignAdmissionError::MissingContextForOption(
+                option_id.to_string(),
+            ));
+        };
+        let report = admit_candidate(candidate, context);
+        if let Some(admitted) = report.admitted_candidate {
+            admitted_options.push(admitted.option);
+            evidence_manifests.push(admitted.manifest);
+        } else {
+            rejected.push(RejectedCampaignCandidate {
+                candidate_id: report.candidate_id,
+                option_id: candidate.option.option_id.clone(),
+                reasons: report.rejection_reasons,
+            });
+        }
+    }
+
+    if !rejected.is_empty() {
+        return Err(CampaignAdmissionError::RejectedCandidates(rejected));
+    }
+
+    let problem = CampaignProblem {
+        campaign_id: "evidence-bound-subterra-campaign".into(),
+        decisions,
+        deployment_bundles,
+        options: admitted_options,
+        budget,
+        assurance,
+        maximum_search_nodes,
+    };
+    evidence_manifests.sort_by(|a, b| a.option_id.cmp(&b.option_id));
+
+    Ok(EvidenceBoundCampaign {
+        problem,
+        evidence_manifests,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -719,6 +865,124 @@ mod tests {
                 .contains(&RejectionReason::EmptyRequiredDigest)
         );
         assert!(report.admitted_candidate.is_none());
+    }
+
+    fn campaign_budget() -> CampaignBudget {
+        CampaignBudget {
+            resources: ResourceVector {
+                energy_millijoules: 100_000,
+                duration_milliseconds: 100_000,
+                data_bytes: 100_000,
+                exposure_milliunits: 100_000,
+            },
+            mission_interruption_upper_ppm: 100_000,
+            robot_loss_upper_ppm: 100_000,
+        }
+    }
+
+    fn campaign_assurance() -> AssuranceBindings {
+        AssuranceBindings {
+            common_cause_graph_digest: "synthetic:graph".into(),
+            fault_domain_profile_digest: "synthetic:profile".into(),
+            common_cause_assessment_digest: "synthetic:assessment".into(),
+            portfolio_value_assessment_digest: "synthetic:factorization".into(),
+            inventory_disposition:
+                subterra_inspection_campaign::InventoryDisposition::Unknown,
+            additive_value_factorization_complete: false,
+        }
+    }
+
+    fn campaign_decisions() -> Vec<DecisionRequirement> {
+        vec![DecisionRequirement {
+            decision_id: "support-08".into(),
+            mandatory: false,
+        }]
+    }
+
+    fn campaign_bundles() -> Vec<DeploymentBundle> {
+        vec![DeploymentBundle {
+            bundle_id: "corridor-west".into(),
+            fixed_resources: ResourceVector::default(),
+        }]
+    }
+
+    #[test]
+    fn campaign_builder_retains_manifests_and_optimizes_only_admitted_options() {
+        let built = build_evidence_bound_campaign(
+            vec![candidate()],
+            &[context()],
+            campaign_decisions(),
+            campaign_bundles(),
+            campaign_budget(),
+            campaign_assurance(),
+            1_000,
+        )
+        .unwrap();
+        assert_eq!(built.candidate_count(), 1);
+        let report = built.optimize().unwrap();
+        assert_eq!(report.campaign.selection.selected_option_ids.len(), 1);
+        assert_eq!(report.candidate_evidence.len(), 1);
+        assert_eq!(report.selected_evidence.len(), 1);
+        assert_eq!(
+            report.selected_evidence[0].observation_receipt_digest,
+            "sha256:observation"
+        );
+    }
+
+    #[test]
+    fn one_rejected_candidate_aborts_the_entire_campaign_build() {
+        let mut stale = candidate();
+        stale.manifest.observation_captured_at_unix_ms = NOW - 3_600_001;
+        let result = build_evidence_bound_campaign(
+            vec![candidate(), stale],
+            &[context()],
+            campaign_decisions(),
+            campaign_bundles(),
+            campaign_budget(),
+            campaign_assurance(),
+            1_000,
+        );
+        assert!(matches!(
+            result,
+            Err(CampaignAdmissionError::RejectedCandidates(rejections))
+                if rejections.len() == 1
+                    && rejections[0].reasons.contains(&RejectionReason::ObservationStale)
+        ));
+    }
+
+    #[test]
+    fn campaign_builder_rejects_missing_and_duplicate_contexts() {
+        let missing = build_evidence_bound_campaign(
+            vec![candidate()],
+            &[],
+            campaign_decisions(),
+            campaign_bundles(),
+            campaign_budget(),
+            campaign_assurance(),
+            1_000,
+        );
+        assert_eq!(
+            missing,
+            Err(CampaignAdmissionError::MissingContextForOption(
+                "support-08-thermal-followup".into()
+            ))
+        );
+
+        let duplicate = build_evidence_bound_campaign(
+            vec![candidate()],
+            &[context(), context()],
+            campaign_decisions(),
+            campaign_bundles(),
+            campaign_budget(),
+            campaign_assurance(),
+            1_000,
+        );
+        assert_eq!(
+            duplicate,
+            Err(CampaignAdmissionError::DuplicateContextOptionId(
+                "support-08-thermal-followup".into()
+            ))
+        );
     }
 
     #[test]
