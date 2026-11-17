@@ -34,7 +34,7 @@
         "evidence_accepted": true,
         "calibration_valid": true,
         "factorization_qualified": true,
-        "dependence_mode": "single_channel",
+        "dependence_mode": "no_evidence",
         "temporal_valid": true,
         "actual_output_possible": true,
         "false_observation_count": 0,
@@ -146,7 +146,7 @@
         "evidence_accepted": true,
         "calibration_valid": true,
         "factorization_qualified": true,
-        "dependence_mode": "single_channel",
+        "dependence_mode": "no_evidence",
         "temporal_valid": true,
         "actual_output_possible": true,
         "false_observation_count": 0,
@@ -196,7 +196,7 @@
         "evidence_accepted": true,
         "calibration_valid": true,
         "factorization_qualified": true,
-        "dependence_mode": "single_channel",
+        "dependence_mode": "no_evidence",
         "temporal_valid": true,
         "actual_output_possible": true,
         "false_observation_count": 0,
@@ -308,7 +308,7 @@
         "evidence_accepted": true,
         "calibration_valid": true,
         "factorization_qualified": true,
-        "dependence_mode": "single_channel",
+        "dependence_mode": "no_evidence",
         "temporal_valid": true,
         "actual_output_possible": true,
         "false_observation_count": 0,
@@ -407,5 +407,6 @@
       "decision_kind": "defer"
     }
   ],
-  "claim_ceiling": "Synthetic evaluator that injects an evaluator-owned unknown-world hypothesis and contamination reserve into D6.17.1 robust risk evaluation. The reserve is an explicit stress assumption, not an estimated probability of all omitted hazards. It does not prove model completeness, estimate real-world contamination, authenticate unknown-world likelihood bounds, or authorize production actions."
+  "claim_ceiling": "Synthetic evaluator that injects an evaluator-owned unknown-world hypothesis and contamination reserve into D6.17.1 robust risk evaluation. The reserve is an explicit stress assumption, not an estimated probability of all omitted hazards. It does not prove model completeness, estimate real-world contamination, authenticate unknown-world likelihood bounds, or authorize production actions.",
+  "contamination_nominal_bps": 1000
 }
