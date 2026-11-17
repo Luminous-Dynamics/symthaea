@@ -122,9 +122,11 @@ pub fn describe(
     }
 
     let count = points.len() as f64;
+    // Divide before summing to reduce avoidable overflow for large coordinate
+    // magnitudes while preserving the same arithmetic mean.
     let centroid = Point2::new(
-        points.iter().map(|point| point.x).sum::<f64>() / count,
-        points.iter().map(|point| point.y).sum::<f64>() / count,
+        points.iter().map(|point| point.x / count).sum::<f64>(),
+        points.iter().map(|point| point.y / count).sum::<f64>(),
     );
 
     let mut min = points[0];
