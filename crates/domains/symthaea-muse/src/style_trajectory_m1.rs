@@ -648,7 +648,27 @@ fn duration_less_than(left: Duration, right: Duration) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use symthaea_music_theory::PitchClass;
+    use symthaea_music_theory::{Key, PartId, Pitch, PitchClass, ScoreNote};
+
+    fn fixture_score(notes: Vec<ScoreNote>, total_beats: i64) -> Score {
+        let mut score = Score::new(Key::major(PitchClass::C), 120.0, 4);
+        score.notes = notes;
+        score.total_beats = Duration::new(total_beats, 1);
+        score
+    }
+
+    fn fixture_note(onset: i64, duration: i64) -> ScoreNote {
+        ScoreNote {
+            part: PartId::UNASSIGNED,
+            pitch: Pitch::new(PitchClass::C, 4),
+            onset: Duration::new(onset, 1),
+            duration: Duration::new(duration, 1),
+            velocity: 0.7,
+            role: VoiceRole::Melody,
+            emphasis: Emphasis::Normal,
+            section_intensity: 1.0,
+        }
+    }
 
     fn m1_intent(arousal: f32) -> MusicalIntent {
         MusicalIntent {
@@ -721,6 +741,29 @@ mod tests {
         let right = realize_classical_to_minimalism_m1(intent).unwrap();
         assert_eq!(left, right);
         assert_eq!(left.composed_score_sha256, right.composed_score_sha256);
+    }
+
+    #[test]
+    fn boundary_evidence_reports_source_tail_and_target_entry_gaps() {
+        let left = fixture_score(vec![fixture_note(0, 3)], 4);
+        let right = fixture_score(vec![fixture_note(1, 1)], 2);
+        let evidence =
+            measure_hard_boundary(&left, &right, Duration::new(4, 1)).unwrap();
+        assert_eq!(evidence.left_last_event_end, Duration::new(3, 1));
+        assert_eq!(evidence.right_first_event_start, Duration::new(1, 1));
+        assert_eq!(evidence.left_tail_gap, Duration::new(1, 1));
+        assert_eq!(evidence.right_entry_gap, Duration::new(1, 1));
+        assert_eq!(evidence.cross_boundary_event_count, 0);
+    }
+
+    #[test]
+    fn boundary_evidence_detects_an_event_that_crosses_the_boundary() {
+        let left = fixture_score(vec![fixture_note(3, 2)], 5);
+        let right = fixture_score(vec![fixture_note(0, 1)], 1);
+        let evidence =
+            measure_hard_boundary(&left, &right, Duration::new(4, 1)).unwrap();
+        assert_eq!(evidence.left_last_event_end, Duration::new(5, 1));
+        assert_eq!(evidence.cross_boundary_event_count, 1);
     }
 
     #[test]
