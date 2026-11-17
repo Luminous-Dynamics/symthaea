@@ -1,0 +1,321 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/lightshell_spacer_doe_v0_1.schema.json",
+  "title": "Lightshell Spacer Textile DoE Manifest v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "state",
+    "parent_article_id",
+    "process_capability",
+    "controls",
+    "factors",
+    "candidate_structures",
+    "response_domains",
+    "specimen_allocation",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "experiment_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "capability_pending",
+        "preregistered",
+        "running",
+        "complete",
+        "invalidated"
+      ]
+    },
+    "parent_article_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "process_capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "machine_ref",
+        "capability_state",
+        "program_revision",
+        "notes"
+      ],
+      "properties": {
+        "machine_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "capability_state": {
+          "enum": [
+            "unknown",
+            "preflight_pending",
+            "qualified_for_sample",
+            "not_capable"
+          ]
+        },
+        "program_revision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "controls": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "control_id",
+          "architecture",
+          "matching_basis",
+          "availability"
+        ],
+        "properties": {
+          "control_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "architecture": {
+            "enum": [
+              "plain_spacer",
+              "textile_only",
+              "foam_equal_thickness",
+              "foam_equal_areal_mass",
+              "commercial_spacer"
+            ]
+          },
+          "matching_basis": {
+            "enum": [
+              "structural_baseline",
+              "no_spacer_baseline",
+              "equal_thickness",
+              "equal_areal_mass",
+              "commercial_baseline"
+            ]
+          },
+          "availability": {
+            "enum": [
+              "unknown",
+              "planned",
+              "available",
+              "not_comparable"
+            ]
+          }
+        }
+      }
+    },
+    "factors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "factor_id",
+          "unit_or_encoding",
+          "levels",
+          "capability_dependent"
+        ],
+        "properties": {
+          "factor_id": {
+            "enum": [
+              "inlay_architecture",
+              "spacer_frequency",
+              "transition_geometry",
+              "face_construction",
+              "inlay_material"
+            ]
+          },
+          "unit_or_encoding": {
+            "type": "string",
+            "minLength": 1
+          },
+          "levels": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "capability_dependent": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "candidate_structures": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "candidate_id",
+          "inlay_architecture",
+          "spacer_frequency",
+          "transition_geometry",
+          "state",
+          "material_lot_ref",
+          "process_revision_ref",
+          "replicate_plan"
+        ],
+        "properties": {
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "inlay_architecture": {
+            "enum": [
+              "none",
+              "float",
+              "square_wave",
+              "square_wave_anchored_tuck"
+            ]
+          },
+          "spacer_frequency": {
+            "enum": [
+              "low",
+              "reference",
+              "high"
+            ]
+          },
+          "transition_geometry": {
+            "enum": [
+              "not_applicable",
+              "one_needle",
+              "two_needles",
+              "three_needles",
+              "not_defined"
+            ]
+          },
+          "state": {
+            "enum": [
+              "proposed",
+              "not_manufacturable",
+              "fabricated",
+              "coupon_tested",
+              "invalidated"
+            ]
+          },
+          "material_lot_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "process_revision_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "replicate_plan": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "response_domains": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "enum": [
+          "identity_dimensions",
+          "compression",
+          "impact",
+          "vibration",
+          "airflow",
+          "thermal",
+          "flex_fatigue",
+          "abrasion",
+          "cleaning_aging",
+          "repairability"
+        ]
+      }
+    },
+    "specimen_allocation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "randomization_seed",
+        "blocking_variables",
+        "destructive_tests_isolated",
+        "confirmatory_holdout",
+        "sample_size_rationale"
+      ],
+      "properties": {
+        "randomization_seed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "blocking_variables": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "destructive_tests_isolated": {
+          "const": true
+        },
+        "confirmatory_holdout": {
+          "type": "boolean"
+        },
+        "sample_size_rationale": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "material_lot_binding",
+        "process_binding",
+        "instrument_calibration_binding",
+        "raw_data_digest_required",
+        "uncertainty_required",
+        "paper_results_not_lightshell_results"
+      ],
+      "properties": {
+        "material_lot_binding": {
+          "const": true
+        },
+        "process_binding": {
+          "const": true
+        },
+        "instrument_calibration_binding": {
+          "const": true
+        },
+        "raw_data_digest_required": {
+          "const": true
+        },
+        "uncertainty_required": {
+          "const": true
+        },
+        "paper_results_not_lightshell_results": {
+          "const": true
+        }
+      }
+    }
+  }
+}
