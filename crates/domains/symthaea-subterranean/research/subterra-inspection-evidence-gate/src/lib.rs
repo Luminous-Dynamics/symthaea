@@ -162,11 +162,7 @@ fn missing(value: &str) -> bool {
     value.trim().is_empty()
 }
 
-fn push_if_mismatch(
-    reasons: &mut Vec<RejectionReason>,
-    mismatch: bool,
-    reason: RejectionReason,
-) {
+fn push_if_mismatch(reasons: &mut Vec<RejectionReason>, mismatch: bool, reason: RejectionReason) {
     if mismatch {
         reasons.push(reason);
     }
@@ -376,9 +372,7 @@ pub fn admit_candidate(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use subterra_inspection_campaign::{
-        ResourceVector,
-    };
+    use subterra_inspection_campaign::ResourceVector;
 
     const NOW: u64 = 1_800_000_000_000;
 
@@ -458,7 +452,10 @@ mod tests {
         assert!(report.admitted_candidate.is_some());
         let admitted = report.admitted_candidate.as_ref().unwrap();
         assert_eq!(admitted.manifest.asset_revision, "rev-17");
-        assert_eq!(admitted.campaign_option().option_id, "support-08-thermal-followup");
+        assert_eq!(
+            admitted.campaign_option().option_id,
+            "support-08-thermal-followup"
+        );
         assert_eq!(report.evidence_references.len(), 6);
     }
 
@@ -467,7 +464,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.observation_captured_at_unix_ms = NOW - 3_600_001;
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::ObservationStale));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::ObservationStale)
+        );
         assert!(report.admitted_candidate.is_none());
     }
 
@@ -476,7 +477,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.observation_captured_at_unix_ms = NOW + 5_001;
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::ObservationFromFuture));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::ObservationFromFuture)
+        );
     }
 
     #[test]
@@ -491,7 +496,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.calibration_valid_until_unix_ms = NOW;
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::CalibrationExpired));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::CalibrationExpired)
+        );
     }
 
     #[test]
@@ -499,7 +508,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.rights_valid_until_unix_ms = NOW;
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::RightsGrantExpired));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::RightsGrantExpired)
+        );
     }
 
     #[test]
@@ -507,7 +520,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.calibration_valid_from_unix_ms = NOW + 1;
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::CalibrationNotYetValid));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::CalibrationNotYetValid)
+        );
     }
 
     #[test]
@@ -515,7 +532,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.evidence_valid_until_unix_ms = NOW;
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::EvidenceExpired));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::EvidenceExpired)
+        );
     }
 
     #[test]
@@ -523,7 +544,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.asset_revision = "rev-16".into();
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::AssetRevisionMismatch));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::AssetRevisionMismatch)
+        );
     }
 
     #[test]
@@ -531,7 +556,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.coordinate_frame_digest = "sha256:wrong-frame".into();
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::CoordinateFrameMismatch));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::CoordinateFrameMismatch)
+        );
     }
 
     #[test]
@@ -540,8 +569,16 @@ mod tests {
         item.manifest.likelihood_model_digest = "sha256:new-likelihood".into();
         item.manifest.loss_table_digest = "sha256:new-loss-table".into();
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::LikelihoodModelMismatch));
-        assert!(report.rejection_reasons.contains(&RejectionReason::LossTableMismatch));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::LikelihoodModelMismatch)
+        );
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::LossTableMismatch)
+        );
     }
 
     #[test]
@@ -549,40 +586,69 @@ mod tests {
         let mut item = candidate();
         item.manifest.evsi_assessment_digest = "sha256:other-evsi".into();
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::EvsiAssessmentMismatch));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::EvsiAssessmentMismatch)
+        );
     }
 
     #[test]
     fn denied_or_unknown_rights_are_rejected() {
         let mut denied = candidate();
         denied.manifest.rights_disposition = RightsDisposition::Denied;
-        assert!(admit_candidate(&denied, &context()).rejection_reasons.contains(&RejectionReason::RightsDenied));
+        assert!(
+            admit_candidate(&denied, &context())
+                .rejection_reasons
+                .contains(&RejectionReason::RightsDenied)
+        );
 
         let mut unknown = candidate();
         unknown.manifest.rights_disposition = RightsDisposition::Unknown;
-        assert!(admit_candidate(&unknown, &context()).rejection_reasons.contains(&RejectionReason::RightsUnknown));
+        assert!(
+            admit_candidate(&unknown, &context())
+                .rejection_reasons
+                .contains(&RejectionReason::RightsUnknown)
+        );
     }
 
     #[test]
     fn unverified_or_revoked_receipt_disposition_is_rejected() {
         let mut unknown = candidate();
         unknown.manifest.receipt_verification = ReceiptVerificationDisposition::Unknown;
-        assert!(admit_candidate(&unknown, &context()).rejection_reasons.contains(&RejectionReason::ReceiptVerificationUnknown));
+        assert!(
+            admit_candidate(&unknown, &context())
+                .rejection_reasons
+                .contains(&RejectionReason::ReceiptVerificationUnknown)
+        );
 
         let mut rejected = candidate();
-        rejected.manifest.receipt_verification = ReceiptVerificationDisposition::RejectedByExternalService;
-        assert!(admit_candidate(&rejected, &context()).rejection_reasons.contains(&RejectionReason::ReceiptRejected));
+        rejected.manifest.receipt_verification =
+            ReceiptVerificationDisposition::RejectedByExternalService;
+        assert!(
+            admit_candidate(&rejected, &context())
+                .rejection_reasons
+                .contains(&RejectionReason::ReceiptRejected)
+        );
     }
 
     #[test]
     fn partial_or_unknown_spatial_coverage_is_rejected() {
         let mut partial = candidate();
         partial.manifest.spatial_scope = SpatialScopeDisposition::Partial;
-        assert!(admit_candidate(&partial, &context()).rejection_reasons.contains(&RejectionReason::SpatialScopePartial));
+        assert!(
+            admit_candidate(&partial, &context())
+                .rejection_reasons
+                .contains(&RejectionReason::SpatialScopePartial)
+        );
 
         let mut unknown = candidate();
         unknown.manifest.spatial_scope = SpatialScopeDisposition::Unknown;
-        assert!(admit_candidate(&unknown, &context()).rejection_reasons.contains(&RejectionReason::SpatialScopeUnknown));
+        assert!(
+            admit_candidate(&unknown, &context())
+                .rejection_reasons
+                .contains(&RejectionReason::SpatialScopeUnknown)
+        );
     }
 
     #[test]
@@ -590,7 +656,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.verifier_receipt_digest.clear();
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::MissingVerifierReceipt));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::MissingVerifierReceipt)
+        );
         assert!(report.admitted_candidate.is_none());
     }
 
@@ -600,8 +670,16 @@ mod tests {
         item.option.decision_id = "other-decision".into();
         item.option.external_gate_passed = false;
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::DecisionMismatch));
-        assert!(report.rejection_reasons.contains(&RejectionReason::ExternalOptionGateNotPassed));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::DecisionMismatch)
+        );
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::ExternalOptionGateNotPassed)
+        );
     }
 
     #[test]
@@ -609,7 +687,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.option_id = "another-action".into();
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::OptionIdMismatch));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::OptionIdMismatch)
+        );
         assert!(report.admitted_candidate.is_none());
     }
 
@@ -618,7 +700,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.source_dataset_digest = "sha256:substituted-dataset".into();
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::SourceDatasetMismatch));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::SourceDatasetMismatch)
+        );
         assert!(report.admitted_candidate.is_none());
     }
 
@@ -627,7 +713,11 @@ mod tests {
         let mut item = candidate();
         item.manifest.sensor_model_digest.clear();
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::EmptyRequiredDigest));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::EmptyRequiredDigest)
+        );
         assert!(report.admitted_candidate.is_none());
     }
 
@@ -635,6 +725,9 @@ mod tests {
     fn freshness_evaluation_is_deterministic_for_frozen_context() {
         let item = candidate();
         let expected = context();
-        assert_eq!(admit_candidate(&item, &expected), admit_candidate(&item, &expected));
+        assert_eq!(
+            admit_candidate(&item, &expected),
+            admit_candidate(&item, &expected)
+        );
     }
 }
