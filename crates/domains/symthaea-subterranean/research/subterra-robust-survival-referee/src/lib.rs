@@ -239,6 +239,7 @@ pub enum RefereeError {
     ObservationMissingContinuation(String),
     TerminalHasContinuation(String),
     StopNodeHasBranches(String),
+    PolicyOutcomeMassMismatch { action_id: String, sum_bits: u64 },
     PosteriorUndefined(String),
     NumericalOverflow(&'static str),
 }
@@ -434,10 +435,10 @@ fn validate_action(action: &MeasurementAction, hypothesis_count: usize) -> Resul
         }
     }
 
+    let mut ordered_outcomes = action.outcomes.iter().collect::<Vec<_>>();
+    ordered_outcomes.sort_by(|a, b| a.id.cmp(&b.id));
     for hypothesis_index in 0..hypothesis_count {
-        let mut ordered = action.outcomes.iter().collect::<Vec<_>>();
-        ordered.sort_by(|a, b| a.id.cmp(&b.id));
-        let sum = ordered
+        let sum = ordered_outcomes
             .iter()
             .map(|outcome| outcome.likelihood_by_hypothesis[hypothesis_index])
             .sum::<f64>();
@@ -577,7 +578,7 @@ fn validate_policy(
         (None, None) => return Err(RefereeError::PolicyHasNeitherActionNorStop),
         (None, Some(decision_id)) => {
             if node.branches.is_empty() {
-                if models[0].problem.decisions.iter().any(|decision| decision.id == *decision_id) {
+                if models[0].problem.decisions.iter().any(|decision| decision.id.as_str() == decision_id) {
                     return Ok(());
                 }
                 return Err(RefereeError::UnknownDecision(decision_id.clone()));
@@ -623,7 +624,7 @@ fn validate_policy(
             for outcome in &first_action.outcomes {
                 let possible_in_any_model = models.iter().any(|model| {
                     model.problem.actions.iter()
-                        .find(|candidate| candidate.id == *action_id)
+                        .find(|candidate| candidate.id.as_str() == action_id)
                         .and_then(|action| action.outcomes.iter().find(|candidate| candidate.id == outcome.id))
                         .is_some_and(|candidate| candidate.likelihood_by_hypothesis.iter().any(|value| *value > 0.0))
                 });
@@ -653,8 +654,8 @@ fn expected_loss(posterior: &[f64], losses: &[f64]) -> Result<f64, RefereeError>
 
 fn outcome_probability(posterior: &[f64], likelihood: &[f64]) -> Result<f64, RefereeError> {
     let value = posterior.iter().zip(likelihood).map(|(p, l)| p * l).sum::<f64>();
-    if value.is_finite() && (0.0..=1.0).contains(&value) {
-        Ok(value)
+    if value.is_finite() && value >= 0.0 && value <= 1.0 + PROBABILITY_TOLERANCE {
+        Ok(value.min(1.0))
     } else {
         Err(RefereeError::NumericalOverflow("outcome probability"))
     }
@@ -811,7 +812,10 @@ fn evaluate_node(
     }
 
     if (total_branch_probability - 1.0).abs() > NUMERICAL_TOLERANCE {
-        return Err(RefereeError::NumericalOverflow("policy branches do not cover model outcome mass"));
+        return Err(RefereeError::PolicyOutcomeMassMismatch {
+            action_id: action_id.to_owned(),
+            sum_bits: total_branch_probability.to_bits(),
+        });
     }
 
     let expected_resource_cost_units = action_cost_value + expected_future_cost;
