@@ -225,6 +225,17 @@ impl RobotGarmentCompilerFixture {
                 true,
             );
         }
+        if self.state == "candidate_geometry"
+            && self.robot.geometry_state != "cad_revision_bound"
+        {
+            push(
+                &mut findings,
+                "candidate_geometry_without_cad",
+                "robot.geometry_state",
+                "A real candidate-geometry state requires revision-bound CAD geometry and digest; synthetic geometry must remain explicitly synthetic_fixture.",
+                true,
+            );
+        }
 
         for (index, frame) in self.robot.coordinate_frames.iter().enumerate() {
             let path = format!("robot.coordinate_frames[{index}]");
@@ -712,6 +723,41 @@ mod tests {
         assert!(report.findings.iter().any(|finding| {
             finding.code == "unresolved_keepout_frame_transform"
         }));
+    }
+
+    #[test]
+    fn candidate_geometry_cannot_be_admitted_from_synthetic_geometry() {
+        let mut fixture = fixture();
+        fixture.state = "candidate_geometry".into();
+        let report = fixture.evaluate();
+        assert!(!report.eligible_for_fit_screen);
+        assert!(report.findings.iter().any(|finding| {
+            finding.code == "candidate_geometry_without_cad"
+        }));
+    }
+
+    #[test]
+    fn advisory_keepout_intersection_is_reported_but_does_not_block() {
+        let mut fixture = fixture();
+        fixture.keepouts[0].severity = "advisory".into();
+        fixture.candidate_panels[0].bounds.min_mm[0] = 64.0;
+        let report = fixture.evaluate();
+        assert!(report.is_valid(), "{:#?}", report.findings);
+        assert!(report.eligible_for_fit_screen);
+        assert!(report.clearance_results.iter().any(|result| {
+            result.keepout_id == "elbow_swept_motion" && result.intersects
+        }));
+    }
+
+    #[test]
+    fn supplier_declared_material_is_not_measured_material_evidence() {
+        let mut fixture = fixture();
+        fixture.candidate_panels[0].material_evidence_state = "supplier_declared".into();
+        fixture.candidate_panels[0].material_profile_ref = Some("supplier:material-001".into());
+        let report = fixture.evaluate();
+        assert!(report.is_valid(), "{:#?}", report.findings);
+        assert!(report.eligible_for_fit_screen);
+        assert!(!report.material_evidence_admitted);
     }
 
     #[test]
