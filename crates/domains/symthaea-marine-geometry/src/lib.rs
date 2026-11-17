@@ -10,6 +10,7 @@ pub mod loft;
 pub mod section;
 pub mod sectional_reference;
 pub mod static_attitude;
+pub mod static_equilibrium;
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
