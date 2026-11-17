@@ -392,13 +392,6 @@ impl EventRevision {
         }
     }
 
-    fn target_revision_id(&self) -> Option<u64> {
-        match self.operation {
-            EventRevisionOperation::Assert { .. } => None,
-            EventRevisionOperation::Supersede { target_revision_id, .. }
-            | EventRevisionOperation::Retract { target_revision_id, .. } => Some(target_revision_id),
-        }
-    }
 }
 
 impl BitemporalEventLedger {
