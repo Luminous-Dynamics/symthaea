@@ -565,3 +565,16 @@ The process-history auditor enforces:
 - a measured ambient state remains explicit at 0 GPa; a later/earlier treatment history does not silently turn unknown measurement pressure into ambient.
 
 The synthetic PQP fixture includes an 18.9 GPa hold and decompression to 0 GPa before a 151 K observed onset, solely as a schema plumbing case. It is not a real data record or validation result.
+
+
+## 32. Synthesis protocol contract implementation
+
+A dedicated JSON Schema and Rust auditor now represent the protocol-first P→X→y programme as data rather than a narrative plan:
+
+- `data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json`
+- synthetic fixture: `tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json`
+- Rust binary: `sc_synthesis_protocol_audit`
+
+The contract separates precursor and target identity, planned step sequence/setpoints, execution runs/readback, source evidence, realized phases and characterization event references. The auditor enforces plan/execution linkage, unique identifiers and sequences, state-specific actual/evidence requirements, failed-step reason retention, run/outcome linkage, and phase-fraction bounds. It does not infer successful execution from a written protocol or setpoint.
+
+The dedicated exact-head workflow now formats, tests, runs and Clippy-checks the synthesis protocol auditor along with the registry, metrics and observation-event auditors. It records schema/fixture digests and uploads a machine-readable smoke receipt. The fixture is synthetic and does not authorize physical synthesis.
