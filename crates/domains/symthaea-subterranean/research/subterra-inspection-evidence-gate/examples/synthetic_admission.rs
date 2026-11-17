@@ -44,6 +44,7 @@ fn main() {
         manifest: EvidenceManifest {
             candidate_id: "candidate-synthetic-001".into(),
             decision_id: "support-08".into(),
+            option_id: "support-08-independent-followup".into(),
             asset_id: "asset-support-08".into(),
             asset_revision: "rev-17".into(),
             coordinate_frame_digest: "sha256:frame".into(),
@@ -59,7 +60,9 @@ fn main() {
             verifier_receipt_digest: "sha256:synthetic-verifier".into(),
             observation_captured_at_unix_ms: now - 60_000,
             evidence_valid_until_unix_ms: now + 600_000,
+            calibration_valid_from_unix_ms: now - 600_000,
             calibration_valid_until_unix_ms: now + 600_000,
+            rights_valid_until_unix_ms: now + 600_000,
             rights_purpose: EvidencePurpose::AssetConditionInspection,
             rights_disposition: RightsDisposition::AuthorizedForDeclaredPurpose,
             receipt_verification: ReceiptVerificationDisposition::VerifiedByExternalService,
