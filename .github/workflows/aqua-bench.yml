@@ -1,0 +1,64 @@
+name: Aqua Matched-Service Adapter
+
+on:
+  pull_request:
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/domains/symthaea-aqua-bench/**"
+      - ".github/workflows/aqua-bench.yml"
+  push:
+    branches:
+      - main
+      - research/aqua-competitor-ledger-v0.1-20261117
+    paths:
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "rust-toolchain.toml"
+      - "crates/domains/symthaea-aqua-bench/**"
+      - ".github/workflows/aqua-bench.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aqua-bench-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  matched-service-adapter:
+    name: Rust format, tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      - name: Install pinned Rust toolchain
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Verify exact checkout
+        env:
+          EXPECTED_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          ACTUAL_HEAD="$(git rev-parse HEAD)"
+          test "$ACTUAL_HEAD" = "$EXPECTED_HEAD"
+          printf 'Aqua test subject: %s\n' "$ACTUAL_HEAD"
+
+      - name: Check workspace metadata under the lockfile
+        run: cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/aqua-metadata.json"
+
+      - name: Format Aqua crate
+        run: cargo fmt -p symthaea-aqua-bench -- --check
+
+      - name: Run Aqua adapter unit tests
+        run: cargo test --locked -p symthaea-aqua-bench
+
+      - name: Run strict Aqua adapter Clippy
+        run: cargo clippy --locked -p symthaea-aqua-bench --all-targets -- -D warnings
