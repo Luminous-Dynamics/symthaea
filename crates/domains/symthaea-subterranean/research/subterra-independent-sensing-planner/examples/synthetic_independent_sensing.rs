@@ -29,7 +29,9 @@ fn option(id: &str, source: &str, deps: Vec<DependencyIdentity>, energy: u64) ->
         resource_assessment_digest: format!("sha256:resource-{id}"),
         risk_model_digest: "sha256:risk-model".into(),
         risk_assessment_digest: format!("sha256:risk-{id}"),
+        resource_assessed_at_unix_ms: 1_799_999_999_900,
         resource_assessment_valid_until_unix_ms: 1_800_000_600_000,
+        risk_assessed_at_unix_ms: 1_799_999_999_900,
         risk_assessment_valid_until_unix_ms: 1_800_000_600_000,
         resources: ResourceVector {
             energy_millijoules: energy,
