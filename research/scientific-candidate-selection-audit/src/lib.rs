@@ -1348,7 +1348,9 @@ mod tests {
         });
         assert_eq!(
             validate_selection_trace(&packet, &frozen),
-            Err(SelectionAuditError::UnknownSelectedCandidate("a-copy".to_owned()))
+            Err(SelectionAuditError::UnknownSelectedCandidate(
+                "a-copy".to_owned()
+            ))
         );
         frozen.decision = SelectionDecision::Select {
             candidate_id: "a".to_owned(),
