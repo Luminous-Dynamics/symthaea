@@ -1424,7 +1424,12 @@ mod tests {
         let candidate_ids: Vec<String> = (0..16).map(|index| format!("p{index:02}")).collect();
         let d4_semantics = vec![semantics(1, 1, "base", "same"); 16];
         let c4_semantics = (0..16)
-            .map(|index| semantics((index % 4) as i64, 0, "base", "same"))
+            .map(|index| {
+                let source = index / 4;
+                let target = index % 4;
+                let delta = (target + 4 - source) % 4;
+                semantics(delta as i64, 0, "base", "same")
+            })
             .collect();
         let asymmetric_semantics = (0..16)
             .map(|index| semantics(index as i64, 0, "base", "same"))
