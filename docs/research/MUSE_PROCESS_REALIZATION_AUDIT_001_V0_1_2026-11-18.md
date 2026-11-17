@@ -92,7 +92,7 @@ Twenty-two new tests are present in `process_grammar.rs`:
 16. Reject mutations to the harmony clock pitch and bass-anchor duration.
 17. Reject assigned identities on accompaniment or melody events.
 18. Reject unplanned voice roles.
-19. Exercise the 4,096-case generated holdout after all melody, expressive and accompaniment checks.
+19. Reject source cells containing non-positive event duration.\n20. Exercise the 4,096-case generated holdout after all melody, expressive and accompaniment checks.
 
 Existing process tests remain in place. No test has been compiled or executed in the current environment. Do not describe these tests as passing.
 
@@ -136,7 +136,7 @@ The first draft used the maximum-prefix cycle observed in the score as the cell 
 
 A test now requires a coherent whole-cell transposition to be rejected. A second test removes the new field from serialized JSON and confirms legacy ProcessPlan data still deserializes, while the source-cell audit returns `MissingProcessCellBinding` rather than silently upgrading legacy evidence.
 
-This is **source process-cell consistency**, not complete provenance: the cell is a plan field, not a cryptographically authenticated claim about a musician-authored motif. A caller needing tamper evidence must pin the complete plan, score, input intent/spec and engine revision in an immutable receipt. The current generator's cell is derived from the selected CompositionSpec and frozen intent; it is not proof of preservation of some separate user-authored motif that was never supplied to this API.
+This is **source process-cell consistency**, not complete provenance: the cell is a plan field, not a cryptographically authenticated claim about a musician-authored motif. A caller needing tamper evidence must pin the complete plan, score, input intent/spec and engine revision in an immutable receipt. The current generator's cell is derived from the selected CompositionSpec and frozen intent; it is not proof of preservation of some separate user-authored motif that was never supplied to this API. The audit also rejects source-cell events with non-positive duration.
 
 ## November 2026 external benchmark and product context
 
@@ -189,6 +189,32 @@ For deterministic structural invariants, the target should be 100% on frozen pos
 The verifier now audits the current three-role realization rather than melody alone. Its serialized report records melody, expressive, harmony and bass event counts. It checks the plan-carried process cell, prefix contour, exact note pitches/durations, velocity and section-intensity bit patterns, phrase-start emphasis, harmony clock, bass anchor, and the no-inferred-PartId boundary. Any extra voice role or assigned part ID is rejected. The existing generator behavior is unchanged; this is an audit of its explicit current contract.
 
 Twenty-one new tests are authored in addition to the three pre-existing ProcessAdditive tests. No test is compiled or run in this environment.
+
+## Benchmark governance and rights constraints
+
+SMEBench is licensed **CC BY-NC-SA 4.0**; component datasets and SoundFonts keep their original licenses. The paper identifies MidiCaps as CC BY-SA 4.0 and MoisesDB/Arachno SoundFont as CC BY-NC-SA 4.0, with other resources under their own terms. That dataset license is not a commercial-use grant. Luminous must not put these assets into commercial training or deliverables under the benchmark's non-commercial permission; any research evaluation must retain component-level license/permission records and the applicable restrictions.
+
+SMEBench also states its data is predominantly Western popular/classical/orchestral/electronic/rock/pop and its SoundFonts are optimized for Western timbres. Its own limitation section notes the synthetic-to-real gap, only twelve MIDI-expressible edit operations, no vocal/production-effect/genre-transfer operations, audibility/filtering bias, and that a paired target is one plausible valid solution rather than the only correct output. Preserve the synthetic and real-audio strata separately, and musician-governed cultural cohorts must be evaluated separately rather than assuming SMEBench is culturally representative.
+
+Sources:
+- https://arxiv.org/abs/2610.36715
+- https://huggingface.co/datasets/anonymous-account-submission/SME-Bench
+
+The ICASSP 2027 Audio Editing Challenge states registration closed on 8 October 2026, the 500-example hidden test set per track opened on 10 November, and final submissions close on 25 November 2026 at 11:59 PM US Pacific. The Agent Track additionally requires its model components to have been publicly released before 1 November. This note does not assume Luminous is registered or eligible; use the public 2,000-example / 17,741-rubric MMAE development set for internal reproduction unless actual registration and credentials are confirmed.
+
+Sources:
+- https://audio-editing-challenge.github.io/
+- https://2027.ieeeicassp.org/sp-grand-challenges/
+
+## CAST comparison scope and a fair path to exceed it
+
+CAST reports five-run means of structural error 0.22±0.02 and chord accuracy 0.96±0.01, improving on the MuseFormer baseline (0.58±0.03 and 0.64±0.02). Its data is GiantMIDI-Piano: 10,855 solo-piano works by 2,786 composers and about 38.7 million transcribed notes, with a filtered 7,236-work subset for the experiments. The paper explicitly identifies current limitations: chord-progression-driven skeletons, insufficient treatment of complex polyphonic counterpoint and atonal music, and single-instrument piano experiments without multi-track timbre interaction.
+
+A fair comparison must first reproduce CAST's exact split, tokenization, metrics, train/test boundaries and five-run protocol. The first target is to match its reported structural error and chord accuracy; stretch targets are structural error below 0.22 and chord accuracy above 0.96, with confidence intervals and a no-leak held-out-composer split. Only after that matched baseline should we evaluate multi-part counterpoint, non-chordal/atonal structures, event lineage, time-varying process and protected edits as separate task families. Those latter tasks are a broader capability extension, not a numerical win on CAST's piano benchmark.
+
+The CAST paper and its data availability statement:
+- https://pmc.ncbi.nlm.nih.gov/articles/PMC13237092/
+- https://github.com/bytedance/GiantMIDI-Piano
 
 ## External industry and benchmark refresh — 2026-11-18
 
