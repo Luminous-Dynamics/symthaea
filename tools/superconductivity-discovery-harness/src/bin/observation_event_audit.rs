@@ -81,6 +81,68 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             ));
         }
 
+        let extraction_method = event
+            .pointer("/provenance/extraction_method")
+            .and_then(Value::as_str)
+            .ok_or_else(|| format!("{observation_id}: missing extraction_method"))?;
+        if extraction_method == "database_import" {
+            let external = event
+                .pointer("/source/external_catalog")
+                .and_then(Value::as_object)
+                .ok_or_else(|| {
+                    format!("{observation_id}: database_import requires source.external_catalog")
+                })?;
+            let external_text_fields = [
+                "library_id",
+                "external_record_id",
+                "api_version",
+                "data_version",
+                "snapshot_id",
+            ];
+            for field in external_text_fields {
+                if external
+                    .get(field)
+                    .and_then(Value::as_str)
+                    .is_none_or(|text| text.trim().is_empty())
+                {
+                    return Err(format!(
+                        "{observation_id}: external_catalog requires non-empty {field}"
+                    ));
+                }
+            }
+            if external.get("x_data_version").and_then(Value::as_str).is_some_and(|version| {
+                Some(version) != external.get("data_version").and_then(Value::as_str)
+            }) {
+                return Err(format!(
+                    "{observation_id}: X-Data-Version must match the declared external data_version"
+                ));
+            }
+            let external_record_id = external.get("external_record_id").and_then(Value::as_str);
+            if let Some(parents) = external.get("external_parent_ids").and_then(Value::as_object) {
+                for (parent_field, event_path) in [
+                    ("material_id", "/material/material_id"),
+                    ("sample_id", "/sample/sample_id"),
+                    ("state_id", "/material/state_id"),
+                ] {
+                    if let Some(parent_id) = parents.get(parent_field).and_then(Value::as_str) {
+                        let event_id = event.pointer(event_path).and_then(Value::as_str);
+                        if Some(parent_id) != event_id {
+                            return Err(format!(
+                                "{observation_id}: external parent {parent_field} does not match the imported event"
+                            ));
+                        }
+                    }
+                }
+                if let Some(parent_result) = parents.get("result_id").and_then(Value::as_str) {
+                    if Some(parent_result) != external_record_id {
+                        return Err(format!(
+                            "{observation_id}: external result_id must match external_record_id"
+                        ));
+                    }
+                }
+            }
+        }
+
         let locator = event
             .pointer("/source/locator")
             .and_then(Value::as_object)
@@ -577,11 +639,11 @@ mod tests {
         let (schema, fixture) = committed_inputs();
         let bytes = serde_json::to_vec(&fixture).unwrap();
         let receipt = validate_fixture(&schema, &bytes).unwrap();
-        assert_eq!(receipt["observation_count"], 7);
+        assert_eq!(receipt["observation_count"], 8);
         assert_eq!(receipt["process_step_count"], 2);
-        assert_eq!(receipt["origin_counts"]["observed"], 4);
+        assert_eq!(receipt["origin_counts"]["observed"], 5);
         assert_eq!(receipt["measurement_scope_counts"]["local_probe"], 1);
-        assert_eq!(receipt["measurement_scope_counts"]["bulk"], 4);
+        assert_eq!(receipt["measurement_scope_counts"]["bulk"], 5);
         assert_eq!(receipt["measurement_scope_counts"]["theoretical_model"], 2);
         assert_eq!(receipt["origin_counts"]["calculated"], 1);
         assert_eq!(receipt["origin_counts"]["predicted"], 1);
@@ -641,6 +703,40 @@ mod tests {
         let event = &fixture["observations"][6];
         assert_eq!(event["assertion"]["property_code"], "superfluid_stiffness");
         assert_eq!(event["assertion"]["measurement_scope"], "bulk");
+    }
+
+    #[test]
+    fn database_import_requires_external_catalog_identity() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][7]["source"]
+            .as_object_mut()
+            .unwrap()
+            .remove("external_catalog");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn imported_external_parent_sample_must_match_event_sample() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][7]["source"]["external_catalog"]
+            ["external_parent_ids"]["sample_id"] = json!("different-sample");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn imported_external_result_id_must_match_record_id() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][7]["source"]["external_catalog"]
+            ["external_parent_ids"]["result_id"] = json!("different-result");
+        assert!(audit_mutated(fixture).is_err());
+    }
+
+    #[test]
+    fn imported_api_data_version_must_match_response_header() {
+        let (_, mut fixture) = committed_inputs();
+        fixture["observations"][7]["source"]["external_catalog"]["x_data_version"] =
+            json!("v-old");
+        assert!(audit_mutated(fixture).is_err());
     }
 
     #[test]
