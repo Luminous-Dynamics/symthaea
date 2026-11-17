@@ -41,5 +41,24 @@ fn main() -> anyhow::Result<()> {
             .all(|group| group.disposition == "SYNTHETIC_PAIRED_PARETO_ANALYSIS"),
         "synthetic paired pathway demonstration did not complete"
     );
+
+    let voi_fixture = std::fs::read_to_string(
+        repository_root
+            .join("xtask/plasma-audit-harness/fixtures/plasma-voi-synthetic-v0.json"),
+    )?;
+    let voi = xtask::plasma_experiment_voi::evaluate_manifest_json(&voi_fixture)
+        .map_err(anyhow::Error::msg)?;
+    println!(
+        "SYNTHETIC EXPERIMENT VOI: {} / {} measurements; selected={:?}; prior_loss={:.4}; no physical result",
+        voi.measurements.len(),
+        voi.measurements.len(),
+        voi.selected_measurement,
+        voi.prior_expected_loss
+    );
+    anyhow::ensure!(
+        voi.disposition == "SELECT_MEASUREMENT"
+            && voi.selected_measurement.as_deref() == Some("high_information_measurement"),
+        "synthetic EVSI fixture did not select its hand-checkable positive-net-value measurement"
+    );
     Ok(())
 }
