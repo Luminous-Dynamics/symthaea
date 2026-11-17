@@ -196,13 +196,22 @@ pub struct ConditionalStateLoss {
 /// `probability` is the probability mass of the information set under the
 /// benchmark prior. `states` contains the evaluator's conditional latent
 /// state distribution. `candidate_action` is the action selected by the
-/// candidate; `None` is useful when evaluating only the Bayes-risk lower
-/// bound, but policy regret requires an action.
+/// candidate. It may be `None` for `evaluate_bayes_risk`; policy regret via
+/// `evaluate_decisions` requires an action for every information set.
 #[derive(Clone, Debug, PartialEq)]
 pub struct InformationSet {
     pub probability: f64,
     pub states: Vec<ConditionalStateLoss>,
     pub candidate_action: Option<usize>,
+}
+
+/// Bayes-risk lower bounds under candidate-observable information.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BayesRisk {
+    /// Best expected loss available with the supplied information.
+    pub bayes_risk: f64,
+    /// Evaluator-only lower bound when the latent state is revealed.
+    pub perfect_information_risk: f64,
 }
 
 /// Decision-risk decomposition under candidate-observable information.
@@ -294,12 +303,15 @@ fn validate_information_sets(sets: &[InformationSet]) -> Result<usize, MetricErr
     Ok(count)
 }
 
-/// Evaluate policy risk, the information-set Bayes risk and the
-/// perfect-information lower bound separately.
-pub fn evaluate_decisions(sets: &[InformationSet]) -> Result<DecisionRisk, MetricError> {
+/// Evaluate the information-set Bayes risk and perfect-information lower
+/// bound without requiring a candidate policy action.
+///
+/// This is the appropriate evaluator for prior/posterior EVSI calculations:
+/// candidate policy regret is a separate quantity and is evaluated by
+/// `evaluate_decisions`.
+pub fn evaluate_bayes_risk(sets: &[InformationSet]) -> Result<BayesRisk, MetricError> {
     let action_count = validate_information_sets(sets)?;
     let mut bayes_risk = 0.0;
-    let mut policy_risk = 0.0;
     let mut perfect_information_risk = 0.0;
 
     for set in sets {
@@ -331,19 +343,45 @@ pub fn evaluate_decisions(sets: &[InformationSet]) -> Result<DecisionRisk, Metri
             .fold(f64::INFINITY, f64::min);
         bayes_risk += set.probability * best_information_set_loss;
         perfect_information_risk += set.probability * conditional_perfect_risk;
-
-        let chosen_action = set
-            .candidate_action
-            .ok_or(MetricError::CandidateActionRequired)?;
-        policy_risk += set.probability * expected_losses[chosen_action];
     }
 
-    if !bayes_risk.is_finite() || !policy_risk.is_finite() || !perfect_information_risk.is_finite()
-    {
+    if !bayes_risk.is_finite() || !perfect_information_risk.is_finite() {
         return Err(MetricError::NonFiniteValue("aggregate decision risk"));
     }
 
-    let raw_regret = policy_risk - bayes_risk;
+    Ok(BayesRisk {
+        bayes_risk,
+        perfect_information_risk,
+    })
+}
+
+/// Evaluate policy risk and regret in addition to the Bayes-risk lower bounds.
+/// Every information set must contain a candidate action.
+pub fn evaluate_decisions(sets: &[InformationSet]) -> Result<DecisionRisk, MetricError> {
+    let bayes = evaluate_bayes_risk(sets)?;
+    let mut policy_risk = 0.0;
+
+    for set in sets {
+        let chosen_action = set
+            .candidate_action
+            .ok_or(MetricError::CandidateActionRequired)?;
+        let conditional_policy_risk: f64 = set
+            .states
+            .iter()
+            .map(|state| state.probability * state.action_losses[chosen_action])
+            .sum();
+
+        if !conditional_policy_risk.is_finite() {
+            return Err(MetricError::NonFiniteValue("expected policy risk"));
+        }
+        policy_risk += set.probability * conditional_policy_risk;
+    }
+
+    if !policy_risk.is_finite() {
+        return Err(MetricError::NonFiniteValue("aggregate policy risk"));
+    }
+
+    let raw_regret = policy_risk - bayes.bayes_risk;
     if !raw_regret.is_finite() {
         return Err(MetricError::NonFiniteValue("decision regret"));
     }
@@ -352,9 +390,9 @@ pub fn evaluate_decisions(sets: &[InformationSet]) -> Result<DecisionRisk, Metri
     }
 
     Ok(DecisionRisk {
-        bayes_risk,
+        bayes_risk: bayes.bayes_risk,
         policy_risk,
-        perfect_information_risk,
+        perfect_information_risk: bayes.perfect_information_risk,
         regret: raw_regret.max(0.0),
     })
 }
@@ -599,6 +637,19 @@ mod tests {
         let result = evaluate_decisions(&information_sets).unwrap();
         assert!((result.regret - 0.0).abs() < 1e-12);
         assert!((result.bayes_risk - 0.0).abs() < 1e-12);
+    }
+
+    #[test]
+    fn bayes_risk_can_be_evaluated_without_a_candidate_action() {
+        let information_sets = [InformationSet {
+            probability: 1.0,
+            states: vec![state(1.0, &[0.0, 1.0])],
+            candidate_action: None,
+        }];
+
+        let result = evaluate_bayes_risk(&information_sets).unwrap();
+        assert_eq!(result.bayes_risk, 0.0);
+        assert_eq!(result.perfect_information_risk, 0.0);
     }
 
     #[test]
