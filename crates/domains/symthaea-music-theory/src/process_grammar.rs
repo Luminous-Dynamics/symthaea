@@ -244,6 +244,9 @@ pub fn verify_additive_process_score_v1(
         .iter()
         .position(|length| *length == maximum_prefix_length)
         .expect("maximum prefix has an index");
+    // This is an internal cell-consistency reference, not an authenticated
+    // source-motif reference: ProcessPlan v1 does not carry the originating
+    // Motif or a source-cell digest.
     let template = &cycle_events[template_cycle_index];
     for (cycle_index, events) in cycle_events.iter().enumerate() {
         for event_index in 0..events.len() {
@@ -586,6 +589,27 @@ mod tests {
             verify_additive_process_score_v1(&realization.plan, &realization.score),
             Err(ProcessRealizationAuditError::PrefixContentMismatch { .. })
         ));
+    }
+
+
+    #[test]
+    fn score_side_audit_is_not_a_source_motif_identity_proof() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        for note in realization
+            .score
+            .notes
+            .iter_mut()
+            .filter(|note| note.role == VoiceRole::Melody)
+        {
+            note.pitch = note.pitch.transpose(1);
+        }
+        // Every cycle still contains a consistent prefix of the same cell.
+        // The current ProcessPlan does not bind the original source motif, so
+        // source-motif preservation must be a separate, stronger contract.
+        assert!(verify_additive_process_score_v1(&realization.plan, &realization.score).is_ok());
     }
 
     #[test]
