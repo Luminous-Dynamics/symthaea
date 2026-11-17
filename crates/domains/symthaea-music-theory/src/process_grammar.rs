@@ -592,6 +592,33 @@ mod tests {
     }
 
 
+
+    #[test]
+    fn frozen_generated_holdout_matrix_has_exact_audit_acceptance() {
+        let spec = Style::Minimalism.spec();
+        let bar_counts = [2, 4, 8, 16];
+        let mut trajectory_counts = [0usize; 4];
+
+        // Seed modulo four selects one of the four ProcessTrajectoryKind cases.
+        // 1,024 seeds therefore provide 256 samples per trajectory kind.
+        for bars in bar_counts {
+            for seed in 0..1024 {
+                let intent = MusicalIntent { bars, seed, ..MusicalIntent::default() };
+                let realization = realize_additive_process(&intent, &spec);
+                trajectory_counts[match realization.plan.trajectory_kind {
+                    ProcessTrajectoryKind::Arch => 0,
+                    ProcessTrajectoryKind::Terraced => 1,
+                    ProcessTrajectoryKind::PeakHold => 2,
+                    ProcessTrajectoryKind::AcceleratingRelease => 3,
+                }] += 1;
+                verify_additive_process_score_v1(&realization.plan, &realization.score)
+                    .expect("pinned deterministic score should satisfy its additive process");
+            }
+        }
+
+        assert_eq!(trajectory_counts, [1024, 1024, 1024, 1024]);
+    }
+
     #[test]
     fn score_side_audit_is_not_a_source_motif_identity_proof() {
         let mut realization = realize_additive_process(
