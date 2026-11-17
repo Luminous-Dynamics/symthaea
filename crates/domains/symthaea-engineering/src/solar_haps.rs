@@ -833,6 +833,34 @@ mod tests {
         profile
     }
 
+
+    fn unserved_load_recovery_profile() -> Vec<SolarHapsInterval> {
+        let mut profile = Vec::with_capacity(48);
+        for hour in 0..48 {
+            let day_index = hour / 24;
+            let hour_of_day = hour % 24;
+            let daylight = hour_of_day < 12;
+            let station_keeping_power_w = match (day_index, daylight) {
+                (0, true) => 100.0,
+                (0, false) => 200.0,
+                (1, _) => 0.0,
+                _ => unreachable!(),
+            };
+            profile.push(SolarHapsInterval {
+                duration_s: 3600.0,
+                incident_irradiance_w_m2: if daylight { 1000.0 } else { 0.0 },
+                incidence_factor: 1.0,
+                pv_temperature_derate: 1.0,
+                station_keeping_power_w,
+                payload_power_w: 0.0,
+                avionics_power_w: 0.0,
+                thermal_management_power_w: 0.0,
+                requested_receiver_power_w: if daylight { 100.0 } else { 0.0 },
+            });
+        }
+        profile
+    }
+
     #[test]
     fn surplus_only_export_preserves_the_haps_daily_energy_cycle() {
         let result = evaluate_day(&base_config(), &day_night_profile(40.0)).unwrap();
@@ -973,6 +1001,26 @@ mod tests {
         assert!(result.horizon_energy_cycle_closed);
         assert!((result.days[0].intervals[0].duration_s - DAY_SECONDS).abs() < 1.0e-8);
         assert!((result.days[1].intervals[0].duration_s - DAY_SECONDS).abs() < 1.0e-8);
+    }
+
+    #[test]
+    fn later_solar_surplus_does_not_erase_prior_own_load_failure() {
+        let result = evaluate_horizon(
+            &base_config(),
+            &unserved_load_recovery_profile(),
+        )
+        .unwrap();
+
+        assert_eq!(result.horizon_days, 2);
+        assert!(result.days[0].reserve_respected);
+        assert!(!result.days[0].own_service_continuous);
+        assert!(result.days[1].own_service_continuous);
+        assert!(result.horizon_energy_cycle_closed);
+        assert!(result.ending_soc_wh >= result.initial_soc_wh);
+        assert!(!result.own_service_continuous);
+        assert!(!result.export_service_admissible);
+        assert!(result.total_own_load_unserved_wh > 0.0);
+        assert!(result.total_export_source_energy_wh > 0.0);
     }
 
     #[test]
