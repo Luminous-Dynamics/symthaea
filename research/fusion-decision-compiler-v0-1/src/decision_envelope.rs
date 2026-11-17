@@ -700,7 +700,10 @@ mod tests {
         let mut input = plan(&[("run-process", 120.0), ("run-saras", 130.0)]);
         input.models[1].convergence = ConvergenceState::NonConverged;
         let report = evaluate_decision_envelope(&input);
-        assert_eq!(report.disposition, DecisionEnvelopeDisposition::IncompleteOrNotComparable);
+        assert_eq!(
+            report.disposition,
+            DecisionEnvelopeDisposition::IncompleteOrNotComparable
+        );
     }
 
     #[test]
