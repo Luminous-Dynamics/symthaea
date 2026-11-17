@@ -144,6 +144,11 @@ pub struct ValidationReport {
     pub run_count: usize,
     pub executed_run_count: usize,
     pub passed_run_count: usize,
+    /// Candidates with at least one failed or inconclusive physical run.
+    /// The candidate-level qualification owner must not rank these silently.
+    pub adverse_candidate_ids: Vec<String>,
+    /// Candidates with records invalidated due to stale or superseded evidence.
+    pub invalidated_candidate_ids: Vec<String>,
     pub campaign_complete: bool,
 }
 
@@ -157,6 +162,14 @@ impl ValidationReport {
     pub fn is_complete(&self) -> bool {
         self.is_valid() && self.campaign_complete
     }
+
+    pub fn candidate_has_adverse_run(&self, candidate_id: &str) -> bool {
+        self.adverse_candidate_ids.iter().any(|id| id == candidate_id)
+    }
+
+    pub fn candidate_has_invalidated_run(&self, candidate_id: &str) -> bool {
+        self.invalidated_candidate_ids.iter().any(|id| id == candidate_id)
+    }
 }
 
 pub fn parse_and_validate(input: &str) -> Result<ValidationReport, serde_json::Error> {
@@ -169,6 +182,8 @@ impl CouponCampaign {
         let mut findings = Vec::new();
         let mut specimens: HashMap<&str, &Specimen> = HashMap::new();
         let mut run_ids = HashSet::new();
+        let mut adverse_candidate_ids = HashSet::new();
+        let mut invalidated_candidate_ids = HashSet::new();
         let mut executed_run_count = 0usize;
         let mut passed_run_count = 0usize;
 
@@ -183,6 +198,11 @@ impl CouponCampaign {
         if !matches!(self.state.as_str(), "proposed" | "running" | "complete" | "invalidated") {
             push(&mut findings, "invalid_campaign_state", "state",
                 "Campaign state must be proposed, running, complete or invalidated.");
+        }
+
+        if self.specimens.is_empty() {
+            push(&mut findings, "no_specimens", "specimens",
+                "A coupon campaign must declare at least one specimen, even while its physical identity is pending.");
         }
 
         for (index, specimen) in self.specimens.iter().enumerate() {
@@ -279,13 +299,21 @@ impl CouponCampaign {
                 }
                 validate_passed_run(run, &path, &mut findings);
             } else if run.status == "failed" || run.status == "inconclusive" {
+                if let Some(specimen) = specimen {
+                    adverse_candidate_ids.insert(specimen.candidate_id.clone());
+                }
                 if is_blank_option(&run.failure_reason) {
                     push(&mut findings, "nonpass_missing_reason", format!("{path}.failure_reason"),
                         "Failed and inconclusive results must retain an explicit reason.");
                 }
-            } else if run.status == "invalidated" && is_blank_option(&run.invalidation_reason) {
-                push(&mut findings, "invalidated_run_missing_reason", format!("{path}.invalidation_reason"),
-                    "Invalidated results must retain an explicit invalidation reason.");
+            } else if run.status == "invalidated" {
+                if let Some(specimen) = specimen {
+                    invalidated_candidate_ids.insert(specimen.candidate_id.clone());
+                }
+                if is_blank_option(&run.invalidation_reason) {
+                    push(&mut findings, "invalidated_run_missing_reason", format!("{path}.invalidation_reason"),
+                        "Invalidated results must retain an explicit invalidation reason.");
+                }
             }
 
             if run.family == "vibration" {
@@ -321,12 +349,19 @@ impl CouponCampaign {
                 "Raw data, calibration, uncertainty, adverse-result retention and claim boundaries must remain mandatory.");
         }
 
+        let mut adverse_candidate_ids: Vec<_> = adverse_candidate_ids.into_iter().collect();
+        let mut invalidated_candidate_ids: Vec<_> = invalidated_candidate_ids.into_iter().collect();
+        adverse_candidate_ids.sort();
+        invalidated_candidate_ids.sort();
+
         ValidationReport {
             findings,
             specimen_count: self.specimens.len(),
             run_count: self.test_runs.len(),
             executed_run_count,
             passed_run_count,
+            adverse_candidate_ids,
+            invalidated_candidate_ids,
             campaign_complete: self.state == "complete",
         }
     }
@@ -896,7 +931,7 @@ mod tests {
     }
 
     #[test]
-    fn failed_physical_run_is_not_promoted_by_a_different_passed_run() {
+    fn adverse_run_remains_candidate_scoped_even_when_another_run_passes() {
         let mut manifest = campaign_fixture();
         passed_vibration_run(&mut manifest);
         let mut failed = manifest["test_runs"][1].clone();
@@ -908,6 +943,47 @@ mod tests {
         assert!(report.findings.is_empty(), "{:?}", report.findings);
         assert_eq!(report.passed_run_count, 1);
         assert_eq!(report.executed_run_count, 2);
+        assert!(report.candidate_has_adverse_run("A0-R"));
+    }
+
+    #[test]
+    fn executed_run_without_calibration_is_rejected() {
+        let mut manifest = campaign_fixture();
+        passed_vibration_run(&mut manifest);
+        manifest["test_runs"][1]["calibration_refs"] = json!([]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "executed_run_missing_calibration"));
+    }
+
+    #[test]
+    fn measurement_metric_and_unit_must_match_test_family() {
+        let mut manifest = campaign_fixture();
+        passed_vibration_run(&mut manifest);
+        manifest["test_runs"][1]["measurements"][0]["metric_id"] = json!("air_permeability_mm_s");
+        manifest["test_runs"][1]["measurements"][0]["unit"] = json!("mm/s");
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "metric_family_mismatch"));
+    }
+
+    #[test]
+    fn candidate_with_invalidated_run_is_explicitly_reported() {
+        let mut manifest = campaign_fixture();
+        passed_vibration_run(&mut manifest);
+        let mut invalidated = manifest["test_runs"][1].clone();
+        invalidated["run_id"] = json!("RUN-VIBRATION-INVALIDATED-003");
+        invalidated["status"] = json!("invalidated");
+        invalidated["invalidation_reason"] = json!("Material lot identity was superseded.");
+        manifest["test_runs"].as_array_mut().unwrap().push(invalidated);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.candidate_has_invalidated_run("A0-R"));
+    }
+
+    #[test]
+    fn campaign_without_specimens_is_rejected() {
+        let mut manifest = campaign_fixture();
+        manifest["specimens"] = json!([]);
+        let report = parse_and_validate(&manifest.to_string()).unwrap();
+        assert!(report.findings.iter().any(|f| f.code == "no_specimens"));
     }
 
     #[test]
