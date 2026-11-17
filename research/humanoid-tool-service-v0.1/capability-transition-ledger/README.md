@@ -22,6 +22,8 @@ Each event is one of:
 - InstrumentedAbsent: the channel was active and the event did not occur.
 - OccurredAtNs(timestamp): the event occurred at a timestamp in the episode's declared clock domain.
 
+When task-success evidence is instrumented, the episode must also carry an independent_verifier_id distinct from both policy_id and source_id. This establishes a separately identified verifier source, not proof of organizational independence; the evaluation protocol must still document how the verifier is isolated from the policy and event recorder.
+
 This avoids turning missing telemetry into a negative observation.
 
 ## Statistics
@@ -38,4 +40,4 @@ Events are not forced into a funnel. Regrasping and recovery can create out-of-o
 
 ## Tests
 
-Seven tests cover missing instrumentation vs event absence, out-of-order events, conditional co-occurrence vs temporal order, task-cell isolation, duplicate episode IDs, no-instrumentation episodes and missing provenance. The library uses only the Rust standard library.
+Eight tests cover missing instrumentation vs event absence, out-of-order events, conditional co-occurrence vs temporal order, task-cell isolation, duplicate episode IDs, no-instrumentation episodes, missing general provenance and task-success verifier identity. The library uses only the Rust standard library.
