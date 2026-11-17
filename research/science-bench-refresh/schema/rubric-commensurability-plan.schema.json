@@ -1,0 +1,398 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/science-bench-refresh/schema/rubric-commensurability-plan.schema.json",
+  "title": "Symthaea Rubric Commensurability Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "analyzer_source_revision",
+    "purpose",
+    "comparison_id",
+    "construct_ontology_sha256",
+    "constructs",
+    "left_instrument",
+    "right_instrument",
+    "shared_anchor_items",
+    "minimum_anchor_items_per_construct",
+    "plan_commitment_sha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "symthaea.science_bench_refresh_rubric_commensurability_plan.v1"
+    },
+    "analyzer_source_revision": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "purpose": {
+      "enum": [
+        "example_only",
+        "qualified_run"
+      ]
+    },
+    "comparison_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "construct_ontology_sha256": {
+      "$ref": "#/$defs/digest"
+    },
+    "constructs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "$ref": "#/$defs/construct"
+      }
+    },
+    "left_instrument": {
+      "$ref": "#/$defs/instrument"
+    },
+    "right_instrument": {
+      "$ref": "#/$defs/instrument"
+    },
+    "shared_anchor_items": {
+      "type": "array",
+      "maxItems": 100000,
+      "items": {
+        "$ref": "#/$defs/anchor_item"
+      }
+    },
+    "minimum_anchor_items_per_construct": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "plan_commitment_sha256": {
+      "$ref": "#/$defs/digest"
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "construct": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "construct_id",
+        "definition_sha256",
+        "scope_sha256"
+      ],
+      "properties": {
+        "construct_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "definition_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "scope_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "scale_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_value",
+        "normalized_score_millionths",
+        "semantic_anchor_sha256"
+      ],
+      "properties": {
+        "raw_value": {
+          "type": "integer"
+        },
+        "normalized_score_millionths": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000
+        },
+        "semantic_anchor_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "construct_id",
+        "relation",
+        "mapping_evidence_sha256",
+        "adjudicator_id_sha256"
+      ],
+      "properties": {
+        "construct_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 128
+        },
+        "relation": {
+          "enum": [
+            "equivalent",
+            "narrower_than",
+            "broader_than",
+            "overlaps",
+            "orthogonal",
+            "incompatible",
+            "unmapped"
+          ]
+        },
+        "mapping_evidence_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "adjudicator_id_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "criterion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "criterion_id",
+        "definition_sha256",
+        "measurement_spec_sha256",
+        "score_min_raw",
+        "score_max_raw",
+        "score_direction",
+        "scale_anchors",
+        "weight_millionths",
+        "construct_mapping"
+      ],
+      "properties": {
+        "criterion_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "definition_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "measurement_spec_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "score_min_raw": {
+          "type": "integer"
+        },
+        "score_max_raw": {
+          "type": "integer"
+        },
+        "score_direction": {
+          "enum": [
+            "higher_raw_is_better",
+            "lower_raw_is_better"
+          ]
+        },
+        "scale_anchors": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 64,
+          "items": {
+            "$ref": "#/$defs/scale_anchor"
+          }
+        },
+        "weight_millionths": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000000
+        },
+        "construct_mapping": {
+          "$ref": "#/$defs/mapping"
+        }
+      }
+    },
+    "instrument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rubric_id",
+        "rubric_revision",
+        "rubric_sha256",
+        "criteria"
+      ],
+      "properties": {
+        "rubric_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "rubric_revision": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "rubric_sha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 512,
+          "items": {
+            "$ref": "#/$defs/criterion"
+          }
+        }
+      }
+    },
+    "anchor_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "anchor_id",
+        "construct_id",
+        "semantics_sha256"
+      ],
+      "properties": {
+        "anchor_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "construct_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "semantics_sha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "purpose": {
+            "const": "qualified_run"
+          }
+        },
+        "required": [
+          "purpose"
+        ]
+      },
+      "then": {
+        "properties": {
+          "analyzer_source_revision": {
+            "not": {
+              "pattern": "^0{40}$"
+            }
+          },
+          "construct_ontology_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "plan_commitment_sha256": {
+            "not": {
+              "pattern": "^0{64}$"
+            }
+          },
+          "constructs": {
+            "items": {
+              "properties": {
+                "definition_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                },
+                "scope_sha256": {
+                  "not": {
+                    "pattern": "^0{64}$"
+                  }
+                }
+              }
+            }
+          },
+          "left_instrument": {
+            "properties": {
+              "rubric_sha256": {
+                "not": {
+                  "pattern": "^0{64}$"
+                }
+              },
+              "criteria": {
+                "items": {
+                  "properties": {
+                    "definition_sha256": {
+                      "not": {
+                        "pattern": "^0{64}$"
+                      }
+                    },
+                    "measurement_spec_sha256": {
+                      "not": {
+                        "pattern": "^0{64}$"
+                      }
+                    },
+                    "construct_mapping": {
+                      "properties": {
+                        "mapping_evidence_sha256": {
+                          "not": {
+                            "pattern": "^0{64}$"
+                          }
+                        },
+                        "adjudicator_id_sha256": {
+                          "not": {
+                            "pattern": "^0{64}$"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "right_instrument": {
+            "properties": {
+              "rubric_sha256": {
+                "not": {
+                  "pattern": "^0{64}$"
+                }
+              },
+              "criteria": {
+                "items": {
+                  "properties": {
+                    "definition_sha256": {
+                      "not": {
+                        "pattern": "^0{64}$"
+                      }
+                    },
+                    "measurement_spec_sha256": {
+                      "not": {
+                        "pattern": "^0{64}$"
+                      }
+                    },
+                    "construct_mapping": {
+                      "properties": {
+                        "mapping_evidence_sha256": {
+                          "not": {
+                            "pattern": "^0{64}$"
+                          }
+                        },
+                        "adjudicator_id_sha256": {
+                          "not": {
+                            "pattern": "^0{64}$"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

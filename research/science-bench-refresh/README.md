@@ -31,6 +31,10 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - src/judge_factorial.rs: strict full-factorial plan/receipt verification, exact condition/input binding, candidate-choice and score effects, per-criterion order effects, and all ten pairwise interactions.
 - schema/judge-factorial-plan.schema.json, schema/judge-factorial-receipt.schema.json and schema/judge-factorial-report.schema.json: preregistered plan, ordinal-bound complete-denominator receipt and typed report contracts.
 - tools/judge_factorial_fixture.py: deterministic synthetic 32-cell/two-repeat CLI fixture; no empirical judge run.
+- docs/research/SCI-RUBRIC-COMMENSURABILITY-001.md: structural measurement-instrument comparability protocol; refuses direct score/ranking comparison when constructs or scales are not commensurable.
+- src/rubric_commensurability.rs: exact construct-ontology commitment, strict instrument/scale/mapping validation, adjudicator-identity separation, and construct-level plus overall commensurability report.
+- schema/rubric-commensurability-plan.schema.json and schema/rubric-commensurability-report.schema.json: frozen ontology, two-instrument plan and typed non-scoring report contracts.
+- tools/rubric_commensurability_fixture.py: deterministic two-rubric synthetic structural positive control; no human calibration or construct-validity result.
 
 - `docs/research/SCI-BENCH-REFRESH-001.md`: benchmark-lifecycle protocol and competitive targets.
 - `schema/generation-manifest.schema.json`: versioned JSON Schema for the v1 generation manifest.
@@ -41,6 +45,20 @@ Protocol-first workstream for SCI-BENCH-REFRESH-001 (Issue #8771).
 - `fixtures/generator-config.example.json`: four-family synthetic generator configuration whose exact bytes are SHA-256-pinned by a real manifest.
 - `src/lib.rs`, `src/generator.rs`, and `src/main.rs`: standalone Rust validator, commitment calculator, deterministic generator/replayer, task-set contract checker, and post-run reveal verifier.
 - `tools/reference_replay.py`: standard-library-only, test-only independent semantic reconstruction used by CI to cross-check Rust task generation; it is not part of production CLI paths.
+
+## Audit rubric construct and measurement commensurability
+
+Build two rubric instruments with independently declared criterion-to-construct mappings, score direction, normalized semantic anchors, weights, and shared anchor items. The construct ontology commitment is computed from the actual construct ID/definition/scope rows.
+
+```sh
+python3 research/science-bench-refresh/tools/rubric_commensurability_fixture.py /tmp/rubric-commensurability
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  verify-rubric-commensurability-plan /tmp/rubric-commensurability/rubric-commensurability-plan.example.json
+cargo run --locked --quiet --manifest-path research/science-bench-refresh/Cargo.toml -- \
+  audit-rubric-commensurability /tmp/rubric-commensurability/rubric-commensurability-plan.example.json
+```
+
+Direct score comparison is permitted only when every construct is explicitly equivalent, measurement specifications and normalized semantic scale anchors match, construct weights match, the minimum shared-anchor coverage is met, no criterion is unmapped, and mapping adjudicator identity commitments are disjoint across instruments. Identity disjointness does not prove actual reviewer independence. The report never claims construct validity, human alignment, generalized accuracy or scoring eligibility. See [SCI-RUBRIC-COMMENSURABILITY-001](../../docs/research/SCI-RUBRIC-COMMENSURABILITY-001.md).
 
 ## Analyze interacting judge nuisance factors
 
