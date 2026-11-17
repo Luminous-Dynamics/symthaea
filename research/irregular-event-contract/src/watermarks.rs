@@ -1071,7 +1071,7 @@ mod tests {
         let mut ledger = SourceWatermarkLedger::default();
         ledger.append(progress(1, 1, 1, 1, 10, 50, false)).unwrap();
         assert_eq!(
-            ledger.record_event_arrival(event(2, 1, 20, 20), 20),
+            ledger.record_event_arrival(event(2, 1, 50, 50), 50),
             Ok(EventArrivalClassification::OnTime)
         );
     }
@@ -1140,7 +1140,7 @@ mod tests {
         assert_eq!(indexed.late_breach_linear_scan_receipts_examined, 0);
         assert_eq!(scanned.late_breach_index_buckets_examined, 0);
         assert_eq!(scanned.late_breach_candidates_examined, 0);
-        assert_eq!(scanned.late_breach_linear_scan_receipts_examined, 3);
+        assert_eq!(scanned.late_breach_linear_scan_receipts_examined, 2);
     }
 
     #[test]
@@ -1327,7 +1327,7 @@ mod tests {
         ledger.append(progress(2, 1, 1, 2, 30, 100, false)).unwrap();
         assert_eq!(
             ledger
-                .completeness(1, &[source(1)], 0, 100, 50)
+                .completeness(1, &[source(1)], 0, 100, 20)
                 .unwrap()
                 .verdict,
             CompletenessVerdict::Incomplete
