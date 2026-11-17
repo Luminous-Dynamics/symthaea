@@ -646,15 +646,19 @@ mod tests{
  use super::*;
  const DETERMINISTIC:&str=include_str!("../../../../docs/development-map/fixtures/egddm-stochastic-policy-deterministic-v0.1.json");
  const DETERMINISTIC_EXPECTED:&str=include_str!("../../../../docs/development-map/fixtures/egddm-stochastic-policy-deterministic-v0.1.expected.json");
+ const D6_17_2_1_EXPECTED:&str=include_str!("../../../../docs/development-map/fixtures/egddm-adaptive-policy-v0.1.expected.json");
  const COMMON_CAUSE:&str=include_str!("../../../../docs/development-map/fixtures/egddm-stochastic-policy-common-cause-v0.1.json");
  const COMMON_CAUSE_EXPECTED:&str=include_str!("../../../../docs/development-map/fixtures/egddm-stochastic-policy-common-cause-v0.1.expected.json");
  #[test]fn deterministic_limit_matches_d6_17_2_1_known_answer(){
   let actual=evaluate(DETERMINISTIC).expect("deterministic limit validates");
   let expected:Value=serde_json::from_str(DETERMINISTIC_EXPECTED).unwrap();
   assert_eq!(actual,expected);
-  assert_eq!(actual["submitted_policy"]["nominal_justified_action_coverage_bps"],6000);
-  assert_eq!(actual["expected_cost"]["nominal_expected_cost_micros"],1300);
-  assert_eq!(actual["expected_cost"]["worst_case_expected_cost_micros"],1420);
+  let legacy:Value=serde_json::from_str(D6_17_2_1_EXPECTED).expect("legacy D6.17.2.1 report");
+  assert_eq!(actual["submitted_policy"]["nominal_justified_action_coverage_bps"],legacy["submitted_policy"]["action_coverage_nominal_bps"]);
+  assert_eq!(actual["expected_cost"]["nominal_expected_cost_micros"],legacy["submitted_policy"]["nominal_expected_cost_bound_micros"]);
+  assert_eq!(actual["expected_cost"]["worst_case_expected_cost_micros"],legacy["submitted_policy"]["worst_case_expected_cost_bound_micros"]);
+  assert_eq!(actual["submitted_policy"]["worst_case_path_cost_micros"],legacy["submitted_policy"]["worst_case_path_cost_bound_micros"]);
+  assert_eq!(actual["submitted_policy"]["policy_feasible"],legacy["submitted_policy"]["policy_feasible"]);
  }
  #[test]fn common_cause_joint_kernel_does_not_multiply_marginals(){
   let r=evaluate(COMMON_CAUSE).expect("common cause fixture validates");
@@ -663,8 +667,14 @@ mod tests{
   // The joint pass/pass event is 45% conditional on safe-world; the
   // nominal prior mass of that world is 90%, so unconditional coverage is 40.5%.
   assert_eq!(r["submitted_policy"]["nominal_justified_action_coverage_bps"],4050);
-  assert_eq!(r["submitted_policy"]["leaf_reports"].as_array().unwrap().iter()
-   .find(|x|x["leaf_node_id"]=="release-after-b-pass").unwrap()["nominal_path_probability_bps"],4050);
+  let release_leaf=r["submitted_policy"]["leaf_reports"].as_array().unwrap().iter()
+   .find(|x|x["leaf_node_id"]=="release-after-b-pass").unwrap();
+  assert_eq!(release_leaf["nominal_path_probability_bps"],4050);
+  let safe_kernel:&Value=&serde_json::from_str::<Value>(COMMON_CAUSE).unwrap()["oracle"]["world_kernels"][0];
+  let pass_pass=safe_kernel["joint_outcomes"].as_array().unwrap().iter()
+   .find(|row|row["outcomes"]["gate-a"]=="pass"&&row["outcomes"]["gate-b"]=="pass").unwrap();
+  assert_eq!(pass_pass["nominal_probability_bps"],4500);
+  assert_ne!(pass_pass["nominal_probability_bps"],2500); // 0.5 * 0.5 independence shortcut
  }
  #[test]fn candidate_cannot_override_joint_kernels(){
   let mut b:Value=serde_json::from_str(DETERMINISTIC).unwrap();
@@ -697,6 +707,21 @@ mod tests{
    b[view]["factors"][0]["likelihoods"][0]["outcomes"]["pass"]["upper_likelihood_bps"]=json!(1);
   }
   assert!(evaluate(&b.to_string()).unwrap_err().contains("does not conservatively contain"));
+ }
+ #[test]fn revoked_joint_kernel_is_rejected_before_policy_replay(){
+  let mut b:Value=serde_json::from_str(COMMON_CAUSE).unwrap();
+  b["oracle"]["world_kernels"][0]["revoked_at"]=json!("2026-11-17T09:59:00Z");
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("revoked at decision cutoff"));
+ }
+ #[test]fn acquisition_tree_cycle_is_rejected(){
+  let mut b:Value=serde_json::from_str(DETERMINISTIC).unwrap();
+  b["candidate_view"]["policy_tree"]["nodes"][0]["branches"]["pass"]=json!("gate-a-root");
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("cycle or repeated node"));
+ }
+ #[test]fn oracle_calibration_scope_cannot_reference_unknown_factors(){
+  let mut b:Value=serde_json::from_str(DETERMINISTIC).unwrap();
+  b["oracle"]["calibrations"][0]["factor_ids"]=json!(["gate-a-factor","not-registered"]);
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("not independently valid at cutoff"));
  }
  #[test]fn read_only_deferral_is_valid_even_when_evidence_support_is_zero(){
   let r=evaluate(COMMON_CAUSE).expect("common cause fixture");
