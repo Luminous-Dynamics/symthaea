@@ -1,0 +1,16 @@
+[package]
+name = "symmetry-query-semantics-reference"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.96"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact finite query aggregation over independently verified symmetry quotients"
+
+[dependencies]
+symmetry-quotient-reference = { path = "../symmetry-quotient-001" }
+
+[lib]
+path = "src/lib.rs"
+
+[workspace]
