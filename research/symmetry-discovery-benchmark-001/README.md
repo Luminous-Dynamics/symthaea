@@ -103,7 +103,7 @@ For mechanics, align masses, constraints, constitutive/contact models, integrato
 
 ## Artifacts and reproducibility
 
-- `fixtures/v0.1/cases.json`: five hand-authored exact controls plus 150 generated point-set instances (30 each for D4, C4, half-turn C2, reflection C2, and C1). The  five hand-authored exact controls plus 150 deterministic generated point-set instances (30 each for D4, C4, C2 half-turn, C2 reflection, and C1).
+- `fixtures/v0.1/cases.json`: five hand-authored exact controls plus 150 deterministic generated point-set instances (30 each for D4, C4, half-turn C2, reflection C2, and C1).
 - `schemas/case_manifest.schema.json`: manifest validation.
 - Future accepted run: baseline source/version, input and split digests, hardware/software record, raw predictions, verifier receipts, all failures, and scorecard.
 - Never label a target as achieved from fixture unit tests alone.
