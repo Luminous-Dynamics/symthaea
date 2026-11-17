@@ -34,9 +34,7 @@ impl StageKind {
 
     fn output_kind(self) -> SimulatedOutputKind {
         match self {
-            Self::Characterization | Self::Exposure => {
-                SimulatedOutputKind::IntermediateProxy
-            }
+            Self::Characterization | Self::Exposure => SimulatedOutputKind::IntermediateProxy,
             Self::Capture => SimulatedOutputKind::CapturedProduct,
             Self::Assay => SimulatedOutputKind::SimulatedIndependentAssay,
         }
@@ -440,9 +438,7 @@ impl TwinWorld {
                 || spec.maintenance_duration_seconds == 0
                 || spec.recalibration_duration_seconds == 0
             {
-                return Err(TwinError::InvalidInstrumentSpec(
-                    spec.instrument_id.clone(),
-                ));
+                return Err(TwinError::InvalidInstrumentSpec(spec.instrument_id.clone()));
             }
             spec.maintenance_cost.validate()?;
             spec.recalibration_cost.validate()?;
@@ -568,16 +564,13 @@ impl TwinWorld {
         if self.seen_job_ids.contains(job_id) {
             return Err(TwinError::DuplicateJob(job_id.to_string()));
         }
-        let progress = self
-            .progress
-            .get(candidate_id)
-            .ok_or_else(|| {
-                if self.holdout_candidates.contains_key(candidate_id) {
-                    TwinError::HoldoutCannotBeMeasured(candidate_id.to_string())
-                } else {
-                    TwinError::UnknownCandidate(candidate_id.to_string())
-                }
-            })?;
+        let progress = self.progress.get(candidate_id).ok_or_else(|| {
+            if self.holdout_candidates.contains_key(candidate_id) {
+                TwinError::HoldoutCannotBeMeasured(candidate_id.to_string())
+            } else {
+                TwinError::UnknownCandidate(candidate_id.to_string())
+            }
+        })?;
         let expected = (progress.next_stage_index < STAGE_COUNT)
             .then_some(stage_from_index(progress.next_stage_index));
         if expected != Some(stage) {
@@ -592,9 +585,7 @@ impl TwinWorld {
             .values()
             .any(|active| active.candidate_id == candidate_id)
         {
-            return Err(TwinError::CandidateAlreadyActive(
-                candidate_id.to_string(),
-            ));
+            return Err(TwinError::CandidateAlreadyActive(candidate_id.to_string()));
         }
         let stage_spec = self
             .stages
@@ -644,13 +635,12 @@ impl TwinWorld {
             .attempts
             .get(&(candidate_id.to_string(), stage))
             .unwrap_or(&0);
-        let rng_seed = keyed_seed(
-            self.manifest.seed,
-            candidate_id,
-            stage,
-            key_attempt,
+        let rng_seed = keyed_seed(self.manifest.seed, candidate_id, stage, key_attempt);
+        let (duration, will_fail) = sample_job(
+            rng_seed,
+            &stage_spec,
+            instrument.spec.duration_scale_permille,
         );
-        let (duration, will_fail) = sample_job(rng_seed, &stage_spec, instrument.spec.duration_scale_permille);
         let finish_at = self.now_seconds.saturating_add(duration);
         if finish_at > self.manifest.max_wall_seconds
             || self.now_seconds.saturating_add(max_duration) > self.manifest.max_wall_seconds
@@ -695,7 +685,8 @@ impl TwinWorld {
             .get_mut(instrument_id)
             .expect("instrument presence checked");
         instrument_state.busy_job_id = Some(job_id.to_string());
-        instrument_state.jobs_since_calibration = instrument_state.jobs_since_calibration.saturating_add(1);
+        instrument_state.jobs_since_calibration =
+            instrument_state.jobs_since_calibration.saturating_add(1);
         self.active_jobs.insert(job_id.to_string(), job);
         self.append_event(TwinEventKind::JobLaunched {
             job_id: job_id.to_string(),
@@ -732,9 +723,7 @@ impl TwinWorld {
             .fouling_ppm
             .saturating_add(fouling_added(&job, &self.stages));
 
-        let duration = job
-            .finish_at_seconds
-            .saturating_sub(job.started_at_seconds);
+        let duration = job.finish_at_seconds.saturating_sub(job.started_at_seconds);
         let mut actual_cost = job.actual_non_time_cost;
         actual_cost.rig_seconds = duration as f64;
         self.reserved = subtract_cost(self.reserved, job.reserved_cost);
@@ -763,10 +752,7 @@ impl TwinWorld {
         } else {
             truth.stage_means[job.stage.index()]
         };
-        let stage_spec = self
-            .stages
-            .get(&job.stage)
-            .expect("stage exists");
+        let stage_spec = self.stages.get(&job.stage).expect("stage exists");
         let noise_seed = keyed_seed(
             self.manifest.seed ^ 0xA5A5_A5A5_A5A5_A5A5,
             &job.candidate_id,
@@ -778,8 +764,7 @@ impl TwinWorld {
                 .saturating_sub(1),
         );
         let noise = sample_noise(noise_seed, stage_spec.measurement_noise_stddev);
-        let fouling_bias =
-            job.fouling_at_launch_ppm as f64 * stage_spec.fouling_bias_per_ppm;
+        let fouling_bias = job.fouling_at_launch_ppm as f64 * stage_spec.fouling_bias_per_ppm;
         let observation = SimulatedObservation {
             candidate_id: job.candidate_id.clone(),
             job_id: job.job_id.clone(),
@@ -832,9 +817,7 @@ impl TwinWorld {
             )
         } else {
             if instrument.jobs_since_calibration < instrument.spec.calibration_valid_for_jobs {
-                return Err(TwinError::CalibrationStillValid(
-                    instrument_id.to_string(),
-                ));
+                return Err(TwinError::CalibrationStillValid(instrument_id.to_string()));
             }
             (
                 instrument.spec.recalibration_duration_seconds,
@@ -873,10 +856,7 @@ impl TwinWorld {
         Ok(())
     }
 
-    pub fn grade_discovery(
-        &self,
-        threshold: f64,
-    ) -> Result<TwinDiscoveryScore, TwinError> {
+    pub fn grade_discovery(&self, threshold: f64) -> Result<TwinDiscoveryScore, TwinError> {
         if !self.closed {
             return Err(TwinError::CampaignNotClosed);
         }
@@ -915,9 +895,7 @@ impl TwinWorld {
                 || !prediction.interval_upper.is_finite()
                 || prediction.interval_lower > prediction.interval_upper
             {
-                return Err(TwinError::InvalidPrediction(
-                    prediction.candidate_id,
-                ));
+                return Err(TwinError::InvalidPrediction(prediction.candidate_id));
             }
             let id = prediction.candidate_id.clone();
             if !self.holdout_candidates.contains_key(&id) {
@@ -985,17 +963,13 @@ impl TwinAgentApi<'_> {
     }
 
     pub fn next_stage(&self, candidate_id: &str) -> Result<Option<StageKind>, TwinError> {
-        let progress = self
-            .world
-            .progress
-            .get(candidate_id)
-            .ok_or_else(|| {
-                if self.world.holdout_candidates.contains_key(candidate_id) {
-                    TwinError::HoldoutCannotBeMeasured(candidate_id.to_string())
-                } else {
-                    TwinError::UnknownCandidate(candidate_id.to_string())
-                }
-            })?;
+        let progress = self.world.progress.get(candidate_id).ok_or_else(|| {
+            if self.world.holdout_candidates.contains_key(candidate_id) {
+                TwinError::HoldoutCannotBeMeasured(candidate_id.to_string())
+            } else {
+                TwinError::UnknownCandidate(candidate_id.to_string())
+            }
+        })?;
         Ok((progress.next_stage_index < STAGE_COUNT)
             .then_some(stage_from_index(progress.next_stage_index)))
     }
@@ -1074,8 +1048,16 @@ fn split_seeds(
         if id.trim().is_empty() || seed.candidate.parameter_digest.trim().is_empty() {
             return Err(TwinError::EmptyIdentity("candidate"));
         }
-        if seed.candidate.features.iter().any(|value| !value.is_finite())
-            || seed.truth.stage_means.iter().any(|value| !value.is_finite())
+        if seed
+            .candidate
+            .features
+            .iter()
+            .any(|value| !value.is_finite())
+            || seed
+                .truth
+                .stage_means
+                .iter()
+                .any(|value| !value.is_finite())
             || !seed.truth.final_utility.is_finite()
         {
             return Err(TwinError::CandidateOutcomeMismatch(id));
@@ -1089,9 +1071,12 @@ fn split_seeds(
 }
 
 fn hash_candidate(candidate_id: &str) -> u64 {
-    candidate_id.as_bytes().iter().fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
-        (hash ^ *byte as u64).wrapping_mul(0x0000_0100_0000_01b3)
-    })
+    candidate_id
+        .as_bytes()
+        .iter()
+        .fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+            (hash ^ *byte as u64).wrapping_mul(0x0000_0100_0000_01b3)
+        })
 }
 
 fn keyed_seed(master: u64, candidate_id: &str, stage: StageKind, attempt: u64) -> u64 {
@@ -1108,12 +1093,12 @@ fn next_random(state: &mut u64) -> u64 {
     state.wrapping_mul(0x2545_f491_4f6c_dd1d)
 }
 
-fn sample_job(
-    seed: u64,
-    stage: &StageSpec,
-    duration_scale_permille: u64,
-) -> (u64, bool) {
-    let mut state = if seed == 0 { 0xa076_1d64_78bd_642f } else { seed };
+fn sample_job(seed: u64, stage: &StageSpec, duration_scale_permille: u64) -> (u64, bool) {
+    let mut state = if seed == 0 {
+        0xa076_1d64_78bd_642f
+    } else {
+        seed
+    };
     let jitter = if stage.duration_jitter_seconds == 0 {
         0
     } else if stage.duration_jitter_seconds == u64::MAX {
@@ -1135,7 +1120,11 @@ fn sample_noise(seed: u64, standard_deviation: f64) -> f64 {
     if standard_deviation == 0.0 {
         return 0.0;
     }
-    let mut state = if seed == 0 { 0xa076_1d64_78bd_642f } else { seed };
+    let mut state = if seed == 0 {
+        0xa076_1d64_78bd_642f
+    } else {
+        seed
+    };
     let mut sum = 0.0;
     for _ in 0..12 {
         let uniform = (next_random(&mut state) >> 11) as f64 / ((1_u64 << 53) as f64);
@@ -1256,12 +1245,7 @@ mod tests {
         }
     }
 
-    fn world(
-        seed: u64,
-        fail_ppm: u64,
-        valid_jobs: u64,
-        fouling_threshold: u64,
-    ) -> TwinWorld {
+    fn world(seed: u64, fail_ppm: u64, valid_jobs: u64, fouling_threshold: u64) -> TwinWorld {
         let instruments = vec![
             instrument("spectrometer-a", valid_jobs, fouling_threshold, 1000),
             instrument("spectrometer-b", valid_jobs, fouling_threshold, 2000),
@@ -1270,9 +1254,25 @@ mod tests {
             instrument("assay-lab", valid_jobs, fouling_threshold, 1000),
         ];
         let stages = vec![
-            stage(StageKind::Characterization, &["spectrometer-a", "spectrometer-b"], 4, 2, 0.02, 2, fail_ppm),
+            stage(
+                StageKind::Characterization,
+                &["spectrometer-a", "spectrometer-b"],
+                4,
+                2,
+                0.02,
+                2,
+                fail_ppm,
+            ),
             stage(StageKind::Exposure, &["reactor"], 5, 3, 0.03, 5, fail_ppm),
-            stage(StageKind::Capture, &["capture-train"], 3, 1, 0.01, 1, fail_ppm),
+            stage(
+                StageKind::Capture,
+                &["capture-train"],
+                3,
+                1,
+                0.01,
+                1,
+                fail_ppm,
+            ),
             stage(StageKind::Assay, &["assay-lab"], 2, 1, 0.01, 0, fail_ppm),
         ];
         TwinWorld::new(
@@ -1294,8 +1294,16 @@ mod tests {
             },
             stages,
             instruments,
-            vec![candidate("train-a", 0.3), candidate("train-b", 0.8), candidate("train-c", 0.6)],
-            vec![candidate("holdout-a", 0.2), candidate("holdout-b", 0.5), candidate("holdout-c", 0.9)],
+            vec![
+                candidate("train-a", 0.3),
+                candidate("train-b", 0.8),
+                candidate("train-c", 0.6),
+            ],
+            vec![
+                candidate("holdout-a", 0.2),
+                candidate("holdout-b", 0.5),
+                candidate("holdout-c", 0.9),
+            ],
         )
         .unwrap()
     }
@@ -1345,10 +1353,20 @@ mod tests {
         let mut world = world(17, 0, 10, 1_000);
         let mut api = world.agent_api();
         let slow = api
-            .launch_stage("slow-job", "train-a", StageKind::Characterization, "spectrometer-b")
+            .launch_stage(
+                "slow-job",
+                "train-a",
+                StageKind::Characterization,
+                "spectrometer-b",
+            )
             .unwrap();
         let fast = api
-            .launch_stage("fast-job", "train-b", StageKind::Characterization, "spectrometer-a")
+            .launch_stage(
+                "fast-job",
+                "train-b",
+                StageKind::Characterization,
+                "spectrometer-a",
+            )
             .unwrap();
         assert!(slow > fast);
         let first = api.advance_next_event().unwrap().unwrap();
@@ -1361,10 +1379,20 @@ mod tests {
     fn one_instrument_cannot_be_reserved_by_two_inflight_jobs() {
         let mut world = world(19, 0, 10, 1_000);
         let mut api = world.agent_api();
-        api.launch_stage("job-a", "train-a", StageKind::Characterization, "spectrometer-a")
-            .unwrap();
+        api.launch_stage(
+            "job-a",
+            "train-a",
+            StageKind::Characterization,
+            "spectrometer-a",
+        )
+        .unwrap();
         assert_eq!(
-            api.launch_stage("job-b", "train-b", StageKind::Characterization, "spectrometer-a"),
+            api.launch_stage(
+                "job-b",
+                "train-b",
+                StageKind::Characterization,
+                "spectrometer-a"
+            ),
             Err(TwinError::InstrumentBusy("spectrometer-a".to_string()))
         );
     }
@@ -1374,7 +1402,12 @@ mod tests {
         let mut world = world(23, 0, 10, 1_000);
         let mut api = world.agent_api();
         assert_eq!(
-            api.launch_stage("exposure-too-soon", "train-a", StageKind::Exposure, "reactor"),
+            api.launch_stage(
+                "exposure-too-soon",
+                "train-a",
+                StageKind::Exposure,
+                "reactor"
+            ),
             Err(TwinError::InvalidStageOrder {
                 candidate_id: "train-a".to_string(),
                 expected: Some(StageKind::Characterization),
@@ -1389,7 +1422,12 @@ mod tests {
         let mut api = world.agent_api();
         assert_eq!(api.holdout_catalog().len(), 3);
         assert_eq!(
-            api.launch_stage("holdout-job", "holdout-a", StageKind::Characterization, "spectrometer-a"),
+            api.launch_stage(
+                "holdout-job",
+                "holdout-a",
+                StageKind::Characterization,
+                "spectrometer-a"
+            ),
             Err(TwinError::HoldoutCannotBeMeasured("holdout-a".to_string()))
         );
     }
@@ -1398,15 +1436,25 @@ mod tests {
     fn calibration_expiry_blocks_new_work_until_recalibration() {
         let mut world = world(31, 0, 1, 1_000);
         let mut api = world.agent_api();
-        api.launch_stage("job-a", "train-a", StageKind::Characterization, "spectrometer-a")
-            .unwrap();
+        api.launch_stage(
+            "job-a",
+            "train-a",
+            StageKind::Characterization,
+            "spectrometer-a",
+        )
+        .unwrap();
         api.advance_next_event().unwrap();
         assert_eq!(
             api.instrument_condition("spectrometer-a"),
             Ok(InstrumentCondition::CalibrationDue)
         );
         assert_eq!(
-            api.launch_stage("job-b", "train-b", StageKind::Characterization, "spectrometer-a"),
+            api.launch_stage(
+                "job-b",
+                "train-b",
+                StageKind::Characterization,
+                "spectrometer-a"
+            ),
             Err(TwinError::CalibrationDue("spectrometer-a".to_string()))
         );
         api.recalibrate("spectrometer-a").unwrap();
@@ -1420,15 +1468,25 @@ mod tests {
     fn fouling_blocks_instrument_until_maintenance() {
         let mut world = world(37, 0, 10, 2);
         let mut api = world.agent_api();
-        api.launch_stage("job-a", "train-a", StageKind::Characterization, "spectrometer-a")
-            .unwrap();
+        api.launch_stage(
+            "job-a",
+            "train-a",
+            StageKind::Characterization,
+            "spectrometer-a",
+        )
+        .unwrap();
         api.advance_next_event().unwrap();
         assert_eq!(
             api.instrument_condition("spectrometer-a"),
             Ok(InstrumentCondition::MaintenanceDue)
         );
         assert_eq!(
-            api.launch_stage("job-b", "train-b", StageKind::Characterization, "spectrometer-a"),
+            api.launch_stage(
+                "job-b",
+                "train-b",
+                StageKind::Characterization,
+                "spectrometer-a"
+            ),
             Err(TwinError::MaintenanceDue("spectrometer-a".to_string()))
         );
         api.perform_maintenance("spectrometer-a").unwrap();
@@ -1442,8 +1500,13 @@ mod tests {
     fn failed_jobs_consume_budget_release_lock_and_do_not_advance_candidate() {
         let mut world = world(41, PPM_SCALE, 10, 10_000);
         let mut api = world.agent_api();
-        api.launch_stage("job-fail", "train-a", StageKind::Characterization, "spectrometer-a")
-            .unwrap();
+        api.launch_stage(
+            "job-fail",
+            "train-a",
+            StageKind::Characterization,
+            "spectrometer-a",
+        )
+        .unwrap();
         assert!(matches!(
             api.advance_next_event().unwrap(),
             Some(TwinTransition::Failed { .. })
@@ -1465,11 +1528,21 @@ mod tests {
         let mut world = world(43, 0, 10, 10_000);
         world.manifest.max_experiments = 1;
         let mut api = world.agent_api();
-        api.launch_stage("job-a", "train-a", StageKind::Characterization, "spectrometer-a")
-            .unwrap();
+        api.launch_stage(
+            "job-a",
+            "train-a",
+            StageKind::Characterization,
+            "spectrometer-a",
+        )
+        .unwrap();
         api.advance_next_event().unwrap();
         assert_eq!(
-            api.launch_stage("job-b", "train-b", StageKind::Characterization, "spectrometer-b"),
+            api.launch_stage(
+                "job-b",
+                "train-b",
+                StageKind::Characterization,
+                "spectrometer-b"
+            ),
             Err(TwinError::ExperimentBudgetExhausted)
         );
     }
@@ -1480,7 +1553,12 @@ mod tests {
         world.manifest.resource_budget.source_energy_wh = 1.0;
         let mut api = world.agent_api();
         assert_eq!(
-            api.launch_stage("job-a", "train-a", StageKind::Characterization, "spectrometer-a"),
+            api.launch_stage(
+                "job-a",
+                "train-a",
+                StageKind::Characterization,
+                "spectrometer-a"
+            ),
             Err(TwinError::ResourceBudgetExceeded)
         );
         assert_eq!(api.world.active_jobs.len(), 0);
@@ -1491,8 +1569,13 @@ mod tests {
     fn maintenance_and_recalibration_consume_wall_time_and_resources() {
         let mut world = world(53, 0, 1, 2);
         let mut api = world.agent_api();
-        api.launch_stage("job-a", "train-a", StageKind::Characterization, "spectrometer-a")
-            .unwrap();
+        api.launch_stage(
+            "job-a",
+            "train-a",
+            StageKind::Characterization,
+            "spectrometer-a",
+        )
+        .unwrap();
         api.advance_next_event().unwrap();
         let before = api.world.elapsed_seconds();
         api.perform_maintenance("spectrometer-a").unwrap();
@@ -1541,9 +1624,7 @@ mod tests {
 
     #[test]
     fn deterministic_noise_approximation_has_zero_mean_and_unit_variance() {
-        let values: Vec<f64> = (1..=10_000)
-            .map(|seed| sample_noise(seed, 1.0))
-            .collect();
+        let values: Vec<f64> = (1..=10_000).map(|seed| sample_noise(seed, 1.0)).collect();
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let variance = values
             .iter()
@@ -1560,10 +1641,20 @@ mod tests {
             let mut world = world(61, 50_000, 10, 10_000);
             {
                 let mut api = world.agent_api();
-                api.launch_stage("job-a", "train-a", StageKind::Characterization, "spectrometer-a")
-                    .unwrap();
-                api.launch_stage("job-b", "train-b", StageKind::Characterization, "spectrometer-b")
-                    .unwrap();
+                api.launch_stage(
+                    "job-a",
+                    "train-a",
+                    StageKind::Characterization,
+                    "spectrometer-a",
+                )
+                .unwrap();
+                api.launch_stage(
+                    "job-b",
+                    "train-b",
+                    StageKind::Characterization,
+                    "spectrometer-b",
+                )
+                .unwrap();
                 while api.advance_next_event().unwrap().is_some() {}
                 api.close_campaign().unwrap();
             }
@@ -1722,13 +1813,23 @@ mod tests {
         let mut world = world(79, 0, 10, 100_000);
         {
             let mut api = world.agent_api();
-            api.launch_stage("job-a", "train-a", StageKind::Characterization, "spectrometer-a")
-                .unwrap();
+            api.launch_stage(
+                "job-a",
+                "train-a",
+                StageKind::Characterization,
+                "spectrometer-a",
+            )
+            .unwrap();
             assert_eq!(api.close_campaign(), Err(TwinError::ActiveJobsRemain));
             api.advance_next_event().unwrap();
             api.close_campaign().unwrap();
             assert_eq!(
-                api.launch_stage("job-b", "train-b", StageKind::Characterization, "spectrometer-b"),
+                api.launch_stage(
+                    "job-b",
+                    "train-b",
+                    StageKind::Characterization,
+                    "spectrometer-b"
+                ),
                 Err(TwinError::CampaignClosed)
             );
         }
