@@ -55,3 +55,5 @@ Product and benchmark contexts are defined in:
 - `docs/AQUA_OWNER_INTEGRATION_MAP_V0_1.md`
 
 The adapter remains deliberately small: it binds paired Aqua test runs to equivalent conditions and canonical owner evidence. New fixture classes and room modes must not add a second water, energy, hydraulic, water-quality, metrology, thermal, pool or safety authority.
+- `docs/AQUA_MODULAR_PLATFORM_ARCHITECTURE_V0_1.md`
+- `AQUA-ADAPTIVE-EXPERIENCE-001 #12712` — optional privacy-preserving preference/task assistance.
