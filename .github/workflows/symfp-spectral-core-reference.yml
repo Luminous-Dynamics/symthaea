@@ -41,5 +41,7 @@ jobs:
         run: cargo test --locked --manifest-path research/symfp-spectral-core-001/Cargo.toml
       - name: Strict Clippy
         run: cargo clippy --locked --manifest-path research/symfp-spectral-core-001/Cargo.toml --all-targets -- -D warnings
+      - name: Test robust SymFP uncertainty envelope
+        run: cargo test --locked --manifest-path research/symfp-spectral-core-001/Cargo.toml robust::tests
       - name: Run deterministic SymFP rank-template probe
         run: cargo run --release --locked --manifest-path research/symfp-spectral-core-001/Cargo.toml --example rank_template_probe
