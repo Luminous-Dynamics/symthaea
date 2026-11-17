@@ -162,16 +162,20 @@ pub enum RejectionReason {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AdmittedInspectionOption {
-    pub option: InspectionOption,
+    option: InspectionOption,
     /// Preserve the complete evidence manifest with the admitted campaign option.
-    pub manifest: EvidenceManifest,
+    manifest: EvidenceManifest,
 }
 
 impl AdmittedInspectionOption {
-    /// Extract the value object expected by the campaign solver. Callers should
-    /// persist this wrapper alongside the campaign so the evidence lineage is retained.
-    pub fn campaign_option(&self) -> InspectionOption {
-        self.option.clone()
+    /// Read the exact option identity without exposing a bare campaign option.
+    pub fn option_id(&self) -> &str {
+        &self.option.option_id
+    }
+
+    /// Read the full manifest without separating it from this admitted wrapper.
+    pub fn manifest(&self) -> &EvidenceManifest {
+        &self.manifest
     }
 }
 
@@ -725,11 +729,8 @@ mod tests {
         assert!(report.rejection_reasons.is_empty());
         assert!(report.admitted_candidate.is_some());
         let admitted = report.admitted_candidate.as_ref().unwrap();
-        assert_eq!(admitted.manifest.asset_revision, "rev-17");
-        assert_eq!(
-            admitted.campaign_option().option_id,
-            "support-08-thermal-followup"
-        );
+        assert_eq!(admitted.manifest().asset_revision, "rev-17");
+        assert_eq!(admitted.option_id(), "support-08-thermal-followup");
         assert_eq!(report.evidence_references.len(), 11);
     }
 
