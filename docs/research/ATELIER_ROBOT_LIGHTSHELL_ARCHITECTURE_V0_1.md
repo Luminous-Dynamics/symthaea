@@ -268,3 +268,8 @@ Two follow-on tracks now make the frontier explicit:
 - [ROBOT-GARMENT-COMPILER-001 #12710](https://github.com/Luminous-Dynamics/symthaea/issues/12710) explores generating robot-specific textile panels and seam topology from exact CAD, kinematics, swept envelopes, thermal/sensor/service keep-outs and process capabilities.
 
 RGBench is a cloth simulation/manipulation comparator, not a protective-shell test. The January 2026 auxetic-lattice research is a candidate local reinforcement direction, not a qualified robot-cover material. These distinctions are recorded in the comparative test plan.
+
+
+## Spacer textile experiment programme
+
+The first zone-specific spacer material campaign is now [LIGHTSHELL-SPACER-DOE-001 #12724](https://github.com/Luminous-Dynamics/symthaea/issues/12724), composed with the existing inverse textile design owner. The proposed screening matrix separates inlay architecture from spacer-course frequency, then refines square-wave transition geometry separately. Compression/impact, vibration, airflow, durability and cleaning are measured as independent responses; the best construction will be zone-dependent.
