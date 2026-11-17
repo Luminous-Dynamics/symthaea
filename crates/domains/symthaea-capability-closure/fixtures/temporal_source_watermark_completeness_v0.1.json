@@ -231,6 +231,12 @@
       "name": "full_completeness_query_linear_reference_parity",
       "expect": "indexed_and_linear_complete_query_semantic_reports_equal",
       "safety": "performance_comparison_changes_only_late_breach_selection_strategy"
+    },
+    {
+      "id": "WM-027",
+      "name": "failed_multi_event_arrival_batch_rolls_back_after_preflight",
+      "expect": "invalid_batch_leaves_arrival_and_breach_indexes_transaction_time_and_state_digest_unchanged",
+      "safety": "full_batch_validation_precedes_direct_append_without_full_history_clone"
     }
   ],
   "metrics": {
@@ -267,7 +273,9 @@
       "linear_scan_breach_query_p50_p95_p99_us",
       "linear_scan_receipt_count",
       "indexed_vs_linear_scan_breach_mismatch_count",
-      "indexed_vs_linear_scan_speedup"
+      "indexed_vs_linear_scan_speedup",
+      "event_arrival_batch_ingest_total_us",
+      "event_arrival_batch_ingest_ns_per_event"
     ]
   },
   "qualification_targets": {
@@ -284,8 +292,8 @@
     "source_authentication_executed": false,
     "benchmark_results_available": false,
     "targets_are_results": false,
-    "watermark_test_functions_authored": 26,
-    "crate_test_functions_authored": 99,
+    "watermark_test_functions_authored": 27,
+    "crate_test_functions_authored": 100,
     "benchmark_protocol_authored": true,
     "clock_calibration_test_functions_authored": 17,
     "clock_calibration_tests_executed": false
@@ -316,11 +324,13 @@
       "verified_ledger_sha256",
       "verified_progress_revision_count",
       "verified_event_arrival_count",
-      "verified_late_breach_count"
+      "verified_late_breach_count",
+      "event_arrival_batch_ingest_total_us",
+      "event_arrival_batch_ingest_ns_per_event"
     ],
     "known_answer": "indexed_semantic_report_equals_linear_scan_reference_semantic_report_equals_verified_receipt.report; verified_receipt.ledger_sha256_equals_current_ledger_state_sha256",
     "correctness_gate": "semantic_report_equality_for_all_three_complete_query_paths_and_consistent_instrumentation_counters_and_current_ledger_digest_match_before_timing",
-    "measurement_boundary": "in_memory_release_build_cpu_query_and_replay_time_only",
+    "measurement_boundary": "in_memory_release_build_cpu_query_and_replay_time_only; event-arrival ingestion separately times four atomic batch commits and excludes event generation and initial progress setup",
     "energy_measurement": "not_measured",
     "source_counts": [
       1,
@@ -353,7 +363,8 @@
       5000,
       10000
     ],
-    "scan_query_repetitions": 31
+    "scan_query_repetitions": 31,
+    "ingestion_atomicity": "the entire batch is preflighted before mutation; after preflight the direct append path has no typed Result error branch; invalid members preserve ledger state SHA-256 and all counts"
   },
   "clock_calibration_contract": {
     "module": "research/irregular-event-contract/src/clock.rs",
