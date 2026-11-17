@@ -69,7 +69,29 @@
         "scenario_order",
         "execution_levels",
         "tool_set_modes",
-        "note"
+        "note",
+        "upstream_repository",
+        "upstream_commit",
+        "upstream_code_license",
+        "toolbook_license",
+        "toolbook_simulation_revision",
+        "toolbook_real_g1_revision",
+        "simulator",
+        "python_version",
+        "observation_dimension",
+        "action_dimension",
+        "action_contract",
+        "control_hz",
+        "policy_steps_per_episode",
+        "success_hold_steps",
+        "official_episodes_per_condition",
+        "official_seed_start",
+        "official_seed_end_inclusive",
+        "estimated_setup_download_gb",
+        "estimated_disk_gb",
+        "estimated_first_checkpoint_download_gb",
+        "upstream_estimated_hours_per_condition",
+        "upstream_estimated_days_all_18_sequential"
       ],
       "properties": {
         "name": {
@@ -112,6 +134,80 @@
         "note": {
           "type": "string",
           "minLength": 1
+        },
+        "upstream_repository": {
+          "const": "SNU-PI/HumanoidToolBench"
+        },
+        "upstream_commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "upstream_code_license": {
+          "const": "MIT"
+        },
+        "toolbook_license": {
+          "const": "CC-BY-NC-4.0"
+        },
+        "toolbook_simulation_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "toolbook_real_g1_revision": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "simulator": {
+          "const": "MuJoCo 3.11.0"
+        },
+        "python_version": {
+          "const": "3.10"
+        },
+        "observation_dimension": {
+          "const": 32
+        },
+        "action_dimension": {
+          "const": 36
+        },
+        "action_contract": {
+          "const": "decoupled_v1"
+        },
+        "control_hz": {
+          "const": 50
+        },
+        "policy_steps_per_episode": {
+          "const": 3000
+        },
+        "success_hold_steps": {
+          "const": 50
+        },
+        "official_episodes_per_condition": {
+          "const": 100
+        },
+        "official_seed_start": {
+          "const": 10000
+        },
+        "official_seed_end_inclusive": {
+          "const": 10099
+        },
+        "estimated_setup_download_gb": {
+          "type": "number",
+          "minimum": 0
+        },
+        "estimated_disk_gb": {
+          "type": "number",
+          "minimum": 0
+        },
+        "estimated_first_checkpoint_download_gb": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upstream_estimated_hours_per_condition": {
+          "type": "number",
+          "minimum": 0
+        },
+        "upstream_estimated_days_all_18_sequential": {
+          "type": "number",
+          "minimum": 0
         }
       }
     },
@@ -134,7 +230,10 @@
           "evidence_class",
           "episode_plan",
           "primary_outcomes",
-          "notes"
+          "notes",
+          "official_environment_id",
+          "upstream_mode_token",
+          "official_success_predicate"
         ],
         "properties": {
           "case_id": {
@@ -192,7 +291,12 @@
             "required": [
               "simulation_episodes_per_policy",
               "physical_trials",
-              "training_seeds_target"
+              "training_seeds_target",
+              "seed_start",
+              "seed_end_inclusive",
+              "max_policy_steps",
+              "control_hz",
+              "success_hold_steps"
             ],
             "properties": {
               "simulation_episodes_per_policy": {
@@ -207,6 +311,21 @@
               },
               "training_seeds_target": {
                 "const": 5
+              },
+              "seed_start": {
+                "const": 10000
+              },
+              "seed_end_inclusive": {
+                "const": 10099
+              },
+              "max_policy_steps": {
+                "const": 3000
+              },
+              "control_hz": {
+                "const": 50
+              },
+              "success_hold_steps": {
+                "const": 50
               }
             }
           },
@@ -219,6 +338,20 @@
             "uniqueItems": true
           },
           "notes": {
+            "type": "string",
+            "minLength": 1
+          },
+          "official_environment_id": {
+            "type": "string",
+            "pattern": "^humanoidtoolbench/G1(BallMove|BallRetrieve|IceBreak)-L[012]-(S|R)$"
+          },
+          "upstream_mode_token": {
+            "enum": [
+              "S",
+              "R"
+            ]
+          },
+          "official_success_predicate": {
             "type": "string",
             "minLength": 1
           }
