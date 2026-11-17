@@ -340,7 +340,7 @@ pub fn admit_candidate(
         reasons.push(RejectionReason::RightsGrantExpired);
     }
     if manifest.observation_captured_at_unix_ms < manifest.calibration_valid_from_unix_ms
-        || manifest.observation_captured_at_unix_ms > manifest.calibration_valid_until_unix_ms
+        || manifest.observation_captured_at_unix_ms >= manifest.calibration_valid_until_unix_ms
     {
         reasons.push(RejectionReason::CalibrationNotYetValid);
     }
@@ -591,7 +591,7 @@ mod tests {
         item.manifest.verifier_receipt_digest.clear();
         let report = admit_candidate(&item, &context());
         assert!(report.rejection_reasons.contains(&RejectionReason::MissingVerifierReceipt));
-        assert!(report.admitted_option.is_none());
+        assert!(report.admitted_candidate.is_none());
     }
 
     #[test]
@@ -610,7 +610,7 @@ mod tests {
         item.manifest.option_id = "another-action".into();
         let report = admit_candidate(&item, &context());
         assert!(report.rejection_reasons.contains(&RejectionReason::OptionIdMismatch));
-        assert!(report.admitted_option.is_none());
+        assert!(report.admitted_candidate.is_none());
     }
 
     #[test]
@@ -619,7 +619,7 @@ mod tests {
         item.manifest.source_dataset_digest = "sha256:substituted-dataset".into();
         let report = admit_candidate(&item, &context());
         assert!(report.rejection_reasons.contains(&RejectionReason::SourceDatasetMismatch));
-        assert!(report.admitted_option.is_none());
+        assert!(report.admitted_candidate.is_none());
     }
 
     #[test]
@@ -628,7 +628,7 @@ mod tests {
         item.manifest.sensor_model_digest.clear();
         let report = admit_candidate(&item, &context());
         assert!(report.rejection_reasons.contains(&RejectionReason::EmptyRequiredDigest));
-        assert!(report.admitted_option.is_none());
+        assert!(report.admitted_candidate.is_none());
     }
 
     #[test]
