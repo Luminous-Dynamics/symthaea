@@ -731,6 +731,9 @@ mod tests{
   assert_eq!(actual["expected_cost"]["worst_case_expected_cost_micros"],legacy["submitted_policy"]["worst_case_expected_cost_bound_micros"]);
   assert_eq!(actual["submitted_policy"]["worst_case_path_cost_micros"],legacy["submitted_policy"]["worst_case_path_cost_bound_micros"]);
   assert_eq!(actual["submitted_policy"]["policy_feasible"],legacy["submitted_policy"]["policy_feasible"]);
+  assert_eq!(actual["submitted_policy"]["justified_action_coverage_bounds_bps"]["lower"],5000);
+  assert_eq!(actual["submitted_policy"]["justified_action_coverage_bounds_bps"]["nominal"],6000);
+  assert_eq!(actual["submitted_policy"]["justified_action_coverage_bounds_bps"]["upper"],7000);
  }
  #[test]fn common_cause_joint_kernel_does_not_multiply_marginals(){
   let r=evaluate(COMMON_CAUSE).expect("common cause fixture validates");
@@ -748,6 +751,10 @@ mod tests{
    .find(|row|row["outcomes"]["gate-a"]=="pass"&&row["outcomes"]["gate-b"]=="pass").unwrap();
   assert_eq!(pass_pass["nominal_probability_bps"],4500);
   assert_ne!(pass_pass["nominal_probability_bps"],2500); // 0.5 * 0.5 independence shortcut
+  assert_eq!(r["submitted_policy"]["justified_action_coverage_bounds_bps"]["lower"],3200);
+  assert_eq!(r["submitted_policy"]["justified_action_coverage_bounds_bps"]["nominal"],4050);
+  assert_eq!(r["submitted_policy"]["justified_action_coverage_bounds_bps"]["upper"],4750);
+  assert_eq!(r["submitted_policy"]["unsafe_action_mass_bounds_bps"]["upper"],0);
  }
  #[test]fn candidate_cannot_override_joint_kernels(){
   let mut b:Value=serde_json::from_str(DETERMINISTIC).unwrap();
@@ -810,6 +817,9 @@ mod tests{
   let r=evaluate(&b.to_string()).expect("mutated evaluator oracle scores");
   assert_eq!(r["submitted_policy"]["actual_hypothesis_unsafe_probability_nominal_bps"],4500);
   assert_eq!(r["submitted_policy"]["actual_hypothesis_unsafe_probability_upper_bps"],5000);
+  assert_eq!(r["submitted_policy"]["unsafe_action_mass_bounds_bps"]["lower"],3200);
+  assert_eq!(r["submitted_policy"]["unsafe_action_mass_bounds_bps"]["nominal"],4050);
+  assert_eq!(r["submitted_policy"]["unsafe_action_mass_bounds_bps"]["upper"],4750);
   assert_eq!(r["submitted_policy"]["risk_violation_leaf_count"],1);
  }
  #[test]fn policy_that_exceeds_budget_is_not_feasible(){
