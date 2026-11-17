@@ -81,6 +81,18 @@ This programme owns benchmark protocol, tool/service skill composition questions
 
 No single aggregate humanoid score. Every task result retains robot, tool, environment, task, model, evidence class, uncertainty and failure identity.
 
+## HumanoidToolBench compatibility, rights and resource gate
+
+The official evaluator source was inspected at `SNU-PI/HumanoidToolBench@3fec9bd36933a1648ff7f95468c983f3452243a0` on 17 November 2026.
+
+- Evaluator code is MIT-licensed.
+- ToolBook simulation and real-G1 recordings are CC BY-NC 4.0. This is non-commercial research data; do not use its recordings or derived artefacts in a commercial product/training pipeline without separately reviewed permission. Third-party models and assets retain their own terms.
+- The simulator policy contract is MuJoCo 3.11.0 / Python 3.10, with 32 observation values and 36 `decoupled_v1` action values. The real-G1 recordings have a distinct 35-value action contract. Neither is interchangeable with Symthaea's 21/53 actuator command arrays by padding or truncation.
+- Upstream standard budget: 100 episodes per condition, seeds 10000–10099, 3000 policy steps at 50 Hz. Maintainers estimate roughly 4 GB setup download, 9 GB disk, another 2 GB for an initial checkpoint, around two hours per condition and about 1.5 sequential days for all 18 on one GPU. These are upstream estimates, not local measurements.
+- The evaluator provides an HTTP policy interface, so a future Rust policy server can be written without making the Symthaea controller a Python production dependency. First, however, a semantics-preserving G1 observation/action adapter must exist and be qualified.
+
+For Luminous commercial work, the benchmark's task design and MIT evaluator may be informative, but any training data and redistributed assets must have rights that permit the intended use. The CC BY-NC ToolBook path is research-only absent additional permission.
+
 ## Complementary research anchors
 
 HumanoidToolBench is the direct humanoid tool-use anchor. We will also audit:
