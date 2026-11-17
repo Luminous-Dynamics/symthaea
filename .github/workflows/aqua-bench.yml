@@ -9,6 +9,7 @@ on:
       - "rust-toolchain.toml"
       - "crates/domains/symthaea-aqua-bench/**"
       - ".github/workflows/aqua-bench.yml"
+      - "docs/AQUA_*.md"
   push:
     branches:
       - main
@@ -19,6 +20,7 @@ on:
       - "rust-toolchain.toml"
       - "crates/domains/symthaea-aqua-bench/**"
       - ".github/workflows/aqua-bench.yml"
+      - "docs/AQUA_*.md"
   workflow_dispatch:
 
 permissions:
