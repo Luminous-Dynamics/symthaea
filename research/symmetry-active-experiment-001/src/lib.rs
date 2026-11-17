@@ -623,6 +623,67 @@ mod tests {
         QualificationBudgetV1::default()
     }
 
+    fn cost_sensitive_fixture() -> ActiveExperimentProblemV1 {
+        ActiveExperimentProblemV1 {
+            problem_id: "cost-sensitive-four-hypotheses-v0.1".to_owned(),
+            hypotheses: vec![
+                "C2".to_owned(),
+                "Cs".to_owned(),
+                "D2".to_owned(),
+                "C2v".to_owned(),
+            ],
+            probes: vec![
+                ExperimentProbeV1 {
+                    probe_id: "expensive-probe-a".to_owned(),
+                    cost: 5,
+                    admissible: true,
+                    outcomes: vec![1, 2, 1, 0],
+                },
+                ExperimentProbeV1 {
+                    probe_id: "expensive-probe-b".to_owned(),
+                    cost: 5,
+                    admissible: true,
+                    outcomes: vec![0, 2, 1, 1],
+                },
+                ExperimentProbeV1 {
+                    probe_id: "adaptive-optimal-probe".to_owned(),
+                    cost: 5,
+                    admissible: true,
+                    outcomes: vec![2, 1, 0, 1],
+                },
+                ExperimentProbeV1 {
+                    probe_id: "cheap-follow-up-probe".to_owned(),
+                    cost: 2,
+                    admissible: true,
+                    outcomes: vec![0, 1, 0, 0],
+                },
+            ],
+        }
+    }
+
+    fn greedy_policy_cost(problem: &ActiveExperimentProblemV1, mask: u64) -> u64 {
+        if mask.count_ones() <= 1 {
+            return 0;
+        }
+        let recommendation = choose_greedy_worst_case_probe(problem, mask)
+            .expect("the frozen greedy fixture has a separating probe");
+        let probe = &problem.probes[recommendation.probe_index];
+        let mut partitions = BTreeMap::<u32, u64>::new();
+        let mut remaining_mask = mask;
+        while remaining_mask != 0 {
+            let hypothesis_index = remaining_mask.trailing_zeros() as usize;
+            let bit = 1_u64 << hypothesis_index;
+            remaining_mask &= remaining_mask - 1;
+            *partitions.entry(probe.outcomes[hypothesis_index]).or_insert(0) |= bit;
+        }
+        probe.cost
+            + partitions
+                .values()
+                .map(|child_mask| greedy_policy_cost(problem, *child_mask))
+                .max()
+                .unwrap_or(0)
+    }
+
     fn exhaustive_cost(problem: &ActiveExperimentProblemV1, mask: u64) -> Option<u64> {
         if mask.count_ones() <= 1 {
             return Some(0);
@@ -674,6 +735,31 @@ mod tests {
         assert_eq!(certificate.node_count, 7);
         assert_eq!(certificate.explored_subsets, 6);
         verify_active_experiment_certificate(&problem, &certificate, budget()).unwrap();
+    }
+
+    #[test]
+    fn exact_adaptive_minimax_beats_myopic_greedy_on_cost_sensitive_probes() {
+        let problem = cost_sensitive_fixture();
+        let certificate = compile_active_experiment(&problem, budget()).unwrap();
+        let PlanDispositionV1::Probe {
+            probe_index,
+            probe_id,
+            ..
+        } = &certificate.root.disposition
+        else {
+            panic!("the root must select a probe");
+        };
+        assert_eq!(*probe_index, 2);
+        assert_eq!(probe_id, "adaptive-optimal-probe");
+        assert_eq!(certificate.root_worst_case_cost, 7);
+
+        let greedy = greedy_policy_cost(&problem, problem.full_hypothesis_mask());
+        assert_eq!(greedy, 10);
+        assert!(certificate.root_worst_case_cost < greedy);
+
+        let entropy = choose_entropy_probe(&problem, problem.full_hypothesis_mask()).unwrap();
+        assert_eq!(entropy.probe_index, 0);
+        assert_ne!(entropy.probe_index, *probe_index);
     }
 
     #[test]
