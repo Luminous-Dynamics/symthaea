@@ -421,11 +421,11 @@ mod tests {
         assert_eq!(result.segments[0].style, Style::Classical);
         assert_eq!(result.segments[1].style, Style::Minimalism);
         assert!(matches!(
-            result.segments[0].grammar_plan,
+            &result.segments[0].grammar_plan,
             GrammarPlanEvidence::PeriodSentence(_)
         ));
         assert!(matches!(
-            result.segments[1].grammar_plan,
+            &result.segments[1].grammar_plan,
             GrammarPlanEvidence::AdditiveProcess(_)
         ));
         assert_eq!(result.plan.segments[0].start_beat, Duration::zero());
