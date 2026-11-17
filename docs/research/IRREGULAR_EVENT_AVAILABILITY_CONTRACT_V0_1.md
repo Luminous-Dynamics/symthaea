@@ -228,15 +228,17 @@ late-event densities 0/100/5,000/10,000 basis points (0%, 1%, 50%, 100%), and
 two historical knowledge cutoffs, for 216 workload configurations. Event-time
 keys are permuted relative to four receipt-time batches.
 
-Each workload first requires exact equality between the fast indexed report and
-the report inside a distinct, non-forgeable `VerifiedCompletenessReport`.
-The verified receipt binds the full-history replay to the ledger SHA-256 and
-progress/arrival/breach counts; this is in-memory ledger consistency, not source
-authentication. It additionally requires the receipt digest to match the
-current ledger snapshot before timing. Each case records 51 indexed query
-samples (nearest-rank p50/p95/p99) and 15 verified replay samples (median and
-observed maximum), plus event-time index buckets visited, receipt candidates
-examined and matching breaches.
+Each workload first requires exact equality between the fast indexed report
+and the report inside a distinct, non-forgeable `VerifiedCompletenessReport`.
+It also requires the indexed late-breach set to equal an independent linear
+scan over the append-only breach receipt vector. The verified receipt binds
+the full-history replay to the ledger SHA-256 and progress/arrival/breach
+counts; this is in-memory ledger consistency, not source authentication. It
+additionally requires the receipt digest to match the current ledger snapshot
+before timing. Each case records 51 indexed query samples and 31 linear-scan
+samples (nearest-rank p50/p95/p99 for both), plus 15 verified replay samples
+(median and observed maximum), event-time index buckets visited, indexed
+receipt candidates examined, total receipts scanned and matching breaches.
 
 The hosted workflow retains CSV output with the exact commit, Rust toolchain,
 dependency lock, and fixture/source digests. This measures in-memory release
