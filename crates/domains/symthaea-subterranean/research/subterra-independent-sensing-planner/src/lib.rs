@@ -31,7 +31,9 @@ pub struct PlannedAcquisitionOption {
     pub resource_assessment_digest: String,
     pub risk_model_digest: String,
     pub risk_assessment_digest: String,
+    pub resource_assessed_at_unix_ms: u64,
     pub resource_assessment_valid_until_unix_ms: u64,
+    pub risk_assessed_at_unix_ms: u64,
     pub risk_assessment_valid_until_unix_ms: u64,
     pub resources: ResourceVector,
     pub mission_interruption_upper_ppm: u32,
@@ -93,8 +95,10 @@ pub enum RejectedOptionReason {
     EmptyDependencyClosure,
     EmptyDependencyIdentity,
     VerifierOverlap,
+    ResourceAssessmentFromFuture,
     ResourceAssessmentExpired,
     ResourceAssessmentStale,
+    RiskAssessmentFromFuture,
     RiskAssessmentExpired,
     RiskAssessmentStale,
 }
@@ -277,22 +281,29 @@ fn option_rejection_reasons(
     if option.resource_assessment_valid_until_unix_ms <= policy.evaluation_time_unix_ms {
         reasons.push(RejectedOptionReason::ResourceAssessmentExpired);
     }
-    if policy
+    let latest_allowed = policy
         .evaluation_time_unix_ms
-        .saturating_sub(option.resource_assessment_valid_until_unix_ms)
+        .saturating_add(policy.maximum_future_clock_skew_ms);
+    if option.resource_assessed_at_unix_ms > latest_allowed {
+        reasons.push(RejectedOptionReason::ResourceAssessmentFromFuture);
+    } else if policy
+        .evaluation_time_unix_ms
+        .saturating_sub(option.resource_assessed_at_unix_ms)
         > policy.maximum_resource_assessment_age_ms
     {
         reasons.push(RejectedOptionReason::ResourceAssessmentStale);
     }
-    if option.risk_assessment_valid_until_unix_ms <= policy.evaluation_time_unix_ms {
-        reasons.push(RejectedOptionReason::RiskAssessmentExpired);
-    }
-    if policy
+    if option.risk_assessed_at_unix_ms > latest_allowed {
+        reasons.push(RejectedOptionReason::RiskAssessmentFromFuture);
+    } else if policy
         .evaluation_time_unix_ms
-        .saturating_sub(option.risk_assessment_valid_until_unix_ms)
+        .saturating_sub(option.risk_assessed_at_unix_ms)
         > policy.maximum_risk_assessment_age_ms
     {
         reasons.push(RejectedOptionReason::RiskAssessmentStale);
+    }
+    if option.risk_assessment_valid_until_unix_ms <= policy.evaluation_time_unix_ms {
+        reasons.push(RejectedOptionReason::RiskAssessmentExpired);
     }
 
     reasons.sort();
@@ -581,7 +592,9 @@ mod tests {
             resource_assessment_digest: format!("sha256:resource-{id}"),
             risk_model_digest: "sha256:risk-model".into(),
             risk_assessment_digest: format!("sha256:risk-{id}"),
+            resource_assessed_at_unix_ms: NOW - 100,
             resource_assessment_valid_until_unix_ms: NOW + 10_000,
+            risk_assessed_at_unix_ms: NOW - 100,
             risk_assessment_valid_until_unix_ms: NOW + 10_000,
             resources: ResourceVector {
                 energy_millijoules: 10,
@@ -763,6 +776,43 @@ mod tests {
             &budget,
         ).unwrap();
         assert!(report.pareto_frontier.is_empty());
+    }
+
+    #[test]
+    fn stale_or_future_resource_and_risk_assessments_are_rejected() {
+        let mut stale = option("stale", "source-stale", vec![dep("robot", "stale")]);
+        stale.resource_assessed_at_unix_ms = NOW - 3_600_001;
+        stale.risk_assessed_at_unix_ms = NOW - 3_600_001;
+        let report = plan_independent_acquisition_portfolio(
+            vec![stale],
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        ).unwrap();
+        assert!(report.rejected_options[0]
+            .reasons
+            .contains(&RejectedOptionReason::ResourceAssessmentStale));
+        assert!(report.rejected_options[0]
+            .reasons
+            .contains(&RejectedOptionReason::RiskAssessmentStale));
+
+        let mut future = option("future", "source-future", vec![dep("robot", "future")]);
+        future.resource_assessed_at_unix_ms = NOW + 5_001;
+        future.risk_assessed_at_unix_ms = NOW + 5_001;
+        let report = plan_independent_acquisition_portfolio(
+            vec![future],
+            &expected(),
+            &verifier(),
+            policy(),
+            &budget(),
+        ).unwrap();
+        assert!(report.rejected_options[0]
+            .reasons
+            .contains(&RejectedOptionReason::ResourceAssessmentFromFuture));
+        assert!(report.rejected_options[0]
+            .reasons
+            .contains(&RejectedOptionReason::RiskAssessmentFromFuture));
     }
 
     #[test]
