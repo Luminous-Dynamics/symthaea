@@ -342,10 +342,11 @@ mod tests {
     fn failed_deposition_rolls_back_material_state() {
         let mut world = campaign();
         let before = world.material_state().clone();
+        let transmission_before = world.process_transmission();
         let result = run_pulse(&mut world, "rollback", &gas(), -1.0, 7);
         assert!(matches!(result, Err(CoupledError::Optical(_))));
         assert_eq!(*world.material_state(), before);
-        assert_eq!(world.process_transmission(), [1.0; 4]);
+        assert_eq!(world.process_transmission(), transmission_before);
     }
 
     #[test]
