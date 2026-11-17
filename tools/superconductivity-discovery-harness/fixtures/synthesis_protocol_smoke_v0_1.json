@@ -165,5 +165,8 @@
       "rights_review": "cleared_for_metadata"
     }
   ],
-  "rights_review": "cleared_for_metadata"
+  "rights_review": "cleared_for_metadata",
+  "source_ids": [
+    "fixture-source-only"
+  ]
 }
