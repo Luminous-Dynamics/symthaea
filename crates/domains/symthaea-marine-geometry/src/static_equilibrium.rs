@@ -418,7 +418,7 @@ fn solve_3x3(
     minimum_pivot_ratio: f64,
     maximum_condition_number: f64,
 ) -> Option<([f64; 3], f64)> {
-    let mut augmented = [[0.0; 6]; 3];
+    let mut augmented = [[0.0; 7]; 3];
     let matrix_norm = matrix
         .iter()
         .map(|row| row.iter().map(|value| value.abs()).sum::<f64>())
@@ -431,7 +431,7 @@ fn solve_3x3(
             augmented[row][column] = matrix[row][column];
         }
         augmented[row][3 + row] = 1.0;
-        augmented[row][5] = right_hand_side[row];
+        augmented[row][6] = right_hand_side[row];
     }
 
     let mut maximum_pivot = 0.0_f64;
@@ -451,7 +451,7 @@ fn solve_3x3(
         augmented.swap(pivot_column, pivot_row);
 
         let divisor = augmented[pivot_column][pivot_column];
-        for column in pivot_column..6 {
+        for column in pivot_column..7 {
             augmented[pivot_column][column] /= divisor;
         }
         for row in 0..3 {
@@ -481,7 +481,7 @@ fn solve_3x3(
     {
         return None;
     }
-    let solution = [augmented[0][5], augmented[1][5], augmented[2][5]];
+    let solution = [augmented[0][6], augmented[1][6], augmented[2][6]];
     solution
         .iter()
         .all(|value| value.is_finite())
