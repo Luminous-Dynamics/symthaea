@@ -852,6 +852,249 @@ mod tests {
         }
     }
 
+    fn reference_add(left: &ResourceVector, right: &ResourceVector) -> Option<ResourceVector> {
+        Some(ResourceVector {
+            energy_millijoules: left.energy_millijoules.checked_add(right.energy_millijoules)?,
+            duration_milliseconds: left.duration_milliseconds.checked_add(right.duration_milliseconds)?,
+            data_bytes: left.data_bytes.checked_add(right.data_bytes)?,
+            exposure_milliunits: left.exposure_milliunits.checked_add(right.exposure_milliunits)?,
+        })
+    }
+
+    fn reference_dominates(left: &AcquisitionPortfolio, right: &AcquisitionPortfolio) -> bool {
+        let same_bundles = left.selected_deployment_bundles.len()
+            == right.selected_deployment_bundles.len()
+            && left
+                .selected_deployment_bundles
+                .iter()
+                .zip(&right.selected_deployment_bundles)
+                .all(|(a, b)| a.bundle_id == b.bundle_id && a.bundle_digest == b.bundle_digest);
+        let no_worse = same_bundles
+            && left.resources.energy_millijoules <= right.resources.energy_millijoules
+            && left.resources.duration_milliseconds <= right.resources.duration_milliseconds
+            && left.resources.data_bytes <= right.resources.data_bytes
+            && left.resources.exposure_milliunits <= right.resources.exposure_milliunits
+            && left.mission_interruption_upper_ppm <= right.mission_interruption_upper_ppm
+            && left.robot_loss_upper_ppm <= right.robot_loss_upper_ppm;
+        let strictly_better = left.resources != right.resources
+            || left.mission_interruption_upper_ppm != right.mission_interruption_upper_ppm
+            || left.robot_loss_upper_ppm != right.robot_loss_upper_ppm;
+        no_worse && strictly_better
+    }
+
+    /// Deliberately simple 2^n reference; does not call the planner recursion.
+    fn bitmask_reference_frontier(
+        input_options: &[PlannedAcquisitionOption],
+        bundles: &[DeploymentBundleCost],
+        verifier: &VerifierDependencyClosure,
+        required: usize,
+        budget: &AcquisitionBudget,
+    ) -> Vec<AcquisitionPortfolio> {
+        let mut options = input_options.to_vec();
+        options.sort_by(|a, b| a.option_id.cmp(&b.option_id));
+        let mut bundles = bundles.to_vec();
+        bundles.sort_by(|a, b| a.bundle_id.cmp(&b.bundle_id));
+        let verifier_set = verifier
+            .claim_critical_dependencies
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        let dependency_sets = options
+            .iter()
+            .map(|option| {
+                option
+                    .claim_critical_dependencies
+                    .iter()
+                    .cloned()
+                    .collect::<BTreeSet<_>>()
+            })
+            .collect::<Vec<_>>();
+        let mut feasible = Vec::new();
+
+        for mask in 0usize..(1usize << options.len()) {
+            if mask.count_ones() as usize != required {
+                continue;
+            }
+            let selected = (0..options.len())
+                .filter(|index| mask & (1usize << index) != 0)
+                .collect::<Vec<_>>();
+            if selected.iter().any(|index| {
+                options[*index].inventory != InventoryDisposition::CompleteWithinDeclaredScope
+                    || dependency_sets[*index].is_empty()
+                    || !dependency_sets[*index].is_disjoint(&verifier_set)
+            }) {
+                continue;
+            }
+            let mut pairwise_disjoint = true;
+            for left in 0..selected.len() {
+                for right in (left + 1)..selected.len() {
+                    if !dependency_sets[selected[left]]
+                        .is_disjoint(&dependency_sets[selected[right]])
+                    {
+                        pairwise_disjoint = false;
+                    }
+                }
+            }
+            if !pairwise_disjoint {
+                continue;
+            }
+
+            let mut variable = ResourceVector::default();
+            let mut risk_interruption = 0u32;
+            let mut risk_robot_loss = 0u32;
+            let mut bundle_ids = BTreeSet::new();
+            let mut valid = true;
+            for index in &selected {
+                let option = &options[*index];
+                let Some(next) = reference_add(&variable, &option.resources) else {
+                    valid = false;
+                    break;
+                };
+                variable = next;
+                risk_interruption = risk_interruption
+                    .saturating_add(option.mission_interruption_upper_ppm)
+                    .min(1_000_000);
+                risk_robot_loss = risk_robot_loss
+                    .saturating_add(option.robot_loss_upper_ppm)
+                    .min(1_000_000);
+                bundle_ids.insert(option.deployment_bundle_id.as_str());
+            }
+            if !valid {
+                continue;
+            }
+
+            let mut fixed = ResourceVector::default();
+            let mut selected_bundles = Vec::new();
+            for bundle_id in bundle_ids {
+                let Some(bundle) = bundles.iter().find(|bundle| bundle.bundle_id == bundle_id)
+                else {
+                    valid = false;
+                    break;
+                };
+                let Some(next) = reference_add(&fixed, &bundle.fixed_resources) else {
+                    valid = false;
+                    break;
+                };
+                fixed = next;
+                selected_bundles.push(SelectedDeploymentBundle {
+                    bundle_id: bundle.bundle_id.clone(),
+                    bundle_digest: bundle.bundle_digest.clone(),
+                    assessment_digest: bundle.assessment_digest.clone(),
+                    fixed_resources: bundle.fixed_resources.clone(),
+                });
+            }
+            if !valid {
+                continue;
+            }
+            let Some(total) = reference_add(&variable, &fixed) else {
+                continue;
+            };
+            if total.energy_millijoules > budget.resources.energy_millijoules
+                || total.duration_milliseconds > budget.resources.duration_milliseconds
+                || total.data_bytes > budget.resources.data_bytes
+                || total.exposure_milliunits > budget.resources.exposure_milliunits
+                || risk_interruption > budget.mission_interruption_upper_ppm
+                || risk_robot_loss > budget.robot_loss_upper_ppm
+            {
+                continue;
+            }
+
+            feasible.push(AcquisitionPortfolio {
+                selected_option_ids: selected
+                    .iter()
+                    .map(|index| options[*index].option_id.clone())
+                    .collect(),
+                selected_source_ids: selected
+                    .iter()
+                    .map(|index| options[*index].source_id.clone())
+                    .collect(),
+                selected_deployment_bundles: selected_bundles,
+                variable_resources: variable,
+                shared_fixed_resources: fixed,
+                resources: total,
+                mission_interruption_upper_ppm: risk_interruption,
+                robot_loss_upper_ppm: risk_robot_loss,
+            });
+        }
+
+        let mut frontier = Vec::new();
+        for candidate in &feasible {
+            if !feasible
+                .iter()
+                .any(|other| reference_dominates(other, candidate))
+            {
+                frontier.push(candidate.clone());
+            }
+        }
+        frontier.sort_by(|a, b| a.selected_option_ids.cmp(&b.selected_option_ids));
+        frontier
+    }
+
+    #[test]
+    fn exact_pareto_frontier_matches_independent_bitmask_reference() {
+        let mut options = vec![
+            option("a-camera", "source-a", vec![dep("robot", "a"), dep("power", "a")]),
+            option("b-depth", "source-b", vec![dep("robot", "a"), dep("power", "a")]),
+            option("c-thermal", "source-c", vec![dep("robot", "c"), dep("power", "c")]),
+            option("d-acoustic", "source-d", vec![dep("robot", "d"), dep("power", "d")]),
+            option("e-lidar", "source-e", vec![dep("robot", "e"), dep("power", "e")]),
+            option("f-ultrasound", "source-f", vec![dep("robot", "f"), dep("power", "f")]),
+        ];
+        options[2].resources.energy_millijoules = 8;
+        options[3].resources.duration_milliseconds = 15;
+        options[4].resources.data_bytes = 7;
+        options[5].resources.exposure_milliunits = 2;
+        options[4].deployment_bundle_id = "bundle-2".into();
+        options[4].deployment_bundle_digest = "sha256:bundle-2".into();
+        options[4].deployment_bundle_resource_model_digest = "sha256:bundle-resource-model-2".into();
+        options[4].deployment_bundle_assessment_digest = "sha256:bundle-assessment-2".into();
+        options[5].deployment_bundle_id = "bundle-2".into();
+        options[5].deployment_bundle_digest = "sha256:bundle-2".into();
+        options[5].deployment_bundle_resource_model_digest = "sha256:bundle-resource-model-2".into();
+        options[5].deployment_bundle_assessment_digest = "sha256:bundle-assessment-2".into();
+
+        let mut bundles = bundle_costs();
+        let mut second_bundle = bundles[0].clone();
+        second_bundle.bundle_id = "bundle-2".into();
+        second_bundle.bundle_digest = "sha256:bundle-2".into();
+        second_bundle.resource_model_digest = "sha256:bundle-resource-model-2".into();
+        second_bundle.assessment_digest = "sha256:bundle-assessment-2".into();
+        second_bundle.fixed_resources.energy_millijoules = 2;
+        bundles.push(second_bundle);
+
+        let mut budget = budget();
+        budget.resources.energy_millijoules = 60;
+        budget.resources.duration_milliseconds = 80;
+        budget.resources.data_bytes = 80;
+        budget.resources.exposure_milliunits = 40;
+
+        let expected_frontier = bitmask_reference_frontier(
+            &options,
+            &bundles,
+            &verifier(),
+            2,
+            &budget,
+        );
+        let actual = plan_independent_acquisition_portfolio(
+            options,
+            &bundles,
+            &expected(),
+            &verifier(),
+            AcquisitionPolicy {
+                required_independent_sources: 2,
+                evaluation_time_unix_ms: NOW,
+                maximum_resource_assessment_age_ms: 3_600_000,
+                maximum_risk_assessment_age_ms: 3_600_000,
+                maximum_future_clock_skew_ms: 5_000,
+                maximum_search_nodes: 100_000,
+            },
+            &budget,
+        )
+        .unwrap();
+        assert_eq!(actual.disposition, SearchDisposition::ExactParetoFrontierProven);
+        assert_eq!(actual.pareto_frontier, expected_frontier);
+    }
+
     #[test]
     fn planner_selects_only_disjoint_source_paths() {
         let options = vec![
