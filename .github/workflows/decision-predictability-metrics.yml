@@ -97,7 +97,7 @@ jobs:
       - name: Upload reproducible generator and forecast report
         uses: actions/upload-artifact@v4
         with:
-          name: forecast-baseline-report-\${{ github.sha }}
+          name: forecast-baseline-report-${{ github.sha }}
           path: |
             chaos-fixtures.csv
             forecast-report.csv
