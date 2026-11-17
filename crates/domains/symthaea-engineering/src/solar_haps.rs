@@ -19,8 +19,10 @@
 /// Seconds in the fixed 24-hour accounting horizon.
 pub const DAY_SECONDS: f64 = 86_400.0;
 
-/// Numerical tolerance for profile duration and energy-ledger comparisons.
-const LEDGER_TOLERANCE: f64 = 1.0e-8;
+/// Absolute timing tolerance for summing a 24-hour profile from interval durations.
+const DURATION_TOLERANCE_S: f64 = 1.0e-3;
+/// Absolute watt-hour tolerance for energy ledgers and reserve comparisons.
+const ENERGY_TOLERANCE_WH: f64 = 1.0e-8;
 
 /// Installed-platform parameters for the bounded day-energy screen.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -179,6 +181,10 @@ pub struct SolarHapsDayResult {
     /// Ending SoC is at least the starting SoC. This is necessary for repeated
     /// identical daily cycles, but is not a months/years reliability demonstration.
     pub daily_energy_cycle_closed: bool,
+    /// A HAPS-to-receiver service claim is admissible only when own loads, reserve,
+    /// and the repeated daily energy cycle all close. Calculated export energy is
+    /// still reported when this flag is false, but must not be promoted as a
+    /// sustainable service capability.
 }
 
 /// Validate the caller-supplied platform parameters before any accounting.
@@ -294,7 +300,7 @@ pub fn evaluate_day(
         total_duration_s += interval.duration_s;
     }
     if !total_duration_s.is_finite()
-        || (total_duration_s - DAY_SECONDS).abs() > LEDGER_TOLERANCE
+        || (total_duration_s - DAY_SECONDS).abs() > DURATION_TOLERANCE_S
     {
         return Err(SolarHapsError::ProfileDurationNot24Hours);
     }
@@ -469,11 +475,13 @@ pub fn evaluate_day(
         return Err(SolarHapsError::NonFiniteResult);
     }
 
-    let reserve_respected = minimum_soc_wh + LEDGER_TOLERANCE >= config.minimum_reserve_wh;
+    let reserve_respected = minimum_soc_wh + ENERGY_TOLERANCE_WH >= config.minimum_reserve_wh;
     let own_service_continuous =
-        reserve_respected && total_own_load_unserved_wh <= LEDGER_TOLERANCE;
+        reserve_respected && total_own_load_unserved_wh <= ENERGY_TOLERANCE_WH;
     let daily_energy_cycle_closed =
-        soc_wh + LEDGER_TOLERANCE >= config.initial_soc_wh;
+        soc_wh + ENERGY_TOLERANCE_WH >= config.initial_soc_wh;
+    let export_service_admissible =
+        own_service_continuous && daily_energy_cycle_closed;
 
     Ok(SolarHapsDayResult {
         intervals: results,
@@ -496,6 +504,7 @@ pub fn evaluate_day(
         reserve_respected,
         own_service_continuous,
         daily_energy_cycle_closed,
+        export_service_admissible,
     })
 }
 
@@ -549,6 +558,7 @@ mod tests {
         assert!(result.reserve_respected);
         assert!(result.own_service_continuous);
         assert!(result.daily_energy_cycle_closed);
+        assert!(result.export_service_admissible);
         assert!((result.ending_soc_wh - 600.0).abs() < 1.0e-8);
         assert!((result.total_export_receiver_energy_wh - 480.0).abs() < 1.0e-8);
         assert!((result.total_export_source_energy_wh - 600.0).abs() < 1.0e-8);
@@ -582,7 +592,8 @@ mod tests {
         for interval in &mut profile {
             interval.station_keeping_power_w = 100.0;
         }
-        // Half the daytime PV surplus cannot cover the full 12-hour night load.
+        // Daylight PV produces only 30 W against a 100 W station-keeping load.
+        // The battery can serve the deficit only until its 500 Wh hard reserve.
         for interval in profile.iter_mut().take(12) {
             interval.incident_irradiance_w_m2 = 120.0;
         }
@@ -591,6 +602,7 @@ mod tests {
         assert!(!result.own_service_continuous);
         assert!(result.total_own_load_unserved_wh > 0.0);
         assert!(!result.daily_energy_cycle_closed);
+        assert!(!result.export_service_admissible);
     }
 
     #[test]
