@@ -815,10 +815,10 @@ impl OperationRegistry {
                 holder: *holder,
             });
         }
-        if let Some(authorization) = self.authorized_rework.get(&spec.scope_id) {
-            if !authorization.matches_spec(&spec) {
-                return Err(ContractError::InvalidAuthorityRevision);
-            }
+        if let Some(authorization) = self.authorized_rework.get(&spec.scope_id)
+            && !authorization.matches_spec(&spec)
+        {
+            return Err(ContractError::InvalidAuthorityRevision);
         }
         let scope_id = spec.scope_id;
         let attempt_id = spec.attempt_id;
@@ -856,10 +856,10 @@ impl OperationRegistry {
         if let Some(key) = command_key {
             self.idempotency_keys.insert(key);
         }
-        if state == AttemptState::ReworkSuperseded {
-            if let Some(authorization) = rework_authorization {
-                self.authorized_rework.insert(scope_id, authorization);
-            }
+        if state == AttemptState::ReworkSuperseded
+            && let Some(authorization) = rework_authorization
+        {
+            self.authorized_rework.insert(scope_id, authorization);
         }
         if !state.locks_scope() && self.active_by_scope.get(&scope_id) == Some(&attempt_id) {
             self.active_by_scope.remove(&scope_id);
