@@ -1043,6 +1043,170 @@ pub fn verify_shared_additive_bias_receipt(
     Ok(())
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedPairIdentifiabilityV1 {
+    pub hypothesis_a: String,
+    pub hypothesis_b: String,
+    /// A single disjoint probe is a witness that the pair can be separated.
+    pub separating_probe_ids: Vec<String>,
+    /// These probes have overlapping allowed outcomes for the pair.
+    pub overlapping_probe_ids: Vec<String>,
+    /// True only when every admissible probe has overlapping outcome sets.
+    pub indistinguishable_under_available_probes: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistentStateWitnessV1 {
+    pub error_state_id: String,
+    pub probe_id: String,
+    pub outcome_a: u32,
+    pub outcome_b: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistentStateCollisionV1 {
+    pub error_state_id: String,
+    /// Complete identical signature over every admissible probe.
+    pub common_signature: Vec<(String, u32)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PersistentPairIdentifiabilityV1 {
+    pub hypothesis_a: String,
+    pub hypothesis_b: String,
+    /// For each possible shared campaign error state, one cheapest probe
+    /// that separates the pair, when such a probe exists.
+    pub state_witnesses: Vec<PersistentStateWitnessV1>,
+    /// Any one collision means the pair cannot be guaranteed distinguishable
+    /// for every allowed persistent campaign state using this probe family.
+    pub unresolved_error_states: Vec<PersistentStateCollisionV1>,
+    pub indistinguishable_under_available_probes: bool,
+}
+
+fn validate_hypothesis_pair(
+    hypothesis_count: usize,
+    hypothesis_a: usize,
+    hypothesis_b: usize,
+) -> Result<(), NoiseErrorV1> {
+    if hypothesis_a >= hypothesis_count
+        || hypothesis_b >= hypothesis_count
+        || hypothesis_a == hypothesis_b
+    {
+        return Err(NoiseErrorV1::InvalidHypothesisPair);
+    }
+    Ok(())
+}
+
+/// Determine whether two hypotheses can be robustly separated by the full
+/// bounded-noise probe family. Because per-probe uncertainty is independent,
+/// their complete outcome-signature sets overlap iff every admissible probe's
+/// allowed sets overlap. A disjoint probe is a constructive witness.
+pub fn bounded_pair_identifiability(
+    problem: &BoundedNoiseProblemV1,
+    hypothesis_a: usize,
+    hypothesis_b: usize,
+) -> Result<BoundedPairIdentifiabilityV1, NoiseErrorV1> {
+    problem.validate()?;
+    validate_hypothesis_pair(problem.hypothesis_ids.len(), hypothesis_a, hypothesis_b)?;
+
+    let mut separating_probe_ids = Vec::new();
+    let mut overlapping_probe_ids = Vec::new();
+    let mut separating: Vec<&NoiseProbeV1> = Vec::new();
+
+    for (probe_index, probe) in problem.probes.iter().enumerate() {
+        if !probe.admissible {
+            continue;
+        }
+        let allowed_a: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis
+            [hypothesis_a][probe_index]
+            .iter()
+            .copied()
+            .collect();
+        let allowed_b: BTreeSet<u32> = problem.allowed_outcomes_by_hypothesis
+            [hypothesis_b][probe_index]
+            .iter()
+            .copied()
+            .collect();
+        if allowed_a.is_disjoint(&allowed_b) {
+            separating_probe_ids.push(probe.probe_id.clone());
+            separating.push(probe);
+        } else {
+            overlapping_probe_ids.push(probe.probe_id.clone());
+        }
+    }
+    separating.sort_by(|left, right| {
+        (left.cost, left.probe_id.as_str()).cmp(&(right.cost, right.probe_id.as_str()))
+    });
+    overlapping_probe_ids.sort();
+
+    Ok(BoundedPairIdentifiabilityV1 {
+        hypothesis_a: problem.hypothesis_ids[hypothesis_a].clone(),
+        hypothesis_b: problem.hypothesis_ids[hypothesis_b].clone(),
+        separating_probe_ids,
+        overlapping_probe_ids,
+        indistinguishable_under_available_probes: separating.is_empty(),
+    })
+}
+
+/// Determine whether two hypotheses can be separated under every possible
+/// campaign-persistent shared error state. The same state index is compared
+/// on both sides: the environment cannot change merely because the candidate
+/// hypothesis changed. For each state, the cheapest admissible probe with
+/// unequal predictions is retained as a replayable witness.
+pub fn persistent_pair_identifiability(
+    problem: &PersistentNoiseProblemV1,
+    hypothesis_a: usize,
+    hypothesis_b: usize,
+) -> Result<PersistentPairIdentifiabilityV1, NoiseErrorV1> {
+    problem.validate()?;
+    validate_hypothesis_pair(problem.hypothesis_ids.len(), hypothesis_a, hypothesis_b)?;
+
+    let mut state_witnesses = Vec::new();
+    let mut unresolved_error_states = Vec::new();
+    for (state_index, error_state_id) in problem.error_state_ids.iter().enumerate() {
+        let mut distinguishing: Vec<(&NoiseProbeV1, u32, u32)> = Vec::new();
+        let mut common_signature = Vec::new();
+        for (probe_index, probe) in problem.probes.iter().enumerate() {
+            if !probe.admissible {
+                continue;
+            }
+            let outcome_a = problem.predicted_outcomes_by_hypothesis[hypothesis_a]
+                [probe_index][state_index];
+            let outcome_b = problem.predicted_outcomes_by_hypothesis[hypothesis_b]
+                [probe_index][state_index];
+            common_signature.push((probe.probe_id.clone(), outcome_a));
+            if outcome_a != outcome_b {
+                distinguishing.push((probe, outcome_a, outcome_b));
+            }
+        }
+        distinguishing.sort_by(|left, right| {
+            (left.0.cost, left.0.probe_id.as_str())
+                .cmp(&(right.0.cost, right.0.probe_id.as_str()))
+        });
+        if let Some((probe, outcome_a, outcome_b)) = distinguishing.first() {
+            state_witnesses.push(PersistentStateWitnessV1 {
+                error_state_id: error_state_id.clone(),
+                probe_id: probe.probe_id.clone(),
+                outcome_a: *outcome_a,
+                outcome_b: *outcome_b,
+            });
+        } else {
+            unresolved_error_states.push(PersistentStateCollisionV1 {
+                error_state_id: error_state_id.clone(),
+                common_signature,
+            });
+        }
+    }
+
+    Ok(PersistentPairIdentifiabilityV1 {
+        hypothesis_a: problem.hypothesis_ids[hypothesis_a].clone(),
+        hypothesis_b: problem.hypothesis_ids[hypothesis_b].clone(),
+        state_witnesses,
+        indistinguishable_under_available_probes: !unresolved_error_states.is_empty(),
+        unresolved_error_states,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1117,6 +1281,58 @@ mod tests {
                 },
             ],
         }
+    }
+
+    #[test]
+    fn bounded_identifiability_reports_a_witness_or_unavoidable_pair_ambiguity() {
+        let problem = bounded_fixture();
+        let separable = bounded_pair_identifiability(&problem, 0, 2).unwrap();
+        assert!(!separable.indistinguishable_under_available_probes);
+        assert_eq!(separable.separating_probe_ids, vec!["p0".to_owned()]);
+
+        let indistinguishable = bounded_pair_identifiability(&problem, 1, 2).unwrap();
+        assert!(indistinguishable.indistinguishable_under_available_probes);
+        assert!(indistinguishable.separating_probe_ids.is_empty());
+        assert_eq!(
+            indistinguishable.overlapping_probe_ids,
+            vec!["p0".to_owned(), "p1".to_owned()]
+        );
+    }
+
+    #[test]
+    fn persistent_identifiability_uses_the_same_global_error_state_on_both_sides() {
+        let problem = persistent_fixture();
+        let report = persistent_pair_identifiability(&problem, 0, 1).unwrap();
+        assert!(!report.indistinguishable_under_available_probes);
+        assert_eq!(report.state_witnesses.len(), 2);
+        assert!(report.unresolved_error_states.is_empty());
+
+        let mut restricted = problem.clone();
+        restricted.probes[1].admissible = false;
+        let report = persistent_pair_identifiability(&restricted, 0, 1).unwrap();
+        assert!(report.indistinguishable_under_available_probes);
+        assert_eq!(
+            report
+                .unresolved_error_states
+                .iter()
+                .map(|state| state.error_state_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["bias-low", "bias-high"]
+        );
+    }
+
+    #[test]
+    fn pair_identifiability_rejects_same_or_out_of_range_hypothesis() {
+        let bounded = bounded_fixture();
+        assert_eq!(
+            bounded_pair_identifiability(&bounded, 1, 1),
+            Err(NoiseErrorV1::InvalidHypothesisPair)
+        );
+        let persistent = persistent_fixture();
+        assert_eq!(
+            persistent_pair_identifiability(&persistent, 0, 2),
+            Err(NoiseErrorV1::InvalidHypothesisPair)
+        );
     }
 
     #[test]
