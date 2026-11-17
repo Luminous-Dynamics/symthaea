@@ -72,6 +72,13 @@ The proposed matched baseline matrix (deterministic baseline, MLP, GRU, static H
 
 **Hard dependencies:** recurrent snapshot/restore #1269; cognitive/plant/transport time separation #1284; UEC v2 #1274 and qualification #1288; independent plant-safety/readiness split #1276. Reuse those owners rather than introducing a second recurrent-state, clock or safety contract.
 
+
+### HLB component maturity: important integration caveat
+
+The full HLB architecture is not yet a turnkey multimodal robot world model. The current `LiquidHolocell` is a first-order leaky hypervector state; its dimensionality dilation tiles/permutates existing coordinates and has not established additional independent information. The `PredictiveHdcEncoder` currently accepts text strings and externally supplied predictions; it is not a native camera/tactile/force/joint-state predictive encoder. The legacy ROS2 bridge has assumed/stubbed state fields and Φ-derived effort scaling, and is not the UEC v2 qualified G1 adapter. See §2.5 of [the HLB ablation protocol](hlb-humanoid-ablation-v0.1.md) for source paths, exact behavior and migration boundaries.
+
+Therefore, the first experiment should reuse the modern humanoid trainer's existing observed-state HDC-LTC residual path. Typed multimodal encoders, action-conditioned contact prediction and HLB memory should be introduced only as measured, separately ablated modules. Do not treat vector-size growth or a consciousness/readiness scalar as physical evidence, predictive accuracy or actuation authority.
+
 ## Ownership map
 
 This programme composes existing owners and must not duplicate them.
