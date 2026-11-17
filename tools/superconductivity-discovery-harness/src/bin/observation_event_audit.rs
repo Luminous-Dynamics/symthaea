@@ -110,14 +110,21 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
                     ));
                 }
             }
-            if external.get("x_data_version").and_then(Value::as_str).is_some_and(|version| {
-                Some(version) != external.get("data_version").and_then(Value::as_str)
-            }) {
+            if external
+                .get("x_data_version")
+                .and_then(Value::as_str)
+                .is_some_and(|version| {
+                    Some(version) != external.get("data_version").and_then(Value::as_str)
+                })
+            {
                 return Err(format!(
                     "{observation_id}: X-Data-Version must match the declared external data_version"
                 ));
             }
-            if let Some(parents) = external.get("external_parent_ids").and_then(Value::as_object) {
+            if let Some(parents) = external
+                .get("external_parent_ids")
+                .and_then(Value::as_object)
+            {
                 for (parent_field, event_path) in [
                     ("material_id", "/material/material_id"),
                     ("sample_id", "/sample/sample_id"),
@@ -325,7 +332,8 @@ fn validate_fixture(schema_bytes: &[u8], fixture_bytes: &[u8]) -> Result<Value, 
             .and_then(Value::as_str)
             .ok_or_else(|| format!("{observation_id}: missing assertion.unit"))?;
 
-        if property == "Tc" && origin == "observed"
+        if property == "Tc"
+            && origin == "observed"
             && !matches!(measurement_scope, "mesoscopic" | "bulk" | "device")
         {
             return Err(format!(
@@ -710,16 +718,16 @@ mod tests {
     #[test]
     fn imported_external_parent_sample_must_match_event_sample() {
         let (_, mut fixture) = committed_inputs();
-        fixture["observations"][7]["source"]["external_catalog"]
-            ["external_parent_ids"]["sample_id"] = json!("different-sample");
+        fixture["observations"][7]["source"]["external_catalog"]["external_parent_ids"]["sample_id"] =
+            json!("different-sample");
         assert!(audit_mutated(fixture).is_err());
     }
 
     #[test]
     fn external_api_record_and_parent_result_ids_remain_distinct() {
         let (_, mut fixture) = committed_inputs();
-        fixture["observations"][7]["source"]["external_catalog"]
-            ["external_parent_ids"]["result_id"] = json!("fixture-parent-result-019");
+        fixture["observations"][7]["source"]["external_catalog"]["external_parent_ids"]["result_id"] =
+            json!("fixture-parent-result-019");
         let receipt = audit_mutated(fixture).unwrap();
         assert_eq!(receipt["status"], "pass");
     }
@@ -727,8 +735,7 @@ mod tests {
     #[test]
     fn imported_api_data_version_must_match_response_header() {
         let (_, mut fixture) = committed_inputs();
-        fixture["observations"][7]["source"]["external_catalog"]["x_data_version"] =
-            json!("v-old");
+        fixture["observations"][7]["source"]["external_catalog"]["x_data_version"] = json!("v-old");
         assert!(audit_mutated(fixture).is_err());
     }
 
