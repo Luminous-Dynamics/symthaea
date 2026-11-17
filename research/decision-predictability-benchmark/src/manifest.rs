@@ -761,15 +761,15 @@ mod tests {
         let schema_line = concat!(
             "      ",
             r#""schema":"luminous.decision-transfer.split-manifest.v1","#,
-            "\\n",
+            "\n",
         );
         let revision_line = concat!(
             "      ",
             r#""protocol_revision":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","#,
-            "\\n",
+            "\n",
         );
         let without_schema = VALID.replacen(schema_line, "", 1);
-        let generator_line = "      \\"generator\\":";
+        let generator_line = concat!("      ", r#""generator":"#, "\n");
         let reordered = without_schema.replacen(
             generator_line,
             &format!("{schema_line}{generator_line}"),
@@ -778,6 +778,51 @@ mod tests {
         let left = parse_and_validate(VALID.as_bytes()).unwrap();
         let right = parse_and_validate(reordered.as_bytes()).unwrap();
         assert_eq!(left.canonical_sha256(), right.canonical_sha256());
+    }
+
+    #[test]
+    fn allows_parameter_holdout_within_a_shared_equation_family() {
+        let mut value: serde_json::Value = serde_json::from_str(VALID).unwrap();
+        let axes = value["split_axes"].as_array_mut().unwrap();
+        axes.retain(|axis| axis["axis"] != "equation_family");
+
+        let scenarios = value["scenarios"].as_array_mut().unwrap();
+        for scenario in scenarios {
+            let groups = scenario["groups"].as_array_mut().unwrap();
+            groups.retain(|group| group["axis"] != "equation_family");
+            groups.push(serde_json::json!({
+                "axis": "equation_family",
+                "group_id": "abababababababababababababababab"
+            }));
+        }
+
+        let bytes = serde_json::to_vec(&value).unwrap();
+        assert!(parse_and_validate(&bytes).is_ok());
+    }
+
+    #[test]
+    fn rejects_calendar_invalid_or_non_utc_timestamps() {
+        for timestamp in [
+            "2026-13-17T12:00:00Z",
+            "2026-02-30T12:00:00Z",
+            "2026-11-17T25:00:00Z",
+            "2026-11-17T12:60:00Z",
+            "2026-11-17T12:00:60Z",
+            "2026-11-17T12:00:00+02:00",
+            "not-a-time",
+        ] {
+            let changed = VALID.replace("2026-11-17T12:00:00Z", timestamp);
+            assert!(matches!(
+                parse_and_validate(changed.as_bytes()),
+                Err(ManifestError::InvalidField(_))
+            ), "expected invalid timestamp to be rejected: {timestamp}");
+        }
+
+        let fractional = VALID.replace(
+            "2026-11-17T12:00:00Z",
+            "2026-11-17T12:00:00.123456Z",
+        );
+        assert!(parse_and_validate(fractional.as_bytes()).is_ok());
     }
 
     #[test]
