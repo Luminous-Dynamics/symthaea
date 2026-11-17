@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-run-cost-bundle-v0.1.schema.json",
+  "title": "EGDDM D6.17.2.3 run-level cost receipt evaluator bundle v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "candidate_view",
+    "oracle"
+  ],
+  "properties": {
+    "candidate_view": {
+      "$ref": "https://luminousdynamics.io/schemas/egddm-run-cost-candidate-v0.1.schema.json"
+    },
+    "oracle": {
+      "$ref": "https://luminousdynamics.io/schemas/egddm-run-cost-oracle-v0.1.schema.json"
+    }
+  }
+}
