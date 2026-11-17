@@ -138,6 +138,33 @@ validation receipt.
 
 For each public baseline, freeze checkpoint hash/revision, licence, model card revision, tokenizer/normalizer, official harness commit, dataset release, split, context, horizon, covariate availability, quantile levels, tuning budget, metric implementation and aggregation. A vendor-reported lead is a comparator to reproduce, not proof that Symthaea has lost or won. Do not compare TimesFM 3.0 self-hosted weights with a hosted API result without recording the separate licence, service terms and system boundary.
 
+## 2.9 Simons-297M and the research-loop efficiency frontier (11 Nov 2026)
+
+**Simons** is now a mandatory open-weight comparator, not just another checkpoint. Abel AI Lab reports a 25M/60M/178M/297M family, with Simons-297M fourth among the open-weight models shown for GIFT-Eval, FEV-Bench and TIME; its release table also reports first place on M6 (168 entries). It supports nine quantiles and known-future covariates. The vendor reports full GIFT-Eval in under 15 minutes on one A100 and about 20x the speed of leading similarly sized models under their respective leaderboard settings. These are vendor-reported results; pin checkpoint, evaluation settings and hardware before reproduction.
+
+- Release and leaderboard table: https://abel.ai/research/introducing-simons/
+- Code, training recipes and synthetic-data generator: https://github.com/Abel-ai-lab/Simons
+- Weights: Simons-25M/60M/178M/297M; OpenMDW-1.1
+- Training/inference code: Apache-2.0
+- Public pretraining collection: OpenMDW-1.1, while each source dataset retains its own licence
+
+The same release is a methodological challenge to architecture-first research. Abel reports a two-week campaign costing less than $8,000 GPU time, more than 250 research directions and nearly 2,000 experiments. Its own attribution says roughly three quarters of first-campaign gains came from data, synthetic-data mixture and input transformations; around one fifth came from optimizer/training schedule; backbone changes contributed comparatively little. It also reports validation-only selection followed by fixed-code retraining on reserved seeds, with agents barred from modifying evaluator code or seeing benchmark labels. These are Abel's own development claims, not independently audited Symthaea results.
+
+### Add a research-loop benchmark, not another model leaderboard
+
+A research system should be scored on both **what it discovers** and **how much verified cost it takes to discover it**. Add a separate meta-benchmark lane with these outputs:
+
+1. **Quality–compute Pareto curve:** official validation skill / CRPS / decision regret against cumulative GPU-hours, CPU-hours, wall-clock and USD. Report the best verified model reachable at each preregistered budget.
+2. **Cost per confirmed improvement:** marginal compute and cost for an improvement that survives the reserved-seed confirmation protocol and has no material regression on guard metrics.
+3. **Confirmation rate / false-discovery rate:** fraction of validation-selected candidates whose gains replicate on previously reserved seeds; report uncertainty, not only the best lucky run.
+4. **Research throughput:** hypotheses, completed experiments, failed experiments, useful artifacts, and median time from hypothesis to independently confirmed result.
+5. **Attribution quality:** matched ablations for data quality/mix, missingness/time transforms, optimizer/schedule, model architecture and inference-time policy. Do not attribute a gain to the backbone when it came from a preprocessing change.
+6. **Evaluator integrity:** freeze official splits, metric code and label access; the proposer/researcher cannot mutate or inspect evaluator code or holdout labels; selection uses validation only; confirmation uses reserved seeds; final test is run once after protocol lock.
+
+For Symthaea, the central target should be a higher area under the **verified improvement versus cumulative compute** curve, while preserving the ordinary forecasting quality gates. A proposed search target is at least 50% lower compute-to-confirmation than a carefully budget-matched manual research baseline at equal verified improvement, or at least 20% higher confirmed improvement under the same compute budget. These are research targets, not results. The research loop must not tune against test labels or weaken guards to increase its confirmation rate.
+
+The machine-readable comparator snapshot records Simons' reported ranks, licences, run-time and development-process claims separately from TimeH2O, Timestral, TimesFM, Chronos and Toto. Do not merge their scores across FEV-Bench win rate, MASE skill, GIFT-Eval MASE/CRPS, TIME, M6, BOOM and inference-time measurements.
+
 ## 3. Comparator tiers
 
 | Tier | Required comparator | Why it belongs | What it can establish |
