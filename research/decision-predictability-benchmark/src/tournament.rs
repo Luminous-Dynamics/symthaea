@@ -986,6 +986,40 @@ mod tests {
     }
 
     #[test]
+    fn held_out_suffix_changes_cannot_change_ngrc_validation_selection() {
+        let mut first = vec![0.2, -0.1];
+        for _ in 0..158 {
+            let index = first.len();
+            let next = 0.1 + 0.72 * first[index - 1] - 0.15 * first[index - 2];
+            first.push(next);
+        }
+
+        let mut second = first.clone();
+        let development_end = first.len() * DEVELOPMENT_PERCENT / 100;
+        for index in development_end..second.len() {
+            let phase = (index - development_end) as f64;
+            second[index] = 0.35 + 0.12 * (phase * 0.31).sin();
+        }
+
+        let first_output = evaluate_fixture_csv(&csv_for(&first)).unwrap();
+        let second_output = evaluate_fixture_csv(&csv_for(&second)).unwrap();
+
+        let selected = |output: &str| {
+            output.lines().find_map(|line| {
+                let fields: Vec<&str> = line.split(',').collect();
+                fields
+                    .get(3)
+                    .filter(|model| model.starts_with("ngrc_tuned_d"))
+                    .map(|model| ((*model).to_owned(), fields[9].to_owned()))
+            })
+        };
+
+        let first_selection = selected(&first_output).expect("NG-RC must have an eligible configuration");
+        let second_selection = selected(&second_output).expect("NG-RC must have an eligible configuration");
+        assert_eq!(first_selection, second_selection);
+    }
+
+    #[test]
     fn constant_channels_are_not_misreported_as_successful_forecasts() {
         let values: Vec<f64> = (0..120).map(|index| (index as f64 * 0.07).sin()).collect();
         let result = evaluate_fixture_csv(&csv_for(&values)).unwrap();
