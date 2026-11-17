@@ -37,6 +37,8 @@ struct Calibration {
 struct FactorizationCertificate {
     authority: String,
     groups: BTreeSet<String>,
+    factor_ids: BTreeSet<String>,
+    conditioning_scope: BTreeSet<String>,
     action_ids: BTreeSet<String>,
     valid_from: DateTime<FixedOffset>,
     valid_until: DateTime<FixedOffset>,
@@ -268,12 +270,16 @@ fn parse_factorization_certificates(value: &Value) -> Result<Vec<(String,Factori
     let mut ids = BTreeSet::new();
     for (i,item) in values.iter().enumerate() {
         let at = format!("oracle.factorization_certificates[{i}]");
-        allowed_keys(item,&["certificate_id","authority","dependence_groups","action_ids","valid_from","valid_until","revoked_at","mutual_conditional_independence"],&at)?;
+        allowed_keys(item,&["certificate_id","authority","dependence_groups","factor_ids","conditioning_scope","action_ids","valid_from","valid_until","revoked_at","mutual_conditional_independence"],&at)?;
         let id = required_str(item,"certificate_id",&at)?;
         if !ids.insert(id.clone()) { return Err(format!("duplicate factorization certificate {id:?}")); }
         let authority = required_str(item,"authority",&at)?;
         let groups = string_set(required_value(item,"dependence_groups",&at)?,&format!("{at}.dependence_groups"),false)?;
         if groups.len() < 2 { return Err(format!("{at}.dependence_groups must contain at least two groups")); }
+        let factor_ids = string_set(required_value(item,"factor_ids",&at)?,&format!("{at}.factor_ids"),false)?;
+        if factor_ids.len() != groups.len() { return Err(format!("{at}: exact factor_ids and dependence_groups cardinalities must match")); }
+        let conditioning_scope = string_set(required_value(item,"conditioning_scope",&at)?,&format!("{at}.conditioning_scope"),false)?;
+        if !conditioning_scope.contains("hypothesis") { return Err(format!("{at}.conditioning_scope must include hypothesis")); }
         let action_ids = string_set(required_value(item,"action_ids",&at)?,&format!("{at}.action_ids"),false)?;
         let valid_from = parse_time(item,"valid_from",&at)?;
         let valid_until = parse_time(item,"valid_until",&at)?;
@@ -281,7 +287,7 @@ fn parse_factorization_certificates(value: &Value) -> Result<Vec<(String,Factori
         if valid_from > valid_until { return Err(format!("{at}: validity interval is inverted")); }
         let mutual = required_bool(item,"mutual_conditional_independence",&at)?;
         if !mutual { return Err(format!("{at}: certificate must qualify mutual conditional independence")); }
-        out.push((id,FactorizationCertificate{authority,groups,action_ids,valid_from,valid_until,revoked_at,mutual}));
+        out.push((id,FactorizationCertificate{authority,groups,factor_ids,conditioning_scope,action_ids,valid_from,valid_until,revoked_at,mutual}));
     }
     Ok(out)
 }
@@ -315,6 +321,8 @@ fn factorization_valid(
         cert.authority.trim() != ""
             && cert.mutual
             && cert.groups == groups
+            && cert.factor_ids == acquired.iter().map(|f| f.factor_id.clone()).collect()
+            && cert.conditioning_scope.contains("hypothesis")
             && cert.action_ids.contains(action_id)
             && acquired.iter().all(|f| cert.valid_from <= f.at)
             && cutoff <= &cert.valid_until
