@@ -266,6 +266,33 @@
           }
         ]
       }
+    ],
+    "risk_queries": [
+      {
+        "query_id": "pass-pass-release",
+        "action_id": "release",
+        "safe_hypotheses": [
+          "safe-world"
+        ],
+        "prior_bounds": [
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "lower_probability_bps": 5000,
+            "upper_probability_bps": 5000,
+            "nominal_probability_bps": 5000
+          },
+          {
+            "hypothesis_id": "safe-world",
+            "lower_probability_bps": 5000,
+            "upper_probability_bps": 5000,
+            "nominal_probability_bps": 5000
+          }
+        ],
+        "observed_outcomes": {
+          "gate-a": "pass",
+          "gate-b": "pass"
+        }
+      }
     ]
   }
 }
