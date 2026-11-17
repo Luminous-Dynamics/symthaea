@@ -682,6 +682,8 @@ mod tests {
         manifest["process_capability"]["program_revision_ref"] = json!("PROGRAM-REV-A");
         manifest["process_capability"]["capability_evidence_ref"] = json!("CAPABILITY-TEST-001");
         manifest["process_capability"]["supported_strategies"] = json!(["sewn_seam"]);
+        manifest["transitions"][0]["interface_detail_ref"] = json!("INTERFACE-DETAIL-REV-A");
+        manifest["transitions"][0]["process_route_ref"] = json!("PROCESS-ROUTE-REV-A");
         let report = parse_and_validate(&manifest.to_string()).unwrap();
         assert!(report.findings.iter().any(|f| f.code == "strategy_not_in_capability_scope"));
     }
@@ -695,6 +697,9 @@ mod tests {
         manifest["process_capability"]["program_revision_ref"] = json!("PROGRAM-REV-A");
         manifest["process_capability"]["capability_evidence_ref"] = json!("CAPABILITY-TEST-001");
         manifest["process_capability"]["supported_strategies"] = json!(["graded_knit","sewn_seam","replaceable_overlap"]);
+        for zone in manifest["zone_refs"].as_array_mut().unwrap() {
+            zone["construction_ref"] = json!("CONSTRUCTION-REV-A");
+        }
         for transition in manifest["transitions"].as_array_mut().unwrap() {
             transition["state"] = json!("frozen");
             transition["transition_width_mm"] = json!(12.0);
