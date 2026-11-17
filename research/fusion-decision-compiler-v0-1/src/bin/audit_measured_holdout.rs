@@ -3,8 +3,7 @@ use fusion_decision_compiler_contract::ModelUse;
 use fusion_decision_compiler_contract::measured_holdout_metrics::{
     CommitmentEvidenceClass, HoldoutEvaluationCampaign, HoldoutEvaluationDisposition,
     HoldoutMetricProfile, MeasurementAttestationClass, MeasurementVerificationReceipt,
-    PairedValidationSample, PredictionCommitment, PredictionInterval,
-    evaluate_measured_holdout,
+    PairedValidationSample, PredictionCommitment, PredictionInterval, evaluate_measured_holdout,
 };
 use fusion_decision_compiler_contract::validation_domain::{
     BlindHoldoutMeasurement, CalibrationExposure, HoldoutExposure, MeasuredObservation,
@@ -179,30 +178,82 @@ fn main() {
         test_stand_measurement_verification: verification("synthetic-test-stand", 'd'),
         holdout_measurement_verification: verification("synthetic-blind-holdout", 'e'),
         test_stand_samples: vec![
-            sample("test-a", "test-group-a", "synthetic-test-stand", 'd', '4', 10.0, 10.05),
-            sample("test-b", "test-group-b", "synthetic-test-stand", 'd', '4', 11.0, 11.08),
+            sample(
+                "test-a",
+                "test-group-a",
+                "synthetic-test-stand",
+                'd',
+                '4',
+                10.0,
+                10.05,
+            ),
+            sample(
+                "test-b",
+                "test-group-b",
+                "synthetic-test-stand",
+                'd',
+                '4',
+                11.0,
+                11.08,
+            ),
         ],
         holdout_samples: vec![
-            sample("holdout-a", "holdout-group-a", "synthetic-blind-holdout", 'e', '5', 12.0, 12.04),
-            sample("holdout-b", "holdout-group-b", "synthetic-blind-holdout", 'e', '5', 13.0, 13.07),
+            sample(
+                "holdout-a",
+                "holdout-group-a",
+                "synthetic-blind-holdout",
+                'e',
+                '5',
+                12.0,
+                12.04,
+            ),
+            sample(
+                "holdout-b",
+                "holdout-group-b",
+                "synthetic-blind-holdout",
+                'e',
+                '5',
+                13.0,
+                13.07,
+            ),
         ],
     };
 
     let report = evaluate_measured_holdout(&campaign);
-    let test = report.test_stand_metrics.as_ref().expect("synthetic test metrics");
-    let holdout = report.holdout_metrics.as_ref().expect("synthetic holdout metrics");
+    let test = report
+        .test_stand_metrics
+        .as_ref()
+        .expect("synthetic test metrics");
+    let holdout = report
+        .holdout_metrics
+        .as_ref()
+        .expect("synthetic holdout metrics");
     println!("contract_version={}", report.contract_version);
     println!("disposition={:?}", report.disposition);
     println!("test_stand_samples={}", test.sample_count);
-    println!("test_stand_mae={:.6}", test.mean_absolute_error.unwrap_or(f64::NAN));
-    println!("test_stand_rmse={:.6}", test.root_mean_square_error.unwrap_or(f64::NAN));
+    println!(
+        "test_stand_mae={:.6}",
+        test.mean_absolute_error.unwrap_or(f64::NAN)
+    );
+    println!(
+        "test_stand_rmse={:.6}",
+        test.root_mean_square_error.unwrap_or(f64::NAN)
+    );
     println!("holdout_samples={}", holdout.sample_count);
     println!("holdout_groups={}", holdout.unique_group_count);
-    println!("holdout_mae={:.6}", holdout.mean_absolute_error.unwrap_or(f64::NAN));
-    println!("holdout_rmse={:.6}", holdout.root_mean_square_error.unwrap_or(f64::NAN));
+    println!(
+        "holdout_mae={:.6}",
+        holdout.mean_absolute_error.unwrap_or(f64::NAN)
+    );
+    println!(
+        "holdout_rmse={:.6}",
+        holdout.root_mean_square_error.unwrap_or(f64::NAN)
+    );
     println!(
         "holdout_interval_empirical_coverage={:.6}",
-        holdout.empirical_prediction_interval_coverage.unwrap_or(f64::NAN)
+        holdout
+            .empirical_prediction_interval_coverage
+            .unwrap_or(f64::NAN)
     );
     println!("claim_ceiling={}", report.claim_ceiling);
     println!(
