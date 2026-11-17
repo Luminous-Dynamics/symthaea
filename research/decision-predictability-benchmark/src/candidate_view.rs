@@ -285,7 +285,7 @@ mod tests {
 
     const TICKET: &str = "0123456789abcdef0123456789abcdef";
     const DIGEST: &str =
-        "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
 
     fn validated_manifest() -> ValidatedManifest {
