@@ -22,9 +22,16 @@ exclude = [
     "crates/core/nixward-web",
     "crates/core/symthaea-zkproof/methods",
     "crates/core/symthaea-zkproof/host",
-    # Legacy placeholder contains only an empty examples/unused.rs and has no Cargo.toml.
-    # Exclude it from the crates/core/* glob so cargo metadata resolves the real workspace.
+    # Source-only paths matched by workspace globs are excluded until each is promoted to a
+    # real crate or deliberately archived. See workspace audit issue #12324.
+    # `symthaea` is examples-only; `symthaea-iit` currently contains orphan tests only.
     "crates/core/symthaea",
+    "crates/core/symthaea-iit",
+    "crates/core/symthaea-observation-attestation",
+    "crates/domains/symthaea-architecture-engineering",
+    "crates/domains/symthaea-dishwasher-design",
+    "crates/domains/symthaea-rea-compat",
+    "crates/domains/symthaea-rea-evidence-verifier",
     "crates/domains/symthaea-spore/fuzz",
     "crates/domains/spark-engine",
     "crates/domains/symthaea-lab",
