@@ -85,6 +85,11 @@
           "$ref": "#/$defs/eventEvidence"
         }
       }
+    },
+    "independent_verifier_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Separate verifier identity required when task_success is instrumented; distinct from policy_id and source_id."
     }
   },
   "$defs": {
@@ -133,5 +138,35 @@
         }
       ]
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "events": {
+            "properties": {
+              "task_success": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "INSTRUMENTED_ABSENT",
+                      "OCCURRED"
+                    ]
+                  }
+                },
+                "required": [
+                  "status"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "independent_verifier_id"
+        ]
+      }
+    }
+  ]
 }
