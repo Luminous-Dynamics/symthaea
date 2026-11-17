@@ -127,8 +127,6 @@ impl ThermalColumn {
         let total_depth_m = cell_count as f64 * parameters.cell_thickness_m;
         let absorbed_fraction = pulse.surface_absorptivity
             * (1.0 - (-total_depth_m / parameters.optical_absorption_depth_m).exp());
-        let expected_absorbed_energy_j_m2 =
-            energy_delivered_after_optics_j_m2 * absorbed_fraction;
         let unabsorbed_energy_j_m2 =
             energy_delivered_after_optics_j_m2 - expected_absorbed_energy_j_m2;
 
