@@ -190,6 +190,8 @@ All productivity targets are secondary to passing identical hard gates. No finit
 
 ## 8. Industry and SOTA comparison
 
+The decision-conditioned inspection adapter in [#12628](https://github.com/Luminous-Dynamics/symthaea/issues/12628) reuses the existing finite-horizon Subterra measurement planner and independent robust-policy referee; it does not create a competing EVSI engine.
+
 | Reference | Current demonstrated focus | Correct Subterra comparison |
 |---|---|---|
 | DARPA SubT / CoSTAR | Extreme-environment exploration, mapping, artifact search and multi-robot autonomy | Preserve exploration baselines; add construction, asset condition and accepted closeout |
@@ -197,9 +199,10 @@ All productivity targets are secondary to passing identical hard gates. No finit
 | Epiroc Deep Automation | Underground-to-surface automated truck cycles using 3-D LiDAR | Matched haulage/localization baseline; add verified intervention and infrastructure-state records |
 | Komatsu / AIM | Commercial autonomous dozers/excavators connected to Smart Construction workflows; adjacent construction domain | Compare work-package interoperability and measured as-built acceptance, not mine-specific capability |
 | 2026 charging-aware mine inspection | Task allocation, path planning and charging-feasible multi-robot inspection in simulation | Reproduce its declared task objective first; extend with verification-aware information gain, model shift and recovery |
-| UC San Diego pipe robot | 2–6 inch in-pipe mobility, pipe-joint traversal and emerging autonomous traversal | Compare confined-pipe mobility and mapping as a component baseline; add defect/asset acceptance |
-| 2026 acoustic pipe inspection robot | Dual-resolution acoustic sensing for in-pipe inspection | Compare power/data-efficient sensing; add multimodal corroboration and verified condition claims |
-| 2026 mine infrastructure review | Finds pipe/cable inspection and drawpoint hang-up volumetric assessment comparatively under-addressed | Target these tasks, while acknowledging adjacent pipe/cable robotics already exists |
+| UC San Diego Pipe Network Inspection Robot | Self-centering 2–6 inch in-pipe platforms; 6-inch steel tests cover straight runs, elbows and T-joints; autonomous traversal is in a new development phase | Component baseline for confined-pipe mobility, joint recognition and odometry; do not equate it with mine-wide asset-condition qualification |
+| 2025 gecko-inspired underground cable robot | Quadruped locomotion concept and vision-based defect recognition for insulation ageing, micro-cracks and contamination | Component baseline for cable access and visual defect detection; independent calibration and site transfer remain separate questions |
+| 2026 dual-resolution acoustic in-pipe robot | Acoustic modality for autonomous in-pipe inspection | Compare modality-specific detection and sensing cost; add cross-modal evidence and condition-decision verification |
+| 2026 mine infrastructure review | Finds dedicated mine pipe/cable inspection and drawpoint hang-up volumetric assessment comparatively under-addressed | Target mine-specific asset-condition and drawpoint tasks, while explicitly benchmarking against adjacent in-pipe and cable-inspection prototypes |
 | 2026 rock-bolt AI review | AI/optimization, monitoring and compliance checks; weak cross-site validation and weak links to as-built records | Make as-built evidence, cross-site robustness and human-governed engineering review central |
 
 ### Standards boundary
