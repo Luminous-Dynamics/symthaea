@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use subterra_inspection_campaign::{
     AssuranceBindings, CampaignBudget, CampaignError, CampaignProblem, CampaignReport,
-    DecisionRequirement, DeploymentBundle, InspectionOption, optimize_campaign,
+    DecisionRequirement, DeploymentBundle, InspectionOption, ResourceVector, optimize_campaign,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +52,12 @@ pub struct ExpectedInspectionContext {
     pub loss_table_digest: String,
     pub evsi_assessment_digest: String,
     pub source_dataset_digest: String,
+    pub deployment_bundle_id: String,
+    pub deployment_bundle_digest: String,
+    pub resource_model_digest: String,
+    pub resource_assessment_digest: String,
+    pub risk_model_digest: String,
+    pub risk_assessment_digest: String,
     pub purpose: EvidencePurpose,
     /// Frozen by the caller for deterministic, reproducible freshness checks.
     pub evaluation_time_unix_ms: u64,
@@ -73,6 +79,18 @@ pub struct EvidenceManifest {
     pub loss_table_digest: String,
     pub evsi_assessment_digest: String,
     pub source_dataset_digest: String,
+    pub deployment_bundle_id: String,
+    pub deployment_bundle_digest: String,
+    pub resource_model_digest: String,
+    pub resource_assessment_digest: String,
+    pub risk_model_digest: String,
+    pub risk_assessment_digest: String,
+    /// Resource/risk values claimed by the external assessment and matched exactly to the option.
+    pub assessed_resources: ResourceVector,
+    pub assessed_mission_interruption_upper_ppm: u32,
+    pub assessed_robot_loss_upper_ppm: u32,
+    pub resource_assessment_valid_until_unix_ms: u64,
+    pub risk_assessment_valid_until_unix_ms: u64,
     pub observation_receipt_digest: String,
     pub calibration_receipt_digest: String,
     pub rights_receipt_digest: String,
@@ -122,6 +140,16 @@ pub enum RejectionReason {
     MissingVerifierReceipt,
     MissingSourceDatasetDigest,
     SourceDatasetMismatch,
+    DeploymentBundleMismatch,
+    DeploymentBundleDigestMismatch,
+    ResourceModelMismatch,
+    ResourceAssessmentMismatch,
+    ResourceValueMismatch,
+    RiskModelMismatch,
+    RiskAssessmentMismatch,
+    RiskValueMismatch,
+    ResourceAssessmentExpired,
+    RiskAssessmentExpired,
     ObservationFromFuture,
     ObservationStale,
     EvidenceExpired,
@@ -199,6 +227,16 @@ pub fn admit_candidate(
         &expected.loss_table_digest,
         &expected.evsi_assessment_digest,
         &expected.source_dataset_digest,
+        &expected.deployment_bundle_digest,
+        &expected.resource_model_digest,
+        &expected.resource_assessment_digest,
+        &expected.risk_model_digest,
+        &expected.risk_assessment_digest,
+        &manifest.deployment_bundle_digest,
+        &manifest.resource_model_digest,
+        &manifest.resource_assessment_digest,
+        &manifest.risk_model_digest,
+        &manifest.risk_assessment_digest,
         &manifest.coordinate_frame_digest,
         &manifest.region_scope_digest,
         &manifest.sensor_model_digest,
@@ -281,6 +319,51 @@ pub fn admit_candidate(
     );
     push_if_mismatch(
         &mut reasons,
+        missing(&expected.deployment_bundle_id)
+            || missing(&manifest.deployment_bundle_id)
+            || manifest.deployment_bundle_id != expected.deployment_bundle_id
+            || option.deployment_bundle_id != expected.deployment_bundle_id,
+        RejectionReason::DeploymentBundleMismatch,
+    );
+    push_if_mismatch(
+        &mut reasons,
+        manifest.deployment_bundle_digest != expected.deployment_bundle_digest,
+        RejectionReason::DeploymentBundleDigestMismatch,
+    );
+    push_if_mismatch(
+        &mut reasons,
+        manifest.resource_model_digest != expected.resource_model_digest,
+        RejectionReason::ResourceModelMismatch,
+    );
+    push_if_mismatch(
+        &mut reasons,
+        manifest.resource_assessment_digest != expected.resource_assessment_digest,
+        RejectionReason::ResourceAssessmentMismatch,
+    );
+    push_if_mismatch(
+        &mut reasons,
+        manifest.assessed_resources != option.variable_resources,
+        RejectionReason::ResourceValueMismatch,
+    );
+    push_if_mismatch(
+        &mut reasons,
+        manifest.risk_model_digest != expected.risk_model_digest,
+        RejectionReason::RiskModelMismatch,
+    );
+    push_if_mismatch(
+        &mut reasons,
+        manifest.risk_assessment_digest != expected.risk_assessment_digest,
+        RejectionReason::RiskAssessmentMismatch,
+    );
+    push_if_mismatch(
+        &mut reasons,
+        manifest.assessed_mission_interruption_upper_ppm
+            != option.mission_interruption_upper_ppm
+            || manifest.assessed_robot_loss_upper_ppm != option.robot_loss_upper_ppm,
+        RejectionReason::RiskValueMismatch,
+    );
+    push_if_mismatch(
+        &mut reasons,
         manifest.rights_purpose != expected.purpose,
         RejectionReason::RightsPurposeMismatch,
     );
@@ -339,6 +422,12 @@ pub fn admit_candidate(
     }
     if manifest.rights_valid_until_unix_ms <= expected.evaluation_time_unix_ms {
         reasons.push(RejectionReason::RightsGrantExpired);
+    }
+    if manifest.resource_assessment_valid_until_unix_ms <= expected.evaluation_time_unix_ms {
+        reasons.push(RejectionReason::ResourceAssessmentExpired);
+    }
+    if manifest.risk_assessment_valid_until_unix_ms <= expected.evaluation_time_unix_ms {
+        reasons.push(RejectionReason::RiskAssessmentExpired);
     }
     if manifest.observation_captured_at_unix_ms < manifest.calibration_valid_from_unix_ms
         || manifest.observation_captured_at_unix_ms >= manifest.calibration_valid_until_unix_ms
@@ -540,6 +629,12 @@ mod tests {
             loss_table_digest: "sha256:loss-table".into(),
             evsi_assessment_digest: "sha256:evsi".into(),
             source_dataset_digest: "sha256:dataset".into(),
+            deployment_bundle_id: "corridor-west".into(),
+            deployment_bundle_digest: "sha256:deployment-bundle".into(),
+            resource_model_digest: "sha256:resource-model".into(),
+            resource_assessment_digest: "sha256:resource-assessment".into(),
+            risk_model_digest: "sha256:risk-model".into(),
+            risk_assessment_digest: "sha256:risk-assessment".into(),
             purpose: EvidencePurpose::AssetConditionInspection,
             evaluation_time_unix_ms: NOW,
             maximum_observation_age_ms: 3_600_000,
@@ -578,6 +673,22 @@ mod tests {
                 loss_table_digest: "sha256:loss-table".into(),
                 evsi_assessment_digest: "sha256:evsi".into(),
                 source_dataset_digest: "sha256:dataset".into(),
+                deployment_bundle_id: "corridor-west".into(),
+                deployment_bundle_digest: "sha256:deployment-bundle".into(),
+                resource_model_digest: "sha256:resource-model".into(),
+                resource_assessment_digest: "sha256:resource-assessment".into(),
+                risk_model_digest: "sha256:risk-model".into(),
+                risk_assessment_digest: "sha256:risk-assessment".into(),
+                assessed_resources: ResourceVector {
+                    energy_millijoules: 5_000,
+                    duration_milliseconds: 20_000,
+                    data_bytes: 1_024,
+                    exposure_milliunits: 2,
+                },
+                assessed_mission_interruption_upper_ppm: 100,
+                assessed_robot_loss_upper_ppm: 10,
+                resource_assessment_valid_until_unix_ms: NOW + 600_000,
+                risk_assessment_valid_until_unix_ms: NOW + 600_000,
                 observation_receipt_digest: "sha256:observation".into(),
                 calibration_receipt_digest: "sha256:calibration".into(),
                 rights_receipt_digest: "sha256:rights".into(),
@@ -857,6 +968,51 @@ mod tests {
                 .contains(&RejectionReason::SourceDatasetMismatch)
         );
         assert!(report.admitted_candidate.is_none());
+    }
+
+    #[test]
+    fn altered_resource_vector_cannot_enter_campaign_option() {
+        let mut item = candidate();
+        item.option.variable_resources.energy_millijoules += 1;
+        let report = admit_candidate(&item, &context());
+        assert!(report.rejection_reasons.contains(&RejectionReason::ResourceValueMismatch));
+        assert!(report.admitted_candidate.is_none());
+    }
+
+    #[test]
+    fn altered_risk_bounds_cannot_enter_campaign_option() {
+        let mut item = candidate();
+        item.option.robot_loss_upper_ppm += 1;
+        let report = admit_candidate(&item, &context());
+        assert!(report.rejection_reasons.contains(&RejectionReason::RiskValueMismatch));
+    }
+
+    #[test]
+    fn resource_and_risk_assessment_digests_must_match() {
+        let mut item = candidate();
+        item.manifest.resource_assessment_digest = "sha256:other-resource".into();
+        item.manifest.risk_assessment_digest = "sha256:other-risk".into();
+        let report = admit_candidate(&item, &context());
+        assert!(report.rejection_reasons.contains(&RejectionReason::ResourceAssessmentMismatch));
+        assert!(report.rejection_reasons.contains(&RejectionReason::RiskAssessmentMismatch));
+    }
+
+    #[test]
+    fn resource_and_risk_assessments_must_be_fresh() {
+        let mut item = candidate();
+        item.manifest.resource_assessment_valid_until_unix_ms = NOW;
+        item.manifest.risk_assessment_valid_until_unix_ms = NOW;
+        let report = admit_candidate(&item, &context());
+        assert!(report.rejection_reasons.contains(&RejectionReason::ResourceAssessmentExpired));
+        assert!(report.rejection_reasons.contains(&RejectionReason::RiskAssessmentExpired));
+    }
+
+    #[test]
+    fn deployment_bundle_identity_is_bound_to_the_candidate() {
+        let mut item = candidate();
+        item.option.deployment_bundle_id = "corridor-east".into();
+        let report = admit_candidate(&item, &context());
+        assert!(report.rejection_reasons.contains(&RejectionReason::DeploymentBundleMismatch));
     }
 
     #[test]
