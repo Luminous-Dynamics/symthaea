@@ -12,6 +12,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Upper bound on retained events per attempt; unresolved work remains locked
+/// when this limit is reached.
+pub const MAX_ATTEMPT_EVENTS: usize = 64;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct WorkScopeId(pub u64);
 
@@ -82,6 +86,7 @@ impl OperationSpec {
             || !self.authority_evidence_digest.is_present()
             || self.executor_id == 0
             || self.executor_sensor_chain_id == 0
+            || self.executor_common_cause_domains.is_empty()
             || self.required_coverage_per_mille == 0
             || self.required_coverage_per_mille > 1000
             || self.expires_at_step < now_step
@@ -118,17 +123,18 @@ pub enum AttemptState {
     Accepted,
     Rejected,
     ReworkReview,
+    ReworkSuperseded,
     Closed,
 }
 
 impl AttemptState {
     /// States in which this attempt still blocks a new mutation in its scope.
     pub const fn locks_scope(self) -> bool {
-        !matches!(self, Self::ReconciledNotExecuted | Self::Closed)
+        !matches!(self, Self::ReconciledNotExecuted | Self::ReworkSuperseded | Self::Closed)
     }
 
     pub const fn is_terminal_for_attempt(self) -> bool {
-        matches!(self, Self::ReconciledNotExecuted | Self::Closed)
+        matches!(self, Self::ReconciledNotExecuted | Self::ReworkSuperseded | Self::Closed)
     }
 }
 
@@ -182,6 +188,59 @@ pub enum OperationEvent {
         authority_revision: u64,
         disposition_digest: EvidenceDigest,
     },
+    /// A responsible authority supersedes this rejected attempt with a new,
+    /// separately identified work package. Registry admission requires the
+    /// next attempt to match this exact authorization.
+    AuthorizeRework {
+        authorization: ReworkAuthorization,
+        approval_digest: EvidenceDigest,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ReworkAuthorization {
+    pub work_package_id: WorkPackageId,
+    pub work_package_revision: u64,
+    pub work_package_digest: EvidenceDigest,
+    pub design_revision: u64,
+    pub design_digest: EvidenceDigest,
+    pub coordinate_frame_revision: u64,
+    pub coordinate_frame_digest: EvidenceDigest,
+    pub calibration_revision: u64,
+    pub calibration_digest: EvidenceDigest,
+    pub authority_revision: u64,
+    pub authority_evidence_digest: EvidenceDigest,
+}
+
+impl ReworkAuthorization {
+    fn validate_against(&self, prior: &OperationSpec) -> bool {
+        self.work_package_id.0 != 0
+            && self.work_package_revision > prior.work_package_revision
+            && self.work_package_digest.is_present()
+            && self.work_package_digest != prior.work_package_digest
+            && self.design_revision > 0
+            && self.design_digest.is_present()
+            && self.coordinate_frame_revision > 0
+            && self.coordinate_frame_digest.is_present()
+            && self.calibration_revision > 0
+            && self.calibration_digest.is_present()
+            && self.authority_revision > prior.authority_revision
+            && self.authority_evidence_digest.is_present()
+    }
+
+    fn matches_spec(&self, spec: &OperationSpec) -> bool {
+        self.work_package_id == spec.work_package_id
+            && self.work_package_revision == spec.work_package_revision
+            && self.work_package_digest == spec.work_package_digest
+            && self.design_revision == spec.design_revision
+            && self.design_digest == spec.design_digest
+            && self.coordinate_frame_revision == spec.coordinate_frame_revision
+            && self.coordinate_frame_digest == spec.coordinate_frame_digest
+            && self.calibration_revision == spec.calibration_revision
+            && self.calibration_digest == spec.calibration_digest
+            && self.authority_revision == spec.authority_revision
+            && self.authority_evidence_digest == spec.authority_evidence_digest
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -214,6 +273,10 @@ pub struct VerificationReceipt {
     pub coverage_per_mille: u16,
     pub unobserved_required_regions: u32,
     pub common_cause_domains: Vec<u64>,
+    /// Evidence from a reviewed common-cause/dependency assessment; this crate
+    /// checks presence and declared overlap, not the assessment's truth.
+    pub common_cause_assessment_digest: EvidenceDigest,
+    pub physical_delta_digest: EvidenceDigest,
     pub postconditions_passed: bool,
     pub digest: EvidenceDigest,
 }
@@ -229,6 +292,8 @@ pub enum VerificationIssue {
     RequiredRegionUnobserved,
     CommonCauseOverlap,
     InvalidCommonCauseDeclaration,
+    MissingIndependenceAssessment,
+    PhysicalDeltaMismatch,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -239,11 +304,21 @@ pub struct VerificationAssessment {
 }
 
 impl VerificationReceipt {
-    pub fn assess(&self, spec: &OperationSpec) -> VerificationAssessment {
+    pub fn assess(
+        &self,
+        spec: &OperationSpec,
+        physical_delta: &PhysicalDeltaEvidence,
+    ) -> VerificationAssessment {
         let mut issues = Vec::new();
 
         if !self.digest.is_present() {
             issues.push(VerificationIssue::MissingDigest);
+        }
+        if !self.common_cause_assessment_digest.is_present() {
+            issues.push(VerificationIssue::MissingIndependenceAssessment);
+        }
+        if self.physical_delta_digest != physical_delta.digest {
+            issues.push(VerificationIssue::PhysicalDeltaMismatch);
         }
         if self.verifier_id == 0 || self.verifier_id == spec.executor_id {
             issues.push(VerificationIssue::VerifierIsExecutor);
@@ -276,7 +351,7 @@ impl VerificationReceipt {
         }
 
         let mut domains = BTreeSet::new();
-        if self.common_cause_domains.contains(&0)
+        if self.common_cause_domains.is_empty() || self.common_cause_domains.contains(&0)
             || self
                 .common_cause_domains
                 .iter()
@@ -319,6 +394,9 @@ pub struct TransitionRecord {
     pub observed_at_step: u64,
     pub from: AttemptState,
     pub to: AttemptState,
+    /// Full typed event retained so a transition cannot be separated from the
+    /// evidence references and revision bindings that caused it.
+    pub event: OperationEvent,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -327,6 +405,7 @@ pub enum ContractError {
     InvalidCommonCauseDeclaration,
     EventSequenceGap { expected: u64, received: u64 },
     EventSequenceExhausted,
+    AttemptEventLimitExceeded,
     WorkPackageIdentityMismatch,
     StepRegression,
     WorkPackageRevisionMismatch,
@@ -401,6 +480,9 @@ impl OperationAttempt {
         &mut self,
         stamped: StampedOperationEvent,
     ) -> Result<AttemptState, ContractError> {
+        if self.history.len() >= MAX_ATTEMPT_EVENTS {
+            return Err(ContractError::AttemptEventLimitExceeded);
+        }
         if stamped.sequence != self.next_sequence {
             return Err(ContractError::EventSequenceGap {
                 expected: self.next_sequence,
@@ -448,6 +530,7 @@ impl OperationAttempt {
             observed_at_step: stamped.observed_at_step,
             from,
             to,
+            event: stamped.event.clone(),
         });
         Ok(to)
     }
@@ -521,6 +604,9 @@ impl OperationAttempt {
                 if !telemetry_digest.is_present() {
                     return Err(ContractError::MissingDigest);
                 }
+                if !self.seen_evidence.insert(*telemetry_digest) {
+                    return Err(ContractError::DuplicateEvidence);
+                }
                 if *calibration_revision != self.spec.calibration_revision
                     || *calibration_digest != self.spec.calibration_digest
                 {
@@ -582,8 +668,10 @@ impl OperationAttempt {
                 if !evidence.digest.is_present() {
                     return Err(ContractError::MissingDigest);
                 }
+                if !self.seen_evidence.insert(evidence.digest) {
+                    return Err(ContractError::DuplicateEvidence);
+                }
                 self.physical_delta = Some(evidence.clone());
-                self.seen_evidence.insert(evidence.digest);
                 Ok(AttemptState::VerificationPending)
             }
             OperationEvent::VerificationSubmitted { receipt }
@@ -592,7 +680,9 @@ impl OperationAttempt {
                 if self.seen_evidence.contains(&receipt.digest) {
                     return Err(ContractError::DuplicateEvidence);
                 }
-                let assessment = receipt.assess(&self.spec);
+                let physical_delta = self.physical_delta.as_ref()
+                    .ok_or(ContractError::InvalidEvidenceSource)?;
+                let assessment = receipt.assess(&self.spec, physical_delta);
                 self.seen_evidence.insert(receipt.digest);
                 let next = if assessment.accepted {
                     AttemptState::Accepted
@@ -628,6 +718,15 @@ impl OperationAttempt {
                     return Err(ContractError::InvalidAuthorityRevision);
                 }
                 Ok(AttemptState::ReworkReview)
+            }
+            OperationEvent::AuthorizeRework {
+                authorization,
+                approval_digest,
+            } if self.state == AttemptState::ReworkReview => {
+                if !authorization.validate_against(&self.spec) || !approval_digest.is_present() {
+                    return Err(ContractError::InvalidAuthorityRevision);
+                }
+                Ok(AttemptState::ReworkSuperseded)
             }
             _ => Err(ContractError::InvalidTransition {
                 from: self.state,
@@ -669,6 +768,7 @@ impl OperationEvent {
             Self::AdditionalEvidenceReceived { .. } => "AdditionalEvidenceReceived",
             Self::CloseAccepted => "CloseAccepted",
             Self::RecordReworkReview { .. } => "RecordReworkReview",
+            Self::AuthorizeRework { .. } => "AuthorizeRework",
         }
     }
 }
@@ -677,6 +777,8 @@ impl OperationEvent {
 pub struct OperationRegistry {
     attempts: BTreeMap<AttemptId, OperationAttempt>,
     active_by_scope: BTreeMap<WorkScopeId, AttemptId>,
+    idempotency_keys: BTreeSet<EvidenceDigest>,
+    authorized_rework: BTreeMap<WorkScopeId, ReworkAuthorization>,
 }
 
 impl OperationRegistry {
@@ -694,11 +796,17 @@ impl OperationRegistry {
                 holder: *holder,
             });
         }
+        if let Some(authorization) = self.authorized_rework.get(&spec.scope_id) {
+            if !authorization.matches_spec(&spec) {
+                return Err(ContractError::InvalidAuthorityRevision);
+            }
+        }
         let scope_id = spec.scope_id;
         let attempt_id = spec.attempt_id;
         let attempt = OperationAttempt::new(spec, now_step)?;
         self.attempts.insert(attempt_id, attempt);
         self.active_by_scope.insert(scope_id, attempt_id);
+        self.authorized_rework.remove(&scope_id);
         Ok(())
     }
 
@@ -707,12 +815,31 @@ impl OperationRegistry {
         attempt_id: AttemptId,
         stamped: StampedOperationEvent,
     ) -> Result<AttemptState, ContractError> {
+        let command_key = match &stamped.event {
+            OperationEvent::CommandIssued { idempotency_key, .. } => Some(*idempotency_key),
+            _ => None,
+        };
+        if command_key.is_some_and(|key| self.idempotency_keys.contains(&key)) {
+            return Err(ContractError::IdempotencyKeyReused);
+        }
+        let rework_authorization = match &stamped.event {
+            OperationEvent::AuthorizeRework { authorization, .. } => Some(authorization.clone()),
+            _ => None,
+        };
         let attempt = self
             .attempts
             .get_mut(&attempt_id)
             .ok_or(ContractError::UnknownAttempt(attempt_id))?;
         let scope_id = attempt.spec.scope_id;
         let state = attempt.apply(stamped)?;
+        if let Some(key) = command_key {
+            self.idempotency_keys.insert(key);
+        }
+        if state == AttemptState::ReworkSuperseded {
+            if let Some(authorization) = rework_authorization {
+                self.authorized_rework.insert(scope_id, authorization);
+            }
+        }
         if !state.locks_scope()
             && self.active_by_scope.get(&scope_id) == Some(&attempt_id)
         {
