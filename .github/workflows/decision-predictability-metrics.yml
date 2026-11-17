@@ -7,7 +7,7 @@ on:
       - ".github/workflows/decision-predictability-metrics.yml"
   push:
     branches:
-      - "research/decision-relevant-predictability-v0"
+      - "research/decision-relevant-predictability-v*"
     paths:
       - "research/decision-predictability-benchmark/**"
       - ".github/workflows/decision-predictability-metrics.yml"
