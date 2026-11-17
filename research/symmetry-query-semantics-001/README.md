@@ -41,3 +41,6 @@ The D4 test suite measures 3 representative inspections against 16 exhaustive ca
 ## Claim boundary
 
 Finite, discrete, exact integer predicates/objectives/weights only. No arbitrary semiring, continuous-group integral, Haar measure, orbit-volume correction, coarea/Jacobian factor, approximate invariance, cryptographic certificate, or production search authority is implemented. Unknown query fields must be declared and qualified before adding new query kinds.
+
+
+The stacked pull request inherits the pinned exact-head Rust 1.96 qualification workflow from its base branch. That workflow is extended to run this crate's format, locked-test and strict-Clippy commands whenever this directory changes.
