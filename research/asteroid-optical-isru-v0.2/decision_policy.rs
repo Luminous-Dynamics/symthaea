@@ -269,8 +269,7 @@ impl DecisionDirectedPolicy {
                     None => true,
                     Some((_, best_score, best_id)) => {
                         net_value_per_cost > *best_score + NUMERIC_TOLERANCE
-                            || ((net_value_per_cost - *best_score).abs()
-                                <= NUMERIC_TOLERANCE
+                            || ((net_value_per_cost - *best_score).abs() <= NUMERIC_TOLERANCE
                                 && action.id < *best_id)
                     }
                 };
@@ -338,10 +337,7 @@ fn validate_config(config: PolicyConfig) -> Result<(), PolicyError> {
     Ok(())
 }
 
-fn validate_problem(
-    problem: &CampaignProblem,
-    weights: CostWeights,
-) -> Result<(), PolicyError> {
+fn validate_problem(problem: &CampaignProblem, weights: CostWeights) -> Result<(), PolicyError> {
     if problem.hypotheses.is_empty() {
         return Err(PolicyError::EmptyHypotheses);
     }
@@ -434,9 +430,10 @@ fn validate_problem(
                 likelihood_sums[hypothesis_index] += likelihood;
             }
         }
-        if likelihood_sums.iter().any(|sum| {
-            !sum.is_finite() || (*sum - 1.0).abs() > PROBABILITY_TOLERANCE
-        }) {
+        if likelihood_sums
+            .iter()
+            .any(|sum| !sum.is_finite() || (*sum - 1.0).abs() > PROBABILITY_TOLERANCE)
+        {
             return Err(PolicyError::OutcomeLikelihoodsDoNotNormalize);
         }
     }
@@ -448,23 +445,27 @@ fn best_decision(
     decisions: &[DecisionOption],
     eligible_decisions: &[usize],
 ) -> Option<(usize, f64)> {
-    eligible_decisions.iter().copied().fold(None, |best, index| {
-        let risk = expected_loss(probabilities, &decisions[index].loss_by_hypothesis);
-        match best {
-            None => Some((index, risk)),
-            Some((best_index, best_risk))
-                if index != best_index && risk < best_risk - NUMERIC_TOLERANCE => {
-                Some((index, risk))
+    eligible_decisions
+        .iter()
+        .copied()
+        .fold(None, |best, index| {
+            let risk = expected_loss(probabilities, &decisions[index].loss_by_hypothesis);
+            match best {
+                None => Some((index, risk)),
+                Some((best_index, best_risk))
+                    if index != best_index && risk < best_risk - NUMERIC_TOLERANCE =>
+                {
+                    Some((index, risk))
+                }
+                Some((best_index, best_risk))
+                    if (risk - best_risk).abs() <= NUMERIC_TOLERANCE
+                        && decisions[index].id < decisions[best_index].id =>
+                {
+                    Some((index, risk))
+                }
+                _ => best,
             }
-            Some((best_index, best_risk))
-                if (risk - best_risk).abs() <= NUMERIC_TOLERANCE
-                    && decisions[index].id < decisions[best_index].id =>
-            {
-                Some((index, risk))
-            }
-            _ => best,
-        }
-    })
+        })
 }
 
 fn expected_loss(probabilities: &[f64], losses: &[f64]) -> f64 {
@@ -498,14 +499,11 @@ fn expected_value_of_sample_information(
         let posterior: Vec<f64> = prior
             .iter()
             .zip(&outcome.likelihood_by_hypothesis)
-            .map(|(probability, likelihood)| {
-                probability * likelihood / outcome_probability
-            })
+            .map(|(probability, likelihood)| probability * likelihood / outcome_probability)
             .collect();
 
-        let (_, posterior_risk) =
-            best_decision(&posterior, decisions, eligible_decisions)
-                .expect("baseline validation guarantees an eligible decision");
+        let (_, posterior_risk) = best_decision(&posterior, decisions, eligible_decisions)
+            .expect("baseline validation guarantees an eligible decision");
         expected_posterior_risk += outcome_probability * posterior_risk;
     }
 
@@ -616,10 +614,7 @@ mod tests {
                         consumables_g: 0.0,
                         experiment_equivalents: 0.0,
                     },
-                    required_gates: vec![
-                        Gate::InstrumentCalibrated,
-                        Gate::QcmWitnessChainValid,
-                    ],
+                    required_gates: vec![Gate::InstrumentCalibrated, Gate::QcmWitnessChainValid],
                     outcomes: vec![
                         ObservationOutcome {
                             id: "clean-reading".to_string(),
@@ -714,20 +709,15 @@ mod tests {
         let mut candidate = problem();
         candidate.actions[0].outcomes[0].likelihood_by_hypothesis = vec![0.9, 0.2];
         candidate.actions[0].outcomes[1].likelihood_by_hypothesis = vec![0.2, 0.8];
-        let result = DecisionDirectedPolicy { config: config() }
-            .evaluate(&candidate, &safety());
-        assert_eq!(
-            result,
-            Err(PolicyError::OutcomeLikelihoodsDoNotNormalize)
-        );
+        let result = DecisionDirectedPolicy { config: config() }.evaluate(&candidate, &safety());
+        assert_eq!(result, Err(PolicyError::OutcomeLikelihoodsDoNotNormalize));
     }
 
     #[test]
     fn impossible_terminal_decision_set_fails_closed() {
         let mut candidate = problem();
         candidate.decisions[1].required_gates = vec![Gate::IndependentAssayPassed];
-        let result = DecisionDirectedPolicy { config: config() }
-            .evaluate(&candidate, &safety());
+        let result = DecisionDirectedPolicy { config: config() }.evaluate(&candidate, &safety());
         assert_eq!(result, Err(PolicyError::NoEligibleTerminalDecision));
     }
 
