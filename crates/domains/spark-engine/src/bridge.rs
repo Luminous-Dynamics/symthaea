@@ -9,8 +9,14 @@
 //!
 //! ## Fusion Approaches
 //!
-//! - **Tokamak (Symthaea):** Hot plasma at 10⁸ K, magnetic confinement, Q > 1 achievable
-//! - **LCF (Spark Engine):** Room temperature, lattice confinement, Q << 1 but anomalous observations
+//! - **Tokamak:** thermal plasma reaction-rate coefficients; gain is unavailable
+//!   until density, confinement and a declared heating-power boundary are supplied.
+//! - **LCF / metallic-hydride studies:** condition-specific reaction-rate modelling;
+//!   gain is unavailable until measured trigger/driver input power is supplied.
+//!
+//! Temperature and reaction-rate coefficients alone do not establish Q or
+//! whole-plant electrical gain. This bridge deliberately fails closed when
+//! required energy inputs are absent.
 //!
 //! This bridge allows systems to query both approaches through a unified API.
 
@@ -24,9 +30,12 @@ use serde::{Deserialize, Serialize};
 /// allowing downstream systems to query either approach.
 #[derive(Debug, Clone)]
 pub struct UnifiedFusionCalculator {
-    /// LCF conditions
+    /// LCF experimental conditions.
     pub lcf_conditions: Option<ExperimentalConditions>,
-    /// Tokamak temperature (keV) - placeholder for Symthaea integration
+    /// Explicit primary driver / trigger input power density, when measured.
+    /// Must share the same active-volume boundary as the fusion power density.
+    pub lcf_primary_input_power_density_w_cm3: Option<f64>,
+    /// Tokamak temperature (keV). Temperature alone does not determine Q.
     pub tokamak_temp_kev: Option<f64>,
 }
 
@@ -35,6 +44,7 @@ impl UnifiedFusionCalculator {
     pub fn lcf(conditions: ExperimentalConditions) -> Self {
         Self {
             lcf_conditions: Some(conditions),
+            lcf_primary_input_power_density_w_cm3: None,
             tokamak_temp_kev: None,
         }
     }
@@ -43,6 +53,7 @@ impl UnifiedFusionCalculator {
     pub fn tokamak(temp_kev: f64) -> Self {
         Self {
             lcf_conditions: None,
+            lcf_primary_input_power_density_w_cm3: None,
             tokamak_temp_kev: Some(temp_kev),
         }
     }
@@ -51,24 +62,43 @@ impl UnifiedFusionCalculator {
     pub fn both(conditions: ExperimentalConditions, tokamak_temp_kev: f64) -> Self {
         Self {
             lcf_conditions: Some(conditions),
+            lcf_primary_input_power_density_w_cm3: None,
             tokamak_temp_kev: Some(tokamak_temp_kev),
         }
     }
 
-    /// Calculate fusion rates for configured approaches.
+    /// Supply an explicit measured or scenario-assumed LCF primary input power density.
+    ///
+    /// This is a primary energy-gain boundary only, not whole-plant gain.
+    pub fn with_lcf_primary_input_power_density_w_cm3(
+        mut self,
+        input_power_density_w_cm3: f64,
+    ) -> Result<Self, String> {
+        if !input_power_density_w_cm3.is_finite() || input_power_density_w_cm3 <= 0.0 {
+            return Err("LCF primary input power density must be finite and positive".to_string());
+        }
+        self.lcf_primary_input_power_density_w_cm3 = Some(input_power_density_w_cm3);
+        Ok(self)
+    }
+
+    /// Calculate reaction-rate coefficients and only those gain values supported
+    /// by explicit input-power data.
     pub fn calculate(&self) -> UnifiedFusionResult {
         let lcf_result = self.lcf_conditions.as_ref().map(|conditions| {
             let screening = conditions.host_material.screening_ev();
             let gamow = GamowIntegration::dd_rate(conditions.temperature_k, screening, 0);
-            let q_params = QFactorParams::lcf_typical();
-            let (q_factor, _) = QFactor::compute(&gamow, &q_params);
+            let n_d = conditions.host_material.d_density_full() * conditions.loading_ratio;
+            let q_factor = self.lcf_primary_input_power_density_w_cm3.map(|input_power_density| {
+                let params = QFactorParams::new(n_d, 1.0, input_power_density);
+                QFactor::compute(&gamow, &params).0
+            });
 
             LcfFusionResult {
                 sigma_v_cm3_s: gamow.sigma_v_cm3_s,
                 q_factor,
                 gamow_peak_kev: gamow.gamow_peak_kev,
                 screening_enhancement: gamow.screening_enhancement,
-                energy_gain_possible: q_factor > 1.0,
+                energy_gain_possible: q_factor.map(|q| q > 1.0),
                 conditions: conditions.clone(),
             }
         });
@@ -109,20 +139,18 @@ impl UnifiedFusionCalculator {
                 let tok_gamow = GamowIntegration::dd_rate(tok_temp_k, 0.0, 0);
 
                 let rate_ratio = if lcf_gamow.sigma_v_cm3_s > 0.0 {
-                    tok_gamow.sigma_v_cm3_s / lcf_gamow.sigma_v_cm3_s
+                    Some(tok_gamow.sigma_v_cm3_s / lcf_gamow.sigma_v_cm3_s)
                 } else {
-                    f64::INFINITY
+                    None
                 };
 
                 Some(ApproachComparison {
                     tokamak_rate_advantage: rate_ratio,
-                    lcf_simplicity_advantage: "No magnets, room temperature, no tritium"
-                        .to_string(),
-                    // The compared input contains temperature only; this cannot
-                    // establish an energy-gain advantage for either approach.
+                    comparison_caveat: "The ratio compares modelled reactivity coefficients only. It is not a rate, power, gain, cost, or whole-system performance comparison; densities, active volumes, confinement, drivers and energy boundaries differ.".to_string(),
+                    lcf_simplicity_advantage: "System-level simplicity is not established by the supplied inputs.".to_string(),
                     tokamak_energy_advantage: None,
-                    lcf_compactness_advantage: true,
-                    recommendation: "Compare reaction-rate coefficients only. Tokamak energy gain requires density, confinement, heating power and a complete energy boundary; LCF remains a separate anomaly/neutron-source research path.".to_string(),
+                    lcf_compactness_advantage: None,
+                    recommendation: "Insufficient engineering and energy-boundary inputs to recommend either approach. Compare physics coefficients only; qualify each system independently.".to_string(),
                 })
             }
             _ => None,
@@ -144,17 +172,18 @@ pub struct UnifiedFusionResult {
 /// LCF-specific fusion result.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LcfFusionResult {
-    /// Reaction rate <σv>
+    /// Reaction rate <σv>.
     pub sigma_v_cm3_s: f64,
-    /// Q factor
-    pub q_factor: f64,
-    /// Gamow peak energy
+    /// Primary energy-gain estimate. None unless explicit input power density
+    /// was supplied; this is not whole-plant electrical gain.
+    pub q_factor: Option<f64>,
+    /// Gamow peak energy.
     pub gamow_peak_kev: f64,
-    /// Screening enhancement
+    /// Screening enhancement.
     pub screening_enhancement: f64,
-    /// Whether energy gain is possible
-    pub energy_gain_possible: bool,
-    /// Conditions used
+    /// Energy-gain assessment. None when primary input power is unavailable.
+    pub energy_gain_possible: Option<bool>,
+    /// Conditions used.
     pub conditions: ExperimentalConditions,
 }
 
@@ -177,16 +206,17 @@ pub struct TokamakFusionResult {
 /// Comparison between LCF and tokamak approaches.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApproachComparison {
-    /// How much faster tokamak rate is
-    pub tokamak_rate_advantage: f64,
-    /// LCF simplicity advantages
+    /// Ratio of modelled reactivity coefficients only, not system performance.
+    pub tokamak_rate_advantage: Option<f64>,
+    /// Explanation of why a coefficient ratio is not a whole-system comparison.
+    pub comparison_caveat: String,
+    /// Engineering simplicity assessment; absence of evidence is explicit.
     pub lcf_simplicity_advantage: String,
-    /// Whether tokamak has a demonstrated energy-gain advantage.
-    /// None means the supplied comparison inputs are insufficient.
+    /// None means energy-gain inputs are incomplete.
     pub tokamak_energy_advantage: Option<bool>,
-    /// Whether LCF is more compact
-    pub lcf_compactness_advantage: bool,
-    /// Overall recommendation
+    /// None means compactness evidence is unavailable.
+    pub lcf_compactness_advantage: Option<bool>,
+    /// Overall recommendation under the supplied evidence.
     pub recommendation: String,
 }
 
@@ -1405,7 +1435,20 @@ mod tests {
         assert!(result.tokamak.is_none());
 
         let lcf = result.lcf.unwrap();
-        assert!(lcf.q_factor < 1.0); // Q < 1 at room temp
+        assert_eq!(lcf.q_factor, None);
+        assert_eq!(lcf.energy_gain_possible, None);
+    }
+
+    #[test]
+    fn test_unified_calculator_lcf_accepts_explicit_input_power_density() {
+        let conditions = ExperimentalConditions::default();
+        let calc = UnifiedFusionCalculator::lcf(conditions)
+            .with_lcf_primary_input_power_density_w_cm3(1.0)
+            .unwrap();
+        let result = calc.calculate();
+        let lcf = result.lcf.unwrap();
+        assert!(lcf.q_factor.is_some());
+        assert_eq!(lcf.energy_gain_possible, Some(false));
     }
 
     #[test]
