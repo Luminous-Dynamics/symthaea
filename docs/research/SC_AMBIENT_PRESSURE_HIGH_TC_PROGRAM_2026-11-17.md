@@ -417,3 +417,32 @@ The current v0.1 registry now contains:
 The three new benchmark tracks added in this revision are GuidedMatDiffusion (generation + DFT + synthesis outcome), ElementsClaw (agentic LAM + LLM + experimental follow-up), and NEMAD (experimental/non-SC literature database + LLM classification/regression/inverse design). Their raw data and model weights are not copied into Symthaea; each child issue specifies source access, revisions, licensing, split integrity and evidence qualification gates.
 
 The registry audit test assertions were updated to expect exactly 11 sources, 8 candidates and 7 benchmark catalogs. The candidate-level observed / calculated / predicted Tc fields remain separate.
+
+
+## 22. Industry translation and the STGI baseline
+
+The October 2026 review proposes the Superconductor Translation Gap Index (STGI): four application-specific axes—temperature margin at target field, in-field engineering current density, cryogenic accessibility/pressure, and mechanical/manufacturing robustness—with a hard viability gate. Its reported scores include REBCO at 76 for a 77 K power-grid case, REBCO at 64 for high-field magnets at 20 K, and hydrides at zero where no conductor form exists. These are conditional composite scores, dependent on review choices and source inputs; they must be reconstructed and stress-tested rather than treated as universal truth.
+
+Source: https://doi.org/10.1016/j.nxmate.2026.103138  
+Work package: [SC-TRANSLATION-GAP-REPRO-001 #12651](https://github.com/Luminous-Dynamics/symthaea/issues/12651).
+
+### Industry evidence points to a different meaning of "better"
+
+- A 2025 power-applications perspective reports REBCO coated-conductor output above 5,000 km/year, while noting mature LTS technologies retain advantages in cost, round-wire geometry and established fabrication/device ecosystems. This is a market-perspective estimate, not a guarantee of uniform quality or producer output: https://doi.org/10.1007/s40766-025-00071-6
+- The SuperRail qualification report describes two 60 m HTS DC cables at 1.5 kV / 3.5 kA and a 35 m type-test loop, designed for 67 kA / 100 ms fault conditions. The application case is constrained urban railway right-of-way, not a universal argument that HTS always beats copper: https://doi.org/10.1049/icp.2025.2154
+- The high-current fusion conductor literature includes an 80 kA REBCO cable-in-conduit development: https://doi.org/10.1016/j.eng.2025.05.015
+
+### Our success definition
+
+A new superconducting material only becomes an industrial contender after it crosses a material-to-device evidence ladder:
+1. repeatable phase synthesis with composition/structure/phase fraction verified;
+2. independent superconducting evidence on the same specimen or matched batch;
+3. transport current and in-field critical-current density over the target B/T/angle envelope;
+4. wire/tape/cable form with measurable engineering current density, anisotropy, strain tolerance and AC loss;
+5. joints, thermal stability, quench detection/protection and mechanical qualification;
+6. long-length uniformity, production yield, critical-element supply, cost per kA·m and lifecycle cryogenic burden;
+7. an application-specific system comparison against incumbent NbTi, Nb3Sn, REBCO, MgB2 or Bi-2212 under matched operating boundaries.
+
+A room-temperature resistance transition without current-carrying conductor form does not pass the engineering viability gate. Conversely, a lower-Tc material can be commercially superior in a particular application if it is cheaper, more robust, scalable and easier to operate.
+
+The STGI reference is now represented as the eighth benchmark catalog entry in the machine-readable registry. Its scores remain paper-reported and un-reproduced.
