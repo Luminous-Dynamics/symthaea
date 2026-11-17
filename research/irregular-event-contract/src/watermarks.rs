@@ -803,13 +803,17 @@ impl SourceWatermarkLedger {
             }
         }
 
-        let mut candidate = self.clone();
+        // Every typed failure has been checked above. Classification reads
+        // only the immutable progress chain; arrivals in this batch cannot
+        // change another arrival's watermark classification. Commit directly
+        // instead of cloning the entire append-only ledger for every batch.
+        // This preserves Result-level atomicity while making append work
+        // proportional to the incoming batch rather than total history size.
         let mut classifications = Vec::with_capacity(incoming.len());
         for event in incoming {
-            classifications.push(candidate.record_event_arrival_unchecked(event, recorded_at_us)?);
+            classifications.push(self.record_event_arrival_unchecked(event, recorded_at_us));
         }
-        candidate.last_transaction_time_us = Some(recorded_at_us);
-        *self = candidate;
+        self.last_transaction_time_us = Some(recorded_at_us);
         Ok(classifications)
     }
 
@@ -817,7 +821,7 @@ impl SourceWatermarkLedger {
         &mut self,
         event: EventRecord,
         recorded_at_us: i64,
-    ) -> Result<EventArrivalClassification, WatermarkError> {
+    ) -> EventArrivalClassification {
         let source = SourceKey {
             entity_id: event.entity_id,
             modality_id: event.modality_id,
@@ -865,7 +869,7 @@ impl SourceWatermarkLedger {
                 .or_default()
                 .push(index);
         }
-        Ok(classification)
+        classification
     }
 
     pub fn verify_consistency(&self) -> Result<(), WatermarkError> {
@@ -1521,6 +1525,32 @@ mod tests {
             })
         );
         assert_eq!(ledger.state_sha256(), before);
+        assert_eq!(ledger.verify_consistency(), Ok(()));
+    }
+
+    #[test]
+    fn failed_event_arrival_batch_is_atomic_without_ledger_clone() {
+        let mut ledger = SourceWatermarkLedger::default();
+        ledger.append(progress(1, 1, 1, 1, 10, 100, false)).unwrap();
+        let before_digest = ledger.state_sha256();
+        let before_revisions = ledger.revisions().to_vec();
+
+        let valid_first = event(2, 1, 50, 20);
+        let mut invalid_second = event(3, 1, 60, 30);
+        invalid_second.available_at_us = 21;
+        assert_eq!(
+            ledger.record_event_arrival_batch([valid_first, invalid_second], 20),
+            Err(WatermarkError::EventUnavailableAtReceipt {
+                available_at_us: 21,
+                recorded_at_us: 20,
+            })
+        );
+
+        assert_eq!(ledger.event_arrivals.len(), 0);
+        assert!(ledger.late_breaches().is_empty());
+        assert_eq!(ledger.revisions(), before_revisions.as_slice());
+        assert_eq!(ledger.state_sha256(), before_digest);
+        assert_eq!(ledger.last_transaction_time_us, Some(10));
         assert_eq!(ledger.verify_consistency(), Ok(()));
     }
 
