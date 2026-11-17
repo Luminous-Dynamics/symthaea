@@ -28,6 +28,11 @@ pub struct ProcessPlan {
     /// Number of cell events sounded in each successive cycle.
     pub prefix_lengths: Vec<usize>,
     pub cycle_starts: Vec<Duration>,
+    /// Canonical post-filter/fallback cell used by the generator. Older
+    /// serialized plans may omit this field; they remain readable but cannot
+    /// receive source-cell realization verification.
+    #[serde(default)]
+    pub process_cell: Option<Motif>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -53,6 +58,14 @@ pub struct ProcessRealizationAuditV1 {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProcessRealizationAuditError {
     EmptyPlan,
+    MissingProcessCellBinding,
+    ProcessCellLengthMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    ProcessCellContainsRest {
+        event_index: usize,
+    },
     CycleStartCountMismatch {
         prefix_count: usize,
         cycle_start_count: usize,
@@ -143,6 +156,21 @@ pub fn verify_additive_process_score_v1(
     }
 
     let maximum_prefix_length = *plan.prefix_lengths.iter().max().expect("non-empty plan");
+    let process_cell = plan
+        .process_cell
+        .as_ref()
+        .ok_or(ProcessRealizationAuditError::MissingProcessCellBinding)?;
+    if process_cell.len() != maximum_prefix_length {
+        return Err(ProcessRealizationAuditError::ProcessCellLengthMismatch {
+            expected: maximum_prefix_length,
+            actual: process_cell.len(),
+        });
+    }
+    for (event_index, note) in process_cell.notes.iter().enumerate() {
+        if note.degree.is_none() {
+            return Err(ProcessRealizationAuditError::ProcessCellContainsRest { event_index });
+        }
+    }
     let expected_contour = independent_prefix_contour(plan.trajectory_kind, maximum_prefix_length);
     for (cycle_index, actual) in plan.prefix_lengths.iter().copied().enumerate() {
         let expected = expected_contour[cycle_index % expected_contour.len()];
@@ -239,20 +267,15 @@ pub fn verify_additive_process_score_v1(
         }
     }
 
-    let template_cycle_index = plan
-        .prefix_lengths
-        .iter()
-        .position(|length| *length == maximum_prefix_length)
-        .expect("maximum prefix has an index");
-    // This is an internal cell-consistency reference, not an authenticated
-    // source-motif reference: ProcessPlan v1 does not carry the originating
-    // Motif or a source-cell digest.
-    let template = &cycle_events[template_cycle_index];
+    let scale = score.key.scale();
     for (cycle_index, events) in cycle_events.iter().enumerate() {
-        for event_index in 0..events.len() {
-            let observed = events[event_index].1;
-            let expected = template[event_index].1;
-            if observed.pitch != expected.pitch || observed.duration != expected.duration {
+        for (event_index, (_, observed)) in events.iter().enumerate() {
+            let source_event = process_cell.notes[event_index];
+            let expected_pitch = scale.degree_pitch(
+                source_event.degree.expect("rest-free process cell checked above"),
+                5,
+            );
+            if observed.pitch != expected_pitch || observed.duration != source_event.duration {
                 return Err(ProcessRealizationAuditError::PrefixContentMismatch {
                     cycle_index,
                     event_index,
@@ -443,6 +466,7 @@ pub fn realize_additive_process(
             trajectory_kind,
             prefix_lengths,
             cycle_starts,
+            process_cell: Some(cell),
         },
     }
 }
@@ -620,7 +644,7 @@ mod tests {
     }
 
     #[test]
-    fn score_side_audit_is_not_a_source_motif_identity_proof() {
+    fn score_side_audit_rejects_a_coherent_whole_cell_transposition() {
         let mut realization = realize_additive_process(
             &MusicalIntent { seed: 1, ..MusicalIntent::default() },
             &Style::Minimalism.spec(),
@@ -633,10 +657,26 @@ mod tests {
         {
             note.pitch = note.pitch.transpose(1);
         }
-        // Every cycle still contains a consistent prefix of the same cell.
-        // The current ProcessPlan does not bind the original source motif, so
-        // source-motif preservation must be a separate, stronger contract.
-        assert!(verify_additive_process_score_v1(&realization.plan, &realization.score).is_ok());
+        // Repetition alone would still be coherent, but each event is now
+        // checked against the source cell carried by the ProcessPlan.
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::PrefixContentMismatch { .. })
+        ));
+    }
+
+    #[test]
+    fn legacy_plan_without_process_cell_is_readable_but_not_source_verified() {
+        let realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let mut legacy_plan = realization.plan.clone();
+        legacy_plan.process_cell = None;
+        assert!(matches!(
+            verify_additive_process_score_v1(&legacy_plan, &realization.score),
+            Err(ProcessRealizationAuditError::MissingProcessCellBinding)
+        ));
     }
 
     #[test]
