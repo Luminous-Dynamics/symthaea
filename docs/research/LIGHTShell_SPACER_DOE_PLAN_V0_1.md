@@ -49,7 +49,7 @@ C2-T and C2-M are separate comparisons. Equal thickness does not imply equal mas
 
 ### Stage 2 — structural screening matrix
 
-Use four inlay architectures at three spacer-connection frequencies. This yields 12 candidate structures:
+Use four inlay architectures at three spacer-connection frequencies, holding transition geometry constant for the square-wave families. This yields 12 screening structures:
 
 | Architecture | Low spacer frequency | Reference frequency | High spacer frequency |
 |---|---|---|---|
@@ -62,7 +62,17 @@ The level definitions (machine courses per unit length, spacer monofilament coun
 
 If a construction is unsupported by the installed equipment, mark it `NOT_MANUFACTURABLE`; do not silently substitute a different stitch or process.
 
-The 12 structures are an exploratory screening set, not a statistically complete characterization of every yarn, material, finish, thickness and process parameter. A follow-on response-surface or sequential design should vary the most influential factors after Stage 2.
+For A2 and A3 in the screening set, hold transition geometry at the reference setting (two-needle spacing in the symbolic fixture) across all three spacer-frequency levels. This prevents transition spacing and spacer frequency from being confounded.
+
+### Stage 2B — transition-geometry follow-up
+
+Only after the screen identifies viable square-wave families, compare one-, two- and three-needle transitions at the **same reference spacer frequency**:
+- A2-T-one/two/three: square-wave without the extra anchoring tuck;
+- A3-T-one/two/three: square-wave with the extra anchoring tuck.
+
+This adds six follow-up structures. The full proposal therefore contains 12 screen conditions and 6 conditional transition-refinement conditions (18 total candidate definitions). If the knitting machine cannot reliably make a geometry, mark it not-manufacturable rather than changing the recipe silently.
+
+The 12 screen structures are an exploratory screening set, not a statistically complete characterization of every yarn, material, finish, thickness and process parameter. A follow-on response-surface or sequential design should vary the most influential factors after the screening stage.
 
 ### Stage 3 — blocking, replication and holdout
 
