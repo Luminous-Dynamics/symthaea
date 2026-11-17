@@ -1,0 +1,20 @@
+[package]
+name = "subterra-inspection-evidence-gate"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Fail-closed evidence provenance and freshness admission for Subterra campaign options"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "synthetic_admission"
+path = "examples/synthetic_admission.rs"
+
+[dependencies]
+subterra-inspection-campaign = { path = "../subterra-inspection-campaign" }
+
+[workspace]
