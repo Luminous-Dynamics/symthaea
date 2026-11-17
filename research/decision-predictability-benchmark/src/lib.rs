@@ -38,7 +38,7 @@ impl fmt::Display for MetricError {
             Self::EmptyForecast => write!(formatter, "forecast series is empty"),
             Self::InvalidThreshold => {
                 write!(formatter, "forecast threshold must be finite and positive")
-            },
+            }
             Self::NonFiniteValue(name) => write!(formatter, "{name} must be finite"),
             Self::NegativeValue(name) => write!(formatter, "{name} must be non-negative"),
             Self::NonPositiveValue(name) => write!(formatter, "{name} must be positive"),
