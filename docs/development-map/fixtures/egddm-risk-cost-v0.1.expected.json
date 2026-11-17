@@ -9,6 +9,7 @@
     "within_budget_count": 12,
     "feasible_action_count": 2,
     "over_budget_count": 1,
+    "cost_estimate_undercoverage_events": 9,
     "comparison_group_count": 1
   },
   "traces": [
@@ -27,6 +28,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 1,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": false,
@@ -40,7 +42,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 400
+          "cost_bound_micros": 400,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
@@ -60,6 +64,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 2,
+      "cost_estimate_undercoverage_count": 1,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": false,
@@ -73,7 +78,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 400
+          "cost_bound_micros": 400,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true
         },
         {
           "option_id": "optical-secondary",
@@ -84,7 +91,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 450
+          "cost_bound_micros": 450,
+          "candidate_estimate_upper_micros": 500,
+          "estimate_undercovered": false
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
@@ -104,6 +113,7 @@
       "warm_cost_bound_micros": 120,
       "retry_cost_bound_micros": 0,
       "attempt_count": 2,
+      "cost_estimate_undercoverage_count": 1,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": true,
@@ -122,7 +132,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 720
+          "cost_bound_micros": 720,
+          "candidate_estimate_upper_micros": 650,
+          "estimate_undercovered": true
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
@@ -142,6 +154,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 2,
+      "cost_estimate_undercoverage_count": 1,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": true,
@@ -155,7 +168,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 1000
+          "cost_bound_micros": 1000,
+          "candidate_estimate_upper_micros": 950,
+          "estimate_undercovered": true
         },
         {
           "option_id": "runtime-check",
@@ -166,7 +181,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 700
+          "cost_bound_micros": 700,
+          "candidate_estimate_upper_micros": 700,
+          "estimate_undercovered": false
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
@@ -186,6 +203,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 0,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": false,
@@ -199,7 +217,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 140
+          "cost_bound_micros": 140,
+          "candidate_estimate_upper_micros": 150,
+          "estimate_undercovered": false
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
@@ -219,6 +239,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 0,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": false,
@@ -232,7 +253,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 140
+          "cost_bound_micros": 140,
+          "candidate_estimate_upper_micros": 150,
+          "estimate_undercovered": false
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
@@ -252,6 +275,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 1,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": false,
@@ -265,7 +289,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 350
+          "cost_bound_micros": 350,
+          "candidate_estimate_upper_micros": 300,
+          "estimate_undercovered": true
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
@@ -285,6 +311,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 0,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": false,
@@ -298,7 +325,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 100
+          "cost_bound_micros": 100,
+          "candidate_estimate_upper_micros": 100,
+          "estimate_undercovered": false
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
@@ -318,6 +347,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 1,
+      "cost_estimate_undercoverage_count": 1,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": false,
@@ -331,7 +361,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 400
+          "cost_bound_micros": 400,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
@@ -351,6 +383,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 0,
+      "cost_estimate_undercoverage_count": 0,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": false,
@@ -372,6 +405,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 0,
+      "cost_estimate_undercoverage_count": 0,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": false,
@@ -393,6 +427,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 0,
       "attempt_count": 3,
+      "cost_estimate_undercoverage_count": 2,
       "within_budget": false,
       "budget_micros": 1800,
       "feasible": false,
@@ -406,7 +441,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 400
+          "cost_bound_micros": 400,
+          "candidate_estimate_upper_micros": 350,
+          "estimate_undercovered": true
         },
         {
           "option_id": "software-test",
@@ -417,7 +454,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 1000
+          "cost_bound_micros": 1000,
+          "candidate_estimate_upper_micros": 950,
+          "estimate_undercovered": true
         },
         {
           "option_id": "runtime-check",
@@ -428,7 +467,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 700
+          "cost_bound_micros": 700,
+          "candidate_estimate_upper_micros": 700,
+          "estimate_undercovered": false
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
@@ -448,6 +489,7 @@
       "warm_cost_bound_micros": 0,
       "retry_cost_bound_micros": 150,
       "attempt_count": 2,
+      "cost_estimate_undercoverage_count": 1,
       "within_budget": true,
       "budget_micros": 1800,
       "feasible": false,
@@ -466,7 +508,9 @@
               "sample_count": 3
             }
           ],
-          "cost_bound_micros": 650
+          "cost_bound_micros": 650,
+          "candidate_estimate_upper_micros": 450,
+          "estimate_undercovered": true
         }
       ],
       "cost_interpretation": "sum_of_per_attempt_nearest_rank_p95_bounds_not_empirical_trajectory_p95"
