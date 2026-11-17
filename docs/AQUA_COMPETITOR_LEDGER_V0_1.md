@@ -187,7 +187,7 @@ For recirculating systems, independent microbiological and aerosol-exposure spec
 - Ren et al. (2026), opportunistic pathogens in shower systems, *Journal of Environmental Sciences*, DOI: https://doi.org/10.1016/j.jes.2026.02.034
 
 
-## 6. Exact comparator updates — current vendor documentation
+## 13. Exact comparator updates — current vendor documentation
 
 ### Hansgrohe South Africa: exact once-through shower system
 
