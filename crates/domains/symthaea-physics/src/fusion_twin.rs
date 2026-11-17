@@ -14,6 +14,11 @@ use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 
 use crate::plasma_hdc_encoder::{PlasmaReading, PlasmaSensorType};
+use crate::plasma_observability::{
+    BlockedChannel, DecisionChannelRequirement, DecisionInputGate, MeasuredDecisionInputs,
+    ObservationContractError, PlasmaObservationFrame,
+};
+use std::collections::BTreeMap;
 
 // ── FEP Action Thresholds (unified) ────────────────────────────────────────
 /// Free energy thresholds for PlasmaFepAction selection AND DisruptionRisk
@@ -379,6 +384,73 @@ pub struct FusionTwinOutput {
     pub prediction_similarities: Vec<(f32, f32)>,
 }
 
+/// Explicit mapping from a measured observation channel to one of the four
+/// sensor dimensions currently consumed by FusionHdcEncoder.
+///
+/// Units are fixed to the encoder's native conventions; arbitrary unit
+/// conversion is deliberately not inferred here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PlasmaSensorBinding {
+    pub channel_id: String,
+    pub sensor: PlasmaSensorType,
+}
+
+/// Why a measurement-gated fusion-twin step did not run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FusionTwinAbstentionReason {
+    ObservationGate(Vec<BlockedChannel>),
+    ReferenceNotInitialized,
+}
+
+/// Result of the evidence-gated entry point.
+///
+/// MeasuredInputsProcessed means the declared observations passed the evidence
+/// gate and were mapped into the existing research predictor. It does not
+/// establish physical observability, forecast calibration, or actuator
+/// authority. Abstained means no predictor state update was performed.
+#[derive(Debug)]
+pub enum FusionTwinEvidenceOutcome {
+    MeasuredInputsProcessed {
+        frame_id: String,
+        shot_id: String,
+        frame_time_ns: u64,
+        output: FusionTwinOutput,
+    },
+    Abstained {
+        frame_id: String,
+        reason: FusionTwinAbstentionReason,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FusionTwinStepError {
+    pub message: String,
+}
+
+impl FusionTwinStepError {
+    fn new(message: impl Into<String>) -> Self {
+        Self { message: message.into() }
+    }
+}
+
+impl std::fmt::Display for FusionTwinStepError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for FusionTwinStepError {}
+
+fn native_encoder_units(sensor: PlasmaSensorType) -> Option<&'static str> {
+    match sensor {
+        PlasmaSensorType::ElectronDensity => Some("10^20 m^-3"),
+        PlasmaSensorType::ElectronTemperature => Some("keV"),
+        PlasmaSensorType::RadiatedPower => Some("MW"),
+        PlasmaSensorType::SafetyFactor => Some("dimensionless"),
+        _ => None,
+    }
+}
+
 /// Fusion Digital Twin: closed-loop plasma control via HDC + CfC + FEP.
 ///
 /// Combines:
@@ -396,6 +468,8 @@ pub struct FusionDigitalTwin {
     predictor: PlasmaMultiScalePredictor,
     agent: PlasmaFepAgent,
     cycle_count: u64,
+    /// True only after the caller has explicitly supplied a non-empty finite reference shot.
+    reference_initialized: bool,
 }
 
 impl FusionDigitalTwin {
@@ -406,6 +480,7 @@ impl FusionDigitalTwin {
             predictor: PlasmaMultiScalePredictor::new(),
             agent: PlasmaFepAgent::new(),
             cycle_count: 0,
+            reference_initialized: false,
         }
     }
 
@@ -413,16 +488,144 @@ impl FusionDigitalTwin {
     pub fn set_reference_shot(&mut self, readings: &[PlasmaReading]) {
         let reference_hv = self.encoder.encode_window(readings);
         self.agent.set_reference(reference_hv);
+        self.reference_initialized = readings.iter().any(|reading| reading.value.is_finite());
     }
 
-    /// Run one prediction cycle on new sensor readings.
+    /// Legacy research path over caller-supplied raw readings.
     ///
-    /// Returns a `FusionTwinOutput` containing predictions at all plasma horizons,
-    /// the current disruption risk level, and a recommended action.
+    /// This method does not validate source provenance, calibration, freshness,
+    /// or direct-measurement status. It remains available for experiments and
+    /// backwards compatibility, but its output is not evidence-qualified and
+    /// does not authorize physical actuation.
+    ///
+    /// Prefer `step_with_measurement_evidence` when observations have a
+    /// `PlasmaObservationFrame` and decision-specific requirements.
     ///
     /// # Panics
     ///
     /// Panics if `dt_seconds` is not finite or is non-positive.
+    /// Run the predictor only after a frame passes the direct-measurement gate.
+    ///
+    /// The caller must provide one explicit channel-to-sensor binding per
+    /// required channel. Only the four sensor dimensions used by the current
+    /// fusion HDC encoder are accepted, with their native units:
+    /// density (10^20 m^-3), temperature (keV), radiated power (MW), and
+    /// safety factor (dimensionless).
+    ///
+    /// If the observation gate abstains, or no reference shot has been set,
+    /// the predictor state and cycle count are left unchanged. Even a
+    /// MeasuredInputsProcessed result is only an evidence-qualified input
+    /// projection into this research heuristic; it is not proof of physical
+    /// observability or a control authorization.
+    pub fn step_with_measurement_evidence(
+        &mut self,
+        frame: &PlasmaObservationFrame,
+        requirements: &[DecisionChannelRequirement],
+        sensor_bindings: &[PlasmaSensorBinding],
+        dt_seconds: f32,
+    ) -> Result<FusionTwinEvidenceOutcome, FusionTwinStepError> {
+        if !dt_seconds.is_finite() || dt_seconds <= 0.0 {
+            return Err(FusionTwinStepError::new(
+                "dt_seconds must be finite and positive",
+            ));
+        }
+
+        let gate = frame
+            .evaluate_decision_requirements(requirements)
+            .map_err(|error: ObservationContractError| FusionTwinStepError::new(error.message))?;
+        let inputs: MeasuredDecisionInputs = match gate {
+            DecisionInputGate::Abstain {
+                frame_id,
+                blocked_channels,
+            } => {
+                return Ok(FusionTwinEvidenceOutcome::Abstained {
+                    frame_id,
+                    reason: FusionTwinAbstentionReason::ObservationGate(blocked_channels),
+                });
+            }
+            DecisionInputGate::MeasuredInputsAvailable(inputs) => inputs,
+        };
+
+        if !self.reference_initialized {
+            return Ok(FusionTwinEvidenceOutcome::Abstained {
+                frame_id: inputs.frame_id().to_owned(),
+                reason: FusionTwinAbstentionReason::ReferenceNotInitialized,
+            });
+        }
+
+        let mut bindings_by_channel = BTreeMap::new();
+        for binding in sensor_bindings {
+            if binding.channel_id.trim().is_empty() {
+                return Err(FusionTwinStepError::new(
+                    "sensor binding channel_id must be non-empty",
+                ));
+            }
+            if native_encoder_units(binding.sensor).is_none() {
+                return Err(FusionTwinStepError::new(format!(
+                    "sensor {:?} is not supported by the current four-channel fusion encoder",
+                    binding.sensor
+                )));
+            }
+            if bindings_by_channel
+                .insert(binding.channel_id.as_str(), binding.sensor)
+                .is_some()
+            {
+                return Err(FusionTwinStepError::new(format!(
+                    "duplicate sensor binding for channel {}",
+                    binding.channel_id
+                )));
+            }
+        }
+
+        if bindings_by_channel.len() != inputs.values().len() {
+            return Err(FusionTwinStepError::new(
+                "sensor bindings must exactly cover the gate's required measured channels",
+            ));
+        }
+
+        let mut readings = Vec::with_capacity(inputs.values().len());
+        for measured in inputs.values() {
+            let sensor = bindings_by_channel
+                .get(measured.channel_id())
+                .copied()
+                .ok_or_else(|| {
+                    FusionTwinStepError::new(format!(
+                        "missing sensor binding for measured channel {}",
+                        measured.channel_id()
+                    ))
+                })?;
+            let expected_units = native_encoder_units(sensor).ok_or_else(|| {
+                FusionTwinStepError::new("unsupported sensor binding")
+            })?;
+            if measured.units() != expected_units {
+                return Err(FusionTwinStepError::new(format!(
+                    "channel {} has units '{}', but {:?} requires '{}'",
+                    measured.channel_id(),
+                    measured.units(),
+                    sensor,
+                    expected_units
+                )));
+            }
+            let timestamp_seconds = measured.observed_at_ns() as f64 / 1_000_000_000.0;
+            readings.push(PlasmaReading::new(
+                sensor,
+                measured.value(),
+                timestamp_seconds,
+            ));
+        }
+
+        let frame_id = inputs.frame_id().to_owned();
+        let shot_id = inputs.shot_id().to_owned();
+        let frame_time_ns = inputs.frame_time_ns();
+        let output = self.step(&readings, dt_seconds);
+        Ok(FusionTwinEvidenceOutcome::MeasuredInputsProcessed {
+            frame_id,
+            shot_id,
+            frame_time_ns,
+            output,
+        })
+    }
+
     pub fn step(&mut self, readings: &[PlasmaReading], dt_seconds: f32) -> FusionTwinOutput {
         assert!(
             dt_seconds.is_finite() && dt_seconds > 0.0,
