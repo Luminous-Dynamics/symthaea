@@ -31,7 +31,7 @@
   ],
   "properties": {
     "adjudication_status": {
-      "const": "synthetic_known_answer_run_level_cost_receipt_validation"
+      "const": "run_level_cost_receipt_validation"
     },
     "run_count": {
       "type": "integer",
