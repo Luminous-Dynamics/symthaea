@@ -1083,7 +1083,7 @@ mod tests {
         revision.policy_sha256 = [9; 32];
         ledger.append(revision).unwrap();
         let classification = ledger
-            .record_event_arrival(event(1, 1, 50, 20), 20)
+            .record_event_arrival(event(1, 1, 10, 20), 20)
             .unwrap();
 
         assert_eq!(
@@ -1501,7 +1501,7 @@ mod tests {
         );
         assert_eq!(
             ledger
-                .completeness(1, &[source(1)], 0, 100, 20)
+                .completeness(1, &[source(1)], 0, 100, 50)
                 .unwrap()
                 .verdict,
             CompletenessVerdict::Contested
