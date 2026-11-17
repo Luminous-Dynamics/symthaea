@@ -1,6 +1,5 @@
 use symmetry_active_experiment_reference::{
-    ActiveExperimentProblemV1, ExperimentProbeV1, QualificationBudgetV1,
-    compile_active_experiment,
+    ActiveExperimentProblemV1, ExperimentProbeV1, QualificationBudgetV1, compile_active_experiment,
 };
 
 fn main() {
