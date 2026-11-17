@@ -51,7 +51,7 @@ cargo run --manifest-path research/decision-predictability-benchmark/Cargo.toml 
 - Select the AR order only on the validation continuation; choose the lowest full-validation rollout NRMSE, with lower order winning exact ties.
 - Refit each test arm on the first 70% and forecast the final 30% once.
 - Report MAE, RMSE, NRMSE (RMSE divided by development-segment population standard deviation), and skill relative to persistence in fixed lead-time bins.
-- Preserve fit/forecast failures and constant channels as explicit status rows rather than silently dropping them.
+- Preserve fit/forecast failures and constant channels as explicit status rows rather than silently dropping them. Channels whose population standard deviation is no greater than 16 machine epsilons times their maximum absolute value are treated as numerically unresolved; no NRMSE is reported for those channels.
 
 **Claim boundary:** this is a within-trajectory, same-regime continuation diagnostic. It is not a held-out equation/parameter-family generalization test, it has one trajectory per generator, and it reports no confidence intervals because adjacent forecast leads are correlated. A chronological split prevents future-to-past leakage but does not create independent episodes. Do not treat this report as an SOTA comparison.
 
