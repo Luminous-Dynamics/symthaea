@@ -1,0 +1,20 @@
+[package]
+name = "subterra-corroboration-assurance"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Fail-closed corroboration admission against declared transitive common-cause dependencies"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "synthetic_corroboration"
+path = "examples/synthetic_corroboration.rs"
+
+[dependencies]
+subterra-inspection-evidence-gate = { path = "../subterra-inspection-evidence-gate" }
+
+[workspace]
