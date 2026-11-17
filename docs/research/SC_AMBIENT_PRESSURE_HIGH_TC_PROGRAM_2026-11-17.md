@@ -466,3 +466,8 @@ The next exact PR workflow run, ID 44106304742, reached the formatter step on he
 Corrective change applied in commit `e8995d52206f2c8caef7a4112ad30e15ee9243b8`: normalize the import and assertion formatting. The exact failure output is retained in [workflow run 44106304742](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44106304742).
 
 Afterward, the registry was expanded with STGI, and the exact-count assertions were advanced to 12 sources / 8 candidates / 8 catalogs. Code, registry and documentation have since received later commits. The current PR head must therefore be re-evaluated; no compile/test/clippy pass is claimed for that new head. The earlier two failed formatting runs remain in the evidence history rather than being overwritten.
+
+
+### Source identity contract refinement
+
+The first actual Rust test run showed that an arXiv-only source was rejected because the schema required DOI for every source. The schema now requires at least one stable publication identifier: DOI or arXiv ID. Negative controls accept the AutoSuperCon arXiv-only record and reject a source with neither identifier. This supports preprints without weakening provenance requirements.
