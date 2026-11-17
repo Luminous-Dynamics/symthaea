@@ -224,6 +224,7 @@
       "accepted",
       "rejected",
       "insufficient",
+      "awaiting_additional_evidence",
       "outcome_unknown",
       "reconciled_not_executed",
       "reconciled_executed_awaiting_inspection",
@@ -288,10 +289,6 @@
         "rework_review"
       ],
       [
-        "insufficient",
-        "outcome_unknown"
-      ],
-      [
         "outcome_unknown",
         "reconciled_not_executed"
       ],
@@ -304,8 +301,12 @@
         "physical_delta_observed"
       ],
       [
-        "reconciled_not_executed",
-        "preflight_accepted"
+        "insufficient",
+        "awaiting_additional_evidence"
+      ],
+      [
+        "awaiting_additional_evidence",
+        "independent_verification"
       ]
     ],
     "safety_invariants": [
@@ -316,7 +317,13 @@
       "unresolved_outcome_blocks_new_mutation_in_affected_scope",
       "retry_requires_new_attempt_id_and_current_preflight",
       "rework_requires_valid_authority",
-      "no_unknown_or_occluded_region_is_silently_marked_clear"
+      "no_unknown_or_occluded_region_is_silently_marked_clear",
+      "insufficient_verification_is_not_the_same_as_unknown_execution",
+      "reconciled_not_executed_is_terminal_for_its_attempt;_retry_creates_a_new_attempt_id"
+    ],
+    "attempt_terminal_states": [
+      "closed",
+      "reconciled_not_executed"
     ]
   },
   "robot_roles": [
