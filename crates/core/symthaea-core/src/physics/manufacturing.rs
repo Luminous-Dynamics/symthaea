@@ -360,7 +360,11 @@ pub struct ToleranceStackup {
     pub worst_case_mm: f64,
     /// Total tolerance (RSS)
     pub rss_mm: f64,
-    /// Is within specification?
+    /// Conservative acceptance flag: true only when the worst-case stack is within
+    /// the limit and every numeric input is finite and physically well-formed.
+    ///
+    /// RSS remains available for statistical analysis; by itself it is not a
+    /// worst-case guarantee and must not make a stack pass this field.
     pub within_spec: bool,
     /// Specification limit (mm)
     pub spec_limit_mm: f64,
@@ -398,7 +402,19 @@ impl ToleranceStackup {
             .sum::<f64>()
             .sqrt();
 
-        let within_spec = rss <= spec_limit_mm;
+        // Fail closed on invalid inputs. In particular, RSS may be smaller than
+        // the limit even when the worst-case stack exceeds it; that statistical
+        // estimate is not a conservative acceptance guarantee.
+        let inputs_valid = nominal_mm.is_finite()
+            && spec_limit_mm.is_finite()
+            && spec_limit_mm >= 0.0
+            && contributors.iter().all(|c| {
+                c.tolerance_mm.is_finite()
+                    && c.tolerance_mm >= 0.0
+                    && c.sensitivity.is_finite()
+            });
+        let within_spec =
+            inputs_valid && worst_case.is_finite() && worst_case <= spec_limit_mm;
 
         Self {
             feature: feature.to_string(),
@@ -912,6 +928,61 @@ mod tests {
         // RSS should be sqrt(0.1^2 + 0.1^2) ≈ 0.141
         assert!((stackup.rss_mm - 0.141).abs() < 0.01);
         assert!(stackup.within_spec);
+    }
+
+    #[test]
+    fn test_tolerance_stackup_rejects_rss_only_pass() {
+        // RSS ~= 0.99 mm would pass a 1.0 mm limit, but worst-case is 1.4 mm.
+        // Acceptance must remain conservative unless a qualified statistical
+        // tolerance policy explicitly governs the design.
+        let stackup = ToleranceStackup::calculate(
+            "Adversarial Stack",
+            10.0,
+            vec![
+                ToleranceContributor {
+                    component: "Part A".to_string(),
+                    tolerance_mm: 0.7,
+                    sensitivity: 1.0,
+                },
+                ToleranceContributor {
+                    component: "Part B".to_string(),
+                    tolerance_mm: 0.7,
+                    sensitivity: 1.0,
+                },
+            ],
+            1.0,
+        );
+
+        assert!(stackup.rss_mm < stackup.spec_limit_mm);
+        assert!(stackup.worst_case_mm > stackup.spec_limit_mm);
+        assert!(!stackup.within_spec);
+    }
+
+    #[test]
+    fn test_tolerance_stackup_rejects_invalid_numeric_inputs() {
+        let negative = ToleranceStackup::calculate(
+            "Negative Tolerance",
+            10.0,
+            vec![ToleranceContributor {
+                component: "Part A".to_string(),
+                tolerance_mm: -0.1,
+                sensitivity: 1.0,
+            }],
+            1.0,
+        );
+        assert!(!negative.within_spec);
+
+        let non_finite = ToleranceStackup::calculate(
+            "Non-finite Tolerance",
+            10.0,
+            vec![ToleranceContributor {
+                component: "Part A".to_string(),
+                tolerance_mm: f64::NAN,
+                sensitivity: 1.0,
+            }],
+            1.0,
+        );
+        assert!(!non_finite.within_spec);
     }
 
     #[test]
