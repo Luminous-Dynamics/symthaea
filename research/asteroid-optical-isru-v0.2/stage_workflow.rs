@@ -216,17 +216,46 @@ pub struct StageRuntime {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WorkflowEventKind {
-    StageStarted { stage_id: String },
-    ObservationRegistered { observation_id: String, stage_id: String },
-    ObservationQualified { observation_id: String },
-    ObservationRejected { observation_id: String, rejection_receipt_id: String },
-    StagePaused { stage_id: String, checkpoint_receipt_id: String },
-    StageMarkedResumable { stage_id: String, checkpoint_receipt_id: String },
-    StageResumed { stage_id: String, checkpoint_receipt_id: String },
-    StageCompleted { stage_id: String },
-    StageFailed { stage_id: String, failure_receipt_id: String },
-    ProductAccepted { assay_observation_id: String, independent_assay_receipt_id: String },
-    CampaignClosed { closeout_receipt_id: String },
+    StageStarted {
+        stage_id: String,
+    },
+    ObservationRegistered {
+        observation_id: String,
+        stage_id: String,
+    },
+    ObservationQualified {
+        observation_id: String,
+    },
+    ObservationRejected {
+        observation_id: String,
+        rejection_receipt_id: String,
+    },
+    StagePaused {
+        stage_id: String,
+        checkpoint_receipt_id: String,
+    },
+    StageMarkedResumable {
+        stage_id: String,
+        checkpoint_receipt_id: String,
+    },
+    StageResumed {
+        stage_id: String,
+        checkpoint_receipt_id: String,
+    },
+    StageCompleted {
+        stage_id: String,
+    },
+    StageFailed {
+        stage_id: String,
+        failure_receipt_id: String,
+    },
+    ProductAccepted {
+        assay_observation_id: String,
+        independent_assay_receipt_id: String,
+    },
+    CampaignClosed {
+        closeout_receipt_id: String,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -242,16 +271,32 @@ pub enum WorkflowError {
     EmptyStageGraph,
     DuplicateStage(String),
     SelfDependency(String),
-    DuplicatePrerequisite { stage_id: String, prerequisite_id: String },
-    MissingPrerequisite { stage_id: String, prerequisite_id: String },
+    DuplicatePrerequisite {
+        stage_id: String,
+        prerequisite_id: String,
+    },
+    MissingPrerequisite {
+        stage_id: String,
+        prerequisite_id: String,
+    },
     DependencyCycle,
     UnknownStage(String),
     UnknownObservation(String),
     DuplicateObservation(String),
     StageNotReady(String),
-    InvalidStageTransition { stage_id: String, status: StageStatus },
-    ExclusiveResourceBusy { resource: String, stage_id: String },
-    InvalidObservationKind { stage_id: String, expected: OutputKind, actual: OutputKind },
+    InvalidStageTransition {
+        stage_id: String,
+        status: StageStatus,
+    },
+    ExclusiveResourceBusy {
+        resource: String,
+        stage_id: String,
+    },
+    InvalidObservationKind {
+        stage_id: String,
+        expected: OutputKind,
+        actual: OutputKind,
+    },
     ObservationNotPending(String),
     ObservationNotQualified(String),
     MissingRequiredObservation(String),
@@ -295,12 +340,10 @@ impl CampaignWorkflow {
         lineage.validate()?;
         graph.validate()?;
 
-        if !graph
-            .stages
-            .iter()
-            .any(|stage| stage.required_for_product_acceptance
-                && stage.output_kind == OutputKind::IndependentProductAssay)
-        {
+        if !graph.stages.iter().any(|stage| {
+            stage.required_for_product_acceptance
+                && stage.output_kind == OutputKind::IndependentProductAssay
+        }) {
             return Err(WorkflowError::IndependentAssayRequired);
         }
 
@@ -451,7 +494,9 @@ impl CampaignWorkflow {
             return Err(WorkflowError::EmptyIdentity("observation_id"));
         }
         if self.observations.contains_key(observation_id) {
-            return Err(WorkflowError::DuplicateObservation(observation_id.to_string()));
+            return Err(WorkflowError::DuplicateObservation(
+                observation_id.to_string(),
+            ));
         }
         if observed_at_utc_s > recorded_at_utc_s {
             return Err(WorkflowError::ObservationTimeAfterReceipt(
@@ -468,7 +513,9 @@ impl CampaignWorkflow {
         }
 
         match self.runtime(stage_id)?.status {
-            StageStatus::Running | StageStatus::PartiallyObserved | StageStatus::Paused
+            StageStatus::Running
+            | StageStatus::PartiallyObserved
+            | StageStatus::Paused
             | StageStatus::Resumable => {}
             status => {
                 return Err(WorkflowError::InvalidStageTransition {
@@ -749,7 +796,9 @@ impl CampaignWorkflow {
             return Err(WorkflowError::MissingReceipt("failure_receipt_id"));
         }
         match self.runtime(stage_id)?.status {
-            StageStatus::Running | StageStatus::PartiallyObserved | StageStatus::Paused
+            StageStatus::Running
+            | StageStatus::PartiallyObserved
+            | StageStatus::Paused
             | StageStatus::Resumable => {}
             status => {
                 return Err(WorkflowError::InvalidStageTransition {
@@ -795,7 +844,10 @@ impl CampaignWorkflow {
             .ok_or_else(|| WorkflowError::UnknownObservation(assay_observation_id.to_string()))?;
         if assay.kind != OutputKind::IndependentProductAssay
             || assay.status != ObservationStatus::Qualified
-            || !self.graph.stage(&assay.stage_id)?.required_for_product_acceptance
+            || !self
+                .graph
+                .stage(&assay.stage_id)?
+                .required_for_product_acceptance
         {
             return Err(WorkflowError::IndependentAssayRequired);
         }
@@ -805,9 +857,16 @@ impl CampaignWorkflow {
             ));
         }
 
-        for stage in self.graph.stages.iter().filter(|stage| stage.required_for_product_acceptance) {
+        for stage in self
+            .graph
+            .stages
+            .iter()
+            .filter(|stage| stage.required_for_product_acceptance)
+        {
             if self.runtime(&stage.id)?.status != StageStatus::Completed {
-                return Err(WorkflowError::MissingRequiredAcceptanceStage(stage.id.clone()));
+                return Err(WorkflowError::MissingRequiredAcceptanceStage(
+                    stage.id.clone(),
+                ));
             }
         }
 
@@ -831,7 +890,12 @@ impl CampaignWorkflow {
         if !nonempty(closeout_receipt_id) {
             return Err(WorkflowError::MissingReceipt("closeout_receipt_id"));
         }
-        for stage in self.graph.stages.iter().filter(|stage| stage.required_for_campaign_close) {
+        for stage in self
+            .graph
+            .stages
+            .iter()
+            .filter(|stage| stage.required_for_campaign_close)
+        {
             if self.runtime(&stage.id)?.status != StageStatus::Completed {
                 return Err(WorkflowError::RequiredStageIncomplete(stage.id.clone()));
             }
@@ -844,7 +908,11 @@ impl CampaignWorkflow {
         }) {
             return Err(WorkflowError::ActiveStagesRemain);
         }
-        if self.observations.values().any(|observation| observation.status == ObservationStatus::Pending) {
+        if self
+            .observations
+            .values()
+            .any(|observation| observation.status == ObservationStatus::Pending)
+        {
             return Err(WorkflowError::PendingObservationsRemain(
                 "campaign".to_string(),
             ));
@@ -863,9 +931,7 @@ impl CampaignWorkflow {
             if event.sequence != index as u64 {
                 return Err(WorkflowError::EventTimeWentBackwards);
             }
-            if index > 0
-                && event.recorded_at_utc_s < self.events[index - 1].recorded_at_utc_s
-            {
+            if index > 0 && event.recorded_at_utc_s < self.events[index - 1].recorded_at_utc_s {
                 return Err(WorkflowError::EventTimeWentBackwards);
             }
         }
@@ -1162,9 +1228,7 @@ mod tests {
                 11,
             )
             .unwrap();
-        value
-            .pause_stage("baseline", "checkpoint-1", 12)
-            .unwrap();
+        value.pause_stage("baseline", "checkpoint-1", 12).unwrap();
         assert_eq!(value.status("baseline"), Ok(StageStatus::Paused));
         assert_eq!(
             value.confirm_resumable("baseline", "wrong-checkpoint", 13),
@@ -1201,15 +1265,12 @@ mod tests {
             .unwrap();
         value.pause_stage("baseline", "checkpoint", 12).unwrap();
         value
-            .qualify_observation(
-                "late-reading",
-                "calibration",
-                "qualification",
-                20,
-            )
+            .qualify_observation("late-reading", "calibration", "qualification", 20)
             .unwrap();
         assert_eq!(value.status("baseline"), Ok(StageStatus::Paused));
-        value.confirm_resumable("baseline", "checkpoint", 21).unwrap();
+        value
+            .confirm_resumable("baseline", "checkpoint", 21)
+            .unwrap();
         value
             .resume_stage("baseline", &lineage(), "checkpoint", 22)
             .unwrap();
@@ -1354,17 +1415,15 @@ mod tests {
     #[test]
     fn late_observation_is_rejected_after_campaign_close() {
         let mini_graph = StageGraph {
-            stages: vec![
-                StageSpec {
-                    id: "assay".to_string(),
-                    prerequisites: vec![],
-                    output_kind: OutputKind::IndependentProductAssay,
-                    requires_qualified_observation: false,
-                    required_for_product_acceptance: true,
-                    required_for_campaign_close: true,
-                    exclusive_resource: None,
-                },
-            ],
+            stages: vec![StageSpec {
+                id: "assay".to_string(),
+                prerequisites: vec![],
+                output_kind: OutputKind::IndependentProductAssay,
+                requires_qualified_observation: false,
+                required_for_product_acceptance: true,
+                required_for_campaign_close: true,
+                exclusive_resource: None,
+            }],
         };
         let mut value = CampaignWorkflow::new(lineage(), mini_graph).unwrap();
         value.start_stage("assay", 10).unwrap();
