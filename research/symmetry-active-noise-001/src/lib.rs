@@ -99,6 +99,8 @@ pub enum NoiseErrorV1 {
     },
     ReceiptMismatch,
     InvalidDeterministicInput,
+    InvalidInterval,
+    IntervalArithmeticOverflow,
 }
 
 impl fmt::Display for NoiseErrorV1 {
@@ -607,6 +609,430 @@ pub fn verify_persistent_noise_receipt(
     Ok(())
 }
 
+
+/// Closed interval with exact signed fixed-point endpoints.
+///
+/// The scale is supplied by the problem contract (for example, micrometres,
+/// microseconds, or millionths of a normalized quantity). No floating-point
+/// tolerance is hidden inside this type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FixedIntervalV1 {
+    pub lower: i128,
+    pub upper: i128,
+}
+
+impl FixedIntervalV1 {
+    pub fn new(lower: i128, upper: i128) -> Result<Self, NoiseErrorV1> {
+        if lower > upper {
+            return Err(NoiseErrorV1::InvalidInterval);
+        }
+        Ok(Self { lower, upper })
+    }
+
+    pub fn point(value: i128) -> Self {
+        Self { lower: value, upper: value }
+    }
+
+    pub fn intersection(self, other: Self) -> Option<Self> {
+        let lower = self.lower.max(other.lower);
+        let upper = self.upper.min(other.upper);
+        (lower <= upper).then_some(Self { lower, upper })
+    }
+
+    pub fn checked_subtract(self, value: i128) -> Result<Self, NoiseErrorV1> {
+        let lower = self
+            .lower
+            .checked_sub(value)
+            .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+        let upper = self
+            .upper
+            .checked_sub(value)
+            .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+        Self::new(lower, upper)
+    }
+}
+
+fn append_interval(target: &mut Vec<u8>, interval: FixedIntervalV1) {
+    target.extend_from_slice(&interval.lower.to_le_bytes());
+    target.extend_from_slice(&interval.upper.to_le_bytes());
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IntervalObservationV1 {
+    pub probe_id: String,
+    pub observed: FixedIntervalV1,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedIntervalProblemV1 {
+    pub problem_id: String,
+    pub hypothesis_ids: Vec<String>,
+    pub probes: Vec<NoiseProbeV1>,
+    /// [hypothesis][probe] -> closed interval of allowed exact outcomes.
+    pub predicted_intervals_by_hypothesis: Vec<Vec<FixedIntervalV1>>,
+}
+
+impl BoundedIntervalProblemV1 {
+    pub fn validate(&self) -> Result<(), NoiseErrorV1> {
+        validate_identifiers(&self.problem_id, &self.hypothesis_ids, &self.probes)?;
+        if self.predicted_intervals_by_hypothesis.len() != self.hypothesis_ids.len() {
+            return Err(NoiseErrorV1::BoundedHypothesisCountMismatch);
+        }
+        for (hypothesis_index, by_probe) in
+            self.predicted_intervals_by_hypothesis.iter().enumerate()
+        {
+            if by_probe.len() != self.probes.len() {
+                return Err(NoiseErrorV1::BoundedProbeCountMismatch {
+                    hypothesis_id: self.hypothesis_ids[hypothesis_index].clone(),
+                });
+            }
+            if by_probe.iter().any(|interval| interval.lower > interval.upper) {
+                return Err(NoiseErrorV1::InvalidInterval);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = b"luminous.symm_active_noise.bounded_intervals.v1\\0".to_vec();
+        append_string(&mut bytes, &self.problem_id);
+        bytes.extend_from_slice(&(self.hypothesis_ids.len() as u64).to_le_bytes());
+        for hypothesis_id in &self.hypothesis_ids {
+            append_string(&mut bytes, hypothesis_id);
+        }
+        bytes.extend_from_slice(&(self.probes.len() as u64).to_le_bytes());
+        for probe in &self.probes {
+            append_string(&mut bytes, &probe.probe_id);
+            bytes.extend_from_slice(&probe.cost.to_le_bytes());
+            bytes.push(u8::from(probe.admissible));
+        }
+        for by_probe in &self.predicted_intervals_by_hypothesis {
+            for interval in by_probe {
+                append_interval(&mut bytes, *interval);
+            }
+        }
+        bytes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IntervalSurvivorSnapshotV1 {
+    pub after_observation_count: usize,
+    pub active_hypothesis_ids: Vec<String>,
+    pub model_consistent: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BoundedIntervalReceiptV1 {
+    pub schema_version: u32,
+    pub problem_id: String,
+    pub problem_contract_bytes: Vec<u8>,
+    pub observation_contract_bytes: Vec<u8>,
+    pub snapshots: Vec<IntervalSurvivorSnapshotV1>,
+    pub final_active_hypothesis_ids: Vec<String>,
+}
+
+fn interval_observation_bytes(observations: &[IntervalObservationV1]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    bytes.extend_from_slice(&(observations.len() as u64).to_le_bytes());
+    for observation in observations {
+        append_string(&mut bytes, &observation.probe_id);
+        append_interval(&mut bytes, observation.observed);
+    }
+    bytes
+}
+
+fn bounded_interval_snapshot(
+    problem: &BoundedIntervalProblemV1,
+    observed_by_probe: &BTreeMap<usize, FixedIntervalV1>,
+    after_observation_count: usize,
+) -> IntervalSurvivorSnapshotV1 {
+    let mut active_hypothesis_ids = Vec::new();
+    for (hypothesis_index, hypothesis_id) in problem.hypothesis_ids.iter().enumerate() {
+        let compatible = observed_by_probe.iter().all(|(probe_index, observed)| {
+            problem.predicted_intervals_by_hypothesis[hypothesis_index][*probe_index]
+                .intersection(*observed)
+                .is_some()
+        });
+        if compatible {
+            active_hypothesis_ids.push(hypothesis_id.clone());
+        }
+    }
+    let model_consistent = !active_hypothesis_ids.is_empty();
+    IntervalSurvivorSnapshotV1 {
+        after_observation_count,
+        active_hypothesis_ids,
+        model_consistent,
+    }
+}
+
+/// Conservative bounded-interval replay. Every repeated observation for a
+/// probe intersects the same observed interval; it is not treated as a new
+/// independent draw. A hypothesis survives only when its predicted interval
+/// overlaps the accumulated observation interval for every measured probe.
+pub fn replay_bounded_intervals(
+    problem: &BoundedIntervalProblemV1,
+    observations: &[IntervalObservationV1],
+) -> Result<BoundedIntervalReceiptV1, NoiseErrorV1> {
+    problem.validate()?;
+    let mut observed_by_probe: BTreeMap<usize, FixedIntervalV1> = BTreeMap::new();
+    let mut snapshots = Vec::with_capacity(observations.len() + 1);
+    snapshots.push(bounded_interval_snapshot(problem, &observed_by_probe, 0));
+
+    for (observation_index, observation) in observations.iter().enumerate() {
+        if observation.observed.lower > observation.observed.upper {
+            return Err(NoiseErrorV1::InvalidInterval);
+        }
+        let probe_index = resolve_probe(&problem.probes, &observation.probe_id)?;
+        if let Some(existing) = observed_by_probe.get_mut(&probe_index) {
+            let Some(intersection) = existing.intersection(observation.observed) else {
+                // Empty accumulated observation interval is an explicit
+                // model/measurement contradiction, not an invalid record.
+                observed_by_probe.remove(&probe_index);
+                snapshots.push(IntervalSurvivorSnapshotV1 {
+                    after_observation_count: observation_index + 1,
+                    active_hypothesis_ids: Vec::new(),
+                    model_consistent: false,
+                });
+                // Keep a contradiction latch: no later observation can
+                // restore a previously empty intersection.
+                for remaining in observations.iter().skip(observation_index + 1) {
+                    if remaining.observed.lower > remaining.observed.upper {
+                        return Err(NoiseErrorV1::InvalidInterval);
+                    }
+                    resolve_probe(&problem.probes, &remaining.probe_id)?;
+                }
+                let final_active_hypothesis_ids = Vec::new();
+                return Ok(BoundedIntervalReceiptV1 {
+                    schema_version: 1,
+                    problem_id: problem.problem_id.clone(),
+                    problem_contract_bytes: problem.canonical_bytes(),
+                    observation_contract_bytes: interval_observation_bytes(observations),
+                    snapshots,
+                    final_active_hypothesis_ids,
+                });
+            };
+            *existing = intersection;
+        } else {
+            observed_by_probe.insert(probe_index, observation.observed);
+        }
+        snapshots.push(bounded_interval_snapshot(
+            problem,
+            &observed_by_probe,
+            observation_index + 1,
+        ));
+    }
+
+    let final_active_hypothesis_ids = snapshots
+        .last()
+        .map(|snapshot| snapshot.active_hypothesis_ids.clone())
+        .unwrap_or_default();
+    Ok(BoundedIntervalReceiptV1 {
+        schema_version: 1,
+        problem_id: problem.problem_id.clone(),
+        problem_contract_bytes: problem.canonical_bytes(),
+        observation_contract_bytes: interval_observation_bytes(observations),
+        snapshots,
+        final_active_hypothesis_ids,
+    })
+}
+
+pub fn verify_bounded_interval_receipt(
+    problem: &BoundedIntervalProblemV1,
+    observations: &[IntervalObservationV1],
+    receipt: &BoundedIntervalReceiptV1,
+) -> Result<(), NoiseErrorV1> {
+    if receipt.schema_version != 1
+        || receipt.problem_id != problem.problem_id
+        || receipt.problem_contract_bytes != problem.canonical_bytes()
+        || receipt.observation_contract_bytes != interval_observation_bytes(observations)
+    {
+        return Err(NoiseErrorV1::ReceiptMismatch);
+    }
+    let replayed = replay_bounded_intervals(problem, observations)?;
+    if *receipt != replayed {
+        return Err(NoiseErrorV1::ReceiptMismatch);
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedAdditiveBiasProblemV1 {
+    pub problem_id: String,
+    pub hypothesis_ids: Vec<String>,
+    pub probes: Vec<NoiseProbeV1>,
+    /// Nominal exact prediction [hypothesis][probe].
+    pub nominal_predictions_by_hypothesis: Vec<Vec<i128>>,
+    /// One bounded additive bias, shared across every probe in the campaign.
+    pub global_bias_interval: FixedIntervalV1,
+}
+
+impl SharedAdditiveBiasProblemV1 {
+    pub fn validate(&self) -> Result<(), NoiseErrorV1> {
+        validate_identifiers(&self.problem_id, &self.hypothesis_ids, &self.probes)?;
+        if self.global_bias_interval.lower > self.global_bias_interval.upper {
+            return Err(NoiseErrorV1::InvalidInterval);
+        }
+        if self.nominal_predictions_by_hypothesis.len() != self.hypothesis_ids.len() {
+            return Err(NoiseErrorV1::PersistentHypothesisCountMismatch);
+        }
+        for (hypothesis_index, by_probe) in
+            self.nominal_predictions_by_hypothesis.iter().enumerate()
+        {
+            if by_probe.len() != self.probes.len() {
+                return Err(NoiseErrorV1::PersistentProbeCountMismatch {
+                    hypothesis_id: self.hypothesis_ids[hypothesis_index].clone(),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        let mut bytes = b"luminous.symm_active_noise.shared_additive_bias.v1\\0".to_vec();
+        append_string(&mut bytes, &self.problem_id);
+        bytes.extend_from_slice(&(self.hypothesis_ids.len() as u64).to_le_bytes());
+        for hypothesis_id in &self.hypothesis_ids {
+            append_string(&mut bytes, hypothesis_id);
+        }
+        bytes.extend_from_slice(&(self.probes.len() as u64).to_le_bytes());
+        for probe in &self.probes {
+            append_string(&mut bytes, &probe.probe_id);
+            bytes.extend_from_slice(&probe.cost.to_le_bytes());
+            bytes.push(u8::from(probe.admissible));
+        }
+        append_interval(&mut bytes, self.global_bias_interval);
+        for by_probe in &self.nominal_predictions_by_hypothesis {
+            for prediction in by_probe {
+                bytes.extend_from_slice(&prediction.to_le_bytes());
+            }
+        }
+        bytes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedBiasHypothesisStateV1 {
+    pub hypothesis_id: String,
+    /// Set of global additive biases that explain all observations so far.
+    pub feasible_global_bias_interval: Option<FixedIntervalV1>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedBiasSnapshotV1 {
+    pub after_observation_count: usize,
+    pub hypotheses: Vec<SharedBiasHypothesisStateV1>,
+    pub active_hypothesis_ids: Vec<String>,
+    pub model_consistent: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedAdditiveBiasReceiptV1 {
+    pub schema_version: u32,
+    pub problem_id: String,
+    pub problem_contract_bytes: Vec<u8>,
+    pub observation_contract_bytes: Vec<u8>,
+    pub snapshots: Vec<SharedBiasSnapshotV1>,
+    pub final_active_hypothesis_ids: Vec<String>,
+}
+
+fn shared_bias_snapshot(
+    problem: &SharedAdditiveBiasProblemV1,
+    feasible_bias_by_hypothesis: &[Option<FixedIntervalV1>],
+    after_observation_count: usize,
+) -> SharedBiasSnapshotV1 {
+    let mut hypotheses = Vec::with_capacity(problem.hypothesis_ids.len());
+    let mut active_hypothesis_ids = Vec::new();
+    for (hypothesis_index, hypothesis_id) in problem.hypothesis_ids.iter().enumerate() {
+        let feasible_global_bias_interval = feasible_bias_by_hypothesis[hypothesis_index];
+        if feasible_global_bias_interval.is_some() {
+            active_hypothesis_ids.push(hypothesis_id.clone());
+        }
+        hypotheses.push(SharedBiasHypothesisStateV1 {
+            hypothesis_id: hypothesis_id.clone(),
+            feasible_global_bias_interval,
+        });
+    }
+    let model_consistent = !active_hypothesis_ids.is_empty();
+    SharedBiasSnapshotV1 {
+        after_observation_count,
+        hypotheses,
+        active_hypothesis_ids,
+        model_consistent,
+    }
+}
+
+/// Replay interval observations under one globally shared additive bias.
+/// For nominal prediction μ and observed interval [l,u], the compatible bias
+/// interval is [l-μ,u-μ]. Intersecting all probes forces one single bias value
+/// to explain the whole campaign. Arithmetic is checked and exact.
+pub fn replay_shared_additive_bias(
+    problem: &SharedAdditiveBiasProblemV1,
+    observations: &[IntervalObservationV1],
+) -> Result<SharedAdditiveBiasReceiptV1, NoiseErrorV1> {
+    problem.validate()?;
+    let mut feasible_bias_by_hypothesis =
+        vec![Some(problem.global_bias_interval); problem.hypothesis_ids.len()];
+    let mut snapshots = Vec::with_capacity(observations.len() + 1);
+    snapshots.push(shared_bias_snapshot(problem, &feasible_bias_by_hypothesis, 0));
+
+    for (observation_index, observation) in observations.iter().enumerate() {
+        if observation.observed.lower > observation.observed.upper {
+            return Err(NoiseErrorV1::InvalidInterval);
+        }
+        let probe_index = resolve_probe(&problem.probes, &observation.probe_id)?;
+        for (hypothesis_index, feasible_bias) in
+            feasible_bias_by_hypothesis.iter_mut().enumerate()
+        {
+            let Some(current) = *feasible_bias else {
+                continue;
+            };
+            let nominal = problem.nominal_predictions_by_hypothesis[hypothesis_index][probe_index];
+            let allowed_bias = observation
+                .observed
+                .checked_subtract(nominal)?;
+            *feasible_bias = current.intersection(allowed_bias);
+        }
+        snapshots.push(shared_bias_snapshot(
+            problem,
+            &feasible_bias_by_hypothesis,
+            observation_index + 1,
+        ));
+    }
+
+    let final_active_hypothesis_ids = snapshots
+        .last()
+        .map(|snapshot| snapshot.active_hypothesis_ids.clone())
+        .unwrap_or_default();
+    Ok(SharedAdditiveBiasReceiptV1 {
+        schema_version: 1,
+        problem_id: problem.problem_id.clone(),
+        problem_contract_bytes: problem.canonical_bytes(),
+        observation_contract_bytes: interval_observation_bytes(observations),
+        snapshots,
+        final_active_hypothesis_ids,
+    })
+}
+
+pub fn verify_shared_additive_bias_receipt(
+    problem: &SharedAdditiveBiasProblemV1,
+    observations: &[IntervalObservationV1],
+    receipt: &SharedAdditiveBiasReceiptV1,
+) -> Result<(), NoiseErrorV1> {
+    if receipt.schema_version != 1
+        || receipt.problem_id != problem.problem_id
+        || receipt.problem_contract_bytes != problem.canonical_bytes()
+        || receipt.observation_contract_bytes != interval_observation_bytes(observations)
+    {
+        return Err(NoiseErrorV1::ReceiptMismatch);
+    }
+    let replayed = replay_shared_additive_bias(problem, observations)?;
+    if *receipt != replayed {
+        return Err(NoiseErrorV1::ReceiptMismatch);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -873,6 +1299,189 @@ mod tests {
             Err(NoiseErrorV1::EmptyObservedOutcomeSet {
                 probe_id: "p-left".to_owned()
             })
+        );
+    }
+
+
+    #[test]
+    fn bounded_numeric_intervals_retain_overlapping_hypotheses_only() {
+        let problem = BoundedIntervalProblemV1 {
+            problem_id: "numeric-bounded-interval-v1".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+            probes: vec![
+                NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 1, admissible: true },
+                NoiseProbeV1 { probe_id: "p1".to_owned(), cost: 1, admissible: true },
+            ],
+            predicted_intervals_by_hypothesis: vec![
+                vec![
+                    FixedIntervalV1::new(0, 10).unwrap(),
+                    FixedIntervalV1::new(20, 30).unwrap(),
+                ],
+                vec![
+                    FixedIntervalV1::new(5, 15).unwrap(),
+                    FixedIntervalV1::new(5, 15).unwrap(),
+                ],
+            ],
+        };
+        let observations = vec![
+            IntervalObservationV1 {
+                probe_id: "p0".to_owned(),
+                observed: FixedIntervalV1::new(8, 9).unwrap(),
+            },
+            IntervalObservationV1 {
+                probe_id: "p1".to_owned(),
+                observed: FixedIntervalV1::new(24, 25).unwrap(),
+            },
+        ];
+        let receipt = replay_bounded_intervals(&problem, &observations).unwrap();
+        assert_eq!(receipt.final_active_hypothesis_ids, vec!["H-A"]);
+        verify_bounded_interval_receipt(&problem, &observations, &receipt).unwrap();
+    }
+
+    #[test]
+    fn repeated_numeric_observations_intersect_the_same_probe_interval() {
+        let problem = BoundedIntervalProblemV1 {
+            problem_id: "numeric-repeat-intersection-v1".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned()],
+            probes: vec![NoiseProbeV1 {
+                probe_id: "p0".to_owned(),
+                cost: 1,
+                admissible: true,
+            }],
+            predicted_intervals_by_hypothesis: vec![vec![FixedIntervalV1::new(0, 10).unwrap()]],
+        };
+        let observations = vec![
+            IntervalObservationV1 {
+                probe_id: "p0".to_owned(),
+                observed: FixedIntervalV1::new(2, 4).unwrap(),
+            },
+            IntervalObservationV1 {
+                probe_id: "p0".to_owned(),
+                observed: FixedIntervalV1::new(6, 7).unwrap(),
+            },
+        ];
+        let receipt = replay_bounded_intervals(&problem, &observations).unwrap();
+        assert_eq!(receipt.final_active_hypothesis_ids, Vec::<String>::new());
+        assert!(!receipt.snapshots[2].model_consistent);
+    }
+
+    #[test]
+    fn one_shared_additive_bias_must_explain_every_probe() {
+        let problem = SharedAdditiveBiasProblemV1 {
+            problem_id: "shared-numeric-bias-v1".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned(), "H-B".to_owned()],
+            probes: vec![
+                NoiseProbeV1 { probe_id: "p0".to_owned(), cost: 1, admissible: true },
+                NoiseProbeV1 { probe_id: "p1".to_owned(), cost: 1, admissible: true },
+            ],
+            nominal_predictions_by_hypothesis: vec![
+                vec![0, 0],
+                vec![0, 10],
+            ],
+            global_bias_interval: FixedIntervalV1::new(-5, 5).unwrap(),
+        };
+        let observations = vec![
+            IntervalObservationV1 {
+                probe_id: "p0".to_owned(),
+                observed: FixedIntervalV1::point(0),
+            },
+            IntervalObservationV1 {
+                probe_id: "p1".to_owned(),
+                observed: FixedIntervalV1::point(10),
+            },
+        ];
+        let receipt = replay_shared_additive_bias(&problem, &observations).unwrap();
+        assert_eq!(receipt.snapshots[1].active_hypothesis_ids, vec!["H-A", "H-B"]);
+        assert_eq!(receipt.final_active_hypothesis_ids, vec!["H-B"]);
+        assert_eq!(
+            receipt.snapshots[2].hypotheses[0].feasible_global_bias_interval,
+            None
+        );
+        assert_eq!(
+            receipt.snapshots[2].hypotheses[1].feasible_global_bias_interval,
+            Some(FixedIntervalV1::point(0))
+        );
+        verify_shared_additive_bias_receipt(&problem, &observations, &receipt).unwrap();
+    }
+
+    #[test]
+    fn shared_bias_repetition_does_not_allow_a_fresh_nuisance_value() {
+        let problem = SharedAdditiveBiasProblemV1 {
+            problem_id: "shared-bias-repeat-v1".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned()],
+            probes: vec![NoiseProbeV1 {
+                probe_id: "p0".to_owned(),
+                cost: 1,
+                admissible: true,
+            }],
+            nominal_predictions_by_hypothesis: vec![vec![0]],
+            global_bias_interval: FixedIntervalV1::new(-10, 10).unwrap(),
+        };
+        let observations = vec![
+            IntervalObservationV1 {
+                probe_id: "p0".to_owned(),
+                observed: FixedIntervalV1::point(1),
+            },
+            IntervalObservationV1 {
+                probe_id: "p0".to_owned(),
+                observed: FixedIntervalV1::point(2),
+            },
+        ];
+        let receipt = replay_shared_additive_bias(&problem, &observations).unwrap();
+        assert_eq!(receipt.snapshots[1].active_hypothesis_ids, vec!["H-A"]);
+        assert!(receipt.snapshots[2].active_hypothesis_ids.is_empty());
+    }
+
+    #[test]
+    fn interval_endpoints_reject_reversal_and_checked_bias_arithmetic_overflow() {
+        assert_eq!(
+            FixedIntervalV1::new(5, 4),
+            Err(NoiseErrorV1::InvalidInterval)
+        );
+        let problem = SharedAdditiveBiasProblemV1 {
+            problem_id: "interval-overflow-v1".to_owned(),
+            hypothesis_ids: vec!["H-A".to_owned()],
+            probes: vec![NoiseProbeV1 {
+                probe_id: "p0".to_owned(),
+                cost: 1,
+                admissible: true,
+            }],
+            nominal_predictions_by_hypothesis: vec![vec![1]],
+            global_bias_interval: FixedIntervalV1::new(i128::MIN, i128::MAX).unwrap(),
+        };
+        let observations = vec![IntervalObservationV1 {
+            probe_id: "p0".to_owned(),
+            observed: FixedIntervalV1::new(i128::MIN, i128::MIN).unwrap(),
+        }];
+        assert_eq!(
+            replay_shared_additive_bias(&problem, &observations),
+            Err(NoiseErrorV1::IntervalArithmeticOverflow)
+        );
+    }
+
+    #[test]
+    fn identical_observation_models_remain_ambiguous() {
+        let problem = BoundedIntervalProblemV1 {
+            problem_id: "observationally-equivalent-symmetries-v1".to_owned(),
+            hypothesis_ids: vec!["H-rotation".to_owned(), "H-reflection".to_owned()],
+            probes: vec![NoiseProbeV1 {
+                probe_id: "non-identifying-probe".to_owned(),
+                cost: 1,
+                admissible: true,
+            }],
+            predicted_intervals_by_hypothesis: vec![
+                vec![FixedIntervalV1::new(3, 7).unwrap()],
+                vec![FixedIntervalV1::new(3, 7).unwrap()],
+            ],
+        };
+        let observations = vec![IntervalObservationV1 {
+            probe_id: "non-identifying-probe".to_owned(),
+            observed: FixedIntervalV1::new(4, 6).unwrap(),
+        }];
+        let receipt = replay_bounded_intervals(&problem, &observations).unwrap();
+        assert_eq!(
+            receipt.final_active_hypothesis_ids,
+            vec!["H-rotation".to_owned(), "H-reflection".to_owned()]
         );
     }
 
