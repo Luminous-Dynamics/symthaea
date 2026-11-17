@@ -320,24 +320,28 @@ mod tests{
         let expected:Value=serde_json::from_str(EXPECTED).unwrap();assert_eq!(report(),expected);
     }
     #[test]fn unknown_reserve_blocks_action_that_closed_world_accepts(){
-        let t=trace(&report(),"no-evidence-deploy");
+        let r=report();
+        let t=trace(&r,"no-evidence-deploy");
         assert_eq!(t["closed_world_action_justified"],true);
         assert_eq!(t["open_world_action_justified"],false);
         assert_eq!(t["closed_world_risk_bps"],0);
         assert_eq!(t["open_world_risk_bps"],1000);
     }
     #[test]fn generic_sensor_that_can_be_fooled_does_not_clear_unknown_world(){
-        let t=trace(&report(),"mimic-signal-deploy");
+        let r=report();
+        let t=trace(&r,"mimic-signal-deploy");
         assert_eq!(t["closed_world_action_justified"],true);
         assert_eq!(t["open_world_action_justified"],false);
     }
     #[test]fn discriminating_measurement_can_resolve_unknown_reserve(){
-        let t=trace(&report(),"discriminating-test-deploy");
+        let r=report();
+        let t=trace(&r,"discriminating-test-deploy");
         assert!(t["open_world_risk_bps"].as_u64().unwrap()<=500);
         assert_eq!(t["open_world_action_justified"],true);
     }
     #[test]fn irreversible_gate_remains_blocked_by_nonzero_unknown_mass(){
-        let t=trace(&report(),"discriminating-test-release");
+        let r=report();
+        let t=trace(&r,"discriminating-test-release");
         assert_eq!(t["open_world_action_justified"],false);
         assert!(t["open_world_risk_bps"].as_u64().unwrap()>0);
     }
