@@ -19,7 +19,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "0.1.0"
+      "const": "0.2.0"
     },
     "benchmark_id": {
       "const": "SENSE-TACTILE-ASSURANCE-BENCH-001"
