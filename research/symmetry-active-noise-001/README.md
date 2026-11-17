@@ -6,10 +6,12 @@ First executable uncertainty-safe replay slice for [SYMM-ACTIVE-NOISE-001 #12667
 
 A hypothesis may be eliminated only when its complete declared outcome model cannot explain the observation record. Uncertainty can keep more hypotheses alive; it cannot create extra certainty.
 
-V0 implements two separate non-probabilistic regimes:
+V0 now has two categorical and two numeric, non-probabilistic observation models:
 
-1. **Bounded per-probe outcomes.** Each hypothesis/probe pair has a finite allowed-outcome set. An observation set retains the hypothesis when it overlaps the allowed set. Repeated observations of the same probe constrain one per-probe outcome through set intersection; they are not treated as independent resamples.
-2. **Campaign-persistent shared bias.** Each hypothesis predicts one outcome for every probe under each possible global error state. A hypothesis survives only if one and the same error-state index explains the entire observation history. The nuisance state cannot silently change between probes. This is a structured, correlated-noise subcase, not the full general persistent-noise ODT/ASRN model.
+1. **Bounded categorical outcomes.** Each hypothesis/probe pair has a finite allowed-outcome set. An observation set retains the hypothesis when it overlaps the allowed set. Repeated observations of the same probe constrain one per-probe outcome through set intersection; they are not treated as independent resamples.
+2. **Campaign-persistent categorical state.** Each hypothesis predicts one outcome for every probe under each possible global error state. A hypothesis survives only if one and the same error-state index explains the entire observation history. The nuisance state cannot silently change between probes. This is a structured, correlated-noise subcase, not the full general persistent-noise ODT/ASRN model.
+3. **Bounded fixed-point numeric intervals.** Closed signed-integer intervals are used with a required unit/scale identifier. A hypothesis survives only when its declared interval overlaps every observed interval. Repeated readings of a probe intersect the same evidence interval. Arithmetic overflow and reversed intervals fail closed.
+4. **Campaign-persistent additive numeric bias.** Each hypothesis has nominal predictions and one shared additive bias interval for the whole campaign. Every observation narrows the same feasible bias interval; it cannot use one offset per probe or a fresh offset per repeated reading.
 
 An empty surviving set is reported as model inconsistency, not as proof that no physical symmetry exists.
 
@@ -17,9 +19,11 @@ An empty surviving set is reported as model inconsistency, not as proof that no 
 
 A deterministic problem from the exact active-experiment crate can be lifted into singleton allowed-outcome sets. Its survivor set must match deterministic observation replay exactly. The bridge is tested on a frozen fixture.
 
-## Adversarial controls
+## Identifiability frontier and adversarial controls
 
-Tests cover overlapping bounded predictions, repeated same-probe observations, globally shared persistent error state, observations outside every model, unknown/inadmissible probes, malformed outcome tables, duplicate/empty observation sets, mutated model contracts and forged receipts.
+Before a policy is selected, pairwise reports determine whether the complete admissible probe family can separate each candidate pair. Bounded categorical pairs return disjoint-outcome probes or explicit ambiguity. Shared-persistent pairs return one cheapest probe witness per global state or an identical-signature collision. This is a full-family identifiability diagnostic, not a guarantee that one fixed probe separates every candidate.
+
+Tests cover overlapping categorical and numeric predictions, repeated same-probe intersections, globally shared categorical error states, one shared numeric bias, observations outside every model, unknown/inadmissible probes, malformed units and outcome tables, duplicate/empty observation sets, interval overflow, mutated model contracts, forged receipts, and observationally equivalent hypotheses.
 
 Receipts bind canonical bytes for the complete model and ordered observation history, every intermediate survivor set, and final compatibility. Canonical bytes are versioned but are not cryptographic digests or signatures.
 
@@ -41,7 +45,7 @@ The next comparison step is a faithful implementation/adapter for the JMLR noisy
 
 ## Claim boundary
 
-Finite discrete outcome sets only; no continuous numeric intervals, likelihoods, priors, posterior calibration, independent transient-noise repetitions, POMDP policy, physical actuation, safety authorization, causal inference, or symmetry proof. The receipt establishes model compatibility only.
+Exact finite categorical sets and bounded fixed-point numeric intervals only. No likelihoods, priors, posterior calibration, independent transient-noise repetitions, POMDP policy, physical actuation, safety authorization, causal inference, or proof of physical symmetry. The receipt establishes compatibility with the declared model only; it does not establish the correctness of that model or the physical system.
 
 
 ## Numeric interval extension
