@@ -1,0 +1,12 @@
+[package]
+name = "auv-hydrodynamic-reference"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Independent analytical references for AUV relative-flow hydrodynamics and energy boundaries"
+
+[workspace]
+
+[lints.rust]
+unsafe_code = "forbid"
