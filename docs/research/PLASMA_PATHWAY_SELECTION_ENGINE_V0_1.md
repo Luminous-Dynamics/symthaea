@@ -37,6 +37,7 @@ The 10,000-draw fixture is deliberately synthetic. It proves that the algorithm 
 - `false_feasible_rate` is not estimated by v0.1. It requires an independent labelled prospective validation set and explicit decision/acceptance outcomes.
 - Value-of-information measurement selection is not implemented yet.
 - Baselines (best-qualified-incumbent, fixed-weighted-sum, TOPSIS, NSGA-II/equivalent, random/space-filling and uncertainty-only selection) are not yet run head-to-head.
+- The Monte Carlo feasibility interval addresses finite-draw numerical uncertainty only; it does not cover uncertainty in the source data, triangular distribution choice, model discrepancy or unknown common-cause effects.
 - The prototype has no operating authority and cannot accept physical evidence as qualified merely because it parses.
 
 ## Next benchmark tranche
@@ -49,7 +50,7 @@ The 10,000-draw fixture is deliberately synthetic. It proves that the algorithm 
 
 ## Verification
 
-Nine authored Rust tests cover:
+Twelve authored Rust tests cover:
 - 10,000-paired-draw execution and Pareto/dominance output;
 - fixed-seed determinism;
 - abstention for the current unmatched source groups;
@@ -58,6 +59,8 @@ Nine authored Rust tests cover:
 - non-compensatory product-quality constraints;
 - mandatory no-credit policy;
 - mismatched functional units;
-- minimum draw count.
+- minimum draw count;
+- Wilson lower-bound behavior at zero/all-success and at the 99% feasibility threshold;
+- exposure of point estimate and 95% lower confidence bound in every route report.
 
 All tests run in the isolated Rust 1.96 workflow. The synthetic fixture is a software test only; it is not a physical process benchmark.
