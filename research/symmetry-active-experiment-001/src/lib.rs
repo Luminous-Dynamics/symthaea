@@ -223,11 +223,13 @@ fn partition_mask(
 ) -> BTreeMap<u32, u64> {
     let probe = &problem.probes[probe_index];
     let mut partitions = BTreeMap::<u32, u64>::new();
-    for (hypothesis_index, outcome) in probe.outcomes.iter().enumerate() {
+    let mut remaining_mask = hypotheses_mask;
+    while remaining_mask != 0 {
+        let hypothesis_index = remaining_mask.trailing_zeros() as usize;
         let bit = 1_u64 << hypothesis_index;
-        if hypotheses_mask & bit != 0 {
-            *partitions.entry(*outcome).or_insert(0) |= bit;
-        }
+        remaining_mask &= remaining_mask - 1;
+        let outcome = probe.outcomes[hypothesis_index];
+        *partitions.entry(outcome).or_insert(0) |= bit;
     }
     partitions
 }
