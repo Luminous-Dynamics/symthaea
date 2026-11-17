@@ -484,7 +484,13 @@ impl FusionDigitalTwin {
         }
     }
 
-    /// Set the reference healthy-plasma state from a known-good shot.
+    /// Set the reference state from a caller-designated reference shot.
+    ///
+    /// The evidence-gated path becomes eligible only if the reference contains
+    /// finite readings for all four sensor dimensions used by the current
+    /// fusion encoder. This method does not authenticate the shot, verify its
+    /// calibration, or establish that it is physically healthy; those remain
+    /// caller-supplied preconditions. It never authorizes actuator use.
     pub fn set_reference_shot(&mut self, readings: &[PlasmaReading]) {
         let reference_hv = self.encoder.encode_window(readings);
         self.agent.set_reference(reference_hv);
@@ -869,6 +875,29 @@ mod tests {
             FusionTwinEvidenceOutcome::MeasuredInputsProcessed { .. }
         ));
         assert_eq!(twin.cycle_count(), 1);
+    }
+
+    #[test]
+    fn evidence_gated_step_abstains_after_incomplete_reference_shot() {
+        let (frame, requirements, bindings) = evidence_test_fixture();
+        let mut twin = FusionDigitalTwin::new();
+        twin.set_reference_shot(&[PlasmaReading::new(
+            PlasmaSensorType::ElectronDensity,
+            0.8,
+            1.0,
+        )]);
+
+        let outcome = twin
+            .step_with_measurement_evidence(&frame, &requirements, &bindings, 0.001)
+            .expect("incomplete reference should cause explicit abstention");
+        assert!(matches!(
+            outcome,
+            FusionTwinEvidenceOutcome::Abstained {
+                reason: FusionTwinAbstentionReason::ReferenceNotInitialized,
+                ..
+            }
+        ));
+        assert_eq!(twin.cycle_count(), 0);
     }
 
     #[test]
