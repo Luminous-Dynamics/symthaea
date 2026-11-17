@@ -22,7 +22,7 @@ use crate::types::{FlightConfig, QuadrotorCommand};
 /// 3. `output_weights @ output + output_bias` → 4D raw
 /// 4. Activations: sigmoid for thrust, tanh for moments
 /// Clone is deliberate: it's the trainer→bridge transfer path. A trained
-/// controller (BPTT touches the network, so an output-layer snapshot alone
+/// controller (local HDC-LTC updates touch the network, so an output-layer snapshot alone
 /// would NOT capture training) is cloned/moved into
 /// `FlightEmbodiment::with_controller` instead of being dropped at the end
 /// of `FlightTrainer::train`.
@@ -128,10 +128,10 @@ impl FlightController {
         }
     }
 
-    /// Train the output projection and network weights via full BPTT.
+    /// Train the output projection and apply one-step local HDC-LTC target updates.
     ///
     /// Uses `target` as the ground-truth command (from PD baseline).
-    /// Backpropagates through the output projection, then through ALL network layers.
+    /// Uses approximate layer-wise target propagation and one-step local HDC-LTC gradients.
     pub fn train_step(
         &mut self,
         sensor_hv: &ContinuousHV,
@@ -196,25 +196,8 @@ impl FlightController {
             *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
         }
 
-        // Weight decay: pull output weights toward zero to prevent unbounded drift.
-        const WEIGHT_DECAY: f32 = 1e-4;
-        let decay = 1.0 - WEIGHT_DECAY;
-        for w in self.output_weights.iter_mut() {
-            *w *= decay;
-        }
-
-        // Update output weights: dW[i][j] = -output_lr * d_raw[i] * hv[j]
-        // output_lr = lr * √D compensates for gradient dilution across 16,384 weights.
-        for i in 0..4 {
-            let row_offset = i * HDC_DIMENSION;
-            for j in 0..HDC_DIMENSION {
-                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
-            }
-            self.output_bias[i] -= output_lr * d_raw[i];
-        }
-
-        // Backprop through network: compute gradient HV in output space
-        // dL/d(hv) = sum_i (d_raw[i] * W[i])
+        // Build the upstream HDC target direction from the output-head weights
+        // that generated this prediction, before mutating those weights.
         let dim = HDC_DIMENSION;
         let mut grad_hv_values = vec![0.0f32; dim];
         for i in 0..4 {
@@ -224,7 +207,22 @@ impl FlightController {
             }
         }
 
-        // Full BPTT: iterate from last layer backward through all layers
+        // Weight decay and output-head update.
+        const WEIGHT_DECAY: f32 = 1e-4;
+        let decay = 1.0 - WEIGHT_DECAY;
+        for w in self.output_weights.iter_mut() {
+            *w *= decay;
+        }
+
+        for i in 0..4 {
+            let row_offset = i * HDC_DIMENSION;
+            for j in 0..HDC_DIMENSION {
+                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
+            }
+            self.output_bias[i] -= output_lr * d_raw[i];
+        }
+
+        // One-step local updates with approximate inter-layer target propagation.
         let n_layers = self.network.n_layers();
         let mut target_hv = output_hv.add(&ContinuousHV::from_vec(grad_hv_values).scale(-1.0));
 
@@ -264,7 +262,7 @@ impl FlightController {
 
     /// Train ONLY the output projection weights (no network BPTT).
     ///
-    /// Used for ablation studies comparing full BPTT vs output-layer-only training.
+    /// Used for ablation studies comparing local HDC-LTC updates vs output-layer-only training.
     pub fn train_output_only(&mut self, target: &QuadrotorCommand, lr_override: Option<f32>) {
         let lr = lr_override.unwrap_or(self.learning_rate);
         let output_lr = lr * (HDC_DIMENSION as f32).sqrt();

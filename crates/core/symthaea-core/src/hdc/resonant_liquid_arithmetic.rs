@@ -179,6 +179,7 @@ impl Default for ResonantConfig {
                 max_iterations: 50,
                 noise_scale: 0.005,
                 energy_threshold: 0.05,
+                initialization_seed: 0x524C_4101,
             },
             cleanup_interval: 5,
             strategy_threshold: 0.6,

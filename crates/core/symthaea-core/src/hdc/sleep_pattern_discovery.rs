@@ -432,6 +432,9 @@ impl PatternDiscoveryEngine {
             max_iterations: self.config.resonator_iterations,
             noise_scale: 0.01 * (1.0 - sleep_intensity), // Less noise during deep sleep
             energy_threshold: 0.05,
+            initialization_seed: 0x534C_4550
+                ^ vectors.len() as u64
+                ^ (sleep_intensity.to_bits() as u64),
         };
 
         let mut resonator = match ResonatorNetwork::with_config(dim, resonator_config) {

@@ -4,9 +4,9 @@
 /*!
 Phase 12: Resonator Networks for Algebraic Problem-Solving
 
-Revolutionary HDC-based constraint satisfaction through coupled oscillators.
-Instead of gradient descent, we find solutions via resonance - like tuning
-a radio to find the right frequency!
+HDC-based heuristic constraint satisfaction through coupled resonators.
+The current implementation uses continuous Hadamard correlations as update
+signals; its fixed points must be evaluated for correctness, not just stability.
 
 ## The Paradigm Shift
 
@@ -16,15 +16,18 @@ Traditional approaches:
 3. **HDC Retrieval**: Find similar patterns (no algebraic solving)
 
 Resonator Networks:
-- **Coupled oscillators** that "resonate" to constraint solutions
-- **O(log N)** convergence for many constraint satisfaction problems
-- **Energy-based**: Solutions are low-energy stable states
-- **Holographic**: Exploits HDC's algebraic properties (bind = multiply)
+- **Coupled iterative states** that search for stable constraint estimates
+- **Convergence is measured**, not assumed to imply correctness
+- **Energy-based diagnostics** for residual constraint consistency
+- **Algebra-aware**: current continuous-Hadamard updates are approximate; exact
+  inverse contracts require bipolar MAP or unitary HRR roles
+- **Replayable runs** with seeded initialization and exploration noise
 
 ## Core Insight
 
 Given constraint: A ⊛ X ≈ C (where ⊛ is HDC bind)
-Solution: X = A⁻¹ ⊛ C (HDC unbind)
+Solution: X = A⁻¹ ⊛ C (algebra-specific inverse; not plain multiplication
+for arbitrary continuous vectors)
 
 But what if we have multiple constraints? What if we don't know which
 factors to unbind? Resonator networks find the solution through iteration:
@@ -33,7 +36,8 @@ factors to unbind? Resonator networks find the solution through iteration:
 X(t+1) = normalize(cleanup(A⁻¹ ⊛ C + prior(X(t))))
 ```
 
-The system resonates to a fixed point that satisfies all constraints!
+The system may settle at a fixed point; convergence and correctness are
+separate outcomes and must be measured independently.
 
 ## Applications
 
@@ -50,7 +54,7 @@ The system resonates to a fixed point that satisfies all constraints!
 */
 
 use anyhow::Result;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Resonator network for HDC constraint satisfaction
 ///
@@ -212,6 +216,45 @@ pub struct ResonatorConfig {
     pub noise_scale: f32,
     /// Energy threshold for solution acceptance
     pub energy_threshold: f32,
+    /// Seed for reproducible initialization and exploration noise.
+    pub initialization_seed: u64,
+}
+
+#[derive(Debug, Clone)]
+struct ResonatorRng {
+    state: u64,
+}
+
+impl ResonatorRng {
+    fn new(seed: u64) -> Self {
+        Self {
+            state: if seed == 0 { 0x9E37_79B9_7F4A_7C15 } else { seed },
+        }
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        // xorshift64*: deterministic and sufficient for initialization/noise,
+        // not intended for cryptographic use.
+        let mut value = self.state;
+        value ^= value >> 12;
+        value ^= value << 25;
+        value ^= value >> 27;
+        self.state = value;
+        value.wrapping_mul(0x2545_F491_4F6C_DD1D)
+    }
+
+    fn unit_f32(&mut self) -> f32 {
+        let mantissa = (self.next_u64() >> 40) as u32;
+        mantissa as f32 * (1.0 / 16_777_216.0)
+    }
+
+    fn signed_f32(&mut self) -> f32 {
+        self.unit_f32().mul_add(2.0, -1.0)
+    }
+
+    fn vector(&mut self, dimension: usize) -> Vec<f32> {
+        (0..dimension).map(|_| self.signed_f32()).collect()
+    }
 }
 
 impl Default for ResonatorConfig {
@@ -224,8 +267,20 @@ impl Default for ResonatorConfig {
             max_iterations: 100,
             noise_scale: 0.01,
             energy_threshold: 0.1,
+            initialization_seed: 0x5253_4E54_524E_0001,
         }
     }
+}
+
+/// Terminal outcome when a solver is evaluated against a known target.
+///
+/// Convergence only means the dynamics stopped changing; it does not imply
+/// that the fixed point is the correct factor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ResonatorOutcome {
+    CorrectConvergence,
+    SpuriousConvergence,
+    NonConvergence,
 }
 
 /// Result of resonator solving
@@ -247,23 +302,74 @@ pub struct ResonatorSolution {
     pub confidence: f32,
 }
 
+impl ResonatorSolution {
+    /// Classify a converged solution against known ground truth.
+    ///
+    /// Returns both the terminal outcome and cosine similarity so benchmarks
+    /// can report convergence separately from actual recovery accuracy.
+    pub fn classify_against(
+        &self,
+        expected: &[f32],
+        min_similarity: f32,
+    ) -> Result<(ResonatorOutcome, f32)> {
+        if expected.len() != self.vector.len() {
+            anyhow::bail!(
+                "Expected vector dimension {} does not match solution dimension {}",
+                expected.len(),
+                self.vector.len()
+            );
+        }
+        if !min_similarity.is_finite() || !(-1.0..=1.0).contains(&min_similarity) {
+            anyhow::bail!("min_similarity must be finite and in [-1, 1]");
+        }
+        if expected.iter().any(|value| !value.is_finite()) {
+            anyhow::bail!("Expected vector contains non-finite values");
+        }
+
+        let similarity = cosine_similarity(&self.vector, expected);
+        let outcome = if !self.converged {
+            ResonatorOutcome::NonConvergence
+        } else if similarity >= min_similarity {
+            ResonatorOutcome::CorrectConvergence
+        } else {
+            ResonatorOutcome::SpuriousConvergence
+        };
+        Ok((outcome, similarity))
+    }
+}
+
 impl ResonatorNetwork {
     /// Create new resonator network with given dimensionality
     pub fn new(dimension: usize) -> Result<Self> {
-        Ok(Self {
-            dimension,
-            codebook: Vec::new(),
-            symbol_names: HashMap::new(),
-            states: Vec::new(),
-            coupling_strengths: Vec::new(),
-            iteration_count: 0,
-            config: ResonatorConfig::default(),
-            energy_history: Vec::new(),
-        })
+        Self::with_config(dimension, ResonatorConfig::default())
     }
 
-    /// Create with custom configuration
+    /// Create with custom configuration after validating dimensions and dynamics.
     pub fn with_config(dimension: usize, config: ResonatorConfig) -> Result<Self> {
+        if dimension == 0 {
+            anyhow::bail!("Resonator dimension must be non-zero");
+        }
+        if !config.step_size.is_finite() || !(0.0..=1.0).contains(&config.step_size) {
+            anyhow::bail!("Resonator step_size must be finite and in [0, 1]");
+        }
+        if !config.momentum.is_finite() || !(0.0..1.0).contains(&config.momentum) {
+            anyhow::bail!("Resonator momentum must be finite and in [0, 1)");
+        }
+        if !config.temperature.is_finite() || config.temperature <= 0.0 {
+            anyhow::bail!("Resonator temperature must be finite and positive");
+        }
+        if !config.convergence_threshold.is_finite()
+            || !(-1.0..=1.0).contains(&config.convergence_threshold)
+        {
+            anyhow::bail!("Resonator convergence threshold must be in [-1, 1]");
+        }
+        if !config.noise_scale.is_finite() || config.noise_scale < 0.0 {
+            anyhow::bail!("Resonator noise_scale must be finite and non-negative");
+        }
+        if !config.energy_threshold.is_finite() || config.energy_threshold < 0.0 {
+            anyhow::bail!("Resonator energy_threshold must be finite and non-negative");
+        }
+
         Ok(Self {
             dimension,
             codebook: Vec::new(),
@@ -280,7 +386,7 @@ impl ResonatorNetwork {
     ///
     /// Symbols serve as attractors - solutions are "cleaned up" to
     /// the nearest codebook entry.
-    pub fn add_symbol(&mut self, name: &str, vector: Vec<f32>) -> Result<()> {
+    pub fn add_symbol(&mut self, name: &str, mut vector: Vec<f32>) -> Result<()> {
         if vector.len() != self.dimension {
             anyhow::bail!(
                 "Symbol dimension {} doesn't match network dimension {}",
@@ -288,6 +394,20 @@ impl ResonatorNetwork {
                 self.dimension
             );
         }
+        if name.trim().is_empty() {
+            anyhow::bail!("Symbol name must not be empty");
+        }
+        if self.symbol_names.contains_key(name) {
+            anyhow::bail!("Symbol name already exists in codebook: {name}");
+        }
+        if vector.iter().any(|value| !value.is_finite()) {
+            anyhow::bail!("Symbol vector contains non-finite values");
+        }
+        let norm = vector.iter().map(|value| value * value).sum::<f32>().sqrt();
+        if norm <= 1e-10 {
+            anyhow::bail!("Symbol vector must have non-zero norm");
+        }
+        normalize(&mut vector);
 
         let idx = self.codebook.len();
         self.codebook.push(SymbolEntry {
@@ -325,13 +445,29 @@ impl ResonatorNetwork {
         constraints: &[Constraint],
         max_iter: Option<usize>,
     ) -> Result<ResonatorSolution> {
+        if constraints.is_empty() {
+            anyhow::bail!("Resonator solve requires at least one constraint");
+        }
+        for constraint in constraints {
+            if constraint.left.len() != self.dimension || constraint.right.len() != self.dimension {
+                anyhow::bail!("Resonator constraint dimensions must match network dimension");
+            }
+            if constraint.left.iter().chain(constraint.right.iter()).any(|value| !value.is_finite()) {
+                anyhow::bail!("Resonator constraint contains non-finite values");
+            }
+            if !constraint.weight.is_finite() || constraint.weight <= 0.0 {
+                anyhow::bail!("Resonator constraint weight must be finite and positive");
+            }
+        }
+
         let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
         self.energy_history.clear();
 
-        // Initialize estimate randomly
-        let mut estimate: Vec<f32> = (0..self.dimension)
-            .map(|_| rand::random::<f32>() * 2.0 - 1.0)
-            .collect();
+        // Deterministic, replayable initialization. The accumulated iteration
+        // count gives successive solve calls distinct but reproducible streams.
+        let seed = self.config.initialization_seed ^ self.iteration_count as u64;
+        let mut rng = ResonatorRng::new(seed);
+        let mut estimate = rng.vector(self.dimension);
         normalize(&mut estimate);
 
         let mut previous = estimate.clone();
@@ -385,7 +521,7 @@ impl ResonatorNetwork {
             // Add noise for exploration
             if self.config.noise_scale > 0.0 {
                 for i in 0..self.dimension {
-                    velocity[i] += self.config.noise_scale * (rand::random::<f32>() * 2.0 - 1.0);
+                    velocity[i] += self.config.noise_scale * rng.signed_f32();
                 }
             }
 
@@ -433,7 +569,7 @@ impl ResonatorNetwork {
             }
         }
 
-        // Did not converge within max iterations
+        // Did not converge within max iterations.
         Ok(self.create_solution(estimate, max_iterations, false))
     }
 
@@ -451,18 +587,81 @@ impl ResonatorNetwork {
         constraints: &[MultiConstraint],
         max_iter: Option<usize>,
     ) -> Result<HashMap<String, ResonatorSolution>> {
-        let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
+        if unknowns.is_empty() {
+            anyhow::bail!("Resonator system requires at least one unknown");
+        }
+        if constraints.is_empty() {
+            anyhow::bail!("Resonator system requires at least one constraint");
+        }
 
-        // Initialize estimates for all unknowns
-        let mut estimates: HashMap<String, Vec<f32>> = unknowns
-            .iter()
-            .map(|&name| {
-                let v: Vec<f32> = (0..self.dimension)
-                    .map(|_| rand::random::<f32>() * 2.0 - 1.0)
-                    .collect();
-                (name.to_string(), v)
-            })
-            .collect();
+        let unknown_names: HashSet<&str> = unknowns.iter().copied().collect();
+        if unknown_names.len() != unknowns.len() {
+            anyhow::bail!("Resonator system contains duplicate unknown names");
+        }
+        if unknowns.iter().any(|name| name.trim().is_empty()) {
+            anyhow::bail!("Resonator unknown names must not be empty");
+        }
+
+        let validate_factor = |factor: &Factor| -> Result<()> {
+            match factor {
+                Factor::Known(vector) => {
+                    if vector.len() != self.dimension {
+                        anyhow::bail!("Known factor dimension does not match resonator dimension");
+                    }
+                    if vector.iter().any(|value| !value.is_finite()) {
+                        anyhow::bail!("Known factor contains non-finite values");
+                    }
+                }
+                Factor::Symbol(name) => {
+                    if !self.symbol_names.contains_key(name) {
+                        anyhow::bail!("Unknown symbol in resonator constraint: {name}");
+                    }
+                }
+                Factor::Unknown(name) => {
+                    if !unknown_names.contains(name.as_str()) {
+                        anyhow::bail!("Constraint references undeclared unknown: {name}");
+                    }
+                }
+            }
+            Ok(())
+        };
+
+        let mut constrained_unknowns = HashSet::new();
+        for constraint in constraints {
+            if !constraint.weight.is_finite() || constraint.weight <= 0.0 {
+                anyhow::bail!("Resonator system constraint weights must be finite and positive");
+            }
+            validate_factor(&constraint.left)?;
+            validate_factor(&constraint.right)?;
+            match &constraint.unknown {
+                Factor::Unknown(name) if unknown_names.contains(name.as_str()) => {
+                    constrained_unknowns.insert(name.as_str());
+                }
+                Factor::Unknown(name) => {
+                    anyhow::bail!("Constraint solves undeclared unknown: {name}");
+                }
+                _ => anyhow::bail!("Each multi-constraint must identify an unknown to update"),
+            }
+        }
+        for name in unknowns {
+            if !constrained_unknowns.contains(name) {
+                anyhow::bail!("Unknown has no solving constraint: {name}");
+            }
+        }
+
+        let max_iterations = max_iter.unwrap_or(self.config.max_iterations);
+        self.energy_history.clear();
+
+        // Deterministic initialization: same seed, call order and inputs produce
+        // identical initial states and terminal status.
+        let seed = self.config.initialization_seed ^ self.iteration_count as u64;
+        let mut rng = ResonatorRng::new(seed);
+        let mut estimates: HashMap<String, Vec<f32>> = HashMap::with_capacity(unknowns.len());
+        for &name in unknowns {
+            let mut estimate = rng.vector(self.dimension);
+            normalize(&mut estimate);
+            estimates.insert(name.to_string(), estimate);
+        }
 
         // Initialize resonator states for introspection
         self.states = unknowns
@@ -491,7 +690,11 @@ impl ResonatorNetwork {
             .map(|&name| (name.to_string(), vec![0.0f32; self.dimension]))
             .collect();
 
-        for _iteration in 0..max_iterations {
+        let mut iterations_run = 0usize;
+        let mut converged = false;
+
+        for iteration in 0..max_iterations {
+            iterations_run = iteration + 1;
             // Compute updates for each unknown
             let mut updates: HashMap<String, Vec<f32>> = unknowns
                 .iter()
@@ -570,6 +773,9 @@ impl ResonatorNetwork {
                 }
             }
 
+            let system_energy = self.compute_system_energy(constraints, &estimates)?;
+            self.energy_history.push(system_energy);
+
             // Update introspection state
             self.iteration_count += 1;
             for (idx, &name_str) in unknowns.iter().enumerate() {
@@ -583,7 +789,7 @@ impl ResonatorNetwork {
                             .map(|e| cosine_similarity(est, &e.vector))
                             .fold(f32::NEG_INFINITY, f32::max)
                     } else {
-                        0.5 // default confidence without codebook
+                        0.0 // no codebook means no symbol-confidence estimate
                     };
                 }
             }
@@ -603,7 +809,9 @@ impl ResonatorNetwork {
             }
 
             if all_converged {
-                // Mark all states as converged
+                converged = true;
+                // Mark all states as converged only after the whole system
+                // satisfies the fixed-point criterion in the same iteration.
                 for state in &mut self.states {
                     state.converged = true;
                 }
@@ -620,12 +828,51 @@ impl ResonatorNetwork {
                     .expect("estimates map must contain all unknowns");
                 (
                     name.to_string(),
-                    self.create_solution(estimate, max_iterations, true),
+                    self.create_solution(estimate, iterations_run, converged),
                 )
             })
             .collect();
 
         Ok(solutions)
+    }
+
+    /// Evaluate residual energy for a multi-unknown system.
+    ///
+    /// Each constraint represents left ⊙ estimate(unknown) ≈ right. This
+    /// metric is a diagnostic for the current continuous-Hadamard resonator;
+    /// it is not an exact inverse or a calibrated probability of correctness.
+    fn compute_system_energy(
+        &self,
+        constraints: &[MultiConstraint],
+        estimates: &HashMap<String, Vec<f32>>,
+    ) -> Result<f32> {
+        let mut weighted_energy = 0.0f32;
+        let mut total_weight = 0.0f32;
+
+        for constraint in constraints {
+            let left = self.resolve_factor(&constraint.left, estimates)?;
+            let right = self.resolve_factor(&constraint.right, estimates)?;
+            let unknown_name = match &constraint.unknown {
+                Factor::Unknown(name) => name,
+                _ => anyhow::bail!("Multi-constraint update target must be an unknown"),
+            };
+            let estimate = estimates
+                .get(unknown_name)
+                .ok_or_else(|| anyhow::anyhow!("Unknown resonator variable: {unknown_name}"))?;
+            let predicted: Vec<f32> = left
+                .iter()
+                .zip(estimate.iter())
+                .map(|(&left_value, &estimate_value)| left_value * estimate_value)
+                .collect();
+            let similarity = cosine_similarity(&predicted, &right);
+            weighted_energy += constraint.weight * (1.0 - similarity);
+            total_weight += constraint.weight;
+        }
+
+        if total_weight <= 0.0 || !total_weight.is_finite() {
+            anyhow::bail!("Multi-constraint system has no positive finite total weight");
+        }
+        Ok(weighted_energy / total_weight)
     }
 
     /// Cleanup vector to nearest codebook entry
@@ -721,10 +968,13 @@ impl ResonatorNetwork {
         };
 
         // Confidence based on symbol similarity and convergence
-        let confidence = if converged {
-            symbol_similarity.max(0.5)
+        // This is a similarity-derived diagnostic, not a calibrated probability.
+        let confidence = if self.codebook.is_empty() {
+            0.0
+        } else if converged {
+            symbol_similarity.clamp(0.0, 1.0)
         } else {
-            symbol_similarity * 0.5
+            (symbol_similarity * 0.5).clamp(0.0, 1.0)
         };
 
         ResonatorSolution {
@@ -958,10 +1208,11 @@ impl MultiConstraint {
 
 /// Unbind operation: inverse of bind
 ///
-/// For element-wise multiplication binding:
-/// unbind(a, b) = a * b (since a * a = 1 for normalized vectors)
+/// Approximate correlation update for continuous Hadamard binding.
 ///
-/// This gives us: if c = bind(a, x), then x ≈ unbind(a, c)
+/// Multiplying by `a` is an exact inverse only for bipolar components in
+/// {-1,+1}. For arbitrary continuous vectors, `a ⊙ a != 1`; this function
+/// intentionally remains a heuristic update signal, not a mathematical inverse.
 fn unbind(a: &[f32], b: &[f32]) -> Vec<f32> {
     a.iter().zip(b.iter()).map(|(x, y)| x * y).collect()
 }
@@ -1550,6 +1801,143 @@ mod tests {
         if let Some(&last) = direct_history.last() {
             assert!((snap.current_energy - last).abs() < 1e-9);
         }
+    }
+
+    #[test]
+    fn test_solution_classifies_correct_spurious_and_non_convergence_separately() {
+        let converged = ResonatorSolution {
+            vector: vec![1.0, 0.0, 0.0],
+            closest_symbol: None,
+            symbol_similarity: 0.0,
+            energy: 0.0,
+            iterations: 3,
+            converged: true,
+            confidence: 0.0,
+        };
+        let correct = converged.classify_against(&[1.0, 0.0, 0.0], 0.99).unwrap();
+        assert_eq!(correct.0, ResonatorOutcome::CorrectConvergence);
+        assert!((correct.1 - 1.0).abs() < 1e-6);
+
+        let spurious = converged.classify_against(&[0.0, 1.0, 0.0], 0.99).unwrap();
+        assert_eq!(spurious.0, ResonatorOutcome::SpuriousConvergence);
+        assert!(spurious.1.abs() < 1e-6);
+
+        let mut not_converged = converged.clone();
+        not_converged.converged = false;
+        let outcome = not_converged
+            .classify_against(&[1.0, 0.0, 0.0], 0.99)
+            .unwrap();
+        assert_eq!(outcome.0, ResonatorOutcome::NonConvergence);
+    }
+
+    #[test]
+    fn test_solve_system_does_not_claim_convergence_at_iteration_limit() {
+        let dimension = 128;
+        let config = ResonatorConfig {
+            step_size: 0.5,
+            momentum: 0.0,
+            temperature: 0.1,
+            convergence_threshold: 1.0,
+            max_iterations: 5,
+            noise_scale: 0.0,
+            energy_threshold: 0.0,
+            initialization_seed: 0x1234_5678,
+        };
+        let mut network = ResonatorNetwork::with_config(dimension, config).unwrap();
+        let left = normalized_random_vector(dimension);
+        let target = normalized_random_vector(dimension);
+        let right: Vec<f32> = left
+            .iter()
+            .zip(target.iter())
+            .map(|(&a, &b)| a * b)
+            .collect();
+        let constraint = MultiConstraint::new(
+            Factor::Known(left),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(right),
+        );
+
+        let solutions = network.solve_system(&["x"], &[constraint], Some(1)).unwrap();
+        let solution = solutions.get("x").unwrap();
+
+        assert!(!solution.converged);
+        assert_eq!(solution.iterations, 1);
+        assert_eq!(network.energy_history().len(), 1);
+        assert!(!network.resonator_states()[0].converged);
+        assert_eq!(
+            solution
+                .classify_against(&target, 0.99)
+                .unwrap()
+                .0,
+            ResonatorOutcome::NonConvergence
+        );
+    }
+
+    #[test]
+    fn test_seeded_resonator_runs_are_replayable() {
+        let dimension = 96;
+        let config = ResonatorConfig {
+            initialization_seed: 0x5EED_CAFE,
+            noise_scale: 0.02,
+            max_iterations: 12,
+            ..Default::default()
+        };
+        let left = normalized_random_vector(dimension);
+        let target = normalized_random_vector(dimension);
+        let right: Vec<f32> = left
+            .iter()
+            .zip(target.iter())
+            .map(|(&a, &b)| a * b)
+            .collect();
+        let constraints = vec![Constraint::new(left, right)];
+
+        let mut first = ResonatorNetwork::with_config(dimension, config.clone()).unwrap();
+        let mut second = ResonatorNetwork::with_config(dimension, config).unwrap();
+        let first_solution = first.solve(&constraints, Some(12)).unwrap();
+        let second_solution = second.solve(&constraints, Some(12)).unwrap();
+
+        assert_eq!(first_solution.vector, second_solution.vector);
+        assert_eq!(first_solution.iterations, second_solution.iterations);
+        assert_eq!(first_solution.converged, second_solution.converged);
+        assert_eq!(first.energy_history(), second.energy_history());
+    }
+
+    #[test]
+    fn test_solve_system_rejects_unconstrained_unknowns() {
+        let mut network = ResonatorNetwork::new(64).unwrap();
+        let left = normalized_random_vector(64);
+        let right = normalized_random_vector(64);
+        let constraint = MultiConstraint::new(
+            Factor::Known(left),
+            Factor::Unknown("x".to_string()),
+            Factor::Known(right),
+        );
+
+        let error = network.solve_system(&["x", "y"], &[constraint], Some(2));
+        assert!(error.is_err());
+        assert!(error.unwrap_err().to_string().contains("no solving constraint"));
+    }
+
+    #[test]
+    fn test_solve_rejects_empty_or_malformed_constraints() {
+        let mut network = ResonatorNetwork::new(32).unwrap();
+        assert!(network.solve(&[], Some(1)).is_err());
+
+        let constraint = Constraint::new(vec![1.0; 31], vec![1.0; 32]);
+        assert!(network.solve(&[constraint], Some(1)).is_err());
+
+        let mut invalid = Constraint::new(vec![1.0; 32], vec![1.0; 32]);
+        invalid.weight = f32::NAN;
+        assert!(network.solve(&[invalid], Some(1)).is_err());
+    }
+
+    #[test]
+    fn test_resonator_rejects_invalid_symbol_vectors() {
+        let mut network = ResonatorNetwork::new(32).unwrap();
+        assert!(network.add_symbol("nan", vec![f32::NAN; 32]).is_err());
+        assert!(network.add_symbol("zero", vec![0.0; 32]).is_err());
+        assert!(network.add_symbol("valid", normalized_random_vector(32)).is_ok());
+        assert!(network.add_symbol("valid", normalized_random_vector(32)).is_err());
     }
 
     #[test]

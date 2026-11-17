@@ -121,7 +121,7 @@ impl VehicleController {
         }
     }
 
-    /// Train the output projection and network weights via full BPTT.
+    /// Train the output projection and apply one-step local HDC-LTC target updates.
     pub fn train_step(
         &mut self,
         sensor_hv: &ContinuousHV,
@@ -170,23 +170,9 @@ impl VehicleController {
             *g = g.clamp(-GRAD_CLIP, GRAD_CLIP);
         }
 
-        // Weight decay
-        const WEIGHT_DECAY: f32 = 1e-4;
-        let decay = 1.0 - WEIGHT_DECAY;
-        for w in self.output_weights.iter_mut() {
-            *w *= decay;
-        }
-
-        // Update output weights
-        for i in 0..NUM_ACTUATORS {
-            let row_offset = i * HDC_DIMENSION;
-            for j in 0..HDC_DIMENSION {
-                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
-            }
-            self.output_bias[i] -= output_lr * d_raw[i];
-        }
-
-        // Full BPTT through network layers
+        // Compute the upstream HDC target direction using the output head as
+        // it produced the forward prediction. Do not use weights after the
+        // optimizer has already changed them.
         let dim = HDC_DIMENSION;
         let mut grad_hv_values = vec![0.0f32; dim];
         for i in 0..NUM_ACTUATORS {
@@ -194,6 +180,22 @@ impl VehicleController {
             for j in 0..dim {
                 grad_hv_values[j] += d_raw[i] * self.output_weights[row_offset + j];
             }
+        }
+
+        // Weight decay and output-head update happen only after the upstream
+        // gradient has been formed with the pre-update parameters.
+        const WEIGHT_DECAY: f32 = 1e-4;
+        let decay = 1.0 - WEIGHT_DECAY;
+        for w in self.output_weights.iter_mut() {
+            *w *= decay;
+        }
+
+        for i in 0..NUM_ACTUATORS {
+            let row_offset = i * HDC_DIMENSION;
+            for j in 0..HDC_DIMENSION {
+                self.output_weights[row_offset + j] -= output_lr * d_raw[i] * hv_values[j];
+            }
+            self.output_bias[i] -= output_lr * d_raw[i];
         }
 
         let n_layers = self.network.n_layers();
