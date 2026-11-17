@@ -729,6 +729,7 @@ fn parse_decision_voi_queries(
     scored.push((robust,nominal,canonical,rule));
    }
    scored.sort_by(|a,b|a.0.cmp(&b.0).then_with(||a.1.cmp(&b.1)).then_with(||a.2.cmp(&b.2)));
+   let decision_rule_count=scored.len();
    let (post_robust,post_nominal,_,best_rule)=scored.into_iter().next().ok_or("no decision rules generated")?;
    let net_robust=signed_net_value(stop_robust,post_robust,*cost,"net robust VOI")?;
    let net_nominal=signed_net_value(stop_nominal,post_nominal,*cost,"net nominal VOI")?;
@@ -740,7 +741,7 @@ fn parse_decision_voi_queries(
     "net_nominal_decision_value_micros":net_nominal,
     "continue_recommended":net_robust>0,
     "decision_rule":best_rule,
-    "decision_rule_count":scored.len()
+    "decision_rule_count":decision_rule_count
    }));
   }
   option_reports.sort_by(|a,b|{
