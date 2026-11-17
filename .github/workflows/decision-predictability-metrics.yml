@@ -78,6 +78,9 @@ jobs:
           grep -q '^lorenz63,' forecast-report.csv
           grep -q ",ok" forecast-report.csv
 
+      - name: Verify resolved standalone dependency lock
+        run: test -s research/decision-predictability-benchmark/Cargo.lock
+
       - name: Summarize per-fixture forecast metrics
         run: |
           awk -F, '
@@ -107,5 +110,6 @@ jobs:
           path: |
             chaos-fixtures.csv
             forecast-report.csv
+            research/decision-predictability-benchmark/Cargo.lock
           if-no-files-found: error
           retention-days: 14
