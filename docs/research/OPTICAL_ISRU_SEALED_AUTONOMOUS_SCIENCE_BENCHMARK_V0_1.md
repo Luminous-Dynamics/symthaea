@@ -190,7 +190,7 @@ B0 is deterministic by design. It does not simulate heterogeneous durations, noi
 - enhancement factor with explicit invalid-reference rejection;
 - minimum 30 unique paired simulation seeds;
 - a separate physical replication plan that requires power, randomization, blocking and independent assay plans;
-- 16 benchmark-contract invariant tests plus 15 B0 replay-oracle tests.
+- 19 benchmark-contract invariant tests plus 15 B0 replay-oracle tests.
 
 ### Reproduce locally
 
