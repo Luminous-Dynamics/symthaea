@@ -105,22 +105,42 @@ These results suggest that Symthaea should be judged on *functional transfer, co
 
 ## Current SOTA shift: agentic policies and durable skill memory
 
-The benchmark portfolio now explicitly includes **agentic manipulation policies**, not only VLA/WAM action-chunk policies.
+The benchmark portfolio now includes **agentic manipulation policies**, not only VLA/WAM action-chunk policies.
 
-AMP1 (arXiv:2611.09892, 6 Nov 2026) reports 85.6% on RoboLab-120 and 104/108 trials on a Franka-based real-world evaluation, with an AMP1+ persistent-memory experiment reporting 4.6× lower failure rate on RoboDojo bimanual tasks versus zero-shot. This is an arm-based result, not a humanoid result. The paper also documents collision/calibration failures and benchmark/verifier artefacts; it states model choice matters much more than modest changes to its harness.
+AMP1 (arXiv:2611.09892, 6 Nov 2026) reports:
+- 85.6% zero-shot RoboLab-120 success in the paper (Gemini 4 Argon); the current NVIDIA RoboLab leaderboard lists 86.0% ±2.5 percentage points from 2,579/3,000 episodes. Keep the paper result and live leaderboard snapshot separate.
+- 95.2% on LIBERO-PRO, 100% on the selected robosuite suite, and 96.0% on two BEHAVIOR-1K mobile tasks on the AMP project page.
+- 84.1% on RoboDojo **after practice**, not zero-shot. The paper's carried-memory analysis reports a 4.6× lower failure rate on RoboDojo bimanual tasks in its setup.
+- 104/108 real-world trials across 12 tasks on a 7-DoF Franka Research 3, not a humanoid.
 
-RoboDojo's 17 Nov 2026 public snapshot distinguishes its standard policy leaderboard from the Agent track. Its SOLVE* agent entry is marked as evaluated before the 14 Nov Agent Track rules and is therefore flagged as non-conforming with updated rules. The scores must not be compared directly with the standard policy board or HumanoidToolBench.
+Sources: [AMP paper](https://arxiv.org/abs/2611.09892), [AMP results](https://apple-aiml-research.github.io/ml-amp/), [NVIDIA RoboLab leaderboard](https://research.nvidia.com/labs/srl/projects/robolab/leaderboard.html?family=all), [RoboDojo Agent Track](https://robodojo-benchmark.com/leaderboard?bench=sim).
 
-VioLA (8 Oct 2026) motivates a second output-space baseline: predict transferable body/hand motion latents and let a qualified whole-body controller track them, rather than predicting raw joint commands. Its reported 140.6M frames include 93.2% human motion data, but human motion must be converted through a valid morphology/frame/action contract before it is usable as robot supervision.
+RoboDojo's 17 Nov public snapshot distinguishes its standard policy leaderboard from the Agent track. The 14 Nov rules mark some earlier entries with an asterisk because they were tested before the updated Agent Track rules; do not treat these as compliant submissions or compare Agent Track averages directly with standard policy results or HumanoidToolBench percentages.
+
+The AMP agent harness uses a persistent Python interpreter, active perception and checked/refused motion calls. Two limitations are particularly relevant to Symthaea: the authors note slow model reasoning and inability to replan an executing trajectory; the RoboLab walkthrough pauses simulation while the model reasons. Our architecture should combine a slow planner with a qualified local fast loop that can stop/hold/recover during contact changes without waiting for another model turn. Report both benchmark-motion time and end-to-end wall-clock time, charging API cost, compute, retries, energy and human intervention.
+
+**Reproduction and licence boundary:** the AMP source repository uses an Apple custom personal, non-exclusive licence, not a conventional MIT/Apache-2.0 licence; third-party components retain separate terms. Do not copy the AMP source into Symthaea or redistribute a fork without specific licence review. The official reproduction guide lists roughly 9 GB VRAM, 15 GB RAM and 40 GB disk for RoboLab; the paper's simulation runs used H100 80 GB GPUs. The known RTX 2070 Laptop 8 GB configuration is below the quickstart's stated VRAM figure, so do not assume the full official stack will run there. A separate lower-resource route would need its own measured qualification.
+
+VioLA (8 Oct 2026) motivates a second output-space baseline: predict transferable body/hand motion latents and let a qualified whole-body controller track them, rather than predicting raw joint commands. Its reported training set includes 140.6M frames, 93.2% human motion; human motion is not automatically robot-compatible without a valid morphology/frame/action contract.
 
 Symthaea's hypothesis is to combine:
 - a generalist agent that remains in the task loop and performs active perception / plan revision;
 - typed, bounded capabilities instead of unrestricted generated code with direct live hardware access;
 - HDC-LTC / FEP multi-timescale cognition and local fast controllers;
-- a validated, provenance-bearing procedural skill memory;
+- validated, provenance-bearing procedural skill memory;
 - terminal deterministic safety, explicit authority and independent physical postcondition verification.
 
 Related programme: [HUM-AGENTIC-POLICY-001 #12685](https://github.com/Luminous-Dynamics/symthaea/issues/12685).
+
+## Active tool affordance discovery
+
+[HUM-TOOL-DISCOVERY-001 #12701](https://github.com/Luminous-Dynamics/symthaea/issues/12701) asks whether Symthaea can identify what an unfamiliar tool can physically do, not merely classify its name or choose among known objects.
+
+The first synthetic corpus has 24 cases across lever, hook, wedge, rotary driver, clamp and mallet families: six development cases, six held-out same-family cases, six held-out task-transfer cases and six visually similar decoys. Hidden parameters, split labels and postcondition oracles are evaluator-only.
+
+Artifacts: [24-case manifest](tool-discovery-cases-v0.1.json) · [schema](tool-discovery-cases-v0.1.schema.json).
+
+This is protocol/synthetic data only. It contains no measured physical tool properties, material-strength, safe-load or serviceability claims. V0.1 excludes powered tools, blades, high forces, mains voltage, hazardous substances and human contact.
 
 ## G1 interface compatibility artifact
 
@@ -129,9 +149,13 @@ The exact HumanoidToolBench G1 action/state mapping is now pinned separately:
 - [G1 mapping JSON Schema](g1-decoupled-v1-mapping.schema.json)
 - [HUM-G1-UEC-ADAPTER-001 #12681](https://github.com/Luminous-Dynamics/symthaea/issues/12681)
 
-The mapping preserves all 43 raw named G1 joint positions, the derived 32-value policy-state projection, the 36-value action schema, the left-hand thumb/middle/index permutation, the waist order change, the base-height command-history field, RGB image modality, and the navigation turn-flag semantics.
+The mapping preserves all 43 raw named G1 joint positions, the derived 32-value policy-state projection, the 36-value action schema, the left-hand thumb/middle/index permutation, the waist order change, the base-height command-history field, RGB image modality, and navigation turn-flag semantics.
 
-This is a **non-actuating software compatibility specification**. It does not map G1 joint targets onto Symthaea DMC21/Dexterous53 torques, does not connect to the current 21-joint PCA9685 HAL, and creates no UEC Applied/Measured receipt or actuation authority. The typed Rust adapter is deliberately dependent on the canonical UEC v2 APIs and their current qualification state.
+**The raw 43-value qpos ordering is now source-traced**, not assumed. The producer chain is `SonicLocoManip._get_obs → MujocoEngine.get_robot_qpos → G1Sonic.get_robot_qpos`; the final dictionary was populated by iterating the pinned `G1Sonic.joint_names`/`WHOLE_BODY_JOINTS` list, and Python preserves insertion order. The producer files and blob IDs are recorded in the mapping manifest.
+
+A dependency-free Rust audit crate is also present at [g1-mapping-audit](g1-mapping-audit/README.md). It includes named and pinned-order state projection, action decode/round-trip, nine authored golden/negative-control tests, a minimal lockfile and a focused workflow. Its tests have not been executed because this editing environment does not have `rustc`/`cargo`.
+
+This remains a **non-actuating software mapping specification**, not a qualified UEC v2 platform adapter. It does not map G1 joint targets onto Symthaea DMC21/Dexterous53 torques, does not connect to the current 21-joint PCA9685 HAL, and creates no TransportAccepted/Applied/Measured receipt or actuation authority. UEC v2 integration and runtime conformance remain separate gates.
 
 ## Active tool affordance discovery
 
