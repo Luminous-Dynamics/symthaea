@@ -206,6 +206,8 @@ pub mod temporal_confirmatory;
 #[cfg(feature = "theory")]
 pub mod style_trajectory_admission;
 #[cfg(feature = "theory")]
+pub mod style_trajectory_m1;
+#[cfg(feature = "theory")]
 pub mod theory_realize;
 pub mod training;
 pub mod training_pairs;
