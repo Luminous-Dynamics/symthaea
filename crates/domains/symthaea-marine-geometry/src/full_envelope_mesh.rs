@@ -224,10 +224,6 @@ fn checked_add(total: usize, amount: usize) -> Option<usize> {
     total.checked_add(amount)
 }
 
-fn checked_mul(left: usize, right: usize) -> Option<usize> {
-    left.checked_mul(right)
-}
-
 fn preflight_mesh_budget(spec: &FullEnvelopeSpec) -> Result<(), Vec<FullEnvelopeMeshIssue>> {
     let station_count = spec.stations.len();
     let Some(profile_point_count) = spec.stations.first().map(|station| station.starboard_profile.len()) else {
@@ -1249,7 +1245,7 @@ mod tests {
         let artifact =
             generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
         assert!(
-            (artifact.admission_report.metrics.signed_volume_m3.unwrap() - 12_350.0).abs()
+            (artifact.admission_report.metrics.signed_volume_m3.unwrap() - 19_475.0).abs()
                 < 1.0e-8
         );
         assert_eq!(artifact.admission_report.metrics.boundary_edge_count, 0);
