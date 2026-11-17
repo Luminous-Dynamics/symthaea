@@ -37,3 +37,21 @@ This version does not use a cryptographic digest. The verifier receives the exac
 This is not a general-purpose group-discovery engine. It does not cover continuous Lie groups, approximate actions, infinite domains, non-finite objectives, transformed output spaces, or physical step-map equivariance. It must abstain when its exact finite contract is incomplete or its resource budget is exceeded.
 
 The D4 benchmark also compares an actual objective search against exhaustive enumeration: a 16-candidate ordered-pair problem has three verified orbits, the optimum found by evaluating one representative per orbit matches the exhaustive optimum, and lifting reconstructs all four original minimizers. This yields 16/3 = 5.33× fewer objective evaluations on this exact finite fixture; it is candidate-work reduction, not a wall-clock speedup claim. The tests independently enumerate candidate orbits, mutate the group table/action/task/certificate witnesses, and verify the optimum and full solution lift.
+
+
+## Multi-environment common symmetry (v0.2 increment)
+
+The first compiler qualified one task snapshot. The new API `qualify_common_task_preserving_subgroup` accepts a set of named task environments over the same candidate universe and computes the exact intersection of their task-preserving stabilizers.
+
+A group element is retained only when it preserves **every** candidate's complete semantics in **every** declared environment: domain membership, admissibility, feasibility, objective, constraint signature, boundary condition and output-equivalence identity. For every excluded ambient element, the report records an environment and candidate pair witnessing the first semantic difference, including the differing task fields.
+
+The retained set is checked for identity, inverse closure and multiplication closure, then materialized as a restricted finite group/action. `compile_multi_environment_quotient` compiles a separate quotient certificate for each environment using this same common subgroup. `verify_multi_environment_quotient` independently reconstructs the common subgroup and replays every per-environment certificate before reporting orbit counts.
+
+This makes the safe symmetry regime explicit:
+- D4 geometry and nominal objective may be invariant in one environment;
+- a changed operating regime may preserve only C4, so reflections are excluded;
+- a further boundary-condition or objective change may reduce the common subgroup to C1.
+
+It is still exact, finite and discrete. No approximate/soft symmetry receives pruning authority. An empty common quotient beyond identity simply means no search reduction was qualified across the declared environment family.
+
+Tests cover D4-to-C4 intersection (with witness records for the four excluded reflections), a third asymmetric environment that shrinks the common subgroup to identity, and rejection of a forged common-subgroup witness. The per-environment certificates are replayed separately.
