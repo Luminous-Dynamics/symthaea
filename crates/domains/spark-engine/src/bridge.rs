@@ -78,17 +78,15 @@ impl UnifiedFusionCalculator {
             let temp_k = temp_kev * 1.16e7;
             let gamow = GamowIntegration::dd_rate(temp_k, 0.0, 0); // No screening in plasma
 
-            // Tokamak Q factor estimate (simplified)
-            // Real tokamak Q depends on confinement time, density, etc.
-            // This is just a placeholder for integration testing
-            let q_factor = gamow.sigma_v_cm3_s * 1e20; // Very rough estimate
-
+            // Temperature and reactivity alone do not determine fusion gain.
+            // Density, confinement, heating power and a declared energy boundary
+            // are required. Keep gain explicitly unavailable until supplied.
             TokamakFusionResult {
                 sigma_v_cm3_s: gamow.sigma_v_cm3_s,
                 temp_kev,
                 temp_k,
-                q_factor_estimate: q_factor,
-                energy_gain_possible: temp_kev > 10.0, // Typically need >10 keV for Q>1
+                q_factor_estimate: None,
+                energy_gain_possible: None,
             }
         });
 
@@ -120,13 +118,11 @@ impl UnifiedFusionCalculator {
                     tokamak_rate_advantage: rate_ratio,
                     lcf_simplicity_advantage: "No magnets, room temperature, no tritium"
                         .to_string(),
-                    tokamak_energy_advantage: tok_kev > 10.0,
+                    // The compared input contains temperature only; this cannot
+                    // establish an energy-gain advantage for either approach.
+                    tokamak_energy_advantage: None,
                     lcf_compactness_advantage: true,
-                    recommendation: if tok_kev > 10.0 {
-                        "Tokamak for energy production, LCF for compact neutron sources".to_string()
-                    } else {
-                        "Neither approach achieves Q > 1 at these conditions".to_string()
-                    },
+                    recommendation: "Compare reaction-rate coefficients only. Tokamak energy gain requires density, confinement, heating power and a complete energy boundary; LCF remains a separate anomaly/neutron-source research path.".to_string(),
                 })
             }
             _ => None,
@@ -171,10 +167,11 @@ pub struct TokamakFusionResult {
     pub temp_kev: f64,
     /// Temperature in K
     pub temp_k: f64,
-    /// Estimated Q factor (simplified)
-    pub q_factor_estimate: f64,
-    /// Whether energy gain is possible
-    pub energy_gain_possible: bool,
+    /// Q estimate. None means required density, confinement and power-boundary
+    /// inputs were not supplied; temperature alone must not produce a Q value.
+    pub q_factor_estimate: Option<f64>,
+    /// Energy-gain assessment. None means the supplied inputs are insufficient.
+    pub energy_gain_possible: Option<bool>,
 }
 
 /// Comparison between LCF and tokamak approaches.
@@ -184,8 +181,9 @@ pub struct ApproachComparison {
     pub tokamak_rate_advantage: f64,
     /// LCF simplicity advantages
     pub lcf_simplicity_advantage: String,
-    /// Whether tokamak achieves energy gain
-    pub tokamak_energy_advantage: bool,
+    /// Whether tokamak has a demonstrated energy-gain advantage.
+    /// None means the supplied comparison inputs are insufficient.
+    pub tokamak_energy_advantage: Option<bool>,
     /// Whether LCF is more compact
     pub lcf_compactness_advantage: bool,
     /// Overall recommendation
@@ -1419,7 +1417,9 @@ mod tests {
         assert!(result.tokamak.is_some());
 
         let tok = result.tokamak.unwrap();
-        assert!(tok.sigma_v_cm3_s > 1e-30); // Should have measurable rate
+        assert!(tok.sigma_v_cm3_s > 1e-30); // Reactivity is calculable from temperature.
+        assert_eq!(tok.q_factor_estimate, None);
+        assert_eq!(tok.energy_gain_possible, None);
     }
 
     #[test]
