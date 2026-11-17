@@ -928,8 +928,7 @@ pub fn plan_survival_conditioned(
         )?;
         let exceeds_risk = candidate.mission_interruption_probability
             > config.risk_limits.maximum_mission_interruption_probability
-            || candidate.robot_loss_probability
-                > config.risk_limits.maximum_robot_loss_probability;
+            || candidate.robot_loss_probability > config.risk_limits.maximum_robot_loss_probability;
 
         root_action_assessments.push(ActionAssessment {
             action_id: action.id.clone(),
@@ -1274,13 +1273,9 @@ mod tests {
     fn external_gate_denial_is_not_overridden_by_information_value() {
         let mut action = scan("denied");
         action.external_gate_passed = false;
-        let report = plan_survival_conditioned(
-            &problem(vec![action]),
-            budget(),
-            prices(),
-            config(2),
-        )
-        .unwrap();
+        let report =
+            plan_survival_conditioned(&problem(vec![action]), budget(), prices(), config(2))
+                .unwrap();
         assert!(report.policy.measurement_action_id.is_none());
         assert_eq!(
             report.root_action_assessments[0].status,
@@ -1298,7 +1293,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(report.policy.measurement_action_id.as_deref(), Some("survey"));
+        assert_eq!(
+            report.policy.measurement_action_id.as_deref(),
+            Some("survey")
+        );
         let observation = report
             .policy
             .branches
