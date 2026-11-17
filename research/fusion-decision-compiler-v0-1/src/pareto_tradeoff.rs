@@ -266,7 +266,7 @@ fn validate_profile(profile: &ObjectiveComparisonProfile) -> Vec<ComparisonDiagn
 fn validate_candidate(
     profile: &ObjectiveComparisonProfile,
     candidate: &CandidateObjectiveVector,
-) -> Vec<ComparisonDiagnostic> {
+ -> Vec<ComparisonDiagnostic> {
     let mut diagnostics = Vec::new();
     if candidate.candidate_id.trim().is_empty() || candidate.candidate_revision.trim().is_empty() {
         diagnostics.push(ComparisonDiagnostic::EmptyCandidateIdentity);
@@ -422,8 +422,8 @@ pub fn compare_pair(
     second: &CandidateObjectiveVector,
 ) -> PairwiseTradeoffReport {
     let profile_diagnostics = validate_profile(profile);
-    let mut first_diagnostics = validate_candidate(profile, first);
-    let mut second_diagnostics = validate_candidate(profile, second);
+    let mut first_diagnostics = validate_candidate(profile, first;
+    let mut second_diagnostics = validate_candidate(profile, second;
     first_diagnostics.extend(profile_diagnostics.iter().copied());
     second_diagnostics.extend(profile_diagnostics.iter().copied());
     if first.candidate_id == second.candidate_id {
@@ -508,7 +508,7 @@ pub fn extract_pareto_front(
     }
 
     for candidate in candidates {
-        let mut candidate_diagnostics = validate_candidate(profile, candidate);
+        let mut candidate_diagnostics = validate_candidate(profile, candidate;
         candidate_diagnostics.extend(profile_diagnostics.iter().copied());
         if duplicate_ids.contains(candidate.candidate_id.as_str()) {
             candidate_diagnostics.push(ComparisonDiagnostic::DuplicateCandidateIdentity);
@@ -603,16 +603,8 @@ mod tests {
         })
     }
 
-    fn candidate(
-        id: &str,
-        energy: f64,
-        cost: f64,
-        availability: f64,
-        planned: f64,
-        unplanned: f64,
-        ebi: f64,
-        interval_width: f64,
-    ) -> CandidateObjectiveVector {
+    fn candidate(id: &str, values: [f64; 7] -> CandidateObjectiveVector {
+        let [energy, cost, availability, planned, unplanned, ebi, interval_width] = values;
         CandidateObjectiveVector {
             candidate_id: id.to_string(),
             candidate_revision: format!("{id}-r1"),
@@ -684,7 +676,7 @@ mod tests {
             300.0,
             0.8,
             25.0,
-        );
+        ;
         let high_service = candidate(
             "high-service",
             12_000.0,
@@ -694,7 +686,7 @@ mod tests {
             350.0,
             0.9,
             15.0,
-        );
+        ;
         let report = compare_pair(&profile, &high_qeng, &high_service);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
         assert_eq!(report.dominance, DominanceRelation::NonDominatedTradeoff);
@@ -726,7 +718,7 @@ mod tests {
             300.0,
             0.20,
             25.0,
-        );
+        ;
         let higher_availability = candidate(
             "higher-availability",
             12_000.0,
@@ -736,7 +728,7 @@ mod tests {
             350.0,
             0.40,
             15.0,
-        );
+        ;
         let report = compare_pair(&profile, &lower_availability, &higher_availability);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
         assert_eq!(report.dominance, DominanceRelation::NonDominatedTradeoff);
@@ -755,7 +747,7 @@ mod tests {
     #[test]
     fn q_eng_cannot_reverse_true_vector_dominance_when_its_inputs_are_in_vector() {
         let profile = profile();
-        let first = candidate("dominant", 12_000.0, 7_000.0, 0.95, 300.0, 200.0, 0.5, 10.0);
+        let first = candidate("dominant", [12_000.0, 7_000.0, 0.95, 300.0, 200.0, 0.5, 10.0]);
         let second = candidate(
             "dominated",
             10_000.0,
@@ -765,7 +757,7 @@ mod tests {
             300.0,
             0.8,
             20.0,
-        );
+        ;
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::FirstDominatesSecond);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
@@ -778,8 +770,8 @@ mod tests {
     #[test]
     fn same_q_eng_ratio_does_not_mean_same_objective_vector() {
         let profile = profile();
-        let first = candidate("ratio-a", 8_000.0, 12_000.0, 0.8, 500.0, 400.0, 0.4, 20.0);
-        let second = candidate("ratio-b", 11_000.0, 7_000.0, 0.9, 300.0, 200.0, 0.45, 10.0);
+        let first = candidate("ratio-a", [8_000.0, 12_000.0, 0.8, 500.0, 400.0, 0.4, 20.0]);
+        let second = candidate("ratio-b", [11_000.0, 7_000.0, 0.9, 300.0, 200.0, 0.45, 10.0]);
         assert_eq!(q_eng(&first).unwrap().q_eng, q_eng(&second).unwrap().q_eng);
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.scalar_preference, ScalarPreference::Tie);
@@ -789,8 +781,8 @@ mod tests {
     #[test]
     fn scalar_winner_is_not_universally_better_when_vectors_are_incomparable() {
         let profile = profile();
-        let first = candidate("first", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
-        let second = candidate("second", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
+        let first = candidate("first", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
+        let second = candidate("second", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NonDominatedTradeoff);
         assert_eq!(report.scalar_preference, ScalarPreference::First);
@@ -803,9 +795,9 @@ mod tests {
     #[test]
     fn missing_lifetime_energy_is_not_imputed() {
         let profile = profile();
-        let mut first = candidate("first", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
+        let mut first = candidate("first", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
         first.lifetime_net_electric_energy_mwh = None;
-        let second = candidate("second", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
+        let second = candidate("second", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
         assert!(
@@ -821,8 +813,8 @@ mod tests {
     #[test]
     fn mixed_cost_or_uncertainty_profile_is_not_comparable() {
         let profile = profile();
-        let first = candidate("first", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
-        let mut second = candidate("second", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
+        let first = candidate("first", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
+        let mut second = candidate("second", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
         second.profile_sha256 = sha('c');
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
@@ -836,8 +828,8 @@ mod tests {
     #[test]
     fn missing_ebi_provenance_is_not_comparable() {
         let profile = profile();
-        let first = candidate("first", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
-        let mut second = candidate("second", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
+        let first = candidate("first", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
+        let mut second = candidate("second", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
         second.ebi_normalization_ref.clear();
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
@@ -851,9 +843,9 @@ mod tests {
     #[test]
     fn a_blocked_hard_gate_cannot_become_pareto_attractive() {
         let profile = profile();
-        let mut first = candidate("blocked", 20_000.0, 1_000.0, 1.0, 0.0, 0.0, 0.1, 1.0);
+        let mut first = candidate("blocked", [20_000.0, 1_000.0, 1.0, 0.0, 0.0, 0.1, 1.0]);
         first.eligibility = CandidateEligibility::BlockedByHardGate;
-        let second = candidate("eligible", 10_000.0, 10_000.0, 0.8, 500.0, 300.0, 0.5, 20.0);
+        let second = candidate("eligible", [10_000.0, 10_000.0, 0.8, 500.0, 300.0, 0.5, 20.0]);
         let report = extract_pareto_front(&profile, &[first, second]);
         assert_eq!(
             report
@@ -870,9 +862,9 @@ mod tests {
     #[test]
     fn frontier_is_order_invariant_and_sorted() {
         let profile = profile();
-        let first = candidate("z", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
-        let second = candidate("a", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
-        let third = candidate("dominated", 7_000.0, 12_000.0, 0.7, 600.0, 450.0, 0.8, 35.0);
+        let first = candidate("z", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
+        let second = candidate("a", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
+        let third = candidate("dominated", [7_000.0, 12_000.0, 0.7, 600.0, 450.0, 0.8, 35.0]);
         let first_report =
             extract_pareto_front(&profile, &[first.clone(), second.clone(), third.clone()]);
         let second_report = extract_pareto_front(&profile, &[third, second, first]);
@@ -886,10 +878,10 @@ mod tests {
     #[test]
     fn adding_a_dominated_candidate_does_not_change_existing_frontier() {
         let profile = profile();
-        let first = candidate("a", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
-        let second = candidate("b", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
+        let first = candidate("a", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
+        let second = candidate("b", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
         let base = extract_pareto_front(&profile, &[first.clone(), second.clone()]);
-        let dominated = candidate("c", 5_000.0, 20_000.0, 0.5, 800.0, 600.0, 1.0, 50.0);
+        let dominated = candidate("c", [5_000.0, 20_000.0, 0.5, 800.0, 600.0, 1.0, 50.0]);
         let extended = extract_pareto_front(&profile, &[first, second, dominated]);
         assert_eq!(base.frontier_candidate_ids, extended.frontier_candidate_ids);
     }
@@ -897,8 +889,8 @@ mod tests {
     #[test]
     fn equivalent_vectors_are_explicitly_tied() {
         let profile = profile();
-        let first = candidate("first", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
-        let mut second = candidate("second", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
+        let first = candidate("first", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
+        let mut second = candidate("second", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
         second.objective_vector_receipt_ref = "other-receipt".to_string();
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::Equivalent);
@@ -908,9 +900,9 @@ mod tests {
     #[test]
     fn non_finite_and_invalid_objective_values_are_rejected() {
         let profile = profile();
-        let mut first = candidate("first", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
+        let mut first = candidate("first", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
         first.whole_life_cost.as_mut().unwrap().value = f64::INFINITY;
-        let second = candidate("second", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
+        let second = candidate("second", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
         assert!(
@@ -925,8 +917,8 @@ mod tests {
     #[test]
     fn pairwise_comparison_rejects_reused_candidate_identity() {
         let profile = profile();
-        let first = candidate("same", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
-        let mut second = candidate("same", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
+        let first = candidate("same", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
+        let mut second = candidate("same", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
         second.candidate_revision = "same-r2".to_string();
         let report = compare_pair(&profile, &first, &second);
         assert_eq!(report.dominance, DominanceRelation::NotComparable);
@@ -945,8 +937,8 @@ mod tests {
     #[test]
     fn duplicate_candidate_ids_are_reported_in_frontier() {
         let profile = profile();
-        let first = candidate("same", 9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0);
-        let second = candidate("same", 11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0);
+        let first = candidate("same", [9_000.0, 10_000.0, 0.9, 400.0, 300.0, 0.5, 20.0]);
+        let second = candidate("same", [11_000.0, 8_000.0, 0.85, 450.0, 350.0, 0.5, 25.0]);
         let report = extract_pareto_front(&profile, &[first, second]);
         assert!(!report.diagnostics.is_empty());
     }
