@@ -13,7 +13,7 @@
     "scenario_id": "d6.18-open-world-contamination-reserve-v0.1",
     "adjudication_status": "synthetic_known_answer_noisy_channel_evaluation_only",
     "hypothesis_count": 1,
-    "factor_count": 0,
+    "factor_count": 2,
     "trace_count": 5,
     "summary": {
       "unsupported_action_trace_count": 0,
@@ -175,7 +175,7 @@
     "scenario_id": "d6.18-open-world-contamination-reserve-v0.1",
     "adjudication_status": "synthetic_known_answer_noisy_channel_evaluation_only",
     "hypothesis_count": 2,
-    "factor_count": 0,
+    "factor_count": 2,
     "trace_count": 5,
     "summary": {
       "unsupported_action_trace_count": 3,
