@@ -185,6 +185,7 @@ pub struct SolarHapsDayResult {
     /// and the repeated daily energy cycle all close. Calculated export energy is
     /// still reported when this flag is false, but must not be promoted as a
     /// sustainable service capability.
+    pub export_service_admissible: bool,
 }
 
 /// Validate the caller-supplied platform parameters before any accounting.
