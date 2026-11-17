@@ -39,9 +39,9 @@ A submitted policy is a rooted tree:
 
 Missing branches, duplicate/unreachable nodes, cycles, shared subtrees, repeated acquisition on a path, unavailable/future evidence, timestamp regressions, invalid action policies and oracle mismatches fail closed.
 
-At every reachable leaf the evaluator replays that history through D6.17.1. It reports nominal and worst-case posterior risk, evidence validity, action qualification, path cost, budget status, unsafe-world action count, justified target-action coverage and unnecessary abstention. It does not infer risk from a candidate claim.
+At every reachable leaf the evaluator replays that history through D6.17.1. It reports nominal and worst-case posterior risk, evidence validity, action qualification, path cost, budget status, unsafe-world action count, justified target-action coverage and unnecessary abstention. Action coverage counts only leaves that meet both risk and budget constraints. It does not infer risk from a candidate claim. Every deterministic world observation must have non-zero upper likelihood under that world’s registered channel row.
 
-The exhaustive oracle enumerates deterministic policies within the declared finite model and caps. Only terminal actions whose D6.17.1 robust risk qualifies are generated as feasible action leaves; deferral must use a non-irreversible, non-hard-gated zero-risk action safe in every evaluator world. It then selects lexicographically:
+The exhaustive oracle enumerates deterministic policies within the declared finite model and caps. The action contract carries an explicit evaluator-checked `read_only` property; the benchmark requires exactly one canonical read-only defer action, with zero risk allowance, no hard gate and safety in every evaluator world. The D6.17.1 adapter strips only that additional classification field before invoking the existing risk evaluator. Only terminal actions whose D6.17.1 robust risk qualifies are generated as feasible action leaves. It then selects lexicographically:
 1. maximize nominal target-action coverage;
 2. minimize worst-case expected acquisition-cost bound over the bounded-simplex prior;
 3. minimize nominal expected acquisition cost;
