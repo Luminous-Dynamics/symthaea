@@ -247,6 +247,51 @@ fn event_bounds(rows:&[JointRow],membership:&BTreeSet<usize>)->Result<Bounds,Str
  if lower>upper||nominal<lower||nominal>upper{return Err("joint-kernel event interval is infeasible".to_owned());}
  Ok(Bounds{lower,upper,nominal})
 }
+fn expected_event_bounds(priors:&BTreeMap<String,Bounds>,events:&BTreeMap<String,Bounds>)->Result<Bounds,String>{
+ if priors.keys().cloned().collect::<BTreeSet<_>>()!=events.keys().cloned().collect::<BTreeSet<_>>(){
+  return Err("event probabilities must cover the exact prior hypothesis set".to_owned());
+ }
+ let lower_mass:u64=priors.values().map(|x|x.lower).sum();
+ let upper_mass:u64=priors.values().map(|x|x.upper).sum();
+ if lower_mass>SCALE||upper_mass<SCALE{return Err("prior simplex cannot allocate unit mass for event expectation".to_owned());}
+ let nominal_num=priors.iter().try_fold(0u128,|sum,(id,p)|{
+  sum.checked_add(p.nominal as u128*events[id].nominal as u128)
+   .ok_or_else(||"nominal event expectation overflow".to_owned())
+ })?;
+ let mut lower_num=priors.iter().try_fold(0u128,|sum,(id,p)|{
+  sum.checked_add(p.lower as u128*events[id].lower as u128)
+   .ok_or_else(||"lower event expectation overflow".to_owned())
+ })?;
+ let mut lower_remaining=SCALE-lower_mass;
+ let mut lower_order:Vec<String>=priors.keys().cloned().collect();
+ lower_order.sort_by(|a,b|events[a].lower.cmp(&events[b].lower).then_with(||a.cmp(b)));
+ for id in lower_order{
+  let p=&priors[&id];let take=lower_remaining.min(p.upper-p.lower);
+  lower_num=lower_num.checked_add(take as u128*events[&id].lower as u128)
+   .ok_or("lower event expectation overflow")?;
+  lower_remaining-=take;if lower_remaining==0{break;}
+ }
+ if lower_remaining>0{return Err("prior upper bounds cannot allocate lower event expectation".to_owned());}
+ let mut upper_num=priors.iter().try_fold(0u128,|sum,(id,p)|{
+  sum.checked_add(p.lower as u128*events[id].upper as u128)
+   .ok_or_else(||"upper event expectation overflow".to_owned())
+ })?;
+ let mut upper_remaining=SCALE-lower_mass;
+ let mut upper_order:Vec<String>=priors.keys().cloned().collect();
+ upper_order.sort_by(|a,b|events[b].upper.cmp(&events[a].upper).then_with(||a.cmp(b)));
+ for id in upper_order{
+  let p=&priors[&id];let take=upper_remaining.min(p.upper-p.lower);
+  upper_num=upper_num.checked_add(take as u128*events[&id].upper as u128)
+   .ok_or("upper event expectation overflow")?;
+  upper_remaining-=take;if upper_remaining==0{break;}
+ }
+ if upper_remaining>0{return Err("prior upper bounds cannot allocate upper event expectation".to_owned());}
+ let lower=(lower_num/SCALE as u128) as u64;
+ let nominal=(nominal_num/SCALE as u128) as u64;
+ let upper=((upper_num+SCALE as u128-1)/SCALE as u128).min(SCALE as u128) as u64;
+ if lower>nominal||nominal>upper{return Err("aggregated event bounds do not contain nominal expectation".to_owned());}
+ Ok(Bounds{lower,upper,nominal})
+}
 fn support_lower(priors:&BTreeMap<String,Bounds>,likelihoods:&BTreeMap<String,Bounds>)->Result<u64,String>{
  let lower_mass: u64=priors.values().map(|x|x.lower).sum();
  let mut value:u128=priors.iter().map(|(id,p)|p.lower as u128*likelihoods[id].lower as u128).sum();
@@ -541,7 +586,8 @@ fn evaluate(raw:&str)->Result<Value,String>{
  let nominal_cost=ceil_scale2(nominal_outer);let worst_cost=ceil_scale2(worst_outer);
  let full_cost=options.values().try_fold(0u64,|sum,o|sum.checked_add(o.cost_micros).ok_or("full revalidation cost overflow"))?;
  let mut leaf_reports=Vec::new();let mut risk_violations=0usize;let mut budget_violations=0usize;
- let mut coverage_numerator=0u128;let mut unnecessary_numerator=0u128;let mut unsafe_numerator=0u128;
+ let mut coverage_numerator=0u128;let mut unnecessary_numerator=0u128;
+ let mut justified_act_leaves:BTreeSet<String>=BTreeSet::new();
  let mut actual_unsafe_nominal=0u64;let mut actual_unsafe_upper=0u64;
  for (leaf_id,path) in &leaf_paths{
   let membership=atoms_by_leaf.get(leaf_id).ok_or_else(||format!("leaf {leaf_id:?} has no joint rows"))?;
@@ -567,8 +613,10 @@ fn evaluate(raw:&str)->Result<Value,String>{
    if !safety[hypothesis].contains(&path.action_id){leaf_unsafe_numerator+=prior.nominal as u128*probability;}
   }
   let leaf_nominal_bps=(leaf_nominal_numerator/SCALE as u128) as u64;
-  if path.decision_kind=="act"&&justified&&within{coverage_numerator+=leaf_nominal_numerator;}
-  if path.decision_kind=="act"{unsafe_numerator+=leaf_unsafe_numerator;}
+  if path.decision_kind=="act"&&justified&&within{
+   coverage_numerator+=leaf_nominal_numerator;
+   justified_act_leaves.insert(leaf_id.clone());
+  }
   let target_risk=if path.decision_kind=="defer"{
    let (tn,tr,ts,_)=leaf_risk(&priors,&safety,&kernels,membership,&target_action)?;
    if ts>0&&tr<=actions[&target_action].max_risk&&within{unnecessary_numerator+=leaf_nominal_numerator;}
@@ -596,9 +644,30 @@ fn evaluate(raw:&str)->Result<Value,String>{
  let actual_unsafe_interval=event_bounds(&actual_kernel.rows,&actual_unsafe_rows)?;
  actual_unsafe_nominal=actual_unsafe_interval.nominal;
  actual_unsafe_upper=actual_unsafe_interval.upper;
+ let mut coverage_events=BTreeMap::new();
+ let mut unsafe_events=BTreeMap::new();
+ for (hypothesis,kernel) in &kernels{
+  let mut covered_rows=BTreeSet::new();
+  let mut unsafe_rows=BTreeSet::new();
+  for (leaf_id,path) in &leaf_paths{
+   let rows=atoms_by_leaf.get(leaf_id).and_then(|m|m.get(hypothesis));
+   if path.decision_kind!="act"{continue;}
+   if justified_act_leaves.contains(leaf_id){
+    if let Some(indices)=rows{covered_rows.extend(indices.iter().copied());}
+   }
+   if !safety[hypothesis].contains(&path.action_id){
+    if let Some(indices)=rows{unsafe_rows.extend(indices.iter().copied());}
+   }
+  }
+  coverage_events.insert(hypothesis.clone(),event_bounds(&kernel.rows,&covered_rows)?);
+  unsafe_events.insert(hypothesis.clone(),event_bounds(&kernel.rows,&unsafe_rows)?);
+ }
+ let coverage_bounds=expected_event_bounds(&priors,&coverage_events)?;
+ let unsafe_bounds=expected_event_bounds(&priors,&unsafe_events)?;
  let coverage=(coverage_numerator/SCALE as u128).min(SCALE as u128) as u64;
  let unnecessary=(unnecessary_numerator/SCALE as u128).min(SCALE as u128) as u64;
- let unsafe_bps=(unsafe_numerator/SCALE as u128).min(SCALE as u128) as u64;
+ if coverage!=coverage_bounds.nominal{return Err("nominal justified-action coverage does not reconcile with joint event aggregation".to_owned());}
+ let unsafe_bps=unsafe_bounds.nominal;
  let policy_feasible=risk_violations==0&&budget_violations==0;
  let report=json!({
   "scenario_id":scenario,"adjudication_status":"stochastic_joint_kernel_adaptive_policy_scoring",
@@ -609,7 +678,10 @@ fn evaluate(raw:&str)->Result<Value,String>{
   })).collect::<Vec<_>>(),
   "submitted_policy":{
    "policy_feasible":policy_feasible,"nominal_justified_action_coverage_bps":coverage,
-   "nominal_unsafe_action_mass_bps":unsafe_bps,"unnecessary_abstention_bps":unnecessary,
+   "justified_action_coverage_bounds_bps":{"lower":coverage_bounds.lower,"nominal":coverage_bounds.nominal,"upper":coverage_bounds.upper},
+   "nominal_unsafe_action_mass_bps":unsafe_bps,
+   "unsafe_action_mass_bounds_bps":{"lower":unsafe_bounds.lower,"nominal":unsafe_bounds.nominal,"upper":unsafe_bounds.upper},
+   "unnecessary_abstention_bps":unnecessary,
    "risk_violation_leaf_count":risk_violations,"over_budget_leaf_count":budget_violations,
    "actual_hypothesis_unsafe_probability_nominal_bps":actual_unsafe_nominal,
    "actual_hypothesis_unsafe_probability_upper_bps":actual_unsafe_upper,
