@@ -1,0 +1,432 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/research/humanoid-tool-service-v0.1/schema-v0.1.json",
+  "title": "HUM-TOOL-SERVICE-001 v0.1 case manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "programme_id",
+    "status",
+    "evidence_class",
+    "source_subject",
+    "benchmark_anchor",
+    "published_task_cells",
+    "extension_strata",
+    "service_loop_cases",
+    "negative_controls",
+    "evaluation_policy",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "programme_id": {
+      "const": "HUM-TOOL-SERVICE-001"
+    },
+    "status": {
+      "const": "protocol_only"
+    },
+    "evidence_class": {
+      "const": "synthetic_protocol_specification"
+    },
+    "source_subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "base_ref",
+        "base_sha",
+        "branch"
+      ],
+      "properties": {
+        "repository": {
+          "const": "Luminous-Dynamics/symthaea"
+        },
+        "base_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "base_sha": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "benchmark_anchor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "paper",
+        "paper_date",
+        "task_cell_count",
+        "scenario_order",
+        "execution_levels",
+        "tool_set_modes",
+        "note"
+      ],
+      "properties": {
+        "name": {
+          "const": "HumanoidToolBench"
+        },
+        "paper": {
+          "type": "string",
+          "format": "uri"
+        },
+        "paper_date": {
+          "type": "string",
+          "format": "date"
+        },
+        "task_cell_count": {
+          "const": 18
+        },
+        "scenario_order": {
+          "type": "array",
+          "const": [
+            "BallMove",
+            "BallRetrieve",
+            "IceBreak"
+          ]
+        },
+        "execution_levels": {
+          "type": "array",
+          "const": [
+            "L0",
+            "L1",
+            "L2"
+          ]
+        },
+        "tool_set_modes": {
+          "type": "array",
+          "const": [
+            "standard",
+            "decoy"
+          ]
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "published_task_cells": {
+      "type": "array",
+      "minItems": 18,
+      "maxItems": 18,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "source",
+          "scenario",
+          "execution_level",
+          "execution_contract",
+          "tool_set_mode",
+          "description",
+          "required_capability_domains",
+          "evidence_class",
+          "episode_plan",
+          "primary_outcomes",
+          "notes"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^HTB-[A-Z]+-L[012]-(STANDARD|DECOY)$"
+          },
+          "source": {
+            "const": "HumanoidToolBench-v1"
+          },
+          "scenario": {
+            "enum": [
+              "BallMove",
+              "BallRetrieve",
+              "IceBreak"
+            ]
+          },
+          "execution_level": {
+            "enum": [
+              "L0",
+              "L1",
+              "L2"
+            ]
+          },
+          "execution_contract": {
+            "enum": [
+              "tool_selection_and_pickup",
+              "stationary_tool_use",
+              "mobile_tool_use"
+            ]
+          },
+          "tool_set_mode": {
+            "enum": [
+              "standard",
+              "decoy"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "required_capability_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "evidence_class": {
+            "const": "benchmark_protocol_only"
+          },
+          "episode_plan": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "simulation_episodes_per_policy",
+              "physical_trials",
+              "training_seeds_target"
+            ],
+            "properties": {
+              "simulation_episodes_per_policy": {
+                "const": 100
+              },
+              "physical_trials": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "minimum": 1
+              },
+              "training_seeds_target": {
+                "const": 5
+              }
+            }
+          },
+          "primary_outcomes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "notes": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "extension_strata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "held_out_tool_instances",
+        "held_out_tool_families",
+        "task_tool_recombination",
+        "unseen_environment_and_work_surface",
+        "irrelevant_and_contradictory_instructions",
+        "friction_payload_occlusion_and_lighting_variation",
+        "tool_damage_and_wear",
+        "sensor_dropout_delay_saturation_and_clock_skew",
+        "interruption_and_recovery",
+        "separate_version_required"
+      ],
+      "properties": {
+        "held_out_tool_instances": {
+          "type": "boolean"
+        },
+        "held_out_tool_families": {
+          "type": "boolean"
+        },
+        "task_tool_recombination": {
+          "type": "boolean"
+        },
+        "unseen_environment_and_work_surface": {
+          "type": "boolean"
+        },
+        "irrelevant_and_contradictory_instructions": {
+          "type": "boolean"
+        },
+        "friction_payload_occlusion_and_lighting_variation": {
+          "type": "boolean"
+        },
+        "tool_damage_and_wear": {
+          "type": "boolean"
+        },
+        "sensor_dropout_delay_saturation_and_clock_skew": {
+          "type": "boolean"
+        },
+        "interruption_and_recovery": {
+          "type": "boolean"
+        },
+        "separate_version_required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "service_loop_cases": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "case_id",
+          "task",
+          "subject",
+          "energy_class",
+          "required_capability_domains",
+          "independent_verifier",
+          "preconditions",
+          "acceptance",
+          "evidence_class",
+          "actuator_authority",
+          "human_contact"
+        ],
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "pattern": "^SVC-[0-9]{2}$"
+          },
+          "task": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1
+          },
+          "energy_class": {
+            "const": "passive_or_low_energy"
+          },
+          "required_capability_domains": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "independent_verifier": {
+            "type": "string",
+            "minLength": 1
+          },
+          "preconditions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1
+          },
+          "acceptance": {
+            "type": "string",
+            "minLength": 1
+          },
+          "evidence_class": {
+            "const": "synthetic_protocol_only"
+          },
+          "actuator_authority": {
+            "const": false
+          },
+          "human_contact": {
+            "const": false
+          }
+        }
+      }
+    },
+    "negative_controls": {
+      "type": "array",
+      "minItems": 15,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "evaluation_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "paired_evaluation_seeds",
+        "independent_training_seeds_target",
+        "simulation_episodes_per_cell_policy_target",
+        "confidence_intervals_required",
+        "report_per_task_stratum",
+        "retain_timeouts_abstentions_interventions_and_indeterminate",
+        "no_aggregate_humanoid_score",
+        "hard_safety_constraints_non_compensable"
+      ],
+      "properties": {
+        "paired_evaluation_seeds": {
+          "const": true
+        },
+        "independent_training_seeds_target": {
+          "const": 5
+        },
+        "simulation_episodes_per_cell_policy_target": {
+          "const": 100
+        },
+        "confidence_intervals_required": {
+          "const": true
+        },
+        "report_per_task_stratum": {
+          "const": true
+        },
+        "retain_timeouts_abstentions_interventions_and_indeterminate": {
+          "const": true
+        },
+        "no_aggregate_humanoid_score": {
+          "const": true
+        },
+        "hard_safety_constraints_non_compensable": {
+          "const": true
+        }
+      }
+    },
+    "claim_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "actuator_authority",
+        "human_contact_authority",
+        "physical_qualification",
+        "benchmark_execution_claimed",
+        "training_claimed",
+        "simulator_run_claimed",
+        "ci_pass_claimed"
+      ],
+      "properties": {
+        "actuator_authority": {
+          "const": false
+        },
+        "human_contact_authority": {
+          "const": false
+        },
+        "physical_qualification": {
+          "const": false
+        },
+        "benchmark_execution_claimed": {
+          "const": false
+        },
+        "training_claimed": {
+          "const": false
+        },
+        "simulator_run_claimed": {
+          "const": false
+        },
+        "ci_pass_claimed": {
+          "const": false
+        }
+      }
+    }
+  }
+}
