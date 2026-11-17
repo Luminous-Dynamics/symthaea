@@ -113,9 +113,14 @@ impl fmt::Display for TournamentError {
                     "line {line} has a non-finite numeric field {field}"
                 )
             }
-            Self::EmptyFixtureId { line } => write!(formatter, "line {line} has an empty fixture ID"),
+            Self::EmptyFixtureId { line } => {
+                write!(formatter, "line {line} has an empty fixture ID")
+            }
             Self::RegimeMismatch { line } => {
-                write!(formatter, "line {line} changes the regime for an existing fixture")
+                write!(
+                    formatter,
+                    "line {line} changes the regime for an existing fixture"
+                )
             }
             Self::NonContiguousStep { line, expected, actual } => write!(
                 formatter,
