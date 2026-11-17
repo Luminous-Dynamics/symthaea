@@ -857,6 +857,7 @@ mod tests {
 
     fn candidate() -> CandidateCorroborationPortfolio {
         let mut anchor_source = source("robot-a-thermal", "sha256:obs-a", "sha256:cal-a");
+        anchor_source.source_dataset_digest = "sha256:dataset-a".into();
         anchor_source.rights_receipt_digest = "sha256:rights".into();
         let sources = vec![
             anchor_source,
