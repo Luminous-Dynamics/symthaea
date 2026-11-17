@@ -6,6 +6,8 @@
 
 use std::collections::{BTreeMap, HashSet};
 
+use serde::{Deserialize, Serialize};
+
 pub const EVENT_COUNT: usize = 5;
 pub const TRANSITION_COUNT: usize = 4;
 
@@ -46,7 +48,8 @@ impl EventKind {
 }
 
 /// The evaluator must never turn missing telemetry into a negative event.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "status", content = "timestamp_ns", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum EventEvidence {
     /// This event was not instrumented for the episode.
     NotInstrumented,
@@ -69,17 +72,97 @@ impl EventEvidence {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ExecutionLevel {
     L0SelectionPickup,
     L1StationaryUse,
     L2MobileUse,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum ToolSetMode {
     Standard,
     Decoy,
+}
+
+/// Named wire-format event collection for capability-transition-ledger-v0.1.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventReceiptSet {
+    pub candidate_contact: EventEvidence,
+    pub correct_first_contact: EventEvidence,
+    pub correct_tool_lift: EventEvidence,
+    pub tool_target_contact: EventEvidence,
+    pub task_success: EventEvidence,
+}
+
+impl EventReceiptSet {
+    pub fn into_array(self) -> [EventEvidence; EVENT_COUNT] {
+        [
+            self.candidate_contact,
+            self.correct_first_contact,
+            self.correct_tool_lift,
+            self.tool_target_contact,
+            self.task_success,
+        ]
+    }
+}
+
+/// JSON receipt matching schema-v0.1.json. The schema version is checked
+/// before conversion into the evaluator's internal representation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EventLedgerReceiptV0_1 {
+    pub schema_version: String,
+    pub episode_id: String,
+    pub policy_id: String,
+    pub split_id: String,
+    pub scenario_id: String,
+    pub execution_level: ExecutionLevel,
+    pub tool_set_mode: ToolSetMode,
+    pub clock_domain_id: String,
+    pub source_id: String,
+    pub independent_verifier_id: Option<String>,
+    pub events: EventReceiptSet,
+}
+
+impl TryFrom<EventLedgerReceiptV0_1> for EpisodeEventLedger {
+    type Error = String;
+
+    fn try_from(receipt: EventLedgerReceiptV0_1) -> Result<Self, Self::Error> {
+        if receipt.schema_version != "0.1" {
+            return Err(format!(
+                "unsupported capability-transition receipt schema_version {:?}",
+                receipt.schema_version
+            ));
+        }
+        let ledger = EpisodeEventLedger {
+            episode_id: receipt.episode_id,
+            policy_id: receipt.policy_id,
+            split_id: receipt.split_id,
+            scenario_id: receipt.scenario_id,
+            execution_level: receipt.execution_level,
+            tool_set_mode: receipt.tool_set_mode,
+            clock_domain_id: receipt.clock_domain_id,
+            source_id: receipt.source_id,
+            independent_verifier_id: receipt.independent_verifier_id,
+            events: receipt.events.into_array(),
+        };
+        ledger.validate()?;
+        Ok(ledger)
+    }
+}
+
+/// Deserialize a JSON array of v0.1 episode receipts into validated evaluator rows.
+///
+/// This function does not infer missing events or synthesize timestamps. A caller
+/// must supply source-provided timestamps in the episode's declared clock domain.
+pub fn deserialize_json_receipts(input: &str) -> Result<Vec<EpisodeEventLedger>, String> {
+    let receipts: Vec<EventLedgerReceiptV0_1> = serde_json::from_str(input)
+        .map_err(|error| format!("invalid capability-transition receipt JSON: {error}"))?;
+    receipts.into_iter().map(EpisodeEventLedger::try_from).collect()
 }
 
 /// One episode's event evidence, all timestamps belonging to clock_domain_id.
@@ -337,6 +420,42 @@ mod tests {
             EventEvidence::OccurredAtNs(40),
             EventEvidence::OccurredAtNs(50),
         ]
+    }
+
+    #[test]
+    fn json_fixtures_deserialize_and_preserve_cell_strata() {
+        let rows = deserialize_json_receipts(include_str!("../fixtures-v0.1.json")).unwrap();
+        assert_eq!(rows.len(), 6);
+        let summaries = summarize_by_cell(&rows).unwrap();
+        assert_eq!(summaries.len(), 5);
+    }
+
+    #[test]
+    fn json_receipts_reject_unknown_schema_versions_and_unknown_fields() {
+        let unknown_version = r#"[{
+            "schema_version":"9.9",
+            "episode_id":"episode-1",
+            "policy_id":"policy-a",
+            "split_id":"heldout",
+            "scenario_id":"BallMove",
+            "execution_level":"L1_STATIONARY_USE",
+            "tool_set_mode":"STANDARD",
+            "clock_domain_id":"sim-clock",
+            "source_id":"event-recorder",
+            "independent_verifier_id":"task-oracle",
+            "events":{
+                "candidate_contact":{"status":"NOT_INSTRUMENTED"},
+                "correct_first_contact":{"status":"NOT_INSTRUMENTED"},
+                "correct_tool_lift":{"status":"NOT_INSTRUMENTED"},
+                "tool_target_contact":{"status":"NOT_INSTRUMENTED"},
+                "task_success":{"status":"NOT_INSTRUMENTED"}
+            }
+        }]"#;
+        assert!(deserialize_json_receipts(unknown_version).is_err());
+
+        let mut valid = include_str!("../fixtures-v0.1.json").to_string();
+        valid = valid.replacen("\"episode_id\": \"ct-001\",", "\"unexpected\": true,\"episode_id\": \"ct-001\",", 1);
+        assert!(deserialize_json_receipts(&valid).is_err());
     }
 
     #[test]
