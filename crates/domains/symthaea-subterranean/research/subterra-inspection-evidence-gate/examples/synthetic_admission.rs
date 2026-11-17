@@ -1,9 +1,8 @@
-use subterra_inspection_evidence_gate::{
-    CandidateInspectionOption, EvidencePurpose, ExpectedInspectionContext,
-    EvidenceManifest, ReceiptVerificationDisposition, RightsDisposition,
-    SpatialScopeDisposition, admit_candidate,
-};
 use subterra_inspection_campaign::{InspectionOption, ResourceVector};
+use subterra_inspection_evidence_gate::{
+    CandidateInspectionOption, EvidenceManifest, EvidencePurpose, ExpectedInspectionContext,
+    ReceiptVerificationDisposition, RightsDisposition, SpatialScopeDisposition, admit_candidate,
+};
 
 fn main() {
     let now = 1_800_000_000_000_u64;
