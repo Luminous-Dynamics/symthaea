@@ -439,7 +439,8 @@
         "measurand",
         "stimuli_digest",
         "environment",
-        "seed"
+        "seed",
+        "replicate_count"
       ],
       "properties": {
         "protocol_id": {
@@ -524,6 +525,10 @@
             "null"
           ],
           "minimum": 0
+        },
+        "replicate_count": {
+          "type": "integer",
+          "minimum": 1
         }
       }
     },
@@ -535,7 +540,8 @@
         "validation_digest",
         "test_digest",
         "contact_episode_split_digest",
-        "physical_article_split_digest"
+        "physical_article_split_digest",
+        "target_encoder_trained"
       ],
       "properties": {
         "train_digest": {
@@ -604,7 +610,8 @@
         "calibration_disposition",
         "observability_disposition",
         "model_adequacy_disposition",
-        "lifecycle_applicability_disposition"
+        "lifecycle_applicability_disposition",
+        "receipt_verification_status"
       ],
       "properties": {
         "raw_observation_digest": {
