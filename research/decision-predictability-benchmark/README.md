@@ -51,6 +51,7 @@ The split manifest is deliberately not yet wired to the forecast tournament. Tha
 The candidate-view module provides an explicit, serializable `CandidatePacketV1` and a separate, non-serializable `EvaluatorTicketBook`.
 
 - Candidate packets contain only a per-run opaque ticket, task-contract digest, time unit, as-of time, channel names, allowed action IDs and causal observation frames.
+- The evaluator binds a packet only through a `ValidatedManifest`, requires the packet's task-contract digest to match that manifest exactly, and rejects scenario IDs absent from the validated manifest.
 - The packet schema has no fields for scenario ID, split role, group memberships, seed commitment, reference-data digest, solver qualification digest, latent state, intervention label or hidden truth. Unknown fields are rejected when deserializing.
 - The evaluator ticket book retains the mapping from one-use ticket to the hidden scenario record. Ticket reuse in one book is rejected.
 - Observation timestamps must be monotonic and no later than the declared as-of time. Values must be finite when present; missing channels remain explicit.
