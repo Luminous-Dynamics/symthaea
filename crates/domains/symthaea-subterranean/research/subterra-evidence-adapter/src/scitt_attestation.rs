@@ -881,4 +881,30 @@ mod tests {
         assert_eq!(statement.predicate.events.len(), 3);
     }
 
+    #[test]
+    fn independent_vector_matches_pinned_binary_digest_and_length() {
+        assert_eq!(INDEPENDENT_CONFORMANCE_VECTOR.len(), 1_622);
+        assert_eq!(
+            sha256_hex(INDEPENDENT_CONFORMANCE_VECTOR),
+            "464b541e1c0918d67248e05159832ce16e6f5a1592f088f8bb1bb1a6ddca5762"
+        );
+    }
+
+    #[test]
+    fn independent_vector_signature_byte_tampering_is_rejected() {
+        let mut tampered = INDEPENDENT_CONFORMANCE_VECTOR.to_vec();
+        *tampered.last_mut().unwrap() ^= 0x01;
+        assert_eq!(
+            verify_scitt_signed_science_return_statement(
+                &tampered,
+                b"abc",
+                INDEPENDENT_CONFORMANCE_ISSUER,
+                INDEPENDENT_CONFORMANCE_SUBJECT,
+                INDEPENDENT_CONFORMANCE_KEY_ID,
+                &INDEPENDENT_CONFORMANCE_PUBLIC_KEY,
+            ),
+            Err(ScittAttestationError::InvalidSignature)
+        );
+    }
+
 }

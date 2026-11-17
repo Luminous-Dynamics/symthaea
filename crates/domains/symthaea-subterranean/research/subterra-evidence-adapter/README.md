@@ -52,7 +52,7 @@ The package has its own Cargo workspace and does not join the production Symthae
 ## Validation boundary
 
 - Site, cave-network and non-uniform-profile adapters, science-return lifecycle, pinned upstream-schema manifest and unit-test fixtures: AUTHORED.
-- Authored tests: 21 site/network + 6 profile + 39 science-return + 14 SCITT/in-toto attestation = 80 adapter tests.
+- Authored tests: 21 site/network + 6 profile + 39 science-return + 17 SCITT/in-toto attestation = 83 adapter tests.
 - The profile adapter validates ordered contiguous coverage and computes observed-only geometry summaries; it does not yet propagate uncertainty through the summary statistics.
 - The science-return record validates stage sequence, canonical UTC timestamp syntax, clock identity, declared uncertainty (at least 1,000 ms for whole-second timestamps), definite same-clock regressions, and acquired-payload SHA-256/byte-length integrity. `verify_signed_payload_bytes()` additionally verifies a detached Ed25519 signature using externally expected actor/key identities and a caller-trusted public key. The signature binds site, observation, acquired event/actor/source-evidence-reference/clock metadata, digest, byte length and key ID. This proves only that the corresponding private key signed the envelope. The package does not establish the key's identity, authorization, expiry/revocation, secure storage, immutable custody or transport delivery.
 - The upstream manifest pins source Git objects but does not fetch or authenticate upstream content at runtime.
@@ -78,3 +78,6 @@ This path is intended for interoperability; the earlier project-specific Ed25519
 ### Independent SCITT interoperability vector
 
 `fixtures/scitt-in-toto-conformance-vector-v0.1.cbor` is an independently generated tag-18 Signed_Statement, not produced by the Rust `coset` crate. It was generated with Python `cryptography 46.0.4` Ed25519 and a separate minimal canonical-CBOR encoder. Its JSON metadata records the public key, trusted issuer/subject/key ID, payload, and exact binary SHA-256/length. The Rust suite verifies the fixed bytes through the production verifier.
+
+
+The conformance fixture is guarded by an exact 1,622-byte length and SHA-256 check. A separate tamper control flips the final signature byte and requires strict verification failure.

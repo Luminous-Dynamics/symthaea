@@ -508,3 +508,6 @@ The SCITT Signed_Statement is not yet a Transparent Statement: no transparency s
 
 
 The independent Signed_Statement vector is pinned by SHA-256 `464b541e1c0918d67248e05159832ce16e6f5a1592f088f8bb1bb1a6ddca5762`, length 1,622 bytes. It uses a three-event science-return record through acquisition and an external public key. The private seed is intentionally not included.
+
+
+The independent conformance fixture has two additional immutable controls: exact binary SHA-256/length and a final-signature-byte mutation that must fail strict verification. This prevents unnoticed fixture replacement and gives a deterministic negative control independent of the Rust signer.
