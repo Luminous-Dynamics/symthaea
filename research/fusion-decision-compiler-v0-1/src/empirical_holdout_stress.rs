@@ -94,14 +94,12 @@ pub enum EmpiricalStressDiagnostic {
     DecisionProfileMismatch,
     ValidationProfileDigestMismatch,
     ResidualBasisMismatch,
-    InvalidHoldoutDisposition,
     DuplicateSlice,
     MissingRequiredSlice,
     UnexpectedSlice,
     SliceOutOfDomain,
     InsufficientSliceSamples,
     InsufficientIndependentGroups,
-    InvalidSliceValue,
     NonFiniteResidual,
     InvalidResidualRange,
     DuplicateSliceEvidence,
@@ -747,12 +745,11 @@ fn classify_stress_interval(
 fn aggregate_stress_decision(reports: &[ModelEmpiricalStressReport]) -> EmpiricalStressDecision {
     let mut passes = 0;
     let mut fails = 0;
-    let mut ambiguous = 0;
     for report in reports {
         match report.stress_side {
             EmpiricalStressSide::StressPass => passes += 1,
             EmpiricalStressSide::StressFail => fails += 1,
-            EmpiricalStressSide::ThresholdAmbiguous => ambiguous += 1,
+            EmpiricalStressSide::ThresholdAmbiguous => {}
         }
     }
     if passes == reports.len() {
@@ -761,8 +758,6 @@ fn aggregate_stress_decision(reports: &[ModelEmpiricalStressReport]) -> Empirica
         EmpiricalStressDecision::AllModelsStressFail
     } else if passes > 0 && fails > 0 {
         EmpiricalStressDecision::StressDecisionSplit
-    } else if ambiguous > 0 {
-        EmpiricalStressDecision::StressAmbiguous
     } else {
         EmpiricalStressDecision::StressAmbiguous
     }
@@ -864,7 +859,7 @@ mod tests {
             maximum_absolute_residual: radius,
             residual_unit_ref: "MWe".to_string(),
             residual_basis_ref: "abs-measured-minus-predicted-v1".to_string(),
-            residual_profile_sha256: sha('8'),
+            residual_profile_sha256: sha('6'),
             evidence_ref: format!("slice-evidence-{id}"),
         }
     }
