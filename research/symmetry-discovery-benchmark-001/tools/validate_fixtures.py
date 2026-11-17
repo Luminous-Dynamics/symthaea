@@ -8,6 +8,7 @@ rationals via Fraction(str(value)).
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import math
 from collections import defaultdict
@@ -18,6 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "fixtures" / "v0.1" / "cases.json"
 SCHEMA = ROOT / "schemas" / "case_manifest.schema.json"
+GENERATOR = ROOT / "tools" / "generate_d4_pointsets.py"
 
 
 def fail(message: str) -> None:
@@ -226,6 +228,19 @@ def main():
     Draft202012Validator.check_schema(schema)
     Draft202012Validator(schema).validate(fixture)
 
+    spec = importlib.util.spec_from_file_location("d4_pointset_generator", GENERATOR)
+    if spec is None or spec.loader is None:
+        fail("could not load deterministic D4 generator")
+    generator = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(generator)
+    generated = generator.generate_cases(fixture)
+    stored_generated = [
+        case for case in fixture["cases"]
+        if case["case_id"].startswith("GENERATED-")
+    ]
+    if stored_generated != generated:
+        fail("generated point-set corpus differs from deterministic generator output")
+
     ambient = fixture["ambient_group"]
     element_ids, matrices, product_table, inverses = parse_group(ambient)
     case_ids = [case["case_id"] for case in fixture["cases"]]
@@ -246,6 +261,7 @@ def main():
     print(f"group={ambient['group_id']} order={len(element_ids)} products={len(product_table)} inverse_witnesses={len(inverses)}")
     for case_id, stabilizer in results:
         print(f"{case_id}: {','.join(stabilizer)}")
+    print(f"generated_exact_cases={len(generated)}; families=5; cases_per_family=30")
     print("benchmark_status=fixture_validation_only; external_baseline_runs=not_started")
 
 
