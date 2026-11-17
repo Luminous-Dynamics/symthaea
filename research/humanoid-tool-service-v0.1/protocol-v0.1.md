@@ -366,6 +366,80 @@ inspect -> isolate -> diagnose -> select replacement/tool
 
 A repair proposal and a repair execution are different records. Return-to-service requires a current, independent acceptance result and exact configuration lineage.
 
+## 5A. HLB in the humanoid: architecture and falsifiable ablations
+
+### Decision and responsibility boundary
+
+Use Symthaea's Holographic Liquid Brain (HLB) as the persistent embodied-cognition and temporal-state substrate, **not** as the hard-real-time servo controller, the sole whole-body controller, or the physical-safety authority. The HLB hypothesis is that compositional HDC state, liquid temporal dynamics, active inference, prediction, uncertainty and validated memory improve long-horizon adaptation, tool-use transfer and recovery. It is not assumed to beat simpler recurrent models.
+
+The current modern `symthaea-humanoid` trainer already uses `HdcLtcUnifiedNetwork`: the 16,384-dimensional state is projected through a 64-dimensional bottleneck to a morphology-sized learned residual. The current trainer feeds observation-encoded state to that network every physics step, composes its residual with task-specific PD baselines through `HierarchicalHumanoidController`, then applies fall protection, deterministic safety projection and backend adaptation before stepping the simulator. Current defaults are 40 Hz physics and 10 Hz cognitive/FEP updates. These are software configuration defaults, not measured physical hardware rates.
+
+The distinction in learning maturity is important:
+- Head-only output learning is the default checkpointable path.
+- An optional path updates HDC-LTC recurrent neurons, but is disabled by default.
+- Full recurrent learner checkpoint/resume is not currently supported; current checkpoints explicitly mark recurrent state absent and reject a claim that it has been restored.
+- The legacy `HumanoidEmbodiment::step(thought_hv, dt, phi)` bridge is a separate path, not the same observation-encoded hierarchical trainer.
+
+The recurrent-state gap belongs to #1269; clock semantics belong to #1284; action/observation semantics belong to UEC v2 #1274/#1288; plant safety must remain independent from cognitive readiness under #1276. Do not create parallel contracts or infer authority from HLB confidence, Φ/Ψ or capability discovery.
+
+### Composed architecture
+
+```text
+typed observations + provenance + clocks
+                |
+       state estimation / freshness
+                |
+      HLB embodied belief and prediction
+ (body + grasp + tool + environment + task)
+                |
+ bounded skill executive / active sensing
+                |
+    task-space goal / motion-latent proposal
+                |
+ existing whole-body + contact-aware control
+                |
+ independent safety admission + local watchdog
+                |
+ measured plant transition + independent verifier
+                |
+ episodic receipt -> candidate memory/skill
+                |
+ replay, counterfactual, transfer, retention gate
+```
+
+HLB owns persistent context, predictions, uncertainty, active observation selection, skill retrieval and candidate learning. The skill executive owns bounded preconditions, state transitions, postconditions, retry limits and handoff. The existing whole-body stack keeps balance, contact, inverse dynamics, grasp and trajectory tracking. Servo/current loops, watchdog, e-stop, safety admission and qualified local fallback remain independent and must function when HLB is late, stale, reset or absent.
+
+### Matched ablation matrix
+
+Hold the morphology, observations, simulator, seeds, action envelope, training/evaluation budget and verifier fixed. Run:
+A. deterministic baseline + hierarchy, no learned residual;
+B. capacity-matched MLP residual;
+C. capacity-matched GRU residual;
+D. HDC encoder + static readout (isolates representation);
+E. current HDC-LTC residual path (current Symthaea baseline);
+F. checkpointable recurrent HDC-LTC learning (only after #1269);
+G. HLB + episodic memory, no procedural skill promotion;
+H. HLB + validated procedural memory + active sensing;
+I. AMP-style agent planner + the same local whole-body controller;
+J. same agent planner + HLB state/memory + the same local controller.
+
+Separate HDC encoding, liquid dynamics, FEP/active inference, episodic memory, procedural memory, active sensing and planner identity with individual ablations. Include parameter-matched and compute-budget-matched recurrent baselines. Do not attribute a gain from a stronger proprietary planner to HLB.
+
+### Metrics and prospective targets
+
+Report verified task success by task cell, held-out tool/task/environment transfer, contact prediction and calibration, correct abstention, recovery success and burden, repeated-failure rate, protected-skill retention, poisoned/stale-memory rejection, false verifier acceptance, HLB and controller p50/p95/p99 latency, deadline misses, model-reasoning wall time, plant time, energy, compute, human intervention and accepted work per robot-hour. Unsafe action admission, loss of local fallback and false return-to-service are non-compensable failures.
+
+Prospective targets (not current results):
+- RoboLab-120: stretch target >=90% under the official 3,000-episode protocol, versus the current 86.0% leaderboard point estimate. This is not a humanoid claim and not directly comparable to HumanoidToolBench.
+- HumanoidToolBench: >=10 percentage-point paired improvement on a preregistered held-out mobile/decoy composite over the strongest locally reproducible baseline, after G1 adapter runtime conformance; publish all 18 cells separately.
+- Own held-out transfer suite: >=80% verified success on same-family and task-composition transfer.
+- >=20% relative reduction in recovery/intervention burden without reducing verified success; separately test a 4x reduction in repeated failure after memory, with protected-skill and poisoning controls.
+- >=90% verified completion on the low-risk service suite, with zero false restoration acceptances in its frozen negative controls.
+- HLB p99 update latency must fit a measured profile-specific budget without consuming local controller/watchdog deadlines. Do not invent a universal update frequency.
+- All frozen timeout/stale/reset tests must retain the declared local fallback or enter the declared restrictive state. This finite result is not a universal safety guarantee.
+
+The full experimental contract, ablation arms, metrics, gates and no-claim list live in [hlb-humanoid-ablation-v0.1.md](hlb-humanoid-ablation-v0.1.md). No HLB ablation has been run and no SOTA improvement is claimed.
+
 ## 6. Tool-use evaluation protocol
 
 ### 6.1 Published anchor
