@@ -192,7 +192,8 @@ def validate_generic(path: Path, text: str, pr_block: list[str]) -> tuple[int, i
             )
         draft_guarded += 1
 
-    if runner_jobs:
+    # Explicitly non-PR runner roots do not require a PR ready_for_review event.
+    if draft_guarded:
         require_ready_event(path, pr_block)
     return runner_jobs, draft_guarded
 
