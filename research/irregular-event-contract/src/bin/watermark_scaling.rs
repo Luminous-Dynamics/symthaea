@@ -187,7 +187,9 @@ fn build_ledger(
     let clone_reference_elapsed = clone_reference_started.elapsed();
 
     if direct_ledger.state_sha256() != clone_ledger.state_sha256() {
-        return Err("direct and clone-reference ingestion produced different ledger digests".to_owned());
+        return Err(
+            "direct and clone-reference ingestion produced different ledger digests".to_owned(),
+        );
     }
     Ok((
         direct_ledger,
