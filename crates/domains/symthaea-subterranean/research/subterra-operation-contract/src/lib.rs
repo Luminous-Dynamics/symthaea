@@ -292,6 +292,7 @@ pub enum VerificationIssue {
     MissingDigest,
     VerifierIsExecutor,
     SensorChainShared,
+    WorkPackageOrDesignMismatch,
     CoordinateFrameMismatch,
     CalibrationMismatch,
     CoverageInsufficient,
@@ -336,7 +337,7 @@ impl VerificationReceipt {
             || self.design_revision != spec.design_revision
             || self.design_digest != spec.design_digest
         {
-            issues.push(VerificationIssue::CoordinateFrameMismatch);
+            issues.push(VerificationIssue::WorkPackageOrDesignMismatch);
         }
         if self.coordinate_frame_revision != spec.coordinate_frame_revision
             || self.coordinate_frame_digest != spec.coordinate_frame_digest
@@ -525,6 +526,7 @@ impl OperationAttempt {
                     | OperationEvent::AdditionalEvidenceReceived { .. }
                     | OperationEvent::CloseAccepted
                     | OperationEvent::RecordReworkReview { .. }
+                    | OperationEvent::AuthorizeRework { .. }
             )
         {
             return Err(ContractError::WorkPackageExpired);
@@ -1718,5 +1720,4 @@ mod tests {
                 .contains(&VerificationIssue::PhysicalDeltaMismatch)
         );
     }
-
 }
