@@ -560,3 +560,87 @@ Symthaea should not claim that its HDC generator beats these systems at generic 
 - Symthaea research issue: https://github.com/Luminous-Dynamics/symthaea/issues/12519
 
 **Evidence boundary:** Symthaea proposes and reasons over candidate grammars; Symtropy evaluates declared physical/structural models; physical coupons and applicable independent engineering qualification determine whether a result can be used in real structures.
+
+
+
+## Structural reasoning frontier — anisotropy, joint compliance and mass-matched evaluation (2026-11-17)
+
+### Current research signals
+
+- The 15 September 2026 review of modular discrete mechanical metamaterials states that inter-module contact, constraints and cooperative interactions shape global stiffness, strength, deformation and energy absorption. A cell-only representation is not enough when interfaces dominate: https://doi.org/10.1016/j.ijmecsci.2026.111915
+- The May 2026 review of anisotropic mechanical metamaterials covers deliberate control of directional response and the shift from intuitive designs toward data-driven unit-cell design: https://doi.org/10.1016/j.tws.2026.114719
+- The September 2026 mechano-X review examines multifunctional architectures and highlights manufacturability, robustness, standardization and sustainability as deployment challenges: https://doi.org/10.1016/j.cossms.2026.101272
+- NIST AM-Bench is moving toward higher-TRL component challenges in 2028 while maintaining lower-TRL modeling benchmarks. Its purpose is controlled measured data for validating manufacturing models, not scoring geometry generators: https://www.nist.gov/ambench
+
+### Updated Symthaea representation
+
+Represent the design as a typed, multilevel, attributed hypergraph with:
+- node/hub identity and connector port frames;
+- member identity, geometry, material, section and principal-axis orientation;
+- interface stiffness/compliance and tolerance distribution;
+- bay/cell relationships and shared-face attachments;
+- assembly/disassembly partial order and robot grasp/tool-access constraints;
+- services, inspection regions, and occupant-infll modules as separate typed layers;
+- links to manufacturing batch, metrology, solver assumptions and physical test receipts.
+
+A conventional graph is still useful, but a hyperedge or explicit interface object is preferable where an interface is shared by several members or cells. HDC/VSA can encode and retrieve this graph; the typed graph remains authoritative.
+
+### Model-fidelity ladder
+
+Symthaea must route candidate designs to the appropriate Symtropy model and explicitly record which physics are absent:
+
+1. Geometry and topological validity.
+2. Perfect-joint axial truss and kinematic mechanism detection.
+3. Axial joint-end compliance and tolerance/fit constraints.
+4. Member axial yield and elastic Euler screening.
+5. Beam/frame elements, rotational joint stiffness and global eigenvalue buckling.
+6. Imperfection-sensitive nonlinear response, contact, fatigue/fracture and damage progression.
+7. Physical coupons, metrology, NDE and mission-specific qualification.
+
+Do not train an HDC surrogate to return a single scalar "safe" label across these levels. Its response should be typed, scoped, and confidence-qualified, with unsupported extrapolation returned as unknown/inconclusive.
+
+### Matched-mass benchmark design
+
+A same-material/same-cross-section comparison can favor one topology simply because it contains more material. Compare candidate topologies under an agreed member-mass budget and fixed external problem definition:
+- same external envelope and attachment/support coordinates;
+- same load vectors, load combinations and constraints;
+- same material density, modulus, yield model and manufacturing route;
+- same member-mass budget and explicitly stated mass exclusions;
+- same solver fidelity, convergence tolerance and evaluation budget;
+- same damage scenarios and uncertainty distributions.
+
+Report member-only mass separately from connector/node/fastener/service mass. A member-mass-normalized axial truss comparison is not a whole-system mass comparison. Add joint, inspection, assembly, service and lifecycle mass before making system-level claims.
+
+### Multiobjective target vector
+
+Symthaea should generate Pareto-diverse candidates across:
+- directional stiffness/compliance tensor and displacement;
+- yield and elastic/inelastic member buckling indicators;
+- global stability and imperfection sensitivity when a validated model exists;
+- joint compliance, connector count, port crowding and tolerance closure;
+- single- and multi-member/joint failure response;
+- member, joint, connector and total-system mass;
+- manufacturing yield, inspection access and repair time;
+- assembly sequence complexity, tool changes, pose correction and replacement;
+- energy/environmental cost over the declared lifecycle;
+- occupant accessibility, privacy choice, sensory controllability and expressive configurability.
+
+### Required learning and search baselines
+
+- parametric grammar enumeration and constrained graph rewriting;
+- NSGA-II/III or other documented multiobjective evolutionary methods;
+- topology optimization with process-aware constraints;
+- Bayesian optimization / surrogate-assisted active learning;
+- graph neural networks and conventional latent graph representations where appropriate;
+- HDC/VSA families (HRR, FHRR, MAP, BSC, TPR, GHRR) for compositional representation;
+- human-authored candidate set.
+
+Hold out complete topology families, connector families, load cases, manufacturing process families and scale regimes. Use identical evaluation budgets and disclose failed/infeasible candidates; do not report only surviving Pareto points.
+
+### Competitive boundary
+
+nTop already offers implicit modeling, graph/TPMS/custom lattices, topology optimization, structural/thermal analysis and manufacturing-oriented export: https://www.ntop.com/software/capabilities/integrations/
+Autodesk Fusion already supports manufacturing-constrained generative design and multiple process choices: https://help.autodesk.com/cloudhelp/ENU/Fusion-GenerativeDesign/files/GD-DESIGN-CRITERIA.htm
+NASA and JPL are already exploring autonomous or supervised robotic assembly of modular space structures, including self-aligning structures and integrated power connections: https://www.nasa.gov/automated-reconfigurable-mission-adaptive-digital-assembly-systems-armadas/ and https://robotics.jpl.nasa.gov/what-we-do/research-tasks/risk-reduction-for-robotic-in-space-telescope-assembly-concept/
+
+Symthaea's defensible opportunity is not generic geometry generation. It is reasoning across module grammar, compliant interfaces, assembly, inspection, damage, repair, evidence and human-authored spatial variation, while Symtropy and physical tests remain the source of mechanical evidence.
