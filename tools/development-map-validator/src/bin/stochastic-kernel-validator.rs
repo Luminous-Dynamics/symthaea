@@ -142,11 +142,11 @@ fn parse_candidate(v:&Value)->Result<(String,String,BTreeMap<String,String>,BTre
   if factors.insert(factor_id.clone(),Factor{outcomes,likelihoods}).is_some(){return Err(format!("duplicate factor ID {factor_id:?}"));}
  }
  for (option,factor) in &options{if !factors.contains_key(factor){return Err(format!("option {option:?} references missing factor {factor:?}"));}}
- let referenced:BTreeSet<String>=options.values().cloned().collect();
- if referenced!=factors.keys().cloned().collect(){return Err("candidate factors must be referenced by the exact option factor set".to_owned());}
  if options.values().collect::<BTreeSet<_>>().len()!=options.len(){
   return Err("each acquisition option must reference a unique factor ID".to_owned());
  }
+ let referenced:BTreeSet<String>=options.values().cloned().collect();
+ if referenced!=factors.keys().cloned().collect(){return Err("candidate factors must be referenced by the exact option factor set".to_owned());}
  for factor in factors.values(){
   let hypotheses:Vec<String>=factor.likelihoods.keys().cloned().collect();
   for hypothesis in &hypotheses{
@@ -339,5 +339,5 @@ mod tests{
  #[test]fn revoked_kernel_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["oracle"]["world_kernels"][0]["revoked_at"]=json!("2026-11-17T10:00:00Z");assert!(evaluate(&b.to_string()).unwrap_err().contains("revoked"));}
  #[test]fn nominal_mass_must_sum_to_one(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["oracle"]["world_kernels"][0]["joint_outcomes"][0]["nominal_probability_bps"]=json!(4000);assert!(evaluate(&b.to_string()).unwrap_err().contains("not a non-empty bounded simplex"));}
  #[test]fn underclaimed_channel_marginal_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["factors"][0]["likelihoods"][0]["outcomes"]["fail"]["upper_likelihood_bps"]=json!(4900);assert!(evaluate(&b.to_string()).unwrap_err().contains("does not conservatively contain"));}
- #[test]fn mismatched_nominal_channel_marginal_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["factors"][1]["likelihoods"][0]["outcomes"]["fail"]["nominal_likelihood_bps"]=json!(4901);assert!(evaluate(&b.to_string()).unwrap_err().contains("does not conservatively contain"));}
+ #[test]fn mismatched_nominal_channel_marginal_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["factors"][1]["likelihoods"][0]["outcomes"]["fail"]["nominal_likelihood_bps"]=json!(4901);b["candidate_view"]["factors"][1]["likelihoods"][0]["outcomes"]["pass"]["nominal_likelihood_bps"]=json!(5099);assert!(evaluate(&b.to_string()).unwrap_err().contains("does not conservatively contain"));}
 }
