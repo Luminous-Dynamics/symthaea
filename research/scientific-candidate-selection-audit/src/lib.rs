@@ -288,6 +288,13 @@ pub struct CandidateSelectionAudit {
     pub selection_cost_units: f64,
     pub budget_limit_cost_units: f64,
     pub attempted_candidates: usize,
+    pub ready_attempts: usize,
+    pub generation_failed_attempts: usize,
+    pub execution_failed_attempts: usize,
+    pub timed_out_attempts: usize,
+    pub invalid_attempts: usize,
+    pub rejected_attempts: usize,
+    pub incomplete_attempts: usize,
     pub distinct_model_artifact_count: usize,
     pub selectable_candidate_count: usize,
     pub exact_duplicate_candidate_attempts: usize,
@@ -1104,6 +1111,13 @@ impl CandidateSelectionAudit {
                 "\"selection_cost_units\":{:.8},",
                 "\"budget_limit_cost_units\":{:.8},",
                 "\"attempted_candidates\":{},",
+                "\"ready_attempts\":{},",
+                "\"generation_failed_attempts\":{},",
+                "\"execution_failed_attempts\":{},",
+                "\"timed_out_attempts\":{},",
+                "\"invalid_attempts\":{},",
+                "\"rejected_attempts\":{},",
+                "\"incomplete_attempts\":{},",
                 "\"distinct_model_artifact_count\":{},",
                 "\"selectable_candidate_count\":{},",
                 "\"exact_duplicate_candidate_attempts\":{},",
@@ -1136,6 +1150,13 @@ impl CandidateSelectionAudit {
             self.selection_cost_units,
             self.budget_limit_cost_units,
             self.attempted_candidates,
+            self.ready_attempts,
+            self.generation_failed_attempts,
+            self.execution_failed_attempts,
+            self.timed_out_attempts,
+            self.invalid_attempts,
+            self.rejected_attempts,
+            self.incomplete_attempts,
             self.distinct_model_artifact_count,
             self.selectable_candidate_count,
             self.exact_duplicate_candidate_attempts,
@@ -1527,15 +1548,17 @@ mod tests {
         });
         let outcomes = vec![
             real_outcome("a", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
-            real_outcome("a-copy", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
             real_outcome("b", 72.0, 82.0, EvaluatorAdmissibility::Qualified),
             real_outcome("c", 68.0, 83.0, EvaluatorAdmissibility::Qualified),
         ];
         let report = audit_submission(&packet, &frozen, &outcomes).unwrap();
         assert_eq!(report.attempted_candidates, 4);
+        assert_eq!(report.ready_attempts, 4);
         assert_eq!(report.distinct_model_artifact_count, 3);
         assert_eq!(report.selectable_candidate_count, 3);
         assert_eq!(report.exact_duplicate_candidate_attempts, 1);
+        assert_eq!(report.scored_candidates, 3);
+        assert_eq!(report.missing_evaluator_outcomes, 0);
         assert_eq!(
             report.identical_model_artifact_groups,
             vec![vec!["a".to_owned(), "a-copy".to_owned()]]
@@ -1547,6 +1570,56 @@ mod tests {
         assert_eq!(
             replay.identical_model_artifact_groups,
             report.identical_model_artifact_groups
+        );
+    }
+
+    #[test]
+    fn failed_generation_attempts_remain_in_denominator_but_not_selector_view() {
+        let mut packet = packet();
+        let mut failed = candidate("failed-attempt", MODEL_A);
+        failed.state = CandidateState::GenerationFailed;
+        failed.canonical_model_sha256 = None;
+        failed.eligibility = DevelopmentEligibility::Unresolved;
+        packet.candidates.push(failed);
+
+        let view = build_selector_view(&packet).unwrap();
+        assert_eq!(view.candidates.len(), 3);
+        let frozen = trace(SelectionDecision::Select {
+            candidate_id: "a".to_owned(),
+        });
+        let report = audit_submission(
+            &packet,
+            &frozen,
+            &[
+                real_outcome("a", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
+                real_outcome("b", 75.0, 82.0, EvaluatorAdmissibility::Qualified),
+                real_outcome("c", 68.0, 84.0, EvaluatorAdmissibility::Qualified),
+            ],
+        )
+        .unwrap();
+        assert_eq!(report.attempted_candidates, 4);
+        assert_eq!(report.ready_attempts, 3);
+        assert_eq!(report.generation_failed_attempts, 1);
+        assert_eq!(report.selectable_candidate_count, 3);
+        assert_eq!(report.missing_evaluator_outcomes, 0);
+    }
+
+    #[test]
+    fn evaluator_outcome_for_duplicate_alias_is_rejected() {
+        let mut packet = packet();
+        packet.candidates.push(candidate("a-copy", MODEL_A));
+        let frozen = trace(SelectionDecision::Select {
+            candidate_id: "a".to_owned(),
+        });
+        let outcomes = vec![
+            real_outcome("a", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
+            real_outcome("a-copy", 70.0, 80.0, EvaluatorAdmissibility::Qualified),
+        ];
+        assert_eq!(
+            audit_submission(&packet, &frozen, &outcomes),
+            Err(SelectionAuditError::UnknownEvaluatorCandidate(
+                "a-copy".to_owned()
+            ))
         );
     }
 
