@@ -459,6 +459,11 @@ pub fn admit_candidate(
             manifest.rights_receipt_digest.clone(),
             manifest.verifier_receipt_digest.clone(),
             manifest.evsi_assessment_digest.clone(),
+            manifest.deployment_bundle_digest.clone(),
+            manifest.resource_model_digest.clone(),
+            manifest.resource_assessment_digest.clone(),
+            manifest.risk_model_digest.clone(),
+            manifest.risk_assessment_digest.clone(),
         ],
     }
 }
@@ -485,6 +490,7 @@ pub enum CampaignAdmissionError {
     EmptyCandidateSet,
     DuplicateContextOptionId(String),
     DuplicateCandidateOptionId(String),
+    DuplicateCandidateId(String),
     MissingContextForOption(String),
     RejectedCandidates(Vec<RejectedCampaignCandidate>),
 }
@@ -559,11 +565,18 @@ pub fn build_evidence_bound_campaign(
 
     candidates.sort_by(|a, b| a.option.option_id.cmp(&b.option.option_id));
     let mut seen_options = BTreeSet::new();
+    let mut seen_candidate_ids = BTreeSet::new();
     let mut admitted_options = Vec::with_capacity(candidates.len());
     let mut evidence_manifests = Vec::with_capacity(candidates.len());
     let mut rejected = Vec::new();
 
     for candidate in &candidates {
+        let candidate_id = candidate.manifest.candidate_id.trim();
+        if !candidate_id.is_empty() && !seen_candidate_ids.insert(candidate_id) {
+            return Err(CampaignAdmissionError::DuplicateCandidateId(
+                candidate_id.to_string(),
+            ));
+        }
         let option_id = candidate.option.option_id.as_str();
         if !seen_options.insert(option_id) {
             return Err(CampaignAdmissionError::DuplicateCandidateOptionId(
@@ -718,7 +731,7 @@ mod tests {
             admitted.campaign_option().option_id,
             "support-08-thermal-followup"
         );
-        assert_eq!(report.evidence_references.len(), 6);
+        assert_eq!(report.evidence_references.len(), 11);
     }
 
     #[test]
@@ -1118,6 +1131,33 @@ mod tests {
                 if rejections.len() == 1
                     && rejections[0].reasons.contains(&RejectionReason::ObservationStale)
         ));
+    }
+
+    #[test]
+    fn campaign_builder_rejects_duplicate_candidate_evidence_identity() {
+        let mut second = candidate();
+        second.option.option_id = "support-08-other-followup".into();
+        second.manifest.option_id = "support-08-other-followup".into();
+        let mut second_context = context();
+        second_context.option_id = "support-08-other-followup".into();
+        let result = build_evidence_bound_campaign(
+            vec![candidate(), second],
+            &[context(), second_context],
+            EvidenceBoundCampaignConfig {
+                campaign_id: "duplicate-evidence-identity".into(),
+                decisions: campaign_decisions(),
+                deployment_bundles: campaign_bundles(),
+                budget: campaign_budget(),
+                assurance: campaign_assurance(),
+                maximum_search_nodes: 1_000,
+            },
+        );
+        assert_eq!(
+            result,
+            Err(CampaignAdmissionError::DuplicateCandidateId(
+                "candidate-2026-014".into()
+            ))
+        );
     }
 
     #[test]
