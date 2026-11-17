@@ -259,6 +259,7 @@ Longer term, the two tracks can share validated tool semantics, fault knowledge 
 - `g1-mapping-audit/`: dependency-free Rust mapping primitives, golden/negative-control tests and focused workflow.
 - `tool-discovery-cases-v0.1.json` / `tool-discovery-cases-v0.1.schema.json`: 24 synthetic active-affordance discovery cases across six tool families.
 - `failure-to-skill-cases-v0.1.json` / `failure-to-skill-cases-v0.1.schema.json`: 30 synthetic cases for causal skill correction, poisoned memory, applicability and protected-skill retention.
+- `capability-transition-ledger/`: dependency-free Rust evaluator for five HumanoidToolBench events, missing-vs-absent evidence, co-occurrence, temporal conversion and stage latency; tracked by [HUM-CAPABILITY-TRANSITION-001 #12741](https://github.com/Luminous-Dynamics/symthaea/issues/12741).
 
 These artifacts define a prospective benchmark. They do not indicate that benchmark episodes were run or that any task has been solved.
 
