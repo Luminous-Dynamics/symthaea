@@ -483,9 +483,7 @@ fn validate_problem(problem: &CampaignProblem, weights: CostWeights) -> Result<(
                     CampaignActionKind::QcmWitnessInspection => {
                         update.gate == Gate::QcmWitnessChainValid
                     }
-                    CampaignActionKind::Calibration => {
-                        update.gate == Gate::InstrumentCalibrated
-                    }
+                    CampaignActionKind::Calibration => update.gate == Gate::InstrumentCalibrated,
                     CampaignActionKind::CleaningRequalification => {
                         update.gate == Gate::OpticalPathQualified
                     }
@@ -598,8 +596,8 @@ fn expected_value_of_action(
         for current_index in 0..hypothesis_count {
             let current_mass =
                 prior[current_index] * outcome.likelihood_by_hypothesis[current_index];
-            for (next_index, transition_probability) in outcome
-                .next_hypothesis_probability[current_index]
+            for (next_index, transition_probability) in outcome.next_hypothesis_probability
+                [current_index]
                 .iter()
                 .enumerate()
             {
@@ -624,9 +622,8 @@ fn expected_value_of_action(
             })
             .collect();
 
-        let (_, next_risk) =
-            best_decision(&next_posterior, decisions, &eligible_next_decisions)
-                .ok_or(PolicyError::NoEligibleTerminalDecision)?;
+        let (_, next_risk) = best_decision(&next_posterior, decisions, &eligible_next_decisions)
+            .ok_or(PolicyError::NoEligibleTerminalDecision)?;
         expected_next_risk += outcome_probability * next_risk;
     }
 
@@ -818,10 +815,7 @@ mod tests {
             .evaluate(&candidate, &safety())
             .unwrap();
         assert_eq!(result.selected_action_id, None);
-        assert_eq!(
-            result.evaluations[0].expected_value_of_action,
-            Some(0.0)
-        );
+        assert_eq!(result.evaluations[0].expected_value_of_action, Some(0.0));
     }
 
     #[test]
@@ -931,10 +925,7 @@ mod tests {
                 ObservationOutcome {
                     id: "requalified".to_string(),
                     likelihood_by_hypothesis: vec![0.1, 0.8],
-                    next_hypothesis_probability: vec![
-                        vec![1.0, 0.0],
-                        vec![1.0, 0.0],
-                    ],
+                    next_hypothesis_probability: vec![vec![1.0, 0.0], vec![1.0, 0.0]],
                     gate_updates: vec![GateUpdate {
                         gate: Gate::OpticalPathQualified,
                         satisfied: true,
@@ -943,10 +934,7 @@ mod tests {
                 ObservationOutcome {
                     id: "cleaning-incomplete".to_string(),
                     likelihood_by_hypothesis: vec![0.9, 0.2],
-                    next_hypothesis_probability: vec![
-                        vec![1.0, 0.0],
-                        vec![0.0, 1.0],
-                    ],
+                    next_hypothesis_probability: vec![vec![1.0, 0.0], vec![0.0, 1.0]],
                     gate_updates: vec![GateUpdate {
                         gate: Gate::OpticalPathQualified,
                         satisfied: false,
@@ -963,10 +951,7 @@ mod tests {
             result.selected_action_id.as_deref(),
             Some("clean-and-requalify")
         );
-        assert_eq!(
-            result.current_best_decision_id,
-            "pause-unqualified-process"
-        );
+        assert_eq!(result.current_best_decision_id, "pause-unqualified-process");
         assert!(result.evaluations[0].expected_value_of_action.unwrap() > 0.1);
     }
 
@@ -993,8 +978,7 @@ mod tests {
                 }],
             }],
         }];
-        let result = DecisionDirectedPolicy { config: config() }
-            .evaluate(&candidate, &safety());
+        let result = DecisionDirectedPolicy { config: config() }.evaluate(&candidate, &safety());
         assert_eq!(result, Err(PolicyError::ProtectedGateUpdate));
     }
 
@@ -1021,8 +1005,7 @@ mod tests {
                 }],
             }],
         }];
-        let result = DecisionDirectedPolicy { config: config() }
-            .evaluate(&candidate, &safety());
+        let result = DecisionDirectedPolicy { config: config() }.evaluate(&candidate, &safety());
         assert_eq!(result, Err(PolicyError::InvalidGateUpdateForAction));
     }
 
@@ -1031,8 +1014,7 @@ mod tests {
         let mut candidate = problem();
         candidate.actions[0].outcomes[0].next_hypothesis_probability =
             vec![vec![0.8, 0.3], vec![0.0, 1.0]];
-        let result = DecisionDirectedPolicy { config: config() }
-            .evaluate(&candidate, &safety());
+        let result = DecisionDirectedPolicy { config: config() }.evaluate(&candidate, &safety());
         assert_eq!(
             result,
             Err(PolicyError::TransitionProbabilitiesDoNotNormalize)
