@@ -20,8 +20,9 @@ use material_regime::{
     TrapAndGasMeasurement,
 };
 use optical_health::{
-    DepositionEvent, DepositionTransfer, HealthAction, OpticalHealthError, OpticalHealthModel,
-    OpticalHealthReading, OpticalHealthThresholds, SpectralBand, SurfaceState,
+    CleaningProtocol, CleaningReceipt, DepositionEvent, DepositionTransfer, HealthAction,
+    OpticalHealthError, OpticalHealthModel, OpticalHealthReading, OpticalHealthThresholds,
+    SpectralBand, SurfaceState,
 };
 #[derive(Clone, Debug, PartialEq)]
 pub enum CoupledError {
@@ -40,6 +41,21 @@ pub struct CoupledPulseCommand<'a> {
     pub gas: &'a TrapAndGasMeasurement,
     pub source_temperature_k: f64,
     pub seed: u64,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct CampaignCleaningReceipt {
+    pub cleaning: CleaningReceipt,
+    pub elapsed_seconds_after_maintenance: u64,
+    pub simulation_only: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct RecoveryInspection {
+    pub reading: OpticalHealthReading,
+    pub qualified: bool,
+    pub action: HealthAction,
+    pub simulation_only: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -149,6 +165,64 @@ impl CoupledCampaign {
         self.material = staged_material;
         self.optics = staged_optics;
         Ok(receipt)
+    }
+
+    /// Cleaning is a real state transition in the campaign model: its
+    /// duration cools the sample and its energy/consumables/roughness effects
+    /// are retained even when later requalification fails.
+    pub fn clean(
+        &mut self,
+        protocol: &CleaningProtocol,
+    ) -> Result<CampaignCleaningReceipt, CoupledError> {
+        let mut staged_material = self.material.clone();
+        let mut staged_optics = self.optics.clone();
+        let now = staged_material.state().elapsed_seconds;
+        let cleaning = staged_optics
+            .clean(protocol, now)
+            .map_err(CoupledError::Optical)?;
+        staged_material
+            .advance_idle(protocol.duration_seconds)
+            .map_err(CoupledError::Material)?;
+        let receipt = CampaignCleaningReceipt {
+            cleaning,
+            elapsed_seconds_after_maintenance: staged_material.state().elapsed_seconds,
+            simulation_only: true,
+        };
+        self.material = staged_material;
+        self.optics = staged_optics;
+        Ok(receipt)
+    }
+
+    /// Preserve the post-clean inspection even when requalification fails.
+    /// A failed reading remains part of the campaign history and does not
+    /// silently restore the optical system to a qualified state.
+    pub fn inspect_and_requalify(
+        &mut self,
+        reading_id: &str,
+        seed: u64,
+    ) -> Result<RecoveryInspection, CoupledError> {
+        let mut staged_optics = self.optics.clone();
+        let observed_at = self.material.state().elapsed_seconds;
+        let reading = staged_optics
+            .inspect(reading_id, observed_at, seed)
+            .map_err(CoupledError::Optical)?;
+        let qualified = match staged_optics.requalify(&reading, &self.thresholds) {
+            Ok(()) => true,
+            Err(OpticalHealthError::RequalificationFailed) => false,
+            Err(error) => return Err(CoupledError::Optical(error)),
+        };
+        let inspection = RecoveryInspection {
+            reading,
+            qualified,
+            action: if qualified {
+                HealthAction::Continue
+            } else {
+                HealthAction::CleanAndRequalify
+            },
+            simulation_only: true,
+        };
+        self.optics = staged_optics;
+        Ok(inspection)
     }
 
     pub fn material_state(&self) -> &MaterialState {
@@ -364,6 +438,62 @@ mod tests {
         assert!(
             wet_receipt.gas_analyzer_water_signal_kg > dry_receipt.gas_analyzer_water_signal_kg
         );
+    }
+
+    fn cleaning_protocol(removal: f64) -> CleaningProtocol {
+        CleaningProtocol {
+            protocol_id: "qualified-cleaning-protocol".to_string(),
+            removal_fraction: [removal; 3],
+            roughness_delta_nm: 0.1,
+            duration_seconds: 10,
+            energy_wh: 0.2,
+            consumables_g: 0.5,
+        }
+    }
+
+    #[test]
+    fn cleaning_advances_campaign_time_and_requires_fresh_requalification() {
+        let mut world = campaign();
+        run_pulse(&mut world, "before-clean", &gas(), 500.0, 7).unwrap();
+        let before = world.material_state().elapsed_seconds;
+        let cleaning = world.clean(&cleaning_protocol(1.0)).unwrap();
+        assert_eq!(cleaning.elapsed_seconds_after_maintenance, before + 10);
+        assert!(!world.is_qualified());
+        let inspection = world
+            .inspect_and_requalify("post-clean-reference", 9)
+            .unwrap();
+        assert!(inspection.qualified);
+        assert_eq!(inspection.action, HealthAction::Continue);
+        assert!(world.is_qualified());
+    }
+
+    #[test]
+    fn incomplete_cleaning_preserves_failed_requalification_evidence() {
+        let mut world = CoupledCampaign::new(
+            material(),
+            optics(),
+            OpticalHealthThresholds {
+                minimum_process_transmission: [0.99; 4],
+                maximum_witness_loss: [0.99; 4],
+                maximum_qcm_mass_ug_cm2: 1.0e9,
+            },
+            DepositionTransfer {
+                process_optic_factor: 1.0,
+                optical_witness_factor: 0.5,
+                qcm_factor: 0.25,
+            },
+            SpectralBand::Visible,
+        )
+        .unwrap();
+        run_pulse(&mut world, "before-incomplete-clean", &gas(), 500.0, 7).unwrap();
+        world.clean(&cleaning_protocol(0.0)).unwrap();
+        let inspection = world
+            .inspect_and_requalify("failed-post-clean-reference", 9)
+            .unwrap();
+        assert!(!inspection.qualified);
+        assert_eq!(inspection.action, HealthAction::CleanAndRequalify);
+        assert!(inspection.reading.simulation_only);
+        assert!(!world.is_qualified());
     }
 
     #[test]
