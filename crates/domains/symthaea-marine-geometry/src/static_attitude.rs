@@ -952,9 +952,9 @@ mod tests {
     fn pure_pitch_clipping_reproduces_the_linear_prismatic_displacement() {
         let mut request = box_request();
         request.attitude.pitch_rad = 0.02;
-        request.attitude.waterplane_offset_m =
-            -0.5 * request.source_spec.principal_dimensions.length_m
-                * request.attitude.pitch_rad.sin();
+        request.attitude.waterplane_offset_m = -0.5
+            * request.source_spec.principal_dimensions.length_m
+            * request.attitude.pitch_rad.sin();
         let receipt = evaluate_static_attitude(&request).unwrap();
         let expected_lcb_m =
             50.0 - (1250.0 / 9.0) * request.attitude.pitch_rad.tan();
