@@ -411,5 +411,5 @@
       ]
     }
   ],
-  "claim_ceiling": "Validates an evaluator-owned shared latent-weight credal simplex and exact conditional joint outcome distributions for every hypothesis/latent-state pair. It derives cross-hypothesis coupled marginal and pairwise event intervals and checks candidate channel consistency. It does not estimate latent weights from real measurements, prove latent-state completeness, optimize adaptive policies, validate drift, authenticate the evaluator's oracle, or authorize actions."
+  "claim_ceiling": "Validates an evaluator-owned shared latent-weight credal simplex and exact conditional joint outcome distributions for every hypothesis/latent-state pair. It derives cross-hypothesis coupled marginal and pairwise event intervals, checks candidate channel consistency, computes evaluator-only posterior-risk probes, and evaluates exact one-step decision value of information over finite outcome-to-action rules under supplied losses and robust action constraints. It does not optimize multi-step adaptive policies, estimate latent weights from real measurements, prove latent-state completeness, validate drift, authenticate the evaluator's oracle, or authorize actions."
 }
