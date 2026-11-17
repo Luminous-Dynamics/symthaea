@@ -64,6 +64,8 @@ impl std::error::Error for ObservationContractError {}
 
 /// A channel's evidence disposition at a declared frame time.
 /// Synthetic reconstruction is a separate variant from direct measurement.
+/// SHA-256 fields bind content identity; they are not signatures or proof of
+/// source authenticity. Trusted source/calibration registries remain external.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
 pub enum ObservationDisposition {
