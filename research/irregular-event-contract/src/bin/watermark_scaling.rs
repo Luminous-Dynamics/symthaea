@@ -49,7 +49,7 @@ fn build_ledger(
     event_count: usize,
     source_count: usize,
     late_rate_basis_points: u16,
-) -> Result<(SourceWatermarkLedger, Vec<SourceKey>, Duration), String> {
+) -> Result<(SourceWatermarkLedger, Vec<SourceKey>, Duration, Duration), String> {
     if event_count == 0 || source_count == 0 || event_count % source_count != 0 {
         return Err("event_count must be nonzero and divisible by source_count".to_owned());
     }
@@ -85,14 +85,13 @@ fn build_ledger(
                     exclusive_event_time_us: watermark_bound,
                 },
             });
-    let mut ledger = SourceWatermarkLedger::default();
-    ledger
+    let mut direct_ledger = SourceWatermarkLedger::default();
+    direct_ledger
         .append_batch(progress)
         .map_err(|error| format!("append source progress: {error}"))?;
 
-    // Four arrival transactions are deliberately distinct from event time.
-    // Multiplication by 37 permutes each source's event-time keys relative to
-    // receipt order for all configured power-of-two source lengths.
+    // Build the immutable input batches outside either measurement boundary.
+    // Both candidate ledgers begin from the exact same progress-only state.
     let mut arrival_batches: [Vec<EventRecord>; ARRIVAL_BATCH_COUNT] =
         std::array::from_fn(|_| Vec::new());
     let mut next_event_id = 1_u64;
@@ -100,7 +99,7 @@ fn build_ledger(
         for local_index in 0..per_source_count {
             let arrival_bucket = local_index % arrival_batches.len();
             let available_at_us = FIRST_ARRIVAL_AT_US + (arrival_bucket as i64 * ARRIVAL_STEP_US);
-            let event = EventRecord {
+            arrival_batches[arrival_bucket].push(EventRecord {
                 event_id: next_event_id,
                 entity_id: source.entity_id,
                 modality_id: source.modality_id,
@@ -114,39 +113,88 @@ fn build_ledger(
                     decimal_scale: 0,
                 },
                 source_sha256: [0x5A; 32],
-            };
-            arrival_batches[arrival_bucket].push(event);
+            });
             next_event_id = next_event_id
                 .checked_add(1)
                 .ok_or_else(|| "event ID overflow".to_owned())?;
         }
     }
 
-    // Time only the transactional arrival path. Event generation and initial
-    // watermark setup are deliberately outside this measurement boundary.
-    let ingestion_started = Instant::now();
-    for (bucket, events) in arrival_batches.into_iter().enumerate() {
-        let recorded_at_us = FIRST_ARRIVAL_AT_US + (bucket as i64 * ARRIVAL_STEP_US);
+    fn verify_classifications(
+        bucket: usize,
+        events: &[EventRecord],
+        classifications: &[EventArrivalClassification],
+        watermark_bound: i64,
+    ) -> Result<(), String> {
         let expected_late_count = events
             .iter()
             .filter(|event| event.event_time_us < watermark_bound)
             .count();
-        let classifications = ledger
-            .record_event_arrival_batch(events, recorded_at_us)
-            .map_err(|error| format!("record arrival bucket {bucket}: {error}"))?;
         let actual_late_count = classifications
             .iter()
             .filter(|classification| matches!(classification, EventArrivalClassification::Late(_)))
             .count();
-        if actual_late_count != expected_late_count {
+        if actual_late_count != expected_late_count || classifications.len() != events.len() {
             return Err(format!(
                 "late-arrival classification mismatch in bucket {bucket}: expected {expected_late_count}, got {actual_late_count}"
             ));
         }
+        Ok(())
     }
 
-    let ingestion_elapsed = ingestion_started.elapsed();
-    Ok((ledger, required_sources, ingestion_elapsed))
+    // New path: complete preflight, then append without a full-ledger clone.
+    // Event creation and initial progress setup are deliberately excluded.
+    let direct_started = Instant::now();
+    for (bucket, events) in arrival_batches.iter().enumerate() {
+        let recorded_at_us = FIRST_ARRIVAL_AT_US + (bucket as i64 * ARRIVAL_STEP_US);
+        let classifications = direct_ledger
+            .record_event_arrival_batch(events.iter().copied(), recorded_at_us)
+            .map_err(|error| format!("direct append bucket {bucket}: {error}"))?;
+        verify_classifications(bucket, events, &classifications, watermark_bound)?;
+    }
+    let direct_elapsed = direct_started.elapsed();
+
+    // Reference path reproduces the former commit strategy: clone the complete
+    // current history for every transaction, append to the clone, then replace.
+    // Both paths run the same preflight/classification/index work.
+    let mut clone_ledger = SourceWatermarkLedger::default();
+    clone_ledger
+        .append_batch(required_sources.iter().enumerate().map(|(index, source)| {
+            SourceProgressRevision {
+                progress_id: index as u64 + 1,
+                source: *source,
+                stream_generation: 1,
+                progress_sequence: 1,
+                recorded_at_us: PROGRESS_RECORDED_AT_US,
+                policy_sha256: [0xA5; 32],
+                operation: SourceProgressOperation::Advance {
+                    exclusive_event_time_us: watermark_bound,
+                },
+            }
+        }))
+        .map_err(|error| format!("append clone-reference source progress: {error}"))?;
+
+    let clone_reference_started = Instant::now();
+    for (bucket, events) in arrival_batches.iter().enumerate() {
+        let recorded_at_us = FIRST_ARRIVAL_AT_US + (bucket as i64 * ARRIVAL_STEP_US);
+        let mut candidate = clone_ledger.clone();
+        let classifications = candidate
+            .record_event_arrival_batch(events.iter().copied(), recorded_at_us)
+            .map_err(|error| format!("clone-reference append bucket {bucket}: {error}"))?;
+        verify_classifications(bucket, events, &classifications, watermark_bound)?;
+        clone_ledger = candidate;
+    }
+    let clone_reference_elapsed = clone_reference_started.elapsed();
+
+    if direct_ledger.state_sha256() != clone_ledger.state_sha256() {
+        return Err("direct and clone-reference ingestion produced different ledger digests".to_owned());
+    }
+    Ok((
+        direct_ledger,
+        required_sources,
+        direct_elapsed,
+        clone_reference_elapsed,
+    ))
 }
 
 fn run_case(
@@ -156,7 +204,7 @@ fn run_case(
     late_rate_basis_points: u16,
     known_at_us: i64,
 ) -> Result<(), String> {
-    let (ledger, required_sources, ingestion_elapsed) =
+    let (ledger, required_sources, direct_ingestion_elapsed, clone_reference_elapsed) =
         build_ledger(event_count, source_count, late_rate_basis_points)?;
     let per_source_count = event_count / source_count;
     let interval_start_us = ((per_source_count - interval_width) / 2) as i64;
@@ -257,10 +305,20 @@ fn run_case(
         .map(|duration| duration.as_secs_f64() * 1_000_000.0)
         .unwrap_or_default();
 
+    let direct_ingest_us = direct_ingestion_elapsed.as_secs_f64() * 1_000_000.0;
+    let clone_ingest_us = clone_reference_elapsed.as_secs_f64() * 1_000_000.0;
+    let clone_to_direct_speedup = if direct_ingest_us > 0.0 {
+        clone_ingest_us / direct_ingest_us
+    } else {
+        0.0
+    };
     println!(
-        "{event_count},{source_count},{interval_width},{late_rate_basis_points},{known_at_us},{ARRIVAL_BATCH_COUNT},{INDEXED_REPETITIONS},{SCAN_REPETITIONS},{VERIFIED_REPETITIONS},{:.3},{:.3},{},{},{},{},{scan_p50:.3},{scan_p95:.3},{scan_p99:.3},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_max:.3}",
-        ingestion_elapsed.as_secs_f64() * 1_000_000.0,
-        ingestion_elapsed.as_secs_f64() * 1_000_000_000.0 / event_count as f64,
+        "{event_count},{source_count},{interval_width},{late_rate_basis_points},{known_at_us},{ARRIVAL_BATCH_COUNT},{:.3},{:.3},{:.3},{:.3},{:.3},{INDEXED_REPETITIONS},{SCAN_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{},{scan_p50:.3},{scan_p95:.3},{scan_p99:.3},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_max:.3}",
+        direct_ingest_us,
+        direct_ingestion_elapsed.as_secs_f64() * 1_000_000_000.0 / event_count as f64,
+        clone_ingest_us,
+        clone_reference_elapsed.as_secs_f64() * 1_000_000_000.0 / event_count as f64,
+        clone_to_direct_speedup,
         warm.late_breach_index_buckets_examined,
         warm.late_breach_candidates_examined,
         scanned.late_breach_linear_scan_receipts_examined,
@@ -271,7 +329,7 @@ fn run_case(
 
 fn main() {
     println!(
-        "events,sources,interval_width_us,late_rate_basis_points,known_at_us,arrival_batches,ingest_total_us,ingest_ns_per_event,indexed_samples,scan_samples,verified_samples,index_buckets,indexed_receipt_candidates,scan_receipts_examined,matching_breaches,scan_p50_us,scan_p95_us,scan_p99_us,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_max_us"
+        "events,sources,interval_width_us,late_rate_basis_points,known_at_us,arrival_batches,direct_ingest_total_us,direct_ingest_ns_per_event,clone_reference_ingest_total_us,clone_reference_ingest_ns_per_event,clone_to_direct_ingest_speedup,indexed_samples,scan_samples,verified_samples,index_buckets,indexed_receipt_candidates,scan_receipts_examined,matching_breaches,scan_p50_us,scan_p95_us,scan_p99_us,indexed_p50_us,indexed_p95_us,indexed_p99_us,verified_p50_us,verified_max_us"
     );
     for event_count in EVENT_COUNTS {
         for source_count in SOURCE_COUNTS {
