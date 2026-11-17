@@ -360,6 +360,40 @@ Each case must bind:
 
 No live mains, high voltage, stored-pressure systems, powered cutting, hazardous substances, load-bearing structural repairs, clinical procedures or unsupervised human treatment in V0.
 
+## 7A. Human + Symthaea repair-workbench track
+
+Robot-only maintenance and human-supported maintenance are different capability questions. Do not wait for a physically qualified humanoid to test whether Symthaea can already help people repair, inspect and restore equipment.
+
+Reuse the existing [HUMAN-TOOL-001 #7983](https://github.com/Luminous-Dynamics/symthaea/issues/7983) protocol and draft evaluator [PR #7997](https://github.com/Luminous-Dynamics/symthaea/pull/7997). Do not create another repair ledger, diagnostic model, instrument adapter, outcome evaluator or human-factors framework.
+
+The existing human-workbench comparison already defines:
+- A0: human-only with current manuals/procedures;
+- A1: structured work instructions/checklist and same instruments;
+- A2: human + local Symthaea advisory with evidence-linked ranked hypotheses, contradicting evidence, missing/stale data, next measurement or abstention, and rationale.
+
+For HUM-TOOL-SERVICE integration, treat this as a **parallel human-augmentation track**, not as humanoid tool-use performance. It asks whether the same verified-service loop and evidence semantics can improve human repair work before the humanoid has equivalent physical competence.
+
+### Required integration
+
+- The same low-risk fault/task family and starting conditions across arms.
+- Same instruments, tool availability, manuals/reference access, participant time and safety boundaries.
+- Ground truth held from participants; independent adjudication of diagnosis and restored function.
+- Primary endpoint: elapsed time from task start to **independently verified useful-function restoration**, including diagnostic time, failed attempts, rework, waiting and safe referral.
+- Retain all started cases in denominators: successful, not restored, abandoned, censored, referred, safety-stopped and unknown.
+- The advisory has no actuation authority and cannot override protection/interlocks.
+- The model must distinguish hypotheses from measured facts and recommend the next measurement only when it has decision value.
+- Preserve participant consent, data minimization, human-factors outcomes and applicable review before any participant study.
+
+### Metrics to compose
+
+Reuse #7983's outcomes: root-cause determination, next-test value, unnecessary swaps, destructive disassembly, repeat work, false reassurance, missed critical indicators, safe referral, recurrence, P50/P90 restoration time, labor/tool/parts/energy cost, workload/usability/trust calibration, measurement uncertainty and evidence conflict.
+
+Add a transfer dimension only after the base study protocol is stable: compare advice on fault families with and without equivalent prior task exposure. This must not change the registered primary endpoint or make the participant study a test of robot physical dexterity.
+
+### Why this matters strategically
+
+Symthaea should be useful before it can physically perform every repair. A reliable advisory system can help people select measurements, reason about unfamiliar faults, find correct tools/parts and verify outcomes. This is a complementary route to the full humanoid—not a substitute for eventual physical competence and not evidence that Symthaea itself executed the repair.
+
 ## 8. Statistics and reporting
 
 - Freeze code, model, config, task set, split, seed, environment, robot, tool and evaluator identities before evaluation.
