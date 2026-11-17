@@ -381,6 +381,49 @@
       "phase_microstructure": "BCC matrix with minor yttrium-rich hexagonal precipitates",
       "pinning": "dominant surface pinning with secondary point contribution; crossover from delta-Tc to delta-l pinning with increasing field",
       "primary_claim_boundary": "Bulk type-II superconductivity confirmed by resistivity, magnetization, AC susceptibility and specific heat. Jc and Hc2 are paper-reported, exact test conditions must be extracted before cross-comparison. The estimated depairing current density is theoretical, not an observed engineering current."
+    },
+    {
+      "source_id": "bi2212_shot_noise_pairing_2026",
+      "doi": "10.1126/science.adt3444",
+      "url": "https://doi.org/10.1126/science.adt3444",
+      "published": "2026-11-05",
+      "source_type": "peer_reviewed_local_shot_noise_pairing_spectroscopy",
+      "title": "Equivalence of pseudogap and pairing energy in a cuprate high-temperature superconductor",
+      "authors": [
+        "Jiasen Niu",
+        "Maialen Ortego Larrazabal",
+        "Thomas Gozlinski",
+        "Yudai Sato",
+        "Koen M. Bastiaans",
+        "Tjerk Benschop",
+        "Jian-Feng Ge",
+        "Yaroslav M. Blanter",
+        "Genda Gu",
+        "Ingmar Swart",
+        "Milan P. Allan"
+      ],
+      "material_formula": "Bi2Sr2CaCu2O8+delta",
+      "method": "local shot-noise spectroscopy / noise-STM (electron-pair microscope)",
+      "reported_pairing_energy_mev_max": 70,
+      "primary_claim_boundary": "Paper reports pseudogap energy coincident with pairing onset energy in Bi2212, spatially heterogeneous up to ~70 meV. This is a local pairing-energy scale, not a 70 meV measured bulk gap or a directly measured room-temperature transition. It does not demonstrate 300 K zero resistance, Meissner response or bulk superconductivity. Authors interpret pair formation as potentially persisting above Tc and identify global phase coherence as a likely bottleneck."
+    },
+    {
+      "source_id": "metallic_reservoir_phase_stiffness_2026",
+      "doi": "10.1103/9tsf-lrgd",
+      "arxiv_id": "2604.28187",
+      "url": "https://doi.org/10.1103/9tsf-lrgd",
+      "published": "2026-11-10",
+      "source_type": "peer_reviewed_theoretical_many_body_bilayer_model",
+      "title": "Enhancement of superconducting stiffness in hybrid superconducting-metallic bilayers",
+      "authors": [
+        "J. E. Ebot",
+        "Lorenzo Pizzino",
+        "Sam Mardazad",
+        "Johannes S. Hofmann",
+        "Thierry Giamarchi",
+        "Adrian Kantian"
+      ],
+      "primary_claim_boundary": "Numerical/theoretical study of Kivelson-style pairing subsystem coupled to a metallic reservoir; pairing and stiffness-limited regimes depend on coupling, filling and density imbalance. Not a physical bilayer experiment or demonstrated increase in an actual material Tc."
     }
   ],
   "candidate_records": [
@@ -995,6 +1038,30 @@
       },
       "metric_interpretation": "Peer-reviewed bulk HEA superconductivity with multi-probe evidence; Jd is a theoretical estimate, not measured conductor current. Exact Jc field/temperature/geometry conditions require source extraction.",
       "local_reproducibility_status": "not_reproduced; microstructure/flux-pinning and in-field engineering comparison tracked in #12673"
+    },
+    {
+      "catalog_id": "Bi2212-Pair-Coherence-2026",
+      "source_ids": [
+        "bi2212_shot_noise_pairing_2026"
+      ],
+      "reported_record_count": 1,
+      "reported_metric": {
+        "name": "local_pairing_energy_scale_meV",
+        "maximum_reported": 70,
+        "measurement": "local_shot_noise_spectroscopy"
+      },
+      "metric_interpretation": "One paper-reported local energy scale and pairing-onset interpretation; not a room-temperature superconducting transition, not zero resistance and not a bulk phase-coherence measurement.",
+      "local_reproducibility_status": "not_reproduced; shot-noise calibration, effective-charge conversion, specimen/doping map, raw spectra and cross-probe validation tracked in #12677"
+    },
+    {
+      "catalog_id": "Metallic-Reservoir-Stiffness-2026",
+      "source_ids": [
+        "metallic_reservoir_phase_stiffness_2026"
+      ],
+      "reported_record_count": 0,
+      "reported_metric": null,
+      "metric_interpretation": "Theoretical many-body numerical benchmark for composite pairing/stiffness subsystems; reproduce model and finite-size behavior, not a physical material leaderboard.",
+      "local_reproducibility_status": "not_reproduced; matched isolated-layer / bilayer parameter sweeps and finite-size checks tracked in #12677"
     }
   ],
   "required_future_fields": [
