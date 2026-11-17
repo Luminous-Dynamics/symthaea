@@ -5,6 +5,7 @@ on:
     paths:
       - 'research/asteroid-optical-isru-v0.2/benchmark_contract.rs'
       - 'research/asteroid-optical-isru-v0.2/replay_oracle.rs'
+      - 'docs/research/OPTICAL_ISRU_SEALED_AUTONOMOUS_SCIENCE_BENCHMARK_V0_1.md'
       - '.github/workflows/isru-benchmark-contract-tests.yml'
   workflow_dispatch:
 
