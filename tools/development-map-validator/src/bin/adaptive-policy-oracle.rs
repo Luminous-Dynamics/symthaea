@@ -563,7 +563,7 @@ mod tests{
  #[test]fn repeated_option_on_a_path_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["policy_tree"]["nodes"][1]["option_id"]=json!("gate-a");assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("repeats option"));}
  #[test]fn more_than_one_global_safe_defer_action_is_rejected(){
   let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
-  let extra=json!({"action_id":"inspect-second","irreversible":false,"hard_gate":false,"max_residual_risk_bps":0});
+  let extra=json!({"action_id":"inspect-second","read_only":true,"irreversible":false,"hard_gate":false,"max_residual_risk_bps":0});
   b["candidate_view"]["actions"].as_array_mut().unwrap().push(extra.clone());
   b["oracle"]["actions"].as_array_mut().unwrap().push(extra);
   for world in b["oracle"]["worlds"].as_array_mut().unwrap(){
