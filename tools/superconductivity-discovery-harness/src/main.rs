@@ -136,6 +136,40 @@ fn audit_registry(schema_bytes: &[u8], registry_bytes: &[u8]) -> Result<Value, S
                 ));
             }
         };
+        let calculations = match candidate.get("tc_calculations") {
+            None | Some(Value::Null) => &[][..],
+            Some(Value::Array(items)) => items.as_slice(),
+            Some(_) => {
+                return Err(format!(
+                    "{candidate_id}: tc_calculations must be array or null"
+                ));
+            }
+        };
+
+        for observation in observations {
+            let status = required_str(observation, "status", candidate_id)?;
+            if status.starts_with("predicted") || status.starts_with("calculated") {
+                return Err(format!(
+                    "{candidate_id}: non-observed Tc status {status} is stored in tc_observations"
+                ));
+            }
+        }
+        for prediction in predictions {
+            let status = required_str(prediction, "status", candidate_id)?;
+            if !status.starts_with("predicted") {
+                return Err(format!(
+                    "{candidate_id}: tc_prediction status must start with 'predicted', got {status}"
+                ));
+            }
+        }
+        for calculation in calculations {
+            let status = required_str(calculation, "status", candidate_id)?;
+            if !status.starts_with("calculated") {
+                return Err(format!(
+                    "{candidate_id}: tc_calculations status must start with 'calculated', got {status}"
+                ));
+            }
+        }
 
         match evidence_class {
             "computational_prediction" | "machine_learning_prediction" => {
@@ -144,18 +178,10 @@ fn audit_registry(schema_bytes: &[u8], registry_bytes: &[u8]) -> Result<Value, S
                         "{candidate_id}: predicted evidence must not be stored as observed Tc"
                     ));
                 }
-                if predictions.is_empty() {
+                if predictions.is_empty() || !calculations.is_empty() {
                     return Err(format!(
-                        "{candidate_id}: prediction evidence class has no predicted Tc entries"
+                        "{candidate_id}: prediction evidence class requires tc_prediction entries and no tc_calculations"
                     ));
-                }
-                for prediction in predictions {
-                    let status = required_str(prediction, "status", candidate_id)?;
-                    if !status.starts_with("predicted") {
-                        return Err(format!(
-                            "{candidate_id}: prediction status must start with 'predicted', got {status}"
-                        ));
-                    }
                 }
             }
             "experimental_report" => {
@@ -164,11 +190,9 @@ fn audit_registry(schema_bytes: &[u8], registry_bytes: &[u8]) -> Result<Value, S
                         "{candidate_id}: experimental report requires at least one observed transition"
                     ));
                 }
-                if !predictions.is_empty() {
-                    return Err(format!(
-                        "{candidate_id}: experimental reference record must not merge predicted Tc with observations"
-                    ));
-                }
+                // Experimental materials may also have separate, explicitly
+                // calculated or predicted Tc estimates; these stay in their
+                // own fields and never overwrite measured observations.
             }
             _ => {}
         }
@@ -348,6 +372,40 @@ mod tests {
             "observable": "zero_resistance",
             "value_k": 44.0,
             "status": "reported"
+        }]);
+        let mutated = serde_json::to_vec(&value).unwrap();
+        assert!(audit_registry(&schema, &mutated).is_err());
+    }
+
+    #[test]
+    fn experimental_observation_and_calculation_channels_coexist() {
+        let (schema, registry) = committed_inputs();
+        let value: Value = serde_json::from_slice(&registry).unwrap();
+        let candidate = &value["candidate_records"][5];
+        assert_eq!(candidate["tc_observations"][0]["value_k"], 3.18);
+        assert_eq!(candidate["tc_calculations"][0]["value_k"], 14.9);
+        let receipt = audit_registry(&schema, &registry).unwrap();
+        assert_eq!(receipt["status"], "pass");
+    }
+
+    #[test]
+    fn calculated_value_cannot_be_stored_as_an_observation() {
+        let (schema, registry) = committed_inputs();
+        let mut value: Value = serde_json::from_slice(&registry).unwrap();
+        value["candidate_records"][5]["tc_observations"][0]["status"] = json!("calculated");
+        let mutated = serde_json::to_vec(&value).unwrap();
+        assert!(audit_registry(&schema, &mutated).is_err());
+    }
+
+    #[test]
+    fn calculation_status_cannot_be_mislabeled_as_prediction() {
+        let (schema, registry) = committed_inputs();
+        let mut value: Value = serde_json::from_slice(&registry).unwrap();
+        value["candidate_records"][5]["tc_prediction"] = json!([{
+            "value_k": 14.9,
+            "pressure_gpa": 0.0,
+            "method": "DFT_Eliashberg",
+            "status": "calculated"
         }]);
         let mutated = serde_json::to_vec(&value).unwrap();
         assert!(audit_registry(&schema, &mutated).is_err());
