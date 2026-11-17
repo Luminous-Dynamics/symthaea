@@ -23,7 +23,6 @@ use optical_health::{
     DepositionEvent, DepositionTransfer, HealthAction, OpticalHealthError, OpticalHealthModel,
     OpticalHealthReading, OpticalHealthThresholds, SpectralBand, SurfaceState,
 };
-
 #[derive(Clone, Debug, PartialEq)]
 pub enum CoupledError {
     Material(RegimeError),
