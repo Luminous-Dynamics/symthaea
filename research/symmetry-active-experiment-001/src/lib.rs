@@ -628,7 +628,7 @@ mod tests {
             return Some(0);
         }
         let mut best: Option<u64> = None;
-        for (probe_index, probe) in problem.probes.iter().enumerate() {
+        for probe in &problem.probes {
             if !probe.admissible {
                 continue;
             }
