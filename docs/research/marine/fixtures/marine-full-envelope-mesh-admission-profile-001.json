@@ -1,0 +1,7 @@
+{
+  "id": "marine-full-envelope-closed-shell-v1",
+  "require_closed_surface": true,
+  "minimum_face_area_m2": 1e-12,
+  "minimum_enclosed_volume_m3": 1e-9,
+  "additional_required_checks": []
+}
