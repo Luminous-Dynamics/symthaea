@@ -656,6 +656,21 @@ impl FixedIntervalV1 {
             .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
         Self::new(lower, upper)
     }
+
+    pub fn expanded_by(self, radius: i128) -> Result<Self, NoiseErrorV1> {
+        if radius < 0 {
+            return Err(NoiseErrorV1::NegativeObservationRadius);
+        }
+        let lower = self
+            .lower
+            .checked_sub(radius)
+            .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+        let upper = self
+            .upper
+            .checked_add(radius)
+            .ok_or(NoiseErrorV1::IntervalArithmeticOverflow)?;
+        Self::new(lower, upper)
+    }
 }
 
 fn append_interval(target: &mut Vec<u8>, interval: FixedIntervalV1) {
