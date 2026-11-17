@@ -18,9 +18,13 @@ use crate::manifest::{ScenarioGroup, SplitRole, ValidatedManifest};
 pub const CANDIDATE_PACKET_SCHEMA_V1: &str =
     "luminous.decision-transfer.candidate-packet.v1";
 const MAX_FRAMES: usize = 1_000_000;
+const MAX_CANDIDATE_PACKET_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CandidateViewError {
+    EmptyInput,
+    InputTooLarge { actual: usize, maximum: usize },
+    InvalidJson,
     InvalidTicket,
     InvalidDigest,
     InvalidField(&'static str),
@@ -36,6 +40,11 @@ pub enum CandidateViewError {
 impl fmt::Display for CandidateViewError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::EmptyInput => write!(formatter, "candidate packet input is empty"),
+            Self::InputTooLarge { actual, maximum } => {
+                write!(formatter, "candidate packet is {actual} bytes; maximum is {maximum}")
+            }
+            Self::InvalidJson => write!(formatter, "candidate packet JSON is invalid"),
             Self::InvalidTicket => write!(
                 formatter,
                 "candidate ticket must be 32 lowercase hexadecimal characters"
@@ -119,6 +128,24 @@ impl CandidatePacketV1 {
             allowed_action_ids,
             observations,
         };
+        packet.validate()?;
+        Ok(packet)
+    }
+
+    /// Parse untrusted candidate packet bytes, enforce the size limit, and
+    /// re-run all semantic validation after strict Serde deserialization.
+    pub fn parse_and_validate(input: &[u8]) -> Result<Self, CandidateViewError> {
+        if input.is_empty() {
+            return Err(CandidateViewError::EmptyInput);
+        }
+        if input.len() > MAX_CANDIDATE_PACKET_BYTES {
+            return Err(CandidateViewError::InputTooLarge {
+                actual: input.len(),
+                maximum: MAX_CANDIDATE_PACKET_BYTES,
+            });
+        }
+        let packet: Self =
+            serde_json::from_slice(input).map_err(|_| CandidateViewError::InvalidJson)?;
         packet.validate()?;
         Ok(packet)
     }
@@ -390,7 +417,36 @@ mod tests {
             .as_object_mut()
             .unwrap()
             .insert("split_role".to_owned(), serde_json::json!("confirmatory_test"));
-        assert!(serde_json::from_value::<CandidatePacketV1>(value).is_err());
+        let bytes = serde_json::to_vec(&value).unwrap();
+        assert_eq!(
+            CandidatePacketV1::parse_and_validate(&bytes),
+            Err(CandidateViewError::InvalidJson)
+        );
+    }
+
+    #[test]
+    fn candidate_packet_parser_rejects_empty_and_oversized_input() {
+        assert_eq!(
+            CandidatePacketV1::parse_and_validate(b""),
+            Err(CandidateViewError::EmptyInput)
+        );
+        let oversized = vec![b' '; MAX_CANDIDATE_PACKET_BYTES + 1];
+        assert!(matches!(
+            CandidatePacketV1::parse_and_validate(&oversized),
+            Err(CandidateViewError::InputTooLarge { .. })
+        ));
+    }
+
+    #[test]
+    fn candidate_packet_parser_revalidates_semantics_after_deserialization() {
+        let packet = packet(TICKET);
+        let mut value = serde_json::to_value(packet).unwrap();
+        value["observations"][1]["timestamp"] = serde_json::json!(2.1);
+        let bytes = serde_json::to_vec(&value).unwrap();
+        assert_eq!(
+            CandidatePacketV1::parse_and_validate(&bytes),
+            Err(CandidateViewError::ObservationAfterAsOfTime)
+        );
     }
 
     #[test]
