@@ -214,6 +214,7 @@ pub enum OpticalHealthError {
     RequalificationFailed,
 }
 
+#[derive(Clone)]
 pub struct OpticalHealthModel {
     process_optic: SurfaceState,
     witness: SurfaceState,
