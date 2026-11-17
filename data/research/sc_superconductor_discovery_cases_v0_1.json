@@ -432,6 +432,172 @@
         "Adrian Kantian"
       ],
       "primary_claim_boundary": "Numerical/theoretical study of Kivelson-style pairing subsystem coupled to a metallic reservoir; pairing and stiffness-limited regimes depend on coupling, filling and density imbalance. Not a physical bilayer experiment or demonstrated increase in an actual material Tc."
+    },
+    {
+      "source_id": "multilayer_metallic_screening_cuprates_2026",
+      "doi": "10.1038/s41467-026-75295-z",
+      "url": "https://doi.org/10.1038/s41467-026-75295-z",
+      "published": "2026-07-14",
+      "source_type": "peer_reviewed_experimental_arpes_plus_theory_of_metallic_screening",
+      "title": "Superconducting coherence boosted by outer-layer metallic screening in multilayered cuprates",
+      "authors": [
+        "Junhyeok Jeong",
+        "Kifu Kurokawa",
+        "Shiro Sakai",
+        "Tomotaka Nakayama",
+        "Kotaro Ando",
+        "Naoshi Ogane",
+        "Soonsang Huh",
+        "Matthew D. Watson",
+        "Timur K. Kim",
+        "Cephise Cacho",
+        "Chun Lin",
+        "Makoto Hashimoto",
+        "Donghui Lu",
+        "Takami Tohyama",
+        "Kazuyasu Tokiwa",
+        "Takeshi Kondo"
+      ],
+      "methods": [
+        "angle-resolved photoemission spectroscopy",
+        "model calculations",
+        "in-situ surface doping"
+      ],
+      "materials": [
+        "(Cu,C)Ba2Ca4Cu5Oy",
+        "Ba2Ca2Cu3O6(F,O)2"
+      ],
+      "reported_findings": {
+        "inner_plane_state": "inner CuO2 planes show superconducting signatures while heavily overdoped outer planes remain metallic at low temperature",
+        "proximity": "no detectable superconducting proximity signal in outer planes",
+        "model_localization_percent": 95,
+        "screening_mechanism": "metallic outer planes screen dopant-layer disorder from the inner superconducting plane; model calculations indicate weak interlayer wavefunction mixing",
+        "surface_doped_inner_plane_gap_mev_approx": 60,
+        "screening_metrics_proposed": [
+          "gap-map distribution width",
+          "ARPES quasiparticle peak width / scattering rate"
+        ]
+      },
+      "primary_claim_boundary": "This is a combination of ARPES observations and model calculations, not a demonstrated increase in the transition temperature of the surface-doped crystal. The >95% outer-plane wavefunction confinement is calculated. The paper does not report a newly determined Tc for the surface-doped state; do not substitute bulk baseline Tc values from a different specimen or composition. It is a screening/disorder-control mechanism distinct from direct pair transfer into a metallic reservoir."
+    },
+    {
+      "source_id": "single_cuo2_plane_bi2201_2026",
+      "doi": "10.1038/s41586-026-10857-1",
+      "url": "https://doi.org/10.1038/s41586-026-10857-1",
+      "arxiv_id": null,
+      "published": "2026-08-12",
+      "source_type": "peer_reviewed_experimental_single_plane_cuprate",
+      "title": "Superconducting 2D cuprate with a single CuO2 plane",
+      "authors": [
+        "Hengsheng Luo",
+        "Dongjoon Song",
+        "Yijun Yu",
+        "Liguo Ma",
+        "Peng Cai",
+        "Ruidan Zhong",
+        "Yiwen Chen",
+        "Lin Zhao",
+        "Jian Shen",
+        "Dan Shahar",
+        "Xingjiang Zhou",
+        "Zhengyu Weng",
+        "Xian Hui Chen",
+        "Wei Ruan",
+        "Yuanbo Zhang"
+      ],
+      "material_formula": "Bi2Sr2CuO6+delta",
+      "reported_findings": {
+        "dimensionality": "single CuO2 plane / single-monolayer Bi-2201",
+        "optimal_transition_effect": "approximately 10% reduction in optimal Tc relative to thicker/bulk Bi-2201",
+        "anomalous_metal": "anomalous metallic state observed between insulating and superconducting regimes as temperature approaches zero",
+        "control_knob": "fine oxygenation of single-monolayer specimens"
+      },
+      "data_availability": "datasets available from corresponding authors upon request",
+      "primary_claim_boundary": "This is a dimensionality and quantum phase-transition reference, not a higher-Tc discovery. The ~10% reduction is a reported dimensionality effect. The data are available on request; no local raw data were mirrored."
+    },
+    {
+      "source_id": "local_to_global_phase_coherence_2023",
+      "doi": "10.1038/s41567-023-02100-9",
+      "url": "https://doi.org/10.1038/s41567-023-02100-9",
+      "published": "2023-06-15",
+      "source_type": "peer_reviewed_experimental_stm_phase_ordering",
+      "title": "The emergence of global phase coherence from local pairing in underdoped cuprates",
+      "authors": [
+        "Shusen Ye",
+        "Changwei Zou",
+        "Hongtao Yan",
+        "Yu Ji",
+        "Miao Xu",
+        "Zehao Dong",
+        "Yiwen Chen",
+        "Xingjiang Zhou",
+        "Yayu Wang"
+      ],
+      "material_formula": "Bi2LaxSr2-xCuO6+delta",
+      "method": "scanning tunnelling microscopy and quasiparticle interference",
+      "reported_findings": {
+        "phase_ordering_mechanism": "global phase coherence appears when spatial occupation of a checkerboard plaquette charge-order pattern exceeds a threshold",
+        "local_spectra": "local spectra remain qualitatively similar across the insulator-to-superconductor boundary",
+        "coherence_signature": "quasiparticle interference becomes long-ranged"
+      },
+      "primary_claim_boundary": "This is an experimental local-to-global coherence result in underdoped Bi-La-Sr-Cu-O. The reported threshold is for the studied material and charge-order texture; it is not a universal occupancy constant or a general design recipe."
+    },
+    {
+      "source_id": "field_free_cuprate_stiffness_meter_2019",
+      "doi": "10.1038/s41467-019-10480-x",
+      "url": "https://doi.org/10.1038/s41467-019-10480-x",
+      "published": "2019-06-05",
+      "source_type": "peer_reviewed_experimental_superfluid_stiffness_metrology",
+      "title": "Phase transition in the cuprates from a magnetic-field-free stiffness meter viewpoint",
+      "authors": [
+        "Itzik Kapon",
+        "Zaher Salman",
+        "Itay Mangel",
+        "Thomas Prokscha",
+        "Nir Gavish",
+        "Amit Keren"
+      ],
+      "material_formula": "La1.875Sr0.125CuO4",
+      "method": "field-free superconducting-ring magnetic moment measurement, complemented by low-energy muSR",
+      "reported_findings": {
+        "output": "superfluid stiffness tensor",
+        "comparison": "in-plane current path versus interplane current path",
+        "result": "different transition temperatures for the two current geometries, identifying a range with two-dimensional stiffness",
+        "validation": "low-energy muSR measured stiffness anisotropy below Tc"
+      },
+      "primary_claim_boundary": "A measurement-method reference for extracting anisotropic stiffness; not a new material or room-temperature superconductivity result."
+    },
+    {
+      "source_id": "resonator_kinetic_inductance_stiffness_2024",
+      "doi": "10.1103/PhysRevResearch.6.043245",
+      "url": "https://doi.org/10.1103/PhysRevResearch.6.043245",
+      "published": "2024-12-06",
+      "source_type": "peer_reviewed_experimental_kinetic_inductance_metrology",
+      "title": "Measuring kinetic inductance and superfluid stiffness of two-dimensional superconductors using high-quality transmission-line resonators",
+      "authors": [
+        "Mary Kreidel",
+        "Xuanjing Chu",
+        "Jesse Balgley",
+        "Abhinandan Antony",
+        "Nishchhal Verma",
+        "Julian Ingham",
+        "Leonardo Ranzani",
+        "Raquel Queiroz",
+        "Robert M. Westervelt",
+        "James Hone",
+        "Kin Chung Fong"
+      ],
+      "method": "high-Q superconducting transmission-line resonators; kinetic-inductance and loss measurement",
+      "reported_findings": {
+        "kinetic_inductance_precision": "up to approximately one part per million",
+        "derived_properties": [
+          "superfluid stiffness",
+          "penetration depth",
+          "complex conductivity"
+        ],
+        "validation": "aluminium results compared with BCS theory; demonstrated on multilayer NbSe2"
+      },
+      "primary_claim_boundary": "Kinetic inductance is a useful stiffness metrology observable, but conversion to penetration depth or superfluid stiffness depends on sample geometry, current profile, locality, anisotropy and nonlocal electrodynamics. The paper explicitly discusses these limits; do not use a universal geometry-free conversion."
     }
   ],
   "candidate_records": [
@@ -835,6 +1001,57 @@
       "sample_identity_resolution": "Nominal composition YNbTiZrHf; retrieve actual refined/matrix/precipitate chemistry, sample dimensions and measurement conditions from paper before comparing numerical Jc.",
       "engineering_readiness": "bulk superconducting HEA research sample; no wire/tape/cable, long-length yield, joint or magnet qualification in the source",
       "safety_review": "laboratory materials; institutional material/process risk review required before experiments"
+    },
+    {
+      "candidate_id": "SC-REF-CU1245-METALLIC-SCREENING-2026",
+      "formula": "(Cu,C)Ba2Ca4Cu5Oy",
+      "family": "five-layer multilayer cuprate",
+      "form": "five-layer cuprate with inner superconducting planes and metallic outer planes",
+      "source_ids": [
+        "multilayer_metallic_screening_cuprates_2026"
+      ],
+      "evidence_class": "reported_material_reference",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [],
+      "phase_and_process_notes": "ARPES study finds inner CuO2 planes superconducting while heavily overdoped outer planes are metallic. Model calculations indicate >95% outer-plane wavefunction confinement, so proximity is negligible; metallic outer planes screen dopant disorder. Not a measured Tc increase.",
+      "engineering_readiness": "research-grade multilayer cuprate; no conductor or manufacturing qualification",
+      "sample_identity_resolution": "Preserve the exact five-layer Cu1245 specimen and do not combine data with the separate F0223 composition.",
+      "primary_claim_boundary": "This is a physical layered-screening architecture reference; no new Tc for a surface-doped sample is reported."
+    },
+    {
+      "candidate_id": "SC-REF-F0223-METALLIC-SCREENING-2026",
+      "formula": "Ba2Ca2Cu3O6(F,O)2",
+      "family": "three-layer fluorinated cuprate",
+      "form": "three-layer cuprate with surface-doped inner superconducting plane and metallic outer planes",
+      "source_ids": [
+        "multilayer_metallic_screening_cuprates_2026"
+      ],
+      "evidence_class": "reported_material_reference",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [],
+      "phase_and_process_notes": "In-situ surface doping produced an inner-plane superconducting gap reported around 60 meV while the outer metallic-plane gap vanished; no surface-doped-state Tc is assigned. The outer metallic planes screen dopant disorder with minimal proximity mixing.",
+      "engineering_readiness": "ARPES / surface-doping research system; no independent conductor/device qualification",
+      "sample_identity_resolution": "Keep surface-doped F0223 data separate from baseline polycrystalline F0223 reports and from five-layer Cu1245.",
+      "primary_claim_boundary": "A local spectral gap is not a measured Tc. The reported surface-doped-state Tc is not determined in this record."
+    },
+    {
+      "candidate_id": "SC-REF-BI2201-SINGLE-CUO2-2026",
+      "formula": "Bi2Sr2CuO6+delta",
+      "family": "single-plane Bi-2201 cuprate",
+      "form": "single-monolayer / single-CuO2-plane specimen",
+      "source_ids": [
+        "single_cuo2_plane_bi2201_2026"
+      ],
+      "evidence_class": "reported_material_reference",
+      "operating_pressure_gpa": 0,
+      "synthesis_pressure_gpa": null,
+      "tc_observations": [],
+      "phase_and_process_notes": "Single-CuO2-plane limit shows about 10% reduction in optimal Tc relative to thicker material and an anomalous metallic state between insulating and superconducting regimes near zero temperature. Fine oxygenation tunes the phase diagram.",
+      "engineering_readiness": "monolayer research specimen, not a practical conductor",
+      "sample_identity_resolution": "Data are available from corresponding authors upon request; no raw dataset is mirrored. Keep single-monolayer and bulk Bi-2201 separate.",
+      "primary_claim_boundary": "Dimensionality-reduction baseline, not a candidate for higher Tc on current evidence."
     }
   ],
   "benchmark_catalogs": [
@@ -1070,6 +1287,65 @@
       "reported_metric": null,
       "metric_interpretation": "Theoretical many-body numerical benchmark for composite pairing/stiffness subsystems; reproduce model and finite-size behavior, not a physical material leaderboard.",
       "local_reproducibility_status": "not_reproduced; matched isolated-layer / bilayer parameter sweeps and finite-size checks tracked in #12677"
+    },
+    {
+      "catalog_id": "Multilayer-Metallic-Screening-2026",
+      "source_ids": [
+        "multilayer_metallic_screening_cuprates_2026"
+      ],
+      "reported_record_count": 2,
+      "reported_metric": {
+        "name": "metallic_screening_architecture_reference",
+        "materials": 2,
+        "model_outer_plane_wavefunction_localization_percent": 95,
+        "inner_plane_gap_after_surface_doping_mev_approx": 60
+      },
+      "metric_interpretation": "Two separately tracked multilayer cuprate material systems. The >95% outer-plane localization is a model calculation and the ~60 meV inner-plane quantity is a spectroscopic gap, not Tc. No surface-doped-state Tc increase is claimed.",
+      "local_reproducibility_status": "not reproduced; ARPES raw data, doping state, layer-resolved dispersion and gap-map/scattering metrics require full source reconstruction; see #12677"
+    },
+    {
+      "catalog_id": "Single-CuO2-Plane-2026",
+      "source_ids": [
+        "single_cuo2_plane_bi2201_2026"
+      ],
+      "reported_record_count": 1,
+      "reported_metric": {
+        "name": "dimensionality_effect",
+        "single_plane_optimal_Tc_reduction_percent_approx": 10
+      },
+      "metric_interpretation": "A single-plane dimensionality control and anomalous-metal reference; not a high-Tc candidate. Preserve oxygenation and monolayer state as conditions.",
+      "local_reproducibility_status": "not reproduced; datasets available from corresponding authors upon request; see #12677"
+    },
+    {
+      "catalog_id": "Local-to-Global-Coherence-2023",
+      "source_ids": [
+        "local_to_global_phase_coherence_2023"
+      ],
+      "reported_record_count": 1,
+      "reported_metric": {
+        "name": "phase_ordering_threshold_observation",
+        "system": "Bi2LaxSr2-xCuO6+delta",
+        "threshold_semantics": "qualitative spatial occupation threshold for checkerboard plaquettes; exact source extraction required"
+      },
+      "metric_interpretation": "Experimental precedent that global phase coherence in studied underdoped cuprate emerges with a spatially thresholded charge-order pattern; not a universal percolation law.",
+      "local_reproducibility_status": "not reproduced; STM maps, occupancy extraction and sample/doping metadata require exact reconstruction; see #12677"
+    },
+    {
+      "catalog_id": "Cuprate-Stiffness-Metrology-2019-2024",
+      "source_ids": [
+        "field_free_cuprate_stiffness_meter_2019",
+        "resonator_kinetic_inductance_stiffness_2024"
+      ],
+      "reported_record_count": 2,
+      "reported_metric": {
+        "name": "stiffness_measurement_methods",
+        "modalities": [
+          "field-free superconducting ring magnetic moment plus muSR",
+          "high-Q transmission-line resonator kinetic inductance"
+        ]
+      },
+      "metric_interpretation": "Complementary experimental metrology references. Kinetic inductance to stiffness conversion requires explicit geometry/electrodynamic assumptions; field-free ring method resolves tensor components in the studied LSCO case.",
+      "local_reproducibility_status": "not reproduced; method adapters and calibration/geometry uncertainty requirements tracked in #12677"
     }
   ],
   "required_future_fields": [
