@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "source_spec": {
+    "schema_version": 1,
+    "candidate_id": "synthetic-full-envelope-box-001",
+    "units": "m",
+    "coordinate_frame": {
+      "id": "ship-local",
+      "axis_convention": "x-forward,y-starboard,z-down",
+      "handedness": "right-handed",
+      "origin_description": "x=0 bow plane, y=0 centreplane, z=0 design waterplane; positive z downward"
+    },
+    "principal_dimensions": {
+      "length_m": 100,
+      "maximum_beam_m": 20,
+      "design_draft_m": 6,
+      "design_freeboard_m": 4
+    },
+    "symmetry": "SYMMETRIC_ABOUT_Y0",
+    "end_conditions": {
+      "bow": "TRANSOM",
+      "stern": "TRANSOM"
+    },
+    "design_waterline": {
+      "waterline_id": "DWL-0",
+      "plane_z_m": 0,
+      "station_intersections": [
+        {
+          "station_id": "ST-000",
+          "starboard_point_id": "BOW-WL-S",
+          "port_point_id": null,
+          "port_source": "MIRRORED_FROM_STARBOARD"
+        },
+        {
+          "station_id": "ST-100",
+          "starboard_point_id": "STERN-WL-S",
+          "port_point_id": null,
+          "port_source": "MIRRORED_FROM_STARBOARD"
+        }
+      ]
+    },
+    "stations": [
+      {
+        "station_id": "ST-000",
+        "x_over_length": 0,
+        "starboard_profile": [
+          {
+            "point_id": "BOW-KEEL",
+            "y_m": 0,
+            "z_m": 6,
+            "role": "KEEL",
+            "region_to_next": "BOTTOM"
+          },
+          {
+            "point_id": "BOW-BOTTOM-S",
+            "y_m": 10,
+            "z_m": 6,
+            "role": "BOTTOM",
+            "region_to_next": "BOTTOM"
+          },
+          {
+            "point_id": "BOW-WL-S",
+            "y_m": 10,
+            "z_m": 0,
+            "role": "WATERLINE",
+            "region_to_next": "TOPSIDES"
+          },
+          {
+            "point_id": "BOW-SHEER-S",
+            "y_m": 10,
+            "z_m": -4,
+            "role": "SHEER",
+            "region_to_next": "NONE"
+          }
+        ]
+      },
+      {
+        "station_id": "ST-100",
+        "x_over_length": 1,
+        "starboard_profile": [
+          {
+            "point_id": "STERN-KEEL",
+            "y_m": 0,
+            "z_m": 6,
+            "role": "KEEL",
+            "region_to_next": "BOTTOM"
+          },
+          {
+            "point_id": "STERN-BOTTOM-S",
+            "y_m": 10,
+            "z_m": 6,
+            "role": "BOTTOM",
+            "region_to_next": "BOTTOM"
+          },
+          {
+            "point_id": "STERN-WL-S",
+            "y_m": 10,
+            "z_m": 0,
+            "role": "WATERLINE",
+            "region_to_next": "TOPSIDES"
+          },
+          {
+            "point_id": "STERN-SHEER-S",
+            "y_m": 10,
+            "z_m": -4,
+            "role": "SHEER",
+            "region_to_next": "NONE"
+          }
+        ]
+      }
+    ],
+    "deck_surface": {
+      "surface_id": "DECK-001",
+      "construction": "LOFTED_DECK_SECTIONS",
+      "sections": [
+        {
+          "station_id": "ST-000",
+          "points": [
+            {
+              "point_id": "MIRROR:BOW-SHEER-S",
+              "y_m": -10,
+              "z_m": -4,
+              "role": "PORT_DECK_EDGE"
+            },
+            {
+              "point_id": "BOW-DECK-CROWN",
+              "y_m": 0,
+              "z_m": -4.5,
+              "role": "DECK_CROWN"
+            },
+            {
+              "point_id": "BOW-SHEER-S",
+              "y_m": 10,
+              "z_m": -4,
+              "role": "STARBOARD_DECK_EDGE"
+            }
+          ]
+        },
+        {
+          "station_id": "ST-100",
+          "points": [
+            {
+              "point_id": "MIRROR:STERN-SHEER-S",
+              "y_m": -10,
+              "z_m": -4,
+              "role": "PORT_DECK_EDGE"
+            },
+            {
+              "point_id": "STERN-DECK-CROWN",
+              "y_m": 0,
+              "z_m": -4.5,
+              "role": "DECK_CROWN"
+            },
+            {
+              "point_id": "STERN-SHEER-S",
+              "y_m": 10,
+              "z_m": -4,
+              "role": "STARBOARD_DECK_EDGE"
+            }
+          ]
+        }
+      ]
+    },
+    "surface_inventory": [
+      "BOTTOM",
+      "TOPSIDES",
+      "DECK",
+      "BOW_END_CLOSURE",
+      "STERN_END_CLOSURE"
+    ],
+    "boundary_semantics": {
+      "exterior_shell": "CLOSED_SHELL",
+      "openings": []
+    },
+    "external_components": []
+  },
+  "load_case_id": "BOX-DESIGN-MASS-001",
+  "target_mass_tonnes": 12300,
+  "water_density_kg_m3": 1025,
+  "lower_waterplane_z_m": -2,
+  "upper_waterplane_z_m": 2,
+  "mass_tolerance_tonnes": 1e-8,
+  "plane_tolerance_m": 1e-10,
+  "maximum_iterations": 64
+}

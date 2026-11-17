@@ -99,3 +99,101 @@ Exit codes: 0 = admissible for the declared mesh profile; 1 = a typed non-admiss
 6. Exact artifact/evidence receipts for #11513, #11442, Mycelix #5968 and Sol-Atlas #809.
 
 No CFD, manufacturing or physical-test claim is made by this G0/G1 implementation.
+
+## G2f full external envelope input contract
+
+G2f is a separate representation from G2a/G2b. G2a/G2b describes keel-to-waterline sections and a loading/design-waterline-capped displacement volume. G2f describes the full external envelope: underwater bottom, topsides/freeboard, deck, deck-edge seams, waterline intersections, bow/stem and stern/transom regions, explicit openings and separately versioned external components.
+
+The G2f-a typed input validator is exposed by `full_envelope`. It checks schema-v1 typed input semantics and computes a deterministic source-spec digest; it does **not** generate a surface, mesh, B-rep or displacement shell:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-full-envelope-validate -- docs/research/marine/fixtures/marine-full-envelope-box-001.json --output /tmp/full-envelope-report.json
+
+Exit codes: 0 = valid input contract; 1 = incomplete/unsupported input; 2 = rejected specification; 3 = CLI, I/O or parse error. The JSON report retains the exact disposition and issue codes. A valid input contract is not a geometry-admission or naval-engineering pass.
+
+The canonical G2f-a schema and fixture are:
+- `docs/research/marine/schemas/marine-full-envelope-spec.schema.json`
+- `docs/research/marine/fixtures/marine-full-envelope-box-001.json` (symmetric transom/transom known-answer input)
+- `docs/research/marine/fixtures/marine-full-envelope-asymmetric-001.json` (explicitly asymmetric port/starboard input; distinct waterline references)
+- `docs/research/marine/fixtures/marine-full-envelope-pointed-bow-asymmetric-001.json` (pointed bow with shared stem IDs and asymmetric midbody)
+- `docs/research/marine/MARINE-FULL-ENVELOPE-G2F-A.md`
+
+Symmetric port geometry must be explicitly declared as derived by reflection; asymmetric geometry must supply a separate port profile. At ordinary asymmetric stations the keel is one shared centreline vertex with the same point identity and coordinates on the port/starboard profiles; the remaining profile points retain distinct identities. At a pointed end, all corresponding profile points share identities and collapse to y=0. The deck is a separate surface definition. Pointed bow/stern sections may collapse to one deck crown point; they may not be forced into a rectangular deck section.
+
+For the synthetic prismatic fixture, the analytical displacement below z=0 is 12,000 m³ and the external envelope including its declared triangular deck crown is 20,500 m³. These are fixture values, not measurements or mesh-generator results.
+
+The next G2f implementation stages remain distinct:
+1. **G2f-b:** loft bottom and topside external surfaces with named breaklines and shared seam identities.
+2. **G2f-c:** close the deck, stem and transom; reconcile all surface regions and boundary loops.
+3. **G2f-d:** intersect that one full external envelope with multiple loading waterplanes to derive separate displacement shells.
+4. **G2f-e:** exchange the external envelope and each derived displacement shell independently through AP242 and independent CAD-kernel re-import.
+
+No G2f-a validator result establishes self-intersection freedom, hull fairness, waterline quality, hydrostatic equilibrium, stability, strength, seakeeping, CFD, cavitation, DFM, class approval or seaworthiness.
+
+## Independent multi-waterline sectional reference
+
+The G2f-a2 increment adds `sectional_reference`, a second numerical path for checking displacement and waterplane properties from the full-envelope station profiles. It is deliberately independent of G2c's tetrahedral integration of a closed triangle mesh.
+
+The request contains one validated `source_spec` and an ordered list of `loading_conditions`. Each condition supplies:
+- a unique condition ID;
+- a horizontal waterplane elevation in the same vessel frame (z-down; negative elevations are above the design waterplane and imply deeper immersion);
+- explicit water density in kg/m³.
+
+For each station, the implementation constructs its transverse section from the actual starboard and port profiles (or derives port by reflection only when the spec says symmetric), clips the polygon to the submerged half-plane, calculates section area/centroid and measures the waterline breadth. It then integrates sectional area and breadth along the vessel length with piecewise-linear trapezoidal integration. First longitudinal moments use the exact integral for a piecewise-linear sectional curve. Kahan compensated summation is used for the accumulated integrals.
+
+Run the analytical sweep fixture:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-sectional-hydrostatics-reference -- docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json --output /tmp/marine-sectional-reference.json
+
+Exit codes: 0 = evaluated or independently verified; 1 = typed source/loading/integration/integrity rejection; 2 = CLI/I/O/JSON parse failure. The emitted receipt includes source-spec and per-condition BLAKE3 digests. Independently re-evaluate a previously saved receipt with the exact original request:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-sectional-hydrostatics-reference -- docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json --verify /tmp/marine-sectional-reference.json
+
+The verifier recomputes the exact request rather than trusting the caller-supplied output, and reports the bound sweep digest on success.
+
+### Synthetic known answers
+
+For the 100 m × 20 m prismatic fixture, density 1,025 kg/m³, and upright horizontal planes:
+- z = -2 m: 16,000 m³ displacement, 2,000 m² waterplane, VCB = 2 m;
+- z = 0 m: 12,000 m³ displacement, 2,000 m² waterplane, VCB = 3 m;
+- z = +2 m: 8,000 m³ displacement, 2,000 m² waterplane, VCB = 4 m.
+
+All three have LCB = LCF = 50 m, TCB = 0, and TPC = 20.5 t/cm. The values are analytic reference results for this prismatic synthetic hull, not real-vessel predictions.
+
+The method uses the source's station spacing and a piecewise-linear longitudinal assumption. The result is an independent numerical reference and screening curve; it is not exact for arbitrary longitudinal curvature between sparse stations. Compare the z=0 result against G2c polyhedral hydrostatics only for matching geometry, waterplane, density, frame and scope. A disagreement is a diagnostic requiring investigation, not permission to average the two results.
+
+### Supported and unsupported scope
+
+G2f-a2 supports upright horizontal waterplanes intersecting the station profiles between keel and sheer. It explicitly rejects planes above the sheer rather than inventing deck/flooding geometry. It does not implement trim, heel, hydrostatic equilibrium, free-surface corrections, GZ curves, intact/damage stability criteria, appendage volume, slamming, seakeeping, resistance, propulsion or CFD. It does not generate a loading-specific displacement mesh. Those remain separate geometry, hydrostatics and validation increments.
+
+The sectional-reference CLI also has an end-to-end integration test suite covering both the prismatic box and tapered hull fixtures, digest-bound output, rejection of non-positive density, and help/scope text. Run the focused package verification as described in the marine benchmark protocol; the current draft PR's exact-head focused result is linked from issue #12434.
+
+### Upright mass-balance waterplane solver
+
+For a known total mass and explicit density, the sectional reference can solve the upright waterplane elevation within a caller-supplied shallow/deep bracket:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-upright-mass-balance -- docs/research/marine/fixtures/marine-upright-mass-balance-box-001.json --output /tmp/marine-upright-mass-balance.json
+
+Independently recompute the receipt from the exact request:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-upright-mass-balance -- docs/research/marine/fixtures/marine-upright-mass-balance-box-001.json --verify /tmp/marine-upright-mass-balance.json
+
+The solver requires:
+- explicit total target mass in tonnes and water density in kg/m³;
+- explicit shallow/deep elevations in the source z-down frame;
+- a bracket whose displaced masses straddle the target;
+- positive mass and waterplane tolerances and a bounded iteration count;
+- monotonic displaced mass from shallow to deep; non-monotone or unbracketed inputs fail closed.
+
+For the synthetic 100 m × 20 m × 6 m box, 12,300 tonnes at 1,025 kg/m³ returns z=0 m; 10,250 tonnes returns z=1 m. These are analytical fixture results.
+
+**Scope boundary:** this is an upright sinkage / displacement-mass balance only. It does not solve longitudinal trim, heel, LCG/TCG equilibrium, KG, tank free-surface, flooding, GZ curves, intact/damage stability or statutory criteria. Commercial packages such as Maxsurf, Orca3D and NAPA already provide much more complete loading and stability workflows; this function is an evidence-bound primitive for research and pipeline integration, not a replacement.
+
+### Upright mass-balance receipt schema v2
+
+The current upright mass-balance receipt is schema v2 / `upright-mass-balance-bisection-v2`. In addition to the final equilibrium and residual, it binds the configured mass tolerance, plane tolerance and requested maximum-iteration budget. Those settings contribute to the BLAKE3 identity: two solves of the same load case that produce the same final waterplane but use different numerical stopping budgets must produce different receipts.
+
+This is evidence provenance, not a change to the physical scope of the solver. It remains upright sinkage only.
+
+### Next: static trim/heel equilibrium
+
+The distinct follow-on specification is [MARINE-STATIC-ATTITUDE-EQUILIBRIUM-001 #12498](https://github.com/Luminous-Dynamics/symthaea/issues/12498). It will solve offset + pitch + roll using explicit CG, density, a body-frame oblique waterplane, force balance and two independent moment residuals. It is not the same as the WAPS manoeuvring/leeway 3-DOF programme and is not a GZ or stability approval. See `docs/research/marine/MARINE-FULL-ENVELOPE-G2F-A.md` for the equations, fixtures and current SOTA comparison.
