@@ -1,0 +1,308 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:lightshell-zone-transition:0.1.0",
+  "title": "Atelier Lightshell Zone Transition Contract",
+  "description": "Admission contract for graded textile transitions between robot garment zones; not physical qualification.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "program_id",
+    "state",
+    "zone_refs",
+    "process_capability",
+    "transitions",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "program_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "capability_pending",
+        "frozen"
+      ]
+    },
+    "zone_refs": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "zone_id",
+          "functional_roles",
+          "construction_ref"
+        ],
+        "properties": {
+          "zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "functional_roles": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": [
+                "impact_compression",
+                "vibration_isolation",
+                "airflow",
+                "thermal_management",
+                "articulation",
+                "abrasion",
+                "fluid_chemical_barrier",
+                "cleanability",
+                "sensor_accommodation",
+                "repairability",
+                "mass_budget",
+                "seam_integrity"
+              ]
+            }
+          },
+          "construction_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "process_capability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "capability_state",
+        "machine_ref",
+        "program_revision_ref",
+        "capability_evidence_ref",
+        "supported_strategies"
+      ],
+      "properties": {
+        "capability_state": {
+          "enum": [
+            "unknown",
+            "preflight_pending",
+            "qualified_for_transition",
+            "not_capable"
+          ]
+        },
+        "machine_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "program_revision_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "capability_evidence_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "supported_strategies": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "graded_knit",
+              "intarsia",
+              "sewn_seam",
+              "bonded_laminate",
+              "printed_reinforcement",
+              "replaceable_overlap",
+              "spacer_stitch"
+            ]
+          }
+        }
+      }
+    },
+    "transitions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "transition_id",
+          "from_zone_id",
+          "to_zone_id",
+          "strategy",
+          "state",
+          "transition_width_mm",
+          "interface_detail_ref",
+          "process_route_ref",
+          "requirements"
+        ],
+        "properties": {
+          "transition_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from_zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to_zone_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "strategy": {
+            "enum": [
+              "graded_knit",
+              "intarsia",
+              "sewn_seam",
+              "bonded_laminate",
+              "printed_reinforcement",
+              "replaceable_overlap",
+              "spacer_stitch"
+            ]
+          },
+          "state": {
+            "enum": [
+              "proposed",
+              "capability_checked",
+              "frozen"
+            ]
+          },
+          "transition_width_mm": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "interface_detail_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "process_route_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "requirements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "metric_id",
+                "unit",
+                "direction",
+                "hard_gate",
+                "lower_bound",
+                "upper_bound",
+                "method_ref",
+                "acceptance_rule_ref"
+              ],
+              "properties": {
+                "metric_id": {
+                  "enum": [
+                    "transition_strain_concentration_ratio",
+                    "stiffness_jump_ratio",
+                    "compression_continuity_ratio",
+                    "seam_strength_n",
+                    "seam_fatigue_cycles",
+                    "peel_strength_n_per_mm",
+                    "delamination_cycles",
+                    "flex_fatigue_cycles",
+                    "added_mass_g",
+                    "attachment_retention_cycles",
+                    "repair_time_min",
+                    "air_permeability_ratio",
+                    "thermal_delta_c"
+                  ]
+                },
+                "unit": {
+                  "enum": [
+                    "ratio",
+                    "N",
+                    "cycles",
+                    "N/mm",
+                    "g",
+                    "min",
+                    "degC"
+                  ]
+                },
+                "direction": {
+                  "enum": [
+                    "higher_is_better",
+                    "lower_is_better",
+                    "within_declared_band"
+                  ]
+                },
+                "hard_gate": {
+                  "type": "boolean"
+                },
+                "lower_bound": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "upper_bound": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "method_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "acceptance_rule_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "unknown_process_capability_fails_closed",
+        "simulation_is_not_interface_qualification",
+        "supplier_process_claims_are_not_capability_evidence",
+        "coupon_interface_results_are_not_robot_qualification"
+      ],
+      "properties": {
+        "unknown_process_capability_fails_closed": {
+          "const": true
+        },
+        "simulation_is_not_interface_qualification": {
+          "const": true
+        },
+        "supplier_process_claims_are_not_capability_evidence": {
+          "const": true
+        },
+        "coupon_interface_results_are_not_robot_qualification": {
+          "const": true
+        }
+      }
+    }
+  }
+}
