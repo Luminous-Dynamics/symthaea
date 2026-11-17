@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Evaluate candidate artifact reports against a separately held ground-truth catalogue, using exact source type labels and an explicit 3-D localization tolerance. The evaluator is intentionally separate from the perception/planning path.
+Evaluate candidate artifact reports against a separately held ground-truth catalogue, using exact source type labels and an explicit 3-D localization tolerance. The evaluator is intentionally separate from the perception/planning path. `parse_ground_truth_tsv` creates deterministic row IDs from the source file identifier and 1-based line number.
 
 The initial target is a compact, rights-aware adapter for the historical DARPA SubT Systems Finals ground-truth CSVs. Source manifest: `DARPA_GROUND_TRUTH_SOURCE_MANIFEST_V0_1.json`.
 
@@ -19,6 +19,8 @@ All coordinates must already be expressed in the exact expected frame and in met
 
 Evaluation:
 - selects at most the configured report budget, highest priority first, stable lexical ID tie-break;
+- parses the source's tab-separated `type, x, y, z` rows (including its optional trailing empty tab field) without normalizing type names;
+- binds every truth and candidate record to an exact coordinate-frame ID and rejects frame mismatch; no CRS/axis/unit transform is inferred;
 - matches reports one-to-one to ground truth;
 - requires exact type-string equality unless a separately versioned external alias table is supplied in a future extension;
 - computes Euclidean 3-D distance and admits an edge only when distance is within the explicit tolerance;
