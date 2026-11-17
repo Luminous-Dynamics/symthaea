@@ -1,0 +1,235 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/docs/engineering/multipurpose-factory/sa-industrial-spares-hypotheses-v0.1.schema.json",
+  "title": "South African Industrial Spares Microfactory Synthetic Hypotheses v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "study_id",
+    "claim_ceiling",
+    "warning",
+    "context",
+    "architecture_alternatives",
+    "product_hypotheses",
+    "comparison_dimensions",
+    "scenario_families",
+    "hostile_cases"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "sa-industrial-microfactory-hypotheses/0.1"
+    },
+    "study_id": {
+      "const": "SA-INDUSTRIAL-MICROFACTORY-SYNTHETIC-v0.1"
+    },
+    "claim_ceiling": {
+      "const": "SYNTHETIC_PRODUCT_ROUTE_AND_ARCHITECTURE_COMPARISON_ONLY"
+    },
+    "warning": {
+      "type": "string",
+      "minLength": 60
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "country",
+        "evidence_basis",
+        "source_references"
+      ],
+      "properties": {
+        "country": {
+          "const": "South Africa"
+        },
+        "evidence_basis": {
+          "type": "string",
+          "minLength": 40
+        },
+        "source_references": {
+          "type": "array",
+          "minItems": 4,
+          "items": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      }
+    },
+    "architecture_alternatives": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "$ref": "#/$defs/architecture"
+      }
+    },
+    "product_hypotheses": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "$ref": "#/$defs/product"
+      }
+    },
+    "comparison_dimensions": {
+      "type": "array",
+      "minItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "scenario_families": {
+      "type": "array",
+      "minItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "hostile_cases": {
+      "type": "array",
+      "minItems": 10,
+      "items": {
+        "$ref": "#/$defs/hostileCase"
+      }
+    }
+  },
+  "$defs": {
+    "architecture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "class",
+        "local_capabilities",
+        "partner_capabilities",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9-]*$"
+        },
+        "class": {
+          "enum": [
+            "FUNCTIONAL_JOB_SHOP",
+            "DEDICATED_SINGLE_PRODUCT_LINE",
+            "MULTIPURPOSE_MICROFACTORY",
+            "HYBRID_LOCAL_PARTNER_NETWORK",
+            "DISTRIBUTED_PARTNER_NETWORK"
+          ]
+        },
+        "local_capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "partner_capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "claim_ceiling": {
+          "const": "SYNTHETIC_ONLY"
+        }
+      }
+    },
+    "product": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "product_id",
+        "intended_use",
+        "required_operations",
+        "critical_evidence",
+        "specialist_partner_options",
+        "excluded_initial_scope",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "product_id": {
+          "enum": [
+            "PUMP-VALVE-SUBASSEMBLY",
+            "SHAFT-COUPLING-SPARE",
+            "BRACKET-HOUSING",
+            "REPAIR-REMANUFACTURE-UNIT"
+          ]
+        },
+        "intended_use": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_operations": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "critical_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "specialist_partner_options": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "excluded_initial_scope": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          }
+        },
+        "claim_ceiling": {
+          "const": "SYNTHETIC_ROUTE_ONLY"
+        }
+      }
+    },
+    "hostileCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "case_id",
+        "mutation",
+        "expected"
+      ],
+      "properties": {
+        "case_id": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9-]*$"
+        },
+        "mutation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected": {
+          "enum": [
+            "NEEDS_EVIDENCE",
+            "REJECT",
+            "OUT_OF_DOMAIN",
+            "NOT_RECONFIGURED",
+            "NOT_TRACEABLE",
+            "NOT_COMPARABLE"
+          ]
+        }
+      }
+    }
+  }
+}

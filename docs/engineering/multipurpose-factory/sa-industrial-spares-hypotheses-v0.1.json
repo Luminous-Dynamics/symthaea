@@ -1,0 +1,306 @@
+{
+  "schema_version": "sa-industrial-microfactory-hypotheses/0.1",
+  "study_id": "SA-INDUSTRIAL-MICROFACTORY-SYNTHETIC-v0.1",
+  "claim_ceiling": "SYNTHETIC_PRODUCT_ROUTE_AND_ARCHITECTURE_COMPARISON_ONLY",
+  "warning": "Product IDs, process steps, route alternatives, and scenario labels are synthetic. No actual South African customer demand, production volume, cost, machine model, local-content percentage, supplier availability, certification or physical capacity is asserted.",
+  "context": {
+    "country": "South Africa",
+    "evidence_basis": "Public dtic and InvestSA industrial-sector/localisation pages identify relevant product categories. Exact tender/product designation and local-content applicability must be resolved per real product and procurement scope.",
+    "source_references": [
+      "https://www.thedtic.gov.za/south-africas-industrial-development-strategy-2026/",
+      "https://www.thedtic.gov.za/sectors-and-services-2/industrial-development/sectors/",
+      "https://www.thedtic.gov.za/sectors-and-services-2/industrial-development/industrial-procurement/",
+      "https://www.investsa.gov.za/key-sectors/clean-technology-component-manufacturing/"
+    ]
+  },
+  "architecture_alternatives": [
+    {
+      "id": "BASELINE-JOB-SHOP",
+      "class": "FUNCTIONAL_JOB_SHOP",
+      "local_capabilities": [
+        "MATERIAL_RECEIPT",
+        "MACHINING",
+        "ASSEMBLY",
+        "METROLOGY",
+        "REPAIR"
+      ],
+      "partner_capabilities": [
+        "HEAT_TREATMENT",
+        "COATING",
+        "SPECIALIST_NDT",
+        "CALIBRATED_PRESSURE_TEST"
+      ],
+      "claim_ceiling": "SYNTHETIC_ONLY"
+    },
+    {
+      "id": "BASELINE-DEDICATED-PUMP-LINE",
+      "class": "DEDICATED_SINGLE_PRODUCT_LINE",
+      "local_capabilities": [
+        "MATERIAL_RECEIPT",
+        "MACHINING",
+        "ASSEMBLY",
+        "FUNCTIONAL_TEST",
+        "METROLOGY"
+      ],
+      "partner_capabilities": [
+        "HEAT_TREATMENT",
+        "COATING",
+        "SPECIALIST_NDT"
+      ],
+      "claim_ceiling": "SYNTHETIC_ONLY"
+    },
+    {
+      "id": "CANDIDATE-SHARED-MICROFACTORY",
+      "class": "MULTIPURPOSE_MICROFACTORY",
+      "local_capabilities": [
+        "MATERIAL_RECEIPT",
+        "MACHINING",
+        "TOOLING",
+        "ASSEMBLY",
+        "METROLOGY",
+        "REPAIR",
+        "FUNCTIONAL_TEST"
+      ],
+      "partner_capabilities": [
+        "HEAT_TREATMENT",
+        "COATING",
+        "SPECIALIST_NDT",
+        "SPECIALIST_MATERIAL_TEST"
+      ],
+      "claim_ceiling": "SYNTHETIC_ONLY"
+    },
+    {
+      "id": "CANDIDATE-HYBRID-NETWORK",
+      "class": "HYBRID_LOCAL_PARTNER_NETWORK",
+      "local_capabilities": [
+        "MATERIAL_RECEIPT",
+        "MACHINING",
+        "ASSEMBLY",
+        "METROLOGY",
+        "REPAIR"
+      ],
+      "partner_capabilities": [
+        "HEAT_TREATMENT",
+        "COATING",
+        "SPECIALIST_NDT",
+        "FUNCTIONAL_TEST",
+        "SPECIALIST_MATERIAL_TEST"
+      ],
+      "claim_ceiling": "SYNTHETIC_ONLY"
+    },
+    {
+      "id": "CANDIDATE-DISTRIBUTED-PARTNERS",
+      "class": "DISTRIBUTED_PARTNER_NETWORK",
+      "local_capabilities": [
+        "MATERIAL_RECEIPT",
+        "INSPECTION",
+        "REPAIR_TRIAGE"
+      ],
+      "partner_capabilities": [
+        "MACHINING",
+        "ASSEMBLY",
+        "HEAT_TREATMENT",
+        "COATING",
+        "NDT",
+        "FUNCTIONAL_TEST"
+      ],
+      "claim_ceiling": "SYNTHETIC_ONLY"
+    }
+  ],
+  "product_hypotheses": [
+    {
+      "product_id": "PUMP-VALVE-SUBASSEMBLY",
+      "intended_use": "NON_HUMAN_RATED_GENERAL_INDUSTRIAL_SERVICE",
+      "required_operations": [
+        "MATERIAL_RECEIPT",
+        "MACHINING",
+        "ASSEMBLY",
+        "DIMENSIONAL_METROLOGY",
+        "FUNCTIONAL_PRESSURE_OR_FLOW_TEST"
+      ],
+      "critical_evidence": [
+        "MATERIAL_GRADE_AND_LOT",
+        "PROCESS_ROUTE_REVISION",
+        "DIMENSIONAL_ACCEPTANCE_PLAN",
+        "TEST_RIG_CALIBRATION",
+        "FIRST_ARTICLE_RESULT"
+      ],
+      "specialist_partner_options": [
+        "HEAT_TREATMENT",
+        "COATING",
+        "SPECIALIST_NDT"
+      ],
+      "excluded_initial_scope": [
+        "HUMAN_RATED_PRESSURE_BOUNDARY",
+        "NUCLEAR_OR_AEROSPACE_QUALIFIED_PART",
+        "UNQUALIFIED_PRESSURE_TEST"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    },
+    {
+      "product_id": "SHAFT-COUPLING-SPARE",
+      "intended_use": "GENERAL_INDUSTRIAL_REPLACEMENT_PART",
+      "required_operations": [
+        "MATERIAL_RECEIPT",
+        "MACHINING",
+        "DIMENSIONAL_METROLOGY",
+        "GEOMETRIC_AND_FIT_INSPECTION"
+      ],
+      "critical_evidence": [
+        "MATERIAL_GRADE_AND_LOT",
+        "DRAWING_AND_REVISION",
+        "MACHINING_PROCESS_PROFILE",
+        "CALIBRATED_DIMENSIONAL_RESULT"
+      ],
+      "specialist_partner_options": [
+        "HEAT_TREATMENT",
+        "COATING",
+        "DYNAMIC_BALANCE_TEST"
+      ],
+      "excluded_initial_scope": [
+        "HIGH_SPEED_ROTOR_RELEASE",
+        "SAFETY_CRITICAL_DRIVETRAIN_RELEASE"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    },
+    {
+      "product_id": "BRACKET-HOUSING",
+      "intended_use": "NON_SAFETY_CRITICAL_MOUNTING_OR_HOUSING",
+      "required_operations": [
+        "MATERIAL_RECEIPT",
+        "CUT_OR_FORM",
+        "MACHINING",
+        "DIMENSIONAL_METROLOGY",
+        "FINAL_INSPECTION"
+      ],
+      "critical_evidence": [
+        "MATERIAL_GRADE_AND_LOT",
+        "GEOMETRY_REVISION",
+        "PROCESS_PROFILE",
+        "DIMENSIONAL_ACCEPTANCE_PLAN"
+      ],
+      "specialist_partner_options": [
+        "COATING",
+        "SPECIALIST_NDT"
+      ],
+      "excluded_initial_scope": [
+        "PRIMARY_PRESSURE_SHELL",
+        "PRIMARY_FLIGHT_OR_HABITAT_STRUCTURE"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    },
+    {
+      "product_id": "REPAIR-REMANUFACTURE-UNIT",
+      "intended_use": "GENERAL_INDUSTRIAL_REPAIR_WITH_DECLARED_ACCEPTANCE_PLAN",
+      "required_operations": [
+        "RETURN_INSPECTION",
+        "DISASSEMBLY",
+        "CLEANING",
+        "REPAIR_OR_REMANUFACTURE",
+        "REASSEMBLY",
+        "REQUALIFICATION"
+      ],
+      "critical_evidence": [
+        "RETURN_CONDITION_RECORD",
+        "UNIT_AND_LOT_GENEALOGY",
+        "REPAIR_PROCEDURE_REVISION",
+        "REPLACED_PART_TRACEABILITY",
+        "POST_REPAIR_TEST"
+      ],
+      "specialist_partner_options": [
+        "SPECIALIST_NDT",
+        "HEAT_TREATMENT",
+        "COATING",
+        "CALIBRATED_FUNCTIONAL_TEST"
+      ],
+      "excluded_initial_scope": [
+        "REPAIR_WITHOUT_INSPECTION",
+        "SAFETY_CRITICAL_RETURN_TO_SERVICE_WITHOUT_AUTHORITY"
+      ],
+      "claim_ceiling": "SYNTHETIC_ROUTE_ONLY"
+    }
+  ],
+  "comparison_dimensions": [
+    "TIME_TO_FIRST_ACCEPTED_OUTPUT",
+    "TOTAL_ORDER_LEAD_TIME",
+    "FIRST_PASS_YIELD",
+    "FIRST_ARTICLE_REJECTION",
+    "REWORK_SCRAP_AND_QUARANTINE",
+    "COST_PER_ACCEPTED_PRODUCT",
+    "MACHINE_AND_QUALIFIED_LABOUR_HOURS",
+    "SPECIALIST_PARTNER_LEAD_TIME",
+    "INVENTORY_AND_CRITICAL_SPARES",
+    "REPAIR_TURNAROUND",
+    "CALIBRATION_AND_INSPECTION_BURDEN",
+    "ENERGY_AND_MATERIAL_PER_ACCEPTED_OUTPUT_WHERE_MEASURED",
+    "CONFIGURATION_CHANGEOVER_TO_FIRST_ACCEPTED_OUTPUT",
+    "TRACEABILITY_COMPLETENESS",
+    "LOWER_TAIL_SERVICE_UNDER_DISRUPTION"
+  ],
+  "scenario_families": [
+    "LOW_VOLUME_HIGH_VARIETY",
+    "STABLE_HIGH_VOLUME_SINGLE_FAMILY",
+    "DEMAND_MIX_SHIFT",
+    "MACHINE_OR_TOOL_FAILURE",
+    "MATERIAL_LOT_REJECTION",
+    "SPECIALIST_PARTNER_DELAY",
+    "CALIBRATION_EXPIRY",
+    "FIRST_ARTICLE_REJECTION",
+    "REPAIR_SCOPE_DISCOVERED_AFTER_DISASSEMBLY",
+    "POWER_OR_UTILITY_INTERRUPTION",
+    "QUALIFIED_OPERATOR_SHORTAGE",
+    "RECONFIGURATION_TO_DIFFERENT_PRODUCT_FAMILY"
+  ],
+  "hostile_cases": [
+    {
+      "case_id": "NEG-GENERIC-MATERIAL-CLAIM",
+      "mutation": "GENERIC_STEEL_NAME_USED_INSTEAD_OF_EXACT_GRADE_LOT_AND_HEAT_TREATMENT",
+      "expected": "NEEDS_EVIDENCE"
+    },
+    {
+      "case_id": "NEG-DRAWING-REVISION",
+      "mutation": "MACHINING_ROUTE_USES_STALE_DRAWING_REVISION",
+      "expected": "REJECT"
+    },
+    {
+      "case_id": "NEG-TEST-RIG-CALIBRATION",
+      "mutation": "PRESSURE_OR_FLOW_TEST_RIG_CALIBRATION_EXPIRED",
+      "expected": "REJECT"
+    },
+    {
+      "case_id": "NEG-PARTNER-DOUBLE-COUNT",
+      "mutation": "SPECIALIST_PARTNER_CAPACITY_ASSIGNED_TO_TWO_ORDERS_AT_ONCE",
+      "expected": "REJECT"
+    },
+    {
+      "case_id": "NEG-REPAIR-UNKNOWN-CONDITION",
+      "mutation": "REPAIR_ROUTE_ACCEPTS_RETURNED_UNIT_WITHOUT_CONDITION_TRIAGE",
+      "expected": "NEEDS_EVIDENCE"
+    },
+    {
+      "case_id": "NEG-UNQUALIFIED-PRESSURE-BOUNDARY",
+      "mutation": "GENERAL_PUMP_VALVE_ROUTE_PROMOTED_TO_HUMAN_RATED_PRESSURE_BOUNDARY",
+      "expected": "OUT_OF_DOMAIN"
+    },
+    {
+      "case_id": "NEG-FIRST-ARTICLE-SKIPPED",
+      "mutation": "CONFIGURATION_CHANGE_MARKED_COMPLETE_WITHOUT_FIRST_ARTICLE_ACCEPTANCE",
+      "expected": "NOT_RECONFIGURED"
+    },
+    {
+      "case_id": "NEG-LOT-GENEALOGY-BROKEN",
+      "mutation": "REPLACEMENT_PART_OR_REPAIR_LOT_NOT_LINKED_TO_FINISHED_UNIT",
+      "expected": "NOT_TRACEABLE"
+    },
+    {
+      "case_id": "NEG-METROLOGY-SHARED-ENV",
+      "mutation": "CONTROLLED_METROLOGY_USED_OUTSIDE_DECLARED_ENVIRONMENTAL_CONDITIONS",
+      "expected": "REJECT"
+    },
+    {
+      "case_id": "NEG-COST-OMITS-PARTNER",
+      "mutation": "QUOTE_EXCLUDES_SPECIALIST_PARTNER_TRANSPORT_AND_INSPECTION_COST",
+      "expected": "NOT_COMPARABLE"
+    }
+  ]
+}
