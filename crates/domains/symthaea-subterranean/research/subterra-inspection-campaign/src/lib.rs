@@ -676,7 +676,9 @@ mod tests {
     }
 
     #[test]
-    fn exact_campaign_beats_gross_evsi_greedy_under_the_same_budget() {
+    fn exact_campaign_beats_all_three_greedy_baselines_under_the_same_budget() {
+        let mut shared = empty_bundle("deploy");
+        shared.fixed_resources.energy_millijoules = 1;
         let p = problem(
             vec![
                 DecisionRequirement {
@@ -687,23 +689,31 @@ mod tests {
                     decision_id: "asset_b".into(),
                     mandatory: false,
                 },
+                DecisionRequirement {
+                    decision_id: "asset_c".into(),
+                    mandatory: false,
+                },
             ],
-            vec![empty_bundle("deploy")],
+            vec![shared],
             vec![
-                option("a_expensive", "asset_a", "deploy", 9, 9),
-                option("a_efficient", "asset_a", "deploy", 6, 4),
-                option("b_value", "asset_b", "deploy", 8, 6),
+                option("a_high_value", "asset_a", "deploy", 19, 10),
+                option("b_efficient", "asset_b", "deploy", 10, 6),
+                option("c_efficient", "asset_c", "deploy", 10, 6),
             ],
-            10,
+            13,
         );
         let exact = optimize_campaign(&p).unwrap();
-        let greedy = greedy_baseline(&p, GreedyMetric::GrossEvsi).unwrap();
+        let gross = greedy_baseline(&p, GreedyMetric::GrossEvsi).unwrap();
+        let energy = greedy_baseline(&p, GreedyMetric::EvsiPerEnergy).unwrap();
+        let time = greedy_baseline(&p, GreedyMetric::EvsiPerDuration).unwrap();
         assert_eq!(
             exact.selection.selected_option_ids,
-            vec!["a_efficient", "b_value"]
+            vec!["b_efficient", "c_efficient"]
         );
-        assert_eq!(exact.selection.additive_evsi_estimate_micro_units, 14);
-        assert_eq!(greedy.selection.additive_evsi_estimate_micro_units, 9);
+        assert_eq!(exact.selection.additive_evsi_estimate_micro_units, 20);
+        assert_eq!(gross.selection.additive_evsi_estimate_micro_units, 19);
+        assert_eq!(energy.selection.additive_evsi_estimate_micro_units, 19);
+        assert_eq!(time.selection.additive_evsi_estimate_micro_units, 19);
         assert_eq!(
             exact.search_disposition,
             SearchDisposition::OptimalityProven
