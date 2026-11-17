@@ -604,3 +604,19 @@ The synthesis-protocol auditor now consumes the separate observation-event schem
 - match the outcome's resolved specimen ID.
 
 This is a deliberately strict synthetic contract for the first end-to-end proof. Ambiguous sample identity is retained as unresolved in real records rather than guessed. The protocol smoke fixture now links its synthetic PQP run to the synthetic Hg1223 observation event with matching material and sample identity. This tests the data join only; it is not an experimental PQP reproduction.
+
+
+## 35. Pairing versus phase-coherence evidence: temperature and scope correction
+
+The Science 2026 Bi2212 local shot-noise study reports spatially heterogeneous pairing-onset energies up to approximately 70 meV. The full methods/preprint record shows measurement base temperatures of 4.2 K, 2.3 K and 0.3 K across samples. The Science paper was first submitted as arXiv:2409.15928 on 24 September 2024 and published on 5 November 2026.
+
+The pairing energy is **not** a transition temperature. The experiment did not directly measure the local pair signal at 300 K, and it did not demonstrate 300 K zero resistance, Meissner response, bulk phase coherence or a room-temperature superconducting state. Pairing persistence toward room temperature is an interpretation based on the energy scale, not a direct high-temperature measurement.
+
+The registry now records the preprint DOI/ID, publication DOI, cryogenic measurement temperatures, local-probe scale and explicit claim ceiling. The observation schema has been extended with:
+- pairing energy and pair-transfer effective charge;
+- superfluid stiffness/density;
+- phase-correlation length/time;
+- Josephson coupling energy, vortex density and kinetic inductance;
+- measurement scope: local probe, mesoscopic, bulk, device, theoretical model or unknown.
+
+The Rust auditor refuses to treat a local-probe pairing signature as bulk Tc and refuses a spectroscopic gap as a Tc criterion. Pairing energy in observed records is unit-checked as meV and requires a physical measurement scope. Synthetic tests separately exercise local pairing and bulk stiffness. No actual Science paper raw data or sample measurement has been ingested.
