@@ -24,6 +24,17 @@ pub enum SpectralBand {
     ShortwaveInfrared,
 }
 
+impl SpectralBand {
+    pub(super) fn index(self) -> usize {
+        match self {
+            Self::Ultraviolet => 0,
+            Self::Visible => 1,
+            Self::NearInfrared => 2,
+            Self::ShortwaveInfrared => 3,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ContaminantSpecies {
     OrganicFilm,
