@@ -691,6 +691,17 @@ mod tests{
   assert_eq!(q["rectangular_hull_worst_case_posterior_risk_bps"],4359);
   assert_eq!(q["rectangular_excess_risk_bps"],581);
  }
+ #[test]fn risk_probe_cannot_be_injected_by_candidate(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["candidate_view"]["risk_queries"]=b["oracle"]["risk_queries"].clone();
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("unknown field"));
+ }
+ #[test]fn risk_probe_rejects_duplicate_query_id(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  let q=b["oracle"]["risk_queries"][0].clone();
+  b["oracle"]["risk_queries"].as_array_mut().unwrap().push(q);
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("duplicate risk query"));
+ }
  #[test]fn risk_probe_requires_exact_registered_outcome_vector(){
   let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
   b["oracle"]["risk_queries"][0]["observed_outcomes"]["gate-b"]=json!("unknown");
