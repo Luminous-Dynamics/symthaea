@@ -115,30 +115,12 @@ fn push_issue(
     });
 }
 
-fn reject(
-    issues: &mut Vec<FullEnvelopeMeshIssue>,
-    code: &str,
-    detail: impl Into<String>,
-) {
-    push_issue(
-        issues,
-        FullEnvelopeMeshIssueLevel::Rejected,
-        code,
-        detail,
-    );
+fn reject(issues: &mut Vec<FullEnvelopeMeshIssue>, code: &str, detail: impl Into<String>) {
+    push_issue(issues, FullEnvelopeMeshIssueLevel::Rejected, code, detail);
 }
 
-fn incomplete(
-    issues: &mut Vec<FullEnvelopeMeshIssue>,
-    code: &str,
-    detail: impl Into<String>,
-) {
-    push_issue(
-        issues,
-        FullEnvelopeMeshIssueLevel::Incomplete,
-        code,
-        detail,
-    );
+fn incomplete(issues: &mut Vec<FullEnvelopeMeshIssue>, code: &str, detail: impl Into<String>) {
+    push_issue(issues, FullEnvelopeMeshIssueLevel::Incomplete, code, detail);
 }
 
 fn close(left: f64, right: f64) -> bool {
@@ -204,11 +186,7 @@ fn ensure_vertex(
     Ok(index)
 }
 
-fn source_profile_position(
-    x_m: f64,
-    point: &ProfilePoint,
-    mirrored: bool,
-) -> [f64; 3] {
+fn source_profile_position(x_m: f64, point: &ProfilePoint, mirrored: bool) -> [f64; 3] {
     [
         x_m,
         if mirrored { -point.y_m } else { point.y_m },
@@ -226,7 +204,11 @@ fn checked_add(total: usize, amount: usize) -> Option<usize> {
 
 fn preflight_mesh_budget(spec: &FullEnvelopeSpec) -> Result<(), Vec<FullEnvelopeMeshIssue>> {
     let station_count = spec.stations.len();
-    let Some(profile_point_count) = spec.stations.first().map(|station| station.starboard_profile.len()) else {
+    let Some(profile_point_count) = spec
+        .stations
+        .first()
+        .map(|station| station.starboard_profile.len())
+    else {
         return Err(vec![FullEnvelopeMeshIssue {
             code: "station_count".into(),
             level: FullEnvelopeMeshIssueLevel::Rejected,
@@ -299,9 +281,7 @@ fn preflight_mesh_budget(spec: &FullEnvelopeSpec) -> Result<(), Vec<FullEnvelope
     Ok(())
 }
 
-fn validate_generation_profile(
-    spec: &FullEnvelopeSpec,
-) -> Result<(), Vec<FullEnvelopeMeshIssue>> {
+fn validate_generation_profile(spec: &FullEnvelopeSpec) -> Result<(), Vec<FullEnvelopeMeshIssue>> {
     let mut issues = Vec::new();
     let source_report = validate_full_envelope_spec(spec);
     match source_report.disposition {
@@ -335,8 +315,7 @@ fn validate_generation_profile(
         );
     }
     if !spec.deck_surface.sections.is_empty()
-        && spec.deck_surface.construction
-            == crate::full_envelope::DeckConstruction::Unsupported
+        && spec.deck_surface.construction == crate::full_envelope::DeckConstruction::Unsupported
     {
         incomplete(
             &mut issues,
@@ -360,8 +339,9 @@ fn validate_generation_profile(
                     &mut issues,
                     "shared_keel_identity",
                     format!(
-                        "asymmetric station {} must use one shared centreline keel point identity and coordinate"
-                    , station.station_id),
+                        "asymmetric station {} must use one shared centreline keel point identity and coordinate",
+                        station.station_id
+                    ),
                 );
             }
         }
@@ -386,9 +366,9 @@ fn validate_generation_profile(
             }
             if spec.symmetry == SymmetryPolicy::ExplicitPortAndStarboard {
                 let port_waterline = station.port_profile.as_ref().and_then(|profile| {
-                    profile
-                        .iter()
-                        .find(|point| point.role == crate::full_envelope::ProfilePointRole::Waterline)
+                    profile.iter().find(|point| {
+                        point.role == crate::full_envelope::ProfilePointRole::Waterline
+                    })
                 });
                 if port_waterline.is_none_or(|point| point.y_m >= -GEOMETRY_TOLERANCE_M) {
                     reject(
@@ -448,9 +428,10 @@ fn validate_generation_profile(
             let right_port = next.port_profile.as_ref();
             if let (Some(left), Some(right)) = (left_port, right_port) {
                 if left.len() != right.len()
-                    || left.iter().zip(right.iter()).any(|(a, b)| {
-                        a.role != b.role || a.region_to_next != b.region_to_next
-                    })
+                    || left
+                        .iter()
+                        .zip(right.iter())
+                        .any(|(a, b)| a.role != b.role || a.region_to_next != b.region_to_next)
                 {
                     reject(
                         &mut issues,
@@ -473,11 +454,7 @@ fn validate_generation_profile(
             .map(|section| section.points.len())
             .max()
             .unwrap_or(0);
-        for (station, section) in spec
-            .stations
-            .iter()
-            .zip(spec.deck_surface.sections.iter())
-        {
+        for (station, section) in spec.stations.iter().zip(spec.deck_surface.sections.iter()) {
             if section.points.len() != 1 && section.points.len() != deck_count {
                 reject(
                     &mut issues,
@@ -603,7 +580,9 @@ fn cap_ring(
         return Err(FullEnvelopeMeshIssue {
             code: "transom_ring_size".into(),
             level: FullEnvelopeMeshIssueLevel::Rejected,
-            detail: format!("transom station {station_id} has fewer than three unique perimeter vertices"),
+            detail: format!(
+                "transom station {station_id} has fewer than three unique perimeter vertices"
+            ),
         });
     }
     if ring.windows(2).any(|pair| pair[0] == pair[1]) {
@@ -761,9 +740,19 @@ fn append_side_interval(
         let port_d = left.port[point_index + 1];
 
         if right_collapsed {
-            target.extend([[a, b, d], [b, c, d], [port_a, port_d, port_b], [port_d, port_c, port_b]]);
+            target.extend([
+                [a, b, d],
+                [b, c, d],
+                [port_a, port_d, port_b],
+                [port_d, port_c, port_b],
+            ]);
         } else {
-            target.extend([[a, b, c], [a, c, d], [port_a, port_c, port_b], [port_a, port_d, port_c]]);
+            target.extend([
+                [a, b, c],
+                [a, c, d],
+                [port_a, port_c, port_b],
+                [port_a, port_d, port_c],
+            ]);
         }
     }
 }
@@ -810,15 +799,19 @@ pub fn compute_full_envelope_mesh_manifest_digest(
         candidate_id: &artifact.candidate.candidate_id,
         admission_profile: &artifact.candidate.profile,
     };
-    Ok(blake3::hash(&serde_json::to_vec(&identity)?).to_hex().to_string())
+    Ok(blake3::hash(&serde_json::to_vec(&identity)?)
+        .to_hex()
+        .to_string())
 }
 
 pub fn compute_vertex_identity_digest(
     bindings: &[VertexIdentityBinding],
 ) -> Result<String, serde_json::Error> {
-    Ok(blake3::hash(&serde_json::to_vec(&VertexIdentityDigest { bindings })?)
-        .to_hex()
-        .to_string())
+    Ok(
+        blake3::hash(&serde_json::to_vec(&VertexIdentityDigest { bindings })?)
+            .to_hex()
+            .to_string(),
+    )
 }
 
 /// Generate a closed full external hull mesh and freshly qualify its triangle
@@ -873,7 +866,10 @@ pub fn generate_full_envelope_mesh(
                     return Err(vec![FullEnvelopeMeshIssue {
                         code: "explicit_port_profile_missing".into(),
                         level: FullEnvelopeMeshIssueLevel::Rejected,
-                        detail: format!("station {} is missing its explicit port profile", station.station_id),
+                        detail: format!(
+                            "station {} is missing its explicit port profile",
+                            station.station_id
+                        ),
                     }]);
                 };
                 add_profile_vertices(
@@ -898,7 +894,10 @@ pub fn generate_full_envelope_mesh(
                 vec![FullEnvelopeMeshIssue {
                     code: "deck_station_missing".into(),
                     level: FullEnvelopeMeshIssueLevel::Rejected,
-                    detail: format!("station {} has no matching deck section", station.station_id),
+                    detail: format!(
+                        "station {} has no matching deck section",
+                        station.station_id
+                    ),
                 }]
             })?;
         let deck = add_deck_vertices(
@@ -1060,8 +1059,8 @@ pub fn generate_full_envelope_mesh(
         (left.station_index, left.source_point_id.as_str())
             .cmp(&(right.station_index, right.source_point_id.as_str()))
     });
-    let vertex_identity_digest_blake3 =
-        compute_vertex_identity_digest(&vertex_identities).map_err(|error| {
+    let vertex_identity_digest_blake3 = compute_vertex_identity_digest(&vertex_identities)
+        .map_err(|error| {
             vec![FullEnvelopeMeshIssue {
                 code: "vertex_identity_digest".into(),
                 level: FullEnvelopeMeshIssueLevel::Rejected,
@@ -1088,8 +1087,8 @@ pub fn generate_full_envelope_mesh(
         candidate,
         admission_report,
     };
-    artifact.manifest_digest_blake3 =
-        compute_full_envelope_mesh_manifest_digest(&artifact).map_err(|error| {
+    artifact.manifest_digest_blake3 = compute_full_envelope_mesh_manifest_digest(&artifact)
+        .map_err(|error| {
             vec![FullEnvelopeMeshIssue {
                 code: "manifest_digest".into(),
                 level: FullEnvelopeMeshIssueLevel::Rejected,
@@ -1142,9 +1141,11 @@ mod tests {
         level: FullEnvelopeMeshIssueLevel,
     ) {
         let errors = generate_full_envelope_mesh(spec, &admission_profile()).unwrap_err();
-        assert!(errors.iter().any(|issue| {
-            issue.code == expected_code && issue.level == level
-        }));
+        assert!(
+            errors
+                .iter()
+                .any(|issue| { issue.code == expected_code && issue.level == level })
+        );
     }
 
     fn make_pointed_end(spec: &mut FullEnvelopeSpec, is_bow: bool) {
@@ -1180,8 +1181,7 @@ mod tests {
             .iter_mut()
             .find(|item| item.station_id == station_id)
             .unwrap();
-        intersection.port_source =
-            crate::full_envelope::WaterlinePortSource::MirroredFromStarboard;
+        intersection.port_source = crate::full_envelope::WaterlinePortSource::MirroredFromStarboard;
         intersection.port_point_id = None;
     }
 
@@ -1200,8 +1200,7 @@ mod tests {
         for intersection in &mut spec.design_waterline.station_intersections {
             intersection.port_source =
                 crate::full_envelope::WaterlinePortSource::ExplicitPortProfile;
-            intersection.port_point_id =
-                Some(format!("PORT-{}", intersection.starboard_point_id));
+            intersection.port_point_id = Some(format!("PORT-{}", intersection.starboard_point_id));
         }
         for (station, deck) in spec
             .stations
@@ -1217,19 +1216,23 @@ mod tests {
     #[test]
     fn box_fixture_generates_admissible_full_external_shell_with_known_volume() {
         let spec = box_fixture();
-        let artifact =
-            generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
+        let artifact = generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
         assert_eq!(
             artifact.admission_report.disposition,
             Disposition::AdmissibleForProfile
         );
         assert_eq!(artifact.admission_report.metrics.boundary_edge_count, 0);
         assert_eq!(artifact.admission_report.metrics.non_manifold_edge_count, 0);
-        assert_eq!(artifact.admission_report.metrics.non_manifold_vertex_link_count, 0);
+        assert_eq!(
+            artifact
+                .admission_report
+                .metrics
+                .non_manifold_vertex_link_count,
+            0
+        );
         assert_eq!(artifact.admission_report.metrics.degenerate_face_count, 0);
         assert!(
-            (artifact.admission_report.metrics.signed_volume_m3.unwrap() - 20_500.0).abs()
-                < 1.0e-8
+            (artifact.admission_report.metrics.signed_volume_m3.unwrap() - 20_500.0).abs() < 1.0e-8
         );
         assert_ne!(
             artifact.admission_report.metrics.signed_volume_m3.unwrap(),
@@ -1250,28 +1253,37 @@ mod tests {
     fn transom_bow_and_pointed_stern_generate_one_open_end_closure() {
         let mut spec = box_fixture();
         make_pointed_end(&mut spec, false);
-        let artifact =
-            generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
+        let artifact = generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
         assert_eq!(artifact.semantic_face_ranges[3].face_count, 0);
         assert!(artifact.semantic_face_ranges[4].face_count > 0);
         assert_eq!(artifact.admission_report.metrics.boundary_edge_count, 0);
         assert_eq!(artifact.admission_report.metrics.non_manifold_edge_count, 0);
-        assert_eq!(artifact.admission_report.metrics.non_manifold_vertex_link_count, 0);
+        assert_eq!(
+            artifact
+                .admission_report
+                .metrics
+                .non_manifold_vertex_link_count,
+            0
+        );
     }
 
     #[test]
     fn pointed_bow_and_transom_stern_generate_one_open_end_closure() {
         let mut spec = box_fixture();
         make_pointed_end(&mut spec, true);
-        let artifact =
-            generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
+        let artifact = generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
         assert_eq!(artifact.semantic_face_ranges[3].face_count, 0);
         assert!(artifact.semantic_face_ranges[4].face_count > 0);
         assert_eq!(artifact.admission_report.metrics.boundary_edge_count, 0);
         assert_eq!(artifact.admission_report.metrics.non_manifold_edge_count, 0);
-        assert_eq!(artifact.admission_report.metrics.non_manifold_vertex_link_count, 0);
+        assert_eq!(
+            artifact
+                .admission_report
+                .metrics
+                .non_manifold_vertex_link_count,
+            0
+        );
     }
-
 
     #[test]
     fn pointed_bow_and_pointed_stern_with_full_midbody_are_manifold() {
@@ -1299,13 +1311,18 @@ mod tests {
         make_pointed_end(&mut spec, true);
         make_pointed_end(&mut spec, false);
 
-        let artifact =
-            generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
+        let artifact = generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
         assert_eq!(artifact.semantic_face_ranges[3].face_count, 0);
         assert_eq!(artifact.semantic_face_ranges[4].face_count, 0);
         assert_eq!(artifact.admission_report.metrics.boundary_edge_count, 0);
         assert_eq!(artifact.admission_report.metrics.non_manifold_edge_count, 0);
-        assert_eq!(artifact.admission_report.metrics.non_manifold_vertex_link_count, 0);
+        assert_eq!(
+            artifact
+                .admission_report
+                .metrics
+                .non_manifold_vertex_link_count,
+            0
+        );
         assert!(artifact.admission_report.metrics.signed_volume_m3.unwrap() > 0.0);
     }
 
@@ -1313,11 +1330,9 @@ mod tests {
     fn explicit_asymmetric_port_profile_is_not_mirrored() {
         let mut spec = box_fixture();
         make_asymmetric(&mut spec);
-        let artifact =
-            generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
+        let artifact = generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
         assert!(
-            (artifact.admission_report.metrics.signed_volume_m3.unwrap() - 19_475.0).abs()
-                < 1.0e-8
+            (artifact.admission_report.metrics.signed_volume_m3.unwrap() - 19_475.0).abs() < 1.0e-8
         );
         assert_eq!(artifact.admission_report.metrics.boundary_edge_count, 0);
         assert_eq!(artifact.admission_report.metrics.non_manifold_edge_count, 0);
@@ -1364,15 +1379,17 @@ mod tests {
         let mut spec = box_fixture();
         spec.boundary_semantics.exterior_shell =
             crate::full_envelope::ExteriorShellSemantics::ExplicitBoundaryLoops;
-        spec.boundary_semantics.openings.push(crate::full_envelope::OpeningBoundary {
-            opening_id: "HATCH-01".into(),
-            boundary_point_refs: vec![
-                "BOW-KEEL".into(),
-                "BOW-WL-S".into(),
-                "BOW-SHEER-S".into(),
-            ],
-            status: crate::full_envelope::OpeningStatus::Supported,
-        });
+        spec.boundary_semantics
+            .openings
+            .push(crate::full_envelope::OpeningBoundary {
+                opening_id: "HATCH-01".into(),
+                boundary_point_refs: vec![
+                    "BOW-KEEL".into(),
+                    "BOW-WL-S".into(),
+                    "BOW-SHEER-S".into(),
+                ],
+                status: crate::full_envelope::OpeningStatus::Supported,
+            });
         assert_issue(
             &spec,
             "boundary_loop_shell_unsupported",
@@ -1382,8 +1399,7 @@ mod tests {
 
     #[test]
     fn semantic_face_ranges_cover_every_generated_face_once() {
-        let artifact =
-            generate_full_envelope_mesh(&box_fixture(), &admission_profile()).unwrap();
+        let artifact = generate_full_envelope_mesh(&box_fixture(), &admission_profile()).unwrap();
         let mut next = 0;
         for range in &artifact.semantic_face_ranges {
             assert_eq!(range.first_face, next);
@@ -1395,22 +1411,17 @@ mod tests {
     #[test]
     fn rehashed_face_mutation_is_rejected_by_fresh_generation_verifier() {
         let spec = box_fixture();
-        let mut artifact =
-            generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
+        let mut artifact = generate_full_envelope_mesh(&spec, &admission_profile()).unwrap();
         artifact.candidate.geometry.faces[0][0] = artifact.candidate.geometry.faces[0][1];
         artifact.mesh_digest_blake3 =
             compute_geometry_digest(&artifact.candidate.geometry).unwrap();
-        artifact.candidate.geometry_digest_blake3 =
-            artifact.mesh_digest_blake3.clone();
+        artifact.candidate.geometry_digest_blake3 = artifact.mesh_digest_blake3.clone();
         artifact.admission_report = admit(&artifact.candidate);
         artifact.manifest_digest_blake3 =
             compute_full_envelope_mesh_manifest_digest(&artifact).unwrap();
-        assert!(verify_full_envelope_mesh_artifact(
-            &spec,
-            &admission_profile(),
-            &artifact
-        )
-        .is_err());
+        assert!(
+            verify_full_envelope_mesh_artifact(&spec, &admission_profile(), &artifact).is_err()
+        );
     }
 
     #[test]
@@ -1418,21 +1429,21 @@ mod tests {
         let mut profile = admission_profile();
         profile.additional_required_checks = vec!["manufacturing-feasibility".into()];
         let errors = generate_full_envelope_mesh(&box_fixture(), &profile).unwrap_err();
-        assert!(errors.iter().any(|item| item.code == "g0_g1_admission_not_pass"));
+        assert!(
+            errors
+                .iter()
+                .any(|item| item.code == "g0_g1_admission_not_pass")
+        );
     }
 
     #[test]
     fn face_and_vertex_identity_digests_are_distinct_from_geometry_digest() {
-        let artifact =
-            generate_full_envelope_mesh(&box_fixture(), &admission_profile()).unwrap();
+        let artifact = generate_full_envelope_mesh(&box_fixture(), &admission_profile()).unwrap();
         assert_ne!(
             artifact.vertex_identity_digest_blake3,
             artifact.mesh_digest_blake3
         );
-        assert_ne!(
-            artifact.manifest_digest_blake3,
-            artifact.mesh_digest_blake3
-        );
+        assert_ne!(artifact.manifest_digest_blake3, artifact.mesh_digest_blake3);
         assert_eq!(
             artifact.vertex_identities.len(),
             artifact.candidate.geometry.vertices.len()
