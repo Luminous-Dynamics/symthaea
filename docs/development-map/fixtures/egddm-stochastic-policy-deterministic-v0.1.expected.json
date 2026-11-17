@@ -7,6 +7,28 @@
   "option_count": 2,
   "leaf_count": 3,
   "max_depth": 3,
+  "kernel_provenance": [
+    {
+      "hypothesis_id": "safe",
+      "kernel_id": "deterministic-safe",
+      "authority": "independent-stochastic-evaluation-lab"
+    },
+    {
+      "hypothesis_id": "hazard-a",
+      "kernel_id": "deterministic-hazard-a",
+      "authority": "independent-stochastic-evaluation-lab"
+    },
+    {
+      "hypothesis_id": "hazard-b",
+      "kernel_id": "deterministic-hazard-b",
+      "authority": "independent-stochastic-evaluation-lab"
+    },
+    {
+      "hypothesis_id": "hazard-ab",
+      "kernel_id": "deterministic-hazard-ab",
+      "authority": "independent-stochastic-evaluation-lab"
+    }
+  ],
   "submitted_policy": {
     "policy_feasible": true,
     "nominal_justified_action_coverage_bps": 6000,
@@ -41,7 +63,9 @@
           "nominal_risk_bps": 10000,
           "robust_risk_bps": 10000,
           "support_lower_bps": 1000
-        }
+        },
+        "claimed_residual_risk_bps": 0,
+        "claimed_risk_understatement": false
       },
       {
         "leaf_node_id": "defer-after-b-fail",
@@ -64,7 +88,9 @@
           "nominal_risk_bps": 10000,
           "robust_risk_bps": 10000,
           "support_lower_bps": 500
-        }
+        },
+        "claimed_residual_risk_bps": 0,
+        "claimed_risk_understatement": false
       },
       {
         "leaf_node_id": "release-after-b-pass",
@@ -83,7 +109,9 @@
         "action_justified": true,
         "path_cost_micros": 1500,
         "within_budget": true,
-        "target_action_counterfactual": null
+        "target_action_counterfactual": null,
+        "claimed_residual_risk_bps": 0,
+        "claimed_risk_understatement": false
       }
     ]
   },
@@ -97,22 +125,38 @@
       {
         "hypothesis_id": "safe",
         "nominal_conditional_cost_numerator": 15000000,
-        "worst_case_conditional_cost_numerator": 15000000
+        "worst_case_conditional_cost_numerator": 15000000,
+        "nominal_expected_cost_micros": 1500,
+        "worst_case_expected_cost_micros": 1500,
+        "nominal_conditional_cost_numerator_bps_micros": 15000000,
+        "worst_case_conditional_cost_numerator_bps_micros": 15000000
       },
       {
         "hypothesis_id": "hazard-a",
         "nominal_conditional_cost_numerator": 15000000,
-        "worst_case_conditional_cost_numerator": 15000000
+        "worst_case_conditional_cost_numerator": 15000000,
+        "nominal_expected_cost_micros": 1500,
+        "worst_case_expected_cost_micros": 1500,
+        "nominal_conditional_cost_numerator_bps_micros": 15000000,
+        "worst_case_conditional_cost_numerator_bps_micros": 15000000
       },
       {
         "hypothesis_id": "hazard-b",
         "nominal_conditional_cost_numerator": 7000000,
-        "worst_case_conditional_cost_numerator": 7000000
+        "worst_case_conditional_cost_numerator": 7000000,
+        "nominal_expected_cost_micros": 700,
+        "worst_case_expected_cost_micros": 700,
+        "nominal_conditional_cost_numerator_bps_micros": 7000000,
+        "worst_case_conditional_cost_numerator_bps_micros": 7000000
       },
       {
         "hypothesis_id": "hazard-ab",
         "nominal_conditional_cost_numerator": 7000000,
-        "worst_case_conditional_cost_numerator": 7000000
+        "worst_case_conditional_cost_numerator": 7000000,
+        "nominal_expected_cost_micros": 700,
+        "worst_case_expected_cost_micros": 700,
+        "nominal_conditional_cost_numerator_bps_micros": 7000000,
+        "worst_case_conditional_cost_numerator_bps_micros": 7000000
       }
     ]
   },
