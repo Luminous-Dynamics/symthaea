@@ -628,7 +628,16 @@ mod tests {
             if !probe.admissible {
                 continue;
             }
-            let partitions = partition_mask(problem, probe_index, mask);
+            // Deliberately independent partition reconstruction for the
+            // exhaustive small-instance oracle; do not call the production
+            // partition_mask helper here.
+            let mut partitions = BTreeMap::<u32, u64>::new();
+            for (hypothesis_index, outcome) in probe.outcomes.iter().enumerate() {
+                let bit = 1_u64 << hypothesis_index;
+                if mask & bit != 0 {
+                    *partitions.entry(*outcome).or_insert(0) |= bit;
+                }
+            }
             if partitions.len() < 2 {
                 continue;
             }
