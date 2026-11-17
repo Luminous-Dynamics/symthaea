@@ -798,3 +798,62 @@ Our research target is to demonstrate all of the following together:
 - final system wins on independently confirmed Pareto improvement per fixed specialist-evaluation budget and lifecycle engineering cost, not raw number of generated candidates.
 
 These remain research targets, not achieved performance.
+
+
+## 12. Independent multi-waterline sectional reference (G2f-d research bridge)
+
+The current branch also adds `sectional_reference.rs`, a deliberately separate numerical route for evaluating multiple upright horizontal waterplanes from the same full-envelope input. It is not a mesh generator. It is intended to become a second hydrostatic comparison against G2c polyhedral integration once G2f-b/c surface generation is available.
+
+### Interpolation contract
+
+For each station, the method builds the full transverse section perimeter from the starboard profile and either:
+- an exact reflected port profile under `SYMMETRIC_ABOUT_Y0`, or
+- the explicitly supplied port profile under `EXPLICIT_PORT_AND_STARBOARD`.
+
+It clips this section to the submerged half-plane (z \ge z_w), with z-down coordinates. It then computes area, transverse/vertical section centroid and waterline breadth.
+
+Between longitudinal stations, the v1 reference declares piecewise-linear interpolation of section area, waterplane breadth and section centroid. The longitudinal integration uses:
+- trapezoidal integration of area for displacement volume;
+- trapezoidal integration of waterline breadth for waterplane area;
+- exact integration of (x f(x)) when (f(x)) is linearly interpolated for LCB/LCF first moments;
+- exact integration of (f(x)g(x)) when both fields are linearly interpolated for transverse and vertical area moments.
+
+The last point is important: using a trapezoid on endpoint products (A_i\bar z_i) or (A_i\bar y_i) is not exact because the product of two linearly varying fields is quadratic. The reference now uses the closed-form integral of that quadratic product.
+
+This is still an approximation model for the longitudinal behavior between the supplied stations. It must not be represented as exact integration of an arbitrary CAD loft. Refinement and convergence studies are required before using it as a decision-grade reference on real vessels.
+
+### Synthetic loading-sweep fixture
+
+The box fixture carries three horizontal waterplanes:
+- z=-2 m (deeper/overload waterline): 16,000 m³;
+- z=0 m (design waterline): 12,000 m³;
+- z=+2 m (shallower/light waterline): 8,000 m³.
+
+At explicit density 1,025 kg/m³, all three have 2,000 m² waterplane area and TPC 20.5 tonnes/cm. LCB and LCF are 50 m. VCB is 2, 3 and 4 m respectively in the declared z-down coordinate frame. These are analytical synthetic fixture values.
+
+A second nonuniform-depth test varies the station draft from 4 m to 8 m across a 100 m length. Under the v1 piecewise-linear section-observable model it has exactly:
+- displacement 12,000 m³;
+- LCB (500/9\) m;
+- VCB (28/9\) m.
+
+This detects the bias from trapezoidal integration of area-centroid endpoint products.
+
+### Receipt and claim semantics
+
+Each result binds:
+- the full-envelope source specification digest;
+- a unique loading-condition ID;
+- explicit horizontal waterplane elevation;
+- explicit water density;
+- the algorithm identity and calculated observables.
+
+The ordered sweep digest binds the complete result list. Receipt verification replays the same exact request; it verifies determinism and integrity, not independent implementation diversity. The independent numerical-method claim is specifically that sectional clipping/integration is separate from G2c mesh tetrahedral integration. The two methods still need to be run on the same generated geometry before claiming cross-method agreement.
+
+The elevation is supplied by the caller; this module does not solve a vessel's draft/trim equilibrium from mass, tank contents or KG. It supports neither trim nor heel. It refuses waterplanes above the supported sheer section rather than creating unmodelled deck flooding.
+
+CLI:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-sectional-hydrostatics-reference -- docs/research/marine/fixtures/marine-full-envelope-loading-sweep-001.json
+
+Exit code 0 reports an evaluated receipt, 1 reports typed validation/integration rejection and 2 indicates CLI, I/O or JSON parsing failure.
+
