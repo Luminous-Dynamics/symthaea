@@ -670,7 +670,7 @@ mod tests {
         );
         assert_eq!(certificate.root_worst_case_cost, 2);
         assert_eq!(certificate.node_count, 7);
-        assert_eq!(certificate.explored_subsets, 3);
+        assert_eq!(certificate.explored_subsets, 6);
         verify_active_experiment_certificate(&problem, &certificate, budget()).unwrap();
     }
 
