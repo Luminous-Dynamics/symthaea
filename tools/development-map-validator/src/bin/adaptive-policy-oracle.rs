@@ -511,5 +511,20 @@ mod tests{
  #[test]fn candidate_cannot_change_world_probability_bounds(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["hypothesis_bounds"][0]["upper_probability_bps"]=json!(9999);assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("differ from evaluator-authoritative"));}
  #[test]fn missing_observation_branch_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["policy_tree"]["nodes"][0]["branches"].as_object_mut().unwrap().remove("fail");assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("cover every factor outcome"));}
  #[test]fn repeated_option_on_a_path_is_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["policy_tree"]["nodes"][1]["option_id"]=json!("gate-a");assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("repeats option"));}
+ #[test]fn oracle_cost_options_must_match_candidate_ids_exactly(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["oracle"]["cost_options"][1]["option_id"]=json!("gate-a");
+  assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("cost option IDs differ"));
+ }
+ #[test]fn world_outcomes_with_zero_registered_likelihood_are_rejected(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  for root in [&mut b["candidate_view"],&mut b["oracle"]]{ 
+   let row=root["factors"][0]["likelihoods"].as_array_mut().unwrap().iter_mut()
+    .find(|x|x["hypothesis_id"]=="safe").unwrap();
+   row["outcomes"]["pass"]=json!({"lower_likelihood_bps":0,"upper_likelihood_bps":0,"nominal_likelihood_bps":0});
+   row["outcomes"]["fail"]=json!({"lower_likelihood_bps":10000,"upper_likelihood_bps":10000,"nominal_likelihood_bps":10000});
+  }
+  assert!(evaluate_adaptive_policy_json(&b.to_string()).unwrap_err().contains("zero likelihood"));
+ }
  #[test]fn cycles_are_rejected(){let mut b:Value=serde_json::from_str(FIXTURE).unwrap();b["candidate_view"]["policy_tree"]["nodes"][0]["branches"]["pass"]=json!("root");b["candidate_view"]["policy_tree"]["nodes"][0]["node_id"]=json!("root");b["candidate_view"]["policy_tree"]["root_node_id"]=json!("root");assert!(evaluate_adaptive_policy_json(&b.to_string()).is_err());}
 }
