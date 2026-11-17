@@ -1,0 +1,16 @@
+[workspace]
+
+[package]
+name = "symthaea-chaos-reference-suite"
+version = "0.1.0"
+edition = "2024"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Deterministic reference generators for nonlinear dynamics estimator qualification"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "chaos-fixtures"
+path = "src/main.rs"

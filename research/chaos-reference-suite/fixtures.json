@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "suite_id": "symthaea-chaos-reference-suite-v0",
+  "claim_type": "deterministic synthetic reference generators",
+  "max_samples_per_fixture": 1000000,
+  "fixtures": [
+    {
+      "id": "stable_linear",
+      "regime": "stable",
+      "equation": "x[n+1] = 0.7*x[n]",
+      "initial_state": [0.4, 0.0, 0.0],
+      "burn_in": 128,
+      "samples": 2048,
+      "analytic_reference": {"max_lyapunov_per_step": -0.35667494393873245}
+    },
+    {
+      "id": "logistic_fixed",
+      "regime": "stable_fixed_point",
+      "equation": "x[n+1] = r*x[n]*(1-x[n])",
+      "parameters": {"r": 2.5},
+      "initial_state": [0.2],
+      "burn_in": 512,
+      "samples": 2048,
+      "analytic_reference": {"fixed_point": 0.6, "max_lyapunov_per_step": -0.6931471805599453}
+    },
+    {
+      "id": "logistic_period2",
+      "regime": "stable_periodic",
+      "equation": "x[n+1] = r*x[n]*(1-x[n])",
+      "parameters": {"r": 3.2},
+      "initial_state": [0.2],
+      "burn_in": 1024,
+      "samples": 2048,
+      "analytic_reference": {"period": 2}
+    },
+    {
+      "id": "logistic_chaotic",
+      "regime": "chaotic_deterministic_map",
+      "equation": "x[n+1] = r*x[n]*(1-x[n])",
+      "parameters": {"r": 4.0},
+      "initial_state": [0.123456789],
+      "burn_in": 512,
+      "samples": 2048,
+      "analytic_reference": {"typical_max_lyapunov_per_step": 0.6931471805599453}
+    },
+    {
+      "id": "henon",
+      "regime": "chaotic_deterministic_map",
+      "equation": "x[n+1] = 1 - a*x[n]^2 + y[n]; y[n+1] = b*x[n]",
+      "parameters": {"a": 1.4, "b": 0.3},
+      "initial_state": [0.0, 0.0],
+      "burn_in": 2048,
+      "samples": 2048,
+      "analytic_reference": {"qualitative": "canonical chaotic Hénon parameter regime"}
+    },
+    {
+      "id": "quasiperiodic_torus",
+      "regime": "quasiperiodic",
+      "equation": "x=cos(n*sqrt(2)); y=sin(n*sqrt(2)); z=cos(n*sqrt(3))",
+      "burn_in": 0,
+      "samples": 2048,
+      "analytic_reference": {"qualitative": "two-frequency irrational torus-rotation construction"}
+    },
+    {
+      "id": "ar1_colored_noise",
+      "regime": "stochastic_linear_process",
+      "equation": "x[n+1] = 0.8*x[n] + sqrt(1-0.8^2)*epsilon[n]",
+      "parameters": {"phi": 0.8},
+      "seed": 20261116,
+      "burn_in": 512,
+      "samples": 2048,
+      "analytic_reference": {"stationary_variance": 1.0}
+    },
+    {
+      "id": "lorenz63",
+      "regime": "chaotic_continuous_flow",
+      "equation": "dx=sigma*(y-x); dy=x*(rho-z)-y; dz=x*y-beta*z",
+      "parameters": {"sigma": 10.0, "rho": 28.0, "beta": 2.6666666666666665, "dt": 0.01},
+      "initial_state": [1.0, 1.0, 1.0],
+      "burn_in": 5000,
+      "samples": 2048,
+      "analytic_reference": {"qualitative": "canonical Lorenz-63 chaotic parameter regime"}
+    }
+  ],
+  "notes": [
+    "Ground-truth regime labels describe the generator construction, not an output of Symthaea's estimators.",
+    "The AR(1) process is stochastic; the seed makes one synthetic realization reproducible. It is not a deterministic-chaos positive control.",
+    "Floating-point trajectories are expected to be reproducible within a fixed build and target contract, not bit-identical across every architecture.",
+    "The FNV-1a digest emitted by the tool is non-cryptographic and is only a fixture-integrity convenience.",
+    "Reference values must be checked against independent numerical methods before being used as estimator acceptance bands."
+  ]
+}
