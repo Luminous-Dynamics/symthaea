@@ -6,7 +6,9 @@
 
 use std::collections::BTreeSet;
 
-use super::validation_domain::{ValidationDomainError, ValidationPlan, validate_validation_domain};
+use super::validation_domain::{
+    ValidationDomainAudit, ValidationDomainError, ValidationPlan, validate_validation_domain,
+};
 
 pub const HOLDOUT_METRICS_VERSION: &str = "fusion-vv-holdout-metrics/0.1";
 
@@ -188,6 +190,8 @@ pub struct HoldoutEvaluationReport {
     pub campaign_id: String,
     pub model_revision: String,
     pub disposition: HoldoutEvaluationDisposition,
+    /// Exact successful split/domain audit consumed before metric calculation.
+    pub validation_domain_audit: Option<ValidationDomainAudit>,
     pub diagnostics: Vec<HoldoutEvaluationDiagnostic>,
     pub test_stand_metrics: Option<ValidationSetMetrics>,
     pub holdout_metrics: Option<ValidationSetMetrics>,
@@ -209,7 +213,7 @@ pub fn evaluate_measured_holdout(campaign: &HoldoutEvaluationCampaign) -> Holdou
     let profile = &campaign.metric_profile;
     let mut diagnostics = validate_metric_profile(profile);
     let domain_audit = match validate_validation_domain(plan) {
-        Ok(audit) => Some(audit),
+        Ok(audit) => audit,
         Err(errors) => {
             return report_for_domain_errors(campaign, errors);
         }
@@ -299,6 +303,7 @@ pub fn evaluate_measured_holdout(campaign: &HoldoutEvaluationCampaign) -> Holdou
             campaign_id: plan.domain.domain_id.clone(),
             model_revision: plan.model_revision.clone(),
             disposition: HoldoutEvaluationDisposition::NotEvaluable,
+            validation_domain_audit: Some(domain_audit.clone()),
             diagnostics,
             test_stand_metrics: None,
             holdout_metrics: None,
@@ -366,6 +371,7 @@ pub fn evaluate_measured_holdout(campaign: &HoldoutEvaluationCampaign) -> Holdou
         campaign_id: plan.domain.domain_id.clone(),
         model_revision: plan.model_revision.clone(),
         disposition,
+        validation_domain_audit: Some(domain_audit),
         diagnostics,
         test_stand_metrics: Some(test_metrics),
         holdout_metrics: Some(holdout_metrics),
@@ -415,6 +421,7 @@ fn report_for_domain_errors(
         } else {
             HoldoutEvaluationDisposition::NotEvaluable
         },
+        validation_domain_audit: None,
         diagnostics,
         test_stand_metrics: None,
         holdout_metrics: None,
@@ -988,6 +995,10 @@ mod tests {
                 .empirical_prediction_interval_coverage,
             Some(1.0)
         );
+        let domain_audit = report.validation_domain_audit.as_ref().unwrap();
+        assert_eq!(domain_audit.domain_id, "tokamak-domain-v1");
+        assert_eq!(domain_audit.holdout_record_id, "holdout-1");
+        assert_eq!(domain_audit.calibration_record_count, 1);
     }
 
     #[test]
