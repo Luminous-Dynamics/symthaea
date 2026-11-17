@@ -75,7 +75,9 @@ pub struct EvidenceManifest {
     pub verifier_receipt_digest: String,
     pub observation_captured_at_unix_ms: u64,
     pub evidence_valid_until_unix_ms: u64,
+    pub calibration_valid_from_unix_ms: u64,
     pub calibration_valid_until_unix_ms: u64,
+    pub rights_valid_until_unix_ms: u64,
     pub rights_purpose: EvidencePurpose,
     pub rights_disposition: RightsDisposition,
     pub receipt_verification: ReceiptVerificationDisposition,
@@ -118,15 +120,32 @@ pub enum RejectionReason {
     ObservationFromFuture,
     ObservationStale,
     EvidenceExpired,
+    CalibrationNotYetValid,
     CalibrationExpired,
+    RightsGrantExpired,
     SpatialScopePartial,
     SpatialScopeUnknown,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AdmittedInspectionOption {
+    pub option: InspectionOption,
+    /// Preserve the complete evidence manifest with the admitted campaign option.
+    pub manifest: EvidenceManifest,
+}
+
+impl AdmittedInspectionOption {
+    /// Extract the value object expected by the campaign solver. Callers should
+    /// persist this wrapper alongside the campaign so the evidence lineage is retained.
+    pub fn campaign_option(&self) -> InspectionOption {
+        self.option.clone()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EvidenceAdmissionReport {
     pub candidate_id: String,
-    pub admitted_option: Option<InspectionOption>,
+    pub admitted_candidate: Option<AdmittedInspectionOption>,
     pub rejection_reasons: Vec<RejectionReason>,
     /// Retain these references even for rejection so auditors can identify
     /// which upstream objects were presented.
@@ -135,7 +154,7 @@ pub struct EvidenceAdmissionReport {
 
 impl EvidenceAdmissionReport {
     pub fn admitted(&self) -> bool {
-        self.admitted_option.is_some() && self.rejection_reasons.is_empty()
+        self.admitted_candidate.is_some() && self.rejection_reasons.is_empty()
     }
 }
 
@@ -194,24 +213,33 @@ pub fn admit_candidate(
 
     push_if_mismatch(
         &mut reasons,
-        option.decision_id != expected.decision_id
+        missing(&expected.decision_id)
+            || missing(&option.decision_id)
+            || missing(&manifest.decision_id)
+            || option.decision_id != expected.decision_id
             || manifest.decision_id != expected.decision_id
             || option.decision_id != manifest.decision_id,
         RejectionReason::DecisionMismatch,
     );
     push_if_mismatch(
         &mut reasons,
-        manifest.option_id != option.option_id || manifest.option_id != expected.option_id,
+        missing(&expected.option_id)
+            || missing(&manifest.option_id)
+            || manifest.option_id != option.option_id
+            || manifest.option_id != expected.option_id,
         RejectionReason::OptionIdMismatch,
     );
     push_if_mismatch(
         &mut reasons,
-        missing(&manifest.asset_id) || manifest.asset_id != expected.asset_id,
+        missing(&expected.asset_id)
+            || missing(&manifest.asset_id)
+            || manifest.asset_id != expected.asset_id,
         RejectionReason::AssetMismatch,
     );
     push_if_mismatch(
         &mut reasons,
-        missing(&manifest.asset_revision)
+        missing(&expected.asset_revision)
+            || missing(&manifest.asset_revision)
             || manifest.asset_revision != expected.asset_revision,
         RejectionReason::AssetRevisionMismatch,
     );
@@ -302,8 +330,19 @@ pub fn admit_candidate(
     if manifest.evidence_valid_until_unix_ms <= expected.evaluation_time_unix_ms {
         reasons.push(RejectionReason::EvidenceExpired);
     }
+    if expected.evaluation_time_unix_ms < manifest.calibration_valid_from_unix_ms {
+        reasons.push(RejectionReason::CalibrationNotYetValid);
+    }
     if manifest.calibration_valid_until_unix_ms <= expected.evaluation_time_unix_ms {
         reasons.push(RejectionReason::CalibrationExpired);
+    }
+    if manifest.rights_valid_until_unix_ms <= expected.evaluation_time_unix_ms {
+        reasons.push(RejectionReason::RightsGrantExpired);
+    }
+    if manifest.observation_captured_at_unix_ms < manifest.calibration_valid_from_unix_ms
+        || manifest.observation_captured_at_unix_ms > manifest.calibration_valid_until_unix_ms
+    {
+        reasons.push(RejectionReason::CalibrationNotYetValid);
     }
 
     match manifest.spatial_scope {
@@ -318,7 +357,10 @@ pub fn admit_candidate(
     let admitted = reasons.is_empty();
     EvidenceAdmissionReport {
         candidate_id: manifest.candidate_id.clone(),
-        admitted_option: admitted.then(|| option.clone()),
+        admitted_candidate: admitted.then(|| AdmittedInspectionOption {
+            option: option.clone(),
+            manifest: manifest.clone(),
+        }),
         rejection_reasons: reasons,
         evidence_references: vec![
             manifest.source_dataset_digest.clone(),
@@ -397,7 +439,9 @@ mod tests {
                 verifier_receipt_digest: "sha256:external-verifier".into(),
                 observation_captured_at_unix_ms: NOW - 60_000,
                 evidence_valid_until_unix_ms: NOW + 600_000,
+                calibration_valid_from_unix_ms: NOW - 600_000,
                 calibration_valid_until_unix_ms: NOW + 600_000,
+                rights_valid_until_unix_ms: NOW + 600_000,
                 rights_purpose: EvidencePurpose::AssetConditionInspection,
                 rights_disposition: RightsDisposition::AuthorizedForDeclaredPurpose,
                 receipt_verification: ReceiptVerificationDisposition::VerifiedByExternalService,
@@ -411,7 +455,10 @@ mod tests {
         let report = admit_candidate(&candidate(), &context());
         assert!(report.admitted());
         assert!(report.rejection_reasons.is_empty());
-        assert!(report.admitted_option.is_some());
+        assert!(report.admitted_candidate.is_some());
+        let admitted = report.admitted_candidate.as_ref().unwrap();
+        assert_eq!(admitted.manifest.asset_revision, "rev-17");
+        assert_eq!(admitted.campaign_option().option_id, "support-08-thermal-followup");
         assert_eq!(report.evidence_references.len(), 6);
     }
 
@@ -421,7 +468,7 @@ mod tests {
         item.manifest.observation_captured_at_unix_ms = NOW - 3_600_001;
         let report = admit_candidate(&item, &context());
         assert!(report.rejection_reasons.contains(&RejectionReason::ObservationStale));
-        assert!(report.admitted_option.is_none());
+        assert!(report.admitted_candidate.is_none());
     }
 
     #[test]
@@ -445,6 +492,22 @@ mod tests {
         item.manifest.calibration_valid_until_unix_ms = NOW;
         let report = admit_candidate(&item, &context());
         assert!(report.rejection_reasons.contains(&RejectionReason::CalibrationExpired));
+    }
+
+    #[test]
+    fn expired_rights_grant_is_rejected() {
+        let mut item = candidate();
+        item.manifest.rights_valid_until_unix_ms = NOW;
+        let report = admit_candidate(&item, &context());
+        assert!(report.rejection_reasons.contains(&RejectionReason::RightsGrantExpired));
+    }
+
+    #[test]
+    fn calibration_not_yet_valid_is_rejected() {
+        let mut item = candidate();
+        item.manifest.calibration_valid_from_unix_ms = NOW + 1;
+        let report = admit_candidate(&item, &context());
+        assert!(report.rejection_reasons.contains(&RejectionReason::CalibrationNotYetValid));
     }
 
     #[test]
