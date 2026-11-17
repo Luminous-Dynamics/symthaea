@@ -1,0 +1,170 @@
+{
+  "schema": "subterra.inspection.dataset-admission",
+  "schema_version": 1,
+  "status": "candidate_inventory_not_dataset_ingestion",
+  "date": "2026-11-17",
+  "issue": "https://github.com/Luminous-Dynamics/symthaea/issues/12652",
+  "rules": {
+    "public_description_is_not_a_license": true,
+    "source_labels_are_not_infallible_physical_truth": true,
+    "source_domain_must_not_be_silently_transferred": true,
+    "unknown_rights_means_no_training_or_redistribution": true,
+    "exact_file_manifest_digest_required_before_ingestion": true,
+    "asset_video_site_groups_must_not_cross_splits": true,
+    "derived_weights_follow_source_license_review": true
+  },
+  "datasets": [
+    {
+      "id": "SEWER-ML",
+      "source": "https://vap.aau.dk/sewer-ml/",
+      "paper": "https://openaccess.thecvf.com/content/CVPR2021/papers/Haurum_Sewer-ML_A_Multi-Label_Sewer_Defect_Classification_Dataset_and_Benchmark_CVPR_2021_paper.pdf",
+      "published_scope": "Danish sewer inspection video frames",
+      "size": {
+        "images": 1300201,
+        "videos": 75618,
+        "utilities": 3,
+        "collection_years": 9
+      },
+      "annotation": {
+        "source": "licensed sewer inspectors",
+        "standard": "Fotomanualen",
+        "class_count": 17,
+        "task": "multi_label_image_classification"
+      },
+      "official_baseline": {
+        "methods_compared": 12,
+        "f2_ciw": 0.5511,
+        "f1_normal": 0.9094,
+        "metric_scope": "original benchmark"
+      },
+      "rights_status": "TERMS_REVIEW_REQUIRED",
+      "access_status": "REQUEST_FORM_LINKED",
+      "permitted_use": "Do not ingest until exact access terms, use purpose, redistribution and derived-weight rights have been reviewed.",
+      "domain_limit": "Sewer condition only; does not establish mine cable-duct, industrial pipe, support installation or drawpoint condition.",
+      "split_rules": [
+        "preserve_official_split_for_reproduction",
+        "group_all_frames_by_source_video",
+        "hold_out_utility_site_where_identifiers_and_rights_allow"
+      ],
+      "readiness": "CANDIDATE_FOR_SOURCE_BENCHMARK_REPRODUCTION"
+    },
+    {
+      "id": "CABLEINSPECT-AD",
+      "source": "https://mila-iqia.github.io/cableinspect-ad/",
+      "paper": "https://proceedings.neurips.cc/paper_files/paper/2024/hash/76d9dd096d9469d6b7e732f0cddb51b3-Abstract-Datasets_and_Benchmarks_Track.html",
+      "published_scope": "expert-replicated power-line cable anomalies for robotic inspection",
+      "size": {
+        "images": 4798,
+        "annotated_anomalies": 6023,
+        "cable_appearances": 3,
+        "defect_types": 7
+      },
+      "annotation": {
+        "source": "domain experts from Hydro-Québec",
+        "levels": [
+          "image",
+          "pixel",
+          "bounding_box"
+        ],
+        "severity": true
+      },
+      "baseline": {
+        "methods": [
+          "Enhanced-PatchCore",
+          "few_shot_anomaly_detection",
+          "many_shot_anomaly_detection",
+          "vision_language_zero_shot"
+        ],
+        "reported_limit": "methods miss some defect types and severity grades"
+      },
+      "rights_status": "CC-BY-NC-SA-4.0_NONCOMMERCIAL",
+      "access_status": "PROJECT_DOWNLOAD_LINK",
+      "permitted_use": "Non-commercial use only under CC BY-NC-SA 4.0; do not use in commercial product/weights without separately reviewed permission. Preserve attribution and ShareAlike obligations.",
+      "domain_limit": "Power-line cable surfaces, not underground cable duct, in-pipe robotics or mine asset-condition evidence.",
+      "split_rules": [
+        "preserve_source_protocol",
+        "group_by_cable_and_capture_session_where_available",
+        "report_few_shot_many_shot_and_zero_shot_separately"
+      ],
+      "readiness": "CANDIDATE_FOR_NONCOMMERCIAL_RESEARCH_ONLY"
+    },
+    {
+      "id": "IPD-INSULATED-PIPE",
+      "source": "https://zenodo-rdm.web.cern.ch/records/17398156",
+      "paper": "https://doi.org/10.1109/ICASSPW62465.2024.10627321",
+      "published_scope": "insulated industrial pipeline surface damage",
+      "size": {
+        "images": 357,
+        "damage_types": 3
+      },
+      "annotation": {
+        "source": "dataset authors",
+        "levels": [
+          "pixel_mask"
+        ],
+        "mask_classes": [
+          "positive_damage"
+        ],
+        "distinguishes_damage_subtypes": false
+      },
+      "rights_status": "SIGNED_RESEARCH_LICENSE_REQUIRED",
+      "access_status": "WRITTEN_REQUEST_AND_SIGNED_AGREEMENT",
+      "permitted_use": "No download, training or redistribution until the signed author licence is obtained and purpose is reviewed.",
+      "domain_limit": "Insulation damage only; masks conflate hole, open insulation and dent; do not manufacture separate class labels.",
+      "split_rules": [
+        "group_by_pipeline_asset_and_capture_session_where_available",
+        "preserve_binary_mask_semantics"
+      ],
+      "readiness": "RESTRICTED_CANDIDATE"
+    },
+    {
+      "id": "VIDEOPIPE-QV-PIPE",
+      "source": "https://doi.org/10.1016/j.autcon.2024.105552",
+      "published_scope": "short-video sewer defect classification",
+      "size": {
+        "video_clips": 9601,
+        "duration_hours": 55
+      },
+      "annotation": {
+        "class_count": 17,
+        "task": "video_defect_classification"
+      },
+      "rights_status": "UNVERIFIED",
+      "access_status": "SOURCE_ACCESS_NOT_YET_VERIFIED",
+      "permitted_use": "Candidate only. Verify original repository, licence, version and permitted use before download or ingestion.",
+      "domain_limit": "Sewer short clips; not cable/duct or drawpoint validation.",
+      "split_rules": [
+        "group_by_original_video_and_asset"
+      ],
+      "readiness": "NOT_ADMITTED"
+    },
+    {
+      "id": "VIDEOPIPE-CCTV-PIPE",
+      "source": "https://doi.org/10.1016/j.autcon.2024.105552",
+      "published_scope": "long untrimmed sewer CCTV video temporal localization",
+      "size": {
+        "videos": 575,
+        "duration_hours": 87
+      },
+      "annotation": {
+        "class_count": 16,
+        "task": "temporal_defect_localization"
+      },
+      "rights_status": "UNVERIFIED",
+      "access_status": "SOURCE_ACCESS_NOT_YET_VERIFIED",
+      "permitted_use": "Candidate only. Verify original repository, licence, version and permitted use before download or ingestion.",
+      "domain_limit": "Sewer CCTV temporal-localization benchmark; not mine cable or drawpoint truth.",
+      "split_rules": [
+        "group_by_original_video_and_asset",
+        "no_adjacent_frame_leakage"
+      ],
+      "readiness": "NOT_ADMITTED"
+    }
+  ],
+  "not_yet_admitted": {
+    "mine_drawpoint_hangup_volume": "NO_RIGHTS_CLEARED_PUBLIC_REFERENCE_DATASET_ADMITTED",
+    "mine_cable_duct_condition": "NO_MINE_SPECIFIC_PUBLIC_REFERENCE_DATASET_ADMITTED",
+    "rock_support_installation_acceptance": "NO_PUBLIC_DATASET_ADMITTED_AS_STRUCTURAL_GROUND_TRUTH"
+  },
+  "claim_ceiling": "This inventory is a source and rights review plan. No dataset bytes have been downloaded, licensed, ingested, trained on or redistributed by this change. No source label is elevated to physical or mine-site truth."
+}
