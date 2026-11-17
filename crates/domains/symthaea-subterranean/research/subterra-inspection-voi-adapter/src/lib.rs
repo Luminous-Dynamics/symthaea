@@ -707,6 +707,43 @@ mod tests {
     }
 
     #[test]
+    fn entropy_and_evsi_baselines_respect_robot_loss_limits() {
+        let mut case = synthetic_decision_boundary_case(InspectionTask::PipeCable);
+        for model in std::iter::once(&mut case.primary_model)
+            .chain(case.evaluation_models.iter_mut().map(|model| &mut model.problem))
+        {
+            let high = model
+                .actions
+                .iter_mut()
+                .find(|action| action.id == "pipe_cable_high_eig")
+                .unwrap();
+            for outcome in &mut high.outcomes {
+                for probability in &mut outcome.likelihood_by_hypothesis {
+                    *probability *= 0.94;
+                }
+            }
+            high.outcomes.push(MeasurementOutcome {
+                id: "robot_lost".into(),
+                kind: OutcomeKind::RobotLost,
+                likelihood_by_hypothesis: vec![0.06; 4],
+                terminal_loss_by_hypothesis: Some(vec![100.0; 4]),
+            });
+        }
+        let report = evaluate_inspection_case(&case).unwrap();
+        let high = report
+            .myopic_action_baselines
+            .iter()
+            .find(|action| action.action_id == "pipe_cable_high_eig")
+            .unwrap();
+        assert!((high.robot_loss_probability - 0.06).abs() < EPSILON);
+        assert!(!high.eligible);
+        assert_ne!(
+            report.planner.policy.measurement_action_id.as_deref(),
+            Some("pipe_cable_high_eig")
+        );
+    }
+
+    #[test]
     fn missing_or_zero_prior_unknown_hypothesis_is_rejected() {
         let mut case = synthetic_decision_boundary_case(InspectionTask::PipeCable);
         case.primary_model.hypotheses[3].prior_probability = 0.0;
