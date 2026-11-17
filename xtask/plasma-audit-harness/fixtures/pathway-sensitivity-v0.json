@@ -1,0 +1,15 @@
+{
+  "schema_version": "luminous.plasma-pathway-sensitivity.v0",
+  "sensitivity_id": "PATHWAY-SYNTHETIC-SEED-DRAW-STABILITY-001",
+  "seeds": [
+    1,
+    42,
+    2026
+  ],
+  "draw_counts": [
+    10000,
+    20000
+  ],
+  "max_feasibility_probability_range": 0.02,
+  "max_pareto_probability_range": 0.03
+}
