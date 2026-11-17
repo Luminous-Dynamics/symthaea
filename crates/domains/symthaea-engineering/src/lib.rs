@@ -9,6 +9,7 @@ pub mod lightshell_qualification;
 pub mod lightshell_spacer_doe;
 pub mod lightshell_zone_spec;
 pub mod lightshell_coupon_evidence;
+pub mod lightshell_zone_transition;
 
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
