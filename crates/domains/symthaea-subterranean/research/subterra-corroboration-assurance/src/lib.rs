@@ -6,7 +6,9 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use subterra_inspection_evidence_gate::AdmittedInspectionOption;
+use subterra_inspection_evidence_gate::{
+    AdmittedInspectionOption, EvidencePurpose, RightsDisposition,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InventoryDisposition {
@@ -54,8 +56,14 @@ pub struct EvidenceSource {
     pub source_dataset_digest: String,
     pub observation_receipt_digest: String,
     pub calibration_receipt_digest: String,
+    pub rights_receipt_digest: String,
+    pub rights_purpose: EvidencePurpose,
+    pub rights_disposition: RightsDisposition,
     pub captured_at_unix_ms: u64,
     pub valid_until_unix_ms: u64,
+    pub calibration_valid_from_unix_ms: u64,
+    pub calibration_valid_until_unix_ms: u64,
+    pub rights_valid_until_unix_ms: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,7 +94,9 @@ pub struct PortfolioAssuranceAssessment {
     pub dependency_graph_digest: String,
     pub fault_domain_profile_digest: String,
     pub assessment_digest: String,
+    pub verifier_id: String,
     pub verifier_receipt_digest: String,
+    pub purpose: EvidencePurpose,
     pub evaluated_at_unix_ms: u64,
     pub valid_until_unix_ms: u64,
     pub inventory: InventoryDisposition,
@@ -133,8 +143,22 @@ pub enum RejectionReason {
     EmptyClaimId,
     EmptyOptionId,
     EmptyAssetId,
+    EmptyVerifierId,
     EmptySourceId,
+    EmptyExpectedDigest,
     EmptyDigest,
+    InvalidPolicy,
+    OptionIdMismatch,
+    ClaimIdMismatch,
+    VerifierIdentityMismatch,
+    RightsPurposeMismatch,
+    RightsDenied,
+    RightsUnknown,
+    MissingRightsReceipt,
+    RightsExpired,
+    CalibrationNotYetValid,
+    CalibrationExpired,
+    ObservationOutsideCalibrationValidity,
     InsufficientDistinctSources,
     DuplicateSourceIdentity,
     DuplicateObservationReceipt,
@@ -257,13 +281,34 @@ pub fn admit_corroboration_portfolio(
     add_if(&mut reasons, missing(&expected.claim_id), RejectionReason::EmptyClaimId);
     add_if(&mut reasons, missing(&expected.option_id), RejectionReason::EmptyOptionId);
     add_if(&mut reasons, missing(&expected.asset_id), RejectionReason::EmptyAssetId);
+    add_if(&mut reasons, missing(&expected.verifier_id), RejectionReason::EmptyVerifierId);
+    if [
+        expected.asset_revision.as_str(),
+        expected.coordinate_frame_digest.as_str(),
+        expected.region_scope_digest.as_str(),
+        expected.evidence_set_digest.as_str(),
+        expected.dependency_graph_digest.as_str(),
+        expected.fault_domain_profile_digest.as_str(),
+        expected.assessment_digest.as_str(),
+        expected.verifier_receipt_digest.as_str(),
+    ]
+    .iter()
+    .any(|value| missing(value))
+    {
+        reasons.push(RejectionReason::EmptyExpectedDigest);
+    }
+    add_if(
+        &mut reasons,
+        policy.minimum_distinct_sources == 0,
+        RejectionReason::InvalidPolicy,
+    );
     add_if(&mut reasons, missing(&assessment.assessment_digest), RejectionReason::EmptyDigest);
     add_if(&mut reasons, missing(&assessment.verifier_receipt_digest), RejectionReason::EmptyDigest);
 
     add_if(
         &mut reasons,
         candidate.admitted_anchor.option_id() != expected.option_id,
-        RejectionReason::EmptyOptionId,
+        RejectionReason::OptionIdMismatch,
     );
     add_if(
         &mut reasons,
@@ -291,7 +336,7 @@ pub fn admit_corroboration_portfolio(
     add_if(
         &mut reasons,
         assessment.claim_id != expected.claim_id,
-        RejectionReason::EmptyClaimId,
+        RejectionReason::ClaimIdMismatch,
     );
     add_if(
         &mut reasons,
@@ -312,6 +357,16 @@ pub fn admit_corroboration_portfolio(
         &mut reasons,
         assessment.assessment_digest != expected.assessment_digest,
         RejectionReason::AssessmentDigestMismatch,
+    );
+    add_if(
+        &mut reasons,
+        assessment.verifier.verifier_id != expected.verifier_id,
+        RejectionReason::VerifierIdentityMismatch,
+    );
+    add_if(
+        &mut reasons,
+        manifest.rights_purpose != expected.purpose,
+        RejectionReason::RightsPurposeMismatch,
     );
     add_if(
         &mut reasons,
@@ -357,6 +412,21 @@ pub fn admit_corroboration_portfolio(
                 || missing(&source.source_dataset_digest),
             RejectionReason::EmptyDigest,
         );
+        add_if(
+            &mut reasons,
+            source.rights_purpose != expected.purpose,
+            RejectionReason::RightsPurposeMismatch,
+        );
+        match source.rights_disposition {
+            RightsDisposition::AuthorizedForDeclaredPurpose => {}
+            RightsDisposition::Denied => reasons.push(RejectionReason::RightsDenied),
+            RightsDisposition::Unknown => reasons.push(RejectionReason::RightsUnknown),
+        }
+        add_if(
+            &mut reasons,
+            source.rights_valid_until_unix_ms <= policy.evaluation_time_unix_ms,
+            RejectionReason::RightsExpired,
+        );
 
         add_if(
             &mut reasons,
@@ -382,8 +452,12 @@ pub fn admit_corroboration_portfolio(
         if source.observation_receipt_digest == manifest.observation_receipt_digest
             && source.calibration_receipt_digest == manifest.calibration_receipt_digest
             && source.source_dataset_digest == manifest.source_dataset_digest
+            && source.rights_receipt_digest == manifest.rights_receipt_digest
             && source.captured_at_unix_ms == manifest.observation_captured_at_unix_ms
             && source.valid_until_unix_ms == manifest.evidence_valid_until_unix_ms
+            && source.calibration_valid_from_unix_ms == manifest.calibration_valid_from_unix_ms
+            && source.calibration_valid_until_unix_ms == manifest.calibration_valid_until_unix_ms
+            && source.rights_valid_until_unix_ms == manifest.rights_valid_until_unix_ms
         {
             anchor_source_found = true;
         }
@@ -402,6 +476,17 @@ pub fn admit_corroboration_portfolio(
             source.valid_until_unix_ms <= policy.evaluation_time_unix_ms,
             RejectionReason::ObservationExpired,
         );
+        if policy.evaluation_time_unix_ms < source.calibration_valid_from_unix_ms {
+            reasons.push(RejectionReason::CalibrationNotYetValid);
+        }
+        if source.calibration_valid_until_unix_ms <= policy.evaluation_time_unix_ms {
+            reasons.push(RejectionReason::CalibrationExpired);
+        }
+        if source.captured_at_unix_ms < source.calibration_valid_from_unix_ms
+            || source.captured_at_unix_ms >= source.calibration_valid_until_unix_ms
+        {
+            reasons.push(RejectionReason::ObservationOutsideCalibrationValidity);
+        }
     }
 
     add_if(
@@ -540,6 +625,7 @@ pub fn admit_corroboration_portfolio(
     for source in &candidate.sources {
         references.push(source.observation_receipt_digest.clone());
         references.push(source.calibration_receipt_digest.clone());
+        references.push(source.rights_receipt_digest.clone());
         references.push(source.source_dataset_digest.clone());
     }
     references.sort();
@@ -668,8 +754,14 @@ mod tests {
             source_dataset_digest: format!("sha256:dataset-{id}"),
             observation_receipt_digest: observation.into(),
             calibration_receipt_digest: calibration.into(),
+            rights_receipt_digest: format!("sha256:rights-{id}"),
+            rights_purpose: EvidencePurpose::AssetConditionInspection,
+            rights_disposition: RightsDisposition::AuthorizedForDeclaredPurpose,
             captured_at_unix_ms: NOW - 1_000,
             valid_until_unix_ms: NOW + 10_000,
+            calibration_valid_from_unix_ms: NOW - 10_000,
+            calibration_valid_until_unix_ms: NOW + 10_000,
+            rights_valid_until_unix_ms: NOW + 10_000,
         }
     }
 
@@ -737,7 +829,9 @@ mod tests {
             dependency_graph_digest: "sha256:graph".into(),
             fault_domain_profile_digest: "sha256:profile".into(),
             assessment_digest: "sha256:assessment".into(),
+            verifier_id: "verifier-7".into(),
             verifier_receipt_digest: "sha256:portfolio-verifier".into(),
+            purpose: EvidencePurpose::AssetConditionInspection,
         }
     }
 
@@ -752,8 +846,10 @@ mod tests {
     }
 
     fn candidate() -> CandidateCorroborationPortfolio {
+        let mut anchor_source = source("robot-a-thermal", "sha256:obs-a", "sha256:cal-a");
+        anchor_source.rights_receipt_digest = "sha256:rights".into();
         let sources = vec![
-            source("robot-a-thermal", "sha256:obs-a", "sha256:cal-a"),
+            anchor_source,
             source("robot-b-lidar", "sha256:obs-b", "sha256:cal-b"),
         ];
         CandidateCorroborationPortfolio {
