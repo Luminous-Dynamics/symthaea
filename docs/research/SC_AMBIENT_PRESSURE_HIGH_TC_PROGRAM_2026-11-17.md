@@ -446,3 +446,8 @@ A new superconducting material only becomes an industrial contender after it cro
 A room-temperature resistance transition without current-carrying conductor form does not pass the engineering viability gate. Conversely, a lower-Tc material can be commercially superior in a particular application if it is cheaper, more robust, scalable and easier to operate.
 
 The STGI reference is now represented as the eighth benchmark catalog entry in the machine-readable registry. Its scores remain paper-reported and un-reproduced.
+
+
+## 23. Registry and audit contract update
+
+The registry now contains 12 sources, 8 candidate/material records and 8 benchmark catalogs. The Rust registry auditor's exact count assertions have been updated to 12 / 8 / 8. All candidate and benchmark source IDs must resolve to the unique source register; measured, calculated and predicted Tc values remain in separate fields.
