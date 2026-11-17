@@ -8,6 +8,7 @@ use std::collections::{BTreeSet, VecDeque};
 
 pub mod cross_solver_comparison;
 pub mod evidence_dependence;
+pub mod measured_holdout_metrics;
 pub mod plant_service_gate;
 pub mod screening_funnel;
 pub mod validation_domain;
