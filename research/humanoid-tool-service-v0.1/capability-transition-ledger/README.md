@@ -40,8 +40,8 @@ Events are not forced into a funnel. Regrasping and recovery can create out-of-o
 
 ## Tests
 
-Nine tests cover missing instrumentation vs event absence, out-of-order events, conditional co-occurrence vs temporal order, task-cell isolation, duplicate episode IDs, no-instrumentation episodes, missing general provenance and task-success verifier identity. The library uses only the Rust standard library.
+Eleven tests cover missing instrumentation vs event absence, out-of-order events, conditional co-occurrence vs temporal order, task-cell isolation, duplicate episode IDs, no-instrumentation episodes, missing general provenance and task-success verifier identity. The library uses the repository-standard serde/serde_json crates and no robotics, simulator, model or transport dependencies.
 
 ## Integration boundary
 
-This crate currently exposes typed Rust structs and summary functions; it does not yet deserialize the JSON receipt schema or read live HumanoidToolBench logs. A caller must parse a receipt, preserve its source clock and verifier identity, then construct an EpisodeEventLedger. The JSON Schema and six fixtures define the wire format for that future ingest adapter.
+The crate deserializes JSON receipt arrays matching the v0.1 schema into typed EpisodeEventLedger values and validates each receipt before aggregation. Live HumanoidToolBench log acquisition/adaptation is not yet implemented; a caller must still supply the actual event measurements, source clock and verifier evidence.
