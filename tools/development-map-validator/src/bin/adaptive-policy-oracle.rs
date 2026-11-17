@@ -361,6 +361,11 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
  })?;
  let nominal_cost=((nominal_numerator+SCALE as u128-1)/SCALE as u128) as u64;
  let worst_expected=nearest_rank_expected_cost(bounds,&world_costs)?;
+ let mut world_path_reports=Vec::new();
+ for (id,leaf) in &world_leaf{
+  let cost=*world_costs.get(id).ok_or_else(||format!("missing path cost for world {id:?}"))?;
+  world_path_reports.push(json!({"world_id":id,"leaf_node_id":leaf,"path_cost_bound_micros":cost}));
+ }
  let feasible=robust_violations==0&&budget_violations==0;
  let report=json!({
   "policy_feasible":feasible,
@@ -374,10 +379,7 @@ fn evaluate_policy(candidate:&Value,oracle:&Value,tree:&PolicyTree,bounds:&BTree
   "worst_case_expected_cost_bound_micros":worst_expected,
   "budget_micros":budget,
   "leaf_reports":leaf_reports,
-  "world_paths":world_leaf.iter().map(|(id,leaf)|{
-   let cost=world_costs.get(id).copied().unwrap_or(u64::MAX);
-   json!({"world_id":id,"leaf_node_id":leaf,"path_cost_bound_micros":cost})
-  }).collect::<Vec<_>>()
+  "world_paths":world_path_reports
  });
  Ok(PolicyMetrics{report,coverage,worst_expected_cost:worst_expected,nominal_expected_cost:nominal_cost,max_path_cost:max_path,feasible})
 }
