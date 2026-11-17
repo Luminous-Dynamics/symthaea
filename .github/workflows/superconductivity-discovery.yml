@@ -8,6 +8,8 @@ on:
       - "data/research/sc_superconductor_discovery_cases_v0_1.json"
       - "data/schemas/superconductivity_discovery_case_v0_1.schema.json"
       - "data/schemas/superconductivity_observation_event_v0_1.schema.json"
+      - "data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
       - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
       - ".github/workflows/superconductivity-discovery.yml"
   pull_request:
@@ -16,6 +18,8 @@ on:
       - "data/research/sc_superconductor_discovery_cases_v0_1.json"
       - "data/schemas/superconductivity_discovery_case_v0_1.schema.json"
       - "data/schemas/superconductivity_observation_event_v0_1.schema.json"
+      - "data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json"
+      - "tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json"
       - "docs/research/SC_AMBIENT_PRESSURE_HIGH_TC_PROGRAM_2026-11-17.md"
       - ".github/workflows/superconductivity-discovery.yml"
   workflow_dispatch:
@@ -46,6 +50,7 @@ jobs:
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/main.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/discovery_metrics.rs
           rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/observation_event_audit.rs
+          rustfmt --edition 2024 --check tools/superconductivity-discovery-harness/src/bin/synthesis_protocol_audit.rs
 
       - name: Generate isolated dependency lockfile
         run: cargo generate-lockfile --manifest-path tools/superconductivity-discovery-harness/Cargo.toml
@@ -58,6 +63,9 @@ jobs:
 
       - name: Test condition-bound observation event auditor and negative controls
         run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit
+
+      - name: Test synthesis protocol contract and negative controls
+        run: cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit
 
       - name: Run metrics runner on synthetic plumbing fixture
         run: |
@@ -75,6 +83,14 @@ jobs:
             --out "$RUNNER_TEMP/sc-observation-event-smoke.json"
           cat "$RUNNER_TEMP/sc-observation-event-smoke.json"
 
+      - name: Run synthetic synthesis protocol audit
+        run: |
+          cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit -- \
+            --schema data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json \
+            --fixture tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json \
+            --out "$RUNNER_TEMP/sc-synthesis-protocol-smoke.json"
+          cat "$RUNNER_TEMP/sc-synthesis-protocol-smoke.json"
+
       - name: Run exact-input registry audit
         run: |
           cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- \
@@ -88,6 +104,7 @@ jobs:
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics -- -D warnings
           cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit -- -D warnings
+          cargo clippy --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_synthesis_protocol_audit -- -D warnings
 
       - name: Record exact-run environment and input identities
         if: always()
@@ -99,6 +116,8 @@ jobs:
             sha256sum data/schemas/superconductivity_discovery_case_v0_1.schema.json
             sha256sum data/schemas/superconductivity_observation_event_v0_1.schema.json
             sha256sum tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json
+            sha256sum data/schemas/superconductivity_synthesis_protocol_v0_1.schema.json
+            sha256sum tools/superconductivity-discovery-harness/fixtures/synthesis_protocol_smoke_v0_1.json
             sha256sum data/research/sc_superconductor_discovery_cases_v0_1.json
             sha256sum tools/superconductivity-discovery-harness/Cargo.toml
             if [ -f tools/superconductivity-discovery-harness/Cargo.lock ]; then
@@ -120,3 +139,4 @@ jobs:
             ${{ runner.temp }}/sc-discovery-registry-receipt.json
             ${{ runner.temp }}/sc-discovery-metrics-smoke.json
             ${{ runner.temp }}/sc-observation-event-smoke.json
+            ${{ runner.temp }}/sc-synthesis-protocol-smoke.json
