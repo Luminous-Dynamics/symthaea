@@ -357,8 +357,7 @@ pub fn admit_candidate(
     );
     push_if_mismatch(
         &mut reasons,
-        manifest.assessed_mission_interruption_upper_ppm
-            != option.mission_interruption_upper_ppm
+        manifest.assessed_mission_interruption_upper_ppm != option.mission_interruption_upper_ppm
             || manifest.assessed_robot_loss_upper_ppm != option.robot_loss_upper_ppm,
         RejectionReason::RiskValueMismatch,
     );
@@ -988,7 +987,11 @@ mod tests {
         let mut item = candidate();
         item.option.variable_resources.energy_millijoules += 1;
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::ResourceValueMismatch));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::ResourceValueMismatch)
+        );
         assert!(report.admitted_candidate.is_none());
     }
 
@@ -997,7 +1000,11 @@ mod tests {
         let mut item = candidate();
         item.option.robot_loss_upper_ppm += 1;
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::RiskValueMismatch));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::RiskValueMismatch)
+        );
     }
 
     #[test]
@@ -1006,8 +1013,16 @@ mod tests {
         item.manifest.resource_assessment_digest = "sha256:other-resource".into();
         item.manifest.risk_assessment_digest = "sha256:other-risk".into();
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::ResourceAssessmentMismatch));
-        assert!(report.rejection_reasons.contains(&RejectionReason::RiskAssessmentMismatch));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::ResourceAssessmentMismatch)
+        );
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::RiskAssessmentMismatch)
+        );
     }
 
     #[test]
@@ -1016,8 +1031,16 @@ mod tests {
         item.manifest.resource_assessment_valid_until_unix_ms = NOW;
         item.manifest.risk_assessment_valid_until_unix_ms = NOW;
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::ResourceAssessmentExpired));
-        assert!(report.rejection_reasons.contains(&RejectionReason::RiskAssessmentExpired));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::ResourceAssessmentExpired)
+        );
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::RiskAssessmentExpired)
+        );
     }
 
     #[test]
@@ -1025,7 +1048,11 @@ mod tests {
         let mut item = candidate();
         item.option.deployment_bundle_id = "corridor-east".into();
         let report = admit_candidate(&item, &context());
-        assert!(report.rejection_reasons.contains(&RejectionReason::DeploymentBundleMismatch));
+        assert!(
+            report
+                .rejection_reasons
+                .contains(&RejectionReason::DeploymentBundleMismatch)
+        );
     }
 
     #[test]
