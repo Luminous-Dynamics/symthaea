@@ -16,7 +16,7 @@ use subterra_robust_survival_referee::{
     evaluate_policy_robustly,
 };
 use subterra_survival_reference::{
-    CostPrices, MeasurementAction, MeasurementOutcome, MissionDecision, OutcomeKind, PlanMetrics,
+    CostPrices, MeasurementAction, MeasurementOutcome, MissionDecision, OutcomeKind,
     PlannerConfig, PlanningError, PlanningProblem, PlanningReport, ResourceBudget, ResourceCost,
     RiskLimits, plan_survival_conditioned,
 };
@@ -259,7 +259,7 @@ fn assess_action(
         && action.cost.duration_s <= budget.duration_s
         && action.cost.data_bytes <= budget.data_bytes
         && action.cost.exposure_units <= budget.exposure_units;
-    let mut expected_loss = 0.0;
+    let mut expected_loss_sum = 0.0;
     let mut expected_entropy = 0.0;
     for outcome in &action.outcomes {
         let (probability, posterior) =
@@ -277,17 +277,17 @@ fn assess_action(
                 .ok_or(AdapterError::InvalidAction)?;
             expected_loss(&posterior, terminal_losses)?
         };
-        expected_loss += probability * branch_risk;
+        expected_loss_sum += probability * branch_risk;
     }
     let information_gain = prior_entropy - expected_entropy;
-    if !information_gain.is_finite() || !expected_loss.is_finite() {
+    if !information_gain.is_finite() || !expected_loss_sum.is_finite() {
         return Err(AdapterError::NumericalFailure("action baseline"));
     }
     Ok(ActionBaseline {
         action_id: action.id.clone(),
         expected_information_gain_nats: information_gain.max(0.0),
-        expected_posterior_decision_loss: expected_loss,
-        gross_evsi: no_test_risk - expected_loss,
+        expected_posterior_decision_loss: expected_loss_sum,
+        gross_evsi: no_test_risk - expected_loss_sum,
         eligible,
     })
 }
