@@ -158,6 +158,25 @@ This creates a concrete Luminous benchmark opportunity: predict candidate action
 
 Compose with Symthaea #9010 (general matched world-model decision value), #12548 (tactile action-conditioned futures), and #11880 (anticipatory reflex/time-to-boundary). #12735 supplies the contact-rich manipulator profile; do not fork their world model or reflex owners.
 
+### Industry frontier: vendor-reported November 2026 systems
+
+These are important external systems to admit as comparators where their checkpoints, task adapters, license and sensor/action interfaces permit. Their press-release figures are vendor-reported and use distinct evaluation protocols; they are not one shared leaderboard.
+
+| System | Vendor-reported 2026 result | What it changes in our comparison |
+|---|---|---|
+| Google DeepMind Gemini Robotics 2.5 (10 Nov 2026) | Evaluated across 200 distinct tasks; Google reports 30–100% higher success than prior baselines depending on task and 20–30% faster completion. A real-world proof-of-concept with Apptronik Apollo 2 on Mercedes-Benz production lines reports 96% pick-and-pack success. | A strong generalist/VLA comparator for task breadth, dexterity, and production-cell workflows. Require exact task, episode count, reset, operator intervention, confidence interval and hardware details before treating 96% as a reproducible benchmark result. |
+| NVIDIA GR00T 2 (CoRL 2026, Nov 2026) | NVIDIA reports at least one completion on 40/50 evaluated tasks without task-specific demonstrations; its one-demo and five-demo settings report 71% and 95% average success across the 50-task suite, respectively. | A direct baseline for few-shot adaptation and cross-embodiment transfer. Compare equal demonstrations, adaptation wall-clock, reset budget, hardware and held-out embodiment/task combinations. |
+| Figure Helix 2.5 (17 Sep 2026) | Figure reports zero-shot whole-body autonomy for three long-horizon behaviors across 30 previously unseen homes, with no data collected, fine-tuning or adaptation in those environments or manipulated objects; its report gives 56% success after Index human-data pretraining vs 9% without it. | A strong unseen-environment and human-data-transfer comparator. Compare home/task splits, human-data exposure, success denominator, safety interventions and generalization beyond the three reported behaviors. |
+| Figure Helix 02 (27 Jan 2026) | Figure reports a continuous four-minute dishwasher unload/reload task integrating whole-body locomotion, manipulation and balance without resets or human intervention. | A whole-body long-horizon systems comparator; do not reduce the claim to isolated grasp accuracy. |
+
+Sources:
+- Gemini Robotics 2.5: https://deepmind.google/blog/gemini-robotics-2-5-accelerates-real-world-physical-intelligence/
+- GR00T 2 / CoRL: https://blogs.nvidia.com/blog/robotics-simulation-advancements-corl/
+- Helix 2.5: https://www.figure.ai/news/helix-2-5-zero-shot-30-home-generalization
+- Helix 02: https://www.figure.ai/news/helix-02
+
+**Strategic implication:** do not try to out-VLA the foundation-model vendors on generic task breadth alone. Our defensible research wedge is measurable incremental value from (a) persistent configuration-bound experience, (b) action-conditioned and counterfactual prediction that improves executed decisions, (c) distributed tactile/local responses, (d) mechanically embodied computation and (e) independent outcome/authority evidence. Each component must win its own ablation before the combined stack receives credit.
+
 ### Concrete competitive targets
 
 1. **Reproduce before claiming:** implement the official task/evaluator adapters and first reproduce the published reference point with the admitted baseline or report exactly why the reference is not reproducible in our environment.
