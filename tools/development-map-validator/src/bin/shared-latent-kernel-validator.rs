@@ -599,6 +599,21 @@ fn decision_rule_coefficients(
  }
  Ok(total)
 }
+fn decision_stop_action_qualified(
+ priors:&BTreeMap<String,Bounds>,
+ latents:&[LatentState],
+ constraint:&DecisionAction,
+ hypotheses:&BTreeSet<String>
+)->Result<bool,String>{
+ if constraint.read_only{
+  return Ok(constraint.safe_hypotheses==*hypotheses&&!constraint.irreversible&&!constraint.hard_gate&&constraint.max_risk==0);
+ }
+ let likelihoods=hypotheses.iter().map(|h|(h.clone(),vec![SCALE;latents.len()])).collect::<BTreeMap<_,_>>();
+ let support=shared_support_lower(priors,latents,&likelihoods)?;
+ if support==0{return Ok(false);}
+ let risk=shared_robust_risk(priors,latents,&likelihoods,&constraint.safe_hypotheses)?;
+ Ok(risk<=constraint.max_risk&&(!constraint.hard_gate||risk==0)&&(!constraint.irreversible||risk==0))
+}
 fn decision_rule_action_qualified(
  priors:&BTreeMap<String,Bounds>,
  latents:&[LatentState],
@@ -777,6 +792,8 @@ fn parse_decision_voi_queries(
   }
   let mut stop_scores=Vec::new();
   for action in &action_ids{
+   let constraint=action_constraints.get(action).ok_or_else(||format!("missing action constraint {action:?}"))?;
+   if !decision_stop_action_qualified(&priors,latents,constraint,hypotheses)?{continue;}
    let robust=robust_stop_loss(&priors,&losses,action)?;
    let nominal=nominal_stop_loss(&priors,&losses,action)?;
    stop_scores.push((robust,nominal,action.clone()));
