@@ -1,7 +1,7 @@
 {
   "schema": "symthaea.tsfm_comparator_snapshot.v0.1",
   "tracking_issue": 9700,
-  "retrieved_at": "2026-11-16",
+  "retrieved_at": "2026-11-17",
   "purpose": "Pin time-series foundation-model comparator claims by benchmark, metric, source surface and source date; these are reproduction targets, not Symthaea results.",
   "rules": [
     "Never merge win rate, MASE skill, CRPS, average rank or BOOM telemetry CRPS into one universal score.",
@@ -62,6 +62,28 @@
           "retrieved_at": "2026-11-16",
           "source_type": "vendor_model_card",
           "qualification": "Vendor-reported metric; reproduce under official harness."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "win_rate",
+          "value": 0.896,
+          "unit": "fraction",
+          "source": "https://github.com/h2oai/benchmarks",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "2026-11-13",
+          "source_type": "public_repository_benchmark_snapshot",
+          "qualification": "The repository's November 13 snapshot reports 89.60%; kept separately from the current live site value."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "win_rate",
+          "value": 0.919,
+          "unit": "fraction",
+          "source": "https://h2oai.com/company/press-media/2026/timeh2o-v1-ranks-first-on-fev-bench",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "2026-10-24",
+          "source_type": "vendor_press_release",
+          "qualification": "The October 26 release says the benchmark data was read October 24 and reported 91.9%; this is a dated launch snapshot, not the current live score."
         }
       ]
     },
@@ -107,6 +129,16 @@
           "retrieved_at": "2026-11-16",
           "source_type": "vendor_release",
           "qualification": "Vendor claim; preserve release date and reproduce."
+        },
+        {
+          "benchmark": "GIFT-Eval",
+          "metric": "average_MASE_rank",
+          "value": 32.52,
+          "unit": "average_rank_lower_is_better",
+          "source": "https://tsfm.ai/benchmarks/gift-eval",
+          "retrieved_at": "2026-11-17",
+          "source_type": "third_party_mirrored_leaderboard",
+          "qualification": "Grouped-slice average rank; not comparable to FEV-Bench win rate or model-card aggregate MASE."
         }
       ]
     },
@@ -209,6 +241,22 @@
           "qualification": "H2O site snapshot; repository detailed table lists 79.30%."
         }
       ]
+    },
+    {
+      "id": "taichu_timeseries_agent_v2",
+      "vendor": "Zidong Taichu / listing as shown by TSFM.ai",
+      "evidence": [
+        {
+          "benchmark": "GIFT-Eval",
+          "metric": "average_MASE_rank",
+          "value": 18.02,
+          "unit": "average_rank_lower_is_better",
+          "source": "https://tsfm.ai/benchmarks/gift-eval",
+          "retrieved_at": "2026-11-17",
+          "source_type": "third_party_mirrored_leaderboard",
+          "qualification": "Top grouped-slice average MASE rank in the current 170-model mirror; this does not establish FEV-Bench win-rate leadership."
+        }
+      ]
     }
   ],
   "source_discrepancies": [
@@ -235,6 +283,32 @@
         "timesfm_3": 0.793
       },
       "handling": "retain both surfaces; do not select a preferred score. Pin exact FEV-Bench tasks, model revisions, win estimator and data snapshot before adjudicating."
+    },
+    {
+      "id": "FEV-2026-11-17-H2O-LIVE-REPO-LAUNCH",
+      "benchmark": "FEV-Bench",
+      "metric": "win_rate",
+      "observations": [
+        {
+          "source": "https://h2oai.github.io/benchmarks/",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "live_page_no_explicit_snapshot_date",
+          "timeh2o_v1": 0.915
+        },
+        {
+          "source": "https://github.com/h2oai/benchmarks",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "2026-11-13",
+          "timeh2o_v1": 0.896
+        },
+        {
+          "source": "https://h2oai.com/company/press-media/2026/timeh2o-v1-ranks-first-on-fev-bench",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "2026-10-24",
+          "timeh2o_v1": 0.919
+        }
+      ],
+      "handling": "preserve all three dated source observations; do not average or choose one. Resolve only with a pinned official FEV-Bench run, model/checkpoint, task set and win-rate estimator."
     }
   ],
   "benchmark_lanes": [
