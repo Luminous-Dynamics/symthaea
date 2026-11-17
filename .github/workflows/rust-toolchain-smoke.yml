@@ -59,5 +59,47 @@ jobs:
       - name: Run focused FEP hierarchical-information tests
         run: cargo test --locked -p symthaea-fep --lib hierarchical_information_gain::tests
 
+      - name: Diagnose Cargo.lock drift after locked validation failure
+        if: failure()
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          out="$RUNNER_TEMP/cargo-lock-diagnostic"
+          mkdir -p "$out"
+          cp Cargo.lock "$out/Cargo.lock.before"
+          rustc --version --verbose > "$out/rustc-version.txt"
+          cargo --version > "$out/cargo-version.txt"
+
+          set +e
+          cargo metadata --format-version 1 > "$out/metadata.stdout" 2> "$out/metadata.stderr"
+          metadata_status=$?
+          set -e
+
+          printf '%s\n' "$metadata_status" > "$out/metadata.exit-code"
+          cp Cargo.lock "$out/Cargo.lock.after"
+          if cmp -s "$out/Cargo.lock.before" "$out/Cargo.lock.after"; then
+            echo "LOCKFILE_UNCHANGED" > "$out/diagnosis.txt"
+          else
+            echo "LOCKFILE_WOULD_CHANGE" > "$out/diagnosis.txt"
+            diff -u "$out/Cargo.lock.before" "$out/Cargo.lock.after" > "$out/Cargo.lock.diff" || true
+          fi
+
+          {
+            echo "### Cargo.lock diagnostic (not a qualification pass)"
+            echo "- The required `--locked` validation remains authoritative and was not weakened."
+            echo "- Diagnostic `cargo metadata` exit code: $metadata_status"
+            cat "$out/diagnosis.txt"
+            echo "- Any generated lockfile delta is retained as an artifact for review only; it is not committed."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Cargo.lock diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cargo-lock-diagnostic-${{ github.event.pull_request.head.sha || github.sha }}
+          path: ${{ runner.temp }}/cargo-lock-diagnostic/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Run strict FEP Clippy
         run: cargo clippy --locked -p symthaea-fep --lib -- -D warnings
