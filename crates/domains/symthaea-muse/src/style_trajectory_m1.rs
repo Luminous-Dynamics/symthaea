@@ -15,11 +15,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use symthaea_music_theory::{
     AssertedObligationState, Duration, GrammarPlanEvidence, GrammarStructuralTrace,
-    MusicalIntent, Score, ScoreNote, ScoreValidationConfig, ScoreValidationIssue, Style,
+    MusicalIntent, Score, ScoreValidationConfig, ScoreValidationIssue, Style,
     StyleTrajectoryPlanV1, StyleTrajectorySegmentV1, StyleTrajectoryTransitionV1,
     StyleTransitionMode, TheoryValidationReport, ValidationSeverity,
-    compose_with_grammar_plan, is_universal_invariant, validate_score,
+    compose_with_grammar_plan, validate_score,
 };
+use symthaea_music_theory::score_validation::is_universal_invariant;
 use symthaea_muse_protocol::catalog::{CATALOG, StyleStatus};
 
 use crate::style_trajectory_admission::{
@@ -42,6 +43,10 @@ pub enum StyleTrajectoryM1Error {
         minimalism_tempo: f32,
         classical_meter: u8,
         minimalism_meter: u8,
+    },
+    KeyMismatch {
+        classical_key: String,
+        minimalism_key: String,
     },
     CatalogueRouteMissing {
         style: String,
@@ -133,6 +138,13 @@ pub fn realize_classical_to_minimalism_m1(
             minimalism_tempo: minimalism.score.tempo_bpm,
             classical_meter: classical.score.meter,
             minimalism_meter: minimalism.score.meter,
+        });
+    }
+
+    if classical.score.key != minimalism.score.key {
+        return Err(StyleTrajectoryM1Error::KeyMismatch {
+            classical_key: format!("{:?}", classical.score.key),
+            minimalism_key: format!("{:?}", minimalism.score.key),
         });
     }
 
