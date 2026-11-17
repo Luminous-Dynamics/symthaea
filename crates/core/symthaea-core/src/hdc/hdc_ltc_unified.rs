@@ -1768,6 +1768,9 @@ impl Default for UnifiedNetworkConfig {
 /// (see [`HdcLtcUnifiedNetwork::snapshot_state_into`]).
 #[derive(Debug, Clone, Default)]
 pub struct NetworkStateSnapshot {
+    /// Exact layer partition captured with the flattened neuron state.
+    /// Equal neuron totals are not sufficient: [2, 3] and [3, 2] are different networks.
+    layer_sizes: Vec<usize>,
     neuron_states: Vec<ContinuousHV>,
     layer_outputs: Vec<ContinuousHV>,
     /// Per-neuron (total_time, update_count). total_time is NOT telemetry:
@@ -1779,7 +1782,30 @@ pub struct NetworkStateSnapshot {
     neuron_clocks: Vec<(f64, u64)>,
 }
 
+/// Failure reasons for an atomic, shape-checked recurrent-state restore.
+///
+/// These checks qualify recurrent-state compatibility only. A caller restoring
+/// across processes must separately bind this snapshot to the exact model /
+/// parameter revision because learned weights and optimizer state are excluded.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NetworkStateRestoreError {
+    LayerShapeMismatch,
+    NeuronCountMismatch,
+    LayerOutputCountMismatch,
+    NeuronClockCountMismatch,
+    NeuronDimensionMismatch { index: usize, expected: usize, actual: usize },
+    LayerOutputDimensionMismatch { index: usize, expected: usize, actual: usize },
+    NonFiniteNeuronState { index: usize },
+    NonFiniteLayerOutput { index: usize },
+    NonFiniteClock { index: usize },
+}
+
 impl NetworkStateSnapshot {
+    /// Exact ordered layer sizes captured by this snapshot.
+    pub fn layer_sizes(&self) -> &[usize] {
+        &self.layer_sizes
+    }
+
     /// Dimension of the captured neuron-state HVs (None if never filled).
     /// Lets callers detect stale snapshots after an adaptive network resize.
     pub fn dimension(&self) -> Option<usize> {
@@ -1790,7 +1816,8 @@ impl NetworkStateSnapshot {
     /// outputs, and evolution clocks). The formal test surface for
     /// "this operation does not perturb evolution state".
     pub fn approx_eq(&self, other: &Self, eps: f32) -> bool {
-        if self.neuron_states.len() != other.neuron_states.len()
+        if self.layer_sizes != other.layer_sizes
+            || self.neuron_states.len() != other.neuron_states.len()
             || self.layer_outputs.len() != other.layer_outputs.len()
             || self.neuron_clocks.len() != other.neuron_clocks.len()
         {
@@ -2073,6 +2100,9 @@ impl HdcLtcUnifiedNetwork {
     /// After the buffer warms up (same network shape), snapshot/restore are
     /// allocation-free element-wise copies.
     pub fn snapshot_state_into(&self, snap: &mut NetworkStateSnapshot) {
+        // Retain capacity so the warmed-up hot path remains allocation-free.
+        snap.layer_sizes.clear();
+        snap.layer_sizes.extend(self.layers.iter().map(Vec::len));
         let n_neurons: usize = self.layers.iter().map(|l| l.len()).sum();
         snap.neuron_states
             .resize_with(n_neurons, || ContinuousHV::zero(0));
@@ -2093,10 +2123,98 @@ impl HdcLtcUnifiedNetwork {
         }
     }
 
-    /// Restore evolution state previously captured by [`snapshot_state_into`].
+    /// Restore a recurrent-state snapshot only when every shape and value is valid.
     ///
-    /// Panics in debug builds if the snapshot shape does not match the network
-    /// (wrong neuron count); in release the mismatched tail is left untouched.
+    /// Validation completes before the first mutation, so any error leaves the
+    /// destination network byte-for-byte unchanged at the represented state
+    /// surface. This is the required path for paired counterfactuals, episode
+    /// forks, and any caller that cannot tolerate partial restore.
+    ///
+    /// The snapshot captures evolution state, not learned parameters or
+    /// optimizer momentum; callers must bind it to the matching model revision.
+    pub fn try_restore_state_from(
+        &mut self,
+        snap: &NetworkStateSnapshot,
+    ) -> Result<(), NetworkStateRestoreError> {
+        let expected_layer_sizes: Vec<usize> = self.layers.iter().map(Vec::len).collect();
+        if snap.layer_sizes != expected_layer_sizes {
+            return Err(NetworkStateRestoreError::LayerShapeMismatch);
+        }
+
+        let expected_neurons: usize = expected_layer_sizes.iter().sum();
+        if snap.neuron_states.len() != expected_neurons {
+            return Err(NetworkStateRestoreError::NeuronCountMismatch);
+        }
+        if snap.neuron_clocks.len() != expected_neurons {
+            return Err(NetworkStateRestoreError::NeuronClockCountMismatch);
+        }
+        if snap.layer_outputs.len() != self.layer_outputs.len() {
+            return Err(NetworkStateRestoreError::LayerOutputCountMismatch);
+        }
+
+        for (index, (saved, neuron)) in snap
+            .neuron_states
+            .iter()
+            .zip(self.layers.iter().flatten())
+            .enumerate()
+        {
+            let expected = neuron.state().values.len();
+            if saved.values.len() != expected {
+                return Err(NetworkStateRestoreError::NeuronDimensionMismatch {
+                    index,
+                    expected,
+                    actual: saved.values.len(),
+                });
+            }
+            if saved.values.iter().any(|value| !value.is_finite()) {
+                return Err(NetworkStateRestoreError::NonFiniteNeuronState { index });
+            }
+            if !snap.neuron_clocks[index].0.is_finite() {
+                return Err(NetworkStateRestoreError::NonFiniteClock { index });
+            }
+        }
+
+        for (index, (saved, current)) in snap
+            .layer_outputs
+            .iter()
+            .zip(self.layer_outputs.iter())
+            .enumerate()
+        {
+            let expected = current.values.len();
+            if saved.values.len() != expected {
+                return Err(NetworkStateRestoreError::LayerOutputDimensionMismatch {
+                    index,
+                    expected,
+                    actual: saved.values.len(),
+                });
+            }
+            if saved.values.iter().any(|value| !value.is_finite()) {
+                return Err(NetworkStateRestoreError::NonFiniteLayerOutput { index });
+            }
+        }
+
+        // The complete snapshot has been validated. No fallible operation
+        // remains after mutation begins.
+        let mut index = 0;
+        for layer in &mut self.layers {
+            for neuron in layer {
+                copy_hv_into(&snap.neuron_states[index], neuron.state_mut());
+                let (total_time, update_count) = snap.neuron_clocks[index];
+                neuron.set_evolution_clock(total_time, update_count);
+                index += 1;
+            }
+        }
+        for (destination, saved) in self.layer_outputs.iter_mut().zip(snap.layer_outputs.iter()) {
+            copy_hv_into(saved, destination);
+        }
+        Ok(())
+    }
+
+    /// Legacy best-effort restore retained for rolling scratch-buffer callers.
+    ///
+    /// Shape or dimension mismatches may leave part of the destination state
+    /// untouched. Use try_restore_state_from whenever exact state isolation
+    /// or all-or-nothing restore semantics are required.
     pub fn restore_state_from(&mut self, snap: &NetworkStateSnapshot) {
         debug_assert_eq!(
             snap.neuron_states.len(),
@@ -2844,4 +2962,69 @@ mod tests {
         neuron.set_fourier_frequencies(&[5.0, 10.0, 15.0]);
         assert_eq!(neuron.config().fourier_frequencies, vec![5.0, 10.0, 15.0]);
     }
+
+    fn state_restore_test_network(layer_sizes: &[usize]) -> HdcLtcUnifiedNetwork {
+        let mut config = UnifiedNetworkConfig::default();
+        config.layer_sizes = layer_sizes.to_vec();
+        HdcLtcUnifiedNetwork::new(config, 0xD2D)
+    }
+
+    #[test]
+    fn strict_state_restore_round_trips_all_recurrent_state() {
+        let mut network = state_restore_test_network(&[2, 3, 1]);
+        let input = ContinuousHV::random_default(0x51A7E);
+        network.evolve_closed_form(0.01, &input);
+
+        let mut expected = NetworkStateSnapshot::default();
+        network.snapshot_state_into(&mut expected);
+
+        network.evolve_closed_form(0.07, &input);
+        network.try_restore_state_from(&expected).unwrap();
+
+        let mut restored = NetworkStateSnapshot::default();
+        network.snapshot_state_into(&mut restored);
+        assert!(expected.approx_eq(&restored, 1e-7));
+        assert_eq!(expected.layer_sizes(), &[2, 3, 1]);
+    }
+
+    #[test]
+    fn strict_state_restore_rejects_same_neuron_total_with_different_layer_partition_atomically() {
+        let source = state_restore_test_network(&[2, 3, 1]);
+        let mut target = state_restore_test_network(&[3, 2, 1]);
+
+        let mut source_snapshot = NetworkStateSnapshot::default();
+        source.snapshot_state_into(&mut source_snapshot);
+        let mut before = NetworkStateSnapshot::default();
+        target.snapshot_state_into(&mut before);
+
+        assert_eq!(
+            target.try_restore_state_from(&source_snapshot),
+            Err(NetworkStateRestoreError::LayerShapeMismatch)
+        );
+
+        let mut after = NetworkStateSnapshot::default();
+        target.snapshot_state_into(&mut after);
+        assert!(before.approx_eq(&after, 0.0), "rejected restore mutated destination state");
+    }
+
+    #[test]
+    fn strict_state_restore_rejects_non_finite_state_before_mutation() {
+        let mut network = state_restore_test_network(&[2, 2]);
+        let mut corrupted = NetworkStateSnapshot::default();
+        network.snapshot_state_into(&mut corrupted);
+        corrupted.neuron_states[0].values[0] = f32::NAN;
+
+        let mut before = NetworkStateSnapshot::default();
+        network.snapshot_state_into(&mut before);
+
+        assert_eq!(
+            network.try_restore_state_from(&corrupted),
+            Err(NetworkStateRestoreError::NonFiniteNeuronState { index: 0 })
+        );
+
+        let mut after = NetworkStateSnapshot::default();
+        network.snapshot_state_into(&mut after);
+        assert!(before.approx_eq(&after, 0.0), "rejected restore mutated destination state");
+    }
+
 }
