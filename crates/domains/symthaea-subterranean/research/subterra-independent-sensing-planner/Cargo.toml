@@ -1,0 +1,21 @@
+[package]
+name = "subterra-independent-sensing-planner"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Exact bounded planner for fault-domain-diverse inspection acquisition portfolios"
+
+[lib]
+path = "src/lib.rs"
+
+[[example]]
+name = "synthetic_independent_sensing"
+path = "examples/synthetic_independent_sensing.rs"
+
+[dependencies]
+subterra-corroboration-assurance = { path = "../subterra-corroboration-assurance" }
+subterra-inspection-campaign = { path = "../subterra-inspection-campaign" }
+
+[workspace]
