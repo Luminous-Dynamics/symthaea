@@ -1,0 +1,372 @@
+{
+  "fixture_source_ids": [
+    "fixture-source-only"
+  ],
+  "observations": [
+    {
+      "schema_version": "0.1.0",
+      "observation_id": "fixture-observed-tc-onset",
+      "fixture_only": true,
+      "material": {
+        "material_id": "fixture-material-x2y3",
+        "formula_as_reported": "X2Y3",
+        "formula_normalized": "X2Y3",
+        "identity_status": "composition_only",
+        "state_id": null,
+        "phase_id": null,
+        "structure_prototype": null,
+        "space_group": null
+      },
+      "sample": {
+        "identity_status": "matched_batch",
+        "sample_id": "fixture-sample-a",
+        "batch_id": "fixture-batch-a",
+        "phase_id": null,
+        "sample_form": "single_crystal",
+        "substrate": null,
+        "phase_fraction_percent": null,
+        "purity_percent": null,
+        "stoichiometry_status": "unknown"
+      },
+      "source": {
+        "source_id": "fixture-source-only",
+        "document_id": {
+          "kind": "other",
+          "identifier": "synthetic-fixture"
+        },
+        "source_revision": "fixture-v0",
+        "source_content_sha256": null,
+        "locator": {
+          "page": 2,
+          "section": null,
+          "table": null,
+          "figure": null,
+          "figure_panel": null,
+          "supplementary_file": null,
+          "row_or_record_id": null,
+          "source_span_sha256": null
+        },
+        "rights_scope": "metadata_only",
+        "source_snapshot_id": "fixture-only"
+      },
+      "assertion": {
+        "property_code": "Tc",
+        "origin": "observed",
+        "value": 7.2,
+        "unit": "K",
+        "detection_status": "detected",
+        "tc_criterion": "zero_resistance",
+        "measurement_method": "four-probe transport",
+        "model_id": null,
+        "model_revision": null,
+        "tested_window": null,
+        "uncertainty": null
+      },
+      "conditions": {
+        "pressure": {
+          "semantics": "explicit_ambient",
+          "value_gpa": 0,
+          "pressure_method": null,
+          "chemical_pressure_description": null
+        },
+        "measurement_temperature_k": 7.2,
+        "magnetic_field_t": 0,
+        "field_orientation": null,
+        "current_density_a_m2": null,
+        "geometry": "synthetic example",
+        "doping_state": null,
+        "strain_state": null
+      },
+      "provenance": {
+        "extraction_method": "manual_curated",
+        "extraction_model": null,
+        "extraction_revision": "fixture-v0",
+        "extraction_confidence": 1,
+        "review_status": "human_source_checked",
+        "reviewer_independence": "not_applicable",
+        "independence_group_id": "fixture-study-a",
+        "duplicate_of": null,
+        "conflict_group_id": null,
+        "rights_review": "cleared_for_metadata"
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "observation_id": "fixture-nondetection-not-zero",
+      "fixture_only": true,
+      "material": {
+        "material_id": "fixture-material-ab",
+        "formula_as_reported": "A2B",
+        "formula_normalized": "A2B",
+        "identity_status": "unresolved",
+        "state_id": null,
+        "phase_id": null,
+        "structure_prototype": null,
+        "space_group": null
+      },
+      "sample": {
+        "identity_status": "unresolved",
+        "sample_id": null,
+        "batch_id": null,
+        "phase_id": null,
+        "sample_form": "not_reported",
+        "substrate": null,
+        "phase_fraction_percent": null,
+        "purity_percent": null,
+        "stoichiometry_status": "unknown"
+      },
+      "source": {
+        "source_id": "fixture-source-only",
+        "document_id": {
+          "kind": "other",
+          "identifier": "synthetic-fixture"
+        },
+        "source_revision": "fixture-v0",
+        "source_content_sha256": null,
+        "locator": {
+          "page": 2,
+          "section": null,
+          "table": null,
+          "figure": null,
+          "figure_panel": null,
+          "supplementary_file": null,
+          "row_or_record_id": null,
+          "source_span_sha256": null
+        },
+        "rights_scope": "metadata_only",
+        "source_snapshot_id": "fixture-only"
+      },
+      "assertion": {
+        "property_code": "Tc",
+        "origin": "observed",
+        "value": null,
+        "unit": "K",
+        "detection_status": "not_detected",
+        "tc_criterion": "reported_unspecified",
+        "measurement_method": "transport",
+        "model_id": null,
+        "model_revision": null,
+        "tested_window": {
+          "temperature_min_k": 4.2,
+          "temperature_max_k": 300,
+          "field_max_t": 0,
+          "method": "synthetic test window"
+        },
+        "uncertainty": null
+      },
+      "conditions": {
+        "pressure": {
+          "semantics": "unknown",
+          "value_gpa": null,
+          "pressure_method": null,
+          "chemical_pressure_description": null
+        },
+        "measurement_temperature_k": null,
+        "magnetic_field_t": 0,
+        "field_orientation": null,
+        "current_density_a_m2": null,
+        "geometry": null,
+        "doping_state": null,
+        "strain_state": null
+      },
+      "provenance": {
+        "extraction_method": "manual_curated",
+        "extraction_model": null,
+        "extraction_revision": "fixture-v0",
+        "extraction_confidence": 1,
+        "review_status": "human_source_checked",
+        "reviewer_independence": "not_applicable",
+        "independence_group_id": "fixture-study-b",
+        "duplicate_of": null,
+        "conflict_group_id": null,
+        "rights_review": "cleared_for_metadata"
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "observation_id": "fixture-calculated-tc-pressure",
+      "fixture_only": true,
+      "material": {
+        "material_id": "fixture-material-cd",
+        "formula_as_reported": "C2D",
+        "formula_normalized": "C2D",
+        "identity_status": "composition_only",
+        "state_id": null,
+        "phase_id": null,
+        "structure_prototype": null,
+        "space_group": null
+      },
+      "sample": {
+        "identity_status": "not_applicable",
+        "sample_id": null,
+        "batch_id": null,
+        "phase_id": null,
+        "sample_form": "not_applicable",
+        "substrate": null,
+        "phase_fraction_percent": null,
+        "purity_percent": null,
+        "stoichiometry_status": "unknown"
+      },
+      "source": {
+        "source_id": "fixture-source-only",
+        "document_id": {
+          "kind": "other",
+          "identifier": "synthetic-fixture"
+        },
+        "source_revision": "fixture-v0",
+        "source_content_sha256": null,
+        "locator": {
+          "page": 2,
+          "section": null,
+          "table": null,
+          "figure": null,
+          "figure_panel": null,
+          "supplementary_file": null,
+          "row_or_record_id": null,
+          "source_span_sha256": null
+        },
+        "rights_scope": "metadata_only",
+        "source_snapshot_id": "fixture-only"
+      },
+      "assertion": {
+        "property_code": "Tc",
+        "origin": "calculated",
+        "value": 8.5,
+        "unit": "K",
+        "detection_status": "not_applicable",
+        "tc_criterion": "not_applicable",
+        "measurement_method": "DFT-Eliashberg",
+        "model_id": "fixture-solver",
+        "model_revision": "fixture-r1",
+        "tested_window": null,
+        "uncertainty": {
+          "kind": "range",
+          "lower": 7,
+          "upper": 9,
+          "value": null,
+          "coverage": null
+        }
+      },
+      "conditions": {
+        "pressure": {
+          "semantics": "applied",
+          "value_gpa": 12,
+          "pressure_method": "synthetic DAC context",
+          "chemical_pressure_description": null
+        },
+        "measurement_temperature_k": null,
+        "magnetic_field_t": null,
+        "field_orientation": null,
+        "current_density_a_m2": null,
+        "geometry": null,
+        "doping_state": null,
+        "strain_state": null
+      },
+      "provenance": {
+        "extraction_method": "calculation_pipeline",
+        "extraction_model": null,
+        "extraction_revision": "fixture-v0",
+        "extraction_confidence": 1,
+        "review_status": "model_checked",
+        "reviewer_independence": "not_applicable",
+        "independence_group_id": "fixture-calculation-a",
+        "duplicate_of": null,
+        "conflict_group_id": null,
+        "rights_review": "cleared_for_metadata"
+      }
+    },
+    {
+      "schema_version": "0.1.0",
+      "observation_id": "fixture-predicted-tc",
+      "fixture_only": true,
+      "material": {
+        "material_id": "fixture-material-ef",
+        "formula_as_reported": "E3F",
+        "formula_normalized": "E3F",
+        "identity_status": "composition_only",
+        "state_id": null,
+        "phase_id": null,
+        "structure_prototype": null,
+        "space_group": null
+      },
+      "sample": {
+        "identity_status": "not_applicable",
+        "sample_id": null,
+        "batch_id": null,
+        "phase_id": null,
+        "sample_form": "not_applicable",
+        "substrate": null,
+        "phase_fraction_percent": null,
+        "purity_percent": null,
+        "stoichiometry_status": "unknown"
+      },
+      "source": {
+        "source_id": "fixture-source-only",
+        "document_id": {
+          "kind": "other",
+          "identifier": "synthetic-fixture"
+        },
+        "source_revision": "fixture-v0",
+        "source_content_sha256": null,
+        "locator": {
+          "page": 2,
+          "section": null,
+          "table": null,
+          "figure": null,
+          "figure_panel": null,
+          "supplementary_file": null,
+          "row_or_record_id": null,
+          "source_span_sha256": null
+        },
+        "rights_scope": "metadata_only",
+        "source_snapshot_id": "fixture-only"
+      },
+      "assertion": {
+        "property_code": "Tc",
+        "origin": "predicted",
+        "value": 11,
+        "unit": "K",
+        "detection_status": "not_applicable",
+        "tc_criterion": "not_applicable",
+        "measurement_method": null,
+        "model_id": "fixture-ml",
+        "model_revision": "model-r2",
+        "tested_window": null,
+        "uncertainty": {
+          "kind": "standard_deviation",
+          "lower": null,
+          "upper": null,
+          "value": 2,
+          "coverage": null
+        }
+      },
+      "conditions": {
+        "pressure": {
+          "semantics": "unknown",
+          "value_gpa": null,
+          "pressure_method": null,
+          "chemical_pressure_description": null
+        },
+        "measurement_temperature_k": null,
+        "magnetic_field_t": null,
+        "field_orientation": null,
+        "current_density_a_m2": null,
+        "geometry": null,
+        "doping_state": null,
+        "strain_state": null
+      },
+      "provenance": {
+        "extraction_method": "database_import",
+        "extraction_model": null,
+        "extraction_revision": "fixture-v0",
+        "extraction_confidence": 1,
+        "review_status": "unreviewed",
+        "reviewer_independence": "not_applicable",
+        "independence_group_id": "fixture-model-run-a",
+        "duplicate_of": null,
+        "conflict_group_id": null,
+        "rights_review": "cleared_for_metadata"
+      }
+    }
+  ]
+}
