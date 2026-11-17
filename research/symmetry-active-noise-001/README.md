@@ -66,3 +66,18 @@ Before selecting a policy, the library can now test whether a hypothesis pair is
 - **Shared persistent-state model:** for every possible global campaign state, the pair must differ on at least one admissible probe. The report records the cheapest witness probe for each state. If any state gives the same complete signature, it emits that collision and reports unresolved identifiability.
 
 This is an upper-bound diagnostic using the complete available probe family, not a policy claiming that one experiment identifies all candidates. It prevents an optimizer from being blamed for failing an impossible instance, and makes probe-family design a first-class benchmark variable.
+
+
+## Numeric identifiability witnesses
+
+The numeric models expose the same pairwise identifiability question:
+
+- `bounded_interval_pair_identifiability` reports admissible probes whose predicted intervals are disjoint, or an explicit unresolved pair when all admissible intervals overlap.
+- `shared_bias_pair_identifiability` reports probes where nominal predictions differ. Because one common additive bias shifts both hypotheses equally, that difference is invariant to the nuisance value. If all admissible nominal predictions agree, the pair is unresolved under that probe family.
+
+These are pairwise, full-probe-family diagnostics. They do not imply a single globally optimal experiment policy or guarantee identification of every candidate at once.
+
+
+## Latest focused qualification
+
+At exact code head `1dca4ffecf7de3490c65b4c0541aedb43ab12897`, the pinned Rust 1.96 workflow passed formatting, **22 tests (0 failures)** and strict Clippy. The later README-only correction does not change the tested source. Repository-wide CI/workflow checks are separate; the draft-runner admission guard remains an inherited failure on the stacked maintenance base.
