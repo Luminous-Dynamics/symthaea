@@ -17,7 +17,7 @@ cargo clippy --manifest-path Cargo.toml --all-targets --offline -- -D warnings
 
 ## Admission rules
 
-The gate rejects a candidate if any required digest is missing; the decision, asset or revision differs from the frozen planning context; frame, region, sensor/model, likelihood, loss-table or EVSI assessment bindings mismatch; observation evidence is future-dated beyond declared clock skew or older than the maximum age; calibration or evidence has expired; rights do not explicitly cover the requested purpose; the region scope is partial/unknown; the external verifier did not mark the receipt verified; or any required receipt digest is missing.
+The gate rejects a candidate if any required digest is missing; the decision, asset or revision differs from the frozen planning context; frame, region, sensor/model, likelihood, loss-table or EVSI assessment bindings mismatch; observation evidence is future-dated beyond declared clock skew or older than the maximum age; calibration, evidence or rights grant is outside its validity interval; rights do not explicitly cover the requested purpose; the region scope is partial/unknown; the external verifier did not mark the receipt verified; or any required receipt digest is missing.
 
 The time comparison uses one frozen evaluation timestamp from the campaign context. It does not call the system clock during evaluation, so repeated evaluations on identical inputs are deterministic.
 
@@ -29,6 +29,6 @@ Admission means only "eligible for downstream planning under these declared bind
 
 ## Integration
 
-The gate returns the original campaign option only for an admitted candidate. Rejected options do not contribute to downstream EVSI or resource optimization. The same frozen context and admission report should be preserved with the campaign plan for later independent audit.
+The gate returns an admitted candidate wrapper containing both the original campaign option and the complete evidence manifest only after all checks pass. Rejected options do not contribute to downstream EVSI or resource optimization. The same frozen context and admission report should be preserved with the campaign plan for later independent audit.
 
 The synthetic example uses fake digests and deliberately does not claim that a real external verifier or rights service ran.
