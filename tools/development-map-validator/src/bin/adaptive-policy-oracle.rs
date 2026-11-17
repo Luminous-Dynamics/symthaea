@@ -440,8 +440,10 @@ pub fn evaluate_adaptive_policy_json(raw:&str)->Result<Value,String>{
  let tree=parse_nodes(val(candidate,"policy_tree","candidate_view")?,&options,&outcomes,&actions)?;
  let submitted=evaluate_policy(candidate,oracle,&tree,&bounds,&actions,&options,&worlds,budget,"release")?;
  let (optimal,optimal_count,optimal_tree)=evaluate_exact(candidate,oracle,&bounds,&actions,&options,&worlds,&outcomes,budget,max_depth)?;
+ let cutoff_raw=s(candidate,"decision_cutoff","candidate_view")?;
+ let cutoff=parse_time(&cutoff_raw,"candidate decision cutoff")?;
  let full_revalidation_cost=options.values()
-  .filter(|option|option.available_at<=parse_time(candidate["decision_cutoff"].as_str().unwrap(),"cutoff").unwrap())
+  .filter(|option|option.available_at<=cutoff)
   .try_fold(0u64,|sum,option|sum.checked_add(option.cost_p95).ok_or("full revalidation cost overflow"))?;
  let coverage_regret=optimal.coverage.saturating_sub(submitted.coverage);
  let cost_regret=submitted.worst_expected_cost.saturating_sub(optimal.worst_expected_cost);
