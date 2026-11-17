@@ -518,3 +518,21 @@ The new `PLASMA-PROCESS-PATHWAY-SELECTION-001` target covers NH3 cracking, metha
 The new case validators preserve distinct NH3 diluent operating conditions, the heat-integrated thermal NH3 plant boundary, the four-route biogas LCOH distributions, and the review-derived methane shock-wave/microwave points. They explicitly distinguish microwave heating from microwave plasma.
 
 The new Rust code and corpus changes have been pushed to the audit branch. The prior exact-head run at 5fb8b3f passed 110 tests; the latest head `af1a548ed19c4574cd83b2ca31a6e3afc2ca9679` has 120 authored tests and refreshed frozen-count assertions. Its exact-head workflow result has not yet been observed, so no pass is claimed for the 120-test revision.
+
+
+## 9.17 Pulsed methane-plasma timescale source audit — 2026-11-17
+
+Lim and Gordon, *Energy Deposition Timescale Controls Chemistry in Pulsed Methane Plasmas*, JACS 148(43), 46877–46892 (2026), DOI 10.1021/jacs.6c13735, is now recorded as `CH4-PULSED-PLASMA-ENERGY-DEPOSITION-TIMESCALE-2026`.
+
+The source-aware Rust audit enforces:
+- the 100 μs energy operating point identity and pulse width;
+- the 377 kJ/mol CH4 conversion-energy denominator;
+- distinct 15 kWh/kg C2H2 and 40 kWh/kg H2 values;
+- nanosecond-only C2-selectivity regime identity (>70% overall C2 selectivity, up to 20% C2H4);
+- the longer-pulse predominantly thermal observation;
+- the source-reported 10–50 mJ pulse-energy sweep;
+- `luminous_reproduction=false`.
+
+Five tests cover acceptance, swapped C2H2/H2 energy denominators, energy borrowed by the nanosecond observation, missing longer-pulse evidence and relabelling the 100 μs condition. The new target is `CH4-PULSE-CHEMISTRY-TIMESCALE-001`.
+
+This source is separate from the DBD + resistive pulsed-heating + CO2-regeneration PPH case and from the hybrid APPJ case. No values transfer between those reactor configurations.
