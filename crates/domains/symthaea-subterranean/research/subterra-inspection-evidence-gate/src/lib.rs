@@ -374,7 +374,6 @@ pub fn admit_candidate(
     }
 }
 
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RejectedCampaignCandidate {
     pub candidate_id: String,
@@ -887,8 +886,7 @@ mod tests {
             fault_domain_profile_digest: "synthetic:profile".into(),
             common_cause_assessment_digest: "synthetic:assessment".into(),
             portfolio_value_assessment_digest: "synthetic:factorization".into(),
-            inventory_disposition:
-                subterra_inspection_campaign::InventoryDisposition::Unknown,
+            inventory_disposition: subterra_inspection_campaign::InventoryDisposition::Unknown,
             additive_value_factorization_complete: false,
         }
     }
