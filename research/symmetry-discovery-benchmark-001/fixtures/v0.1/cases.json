@@ -1,0 +1,348 @@
+{
+  "schema_version": "0.1.0",
+  "benchmark_id": "LUMINOUS-SYMM-QUALIFIED-DISCOVERY-001",
+  "freeze_status": "protocol_fixtures_not_benchmark_results",
+  "group_convention": "column vectors; group matrices act on the left; exact rational/integer entries unless explicitly marked approximate",
+  "ambient_group": {
+    "group_id": "D4",
+    "description": "dihedral symmetry group of a square in R^2",
+    "elements": [
+      {
+        "id": "e",
+        "matrix": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      },
+      {
+        "id": "r90",
+        "matrix": [
+          [
+            0,
+            -1
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      {
+        "id": "r180",
+        "matrix": [
+          [
+            -1,
+            0
+          ],
+          [
+            0,
+            -1
+          ]
+        ]
+      },
+      {
+        "id": "r270",
+        "matrix": [
+          [
+            0,
+            1
+          ],
+          [
+            -1,
+            0
+          ]
+        ]
+      },
+      {
+        "id": "fx",
+        "matrix": [
+          [
+            1,
+            0
+          ],
+          [
+            0,
+            -1
+          ]
+        ]
+      },
+      {
+        "id": "fy",
+        "matrix": [
+          [
+            -1,
+            0
+          ],
+          [
+            0,
+            1
+          ]
+        ]
+      },
+      {
+        "id": "fdiag",
+        "matrix": [
+          [
+            0,
+            1
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      {
+        "id": "fanti",
+        "matrix": [
+          [
+            0,
+            -1
+          ],
+          [
+            -1,
+            0
+          ]
+        ]
+      }
+    ],
+    "multiplication_contract": "matrix multiplication; element table must be independently checked for closure, identity and inverses by the exact oracle"
+  },
+  "cases": [
+    {
+      "case_id": "D4-SQUARE-POINTSET-001",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            1,
+            1
+          ],
+          [
+            -1,
+            1
+          ],
+          [
+            -1,
+            -1
+          ],
+          [
+            1,
+            -1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "D4",
+      "controls": {
+        "is_exact": true,
+        "perturbation_norm": 0,
+        "orientation_holdouts": true,
+        "point_permutation_holdouts": true
+      }
+    },
+    {
+      "case_id": "C4-CHIRAL-ORBIT-001",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            1,
+            2
+          ],
+          [
+            -2,
+            1
+          ],
+          [
+            -1,
+            -2
+          ],
+          [
+            2,
+            -1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "expected_subgroup_label": "C4",
+      "controls": {
+        "is_exact": true,
+        "reflection_negative_controls": true,
+        "orientation_holdouts": true,
+        "point_permutation_holdouts": true
+      }
+    },
+    {
+      "case_id": "D4-NEAR-SYMMETRY-BREAK-001",
+      "track": "exact_finite_structural_stabilizer",
+      "geometry": {
+        "dimension": 2,
+        "points": [
+          [
+            1,
+            1.01
+          ],
+          [
+            -1,
+            1
+          ],
+          [
+            -1,
+            -1
+          ],
+          [
+            1,
+            -1
+          ]
+        ],
+        "point_order_semantics": "unordered set"
+      },
+      "target_subgroup": [
+        "e"
+      ],
+      "expected_subgroup_label": "C1",
+      "controls": {
+        "is_exact": false,
+        "near_symmetry": true,
+        "perturbation_norm": 0.01,
+        "abstention_expected_for_sampled_methods": true
+      }
+    },
+    {
+      "case_id": "D4-REGRESSION-D4-001",
+      "track": "finite_reference_group_regression_discovery",
+      "ambient_group_id": "D4",
+      "polynomial": {
+        "variables": [
+          "x",
+          "y"
+        ],
+        "monomial_exponents": [
+          [
+            4,
+            0
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            3,
+            1
+          ],
+          [
+            1,
+            3
+          ]
+        ],
+        "coefficients": [
+          1,
+          1,
+          0,
+          0
+        ],
+        "exact_rational": true
+      },
+      "target_subgroup": [
+        "e",
+        "r90",
+        "r180",
+        "r270",
+        "fx",
+        "fy",
+        "fdiag",
+        "fanti"
+      ],
+      "expected_subgroup_label": "D4",
+      "controls": {
+        "exact_invariance": true,
+        "heldout_points_required": true
+      }
+    },
+    {
+      "case_id": "D4-REGRESSION-C4-001",
+      "track": "finite_reference_group_regression_discovery",
+      "ambient_group_id": "D4",
+      "polynomial": {
+        "variables": [
+          "x",
+          "y"
+        ],
+        "monomial_exponents": [
+          [
+            4,
+            0
+          ],
+          [
+            0,
+            4
+          ],
+          [
+            3,
+            1
+          ],
+          [
+            1,
+            3
+          ]
+        ],
+        "coefficients": [
+          1,
+          1,
+          1,
+          -1
+        ],
+        "exact_rational": true
+      },
+      "target_subgroup": [
+        "e",
+        "r90",
+        "r180",
+        "r270"
+      ],
+      "expected_subgroup_label": "C4",
+      "controls": {
+        "exact_invariance": true,
+        "reflection_breaking": true,
+        "heldout_points_required": true
+      }
+    }
+  ],
+  "split_contract": {
+    "discovery_split_id": "pending-generator-0001",
+    "calibration_split_id": "pending-generator-0001",
+    "final_holdout_split_id": "pending-generator-0001",
+    "rule": "replace pending generator IDs with deterministic split digests before any benchmark run; never use final holdout for threshold or model selection"
+  },
+  "benchmark_status": {
+    "fixture_validation": "authored_not_yet_run",
+    "external_baseline_runs": "not_started",
+    "results": "none",
+    "claim_boundary": "synthetic exact fixture definitions are not benchmark results"
+  }
+}
