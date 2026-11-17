@@ -88,6 +88,96 @@
       ]
     },
     {
+      "id": "simons_297m",
+      "vendor": "Abel AI Lab",
+      "parameters_millions": 297,
+      "family_sizes_millions": [
+        25,
+        60,
+        178,
+        297
+      ],
+      "claimed_capabilities": [
+        "zero_shot_probabilistic_forecasting",
+        "nine_quantiles",
+        "known_future_covariates",
+        "open_weights",
+        "open_training_code",
+        "public_training_data",
+        "synthetic_data_generator"
+      ],
+      "licence": {
+        "weights": "OpenMDW-1.1",
+        "inference_and_training_code": "Apache-2.0",
+        "training_data": "OpenMDW-1.1 collection licence; individual datasets retain their own licences"
+      },
+      "release_url": "https://abel.ai/research/introducing-simons/",
+      "release_date": "2026-11-11",
+      "evidence": [
+        {
+          "benchmark": "GIFT-Eval",
+          "metric": "MASE_rank",
+          "value": 4,
+          "unit": "rank_of_101",
+          "source": "https://abel.ai/research/introducing-simons/",
+          "retrieved_at": "2026-11-17",
+          "source_type": "vendor_release_leaderboard_snapshot",
+          "qualification": "Vendor reports fourth among listed open-weight models; TimesFM-3 remains slightly ahead on aggregate MASE even though Simons ranks ahead by mean task rank."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "rank",
+          "value": 4,
+          "unit": "rank_of_34",
+          "source": "https://abel.ai/research/introducing-simons/",
+          "retrieved_at": "2026-11-17",
+          "source_type": "vendor_release_leaderboard_snapshot",
+          "qualification": "Rank only; do not infer a raw win rate from this rank."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "win_rate",
+          "value": 0.82,
+          "unit": "fraction",
+          "source": "https://github.com/h2oai/benchmarks",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "2026-11-13",
+          "source_type": "public_repository_benchmark_snapshot",
+          "qualification": "H2O curated snapshot lists Simons-297M at 82.0%; keep separate from Abel's rank table and from other dated leaderboard surfaces."
+        },
+        {
+          "benchmark": "TIME",
+          "metric": "MASE_rank",
+          "value": 4,
+          "unit": "rank_of_38",
+          "source": "https://abel.ai/research/introducing-simons/",
+          "retrieved_at": "2026-11-17",
+          "source_type": "vendor_release_leaderboard_snapshot",
+          "qualification": "Vendor release table; reproduce exact official TIME protocol and checkpoint."
+        },
+        {
+          "benchmark": "M6",
+          "metric": "RPS_rank",
+          "value": 1,
+          "unit": "rank_of_168",
+          "source": "https://abel.ai/research/introducing-simons/",
+          "retrieved_at": "2026-11-17",
+          "source_type": "vendor_release_leaderboard_snapshot",
+          "qualification": "Vendor reports first place on the M6 benchmark, which they state does not overlap training data; independently verify the benchmark's data exposure and evaluation setup."
+        },
+        {
+          "benchmark": "GIFT-Eval",
+          "metric": "benchmark_runtime",
+          "value": 15,
+          "unit": "minutes_upper_bound_on_one_A100",
+          "source": "https://abel.ai/research/introducing-simons/",
+          "retrieved_at": "2026-11-17",
+          "source_type": "vendor_release_runtime_claim",
+          "qualification": "Vendor reports full GIFT-Eval under 15 minutes on one A100 and roughly 20x faster than leading similarly sized models; pin their run settings and hardware before comparison."
+        }
+      ]
+    },
+    {
       "id": "timestral_209m",
       "vendor": "Mistral",
       "parameters_millions": 209,
@@ -371,5 +461,21 @@
     "model_weight_hashes_pinned": false,
     "exact_head_external_results": false,
     "universal_sota_claim": false
+  },
+  "research_loop_observations": {
+    "source": "https://abel.ai/research/introducing-simons/",
+    "retrieved_at": "2026-11-17",
+    "source_type": "vendor_reported_research_process",
+    "duration_days": 14,
+    "gpu_cost_usd_upper_bound": 8000,
+    "research_directions_over_250": true,
+    "experiments_nearly": 2000,
+    "reported_gain_attribution": {
+      "data_synthetic_data_mixture_and_input_transformations": "about 75 percent of first-campaign gain",
+      "optimizer_and_training_schedule": "about 20 percent of first-campaign gain",
+      "backbone": "reported as a small contribution"
+    },
+    "confirmation_protocol": "select candidate on validation only, then rebuild and retrain fixed code on reserved random seeds; research agents cannot modify evaluation code or access benchmark labels",
+    "qualification": "These are Abel AI Lab's own development claims, not independently audited or reproduced Symthaea results. Research-loop efficiency and model-quality leaderboards are separate measures."
   }
 }
