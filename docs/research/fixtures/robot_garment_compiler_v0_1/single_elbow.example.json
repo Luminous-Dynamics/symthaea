@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.1.0",
+  "compilation_id": "ROBOT-GARMENT-COMPILER-SYNTHETIC-ELBOW-001",
+  "state": "synthetic_fixture",
+  "units": "mm",
+  "robot": {
+    "robot_id": "synthetic-single-elbow-forearm",
+    "revision": "fixture-r1",
+    "geometry_state": "synthetic_fixture",
+    "geometry_digest": null,
+    "coordinate_frames": [
+      {
+        "frame_id": "robot_root",
+        "units": "mm"
+      }
+    ]
+  },
+  "zones": [
+    {
+      "zone_id": "forearm_outer_shell",
+      "coordinate_frame_ref": "robot_root",
+      "bounds": {
+        "min_mm": [
+          60,
+          -22,
+          -5
+        ],
+        "max_mm": [
+          100,
+          22,
+          25
+        ]
+      },
+      "functions": [
+        "abrasion_skin",
+        "environmental_cover",
+        "compliant_cushion"
+      ]
+    }
+  ],
+  "keepouts": [
+    {
+      "keepout_id": "elbow_swept_motion",
+      "coordinate_frame_ref": "robot_root",
+      "bounds": {
+        "min_mm": [
+          20,
+          -18,
+          -5
+        ],
+        "max_mm": [
+          62,
+          18,
+          25
+        ]
+      },
+      "kind": "swept_motion",
+      "affected_zone_ids": [
+        "forearm_outer_shell"
+      ],
+      "required_clearance_mm": 2,
+      "uncertainty_mm": 1,
+      "severity": "hard"
+    },
+    {
+      "keepout_id": "forearm_cable_route",
+      "coordinate_frame_ref": "robot_root",
+      "bounds": {
+        "min_mm": [
+          60,
+          -4,
+          0
+        ],
+        "max_mm": [
+          63,
+          4,
+          20
+        ]
+      },
+      "kind": "cable_route",
+      "affected_zone_ids": [
+        "forearm_outer_shell"
+      ],
+      "required_clearance_mm": 1,
+      "uncertainty_mm": 0.5,
+      "severity": "hard"
+    },
+    {
+      "keepout_id": "wrist_sensor_aperture",
+      "coordinate_frame_ref": "robot_root",
+      "bounds": {
+        "min_mm": [
+          96,
+          -10,
+          0
+        ],
+        "max_mm": [
+          99,
+          10,
+          20
+        ]
+      },
+      "kind": "sensor_aperture",
+      "affected_zone_ids": [
+        "forearm_outer_shell"
+      ],
+      "required_clearance_mm": 1,
+      "uncertainty_mm": 0,
+      "severity": "hard"
+    },
+    {
+      "keepout_id": "service_connector",
+      "coordinate_frame_ref": "robot_root",
+      "bounds": {
+        "min_mm": [
+          97,
+          -20,
+          20
+        ],
+        "max_mm": [
+          100,
+          20,
+          24
+        ]
+      },
+      "kind": "service_access",
+      "affected_zone_ids": [
+        "forearm_outer_shell"
+      ],
+      "required_clearance_mm": 1,
+      "uncertainty_mm": 0,
+      "severity": "hard"
+    }
+  ],
+  "candidate_panels": [
+    {
+      "panel_id": "forearm_textile_panel_A",
+      "zone_id": "forearm_outer_shell",
+      "coordinate_frame_ref": "robot_root",
+      "bounds": {
+        "min_mm": [
+          66,
+          -18,
+          0
+        ],
+        "max_mm": [
+          94,
+          18,
+          20
+        ]
+      },
+      "material_evidence_state": "unknown",
+      "material_profile_ref": null,
+      "pattern_revision_ref": null
+    }
+  ]
+}
