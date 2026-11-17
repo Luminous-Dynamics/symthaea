@@ -1,0 +1,446 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://luminousdynamics.io/schemas/egddm-open-world-wrapper-report-v0.1.schema.json",
+  "title": "EGDDM D6.18 closed/open-world comparison v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "scenario_id",
+    "adjudication_status",
+    "unknown_hypothesis_id",
+    "contamination_reserve_bps",
+    "contamination_nominal_bps",
+    "policy_version",
+    "actual_hypothesis_is_unknown",
+    "closed_world_comparison_available",
+    "unknown_world_safe_action_ids",
+    "closed_world_report",
+    "open_world_report",
+    "summary",
+    "traces",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "adjudication_status": {
+      "const": "synthetic_known_answer_open_world_contamination_evaluation_only"
+    },
+    "unknown_hypothesis_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "contamination_reserve_bps": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10000
+    },
+    "contamination_nominal_bps": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000
+    },
+    "policy_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "actual_hypothesis_is_unknown": {
+      "type": "boolean"
+    },
+    "closed_world_comparison_available": {
+      "type": "boolean"
+    },
+    "unknown_world_safe_action_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
+    },
+    "closed_world_report": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/noisyReport"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "open_world_report": {
+      "$ref": "#/$defs/noisyReport"
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "closed_world_unadjudicable_actual_hypothesis",
+        "closed_world_false_assurance_trace_count",
+        "closed_world_justified_trace_count",
+        "open_world_justified_trace_count",
+        "open_world_rejected_trace_count"
+      ],
+      "properties": {
+        "closed_world_unadjudicable_actual_hypothesis": {
+          "type": "boolean"
+        },
+        "closed_world_false_assurance_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "closed_world_justified_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "open_world_justified_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "open_world_rejected_trace_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "traces": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 128,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trace_id",
+          "closed_world_risk_bps",
+          "open_world_risk_bps",
+          "open_world_risk_uplift_bps",
+          "closed_world_action_justified",
+          "open_world_action_justified",
+          "closed_world_false_assurance",
+          "actual_unsafe_action",
+          "open_world_evidence_status",
+          "open_world_evidence_support_lower_bps",
+          "decision_kind"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "closed_world_risk_bps": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "open_world_risk_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "open_world_risk_uplift_bps": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "closed_world_action_justified": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "open_world_action_justified": {
+            "type": "boolean"
+          },
+          "closed_world_false_assurance": {
+            "type": "boolean"
+          },
+          "actual_unsafe_action": {
+            "type": "boolean"
+          },
+          "open_world_evidence_status": {
+            "type": "string",
+            "minLength": 1
+          },
+          "open_world_evidence_support_lower_bps": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10000
+          },
+          "decision_kind": {
+            "enum": [
+              "act",
+              "defer"
+            ]
+          }
+        }
+      }
+    },
+    "claim_ceiling": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "noisyReport": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://luminousdynamics.io/schemas/egddm-open-world-noisy-report-v0.1.schema.json",
+      "title": "EGDDM D6.18 augmented noisy-channel report v0.1",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scenario_id",
+        "adjudication_status",
+        "hypothesis_count",
+        "factor_count",
+        "trace_count",
+        "summary",
+        "traces",
+        "claim_ceiling"
+      ],
+      "properties": {
+        "scenario_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "adjudication_status": {
+          "const": "synthetic_known_answer_noisy_channel_evaluation_only"
+        },
+        "hypothesis_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "factor_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32
+        },
+        "trace_count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 128
+        },
+        "summary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "unsupported_action_trace_count",
+            "actual_unsafe_action_trace_count",
+            "hard_gate_violation_trace_count",
+            "nominal_false_safe_trace_count",
+            "unnecessary_abstention_trace_count",
+            "invalid_calibration_trace_count",
+            "unqualified_dependence_trace_count",
+            "impossible_output_trace_count",
+            "zero_support_trace_count",
+            "false_observation_events"
+          ],
+          "properties": {
+            "unsupported_action_trace_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "actual_unsafe_action_trace_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "hard_gate_violation_trace_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "nominal_false_safe_trace_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unnecessary_abstention_trace_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "invalid_calibration_trace_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "unqualified_dependence_trace_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "impossible_output_trace_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "zero_support_trace_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "false_observation_events": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "traces": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "trace_id",
+              "evidence_status",
+              "evidence_accepted",
+              "calibration_valid",
+              "factorization_qualified",
+              "dependence_mode",
+              "temporal_valid",
+              "actual_output_possible",
+              "false_observation_count",
+              "acquisition_count",
+              "nominal_posterior_risk_bps",
+              "prior_only_robust_risk_bps",
+              "likelihood_only_robust_risk_bps",
+              "worst_case_posterior_risk_bps",
+              "evidence_support_lower_bps",
+              "max_residual_risk_bps",
+              "nominal_action_justified",
+              "robust_action_justified",
+              "unsupported_action",
+              "actual_unsafe_action",
+              "hard_gate_violation",
+              "nominal_false_safe",
+              "unnecessary_abstention",
+              "claimed_residual_risk_bps",
+              "claimed_risk_understatement",
+              "irreversible_action"
+            ],
+            "properties": {
+              "trace_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence_status": {
+                "enum": [
+                  "accepted",
+                  "invalid_temporal_order_or_availability",
+                  "invalid_or_stale_calibration",
+                  "unmodeled_channel_outcome",
+                  "impossible_output_under_actual_hypothesis",
+                  "unqualified_dependence_or_factorization",
+                  "zero_evidence_support",
+                  "accepted_with_frechet_dependence_bounds"
+                ]
+              },
+              "evidence_accepted": {
+                "type": "boolean"
+              },
+              "calibration_valid": {
+                "type": "boolean"
+              },
+              "factorization_qualified": {
+                "type": "boolean"
+              },
+              "temporal_valid": {
+                "type": "boolean"
+              },
+              "actual_output_possible": {
+                "type": "boolean"
+              },
+              "false_observation_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "acquisition_count": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 16
+              },
+              "nominal_posterior_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "prior_only_robust_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "likelihood_only_robust_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "worst_case_posterior_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "evidence_support_lower_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "max_residual_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "nominal_action_justified": {
+                "type": "boolean"
+              },
+              "robust_action_justified": {
+                "type": "boolean"
+              },
+              "unsupported_action": {
+                "type": "boolean"
+              },
+              "actual_unsafe_action": {
+                "type": "boolean"
+              },
+              "hard_gate_violation": {
+                "type": "boolean"
+              },
+              "nominal_false_safe": {
+                "type": "boolean"
+              },
+              "unnecessary_abstention": {
+                "type": "boolean"
+              },
+              "claimed_residual_risk_bps": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "claimed_risk_understatement": {
+                "type": "boolean"
+              },
+              "irreversible_action": {
+                "type": "boolean"
+              },
+              "dependence_mode": {
+                "enum": [
+                  "single_channel",
+                  "within_group_frechet_and_exact_set_cross_group_product",
+                  "unrestricted_frechet_joint_bounds",
+                  "no_evidence"
+                ]
+              }
+            }
+          }
+        },
+        "claim_ceiling": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

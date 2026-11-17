@@ -594,7 +594,7 @@ fn evaluate_trace(
         "evidence_accepted":evidence_accepted,
         "calibration_valid":calibration_ok,
         "factorization_qualified":factorization_ok,
-        "dependence_mode":if selected.len()<=1 {"single_channel"} else if factorization_ok {"within_group_frechet_and_exact_set_cross_group_product"} else {"unrestricted_frechet_joint_bounds"},
+        "dependence_mode":if selected.is_empty() {"no_evidence"} else if selected.len()==1 {"single_channel"} else if factorization_ok {"within_group_frechet_and_exact_set_cross_group_product"} else {"unrestricted_frechet_joint_bounds"},
         "temporal_valid":temporal_valid,
         "actual_output_possible":actual_output_possible,
         "false_observation_count":false_observation_count,
@@ -758,7 +758,8 @@ mod tests{
         assert_eq!(triple.nominal,5865);
     }
     #[test]fn point_likelihood_looks_safe_but_robust_channel_risk_rejects(){
-        let t=trace(&report(),"noisy-point-estimate-false-safe");
+        let r=report();
+        let t=trace(&r,"noisy-point-estimate-false-safe");
         assert_eq!(t["nominal_posterior_risk_bps"],129);
         assert_eq!(t["prior_only_robust_risk_bps"],454);
         assert_eq!(t["likelihood_only_robust_risk_bps"],291);
@@ -768,7 +769,8 @@ mod tests{
         assert_eq!(t["nominal_false_safe"],true);
     }
     #[test]fn same_dependence_group_uses_frechet_bounds_not_independence(){
-        let t=trace(&report(),"correlated-sensors-not-independent");
+        let r=report();
+        let t=trace(&r,"correlated-sensors-not-independent");
         assert_eq!(t["factorization_qualified"],false);
         assert_eq!(t["evidence_accepted"],true);
         assert_eq!(t["evidence_status"],"accepted_with_frechet_dependence_bounds");
@@ -779,48 +781,56 @@ mod tests{
         assert_eq!(t["robust_action_justified"],false);
     }
     #[test]fn joint_model_preserves_common_mode_uncertainty_without_false_independence(){
-        let t=trace(&report(),"joint-common-mode-model");
+        let r=report();
+        let t=trace(&r,"joint-common-mode-model");
         assert_eq!(t["factorization_qualified"],true);
         assert_eq!(t["worst_case_posterior_risk_bps"],555);
         assert_eq!(t["robust_action_justified"],true);
     }
     #[test]fn exact_set_mutual_certificate_allows_qualified_factorization(){
-        let t=trace(&report(),"qualified-independent-factors");
+        let r=report();
+        let t=trace(&r,"qualified-independent-factors");
         assert_eq!(t["factorization_qualified"],true);
         assert_eq!(t["nominal_posterior_risk_bps"],1);
         assert_eq!(t["worst_case_posterior_risk_bps"],15);
         assert_eq!(t["robust_action_justified"],true);
     }
     #[test]fn calibration_expired_after_observation_is_invalid_at_decision(){
-        let t=trace(&report(),"calibration-expired-before-decision");
+        let r=report();
+        let t=trace(&r,"calibration-expired-before-decision");
         assert_eq!(t["calibration_valid"],false);
         assert_eq!(t["evidence_accepted"],false);
         assert_eq!(t["evidence_status"],"invalid_or_stale_calibration");
     }
     #[test]fn calibration_revoked_after_observation_is_invalid_at_decision(){
-        let t=trace(&report(),"calibration-revoked-before-decision");
+        let r=report();
+        let t=trace(&r,"calibration-revoked-before-decision");
         assert_eq!(t["calibration_valid"],false);
         assert_eq!(t["evidence_accepted"],false);
     }
     #[test]fn impossible_output_under_actual_world_is_not_used(){
-        let t=trace(&report(),"impossible-output-for-actual-world");
+        let r=report();
+        let t=trace(&r,"impossible-output-for-actual-world");
         assert_eq!(t["actual_output_possible"],false);
         assert_eq!(t["false_observation_count"],1);
         assert_eq!(t["evidence_accepted"],false);
     }
     #[test]fn zero_lower_evidence_support_never_becomes_zero_risk(){
-        let t=trace(&report(),"zero-evidence-support");
+        let r=report();
+        let t=trace(&r,"zero-evidence-support");
         assert_eq!(t["evidence_support_lower_bps"],0);
         assert_eq!(t["worst_case_posterior_risk_bps"],10000);
         assert_eq!(t["robust_action_justified"],false);
     }
     #[test]fn future_evidence_is_rejected(){
-        let t=trace(&report(),"future-evidence");
+        let r=report();
+        let t=trace(&r,"future-evidence");
         assert_eq!(t["temporal_valid"],false);
         assert_eq!(t["evidence_accepted"],false);
     }
     #[test]fn pairwise_certificates_do_not_authorize_three_way_product_but_frechet_can(){
-        let t=trace(&report(),"three-group-certificate-mismatch");
+        let r=report();
+        let t=trace(&r,"three-group-certificate-mismatch");
         assert_eq!(t["factorization_qualified"],false);
         assert_eq!(t["evidence_accepted"],true);
         assert_eq!(t["evidence_status"],"accepted_with_frechet_dependence_bounds");
@@ -829,7 +839,8 @@ mod tests{
         assert_eq!(t["robust_action_justified"],true);
     }
     #[test]fn drift_widened_likelihood_bounds_defeat_nominal_confidence(){
-        let t=trace(&report(),"drift-widened-channel-bounds");
+        let r=report();
+        let t=trace(&r,"drift-widened-channel-bounds");
         assert_eq!(t["nominal_posterior_risk_bps"],182);
         assert_eq!(t["prior_only_robust_risk_bps"],639);
         assert_eq!(t["likelihood_only_robust_risk_bps"],910);
