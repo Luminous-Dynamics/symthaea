@@ -16,10 +16,10 @@ pub mod scaler;
 pub mod time_imm;
 pub mod watermarks;
 pub use clock::{
-    conservative_min_exclusive_watermark, ClockCalibrationError, ClockCalibrationLedger,
-    ClockCalibrationV1,
-    ClockDomainId, ConservativeExclusiveWatermark, MappedClockTime,
-    MappedExclusiveWatermark,
+    compare_event_time_to_exclusive_watermark, conservative_min_exclusive_watermark,
+    ClockCalibrationError, ClockCalibrationLedger, ClockCalibrationV1, ClockDomainId,
+    ConservativeExclusiveWatermark, EventWatermarkComparisonV1, EventWatermarkOrdering,
+    MappedClockTime, MappedExclusiveWatermark,
 };
 pub use watermarks::{CompletenessReport, CompletenessVerdict, EventArrivalClassification, LateEventBreach, LateEventKind, SourceCompleteness, SourceCompletenessEntry, SourceKey, SourceProgressEvidence, SourceProgressOperation, SourceProgressRevision, SourceWatermarkLedger, VerifiedCompletenessReport, WatermarkError};
 pub use time_imm::{AvailabilityPolicy, NaiveTimestampZone, NumericFeatureSpec, TimeImmAdapterConfig, TimeImmAdapterError, TimeImmCsvAdapter, TimeImmParsedTable};
