@@ -49,3 +49,24 @@ The report contains precision@K, recall@K, random-prevalence expectation, enrich
 The workflow runs this binary against a clearly synthetic six-row plumbing fixture; this only validates deterministic metric execution and does not represent material evidence, model quality or scientific discovery. Confidence intervals, calibration, OOD selective risk, cost-normalized comparisons and prospective validation remain separate benchmark work and must not be inferred from these ranking metrics.
 
 The GitHub Actions workflow creates an isolated Cargo.lock for each exact run, uses --locked for the subsequent build/test commands, and uploads the generated lockfile, toolchain versions, source digests and receipts as one run artifact. This allows the resolved transitive dependency graph to be reviewed and committed after the first successful exact-head run rather than hand-authoring a lockfile. The lockfile is generated from the pinned Rust 1.96.0 toolchain and exact direct dependency versions.
+
+## Condition-bound observation event contract
+
+The registry identifies source records and candidate materials; the observation-event schema preserves each reported measurement/calculation/prediction as its own condition-bound event.
+
+Schema: `data/schemas/superconductivity_observation_event_v0_1.schema.json`.
+
+Synthetic smoke fixture (never a real material claim): `tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json`.
+
+Run:
+
+```bash
+cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit
+cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_observation_event_audit -- \
+  --schema data/schemas/superconductivity_observation_event_v0_1.schema.json \
+  --fixture tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json
+```
+
+The auditor refuses orphan source IDs, duplicate observation IDs, non-detection encoded as zero, unknown pressure coerced to ambient, ambient pressure without explicit zero, applied pressure without a positive value, and calculated/predicted values represented as experimentally detected. Negative controls exercise each refusal.
+
+This is an observation-level data contract. It does not verify the underlying source claim or establish scientific truth; production imports still require a source-pinned, rights-reviewed record and appropriate human adjudication.
