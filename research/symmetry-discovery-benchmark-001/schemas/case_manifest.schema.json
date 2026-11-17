@@ -39,7 +39,11 @@
         "group_id",
         "description",
         "elements",
-        "multiplication_contract"
+        "multiplication_contract",
+        "group_order",
+        "identity_element_id",
+        "inverse_table",
+        "multiplication_table"
       ],
       "properties": {
         "group_id": {
@@ -84,6 +88,63 @@
         "multiplication_contract": {
           "type": "string",
           "minLength": 1
+        },
+        "group_order": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "identity_element_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "inverse_table": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "element_id",
+              "inverse_element_id"
+            ],
+            "properties": {
+              "element_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "inverse_element_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "multiplication_table": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "left_element_id",
+              "right_element_id",
+              "product_element_id"
+            ],
+            "properties": {
+              "left_element_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "right_element_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "product_element_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
         }
       }
     },
