@@ -26,6 +26,27 @@ This tranche closes that narrow gap without changing the grammar's output format
 
 The return value is a small versioned report: cycle count, observed melody event count, and maximum prefix length. The error enum reports specific rejection causes.
 
+## Versioned expressive-envelope verification
+
+The current generator writes a deterministic note-level envelope for each process cycle:
+
+- velocity: `0.46 + 0.24 × prefix_length / cell_length`;
+- section intensity: `0.42 + 0.44 × prefix_length / cell_length`;
+- `PhraseStart` emphasis only on the first event of the first cycle; all other process melody events are `Normal`.
+
+ProcessPlan now declares `ProcessDynamicsProfileV1::PrefixLinear`. The independent audit recomputes both f32 values using the generator's exact operation order and compares their bit patterns. It checks emphasis separately and counts all successfully checked expressive events in the serialized audit report. A legacy plan missing the profile is still readable, but returns `MissingDynamicsProfile` and is not expressively qualified.
+
+Frozen reference values for normalized prefixes 1/4, 2/4, 3/4 and 4/4 are:
+
+| Prefix ratio | Velocity | Section intensity |
+|---|---:|---:|
+| 1/4 | 0.52 | 0.53 |
+| 2/4 | 0.58 | 0.64 |
+| 3/4 | 0.64 | 0.75 |
+| 4/4 | 0.70 | 0.86 |
+
+The audit only verifies the current melody envelope. It does not verify the separate constant accompaniment layers (harmony/bass), acoustic loudness after rendering, perceptual crescendi, expressive timing, or whether the linear envelope is artistically appropriate. The purpose is to prove adherence to an explicit contract, not to claim that this contract is musically optimal.
+
 ## Evidence boundary
 
 This establishes symbolic score-to-plan realization only. It does **not** establish:
@@ -41,7 +62,7 @@ In particular, event-count growth is a structural fact, not a listener-experienc
 
 ## Adversarial fixtures authored
 
-Eleven new tests are present in `process_grammar.rs`:
+Sixteen new tests are present in `process_grammar.rs`:
 
 1. Accept unmodified realizations for all four declared trajectory kinds.
 2. Match hand-frozen expected contour vectors for all four process kinds.
@@ -54,17 +75,20 @@ Eleven new tests are present in `process_grammar.rs`:
 9. Reject a shifted cycle boundary.
 10. Reject a score with a missing melody event.
 11. Exercise a deterministic 4,096-case holdout: four process kinds × 256 seeds per kind × 2, 4, 8 and 16 bars.
+12. Match frozen prefix-linear velocity and section-intensity reference values.
+13. Reject velocity, section-intensity and phrase-start emphasis mutations.
+14. Refuse expressive verification when a legacy plan lacks the dynamics profile.
 
 Existing process tests remain in place. No test has been compiled or executed in the current environment. Do not describe these tests as passing.
 
 ## Benchmark plan
 
-Report separate measurements; do not collapse them into a single music-quality score.
+Report separate measurements; do not collapse them into a single music-quality score. Include expressive-envelope correctness as a distinct symbolic score-integrity dimension.
 
 | Dimension | Metric | Qualification target |
 |---|---|---|
 | Deterministic positive fixtures | Exact plan-to-score audit acceptance | 100% |
-| Frozen adversarial fixtures | Invalid score rejection | 100%; zero false semantic accepts |
+| Frozen adversarial fixtures | Invalid score rejection | 100%; zero false semantic accepts |\n| Expressive envelope | Bit-exact note-level velocity/intensity/emphasis profile adherence | 100% for the declared profile; unsupported/legacy profiles explicitly rejected |
 | Generated holdout cohort | Exact adherence across trajectory kinds, seeds, and bar counts | 100% for the pinned deterministic generator |
 | Mutation robustness | Detection rate by mutation class, plus false rejection rate | 100% detection on the frozen matrix; report every class separately |
 | Coverage | Accepted examples / all examples; abstentions by reason | Report explicitly; never hide abstentions in accuracy |
@@ -145,9 +169,54 @@ Keep five scorecards independent:
 
 For deterministic structural invariants, the target should be 100% on frozen positive and negative fixtures. For open-ended generative behavior, preregister coverage/abstention, stratify by grammar and task, report confidence intervals, and do not optimize one headline scalar at the expense of protected-content failures.
 
+## External industry and benchmark refresh — 2026-11-18
+
+### Audio generation preference is not the same as control correctness
+
+The current Artificial Analysis live instrumental v1.1 board displays Suno v6 1148±22, Suno v6-mini 1114±21, Mureka V9.5 1084±21, Mureka V9 1083±21, Lyria 3 Pro 1080±21, and Lyria 3.5 1078±21. The live vocal v1.1 board displays ACE Music v1 1160±21, Suno v6 1144±18, Suno v6-mini 1132±18, and Mureka V9.5 1101±18. The official method uses blind same-prompt, same-modality pairwise preference, a ten-second minimum listen per track, Bradley–Terry estimation, and 95% confidence intervals. It is an audio-preference benchmark, not a score-edit or source-preservation test.
+
+Sources:
+- https://artificialanalysis.ai/music/leaderboard/instrumental
+- https://artificialanalysis.ai/music/leaderboard/vocals
+- https://artificialanalysis.ai/methodology/music
+
+### Music editing is a direct competitor capability
+
+SMEBench (27 October 2026) has twelve instrumentation, articulation, dynamics and pitch operations, a balanced 3,600-example synthetic MIDI test set, and a smaller real-audio multitrack complement. Its paired targets explicitly separate source preservation, target agreement and textual compatibility; its analysis finds that common metrics can rank editors differently. It is a direct benchmark to consider for Muse's controlled editing adapters, subject to its research-use and component-license constraints.
+
+Source: https://arxiv.org/abs/2610.36715
+
+The ICASSP 2027 Audio Editing Challenge's public MMAE development set has 2,000 examples and 17,741 atomic rubrics. It reports Instruction Following Rate (IFR), Consistency Rate (CR), and Exact Match Rate (EMR); the official challenge page says existing systems remain below 5% EMR. On 10 November, the organizers released 500 hidden test examples per track and the submission SDK. Final submission is 25 November 2026 (11:59 PM US Pacific); registration closed 8 October and the Agent track has a 1 November model-release cutoff. The current task is to reproduce the public baseline and build a private Muse evaluation; participation eligibility cannot be inferred and must not be assumed.
+
+Sources:
+- https://audio-editing-challenge.github.io/
+- https://2027.ieeeicassp.org/sp-grand-challenges/
+
+### Symbolic generation and structure comparisons
+
+CAST (Scientific Reports, 14 April 2026) reports structural error 0.22±0.02 and chord accuracy 0.96±0.01, against its MuseFormer baseline at 0.58±0.03 and 0.64±0.02, over five runs. It demonstrates the value of explicit skeleton guidance. Muse must compare on the paper's exact single-track task before claiming better results; future multi-part, counterpoint, atonal and event-identity tasks would be separate extensions, not directly comparable wins.
+
+Source: https://www.nature.com/articles/s41598-026-46750-0
+
+MIREX 2026 symbolic-generation subjective results report DAMN at 3.68±0.16 coherence, 3.39±0.18 structure, 3.18±0.16 creativity and 3.47±0.14 musicality; Anticipatory Music Transformer reports 3.47±0.20, 3.34±0.16, 3.34±0.16 and 3.61±0.17 respectively. The survey used eight prompts, twelve listeners and 38 ratings per model, with one sample selected from eight generated candidates. Treat this as a small subjective comparison, not a definitive general SOTA leaderboard.
+
+Source: https://music-ir.org/mirex/wiki/2026:Symbolic_Music_Generation_Results
+
+MIREX 2026's Music Structure Analysis task on 200 Harmonix test songs reports SongMamba HR3F 0.840 (best displayed) and SongFormer accuracy 0.802 (best displayed); the task is audio section-boundary analysis, not symbolic process generation. It can be a downstream perception/structure benchmark for a Muse audio-analysis path, but is not the same metric as CAST or ProcessAdditive adherence.
+
+Source: https://music-ir.org/mirex/wiki/2026:Music_Structure_Analysis_Results
+
+### Product frontier
+
+Suno Studio 2.0 offers MIDI tracks and piano roll, velocity and pitch-bend editing, automation, effects, synths, and chat-driven clip/plugin creation. Lyria RealTime offers continuous streaming generation with weighted-prompt steering and BPM, density, key and brightness controls. These are strong product references; neither alone proves exact event preservation or an independently verified edit.
+
+Sources:
+- https://help.suno.com/en/articles/13670529
+- https://deepmind.google/models/lyria/lyria-realtime/
+
 ## Validation status
 
 - Source authored on a branch based on current `main` at `67939c904adcfafd246848b74cd53c52a2cca244`.
-- Eleven new Rust unit tests authored, including the 4,096-case deterministic holdout matrix.
+- Sixteen new Rust unit tests authored, including the 4,096-case deterministic holdout matrix and note-level expressive-envelope mutations.
 - Cargo/rustc/rustfmt execution unavailable in this environment; compilation, formatting and test results are pending.
 - No workflow pass, audio result, human preference result, or SOTA superiority is claimed.
