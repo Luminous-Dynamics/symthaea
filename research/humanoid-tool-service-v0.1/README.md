@@ -1,0 +1,98 @@
+# HUM-TOOL-SERVICE-001 — v0.1
+
+**Status:** protocol and case-specification research only  
+**Issue:** [#12657](https://github.com/Luminous-Dynamics/symthaea/issues/12657)  
+**Base:** `main@d67bb3ea4824fde5e95c721dd28dc9cc2b064bd9`  
+**Branch:** `research/humanoid-tool-service-v0-1`
+
+## Objective
+
+Determine whether Symthaea can acquire transferable tool competence and complete bounded maintenance tasks with independently verified outcomes.
+
+The unit of capability is not “recognizes a wrench” or “can grasp an object”. It is a complete, inspectable chain:
+
+```
+interpret goal
+  -> identify affordances and constraints
+  -> select tool and part
+  -> approach / grasp / secure
+  -> predict contact consequences
+  -> use tool (stationary or mobile)
+  -> detect effect, error and uncertainty
+  -> recover, abstain or hand off
+  -> independently verify postcondition
+```
+
+For maintenance, extend the chain:
+
+```
+inspect -> isolate -> diagnose -> plan -> disassemble
+  -> repair / replace -> reassemble -> recalibrate
+  -> independently test -> accept or quarantine
+```
+
+A robot's own completion flag is not the verifier.
+
+## Why this programme is different
+
+We will test seven hypotheses rather than assume them:
+
+1. **Tool-as-body-schema:** a held tool changes effective reach, collision envelope, inertia, contact geometry and affordances. The robot should reason over the combined embodiment + grasp + tool, not just the object's class.
+2. **Functional transfer:** infer what a tool can do from its physical/functional properties, not from memorized tool names or trajectories.
+3. **Active physical inquiry:** choose bounded, low-risk probes when resolving an unknown property would change the action.
+4. **Contact prediction:** predict contact transition, slip, engagement, load and task effect; compare forecasts to native observations.
+5. **Compositional service:** combine reusable skills into verifiable diagnosis and restoration workflows.
+6. **Cross-embodiment portability:** share skill semantics while keeping morphology, tool interface, sensor calibration, actuation and safety envelopes embodiment-specific.
+7. **Calibrated abstention:** recognize insufficient evidence, damaged tools, incompatible parts, missing isolation or stale calibration and stop/handoff correctly.
+
+## Current Symthaea starting point
+
+The public humanoid crate already contains HDC-LTC control, FEP regulation, morphology profiles, state estimation, terrain/contact/whole-body control, deterministic safety projection and fall recovery. The morphology profiles include 21-, 27-, 53- and 64-actuator variants. The current task enum is limited to Stand, Walk, Run, Reach and Grasp.
+
+The 53-DOF DAgger example currently configures the Stand task; its OOD correction segment samples a simple humanoid simulator and PD standing targets. It does not demonstrate learned tool use. The inspected HAL servo path is a 21-joint PCA9685 implementation, not a dexterous 53-DOF hand interface.
+
+The benchmark's Unitree G1/Dex3 embodiment is a separate physical/configuration subject. **No direct morphology, actuator ordering, units, observation space or control-mode equivalence is assumed.** A compatibility adapter must be specified and tested before any comparison is called matched.
+
+## Ownership map
+
+This programme composes existing owners and must not duplicate them.
+
+| Concern | Canonical owner |
+|---|---|
+| Tool, platform, role and workcell specialization | [ROB-SPEC #6033](https://github.com/Luminous-Dynamics/symthaea/issues/6033) |
+| Repair parts and productive self-maintenance closure | [ROB-MFG #5775](https://github.com/Luminous-Dynamics/symthaea/issues/5775), [SELF-BOOT #6229](https://github.com/Luminous-Dynamics/symthaea/issues/6229) |
+| Degradation, reliability and maintainability | [ROB-LIFE #4863](https://github.com/Luminous-Dynamics/symthaea/issues/4863) |
+| Capability observatory and external benchmark import | [HUM-OBS #4780](https://github.com/Luminous-Dynamics/symthaea/issues/4780), [#4781](https://github.com/Luminous-Dynamics/symthaea/issues/4781) |
+| Benchmark validity and transfer claims | [ROB-BENCH-AUDIT #11231](https://github.com/Luminous-Dynamics/symthaea/issues/11231) |
+| Tactile co-design / representation / native metrology / prediction | [#5821](https://github.com/Luminous-Dynamics/symthaea/issues/5821), [#12477](https://github.com/Luminous-Dynamics/symthaea/issues/12477), [#12484](https://github.com/Luminous-Dynamics/symthaea/issues/12484), [#12500](https://github.com/Luminous-Dynamics/symthaea/issues/12500), [#12548](https://github.com/Luminous-Dynamics/symthaea/issues/12548) |
+| Contact-rich recovery | [#11606](https://github.com/Luminous-Dynamics/symthaea/issues/11606) |
+| Design, experiment, instrumentation and physical article | [ROB-DESIGN #4795](https://github.com/Luminous-Dynamics/symthaea/issues/4795), [ROB-EXP #4800](https://github.com/Luminous-Dynamics/symthaea/issues/4800), [ROB-INSTR #4866](https://github.com/Luminous-Dynamics/symthaea/issues/4866), [JOINTLAB #4814](https://github.com/Luminous-Dynamics/symthaea/issues/4814) |
+| Physical grasp and human-contact consent | [#1400](https://github.com/Luminous-Dynamics/symthaea/issues/1400), [#4680](https://github.com/Luminous-Dynamics/symthaea/issues/4680) |
+| Accepted productive work accounting | [#11607](https://github.com/Luminous-Dynamics/symthaea/issues/11607) |
+
+This programme owns benchmark protocol, tool/service skill composition questions, and the gap analysis only.
+
+## Research tracks
+
+- **T0 — Paper-faithful tool-use reproduction:** reproduce HumanoidToolBench as published when rights, source, checkpoint and runtime permit.
+- **T1 — Transfer and shortcut resistance:** held-out tool instances/families, unseen environments, tool/task recombination, decoys, irrelevant instructions and sensor faults.
+- **T2 — Verified service loops:** simulation and passive/low-energy bench fixtures for repair, replacement, fit-check and return-to-service.
+- **T3 — Field readiness:** outdoor navigation, communications, power budgeting and low-risk field-kit maintenance only after T0–T2 show credible capability.
+
+No single aggregate humanoid score. Every task result retains robot, tool, environment, task, model, evidence class, uncertainty and failure identity.
+
+## Deliverables
+
+- `protocol-v0.1.md`: preregisterable comparison and claim-boundary protocol.
+- `cases-v0.1.json`: exact 18-cell benchmark anchor, eight service-case definitions and negative controls.
+- `schema-v0.1.json`: strict structural contract for the case manifest.
+
+These artifacts define a prospective benchmark. They do not indicate that benchmark episodes were run or that any task has been solved.
+
+## Initial success criterion
+
+A first research win is not “Symthaea beats Figure”. It is a credible, reproducible, matched experiment showing that one or more proposed mechanisms (functional tool model, tactile/contact prediction, active probing, compositional recovery) improve **held-out verified task success** over a strong baseline at a declared data/compute/latency budget, without increasing unsafe action, false acceptance or unreported human intervention.
+
+## Claim ceiling
+
+Protocol consistency is not robot capability. A simulation pass is not HIL. HIL is not physical qualification. Physical task qualification is not unrestricted deployment, human-contact safety, clinical competence or legal/product certification. No actuator authority is introduced here.
