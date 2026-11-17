@@ -1,0 +1,287 @@
+{
+  "schema": "symthaea.irregular_event_contract.v0.1",
+  "tracking_issue": "NEURO-SILICON-011",
+  "candidate_package": "research/irregular-event-contract",
+  "clocks": {
+    "event_time": "phenomenon occurred",
+    "availability_time": "earliest legal candidate access",
+    "observation_visibility": "available_at_us <= forecast_origin_us",
+    "observation_invariant": "available_at_us >= event_time_us"
+  },
+  "identity": [
+    "event_id",
+    "entity_id",
+    "modality_id",
+    "source_id",
+    "source_sequence",
+    "source_sha256"
+  ],
+  "measurement_variants": [
+    "observed_fixed_point",
+    "missing_with_reason",
+    "censored_interval",
+    "opaque_content_addressed_payload",
+    "append_only_bitemporal_event_revision"
+  ],
+  "known_future_covariates": {
+    "separate_type": true,
+    "availability": "published_at_us <= forecast_origin_us",
+    "requires_target_inside_validity_interval": true,
+    "future_derived_targets_never_candidate_visible": true
+  },
+  "preprocessing": {
+    "implicit_sort_by_event_time": false,
+    "implicit_resampling": false,
+    "implicit_interpolation": false,
+    "implicit_forward_fill": false,
+    "implicit_zero_imputation": false,
+    "separately_versioned_and_charged": true
+  },
+  "validation_status": {
+    "rust_test_functions_authored": 73,
+    "cargo_build_executed": false,
+    "rustfmt_executed": false,
+    "clippy_executed": false,
+    "rust_tests_executed": false,
+    "external_dataset_adapter_executed": false,
+    "event_contract_test_functions_authored": 16,
+    "bitemporal_test_functions_authored": 12,
+    "purged_split_test_functions_authored": 8,
+    "train_only_scaler_test_functions_authored": 10,
+    "time_imm_adapter_test_functions_authored": 10,
+    "source_watermark_test_functions_authored": 17
+  },
+  "opaque_payload_contract": {
+    "fields": [
+      "payload_sha256",
+      "payload_bytes",
+      "encoding_id"
+    ],
+    "allowed_examples": [
+      "text",
+      "audio",
+      "image",
+      "embedding"
+    ],
+    "payload_bytes_stored_outside_event_record": true
+  },
+  "bitemporal_ledger": {
+    "coordinates": {
+      "valid_time": "event_time_us",
+      "knowledge_time": "recorded_at_us",
+      "precision": "microseconds"
+    },
+    "operations": [
+      "assert",
+      "supersede",
+      "retract"
+    ],
+    "append_only": true,
+    "per_event_revision_sequence": "contiguous starting at one",
+    "transaction_batch": "single timestamp; atomic all-or-nothing",
+    "committed_transaction_clock": "strictly increasing",
+    "record_availability_must_not_exceed_transaction_time": true,
+    "corrections_preserve": [
+      "entity_id",
+      "modality_id",
+      "source_id"
+    ],
+    "as_known_query": "latest revision recorded by known_at, filtered by event_time <= valid_at and available_at <= known_at",
+    "active_source_sequence_unique": true,
+    "history_digest": "domain-separated SHA-256 over ordered revision history",
+    "composes_existing_broca_ledger": false,
+    "related_existing_prs": [
+      9109,
+      9292
+    ]
+  },
+  "chronological_split": {
+    "module": "research/irregular-event-contract/src/splits.rs",
+    "split_units": "distinct forecast origins per entity",
+    "train_basis_points_default": 6000,
+    "validation_basis_points_default": 2000,
+    "test_basis_points_default": 2000,
+    "tied_forecast_origins_stay_together": true,
+    "target_intervals": "[forecast_origin_us,target_end_exclusive_us)",
+    "train_target_must_end_by": "validation_start_us - embargo_us",
+    "validation_target_must_end_by": "test_start_us - embargo_us",
+    "history_window_overlap_allowed": true,
+    "cross_partition_target_overlap_allowed": false,
+    "purged_windows_reported_separately": true
+  },
+  "train_only_standardizer": {
+    "module": "research/irregular-event-contract/src/scaler.rs",
+    "fit_scope": "train_window_ids only",
+    "grouping": [
+      "entity_id",
+      "feature_id"
+    ],
+    "raw_observation_dedup_key": [
+      "entity_id",
+      "feature_id",
+      "observation_id"
+    ],
+    "conflict_policy": "reject duplicate raw observation IDs with different values",
+    "estimator": "Welford sample mean and standard deviation (ddof=1)",
+    "validation_test_purged_values_read": false,
+    "validates_split_plan_boundaries": true,
+    "missing_values": "adapter omits from numeric moment samples and preserves a separate mask",
+    "zero_std": "subtract mean without division",
+    "exposes": [
+      "count",
+      "mean",
+      "sample_std"
+    ],
+    "physical_measurement_claim": false,
+    "value_timestamp_required": true,
+    "observation_must_be_within_history_interval": true,
+    "observation_must_precede_forecast_origin": true,
+    "validation_test_and_purged_values_skipped_before_numeric_inspection": true,
+    "test_functions_authored": 10
+  },
+  "time_imm_adapter": {
+    "module": "research/irregular-event-contract/src/time_imm.rs",
+    "repository_commit": "e934cef23d526817dcf0d1a66c6f82274c96c04b",
+    "sample_entity": "EPA-Air/Bexar",
+    "numeric_file": {
+      "data_rows": 4370,
+      "columns": [
+        "date_time",
+        "record_id",
+        "temp",
+        "pm2_5",
+        "aqi",
+        "ozone"
+      ],
+      "git_blob_oid": "c12a34fa63f6fdab7b9608a3c581b0d929a2626e"
+    },
+    "text_file": {
+      "data_rows": 18,
+      "columns": [
+        "date_time",
+        "record_id",
+        "text"
+      ],
+      "git_blob_oid": "01840c5b62c699e2a3a9b5d6198067c383df8485"
+    },
+    "datetime_timezone_required_for_naive_values": true,
+    "timezone_support": [
+      "fixed_utc_offset",
+      "iana_timezone"
+    ],
+    "ambiguous_dst_local_time": "reject",
+    "nonexistent_dst_local_time": "reject",
+    "availability_policy_required": true,
+    "availability_policies": [
+      "synchronous_event_time_assumption",
+      "fixed_delay_assumption"
+    ],
+    "actual_arrival_time_claim": false,
+    "source_provenance": [
+      "exact_file_sha256",
+      "canonical_row_sha256"
+    ],
+    "numeric_fixed_point": {
+      "supported_scale_range": [
+        -9,
+        0
+      ],
+      "rounding": "nearest_ties_away_from_zero",
+      "returns_half_unit_error_bound": true
+    },
+    "text_payload": {
+      "whitespace_preserved": true,
+      "content_addressed": true
+    },
+    "test_functions_authored": 10,
+    "parsed_table_provenance_fields": [
+      "dataset_id",
+      "record_id",
+      "entity_id",
+      "adapter_config_sha256",
+      "source_file_sha256",
+      "availability_policy_sha256",
+      "timestamp_zone_sha256"
+    ],
+    "git_blob_oid_note": "Git blob OIDs are repository object IDs, not SHA-256 content digests; adapter computes SHA-256 from exact file bytes."
+  },
+  "bitemporal_event_ledger": {
+    "append_only": true,
+    "transaction_time_field": "recorded_at_us",
+    "valid_time_field": "event_time_us",
+    "operations": [
+      "assert",
+      "supersede",
+      "retract"
+    ],
+    "query_coordinates": [
+      "valid_at_us",
+      "known_at_us"
+    ],
+    "source_identity_preserved": [
+      "entity_id",
+      "modality_id",
+      "source_id",
+      "source_sequence"
+    ],
+    "atomic_batches": true,
+    "deterministic_state_sha256": true,
+    "validity_semantics": "point event_time_us <= valid_at_us",
+    "durable_persistence_implemented": false,
+    "indexes": [
+      "revision_id",
+      "event_id_to_revision_chain",
+      "latest_revision_by_event",
+      "active_source_sequence",
+      "entity_to_event"
+    ],
+    "single_append_clones_full_log": false,
+    "batch_atomicity": "one clone per transaction batch; commit after all revisions validate",
+    "as_known_query": "binary search transaction-time-ordered per-event revision chain",
+    "consistency_audit": "rebuild indexes from append-only log and compare",
+    "test_functions_authored": 12
+  },
+  "source_watermark_contract": {
+    "module": "research/irregular-event-contract/src/watermarks.rs",
+    "source_progress_fields": [
+      "entity_id",
+      "modality_id",
+      "source_id",
+      "stream_generation",
+      "progress_sequence",
+      "exclusive_event_time_us",
+      "recorded_at_us",
+      "policy_sha256"
+    ],
+    "operations": [
+      "advance",
+      "end_of_stream"
+    ],
+    "inferred_from_max_seen_event_time": false,
+    "completeness_query_coordinates": [
+      "entity_id",
+      "required_sources",
+      "interval_start_us",
+      "interval_end_exclusive_us",
+      "known_at_us"
+    ],
+    "verdicts": [
+      "complete",
+      "incomplete",
+      "contested"
+    ],
+    "required_source_rule": "every required source watermark >= exclusive interval end or explicit end-of-stream",
+    "late_event_rule": "event_time_us < already visible exclusive watermark is a breach; equality is on-time",
+    "preserves_historical_as_known_answers": true,
+    "records_all_event_arrival_classifications_idempotently": true,
+    "caller_must_append_authoritative_event_to_bitemporal_ledger": true,
+    "durable_persistence_implemented": false,
+    "source_authentication_implemented": false,
+    "test_functions_authored": 17,
+    "global_knowledge_time_order": "strictly increasing across progress and event-arrival transactions",
+    "same_timestamp_event_arrivals": "atomic batch",
+    "progress_cannot_be_backdated_behind_arrival": true,
+    "policy_digest_pinned_within_generation": true,
+    "policy_change_requires_new_generation": true
+  }
+}

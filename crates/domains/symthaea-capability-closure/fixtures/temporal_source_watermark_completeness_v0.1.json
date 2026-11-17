@@ -1,0 +1,428 @@
+{
+  "schema": "symthaea.temporal_source_watermark_completeness.v0.1",
+  "tracking_issue": 9768,
+  "implementation": "research/irregular-event-contract/src/watermarks.rs",
+  "event_ledger": "research/irregular-event-contract/src/lib.rs::BitemporalEventLedger",
+  "time_unit": "microseconds",
+  "interval_convention": "half_open_[start,end)",
+  "watermark_convention": "exclusive_event_time_lower_bound_for_future_on_time_arrivals",
+  "required_source_identity": [
+    "entity_id",
+    "modality_id",
+    "source_id"
+  ],
+  "progress_record": {
+    "identity": [
+      "progress_id",
+      "source",
+      "stream_generation",
+      "progress_sequence"
+    ],
+    "transaction_time": "recorded_at_us",
+    "policy_binding": "nonzero_policy_sha256",
+    "policy_digest_may_change_within_generation": false,
+    "policy_change_requires": "next_stream_generation",
+    "generation_change_must_not_decrease_watermark": true,
+    "end_of_stream_is_terminal": true
+  },
+  "query": {
+    "coordinates": [
+      "entity_id",
+      "required_sources",
+      "interval_start_us",
+      "interval_end_exclusive_us",
+      "known_at_us"
+    ],
+    "complete_when": "all_required_sources_watermark_at_least_interval_end_or_terminal",
+    "no_progress": "incomplete",
+    "late_breach": "contested",
+    "historical_query": "progress_and_late_arrival_only_visible_at_or_before_known_at",
+    "completeness_report_binds_progress_evidence": [
+      "progress_id",
+      "stream_generation",
+      "progress_sequence",
+      "recorded_at_us",
+      "policy_sha256",
+      "exclusive_watermark_us"
+    ],
+    "hot_path": "source_progress_chain_plus_source_event_time_late_breach_index",
+    "audit_path": "completeness_verified_rebuilds_and_checks_full_append_only_history",
+    "breach_index_key": [
+      "source_identity",
+      "event_time_us",
+      "nested_recorded_at_us"
+    ],
+    "known_at_behavior": "each_event_time_bucket_range_is_cut_off_at_known_at",
+    "audit_result_type": "VerifiedCompletenessReport",
+    "audit_result_semantics": "private_fields_bind_full_history_replay_to_ledger_sha256_and_record_counts; not physical_source_authentication"
+  },
+  "arrival": {
+    "event_time_less_than_prior_watermark": "late_breach",
+    "event_time_equal_to_watermark": "on_time",
+    "after_end_of_stream": "late_breach",
+    "all_arrival_classifications_recorded": true,
+    "duplicate_event_arrival": "reject",
+    "global_transaction_clock": "strictly_increasing_across_progress_and_arrival_transactions",
+    "multiple_same_time_arrivals": "atomic_batch",
+    "raw_event_persistence": "bitemporal_event_ledger_owns_authoritative_event",
+    "no_prior_progress": "unqualified_not_on_time",
+    "late_breach_receipt_binds_progress_evidence": [
+      "progress_id",
+      "stream_generation",
+      "progress_sequence",
+      "recorded_at_us",
+      "policy_sha256",
+      "exclusive_watermark_us"
+    ]
+  },
+  "adversarial_scenarios": [
+    {
+      "id": "WM-001",
+      "name": "no_progress",
+      "expect": "incomplete",
+      "safety": "absence_must_not_be_inferred"
+    },
+    {
+      "id": "WM-002",
+      "name": "multi_source_minimum_watermark",
+      "expect": "incomplete_until_slowest_required_source_advances",
+      "safety": "all_required_modalities_must_close"
+    },
+    {
+      "id": "WM-003",
+      "name": "exclusive_end_boundary",
+      "expect": "complete_when_watermark_equals_interval_end",
+      "safety": "half_open_interval_boundary"
+    },
+    {
+      "id": "WM-004",
+      "name": "later_progress_as_known",
+      "expect": "earlier_known_at_remains_incomplete",
+      "safety": "no_future_progress_leakage"
+    },
+    {
+      "id": "WM-005",
+      "name": "late_event_below_watermark",
+      "expect": "contested_after_receipt",
+      "safety": "late_event_not_dropped"
+    },
+    {
+      "id": "WM-006",
+      "name": "event_exactly_at_watermark",
+      "expect": "on_time",
+      "safety": "exclusive_boundary_not_inclusive"
+    },
+    {
+      "id": "WM-007",
+      "name": "terminal_source",
+      "expect": "complete_for_future_intervals",
+      "safety": "end_of_stream_is_explicit"
+    },
+    {
+      "id": "WM-008",
+      "name": "watermark_regression",
+      "expect": "reject_without_mutation",
+      "safety": "monotonic_progress"
+    },
+    {
+      "id": "WM-009",
+      "name": "generation_change_policy_binding",
+      "expect": "new_generation_required_for_policy_change_and_watermark_must_not_regress",
+      "safety": "policy_semantics_are_versioned"
+    },
+    {
+      "id": "WM-010",
+      "name": "progress_backdated_after_arrival",
+      "expect": "reject_without_mutation",
+      "safety": "global_knowledge_time_order"
+    },
+    {
+      "id": "WM-011",
+      "name": "on_time_arrival_replayed_after_watermark",
+      "expect": "duplicate_arrival_rejected_not_reclassified_late",
+      "safety": "arrival_idempotency"
+    },
+    {
+      "id": "WM-012",
+      "name": "same_time_multi_event_arrival",
+      "expect": "atomic_batch",
+      "safety": "timestamp_ties_have_one_transaction"
+    },
+    {
+      "id": "WM-013",
+      "name": "failed_multi_source_progress_batch",
+      "expect": "no_source_position_changes",
+      "safety": "atomic_progress"
+    },
+    {
+      "id": "WM-014",
+      "name": "history_rebuild_and_digest",
+      "expect": "exact_index_and_receipt_parity",
+      "safety": "append_only_replay"
+    },
+    {
+      "id": "WM-015",
+      "name": "arrival_without_prior_progress",
+      "expect": "unqualified_no_prior_progress_not_on_time",
+      "safety": "lack_of_watermark_cannot_certify_timeliness"
+    },
+    {
+      "id": "WM-016",
+      "name": "progress_and_breach_evidence_binding",
+      "expect": "exact_progress_revision_and_policy_digest_returned",
+      "safety": "completeness_and_late_receipts_are_auditable"
+    },
+    {
+      "id": "WM-017",
+      "name": "indexed_query_matches_full_history_audit",
+      "expect": "exact_completeness_report_parity",
+      "safety": "fast_path_does_not_weaken_integrity"
+    },
+    {
+      "id": "WM-018",
+      "name": "late_breach_index_source_and_interval_filter",
+      "expect": "unrelated_source_and_out_of_interval_breaches_do_not_contest",
+      "safety": "no_cross_source_or_boundary_contamination"
+    },
+    {
+      "id": "WM-019",
+      "name": "seeded_multi_source_indexed_vs_audited_differential",
+      "expect": "identical_reports_for_180_source_interval_and_knowledge_time_queries",
+      "safety": "secondary_index_matches_full_history_oracle_under_mixed_source_arrivals"
+    },
+    {
+      "id": "WM-020",
+      "name": "indexed_vs_verified_query_scaling",
+      "expect": "known_answer_and_exact_report_parity_at_1k_10k_100k_arrivals",
+      "safety": "query_latency_gain_never_substitutes_for_full_replay_audit"
+    },
+    {
+      "id": "WM-021",
+      "name": "historical_query_prunes_future_breach_receipts",
+      "expect": "zero_one_and_three_visible_candidates_at_successive_knowledge_cutoffs",
+      "safety": "index_range_lookup_does_not_visit_future_known_evidence"
+    },
+    {
+      "id": "WM-022",
+      "name": "same-calibration-exclusive-equality",
+      "expect": "event_equal_to_watermark_is_definitely_not_late",
+      "safety": "preserve_strict_exclusive_boundary"
+    },
+    {
+      "id": "WM-023",
+      "name": "cross-calibration-overlap-is-ambiguous",
+      "expect": "no_forced_on_time_or_late_order",
+      "safety": "uncertainty_never_collapsed_to_midpoint"
+    },
+    {
+      "id": "WM-024",
+      "name": "mapped-event-watermark-reference-domain-mismatch",
+      "expect": "reject",
+      "safety": "no_cross-clock-comparison_without_common_reference"
+    },
+    {
+      "id": "WM-025",
+      "name": "indexed_breach_result_matches_independent_linear_scan",
+      "expect": "exact_ordered_breach_receipt_equality_before_timing",
+      "safety": "index_speed_claim_is_tied_to_independent_scan_oracle"
+    },
+    {
+      "id": "WM-026",
+      "name": "full_completeness_query_linear_reference_parity",
+      "expect": "indexed_and_linear_complete_query_semantic_reports_equal",
+      "safety": "performance_comparison_changes_only_late_breach_selection_strategy"
+    },
+    {
+      "id": "WM-027",
+      "name": "failed_multi_event_arrival_batch_rolls_back_after_preflight",
+      "expect": "invalid_batch_leaves_arrival_and_breach_indexes_transaction_time_and_state_digest_unchanged",
+      "safety": "full_batch_validation_precedes_direct_append_without_full_history_clone"
+    }
+  ],
+  "metrics": {
+    "primary": [
+      "false_complete_rate"
+    ],
+    "safety": [
+      "late_arrival_breach_recall",
+      "historical_as_known_mutation_count"
+    ],
+    "availability": [
+      "false_incomplete_rate",
+      "completeness_lag_us"
+    ],
+    "diagnostic": [
+      "per_source_watermark_skew_us",
+      "required_source_blocked_fraction",
+      "late_arrival_detection_latency_us",
+      "unknown_until_complete_fraction",
+      "completeness_query_latency_p50_us",
+      "completeness_query_latency_p95_us",
+      "completeness_query_latency_p99_us",
+      "late_breach_index_candidates_visited",
+      "full_history_audit_rebuild_latency_us",
+      "indexed_vs_audited_report_mismatch_count",
+      "indexed_query_p50_p95_p99_us",
+      "verified_query_p50_p95_p99_us",
+      "future_known_breach_candidates_pruned",
+      "late_breach_index_buckets_examined",
+      "verified_report_ledger_digest_mismatch_count",
+      "verified_report_record_count_mismatch_count",
+      "verified_report_ledger_digest_mismatch_count",
+      "verified_report_record_count_mismatch_count",
+      "linear_scan_breach_query_p50_p95_p99_us",
+      "linear_scan_receipt_count",
+      "indexed_vs_linear_scan_breach_mismatch_count",
+      "indexed_vs_linear_scan_speedup",
+      "event_arrival_batch_ingest_total_us",
+      "event_arrival_batch_ingest_ns_per_event",
+      "direct_event_arrival_ingest_total_us",
+      "direct_event_arrival_ingest_ns_per_event",
+      "clone_reference_event_arrival_ingest_total_us",
+      "clone_reference_event_arrival_ingest_ns_per_event",
+      "clone_to_direct_event_arrival_ingest_speedup",
+      "direct_vs_clone_final_ledger_digest_mismatch_count"
+    ]
+  },
+  "qualification_targets": {
+    "deterministic_false_complete_count": 0,
+    "injected_late_event_detection_recall": 1,
+    "historical_as_known_mutation_count": 0,
+    "append_rebuild_digest_mismatch_count": 0,
+    "always_incomplete_policy_accepted": false
+  },
+  "validation_status": {
+    "unit_tests_executed": false,
+    "external_stream_replay_executed": false,
+    "durable_persistence_executed": false,
+    "source_authentication_executed": false,
+    "benchmark_results_available": false,
+    "targets_are_results": false,
+    "watermark_test_functions_authored": 27,
+    "crate_test_functions_authored": 100,
+    "benchmark_protocol_authored": true,
+    "clock_calibration_test_functions_authored": 17,
+    "clock_calibration_tests_executed": false
+  },
+  "benchmark_protocol": {
+    "executable": "research/irregular-event-contract/src/bin/watermark_scaling.rs",
+    "event_counts": [
+      4096,
+      16384,
+      65536
+    ],
+    "indexed_query_repetitions": 51,
+    "verified_query_repetitions": 15,
+    "event_time_order": "deterministic_permutation_relative_to_arrival_order",
+    "outputs": [
+      "late_rate_basis_points",
+      "source_count",
+      "interval_width_us",
+      "known_at_us",
+      "indexed_event_time_buckets_visited",
+      "indexed_receipt_candidates_examined",
+      "linear_scan_receipts_examined",
+      "matching_breaches",
+      "linear_scan_p50_p95_p99_us",
+      "indexed_p50_p95_p99_us",
+      "verified_p50_us",
+      "verified_max_us",
+      "verified_ledger_sha256",
+      "verified_progress_revision_count",
+      "verified_event_arrival_count",
+      "verified_late_breach_count",
+      "event_arrival_batch_ingest_total_us",
+      "event_arrival_batch_ingest_ns_per_event",
+      "direct_event_arrival_ingest_total_us",
+      "direct_event_arrival_ingest_ns_per_event",
+      "clone_reference_event_arrival_ingest_total_us",
+      "clone_reference_event_arrival_ingest_ns_per_event",
+      "clone_to_direct_event_arrival_ingest_speedup"
+    ],
+    "known_answer": "indexed_semantic_report_equals_linear_scan_reference_semantic_report_equals_verified_receipt.report; verified_receipt.ledger_sha256_equals_current_ledger_state_sha256; direct_append_final_ledger_sha256_equals_clone_per_batch_reference_final_ledger_sha256",
+    "correctness_gate": "semantic_report_equality_for_all_three_complete_query_paths_and_consistent_instrumentation_counters_and_current_ledger_digest_match_before_timing",
+    "measurement_boundary": "in_memory_release_build_cpu_query_and_replay_time_only; event-arrival ingestion separately times four atomic batch commits and excludes event generation and initial progress setup",
+    "energy_measurement": "not_measured",
+    "source_counts": [
+      1,
+      4,
+      16
+    ],
+    "interval_widths_us": [
+      1,
+      16,
+      256
+    ],
+    "knowledge_cutoffs_us": [
+      3000000,
+      5000000
+    ],
+    "workload_combinations": 216,
+    "source_progress_recorded_at_us": 1000000,
+    "arrival_transaction_times_us": [
+      2000000,
+      3000000,
+      4000000,
+      5000000
+    ],
+    "availability_time": "equal_to_each_event_arrival_transaction_and_after_generated_event_time",
+    "event_time": "zero_based_per_source_permuted_microsecond_values_below_declared_watermark",
+    "statistical_note": "51 indexed complete-query samples and 31 linear-reference complete-query samples report nearest-rank p50/p95/p99; 15 full replay samples report median and observed maximum",
+    "late_rate_basis_points": [
+      0,
+      100,
+      5000,
+      10000
+    ],
+    "scan_query_repetitions": 31,
+    "ingestion_atomicity": "the entire batch is preflighted before mutation; after preflight the direct append path has no typed Result error branch; invalid members preserve ledger state SHA-256 and all counts",
+    "ingestion_comparison": {
+      "direct_path": "preflight_full_batch_then_append_without_full_ledger_clone",
+      "reference_path": "clone_complete_current_ledger_for_each_event_batch_then_append_and_commit",
+      "initial_state": "identical_progress_only_snapshot",
+      "inputs": "identical_four_prebuilt_event_batches_and_transaction_timestamps",
+      "timing_boundary": "exclude_event_generation_and_initial_source_progress_setup; report one total sample per path",
+      "acceptance": "final ledger SHA-256 digests must match before reporting time or speedup"
+    }
+  },
+  "clock_calibration_contract": {
+    "module": "research/irregular-event-contract/src/clock.rs",
+    "authored_test_functions": 14,
+    "mapping": "affine_reference_coordinate_with_bounded_anchor_offset_and_max_absolute_drift_ppb",
+    "drift_rounding": "outward_ceiling",
+    "completeness_bound": "earliest_possible_mapped_exclusive_watermark",
+    "aggregation": "minimum_earliest_bound_only_after_same_reference_domain_check",
+    "knowledge_time": "calibration_recorded_at_must_be_no_later_than_decision_cutoff",
+    "failure_modes": [
+      "future_calibration",
+      "expired_source_time_range",
+      "wrong_source_domain",
+      "mixed_reference_domains",
+      "invalid_parameters",
+      "arithmetic_overflow"
+    ],
+    "result_types_non_forgeable": true,
+    "ledger_integration": "not_yet_automatic; v0.1 SourceWatermarkLedger expects timestamps in one common reference coordinate",
+    "authentication": "policy_sha256_only; no calibration-authority signature verification or key revocation",
+    "ledger": "ClockCalibrationLedger",
+    "revision_selection": "latest_revision_visible_at_known_at_that_covers_source_time",
+    "transaction_semantics": "monotonic_knowledge_time; same-time atomic batches; unique calibration IDs",
+    "replay_audit": "rebuild_domain_pair_index_and_state_sha256",
+    "event_watermark_ordering": {
+      "operation": "compare_event_time_to_exclusive_watermark",
+      "result_type": "EventWatermarkComparisonV1",
+      "ordering_values": [
+        "definitely_late",
+        "definitely_not_late",
+        "ambiguous"
+      ],
+      "definitely_late_when": "event_latest_reference_us < watermark_earliest_reference_bound_us",
+      "definitely_not_late_when": "event_earliest_reference_us >= watermark_latest_reference_bound_us",
+      "same_source_same_calibration": "compare source-local coordinates directly to preserve strict exclusive-boundary equality",
+      "different_calibrations_or_sources": "overlapping mapped intervals return ambiguous",
+      "reference_domain_mismatch": "reject",
+      "calibration_provenance": "both calibration IDs and SHA-256 digests preserved in comparison result",
+      "automatic_source_watermark_ledger_integration": false
+    }
+  }
+}

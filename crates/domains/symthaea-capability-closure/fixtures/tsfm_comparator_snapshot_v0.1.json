@@ -1,0 +1,668 @@
+{
+  "schema": "symthaea.tsfm_comparator_snapshot.v0.1",
+  "tracking_issue": 9700,
+  "retrieved_at": "2026-11-17",
+  "purpose": "Pin time-series foundation-model comparator claims by benchmark, metric, source surface and source date; these are reproduction targets, not Symthaea results.",
+  "rules": [
+    "Never merge win rate, MASE skill, CRPS, average rank or BOOM telemetry CRPS into one universal score.",
+    "Keep source URL, retrieval date, benchmark data date, model/checkpoint revision, split and aggregation implementation with every observation.",
+    "Different public surfaces may disagree; preserve both observations and resolve only by rerunning the underlying official evaluation.",
+    "Distinguish vendor-reported results, public leaderboard snapshots, mirrored leaderboard views and independent published studies.",
+    "A model lead does not establish a lead on irregular asynchronous, missingness-aware or availability-time-qualified tasks."
+  ],
+  "models": [
+    {
+      "id": "timeh2o_v1",
+      "vendor": "H2O.ai",
+      "parameters_millions": 108.8,
+      "claimed_capabilities": [
+        "zero_shot_probabilistic_forecasting",
+        "covariates",
+        "context_up_to_16384"
+      ],
+      "licence": "non-commercial model-card licence; validate current terms before any production or commercial use",
+      "model_card_url": "https://huggingface.co/h2oai/timeh2o-v1",
+      "evidence": [
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "win_rate",
+          "value": 0.915,
+          "unit": "fraction",
+          "source": "https://h2oai.github.io/benchmarks/",
+          "retrieved_at": "2026-11-16",
+          "source_type": "vendor_live_leaderboard",
+          "qualification": "Current H2O site snapshot; its score differs from the repository README snapshot."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "MASE_skill_score",
+          "value": 39.95,
+          "unit": "score",
+          "source": "https://tsfm.ai/benchmarks/fev-bench",
+          "retrieved_at": "2026-11-16",
+          "source_type": "third_party_mirrored_leaderboard",
+          "qualification": "MASE skill ranking, not win rate."
+        },
+        {
+          "benchmark": "GIFT-Eval",
+          "metric": "CRPS",
+          "value": 0.441,
+          "unit": "score_lower_is_better",
+          "source": "https://huggingface.co/h2oai/timeh2o-v1",
+          "retrieved_at": "2026-11-16",
+          "source_type": "vendor_model_card",
+          "qualification": "Vendor-reported metric; reproduce under official harness."
+        },
+        {
+          "benchmark": "GIFT-Eval",
+          "metric": "MASE",
+          "value": 0.654,
+          "unit": "score_lower_is_better",
+          "source": "https://huggingface.co/h2oai/timeh2o-v1",
+          "retrieved_at": "2026-11-16",
+          "source_type": "vendor_model_card",
+          "qualification": "Vendor-reported metric; reproduce under official harness."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "win_rate",
+          "value": 0.896,
+          "unit": "fraction",
+          "source": "https://github.com/h2oai/benchmarks",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "2026-11-13",
+          "source_type": "public_repository_benchmark_snapshot",
+          "qualification": "The repository's November 13 snapshot reports 89.60%; kept separately from the current live site value."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "win_rate",
+          "value": 0.919,
+          "unit": "fraction",
+          "source": "https://h2oai.com/company/press-media/2026/timeh2o-v1-ranks-first-on-fev-bench",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "2026-10-24",
+          "source_type": "vendor_press_release",
+          "qualification": "The October 26 release says the benchmark data was read October 24 and reported 91.9%; this is a dated launch snapshot, not the current live score."
+        }
+      ]
+    },
+    {
+      "id": "simons_297m",
+      "vendor": "Abel AI Lab",
+      "parameters_millions": 297,
+      "family_sizes_millions": [
+        25,
+        60,
+        178,
+        297
+      ],
+      "claimed_capabilities": [
+        "zero_shot_probabilistic_forecasting",
+        "nine_quantiles",
+        "known_future_covariates",
+        "open_weights",
+        "open_training_code",
+        "public_training_data",
+        "synthetic_data_generator"
+      ],
+      "licence": {
+        "weights": "OpenMDW-1.1",
+        "inference_and_training_code": "Apache-2.0",
+        "training_data": "OpenMDW-1.1 collection licence; individual datasets retain their own licences"
+      },
+      "release_url": "https://abel.ai/research/introducing-simons/",
+      "release_date": "2026-11-11",
+      "evidence": [
+        {
+          "benchmark": "GIFT-Eval",
+          "metric": "MASE_rank",
+          "value": 4,
+          "unit": "rank_of_101",
+          "source": "https://abel.ai/research/introducing-simons/",
+          "retrieved_at": "2026-11-17",
+          "source_type": "vendor_release_leaderboard_snapshot",
+          "qualification": "Vendor reports fourth among listed open-weight models; TimesFM-3 remains slightly ahead on aggregate MASE even though Simons ranks ahead by mean task rank."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "rank",
+          "value": 4,
+          "unit": "rank_of_34",
+          "source": "https://abel.ai/research/introducing-simons/",
+          "retrieved_at": "2026-11-17",
+          "source_type": "vendor_release_leaderboard_snapshot",
+          "qualification": "Rank only; do not infer a raw win rate from this rank."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "win_rate",
+          "value": 0.82,
+          "unit": "fraction",
+          "source": "https://github.com/h2oai/benchmarks",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "2026-11-13",
+          "source_type": "public_repository_benchmark_snapshot",
+          "qualification": "H2O curated snapshot lists Simons-297M at 82.0%; keep separate from Abel's rank table and from other dated leaderboard surfaces."
+        },
+        {
+          "benchmark": "TIME",
+          "metric": "MASE_rank",
+          "value": 4,
+          "unit": "rank_of_38",
+          "source": "https://abel.ai/research/introducing-simons/",
+          "retrieved_at": "2026-11-17",
+          "source_type": "vendor_release_leaderboard_snapshot",
+          "qualification": "Vendor release table; reproduce exact official TIME protocol and checkpoint."
+        },
+        {
+          "benchmark": "M6",
+          "metric": "RPS_rank",
+          "value": 1,
+          "unit": "rank_of_168",
+          "source": "https://abel.ai/research/introducing-simons/",
+          "retrieved_at": "2026-11-17",
+          "source_type": "vendor_release_leaderboard_snapshot",
+          "qualification": "Vendor reports first place on the M6 benchmark, which they state does not overlap training data; independently verify the benchmark's data exposure and evaluation setup."
+        },
+        {
+          "benchmark": "GIFT-Eval",
+          "metric": "benchmark_runtime",
+          "value": 15,
+          "unit": "minutes_upper_bound_on_one_A100",
+          "source": "https://abel.ai/research/introducing-simons/",
+          "retrieved_at": "2026-11-17",
+          "source_type": "vendor_release_runtime_claim",
+          "qualification": "Vendor reports full GIFT-Eval under 15 minutes on one A100 and roughly 20x faster than leading similarly sized models; pin their run settings and hardware before comparison."
+        }
+      ]
+    },
+    {
+      "id": "timestral_209m",
+      "vendor": "Mistral",
+      "parameters_millions": 209,
+      "claimed_capabilities": [
+        "probabilistic_forecasting",
+        "multivariate",
+        "past_covariates",
+        "known_future_covariates",
+        "cpu_inference"
+      ],
+      "release_url": "https://mistral.ai/news/timestral/",
+      "release_date": "2026-10-15",
+      "evidence": [
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "win_rate",
+          "value": 0.89,
+          "unit": "fraction",
+          "source": "https://h2oai.github.io/benchmarks/",
+          "retrieved_at": "2026-11-16",
+          "source_type": "vendor_live_leaderboard",
+          "qualification": "H2O site snapshot; separate repository snapshot lists 87.10%."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "MASE_skill_score",
+          "value": 39.49,
+          "unit": "score",
+          "source": "https://tsfm.ai/benchmarks/fev-bench",
+          "retrieved_at": "2026-11-16",
+          "source_type": "third_party_mirrored_leaderboard",
+          "qualification": "Not interchangeable with win rate."
+        },
+        {
+          "benchmark": "GIFT-Eval/TIME/FEV-Bench",
+          "metric": "leadership_claim",
+          "value": "Mistral reports first place on all three",
+          "source": "https://mistral.ai/news/timestral/",
+          "retrieved_at": "2026-11-16",
+          "source_type": "vendor_release",
+          "qualification": "Vendor claim; preserve release date and reproduce."
+        },
+        {
+          "benchmark": "GIFT-Eval",
+          "metric": "average_MASE_rank",
+          "value": 32.52,
+          "unit": "average_rank_lower_is_better",
+          "source": "https://tsfm.ai/benchmarks/gift-eval",
+          "retrieved_at": "2026-11-17",
+          "source_type": "third_party_mirrored_leaderboard",
+          "qualification": "Grouped-slice average rank; not comparable to FEV-Bench win rate or model-card aggregate MASE."
+        }
+      ]
+    },
+    {
+      "id": "ci_proto",
+      "vendor": "Continuous Intelligence",
+      "evidence": [
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "win_rate",
+          "value": 0.9,
+          "unit": "fraction",
+          "source": "https://github.com/h2oai/benchmarks",
+          "retrieved_at": "2026-11-16",
+          "source_type": "public_repository_benchmark_snapshot",
+          "qualification": "Repository README detailed top-ten table; conflicts with H2O site summary."
+        },
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "MASE_skill_score",
+          "value": 40.8,
+          "unit": "score",
+          "source": "https://tsfm.ai/benchmarks/fev-bench",
+          "retrieved_at": "2026-11-16",
+          "source_type": "third_party_mirrored_leaderboard",
+          "qualification": "Different aggregation from win rate."
+        }
+      ]
+    },
+    {
+      "id": "time_rsi_1_5",
+      "vendor": "Research model / listing as displayed by TSFM.ai",
+      "evidence": [
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "MASE_skill_score",
+          "value": 41.44,
+          "unit": "score",
+          "source": "https://tsfm.ai/benchmarks/fev-bench",
+          "retrieved_at": "2026-11-16",
+          "source_type": "third_party_mirrored_leaderboard",
+          "qualification": "Snapshot data loaded 2026-11-15; validate model identity, checkpoint and upstream official evaluation before reproduction."
+        }
+      ]
+    },
+    {
+      "id": "toto_2_0_2_5b",
+      "vendor": "Datadog",
+      "parameters_millions": 2500,
+      "evidence": [
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "MASE_skill_score",
+          "value": 35.5,
+          "unit": "score",
+          "source": "https://tsfm.ai/benchmarks/fev-bench",
+          "retrieved_at": "2026-11-16",
+          "source_type": "third_party_mirrored_leaderboard",
+          "qualification": "General zero-shot forecasting metric."
+        },
+        {
+          "benchmark": "BOOM",
+          "metric": "CRPS",
+          "value": 0.35,
+          "unit": "score_lower_is_better",
+          "source": "https://tsfm.ai/benchmarks",
+          "retrieved_at": "2026-11-16",
+          "source_type": "third_party_mirrored_leaderboard",
+          "qualification": "Infrastructure observability telemetry task; do not generalize to all irregular forecasting."
+        }
+      ]
+    },
+    {
+      "id": "chronos_bolt",
+      "vendor": "AWS",
+      "evidence": [
+        {
+          "benchmark": "PMLR time-series energy study",
+          "metric": "efficiency_observation",
+          "value": "among consistently low-energy and low-latency models",
+          "source": "https://proceedings.mlr.press/v309/guibert26a",
+          "retrieved_at": "2026-11-16",
+          "source_type": "independent_published_study",
+          "qualification": "Study-specific datasets, context 512 and horizon 64; not a universal hardware-independent rank."
+        }
+      ]
+    },
+    {
+      "id": "timesfm_3",
+      "vendor": "Google",
+      "evidence": [
+        {
+          "benchmark": "FEV-Bench",
+          "metric": "win_rate",
+          "value": 0.82,
+          "unit": "fraction",
+          "source": "https://h2oai.github.io/benchmarks/",
+          "retrieved_at": "2026-11-16",
+          "source_type": "vendor_live_leaderboard",
+          "qualification": "H2O site snapshot; repository detailed table lists 79.30%."
+        }
+      ]
+    },
+    {
+      "id": "taichu_timeseries_agent_v2",
+      "vendor": "Zidong Taichu / listing as shown by TSFM.ai",
+      "evidence": [
+        {
+          "benchmark": "GIFT-Eval",
+          "metric": "average_MASE_rank",
+          "value": 18.02,
+          "unit": "average_rank_lower_is_better",
+          "source": "https://tsfm.ai/benchmarks/gift-eval",
+          "retrieved_at": "2026-11-17",
+          "source_type": "third_party_mirrored_leaderboard",
+          "qualification": "Top grouped-slice average MASE rank in the current 170-model mirror; this does not establish FEV-Bench win-rate leadership."
+        }
+      ]
+    }
+  ],
+  "source_discrepancies": [
+    {
+      "id": "FEV-2026-11-16-H2O-SITE-VS-REPO",
+      "benchmark": "FEV-Bench",
+      "metric": "win_rate",
+      "source_a": {
+        "url": "https://h2oai.github.io/benchmarks/",
+        "retrieved_at": "2026-11-16",
+        "timeh2o_v1": 0.915,
+        "timestral_209m": 0.89,
+        "t0_gamma": 0.874,
+        "timesfm_3": 0.82
+      },
+      "source_b": {
+        "url": "https://github.com/h2oai/benchmarks",
+        "retrieved_at": "2026-11-16",
+        "data_date": "2026-11-13",
+        "ci_proto": 0.9,
+        "timeh2o_v1": 0.896,
+        "timestral_209m": 0.871,
+        "t0_gamma": 0.847,
+        "timesfm_3": 0.793
+      },
+      "handling": "retain both surfaces; do not select a preferred score. Pin exact FEV-Bench tasks, model revisions, win estimator and data snapshot before adjudicating."
+    },
+    {
+      "id": "FEV-2026-11-17-H2O-LIVE-REPO-LAUNCH",
+      "benchmark": "FEV-Bench",
+      "metric": "win_rate",
+      "observations": [
+        {
+          "source": "https://h2oai.github.io/benchmarks/",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "live_page_no_explicit_snapshot_date",
+          "timeh2o_v1": 0.915
+        },
+        {
+          "source": "https://github.com/h2oai/benchmarks",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "2026-11-13",
+          "timeh2o_v1": 0.896
+        },
+        {
+          "source": "https://h2oai.com/company/press-media/2026/timeh2o-v1-ranks-first-on-fev-bench",
+          "retrieved_at": "2026-11-17",
+          "benchmark_data_date": "2026-10-24",
+          "timeh2o_v1": 0.919
+        }
+      ],
+      "handling": "preserve all three dated source observations; do not average or choose one. Resolve only with a pinned official FEV-Bench run, model/checkpoint, task set and win-rate estimator."
+    }
+  ],
+  "benchmark_lanes": [
+    {
+      "id": "general_zero_shot",
+      "benchmarks": [
+        "FEV-Bench",
+        "GIFT-Eval",
+        "TIME"
+      ],
+      "primary_metrics": [
+        "official_task_metrics",
+        "probabilistic_calibration",
+        "slice_metrics"
+      ]
+    },
+    {
+      "id": "irregular_native",
+      "benchmarks": [
+        "BITS",
+        "Time-IMM"
+      ],
+      "primary_metrics": [
+        "accuracy_by_irregularity_cause",
+        "missingness_robustness",
+        "arrival_causality",
+        "calibration",
+        "abstention_and_recovery"
+      ]
+    },
+    {
+      "id": "observability",
+      "benchmarks": [
+        "BOOM"
+      ],
+      "primary_metrics": [
+        "telemetry_CRPS",
+        "rare_event_detection",
+        "regime_recovery"
+      ]
+    },
+    {
+      "id": "energy_latency",
+      "benchmarks": [
+        "PMLR TSFM energy study",
+        "matched local system runs"
+      ],
+      "primary_metrics": [
+        "p50_p95_p99_latency",
+        "joules_per_forecast",
+        "peak_memory",
+        "end_to_end_cost"
+      ]
+    }
+  ],
+  "validation_status": {
+    "source_snapshot_recorded": true,
+    "official_models_reproduced": false,
+    "official_dataset_runs": false,
+    "model_weight_hashes_pinned": false,
+    "exact_head_external_results": false,
+    "universal_sota_claim": false
+  },
+  "research_loop_observations": {
+    "source": "https://abel.ai/research/introducing-simons/",
+    "retrieved_at": "2026-11-17",
+    "source_type": "vendor_reported_research_process",
+    "duration_days": 14,
+    "gpu_cost_usd_upper_bound": 8000,
+    "research_directions_over_250": true,
+    "experiments_nearly": 2000,
+    "reported_gain_attribution": {
+      "data_synthetic_data_mixture_and_input_transformations": "about 75 percent of first-campaign gain",
+      "optimizer_and_training_schedule": "about 20 percent of first-campaign gain",
+      "backbone": "reported as a small contribution"
+    },
+    "confirmation_protocol": "select candidate on validation only, then rebuild and retrain fixed code on reserved random seeds; research agents cannot modify evaluation code or access benchmark labels",
+    "qualification": "These are Abel AI Lab's own development claims, not independently audited or reproduced Symthaea results. Research-loop efficiency and model-quality leaderboards are separate measures."
+  },
+  "benchmark_source_snapshots": [
+    {
+      "snapshot_id": "tsfm_fev_views_2026_11_17",
+      "retrieved_at": "2026-11-17",
+      "observations": [
+        {
+          "source": "https://tsfm.ai/benchmarks/fev-bench",
+          "source_type": "live_leaderboard_mase_skill",
+          "metric": "MASE Skill Score",
+          "benchmark": "FEV-Bench",
+          "values": [
+            {
+              "model": "TimeRSI-1.5",
+              "value": 41.44,
+              "rank": 1
+            },
+            {
+              "model": "ci-proto",
+              "value": 40.8,
+              "rank": 2
+            },
+            {
+              "model": "TimeRSI",
+              "value": 40.58,
+              "rank": 3
+            },
+            {
+              "model": "TimeH2O-v1",
+              "value": 39.95,
+              "rank": 4
+            },
+            {
+              "model": "Timestral-209M",
+              "value": 39.49,
+              "rank": 5
+            },
+            {
+              "model": "PDM-Nano",
+              "value": 39.21,
+              "rank": 6
+            },
+            {
+              "model": "Timestral-123M",
+              "value": 39.19,
+              "rank": 7
+            },
+            {
+              "model": "t0-gamma",
+              "value": 37.99,
+              "rank": 8
+            },
+            {
+              "model": "Simons-297M",
+              "value": 37.85,
+              "rank": 9
+            },
+            {
+              "model": "TimesFM-3",
+              "value": 37.82,
+              "rank": 10
+            },
+            {
+              "model": "PDM-Pico",
+              "value": 37.78,
+              "rank": 11
+            },
+            {
+              "model": "Simons-178M",
+              "value": 37.43,
+              "rank": 12
+            }
+          ],
+          "qualification": "Live leaderboard crawl, 52 entries total. Point-accuracy MASE skill, not SQL win rate or GIFT-Eval probabilistic average rank."
+        },
+        {
+          "source": "https://theaggregate.ai/benchmark?slug=fev-bench-sql",
+          "source_type": "live_sql_win_rate_snapshot",
+          "benchmark": "FEV-Bench",
+          "metric": "SQL Win Rate",
+          "snapshot_date": "2026-11-16",
+          "values": [
+            {
+              "model": "ci-proto",
+              "value": 90,
+              "unit": "percent",
+              "rank": 1
+            },
+            {
+              "model": "TimeH2O-v1",
+              "value": 89.65,
+              "unit": "percent",
+              "rank": 2
+            },
+            {
+              "model": "Timestral-209M",
+              "value": 87.06,
+              "unit": "percent",
+              "rank": 3
+            },
+            {
+              "model": "t0-gamma",
+              "value": 84.68,
+              "unit": "percent",
+              "rank": 4
+            },
+            {
+              "model": "Simons-297M",
+              "value": 81.97,
+              "unit": "percent",
+              "rank": 5
+            },
+            {
+              "model": "TimesFM-3",
+              "value": 79.26,
+              "unit": "percent",
+              "rank": 6
+            },
+            {
+              "model": "iAmTime",
+              "value": 73.68,
+              "unit": "percent",
+              "rank": 7
+            },
+            {
+              "model": "Chronos-2",
+              "value": 72.24,
+              "unit": "percent",
+              "rank": 8
+            },
+            {
+              "model": "t0-beta",
+              "value": 69.88,
+              "unit": "percent",
+              "rank": 9
+            },
+            {
+              "model": "Toto-2.0-2.5B",
+              "value": 69.44,
+              "unit": "percent",
+              "rank": 10
+            }
+          ],
+          "qualification": "Daily-refreshed full-suite SQL view. This is win rate under one FEV-Bench metric, not MASE skill."
+        },
+        {
+          "source": "https://h2oai.github.io/benchmarks/",
+          "source_type": "live_vendor_benchmark_dashboard",
+          "benchmark": "FEV-Bench",
+          "metric": "SQL Win Rate",
+          "retrieved_at": "2026-11-17",
+          "values": [
+            {
+              "model": "TimeH2O-v1",
+              "value": 91.5,
+              "unit": "percent"
+            },
+            {
+              "model": "Timestral-209M",
+              "value": 89,
+              "unit": "percent"
+            },
+            {
+              "model": "t0-gamma",
+              "value": 87.4,
+              "unit": "percent"
+            },
+            {
+              "model": "TimesFM-3",
+              "value": 82,
+              "unit": "percent"
+            },
+            {
+              "model": "Chronos-2",
+              "value": 75.8,
+              "unit": "percent"
+            },
+            {
+              "model": "Toto-2.0-2.5B",
+              "value": 72.2,
+              "unit": "percent"
+            }
+          ],
+          "qualification": "Live H2O dashboard surface retrieved 17 Nov. Its current values conflict with H2O GitHub README data read 13 Nov and the independent Aggregate view. Preserve as a separate un-dated/live observation; do not average or choose the highest."
+        }
+      ]
+    }
+  ]
+}
