@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://luminousdynamics.io/schemas/lightshell-zone-spec-0.1.0.json",
+  "$id": "urn:luminous-dynamics:lightshell-zone-spec:0.1.0",
   "title": "Atelier Lightshell Zone Requirements",
   "description": "A proposed or frozen, robot-specific functional requirement brief for textile garment zones. This is not physical qualification.",
   "type": "object",
