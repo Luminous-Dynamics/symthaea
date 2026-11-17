@@ -29,3 +29,21 @@ The `jsonschema` dependency is pinned and built with default features disabled. 
 ## Claim ceiling
 
 A passing registry audit verifies data shape and selected evidence semantics. It does not verify source truth, reproduce the source calculations, establish phase stability, or qualify a material experimentally or for engineering use.
+
+## Ranking metrics runner
+
+The standalone harness also provides a deterministic top-K ranking calculator.
+
+```bash
+cargo test --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics
+cargo run --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics -- \
+  --predictions path/to/predictions.json \
+  --budgets 10,25,50,100 \
+  --out /tmp/sc-discovery-metrics.json
+```
+
+Prediction input is a JSON array of unique records with candidate_id, score (finite number), and relevant (boolean). Scores are ranking values only; the runner does not interpret them as calibrated probabilities.
+
+The report contains precision@K, recall@K, random-prevalence expectation, enrichment over random, average precision and input SHA-256. Equal-score rows are ordered by candidate ID for deterministic replay. Invalid/duplicate budgets and duplicate candidates fail closed. When no positive labels exist, recall and enrichment are null rather than fabricated.
+
+The workflow runs this binary against a clearly synthetic six-row plumbing fixture; this only validates deterministic metric execution and does not represent material evidence, model quality or scientific discovery. Confidence intervals, calibration, OOD selective risk, cost-normalized comparisons and prospective validation remain separate benchmark work and must not be inferred from these ranking metrics.
