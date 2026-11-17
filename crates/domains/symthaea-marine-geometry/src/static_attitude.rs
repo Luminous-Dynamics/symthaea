@@ -956,8 +956,7 @@ mod tests {
             * request.source_spec.principal_dimensions.length_m
             * request.attitude.pitch_rad.sin();
         let receipt = evaluate_static_attitude(&request).unwrap();
-        let expected_lcb_m =
-            50.0 - (1250.0 / 9.0) * request.attitude.pitch_rad.tan();
+        let expected_lcb_m = 50.0 - (1250.0 / 9.0) * request.attitude.pitch_rad.tan();
         assert!(
             (receipt.displacement_volume_m3 - 12_000.0).abs() < 1.0e-7,
             "unexpected displaced volume: {:.12}",
