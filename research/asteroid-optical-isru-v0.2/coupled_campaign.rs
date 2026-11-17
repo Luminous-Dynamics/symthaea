@@ -319,7 +319,9 @@ mod tests {
         run_pulse(&mut world, "first", &gas(), 500.0, 7).unwrap();
         assert!(matches!(
             run_pulse(&mut world, "second", &gas(), 500.0, 8),
-            Err(CoupledError::CampaignBlocked(HealthAction::CleanAndRequalify))
+            Err(CoupledError::CampaignBlocked(
+                HealthAction::CleanAndRequalify
+            ))
         ));
     }
 
