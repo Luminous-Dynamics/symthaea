@@ -1,0 +1,567 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:luminous-dynamics:lightshell-coupon-evidence:0.1.0",
+  "title": "Atelier Lightshell Coupon Evidence",
+  "description": "Specimen- and raw-data-bound records for physical coupon tests. Does not qualify a robot-mounted garment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "campaign_id",
+    "state",
+    "doe_manifest_ref",
+    "specimens",
+    "test_runs",
+    "evidence_policy"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "0.1.0"
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": [
+        "proposed",
+        "running",
+        "complete",
+        "invalidated"
+      ]
+    },
+    "doe_manifest_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "specimens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "specimen_id",
+          "candidate_id",
+          "state",
+          "material_lot_ref",
+          "construction_ref",
+          "process_revision_ref",
+          "manufactured_article_ref",
+          "orientation",
+          "width_mm",
+          "length_mm",
+          "thickness_mm",
+          "conditioning",
+          "geometry_qc_state",
+          "geometry_qc_ref"
+        ],
+        "properties": {
+          "specimen_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "candidate_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "state": {
+            "enum": [
+              "proposed",
+              "available",
+              "rejected",
+              "invalidated"
+            ]
+          },
+          "material_lot_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "construction_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "process_revision_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "manufactured_article_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "orientation": {
+            "enum": [
+              "coursewise",
+              "walewise",
+              "face_a",
+              "face_b",
+              "unknown"
+            ]
+          },
+          "width_mm": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "length_mm": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "thickness_mm": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "exclusiveMinimum": 0
+          },
+          "conditioning": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "method_ref",
+              "environment_ref",
+              "temperature_c",
+              "relative_humidity_pct",
+              "duration_hours"
+            ],
+            "properties": {
+              "method_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "environment_ref": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "temperature_c": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "relative_humidity_pct": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0,
+                "maximum": 100
+              },
+              "duration_hours": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "exclusiveMinimum": 0
+              }
+            }
+          },
+          "geometry_qc_state": {
+            "enum": [
+              "unknown",
+              "passed",
+              "failed"
+            ]
+          },
+          "geometry_qc_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "test_runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "run_id",
+          "specimen_id",
+          "family",
+          "status",
+          "protocol_ref",
+          "fixture_ref",
+          "fixture_revision",
+          "environment_ref",
+          "instrument_refs",
+          "calibration_refs",
+          "raw_data_ref",
+          "raw_data_digest",
+          "operator_ref",
+          "reviewer_ref",
+          "acceptance_rule_ref",
+          "acquired_at",
+          "replicate_count",
+          "sample_count",
+          "measurements",
+          "response_curve",
+          "resonance_assessment",
+          "resonance_peaks",
+          "failure_reason",
+          "invalidation_reason"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "specimen_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "family": {
+            "enum": [
+              "compression",
+              "dynamic_impact",
+              "vibration",
+              "airflow",
+              "thermal",
+              "flex_fatigue",
+              "abrasion",
+              "cleaning_retention"
+            ]
+          },
+          "status": {
+            "enum": [
+              "planned",
+              "passed",
+              "failed",
+              "inconclusive",
+              "invalidated"
+            ]
+          },
+          "protocol_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fixture_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fixture_revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "environment_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "instrument_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "calibration_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "raw_data_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "raw_data_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^sha256:[0-9a-fA-F]{64}$"
+          },
+          "operator_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reviewer_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acceptance_rule_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "acquired_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "replicate_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "measurements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "metric_id",
+                "unit",
+                "value",
+                "uncertainty_kind",
+                "uncertainty_value",
+                "coverage_factor",
+                "replicate_count",
+                "sample_count",
+                "measurement_boundary",
+                "method_ref",
+                "uncertainty_model_ref"
+              ],
+              "properties": {
+                "metric_id": {
+                  "enum": [
+                    "compression_energy_j_g",
+                    "compression_stiffness_kpa",
+                    "compression_set_pct",
+                    "compression_hysteresis_fraction",
+                    "transmitted_force_n",
+                    "impulse_ns",
+                    "absorbed_energy_j_g",
+                    "vibration_transmissibility_ratio",
+                    "air_permeability_mm_s",
+                    "temperature_delta_c",
+                    "flex_cycles_to_endpoint",
+                    "abrasion_cycles_to_endpoint",
+                    "post_cleaning_property_retention_pct"
+                  ]
+                },
+                "unit": {
+                  "enum": [
+                    "J/g",
+                    "kPa",
+                    "%",
+                    "ratio",
+                    "N",
+                    "N*s",
+                    "mm/s",
+                    "degC",
+                    "cycles"
+                  ]
+                },
+                "value": {
+                  "type": "number"
+                },
+                "uncertainty_kind": {
+                  "enum": [
+                    "standard",
+                    "expanded"
+                  ]
+                },
+                "uncertainty_value": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "coverage_factor": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 1
+                },
+                "replicate_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "sample_count": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "measurement_boundary": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "method_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "uncertainty_model_ref": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "response_curve": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "kind",
+                  "x_unit",
+                  "y_unit",
+                  "points"
+                ],
+                "properties": {
+                  "kind": {
+                    "enum": [
+                      "stress_strain",
+                      "impact_force_time",
+                      "frequency_response"
+                    ]
+                  },
+                  "x_unit": {
+                    "enum": [
+                      "strain_fraction",
+                      "s",
+                      "Hz"
+                    ]
+                  },
+                  "y_unit": {
+                    "enum": [
+                      "kPa",
+                      "N",
+                      "ratio"
+                    ]
+                  },
+                  "points": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "x",
+                        "y"
+                      ],
+                      "properties": {
+                        "x": {
+                          "type": "number"
+                        },
+                        "y": {
+                          "type": "number",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          "resonance_assessment": {
+            "enum": [
+              "not_assessed",
+              "none_observed",
+              "peaks_reported"
+            ]
+          },
+          "resonance_peaks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "frequency_hz",
+                "transmissibility_ratio"
+              ],
+              "properties": {
+                "frequency_hz": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "transmissibility_ratio": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              }
+            }
+          },
+          "failure_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "invalidation_reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "raw_data_required_for_executed_runs",
+        "calibration_required_for_executed_runs",
+        "uncertainty_required_for_passed_runs",
+        "failed_and_inconclusive_results_retained",
+        "coupon_is_not_robot_qualification",
+        "supplier_claims_are_not_independent_evidence"
+      ],
+      "properties": {
+        "raw_data_required_for_executed_runs": {
+          "const": true
+        },
+        "calibration_required_for_executed_runs": {
+          "const": true
+        },
+        "uncertainty_required_for_passed_runs": {
+          "const": true
+        },
+        "failed_and_inconclusive_results_retained": {
+          "const": true
+        },
+        "coupon_is_not_robot_qualification": {
+          "const": true
+        },
+        "supplier_claims_are_not_independent_evidence": {
+          "const": true
+        }
+      }
+    }
+  }
+}
