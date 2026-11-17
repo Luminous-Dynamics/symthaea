@@ -102,6 +102,23 @@ pub struct StyleTrajectoryM1SegmentV1 {
     pub validation: TheoryValidationReport,
 }
 
+/// Score-domain evidence around an explicit hard boundary. These are
+/// descriptive measurements, not a perceptual quality judgment.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct StyleTrajectoryM1BoundaryEvidenceV1 {
+    pub boundary_beat: Duration,
+    pub left_last_event_end: Duration,
+    /// Onsets are local to the target segment, whose origin is the boundary.
+    pub right_first_event_start: Duration,
+    pub left_tail_gap: Duration,
+    pub right_entry_gap: Duration,
+    /// Event counts in the final/initial four-beat windows.
+    pub left_events_in_window: usize,
+    pub right_events_in_window: usize,
+    /// Must be zero for this hard-boundary implementation.
+    pub cross_boundary_event_count: usize,
+}
+
 /// Result of the first real two-family symbolic trajectory.
 /// The composed Score and plan are digest-bound. Segment-local score/trace
 /// material is retained so each grammar can be inspected independently.
@@ -115,6 +132,7 @@ pub struct StyleTrajectoryM1ResultV1 {
     pub composed_validation: TheoryValidationReport,
     pub segments: Vec<StyleTrajectoryM1SegmentV1>,
     pub transition_at_beat: Duration,
+    pub boundary_evidence: StyleTrajectoryM1BoundaryEvidenceV1,
     pub plan: StyleTrajectoryPlanV1,
     /// True when catalogue metadata says expert review is required.
     /// It is not evidence that the review has happened.
@@ -217,6 +235,7 @@ pub fn realize_classical_to_minimalism_m1(
     composed_score.total_beats = total_beats;
 
     let composed_validation = validate_universal_invariants(Style::Classical, &composed_score)?;
+    let boundary_evidence = measure_hard_boundary(&classical.score, &minimalism.score, minimalism_start)?;
     let composed_score_sha256 = score_sha256(&composed_score)?;
     let classical_id = catalogue_id_for_style(Style::Classical)?;
     let minimalism_id = catalogue_id_for_style(Style::Minimalism)?;
@@ -297,6 +316,7 @@ pub fn realize_classical_to_minimalism_m1(
         composed_validation,
         segments,
         transition_at_beat: minimalism_start,
+        boundary_evidence,
         plan,
         expert_review_required: admission.expert_review_required,
     })
@@ -495,6 +515,80 @@ fn musical_time(beats: f64, tempo_bpm: f32) -> MusicalTime {
     }
 }
 
+fn measure_hard_boundary(
+    left: &Score,
+    right: &Score,
+    boundary: Duration,
+) -> Result<StyleTrajectoryM1BoundaryEvidenceV1, StyleTrajectoryM1Error> {
+    let left_last_event_end = left
+        .notes
+        .iter()
+        .map(|note| note.onset + note.duration)
+        .max_by(|a, b| duration_cmp(*a, *b))
+        .ok_or_else(|| StyleTrajectoryM1Error::UnexpectedGrammarEvidence {
+            style: "Classical".into(),
+            reason: "cannot measure boundary from an empty source segment".into(),
+        })?;
+    let right_first_event_start = right
+        .notes
+        .iter()
+        .map(|note| note.onset)
+        .min_by(|a, b| duration_cmp(*a, *b))
+        .ok_or_else(|| StyleTrajectoryM1Error::UnexpectedGrammarEvidence {
+            style: "Minimalism".into(),
+            reason: "cannot measure boundary from an empty target segment".into(),
+        })?;
+
+    let left_window_start = boundary.saturating_sub(Duration::new(4, 1));
+    let left_events_in_window = left
+        .notes
+        .iter()
+        .filter(|note| {
+            !duration_less_than(note.onset, left_window_start)
+                && duration_less_than(note.onset, boundary)
+        })
+        .count();
+    let right_window_end = Duration::new(4, 1);
+    let right_events_in_window = right
+        .notes
+        .iter()
+        .filter(|note| duration_less_than(note.onset, right_window_end))
+        .count();
+
+    let left_overruns = left
+        .notes
+        .iter()
+        .filter(|note| duration_less_than(boundary, note.onset + note.duration))
+        .count();
+    let right_precedes = right
+        .notes
+        .iter()
+        .filter(|note| duration_less_than(note.onset, Duration::zero()))
+        .count();
+
+    Ok(StyleTrajectoryM1BoundaryEvidenceV1 {
+        boundary_beat: boundary,
+        left_last_event_end,
+        right_first_event_start,
+        left_tail_gap: boundary.saturating_sub(left_last_event_end),
+        right_entry_gap: right_first_event_start,
+        left_events_in_window,
+        right_events_in_window,
+        cross_boundary_event_count: left_overruns + right_precedes,
+    })
+}
+
+fn duration_cmp(left: Duration, right: Duration) -> std::cmp::Ordering {
+    match (
+        duration_less_than(left, right),
+        duration_less_than(right, left),
+    ) {
+        (true, false) => std::cmp::Ordering::Less,
+        (false, true) => std::cmp::Ordering::Greater,
+        _ => std::cmp::Ordering::Equal,
+    }
+}
+
 fn validate_universal_invariants(
     style: Style,
     score: &Score,
@@ -574,6 +668,12 @@ mod tests {
         assert_eq!(result.segments.len(), 2);
         assert_eq!(result.composed_score.tempo_bpm, 140.0);
         assert_eq!(result.composed_score.meter, 4);
+        assert_eq!(result.boundary_evidence.boundary_beat, result.transition_at_beat);
+        assert_eq!(result.boundary_evidence.left_tail_gap, Duration::zero());
+        assert_eq!(result.boundary_evidence.right_entry_gap, Duration::zero());
+        assert_eq!(result.boundary_evidence.cross_boundary_event_count, 0);
+        assert!(result.boundary_evidence.left_events_in_window > 0);
+        assert!(result.boundary_evidence.right_events_in_window > 0);
         assert_eq!(result.segments[0].style, Style::Classical);
         assert_eq!(result.segments[1].style, Style::Minimalism);
         assert!(matches!(
