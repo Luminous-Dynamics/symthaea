@@ -1,0 +1,52 @@
+name: Subterra operation contract
+
+on:
+  push:
+    branches:
+      - research/subterra-robotic-loops-v0-1
+    paths:
+      - crates/domains/symthaea-subterranean/research/subterra-operation-contract/**
+      - .github/workflows/subterra-operation-contract.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - crates/domains/symthaea-subterranean/research/subterra-operation-contract/**
+      - .github/workflows/subterra-operation-contract.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: subterra-operation-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  exact-head:
+    name: Rust 1.96.0 format, tests and strict Clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CARGO_INCREMENTAL: "0"
+      CARGO_TERM_COLOR: always
+    steps:
+      - name: Check out exact commit
+        uses: actions/checkout@v4
+
+      - name: Install pinned Rust 1.96.0
+        uses: dtolnay/rust-toolchain@1.96.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting without modifying source
+        run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-operation-contract/Cargo.toml -- --check
+
+      - name: Run operation contract tests
+        run: cargo test --manifest-path crates/domains/symthaea-subterranean/research/subterra-operation-contract/Cargo.toml --all-targets --offline
+
+      - name: Run strict Clippy
+        run: cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-operation-contract/Cargo.toml --all-targets --offline -- -D warnings
+
+      - name: Preserve claim ceiling
+        if: always()
+        run: echo "This workflow qualifies the dependency-free state-machine contract only; it does not qualify robot hardware, mine safety, geotechnical adequacy or field operation."
