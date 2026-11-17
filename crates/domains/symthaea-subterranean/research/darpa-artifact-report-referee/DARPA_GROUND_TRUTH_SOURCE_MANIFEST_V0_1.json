@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "dataset_name": "DARPA SubT Systems Finals artifact ground truth",
+  "source_repository": "https://github.com/subtchallenge/systems_finals_ground_truth",
+  "source_default_branch": "master",
+  "source_tree_commit": "8276a16155eddf966e4458e40054bc53a31c8ac5",
+  "coordinate_frame": "darpa",
+  "coordinate_dimension": 3,
+  "source_format": "tab-separated UTF-8 text; source type string followed by x, y, z",
+  "rights_status": "unresolved_do_not_redistribute",
+  "license_spdx": null,
+  "files": [
+    {
+      "path": "artifacts/systems_final_prelim1.csv",
+      "git_blob_sha": "ec44165ff647346d83646bcdbc1e03b2f0de58d3",
+      "byte_length": 638,
+      "rows": 20
+    },
+    {
+      "path": "artifacts/systems_final_prelim2.csv",
+      "git_blob_sha": "4fbbf71acbfc9e2a555862cd910783fbd8ed1923",
+      "byte_length": 636,
+      "rows": 20
+    },
+    {
+      "path": "artifacts/systems_final_prize.csv",
+      "git_blob_sha": "c1a1e717f0318d093a639d23c1df91c5d703a60a",
+      "byte_length": 1228,
+      "rows": 40
+    },
+    {
+      "path": "artifacts/systems_final_all.csv",
+      "git_blob_sha": "13397b0218a4f084431bf8a07ad1990be3999850",
+      "byte_length": 2423,
+      "rows": 80
+    }
+  ],
+  "source_type_alias_policy": "none; raw type strings preserved",
+  "official_scoring_rule_status": "not yet pinned; do not claim official score parity",
+  "data_bytes_vendored": false
+}
