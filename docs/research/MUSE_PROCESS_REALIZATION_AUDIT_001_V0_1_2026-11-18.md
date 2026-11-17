@@ -41,7 +41,7 @@ In particular, event-count growth is a structural fact, not a listener-experienc
 
 ## Adversarial fixtures authored
 
-Six new tests are present in `process_grammar.rs`:
+Eight new tests are present in `process_grammar.rs`:
 
 - accept unmodified realizations for all four declared trajectory kinds;
 - reject a plan with a false cycle count / contour;
@@ -66,7 +66,7 @@ Report separate measurements; do not collapse them into a single music-quality s
 | Runtime | p50 / p95 / p99 verifier latency, by event count | Establish measured baseline before target setting |
 | Perceptual validity | Blind listening recognition of growth/release and musical preference | Separate preregistered human study; no score-audit proxy |
 
-A useful first holdout matrix is all four process kinds × seeds 0–255 × 2, 4, 8 and 16 input bars, with engine revision pinned. Then add mutation families: missing/extra notes, pitch substitution, duration change, wrong cycle start, wrong contour declaration, gap, overlap, cross-boundary note, and trailing/leading events. Preserve each case's plan digest, score digest, expected disposition, actual disposition and verifier version.
+The authored deterministic holdout currently uses all four process kinds × 256 seeds per kind × 2, 4, 8 and 16 input bars (4,096 examples), with engine revision pinned. This is a test definition, not an executed result; its acceptance rate remains unknown until Rust tests run. Then add mutation families: missing/extra notes, pitch substitution, duration change, wrong cycle start, wrong contour declaration, gap, overlap, cross-boundary note, and trailing/leading events. Preserve each case's plan digest, score digest, expected disposition, actual disposition and verifier version.
 
 ## Industry comparison and differentiation
 
@@ -143,6 +143,6 @@ For deterministic structural invariants, the target should be 100% on frozen pos
 ## Validation status
 
 - Source authored on a branch based on current `main` at `67939c904adcfafd246848b74cd53c52a2cca244`.
-- Six new Rust unit tests authored.
+- Eight new Rust unit tests authored, including the 4,096-case deterministic holdout matrix.
 - Cargo/rustc/rustfmt execution unavailable in this environment; compilation, formatting and test results are pending.
 - No workflow pass, audio result, human preference result, or SOTA superiority is claimed.
