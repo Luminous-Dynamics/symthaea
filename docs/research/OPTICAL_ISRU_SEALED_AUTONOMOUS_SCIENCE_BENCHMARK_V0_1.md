@@ -160,7 +160,24 @@ Do not claim superiority from one seed, one batch, one material family, one lab 
 
 These are target hypotheses. They are not current measured results.
 
-## 9. Executable contract
+## 9. B0 replay oracle implementation
+
+`research/asteroid-optical-isru-v0.2/replay_oracle.rs` is the first executable backend slice.
+
+- The agent-side API sees candidate metadata, measurable candidates and holdout candidate metadata, but receives outcome values only after it requests an allowed measurable candidate.
+- Holdout candidates cannot be measured. Their labels remain in a separate private store held by the evaluator.
+- Request IDs are idempotent; reusing one request ID for another candidate is rejected.
+- A candidate cannot be measured twice in B0 v0, and the maximum experiment count is a hard limit.
+- Campaign closeout is required before discovery or learning grading.
+- Discovery grading uses only the selected, replayed outcomes.
+- Learning grading requires predictions for the complete sealed holdout and returns aggregate rank correlation and interval coverage, never the raw holdout labels.
+- Candidate/outcome mapping, candidate-set overlap, duplicate IDs, invalid numbers and missing holdout records are rejected at construction or grading.
+
+The agent and grader are separate Rust interfaces. For an actual sealed tournament, the grader and hidden outcome store must run in a custodian-controlled process or service; merely hiding a Rust field is not a security boundary against arbitrary code in the same process.
+
+B0 is deterministic by design. It does not simulate heterogeneous durations, noise, fouling, failure, calibration drift or asynchronous queues. Those belong in B1, not in the replay oracle.
+
+## 10. Executable contract
 
 `research/asteroid-optical-isru-v0.2/benchmark_contract.rs` implements:
 - backend/task/algorithm identities;
@@ -173,12 +190,14 @@ These are target hypotheses. They are not current measured results.
 - enhancement factor with explicit invalid-reference rejection;
 - minimum 30 unique paired simulation seeds;
 - a separate physical replication plan that requires power, randomization, blocking and independent assay plans;
-- 16 standalone invariant tests.
+- 16 benchmark-contract invariant tests plus 15 B0 replay-oracle tests.
 
 ### Reproduce locally
 
     rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/benchmark_contract.rs -o /tmp/isru-benchmark-contract-tests
     /tmp/isru-benchmark-contract-tests
+    rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/replay_oracle.rs -o /tmp/isru-replay-oracle-tests
+    /tmp/isru-replay-oracle-tests
 
 The contract is not the benchmark dataset or an executed tournament. No scientific superiority, physical yield, lab throughput or live-rig qualification is claimed.
 
