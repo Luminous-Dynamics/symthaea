@@ -23,7 +23,9 @@ pub struct ResourceVector {
 impl ResourceVector {
     fn checked_add(self, other: Self) -> Option<Self> {
         Some(Self {
-            energy_millijoules: self.energy_millijoules.checked_add(other.energy_millijoules)?,
+            energy_millijoules: self
+                .energy_millijoules
+                .checked_add(other.energy_millijoules)?,
             duration_milliseconds: self
                 .duration_milliseconds
                 .checked_add(other.duration_milliseconds)?,
@@ -467,10 +469,7 @@ impl PortfolioSearch<'_> {
         self.evaluated_nodes += 1;
 
         if state.index == self.groups.len() {
-            if self
-                .best
-                .as_ref()
-                .is_none_or(|best| better(&state, best))
+            if self.best.as_ref().is_none_or(|best| better(&state, best))
             {
                 self.best = Some(state);
             }
@@ -498,9 +497,7 @@ impl PortfolioSearch<'_> {
 
         let group = self.groups[state.index].clone();
         for option in &group.options {
-            if let Some(mut next) =
-                apply_option(self.problem, self.bundles, &state, option)?
-            {
+            if let Some(mut next) = apply_option(self.problem, self.bundles, &state, option)? {
                 next.index += 1;
                 self.visit(next)?;
                 if self.hit_node_limit {
@@ -592,17 +589,17 @@ pub fn greedy_baseline(
         if covered.contains(&option.decision_id) {
             continue;
         }
-        if let Some(next) =
-            apply_option(problem, &prepared.bundles, &state, option)?
-        {
+        if let Some(next) = apply_option(problem, &prepared.bundles, &state, option)? {
             state = next;
             covered.insert(option.decision_id.clone());
         }
     }
 
-    if prepared.groups.iter().any(|group| {
-        group.mandatory && !covered.contains(&group.decision_id)
-    }) {
+    if prepared
+        .groups
+        .iter()
+        .any(|group| group.mandatory && !covered.contains(&group.decision_id))
+    {
         return Err(CampaignError::NoFeasibleCampaign);
     }
 
@@ -627,13 +624,7 @@ mod tests {
         }
     }
 
-    fn option(
-        id: &str,
-        decision: &str,
-        bundle: &str,
-        value: u64,
-        energy: u64,
-    ) -> InspectionOption {
+    fn option(id: &str, decision: &str, bundle: &str, value: u64, energy: u64) -> InspectionOption {
         InspectionOption {
             option_id: id.into(),
             decision_id: decision.into(),
@@ -921,10 +912,7 @@ mod tests {
         );
         p.options[0].deployment_bundle_id = "deploy".into();
         p.options[0].robot_loss_upper_ppm = MAX_RISK_PPM + 1;
-        assert_eq!(
-            optimize_campaign(&p),
-            Err(CampaignError::InvalidRiskBound)
-        );
+        assert_eq!(optimize_campaign(&p), Err(CampaignError::InvalidRiskBound));
     }
 
     #[test]
