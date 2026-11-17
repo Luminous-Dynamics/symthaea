@@ -1793,8 +1793,16 @@ pub enum NetworkStateRestoreError {
     NeuronCountMismatch,
     LayerOutputCountMismatch,
     NeuronClockCountMismatch,
-    NeuronDimensionMismatch { index: usize, expected: usize, actual: usize },
-    LayerOutputDimensionMismatch { index: usize, expected: usize, actual: usize },
+    NeuronDimensionMismatch {
+        index: usize,
+        expected: usize,
+        actual: usize,
+    },
+    LayerOutputDimensionMismatch {
+        index: usize,
+        expected: usize,
+        actual: usize,
+    },
     NonFiniteNeuronState { index: usize },
     NonFiniteLayerOutput { index: usize },
     NonFiniteClock { index: usize },
@@ -2126,8 +2134,7 @@ impl HdcLtcUnifiedNetwork {
     /// Restore a recurrent-state snapshot only when every shape and value is valid.
     ///
     /// Validation completes before the first mutation, so any error leaves the
-    /// destination network byte-for-byte unchanged at the represented state
-    /// surface. This is the required path for paired counterfactuals, episode
+    /// destination network unchanged at the represented state surface. This is the required path for paired counterfactuals, episode
     /// forks, and any caller that cannot tolerate partial restore.
     ///
     /// The snapshot captures evolution state, not learned parameters or
@@ -3004,7 +3011,40 @@ mod tests {
 
         let mut after = NetworkStateSnapshot::default();
         target.snapshot_state_into(&mut after);
-        assert!(before.approx_eq(&after, 0.0), "rejected restore mutated destination state");
+        assert!(
+            before.approx_eq(&after, 0.0),
+            "rejected restore mutated destination state"
+        );
+    }
+
+
+    #[test]
+    fn strict_state_restore_rejects_hv_dimension_mismatch_atomically() {
+        let mut network = state_restore_test_network(&[2, 2]);
+        let mut malformed = NetworkStateSnapshot::default();
+        network.snapshot_state_into(&mut malformed);
+        malformed.neuron_states[0].values.pop();
+
+        let mut before = NetworkStateSnapshot::default();
+        network.snapshot_state_into(&mut before);
+        let expected = before.neuron_states[0].values.len();
+        let actual = malformed.neuron_states[0].values.len();
+
+        assert_eq!(
+            network.try_restore_state_from(&malformed),
+            Err(NetworkStateRestoreError::NeuronDimensionMismatch {
+                index: 0,
+                expected,
+                actual,
+            })
+        );
+
+        let mut after = NetworkStateSnapshot::default();
+        network.snapshot_state_into(&mut after);
+        assert!(
+            before.approx_eq(&after, 0.0),
+            "dimension-rejected restore mutated destination state"
+        );
     }
 
     #[test]
