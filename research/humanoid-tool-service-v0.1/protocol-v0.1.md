@@ -293,6 +293,23 @@ The full file is evaluator-owned: policy context receives only candidate-visible
 
 No powered tools, blades, high force, mains voltage, hazardous materials, human-contact tasks or destructive probes are included in v0.1.
 
+
+## 3D. ULTRA — a direct humanoid whole-body loco-manipulation comparator
+
+ULTRA (He et al., IROS 2026; arXiv:2603.03279) is a particularly relevant comparator because it reports a unified multimodal controller evaluated in simulation and on a physical Unitree G1. It supports dense reference tracking when motion references exist and sparse, goal-conditioned whole-body loco-manipulation when they do not. Its released project page demonstrates long-horizon goal following under motion-capture state and egocentric depth, plus sim-to-sim transfer with point-cloud perturbations. Its approach combines physics-driven neural motion retargeting, teacher/student distillation, compact motion-skill latents and RL fine-tuning.
+
+Sources:
+- Project, demonstrations and paper: https://ultrahumanoid.github.io/
+- Paper: https://arxiv.org/abs/2603.03279
+- Public code: https://github.com/Sirui-Xu/ULTRA
+
+**Why it matters:** ULTRA is closer to our target embodiment/control problem than AMP1's Franka real-robot trials. It is a direct baseline for the question “can one controller convert sparse intent and egocentric sensing into coordinated G1 whole-body behavior?” AMP1 remains the separate comparator for “does a generalist agent reason and revise manipulation plans during the task?” HumanoidToolBench remains the separate benchmark for “can a G1 select and use tools, including after mobile repositioning and with decoys?” These test different capabilities; their scores must not be pooled.
+
+**ULTRA limits and reproduction boundary:** the project page establishes real-G1 evaluation and qualitative long-horizon demonstrations, but does not present one directly comparable aggregate success percentage for HumanoidToolBench or a shared service task. Do not invent a ULTRA-to-HumanoidToolBench conversion. The public repository lists ULTRA code as Apache-2.0 and an InterMimic-derived stack under MIT; assets, motion data and third-party dependencies retain separate terms. Its reproduction instructions use Python, IsaacGym Preview 4 and MuJoCo. Before reproduction or reuse, pin the exact commit/checkpoint, establish compatible robot and task semantics, inspect asset/data licences, and measure the actual compute requirement.
+
+**Matched baseline addition:** include ULTRA's released G1 controller, where checkpoint, data rights and runtime can be qualified, as an independent learned whole-body baseline. Compare it against the existing Symthaea hierarchy on matched G1 tasks and sensors, then compare both with and without the same HLB/agentic skill executive. Keep controller policy, planner, sensor access and safety stack factors separable. If full reproduction is not feasible, record ULTRA as a paper/project reference and mark the runtime baseline unavailable rather than substituting a different policy.
+
+
 ## 4. Matched baseline ladder
 
 Evaluate the following arms only when the exact artifact and interface are available:
@@ -302,6 +319,7 @@ Evaluate the following arms only when the exact artifact and interface are avail
 4. ACT / Diffusion Policy or other task-native imitation baseline.
 5. GR00T N1.7 and another compatible open VLA baseline (for example pi0.5).
 6. VioLA-style body/hand motion-latent policy, if exact code/checkpoint and morphology-compatible controllers become available.
+6a. ULTRA unified multimodal G1 loco-manipulation controller, where released checkpoint/data/robot semantics and runtime can be qualified; treat as a distinct real-humanoid baseline, not as a tool-use score.
 7. AMP1-style agent-as-policy baseline, including an open-weight agent model where available (the AMP1 paper reports Qwen3.8-Flash-Next at 64.9% on RoboLab-120 in its protocol).
 8. Agentic model + typed capability API + deterministic action admission (Symthaea-bound harness).
 9. Arm 8 plus episodic memory only.
