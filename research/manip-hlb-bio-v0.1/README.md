@@ -134,6 +134,40 @@ Do not collapse these into one weighted score. Report paired mission/episode res
 - Memory/model promotion remains quarantined until independent held-out evaluation and rollback evidence are present.
 - No HLB advantage is claimed unless matched ablations show positive held-out task/decision benefit without increasing hard physical-envelope violations.
 
-## 9. Claim ceiling
+## 9. External benchmark comparators and SOTA strategy
+
+These suites answer different questions. Their scores must remain separate.
+
+| Comparator | Published 2026 reference point | What it tests | How to use it here |
+|---|---|---|---|
+| RLBench 18-task subset | Stanford AI Index 2026 reports EquAct at 89.4% average success as of January 2026. | Standardized, comparatively short-horizon simulated manipulation across 18 tasks. | Use as a short-horizon manipulation baseline only when task, demos, observation, compute and evaluator match. Add 3D rotation and object-condition holdouts. |
+| BEHAVIOR-1K Challenge 2026 | 100 full-length household tasks, 7 scenes, RGB + depth + proprioception, 20,000 demonstrations / 1,950 hours; official scoring uses average BDDL predicate partial credit. The first-place HiPhys-RSI system reports Q=0.683 and 48.2% full-task success on hidden instances. | Long-horizon household workflows, mobile manipulation, bimanual dexterity, subgoal dependencies and task completion. | Treat as the most relevant external long-horizon comparator. Include a procedure/skill-graph-only baseline, a VLA baseline, HLB without procedures, and HLB + procedures. Only compare under the official task split, observations, data, compute and evaluator. |
+| LIBERO-RECOVER | September 2026 preprint: 1,000+ recovery scenarios across action retry, action adaptation, object-state recovery and environmental recovery. | Recovery after execution failure rather than success from ideal initial states. | Use its four recovery levels as a separate challenge family; preserve natural and injected failures in separate strata. |
+| Morphology-conditioned QWM | CoRL 2026 morphology-conditioned quadruped world model with zero-shot transfer bounded to the studied quadruped family. | Dynamics transfer conditioned on explicit morphology. | Compare quadruped prediction and locomotion on held-out morphology combinations and fault × morphology strata; do not describe this as universal transfer. |
+| Octopus-inspired distributed soft arm | Nature Machine Intelligence, 12 May 2026: ten sensorized suction cups, local reflexes and hierarchical global grasp coordination; reported force/direction results are specific to its sensor and still-water experiments. | Distributed tactile observation and peripheral control. | Use as a mechanism comparator for local-vs-central-vs-hybrid sensing/control, not as a direct rigid-manipulator leaderboard score. |
+
+### Concrete competitive targets
+
+1. **Reproduce before claiming:** implement the official task/evaluator adapters and first reproduce the published reference point with the admitted baseline or report exactly why the reference is not reproducible in our environment.
+2. **Long-horizon stretch:** on a comparable future BEHAVIOR evaluation, target Q > 0.683 and full-task success > 48.2%, while separately reporting partial predicate completion, worst task families, recovery cost, elapsed simulation time and intervention burden. This is an aspiration, not a forecast.
+3. **Short-horizon stretch:** target at least 90% mean success on the exact RLBench 18-task subset with the same observation and demonstration budget, then test 3D orientation and object-condition generalization. A 90% result on a different task or easier split does not beat EquAct.
+4. **Recovery superiority:** beat the strongest matched retry/adaptation/state-recovery/environment-recovery baseline on paired recovery episodes, not merely on nominal task success.
+5. **HLB attribution:** compare procedure graph alone vs HLB alone vs procedure graph + HLB. The HiPhys-RSI result shows structured executable procedures are already a strong baseline; memory retrieval or a larger latent state earns credit only if its incremental effect is measured.
+6. **World-model utility:** report role-conditioned prediction error and interval coverage, but also policy-ranking correlation, downstream decision improvement, exploitability under closed-loop rollouts, and sim-to-real discrepancy. Plausible imagined rollouts are not sufficient.
+7. **Distributed-sensing value:** compare local reflex, centralized processing and hybrid local/global coordination at matched sensor hardware, contact task, compute, bandwidth and physical envelope. Report latency, bytes, power, calibration drift and performance under node/network loss.
+
+The current benchmark literature explicitly warns that binary success obscures partial progress, error propagation, recovery cost and horizon-dependent degradation. The 16 November 2026 long-horizon manipulation survey is a useful current framing; the world-model survey likewise emphasizes action alignment, rollout exploitation and closed-loop utility. These motivate our scorecard but do not replace official benchmark protocols.
+
+References:
+- Stanford AI Index 2026, robotics / RLBench: https://hai.stanford.edu/assets/files/ai_index_report_2026_chapter_2_technical.pdf
+- 2026 BEHAVIOR Challenge and rules: https://behavior.stanford.edu/challenge/index.html and https://behavior.stanford.edu/challenge/evaluation.html
+- 2026 BEHAVIOR winner report: https://behavior1k-champion.com/
+- LIBERO-RECOVER: https://arxiv.org/abs/2609.05178
+- QWM: https://arxiv.org/abs/2604.08780
+- Octopus-inspired distributed sensing: https://doi.org/10.1038/s42256-026-01230-y
+- Long-horizon manipulation survey (16 Nov 2026): https://doi.org/10.1007/s44336-026-00048-x
+- Manipulation world-model survey: https://doi.org/10.1002/smb2.70053
+
+## 10. Claim ceiling
 
 This contract scaffold is not a test pass, an implemented sensor/reflex network, a calibrated world model, a biological reproduction, a physical qualification, or evidence of SOTA superiority. A synthetic fixture pass proves only the fixture implementation for its declared cases. In-simulation results remain in-simulation results; HIL and physical evidence require separate instrumentation and qualification.
