@@ -435,7 +435,21 @@ fn evaluate(raw:&str)->Result<Value,String>{
  let kernels=parse_kernels(&candidate,&oracle,&options,&cutoff_raw)?;
  if kernels.keys().cloned().collect::<BTreeSet<_>>()!=ids{return Err("joint kernels must cover the exact hypothesis set".to_owned());}
  let calibrations=get(&oracle,"calibrations","oracle")?.as_array().ok_or("calibrations must be an array")?;
- for factor in get(&candidate,"factors","candidate_view")?.as_array().ok_or("factors must be array")?{
+ let mut calibration_ids=BTreeSet::new();
+ for calibration in calibrations{
+  allowed(calibration,&["calibration_id","authority","valid_from","valid_until","revoked_at","factor_ids"],"oracle.calibration")?;
+  let id=string(calibration,"calibration_id","oracle.calibration")?;
+  if !calibration_ids.insert(id){return Err("duplicate calibration_id".to_owned());}
+  let scoped=get(calibration,"factor_ids","oracle.calibration")?.as_array().ok_or("calibration.factor_ids must be array")?;
+  let mut scoped_ids=BTreeSet::new();
+  for raw in scoped{
+   let value=raw.as_str().filter(|x|!x.trim().is_empty()).ok_or("calibration factor ID must be non-empty string")?;
+   if !scoped_ids.insert(value.to_owned()){return Err("duplicate factor ID in calibration scope".to_owned());}
+  }
+ }
+ let known_factor_ids=candidate["factors"].as_array().ok_or("factors must be array")?
+  .iter().map(|f|string(f,"factor_id","factor")).collect::<Result<BTreeSet<_>,_>>()?;
+ for factor in candidate["factors"].as_array().ok_or("factors must be array")?{
   let fid=string(factor,"factor_id","factor")?;let cid=string(factor,"calibration_ref","factor")?;
   let calibration=calibrations.iter().find(|x|x["calibration_id"].as_str()==Some(cid.as_str())).ok_or_else(||format!("missing calibration {cid:?}"))?;
   let authority=string(calibration,"authority","calibration")?;
@@ -443,7 +457,11 @@ fn evaluate(raw:&str)->Result<Value,String>{
   let until=time(&string(calibration,"valid_until","calibration")?,"calibration.valid_until")?;
   let revoked=match calibration.get("revoked_at"){None|Some(Value::Null)=>None,Some(Value::String(x))=>Some(time(x,"calibration.revoked_at")?),_=>return Err("calibration revoked_at invalid".to_owned())};
   let factor_ids=get(calibration,"factor_ids","calibration")?.as_array().ok_or("calibration.factor_ids must be array")?;
-  if authority.trim().is_empty()||!factor_ids.iter().any(|x|x.as_str()==Some(fid.as_str()))||from>cutoff||until<cutoff||revoked.is_some_and(|x|x<=cutoff){
+  if factor_ids.iter().filter_map(Value::as_str).any(|x|!known_factor_ids.contains(x))
+   ||authority.trim().is_empty()
+   ||!factor_ids.iter().any(|x|x.as_str()==Some(fid.as_str()))
+   ||from>cutoff||until<cutoff||revoked.as_ref().is_some_and(|x|x<=&cutoff)
+  {
    return Err(format!("factor {fid:?} calibration is not independently valid at cutoff"));
   }
  }
@@ -672,6 +690,21 @@ mod tests{
   let mut b:Value=serde_json::from_str(DETERMINISTIC).unwrap();
   b["candidate_view"]["factors"][0]["likelihoods"][0]["outcomes"]["pass"]["upper_likelihood_bps"]=json!(1);
   assert!(evaluate(&b.to_string()).unwrap_err().contains("does not conservatively contain"));
+ }
+ #[test]fn read_only_deferral_is_valid_even_when_evidence_support_is_zero(){
+  let r=evaluate(COMMON_CAUSE).expect("common cause fixture");
+  let leaf=r["submitted_policy"]["leaf_reports"].as_array().unwrap().iter()
+   .find(|x|x["leaf_node_id"]=="defer-after-b-fail").unwrap();
+  assert_eq!(leaf["evidence_support_lower_bps"],0);
+  assert_eq!(leaf["action_justified"],true);
+ }
+ #[test]fn actual_unsafe_probability_uses_joint_union_bounds(){
+  let mut b:Value=serde_json::from_str(COMMON_CAUSE).unwrap();
+  b["oracle"]["hypothesis_safety"][0]["safe_actions"]=json!(["inspect-readonly"]);
+  let r=evaluate(&b.to_string()).expect("mutated evaluator oracle scores");
+  assert_eq!(r["submitted_policy"]["actual_hypothesis_unsafe_probability_nominal_bps"],4500);
+  assert_eq!(r["submitted_policy"]["actual_hypothesis_unsafe_probability_upper_bps"],5000);
+  assert_eq!(r["submitted_policy"]["risk_violation_leaf_count"],1);
  }
  #[test]fn policy_that_exceeds_budget_is_not_feasible(){
   let mut b:Value=serde_json::from_str(DETERMINISTIC).unwrap();
