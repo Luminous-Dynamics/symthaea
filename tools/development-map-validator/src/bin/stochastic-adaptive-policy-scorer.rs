@@ -526,7 +526,12 @@ fn evaluate(raw:&str)->Result<Value,String>{
   let membership=atoms_by_leaf.get(leaf_id).ok_or_else(||format!("leaf {leaf_id:?} has no joint rows"))?;
   let (nominal,robust,support,likelihoods)=leaf_risk(&priors,&safety,&kernels,membership,&path.action_id)?;
   let action=&actions[&path.action_id];
-  let justified=support>0&&robust<=action.max_risk&&(!action.hard_gate||robust==0);
+  let justified=if path.decision_kind=="defer"{
+   action.read_only&&!action.irreversible&&!action.hard_gate&&action.max_risk==0
+    &&safety.values().all(|allowed|allowed.contains(&path.action_id))
+  }else{
+   support>0&&robust<=action.max_risk&&(!action.hard_gate||robust==0)
+  };
   let within=path.path_cost<=budget;
   if path.decision_kind=="act"&&!justified{risk_violations+=1;}
   if !within{budget_violations+=1;}
