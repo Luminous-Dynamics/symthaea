@@ -1,0 +1,18 @@
+[package]
+name = "subterra-dependence-audit"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Hierarchy-aware split and common-cause evidence audit for Subterra"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Standalone research crate; intentionally outside the production workspace.
+[workspace]

@@ -1,0 +1,118 @@
+{
+  "schema_version": "0.1",
+  "manifest_id": "synthetic-subterra-lineage-manifest-001",
+  "dataset_id": "synthetic-subterra-multisite-evidence-v1",
+  "records": [
+    {
+      "record_id": "record-site-a-raw-01",
+      "site_id": "synthetic-site-a",
+      "observation_id": "obs-site-a-raw-01",
+      "artifact_kind": "raw_acquisition",
+      "source_record_ids": [],
+      "shared_cause_groups": [
+        {
+          "kind": "instrument_calibration",
+          "group_id": "calibration-session-2026-11-01",
+          "description": "Synthetic calibration episode shared across two site surveys"
+        },
+        {
+          "kind": "environmental_episode",
+          "group_id": "illumination-dust-episode-01",
+          "description": "Synthetic shared dust and illumination conditions"
+        }
+      ],
+      "provenance_ref": "synthetic-provenance-record-a-raw",
+      "acquisition_lineage_ids": [
+        "acquisition-a-01"
+      ]
+    },
+    {
+      "record_id": "record-site-a-raw-02",
+      "site_id": "synthetic-site-a",
+      "observation_id": "obs-site-a-raw-02",
+      "acquisition_lineage_ids": [
+        "acquisition-a-02"
+      ],
+      "artifact_kind": "raw_acquisition",
+      "source_record_ids": [],
+      "shared_cause_groups": [],
+      "provenance_ref": "synthetic-provenance-record-a-raw-02"
+    },
+    {
+      "record_id": "record-site-a-mesh-01",
+      "site_id": "synthetic-site-a",
+      "observation_id": "obs-site-a-mesh-01",
+      "artifact_kind": "derived_product",
+      "source_record_ids": [
+        "record-site-a-raw-01"
+      ],
+      "shared_cause_groups": [
+        {
+          "kind": "processing_lineage",
+          "group_id": "processing-run-subterra-42",
+          "description": "Synthetic meshing pipeline execution"
+        }
+      ],
+      "provenance_ref": "synthetic-provenance-record-a-mesh",
+      "acquisition_lineage_ids": [
+        "acquisition-a-01"
+      ]
+    },
+    {
+      "record_id": "record-site-a-features-01",
+      "site_id": "synthetic-site-a",
+      "observation_id": "obs-site-a-features-01",
+      "artifact_kind": "derived_product",
+      "source_record_ids": [
+        "record-site-a-raw-01",
+        "record-site-a-raw-02",
+        "record-site-a-mesh-01"
+      ],
+      "shared_cause_groups": [
+        {
+          "kind": "processing_lineage",
+          "group_id": "processing-run-subterra-42"
+        }
+      ],
+      "provenance_ref": "synthetic-provenance-record-a-features",
+      "acquisition_lineage_ids": [
+        "acquisition-a-01",
+        "acquisition-a-02"
+      ]
+    },
+    {
+      "record_id": "record-site-b-raw-01",
+      "site_id": "synthetic-site-b",
+      "observation_id": "obs-site-b-raw-01",
+      "artifact_kind": "raw_acquisition",
+      "source_record_ids": [],
+      "shared_cause_groups": [
+        {
+          "kind": "instrument_calibration",
+          "group_id": "calibration-session-2026-11-01"
+        },
+        {
+          "kind": "environmental_episode",
+          "group_id": "illumination-dust-episode-01"
+        }
+      ],
+      "provenance_ref": "synthetic-provenance-record-b-raw",
+      "acquisition_lineage_ids": [
+        "acquisition-b-01"
+      ]
+    },
+    {
+      "record_id": "record-site-c-raw-01",
+      "site_id": "synthetic-site-c",
+      "observation_id": "obs-site-c-raw-01",
+      "artifact_kind": "raw_acquisition",
+      "source_record_ids": [],
+      "shared_cause_groups": [],
+      "provenance_ref": "synthetic-provenance-record-c-raw",
+      "acquisition_lineage_ids": [
+        "acquisition-c-01"
+      ]
+    }
+  ],
+  "notes": "Illustrative only. Source-record graph, site/observation associations and provenance references require semantic validation/authentication. Calibration and environmental groups connect site A and site B; these site groups must be placed in the same split or evaluated in a deliberately declared holdout design. Site C is separate under the declared metadata only."
+}

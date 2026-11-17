@@ -1,0 +1,83 @@
+{
+  "schema_version": "0.1",
+  "site_id": "synthetic-mars-subterranean-candidate-01",
+  "body": "Mars",
+  "coordinates": null,
+  "morphology": {
+    "class": "skylight",
+    "state": "supported",
+    "description": "Synthetic multimodal morphology fixture; no real site is implied.",
+    "evidence_refs": ["synthetic-optical-001", "synthetic-thermal-001"]
+  },
+  "origin_hypotheses": [
+    {
+      "mechanism": "volcanic_lava_tube",
+      "state": "candidate",
+      "rationale": "Synthetic hypothesis only.",
+      "evidence_refs": ["synthetic-context-001"]
+    },
+    {
+      "mechanism": "collapse",
+      "state": "unknown",
+      "rationale": "Alternative origin is unresolved.",
+      "evidence_refs": []
+    }
+  ],
+  "connectivity": {
+    "state": "candidate",
+    "known_extent_m": null,
+    "basis": "No direct interior observation in this synthetic fixture.",
+    "evidence_refs": []
+  },
+  "accessibility": {
+    "state": "unknown",
+    "access_method": null,
+    "egress_method": null,
+    "evidence_refs": []
+  },
+  "interior_survey": {
+    "state": "not_surveyed",
+    "surveyed_extent_m": null,
+    "coverage_fraction": null,
+    "evidence_refs": []
+  },
+  "engineering_assessments": [
+    {
+      "use_case": "habitation",
+      "state": "not_assessed",
+      "envelope_id": null,
+      "evidence_refs": []
+    }
+  ],
+  "preservation": {
+    "planetary_protection_state": "review_required",
+    "sampling_permission": "review_required",
+    "biological_activity_permission": "prohibited",
+    "basis_refs": ["synthetic-policy-placeholder"]
+  },
+  "observations": [
+    {
+      "observation_id": "synthetic-optical-001",
+      "modality": "optical",
+      "captured_at": "2026-11-16T00:00:00Z",
+      "native_resolution": "synthetic 1 m/pixel",
+      "coordinate_frame": "synthetic-local-frame",
+      "provenance_ref": "synthetic-provenance-001"
+    },
+    {
+      "observation_id": "synthetic-thermal-001",
+      "modality": "thermal_ir",
+      "captured_at": "2026-11-16T00:00:00Z",
+      "native_resolution": "synthetic 100 m/pixel",
+      "coordinate_frame": "synthetic-local-frame",
+      "provenance_ref": "synthetic-provenance-002"
+    }
+  ],
+  "unknowns": [
+    "Whether a cave is connected",
+    "Geological origin",
+    "Robot access and egress",
+    "Interior geometry",
+    "Structural condition"
+  ]
+}

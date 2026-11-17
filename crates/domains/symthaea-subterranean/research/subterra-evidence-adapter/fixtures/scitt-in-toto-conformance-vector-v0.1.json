@@ -1,0 +1,17 @@
+{
+  "generator": "Python cryptography 46.0.4 Ed25519 + independent deterministic CBOR encoder",
+  "format": "CBOR tag 18 wrapping COSE_Sign1",
+  "cose_algorithm": -19,
+  "content_type": "application/vnd.in-toto+json",
+  "issuer_uri": "https://science.example.org/issuers/conformance-vector-01",
+  "subject_uri": "urn:subterra:site:conformance-site:observation:conformance-obs-001",
+  "key_id": "conformance-key-01",
+  "public_key_hex": "91a28a0b74381593a4d9469579208926afc8ad82c8839b7644359b9eba9a4b3a",
+  "payload_ascii": "abc",
+  "payload_sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+  "statement_payload_sha256": "753f7e7a3c791c31cee806d743c5972b85b5876dbb8f15685f53405f32c420bf",
+  "sig_structure_sha256": "317ffe8d3b1626e2e5504421ebfa7ee1511bc2505037b16494275431d651929a",
+  "signed_statement_sha256": "464b541e1c0918d67248e05159832ce16e6f5a1592f088f8bb1bb1a6ddca5762",
+  "signed_statement_length": 1622,
+  "event_count": 3
+}
