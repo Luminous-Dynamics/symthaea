@@ -620,3 +620,72 @@ The registry now records the preprint DOI/ID, publication DOI, cryogenic measure
 - measurement scope: local probe, mesoscopic, bulk, device, theoretical model or unknown.
 
 The Rust auditor refuses to treat a local-probe pairing signature as bulk Tc and refuses a spectroscopic gap as a Tc criterion. Pairing energy in observed records is unit-checked as meV and requires a physical measurement scope. Synthetic tests separately exercise local pairing and bulk stiffness. No actual Science paper raw data or sample measurement has been ingested.
+
+
+## 36. Metallic screening, dimensionality and the local-to-global coherence transition
+
+A distinct physical architecture has emerged alongside the metallic-reservoir *pair-transfer* model.
+
+### Metallic outer layers as disorder screens, not necessarily superconducting reservoirs
+
+Jeong et al., *Superconducting coherence boosted by outer-layer metallic screening in multilayered cuprates*, Nature Communications 17, 8630 (14 July 2026), DOI 10.1038/s41467-026-75295-z.
+
+- ARPES on five-layer (Cu,C)Ba2Ca4Cu5Oy (Cu1245) and three-layer Ba2Ca2Cu3O6(F,O)2 (F0223) finds superconducting signatures in the inner CuO2 planes while heavily overdoped outer planes remain metallic.
+- The outer planes show no detectable superconducting proximity signal in the studied specimens.
+- Model calculations estimate >95% confinement of the outer-plane wavefunction to the outer planes, limiting interlayer proximity/hybridization.
+- The authors' mechanism is electrostatic/disorder screening: the highly conductive outer layers shield the inner superconducting plane from dopant-induced random potential, improving spectral coherence without requiring the metallic layer itself to become superconducting.
+- In surface-doped F0223, the inner-plane gap is reported around 60 meV while the outer-plane gap closes. This is a spectroscopic gap, not a transition temperature.
+- **The surface-doped-state Tc is not assigned here**. Do not substitute a bulk baseline value from a different specimen or polycrystalline report.
+
+This is different from Ebot et al.'s 2026 theoretical metallic-reservoir stiffness model: one is a physical ARPES + screening/disorder experiment with decoupled metallic planes; the other is a 1D many-body theoretical model involving interlayer pair coupling. We must not merge the two mechanisms.
+
+### Dimensionality as a control and penalty
+
+Luo et al., *Superconducting 2D cuprate with a single CuO2 plane*, Nature 656, 609–615 (published 12 August 2026), DOI 10.1038/s41586-026-10857-1.
+
+A single-monolayer Bi-2201 system exhibits an approximately 10% reduction in optimal transition temperature relative to thicker material, with fine oxygenation extending the phase diagram and revealing an anomalous-metal regime. This supplies a dimensionality-reduction baseline: protecting one clean plane is useful, but isolation alone does not guarantee higher Tc. The single-plane data are available from corresponding authors upon request; no raw dataset is mirrored here.
+
+### Geometry/topology of phase ordering
+
+Ye et al., *The emergence of global phase coherence from local pairing in underdoped cuprates*, Nature Physics 19, 1301–1307 (15 June 2023), DOI 10.1038/s41567-023-02100-9.
+
+STM in underdoped Bi2La_xSr2-xCuO6+delta finds that global phase coherence appears once the spatial occupation of a checkerboard plaquette charge-order pattern crosses a threshold in the studied samples. Local spectra remain qualitatively similar across the transition while quasiparticle interference becomes long-ranged. This supports testing spatial connectivity/topology as a contributor to phase coherence, but its threshold is sample/family-specific, not a universal percolation law.
+
+### Metrology baselines
+
+- Kapon et al., Nature Communications 10, 2463 (2019), DOI 10.1038/s41467-019-10480-x: a magnetic-field-free superconducting-ring method measures stiffness tensor components and distinguishes in-plane from interplane current paths in LSCO, complemented by low-energy muSR.
+- Kreidel et al., Physical Review Research 6, 043245 (6 December 2024), DOI 10.1103/PhysRevResearch.6.043245: high-Q transmission-line resonators measure kinetic inductance with reported precision up to ~1 ppm and infer stiffness, penetration depth and complex conductivity. The conversion depends on device geometry, current profile, locality, anisotropy and nonlocal response; this is not a geometry-free universal stiffness meter.
+
+### Updated phase-coherence benchmark design
+
+Treat the mechanism as a multi-observable, same-specimen causal experiment:
+
+1. **Pairing layer:** local gap/pair-transfer energy distribution, pairing onset, shot noise/effective charge, pair lifetime and spatial uniformity.
+2. **Disorder screening:** gap-map distribution width, local potential variance, ARPES quasiparticle linewidth/scattering rate, outer-plane carrier density, interlayer wavefunction mixing and screening geometry.
+3. **Phase ordering:** superfluid stiffness tensor, kinetic inductance, penetration depth, phase-correlation length, Josephson coupling, long-range quasiparticle interference, vortex/phase-slip signatures.
+4. **Bulk superconductivity:** transport onset, midpoint and zero resistance; diamagnetic/Meissner response and volume fraction; heat-capacity anomaly where practical; same-specimen field/current response.
+5. **Application translation:** usable in-field current, anisotropy, thermal margin, reproducibility, sample geometry and manufacturing feasibility.
+
+### Required controls
+
+- Pairing layer alone.
+- Pairing layer with inert spacer.
+- Pairing layer with metallic screening layer but deliberately weak interlayer hybridization.
+- Pairing layer with direct/strongly coupled metallic reservoir (tests Ebot-style pair transfer).
+- Matched insulating or low-carrier-density outer-layer control.
+- Disorder/oxygenation-only control with no metallic screen.
+- Single CuO2 plane and multilayer reference at matched doping/oxygenation.
+- Geometry/thickness, substrate and surface-doping controls.
+
+Keep pairing amplitude fixed or matched when testing stiffness improvement. Otherwise a larger stiffness may simply result from changing the pairing layer's carrier density or gap.
+
+### Proposed targets (research targets, not results)
+
+- Reduce local gap-map coefficient of variation and ARPES quasiparticle linewidth at matched nominal doping relative to a no-screen control, while preserving the inner-plane pairing gap within a preregistered tolerance.
+- Demonstrate that any stiffness gain is statistically significant with field-free ring or calibrated resonator measurement and independent cross-check (e.g., muSR/mutual inductance).
+- Establish a spatial phase-coherence metric that predicts long-range QPI/zero-resistance transition on held-out regions or specimens better than gap magnitude alone.
+- Demonstrate a coherent-transition increase on the same identified material state; do not infer one from a local gap or ARPES spectrum.
+- Report both successes and cases where screening narrows spectral disorder but does not improve bulk Tc.
+- Preserve dimensionality penalty as a baseline: the single-plane Bi-2201 study reports about a 10% decrease in optimal Tc relative to thicker material.
+
+Sources are registered as separate records/catalogues; no paper raw data have been ingested and no physical replication is claimed.
