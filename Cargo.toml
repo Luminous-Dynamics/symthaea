@@ -31,6 +31,9 @@ exclude = [
     # live modules. Excluded so the workspace stops compiling a dead island;
     # the adopt path (foveation RealVentralPipeline) still works via path dep.
     "crates/domains/symthaea-perception",
+    # Retired package shell: only legacy examples remain; no Cargo.toml.
+    # Exclude it from the crates/core/* workspace glob until examples are relocated.
+    "crates/core/symthaea",
 ]
 default-members = [
     "xtask",
