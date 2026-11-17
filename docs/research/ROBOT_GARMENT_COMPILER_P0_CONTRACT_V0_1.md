@@ -97,7 +97,7 @@ The fixture models a simple forearm region and elbow boundary:
 - elbow sweep/cable/sensor/service keep-out AABBs;
 - clearance and geometric uncertainty added before intersection testing.
 
-The test suite contains eight cases:
+The test suite contains eleven cases:
 1. known-answer elbow fixture is eligible for fit-screen only;
 2. panel entering joint swept envelope is rejected;
 3. unknown coordinate frame fails closed;
@@ -105,7 +105,10 @@ The test suite contains eight cases:
 5. clearance uncertainty contributes to the expanded envelope;
 6. mismatched panel/keep-out frames require an explicit transform;
 7. CAD-bound geometry without revision/digest is rejected;
-8. unsupported units are not implicitly converted.
+8. unsupported units are not implicitly converted;
+9. real candidate geometry cannot be admitted from a synthetic geometry state;
+10. advisory keep-out intersections are reported without becoming hard blockers;
+11. supplier-declared material remains distinct from measured-coupon/qualified material evidence.
 
 These unit tests are authored but **not yet executed**. Run:
 `cargo test -p symthaea-engineering robot_garment_compiler -- --nocapture`
