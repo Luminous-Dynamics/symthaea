@@ -50,3 +50,11 @@ The companion robust module adds a conservative uncertainty-aware decision layer
 From these intervals it derives a minimum/maximum numerical rank per degree and a minimum/maximum L1 distance for each candidate template. It reports a guaranteed nearest template only when one candidate's worst-case distance is strictly smaller than every competitor's best-case distance. Otherwise it returns the candidates not ruled out by interval dominance and abstains on a unique label.
 
 The perturbation bounds are assumptions supplied by the caller; the module does not prove them, derive them from the SVD orthogonality residual, or interpret them as a posterior. This is an ambiguity-control extension, not part of the published SymFP algorithm, and still provides spectral compatibility only.
+
+## Robust decision envelope (stacked research increment)
+
+The companion `robust` module accepts one explicit operator-norm bound per degree, `||ΔV_l||₂ ≤ δ_l`. It applies Weyl's inequality to each singular value and also propagates uncertainty in the degree-zero scale used by the common numerical-rank threshold.
+
+A rank/template result is called guaranteed only if one candidate's worst-case L1 distance is strictly below every competitor's best-case distance. Otherwise the module returns a conservative set of templates that have not been ruled out. This is an interval decision, not a probability distribution.
+
+The bounds are assumptions supplied by the caller. The module does not prove that the bounds hold, estimate them from the Jacobi SVD residual, or promote a spectral match into an action or pruning certificate. Its claim ceiling remains spectral compatibility only.
