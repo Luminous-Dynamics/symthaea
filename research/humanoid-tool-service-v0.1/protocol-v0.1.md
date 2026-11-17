@@ -240,6 +240,26 @@ Sources:
 - Current NVIDIA RoboLab leaderboard: https://research.nvidia.com/labs/srl/projects/robolab/leaderboard.html?family=all
 - Current RoboDojo simulation leaderboard / Agent Track: https://robodojo-benchmark.com/leaderboard?bench=sim
 
+### 3C.1 Current RoboLab-120 leaderboard context (17 November 2026)
+
+The live public leaderboard currently lists the following overall entries:
+
+| Policy | Type | Evaluated episodes | Success rate | Reported model size / VRAM |
+|---|---|---:|---:|---|
+| AMP1 | Agentic LM | 2,579 / 3,000; 25 eps/task | 86.0% | not listed |
+| SenseNova-RoboRSI | Agentic LM | 685 / 1,200; 10 eps/task | 57.1% | not listed |
+| Lakeside | LWM | 1,531 / 3,000; 25 eps/task | 51.0% | 5B / 27.2 GB |
+| BiMind v0.5 | VLA | 590 / 1,200; 10 eps/task | 49.2% | 8B / 30 GiB |
+| Praxis-1 | WAM | 555 / 1,200; 10 eps/task | 46.2% | 27.3B / ~70 GB |
+| FLUX 3 Action | WAM | 515 / 1,200; 10 eps/task | 42.9% | 7B / 69 GiB |
+| Cosmic | TAMP + FM | 508 / 1,200; 10 eps/task | 42.3% | ~350M / 10 GB |
+
+Source: NVIDIA's live [RoboLab-120 leaderboard](https://research.nvidia.com/labs/srl/projects/robolab/leaderboard.html), observed 17 November 2026.
+
+The table shows a meaningful gap between AMP1 and the next listed policies in this snapshot, but denominators differ: AMP1/Lakeside have 25 episodes per task; most other rows have 10 episodes per task. Results are not all paired or equally sampled. Report the actual episode count and uncertainty, do not treat the row order as a significance test, and do not interpret these as humanoid hardware results. RoboLab is a generalist tabletop/interaction simulation suite, not HumanoidToolBench or physical G1 qualification. Its published score should be a model/harness reference only.
+
+The page exposes action-generation latency and replanning delay columns, but current AMP1 entries are not populated there. This makes end-to-end reasoning latency, motion overlap, action execution and cost especially important to reproduce locally rather than infer from headline success.
+
 ### Agent Track governance and score comparability
 
 RoboDojo published revised Agent Track rules on 14 November 2026 and marks previously evaluated entries with an asterisk when they do not conform to one or more updated provisions. The 17 November snapshot shows a separate Agent Track, including SOLVE* at 79.50 average / 74.96 success and Q0-Preview* at 73.20 / 67.34, while the standard policy board has a different scale and top standard entry. Do not rank starred pre-rule results as compliant submissions, and do not compare Agent Track averages with standard policy averages, RoboLab percentages or HumanoidToolBench success rates.
