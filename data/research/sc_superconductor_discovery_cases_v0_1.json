@@ -617,9 +617,9 @@
       "reported_metric": {
         "unique_generated_candidates": 34027,
         "dft_tc_gt_5k": 773,
-        "dfT_hit_rate_percent": 2.27,
         "experimental_attempts": 18,
-        "attempts_with_any_signal_gt_4_2k": 9
+        "attempts_with_any_signal_gt_4_2k": 9,
+        "dft_hit_rate_percent": 2.27
       },
       "metric_interpretation": "paper-reported generative and DFT screening throughput. 9/18 is any signal, not target phase or bulk superconductivity.",
       "local_reproducibility_status": "not_reproduced; exact commit/checkpoints/all generated and rejected IDs and experiment dossiers tracked in #12646"
