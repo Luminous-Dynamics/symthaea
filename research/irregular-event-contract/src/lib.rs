@@ -186,19 +186,19 @@ impl EventRecord {
             }
             Measurement::Missing { .. } | Measurement::OpaquePayload { .. } => {}
         }
-        if let Measurement::OpaquePayload { payload_sha256, payload_bytes, encoding_id } = self.measurement {
-            if !nonzero_digest(&payload_sha256) || payload_bytes == 0 || encoding_id == 0 {
-                return Err(ContractError::InvalidOpaquePayload);
-            }
+        if let Measurement::OpaquePayload { payload_sha256, payload_bytes, encoding_id } = self.measurement
+            && (!nonzero_digest(&payload_sha256) || payload_bytes == 0 || encoding_id == 0)
+        {
+            return Err(ContractError::InvalidOpaquePayload);
         }
         if let Measurement::Censored { lower_scaled, upper_scaled, .. } = self.measurement {
             if lower_scaled.is_none() && upper_scaled.is_none() {
                 return Err(ContractError::EmptyCensoredInterval);
             }
-            if let (Some(lower), Some(upper)) = (lower_scaled, upper_scaled) {
-                if lower > upper {
-                    return Err(ContractError::InvertedCensoredInterval);
-                }
+            if let (Some(lower), Some(upper)) = (lower_scaled, upper_scaled)
+                && lower > upper
+            {
+                return Err(ContractError::InvertedCensoredInterval);
             }
         }
         Ok(())
@@ -262,11 +262,11 @@ pub fn validate_event_batch(events: &[EventRecord]) -> Result<(), ContractError>
 
 /// Return only observations legally available at the forecast origin. Preserve
 /// caller order; do not sort by event time, interpolate or fill missing values.
-pub fn observations_available_at<'a>(
-    events: &'a [EventRecord],
+pub fn observations_available_at(
+    events: &[EventRecord],
     entity_id: u64,
     forecast_origin_us: TimestampUs,
-) -> Result<Vec<&'a EventRecord>, ContractError> {
+) -> Result<Vec<&EventRecord>, ContractError> {
     if entity_id == 0 {
         return Err(ContractError::ZeroForecastEntity);
     }
@@ -278,12 +278,12 @@ pub fn observations_available_at<'a>(
 
 /// Return separately typed covariates legitimately known at forecast time.
 /// These are not observations and are not target labels.
-pub fn known_covariates_for_target<'a>(
-    covariates: &'a [KnownFutureCovariate],
+pub fn known_covariates_for_target(
+    covariates: &[KnownFutureCovariate],
     entity_id: u64,
     forecast_origin_us: TimestampUs,
     target_time_us: TimestampUs,
-) -> Result<Vec<&'a KnownFutureCovariate>, ContractError> {
+) -> Result<Vec<&KnownFutureCovariate>, ContractError> {
     if entity_id == 0 {
         return Err(ContractError::ZeroForecastEntity);
     }
@@ -400,13 +400,13 @@ impl BitemporalEventLedger {
     }
 
     pub fn append(&mut self, revision: EventRevision) -> Result<(), BitemporalEventError> {
-        if let Some(previous) = self.revisions.last().map(|item| item.recorded_at_us) {
-            if revision.recorded_at_us <= previous {
-                return Err(BitemporalEventError::NonIncreasingTransactionTime {
-                    previous,
-                    actual: revision.recorded_at_us,
-                });
-            }
+        if let Some(previous) = self.revisions.last().map(|item| item.recorded_at_us)
+            && revision.recorded_at_us <= previous
+        {
+            return Err(BitemporalEventError::NonIncreasingTransactionTime {
+                previous,
+                actual: revision.recorded_at_us,
+            });
         }
         // A single-event append is preflighted and committed in O(log n),
         // without cloning the complete append-only history.
@@ -428,13 +428,13 @@ impl BitemporalEventLedger {
         if incoming.iter().any(|revision| revision.recorded_at_us != transaction_time) {
             return Err(BitemporalEventError::BatchTimestampMismatch);
         }
-        if let Some(previous) = self.revisions.last().map(|revision| revision.recorded_at_us) {
-            if transaction_time <= previous {
-                return Err(BitemporalEventError::NonIncreasingTransactionTime {
-                    previous,
-                    actual: transaction_time,
-                });
-            }
+        if let Some(previous) = self.revisions.last().map(|revision| revision.recorded_at_us)
+            && transaction_time <= previous
+        {
+            return Err(BitemporalEventError::NonIncreasingTransactionTime {
+                previous,
+                actual: transaction_time,
+            });
         }
 
         let mut candidate = self.clone();
@@ -550,10 +550,10 @@ impl BitemporalEventLedger {
             }
         }
 
-        if let Some(key) = remove_active_key {
-            if !self.active_source_sequences.contains(&key) {
-                return Err(BitemporalEventError::InvalidHistory);
-            }
+        if let Some(key) = remove_active_key
+            && !self.active_source_sequences.contains(&key)
+        {
+            return Err(BitemporalEventError::InvalidHistory);
         }
         // All fallible semantic checks are complete. The following mutations
         // preserve the index invariants established by the preflight above.
@@ -581,10 +581,10 @@ impl BitemporalEventLedger {
         let mut candidate = Self::default();
         let mut prior_transaction_time = None;
         for revision in &self.revisions {
-            if let Some(previous) = prior_transaction_time {
-                if revision.recorded_at_us < previous {
-                    return Err(BitemporalEventError::InvalidHistory);
-                }
+            if let Some(previous) = prior_transaction_time
+                && revision.recorded_at_us < previous
+            {
+                return Err(BitemporalEventError::InvalidHistory);
             }
             prior_transaction_time = Some(revision.recorded_at_us);
             candidate.append_unchecked(*revision)?;
