@@ -86,7 +86,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo run --release \
+          cargo run --release --locked \
             --manifest-path research/irregular-event-contract/Cargo.toml \
             --bin watermark_scaling \
             | tee validation-artifacts/watermark-scaling.csv
@@ -103,6 +103,7 @@ jobs:
             echo "crate_manifest_sha256=$(sha256sum research/irregular-event-contract/Cargo.toml | cut -d ' ' -f 1)"
             echo "event_source_sha256=$(sha256sum research/irregular-event-contract/src/lib.rs | cut -d ' ' -f 1)"
             echo "watermark_source_sha256=$(sha256sum research/irregular-event-contract/src/watermarks.rs | cut -d ' ' -f 1)"
+            echo "watermark_scaling_source_sha256=$(sha256sum research/irregular-event-contract/src/bin/watermark_scaling.rs | cut -d ' ' -f 1)"
             echo "split_source_sha256=$(sha256sum research/irregular-event-contract/src/splits.rs | cut -d ' ' -f 1)"
             echo "scaler_source_sha256=$(sha256sum research/irregular-event-contract/src/scaler.rs | cut -d ' ' -f 1)"
             echo "time_imm_source_sha256=$(sha256sum research/irregular-event-contract/src/time_imm.rs | cut -d ' ' -f 1)"
