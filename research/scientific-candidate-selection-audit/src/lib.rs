@@ -711,6 +711,18 @@ pub fn validate_selection_trace(
 
     match &trace.decision {
         SelectionDecision::Select { candidate_id } => {
+            let attempt = packet
+                .candidates
+                .iter()
+                .find(|candidate| candidate.candidate_id == *candidate_id)
+                .ok_or_else(|| {
+                    SelectionAuditError::UnknownSelectedCandidate(candidate_id.clone())
+                })?;
+            if attempt.state != CandidateState::Ready {
+                return Err(SelectionAuditError::SelectedCandidateUnavailable(
+                    candidate_id.clone(),
+                ));
+            }
             let candidate = view
                 .candidates
                 .iter()
@@ -718,11 +730,6 @@ pub fn validate_selection_trace(
                 .ok_or_else(|| {
                     SelectionAuditError::UnknownSelectedCandidate(candidate_id.clone())
                 })?;
-            if candidate.state != CandidateState::Ready {
-                return Err(SelectionAuditError::SelectedCandidateUnavailable(
-                    candidate_id.clone(),
-                ));
-            }
             if candidate.eligibility != DevelopmentEligibility::Eligible {
                 return Err(SelectionAuditError::SelectedCandidateIneligible(
                     candidate_id.clone(),
@@ -1202,6 +1209,7 @@ mod tests {
     const MODEL_A: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     const MODEL_B: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
     const MODEL_C: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
+    const MODEL_D: &str = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
     const EVIDENCE_SHA: &str = "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee";
 
     fn candidate(id: &str, digest: &str) -> SelectorCandidate {
@@ -1502,7 +1510,7 @@ mod tests {
     #[test]
     fn evaluator_failures_and_missing_outcomes_stay_in_attempt_denominator() {
         let mut packet = packet();
-        packet.candidates.push(candidate("d", MODEL_C));
+        packet.candidates.push(candidate("d", MODEL_D));
         let frozen = trace(SelectionDecision::Select {
             candidate_id: "a".to_owned(),
         });
