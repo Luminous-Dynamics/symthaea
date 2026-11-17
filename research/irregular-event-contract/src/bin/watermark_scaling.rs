@@ -259,7 +259,7 @@ fn run_case(
         .unwrap_or_default();
 
     println!(
-        "{event_count},{source_count},{interval_width},{late_rate_basis_points},{known_at_us},{ARRIVAL_BATCH_COUNT},{INDEXED_REPETITIONS},{SCAN_REPETITIONS},{VERIFIED_REPETITIONS},{},{},{},{},{:.3},{:.3},{scan_p50:.3},{scan_p95:.3},{scan_p99:.3},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_max:.3}",
+        "{event_count},{source_count},{interval_width},{late_rate_basis_points},{known_at_us},{ARRIVAL_BATCH_COUNT},{INDEXED_REPETITIONS},{SCAN_REPETITIONS},{VERIFIED_REPETITIONS},{:.3},{:.3},{},{},{},{},{scan_p50:.3},{scan_p95:.3},{scan_p99:.3},{indexed_p50:.3},{indexed_p95:.3},{indexed_p99:.3},{verified_p50:.3},{verified_max:.3}",
         ingestion_elapsed.as_secs_f64() * 1_000_000.0,
         ingestion_elapsed.as_secs_f64() * 1_000_000_000.0 / event_count as f64,
         warm.late_breach_index_buckets_examined,
