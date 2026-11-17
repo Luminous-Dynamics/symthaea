@@ -285,6 +285,12 @@ pub fn classify_paired_representations(
     candidates: &[PointGroupTemplateV1],
     paired_blocks: &[PairedRepresentationBlockV1],
 ) -> Result<PairedRobustSymFpReceiptV1, PairedSymFpErrorV1> {
+    let mut candidate_names = BTreeSet::new();
+    for candidate in candidates {
+        if !candidate_names.insert(candidate.schoenflies) {
+            return Err(PairedSymFpErrorV1::DuplicateCandidate);
+        }
+    }
     let derived_operator_bounds = validate_paired_blocks(reference_receipt, paired_blocks)?;
     let bounds: Vec<f64> = derived_operator_bounds
         .iter()
@@ -296,12 +302,6 @@ pub fn classify_paired_representations(
         &bounds,
     )
     .map_err(PairedSymFpErrorV1::RobustClassifier)?;
-    let mut candidate_names = BTreeSet::new();
-    for candidate in candidates {
-        if !candidate_names.insert(candidate.schoenflies) {
-            return Err(PairedSymFpErrorV1::DuplicateCandidate);
-        }
-    }
     let reference_svd_residuals = reference_receipt
         .spectra
         .iter()
