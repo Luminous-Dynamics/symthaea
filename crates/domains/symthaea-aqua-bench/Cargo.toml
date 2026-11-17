@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.94"
 authors = ["Luminous Dynamics"]
-description = "Deterministic whole-service water and energy accounting for Luminous Aqua benchmarks"
+description = "Matched-service benchmark context and evidence adapter for Luminous Aqua"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 
