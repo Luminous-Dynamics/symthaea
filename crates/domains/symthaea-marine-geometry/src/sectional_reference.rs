@@ -478,6 +478,34 @@ fn integrate_linear_curve(samples: &[SectionSample], value: impl Fn(&SectionSamp
 
 /// Exact first moment of a piecewise-linear scalar curve f(x) over each station
 /// interval. This avoids applying a trapezoid to x*f(x), which is quadratic.
+/// Integrate the product of two piecewise-linear observables exactly on
+/// each station interval. This matters for first moments such as A(x)*VCB(x):
+/// trapezoidal integration of the endpoint products is not exact because the
+/// product of two linear functions is quadratic.
+fn integrate_product_of_linear_curves(
+    samples: &[SectionSample],
+    left: impl Fn(&SectionSample) -> f64,
+    right: impl Fn(&SectionSample) -> f64,
+) -> f64 {
+    let mut sum = 0.0;
+    let mut correction = 0.0;
+    for pair in samples.windows(2) {
+        let dx = pair[1].x_m - pair[0].x_m;
+        let left_0 = left(&pair[0]);
+        let left_1 = left(&pair[1]);
+        let right_0 = right(&pair[0]);
+        let right_1 = right(&pair[1]);
+        let delta_left = left_1 - left_0;
+        let delta_right = right_1 - right_0;
+        let segment = dx
+            * (left_0 * right_0
+                + 0.5 * (left_0 * delta_right + right_0 * delta_left)
+                + delta_left * delta_right / 3.0);
+        kahan_add(&mut sum, &mut correction, segment);
+    }
+    sum
+}
+
 fn integrate_linear_first_moment(
     samples: &[SectionSample],
     value: impl Fn(&SectionSample) -> f64,
@@ -557,10 +585,16 @@ fn evaluate_one(
     let waterplane_area = integrate_linear_curve(&samples, |sample| sample.waterline_breadth_m);
     let lcb_moment = integrate_linear_first_moment(&samples, |sample| sample.area_m2);
     let lcf_moment = integrate_linear_first_moment(&samples, |sample| sample.waterline_breadth_m);
-    let transverse_moment =
-        integrate_linear_curve(&samples, |sample| sample.area_m2 * sample.centroid_y_m);
-    let vertical_moment =
-        integrate_linear_curve(&samples, |sample| sample.area_m2 * sample.centroid_z_m);
+    let transverse_moment = integrate_product_of_linear_curves(
+        &samples,
+        |sample| sample.area_m2,
+        |sample| sample.centroid_y_m,
+    );
+    let vertical_moment = integrate_product_of_linear_curves(
+        &samples,
+        |sample| sample.area_m2,
+        |sample| sample.centroid_z_m,
+    );
 
     if !displacement_volume.is_finite()
         || displacement_volume <= 0.0
@@ -1583,6 +1617,30 @@ mod tests {
                     < 1.0e-12
             );
         }
+    }
+
+
+    #[test]
+    fn variable_draft_fixture_integrates_section_first_moments_exactly() {
+        let mut request = fixture_request();
+        request.source_spec.principal_dimensions.design_draft_m = 8.0;
+        for (index, station) in request.source_spec.stations.iter_mut().enumerate() {
+            let local_draft = if index == 0 { 4.0 } else { 8.0 };
+            station.starboard_profile[0].z_m = local_draft;
+            station.starboard_profile[1].z_m = local_draft;
+        }
+        request.loading_conditions = vec![LoadingCondition {
+            condition_id: "VARIABLE-DRAFT-DESIGN-WL".into(),
+            waterplane_z_m: 0.0,
+            water_density_kg_m3: 1025.0,
+        }];
+        let receipt = evaluate_loading_sweep(&request).unwrap();
+        let result = &receipt.results[0];
+
+        assert!((result.displacement_volume_m3 - 12_000.0).abs() < 1.0e-9);
+        assert!((result.waterplane_area_m2 - 2_000.0).abs() < 1.0e-9);
+        assert!((result.longitudinal_center_of_buoyancy_m - 500.0 / 9.0).abs() < 1.0e-9);
+        assert!((result.vertical_center_of_buoyancy_m - 28.0 / 9.0).abs() < 1.0e-9);
     }
 
     #[test]
