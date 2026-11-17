@@ -32,6 +32,10 @@ A portfolio is admitted only when:
 
 "Independent" means independent within this declared, complete fault model. It does not mean physically or metaphysically independent in the absence of an accurate inventory.
 
+## Frozen benchmark manifest
+
+`subterra-corroboration-benchmark.v0.1.json` defines the source/robot/modality/path-depth panel, 16 adversarial cases, metrics and research targets. It is a protocol manifest, not evidence that the cases have been executed or that physical independence has been demonstrated.
+
 ## Run
 
 ```sh
