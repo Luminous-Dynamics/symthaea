@@ -418,6 +418,7 @@
           "query_id",
           "loss_currency",
           "loss_unit",
+          "net_value_rounding",
           "robust_stop_action_id",
           "robust_stop_loss_micros",
           "nominal_stop_loss_micros",
@@ -523,6 +524,10 @@
                 }
               }
             }
+          },
+          "net_value_rounding": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }
