@@ -461,7 +461,7 @@ The NEMAD model-index repository root was also inspected: it lists README.md and
 
 ## 24. Second hosted execution audit — 17 November 2026
 
-The next exact PR workflow run, ID 44106304742, reached the formatter step on head 9b? (exact checked-out PR head from the run is recorded by GitHub; see the workflow URL below) and failed only because the **metrics binary** had two Rust 1.96 formatting differences: serde_json import ordering and a multiline assertion. The registry auditor's rustfmt check passed in that run. Lock generation, both test suites, executable runs and clippy were skipped.
+The next exact PR workflow run, ID 44106304742, reached the formatter step on head `dd72dc9cc712c4c4fcd3023c04e5077d17b4a61a` and failed only because the **metrics binary** had two Rust 1.96 formatting differences: serde_json import ordering and a multiline assertion. The registry auditor's rustfmt check passed in that run. Lock generation, both test suites, executable runs and clippy were skipped.
 
 Corrective change applied in commit `e8995d52206f2c8caef7a4112ad30e15ee9243b8`: normalize the import and assertion formatting. The exact failure output is retained in [workflow run 44106304742](https://github.com/Luminous-Dynamics/symthaea/actions/runs/44106304742).
 
