@@ -798,6 +798,16 @@ mod tests {
     }
 
     #[test]
+    fn malformed_deterministic_table_is_rejected_before_singleton_adaptation() {
+        let mut deterministic = deterministic_fixture();
+        deterministic.probes[0].outcomes.pop();
+        assert_eq!(
+            BoundedNoiseProblemV1::from_deterministic(&deterministic),
+            Err(NoiseErrorV1::InvalidDeterministicInput)
+        );
+    }
+
+    #[test]
     fn no_compatible_hypothesis_is_reported_as_model_mismatch_not_a_symmetry_proof() {
         let problem = bounded_fixture();
         let observations = vec![NoiseObservationV1 {
