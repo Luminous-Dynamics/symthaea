@@ -71,7 +71,10 @@ impl Display for ContractError {
                 write!(f, "matched benchmark context differs at: {field}")
             }
             Self::MissingEnergyReceipt => {
-                write!(f, "energy comparison requires a Symtropy resource-closure receipt")
+                write!(
+                    f,
+                    "energy comparison requires a Symtropy resource-closure receipt"
+                )
             }
         }
     }
@@ -118,20 +121,36 @@ impl BenchmarkConditions {
         if self.duration_seconds == 0 {
             return Err(ContractError::ZeroDuration);
         }
-        require_digest("inlet_water_profile_sha256", &self.inlet_water_profile_sha256)?;
-        require_digest("delivery_conditions_sha256", &self.delivery_conditions_sha256)?;
+        require_digest(
+            "inlet_water_profile_sha256",
+            &self.inlet_water_profile_sha256,
+        )?;
+        require_digest(
+            "delivery_conditions_sha256",
+            &self.delivery_conditions_sha256,
+        )?;
         require_digest("room_conditions_sha256", &self.room_conditions_sha256)?;
-        require_digest("measurement_protocol_sha256", &self.measurement_protocol_sha256)?;
-        require_digest("accounting_boundary_sha256", &self.accounting_boundary_sha256)?;
+        require_digest(
+            "measurement_protocol_sha256",
+            &self.measurement_protocol_sha256,
+        )?;
+        require_digest(
+            "accounting_boundary_sha256",
+            &self.accounting_boundary_sha256,
+        )?;
         Ok(())
     }
 
     fn compare_with(&self, other: &Self) -> Result<(), ContractError> {
         if self.task_profile_id != other.task_profile_id {
-            return Err(ContractError::ContextMismatch { field: "task_profile_id" });
+            return Err(ContractError::ContextMismatch {
+                field: "task_profile_id",
+            });
         }
         if self.duration_seconds != other.duration_seconds {
-            return Err(ContractError::ContextMismatch { field: "duration_seconds" });
+            return Err(ContractError::ContextMismatch {
+                field: "duration_seconds",
+            });
         }
         if self.inlet_water_profile_sha256 != other.inlet_water_profile_sha256 {
             return Err(ContractError::ContextMismatch {
@@ -200,14 +219,10 @@ pub struct AquaRunEvidence {
 
 impl AquaRunEvidence {
     pub fn validate(&self, scope: ComparisonScope) -> Result<(), ContractError> {
-        self.water_service_t0.validate(
-            "water_service_t0",
-            EvidenceOwner::SymtropyWaterServiceT0,
-        )?;
-        self.metrology_admission.validate(
-            "metrology_admission",
-            EvidenceOwner::MycelixMetrology,
-        )?;
+        self.water_service_t0
+            .validate("water_service_t0", EvidenceOwner::SymtropyWaterServiceT0)?;
+        self.metrology_admission
+            .validate("metrology_admission", EvidenceOwner::MycelixMetrology)?;
         self.water_quality_assessment.validate(
             "water_quality_assessment",
             EvidenceOwner::MycelixWaterQuality,
@@ -309,11 +324,7 @@ mod tests {
                 firmware_revision: Some("1.0.0".to_owned()),
             },
             evidence: AquaRunEvidence {
-                water_service_t0: evidence(
-                    EvidenceOwner::SymtropyWaterServiceT0,
-                    "water-run",
-                    '2',
-                ),
+                water_service_t0: evidence(EvidenceOwner::SymtropyWaterServiceT0, "water-run", '2'),
                 metrology_admission: evidence(
                     EvidenceOwner::MycelixMetrology,
                     "metrology-run",
@@ -343,11 +354,7 @@ mod tests {
         let control = run("control-001", "incumbent-shower", '7');
         let candidate = run("candidate-001", "aqua-test-article", '8');
         assert_eq!(
-            validate_matched_comparison(
-                &control,
-                &candidate,
-                ComparisonScope::WaterAndEnergy,
-            ),
+            validate_matched_comparison(&control, &candidate, ComparisonScope::WaterAndEnergy,),
             Ok(())
         );
     }
@@ -358,11 +365,7 @@ mod tests {
         let mut candidate = run("candidate-001", "aqua-test-article", '8');
         candidate.conditions.task_profile_id = "HAIR_WASH".to_owned();
         assert_eq!(
-            validate_matched_comparison(
-                &control,
-                &candidate,
-                ComparisonScope::WaterServiceOnly,
-            ),
+            validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly,),
             Err(ContractError::ContextMismatch {
                 field: "task_profile_id",
             })
@@ -472,7 +475,9 @@ mod tests {
         candidate.conditions.duration_seconds = 599;
         assert_eq!(
             validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly),
-            Err(ContractError::ContextMismatch { field: "duration_seconds" })
+            Err(ContractError::ContextMismatch {
+                field: "duration_seconds"
+            })
         );
     }
 
@@ -483,7 +488,9 @@ mod tests {
         candidate.conditions.inlet_water_profile_sha256 = digest('9');
         assert_eq!(
             validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly),
-            Err(ContractError::ContextMismatch { field: "inlet_water_profile_sha256" })
+            Err(ContractError::ContextMismatch {
+                field: "inlet_water_profile_sha256"
+            })
         );
     }
 
@@ -494,7 +501,9 @@ mod tests {
         candidate.conditions.room_conditions_sha256 = digest('9');
         assert_eq!(
             validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly),
-            Err(ContractError::ContextMismatch { field: "room_conditions_sha256" })
+            Err(ContractError::ContextMismatch {
+                field: "room_conditions_sha256"
+            })
         );
     }
 
@@ -505,7 +514,9 @@ mod tests {
         candidate.conditions.measurement_protocol_sha256 = digest('9');
         assert_eq!(
             validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly),
-            Err(ContractError::ContextMismatch { field: "measurement_protocol_sha256" })
+            Err(ContractError::ContextMismatch {
+                field: "measurement_protocol_sha256"
+            })
         );
     }
 
@@ -516,7 +527,9 @@ mod tests {
         candidate.conditions.accounting_boundary_sha256 = digest('9');
         assert_eq!(
             validate_matched_comparison(&control, &candidate, ComparisonScope::WaterServiceOnly),
-            Err(ContractError::ContextMismatch { field: "accounting_boundary_sha256" })
+            Err(ContractError::ContextMismatch {
+                field: "accounting_boundary_sha256"
+            })
         );
     }
 
@@ -526,18 +539,26 @@ mod tests {
         candidate.evidence.task_outcome_assessment.record_id.clear();
         assert_eq!(
             candidate.validate(ComparisonScope::WaterServiceOnly),
-            Err(ContractError::MissingField { field: "task_outcome_assessment" })
+            Err(ContractError::MissingField {
+                field: "task_outcome_assessment"
+            })
         );
     }
 
     #[test]
     fn rejects_wrong_energy_resource_owner() {
         let mut candidate = run("candidate-001", "aqua-test-article", '8');
-        candidate.evidence.energy_resource_closure.as_mut().unwrap().owner =
-            EvidenceOwner::SymtropyWaterServiceT0;
+        candidate
+            .evidence
+            .energy_resource_closure
+            .as_mut()
+            .unwrap()
+            .owner = EvidenceOwner::SymtropyWaterServiceT0;
         assert_eq!(
             candidate.validate(ComparisonScope::WaterAndEnergy),
-            Err(ContractError::WrongEvidenceOwner { field: "energy_resource_closure" })
+            Err(ContractError::WrongEvidenceOwner {
+                field: "energy_resource_closure"
+            })
         );
     }
 
@@ -547,7 +568,9 @@ mod tests {
         candidate.device.cleaning_protocol_sha256 = "not-a-digest".to_owned();
         assert_eq!(
             candidate.validate(ComparisonScope::WaterServiceOnly),
-            Err(ContractError::InvalidDigest { field: "cleaning_protocol_sha256" })
+            Err(ContractError::InvalidDigest {
+                field: "cleaning_protocol_sha256"
+            })
         );
     }
 }
