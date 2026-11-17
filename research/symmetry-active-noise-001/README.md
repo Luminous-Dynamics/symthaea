@@ -42,3 +42,13 @@ The next comparison step is a faithful implementation/adapter for the JMLR noisy
 ## Claim boundary
 
 Finite discrete outcome sets only; no continuous numeric intervals, likelihoods, priors, posterior calibration, independent transient-noise repetitions, POMDP policy, physical actuation, safety authorization, causal inference, or symmetry proof. The receipt establishes model compatibility only.
+
+
+## Numeric interval extension
+
+The Rust reference also includes an exact fixed-point interval path:
+- `FixedIntervalV1` stores closed signed integer bounds at an explicitly declared unit scale. It uses no hidden epsilon and all arithmetic is checked.
+- `BoundedIntervalProblemV1` retains a hypothesis only when every observed interval overlaps its declared prediction interval. Repeated readings of one probe intersect the same evidence interval. Once that intersection is empty, the campaign remains inconsistent and still records every subsequent observation in its replay snapshots.
+- `SharedAdditiveBiasProblemV1` models one continuous, campaign-wide additive nuisance value. Each observation induces a feasible interval for that bias; a hypothesis survives only if the intersection across all probes and repeated readings is nonempty. It cannot assign a different bias to each probe.
+
+Tests include interval-overlap discrimination, repeated-reading contradiction, one shared bias across probes, fixed-point overflow rejection, and observationally equivalent hypotheses that must remain ambiguous. The numeric scale is part of the caller's problem definition; these intervals are not probabilities or confidence intervals.
