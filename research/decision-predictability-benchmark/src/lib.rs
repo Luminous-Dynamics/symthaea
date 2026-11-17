@@ -1,3 +1,4 @@
+pub mod baseline;
 pub mod decision_horizon;
 pub mod paired_world;
 
