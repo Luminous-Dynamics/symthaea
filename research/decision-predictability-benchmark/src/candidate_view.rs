@@ -13,7 +13,7 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::manifest::{Scenario, ScenarioGroup, SplitRole};
+use crate::manifest::{Scenario, ScenarioGroup, SplitRole, ValidatedManifest};
 
 pub const CANDIDATE_PACKET_SCHEMA_V1: &str =
     "luminous.decision-transfer.candidate-packet.v1";
@@ -29,6 +29,7 @@ pub enum CandidateViewError {
     NonIncreasingObservationTime,
     ObservationAfterAsOfTime,
     DuplicateTicket,
+    UnknownScenario,
 }
 
 impl fmt::Display for CandidateViewError {
@@ -42,6 +43,7 @@ impl fmt::Display for CandidateViewError {
             Self::NonIncreasingObservationTime => write!(formatter, "observation timestamps must be strictly increasing"),
             Self::ObservationAfterAsOfTime => write!(formatter, "candidate packet contains an observation after its as-of time"),
             Self::DuplicateTicket => write!(formatter, "candidate ticket is already bound in this evaluator run"),
+            Self::UnknownScenario => write!(formatter, "scenario ID is not present in the validated manifest"),
         }
     }
 }
@@ -207,15 +209,24 @@ pub struct EvaluatorTicketBook {
 }
 
 impl EvaluatorTicketBook {
-    pub fn bind(
+    /// Bind a candidate ticket only to a scenario extracted from a validated
+    /// manifest. Arbitrary caller-constructed Scenario values are not accepted.
+    pub fn bind_from_manifest(
         &mut self,
         packet: &CandidatePacketV1,
-        scenario: &Scenario,
+        manifest: &ValidatedManifest,
+        scenario_id: &str,
     ) -> Result<(), CandidateViewError> {
         packet.validate()?;
         if self.bindings.contains_key(&packet.ticket) {
             return Err(CandidateViewError::DuplicateTicket);
         }
+        let scenario = manifest
+            .manifest()
+            .scenarios
+            .iter()
+            .find(|scenario| scenario.scenario_id == scenario_id)
+            .ok_or(CandidateViewError::UnknownScenario)?;
         let binding = EvaluatorOnlyBinding {
             scenario_id: scenario.scenario_id.clone(),
             split_role: scenario.split_role,
@@ -265,30 +276,15 @@ fn is_safe_label(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::manifest::ScenarioGroup;
+    use crate::manifest::parse_and_validate;
 
     const TICKET: &str = "0123456789abcdef0123456789abcdef";
     const DIGEST: &str =
         "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
-    fn scenario() -> Scenario {
-        Scenario {
-            scenario_id: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1".to_owned(),
-            split_role: SplitRole::ConfirmatoryTest,
-            groups: vec![
-                ScenarioGroup {
-                    axis: crate::manifest::SplitAxisKind::EquationFamily,
-                    group_id: "11111111111111111111111111111111".to_owned(),
-                },
-                ScenarioGroup {
-                    axis: crate::manifest::SplitAxisKind::ParameterCell,
-                    group_id: "22222222222222222222222222222222".to_owned(),
-                },
-            ],
-            seed_commitment: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_owned(),
-            reference_data_digest: "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc".to_owned(),
-            solver_qualification_digest: "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd".to_owned(),
-        }
+
+    fn validated_manifest() -> ValidatedManifest {
+        parse_and_validate(include_bytes!("../fixtures/split-manifest-v1.json")).unwrap()
     }
 
     fn packet(ticket: &str) -> CandidatePacketV1 {
@@ -316,9 +312,10 @@ mod tests {
     #[test]
     fn candidate_serialization_excludes_evaluator_only_fields() {
         let mut book = EvaluatorTicketBook::default();
-        let scenario = scenario();
+        let manifest = validated_manifest();
+        let scenario_id = manifest.manifest().scenarios[2].scenario_id.clone();
         let packet = packet(TICKET);
-        book.bind(&packet, &scenario).unwrap();
+        book.bind_from_manifest(&packet, &manifest, &scenario_id).unwrap();
 
         let json = serde_json::to_value(&packet).unwrap();
         let object = json.as_object().unwrap();
@@ -336,7 +333,7 @@ mod tests {
             assert!(!object.contains_key(field), "candidate JSON leaked {field}");
         }
         assert_eq!(book.binding_for(TICKET).unwrap().split_role(), SplitRole::ConfirmatoryTest);
-        assert_eq!(book.binding_for(TICKET).unwrap().scenario_id(), scenario.scenario_id);
+        assert_eq!(book.binding_for(TICKET).unwrap().scenario_id(), scenario_id);
     }
 
     #[test]
@@ -367,12 +364,28 @@ mod tests {
 
     #[test]
     fn evaluator_ticket_book_rejects_ticket_reuse() {
-        let scenario = scenario();
+        let manifest = validated_manifest();
+        let scenario_id = manifest.manifest().scenarios[2].scenario_id.clone();
         let packet = packet(TICKET);
         let mut book = EvaluatorTicketBook::default();
-        book.bind(&packet, &scenario).unwrap();
-        assert_eq!(book.bind(&packet, &scenario), Err(CandidateViewError::DuplicateTicket));
+        book.bind_from_manifest(&packet, &manifest, &scenario_id).unwrap();
+        assert_eq!(
+            book.bind_from_manifest(&packet, &manifest, &scenario_id),
+            Err(CandidateViewError::DuplicateTicket)
+        );
         assert_eq!(book.len(), 1);
+    }
+
+    #[test]
+    fn evaluator_book_rejects_scenario_outside_validated_manifest() {
+        let manifest = validated_manifest();
+        let packet = packet(TICKET);
+        let mut book = EvaluatorTicketBook::default();
+        assert_eq!(
+            book.bind_from_manifest(&packet, &manifest, "ffffffffffffffffffffffffffffffff"),
+            Err(CandidateViewError::UnknownScenario)
+        );
+        assert!(book.is_empty());
     }
 
     #[test]
