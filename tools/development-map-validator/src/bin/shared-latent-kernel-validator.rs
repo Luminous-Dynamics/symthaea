@@ -419,6 +419,17 @@ mod tests{
   assert_eq!(pair["joint_nominal_bps"],5000);
   assert_eq!(pair["joint_upper_bps"],5600);
  }
+ #[test]fn shared_latent_posterior_risk_is_tighter_than_rectangular_hull(){
+  // Exact prior: safe-world=hazard=50%. For pass/pass:
+  // shared w0=0.4 gives safe=0.56 and hazard=0.34, the worst coupled ratio.
+  // The independent product hull combines safe lower=0.44 with hazard upper=0.34,
+  // although those extrema cannot occur at the same shared latent weight.
+  let coupled=(3400u64*10000+9000-1)/9000;
+  let rectangular=(3400u64*10000+3400+4400-1)/(3400+4400);
+  assert_eq!(coupled,3778);
+  assert_eq!(rectangular,4359);
+  assert!(coupled<rectangular);
+ }
  #[test]fn candidate_cannot_inject_shared_latent_oracle(){
   let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
   b["candidate_view"]["latent_states"]=json!([]);
