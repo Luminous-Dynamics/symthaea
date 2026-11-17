@@ -179,3 +179,28 @@ These are prospective targets. They are not current performance claims.
 ## Additional enabling architecture — exact score-time maps
 
 Issue #12722 now tracks a versioned score-time map for notated tempo and meter changes. This is intentionally separate from #11355's expressive performance clock. The current M1 experiment (#12721) remains same-tempo/same-meter; a broader tempo/meter transition is not claimed until exact score-beat-to-nominal-seconds mapping, meter boundaries, legacy Score migration and performance-clock composition are independently verified.
+
+## 12. Industry snapshot clarification — 2026-11-17
+
+The official Artificial Analysis v1.1 boards were rechecked on 2026-11-17. The displayed instrumental leaders remain Suno v6 (1148 ± 22; 2,208 samples), Suno v6-mini (1114 ± 21), Mureka V9.5 (1084 ± 21), Mureka V9 (1083 ± 21), Lyria 3 Pro (1080 ± 21) and Lyria 3.5 (1078 ± 21). The displayed vocal leaders are ACE Music v1 (1160 ± 21; 2,119 samples), Suno v6 (1144 ± 18; 3,063) and Suno v6-mini (1132 ± 18; 3,175), followed by Mureka V9.5 (1101 ± 18).
+
+Do not overstate the vocal ordering: ACE Music v1's 95% interval (1139–1181) overlaps Suno v6's (1126–1162). It is the current displayed point-estimate leader, not a cleanly separated statistical winner from Suno v6 under the published intervals. Instrumental and vocal tracks are separate modalities and should remain separate Muse scorecards.
+
+Artificial Analysis's methodology page specifies same-prompt/same-modality blind pairwise choices, at least ten seconds listening to each track, Bradley–Terry estimation, an updated October 2026 confidence-interval method, static gain normalization toward −16 LUFS with a −1 dBTP ceiling, and 320 kbps MP3 / 44.1 kHz delivery. Its standard tracks are approximately three minutes, or the closest supported length, with one track per prompt. These details should be copied into a matched Muse preference protocol rather than comparing results from unlike output budgets.
+
+Suno has advanced beyond simple prompt-to-audio generation: Studio 2.0 documents MIDI import/record/edit, chat-driven clip and instrument creation, user-designed plugins, effects, a wavetable synth and automation; October 2026 release notes add downbeat detection improvements, clip time-stretching and editable fade curves. This makes it inaccurate to describe MIDI editing, chat or timeline control as an unoccupied niche. Muse's differentiation must be exact symbolic semantics, protected-content verification, reversible score transactions, causal attribution, persistent identity and evidence that requested changes occurred without unauthorized collateral changes.
+
+Google DeepMind describes Lyria RealTime as a continuous real-time stream with direct key, tempo, density and brightness control and 48 kHz stereo output. Lyria 3.5 is described as capable of up-to-three-minute tracks and as improving prompt adherence, audio fidelity, vocals and musicality. Treat these as vendor-described capabilities; use matched latency and blinded musical tasks for quantitative comparisons.
+
+### Source links added to the comparison record
+
+- Artificial Analysis instrumental leaderboard: https://artificialanalysis.ai/music/leaderboard/instrumental?mode=instrumental&tab=leaderboard
+- Artificial Analysis vocal leaderboard: https://artificialanalysis.ai/embed/music-generation-leaderboard/leaderboard/vocals
+- Artificial Analysis methodology: https://artificialanalysis.ai/methodology/music
+- Suno Studio 2.0 official feature overview: https://help.suno.com/en/articles/13670529
+- Suno Oct 8, 2026 Studio improvements: https://suno.com/release-notes
+- Google DeepMind Lyria RealTime: https://deepmind.google/models/lyria/lyria-realtime/
+- Google DeepMind Lyria 3.5: https://deepmind.google/models/lyria/
+- MIREX 2026 symbolic generation results: https://futuremirex.com/mirex/wiki/2026%3ASymbolic_Music_Generation_Results
+
+**Claim boundary:** all model Elo values are preference results from the listed modality-specific arena. They do not imply exact-score control, edit fidelity, continuity, reciprocal contingency, rights compliance or source provenance. No Muse head-to-head preference result is claimed here.
