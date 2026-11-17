@@ -166,6 +166,8 @@ pub struct CompletenessReport {
     pub late_breach_index_buckets_examined: usize,
     /// Number of receipt records visited after the knowledge-time cutoff.
     pub late_breach_candidates_examined: usize,
+    /// Number of breach receipts visited by the linear-scan reference path.
+    pub late_breach_linear_scan_receipts_examined: usize,
 }
 
 /// A completeness report produced only after replaying the append-only
@@ -552,6 +554,47 @@ impl SourceWatermarkLedger {
         interval_end_exclusive_us: i64,
         known_at_us: i64,
     ) -> Result<CompletenessReport, WatermarkError> {
+        self.completeness_with_lookup(
+            entity_id,
+            required_sources,
+            interval_start_us,
+            interval_end_exclusive_us,
+            known_at_us,
+            true,
+        )
+    }
+
+    /// Reference implementation using the same query/report path but scanning
+    /// all late-breach receipts instead of using the secondary index. This is
+    /// retained for deterministic differential benchmarks and test oracles.
+    #[doc(hidden)]
+    pub fn completeness_linear_scan_reference(
+        &self,
+        entity_id: u64,
+        required_sources: &[SourceKey],
+        interval_start_us: i64,
+        interval_end_exclusive_us: i64,
+        known_at_us: i64,
+    ) -> Result<CompletenessReport, WatermarkError> {
+        self.completeness_with_lookup(
+            entity_id,
+            required_sources,
+            interval_start_us,
+            interval_end_exclusive_us,
+            known_at_us,
+            false,
+        )
+    }
+
+    fn completeness_with_lookup(
+        &self,
+        entity_id: u64,
+        required_sources: &[SourceKey],
+        interval_start_us: i64,
+        interval_end_exclusive_us: i64,
+        known_at_us: i64,
+        use_index: bool,
+    ) -> Result<CompletenessReport, WatermarkError> {
         if entity_id == 0 {
             return Err(WatermarkError::ZeroSourceIdentity);
         }
@@ -595,36 +638,61 @@ impl SourceWatermarkLedger {
             });
         }
 
-        // Use the required-source + half-open event-time index. Historical
-        // visibility is still filtered by transaction/knowledge time.
         let mut late_breaches = Vec::new();
         let mut late_breach_index_buckets_examined = 0usize;
         let mut late_breach_candidates_examined = 0usize;
-        for source in &unique {
-            let start = (*source, interval_start_us);
-            let end = (*source, interval_end_exclusive_us);
-            for receipts_by_time in self
-                .late_breaches_by_source_event_time_recorded_at
-                .range(start..end)
-                .map(|(_, receipts)| receipts)
-            {
-                late_breach_index_buckets_examined = late_breach_index_buckets_examined
+        let mut late_breach_linear_scan_receipts_examined = 0usize;
+        if use_index {
+            // Use the required-source + half-open event-time index. Historical
+            // visibility is applied inside the receipt-time sub-index.
+            for source in &unique {
+                let start = (*source, interval_start_us);
+                let end = (*source, interval_end_exclusive_us);
+                for receipts_by_time in self
+                    .late_breaches_by_source_event_time_recorded_at
+                    .range(start..end)
+                    .map(|(_, receipts)| receipts)
+                {
+                    late_breach_index_buckets_examined = late_breach_index_buckets_examined
+                        .checked_add(1)
+                        .ok_or(WatermarkError::ArithmeticOverflow)?;
+                    for indices in receipts_by_time
+                        .range(..=known_at_us)
+                        .map(|(_, indices)| indices)
+                    {
+                        for index in indices {
+                            late_breach_candidates_examined = late_breach_candidates_examined
+                                .checked_add(1)
+                                .ok_or(WatermarkError::ArithmeticOverflow)?;
+                            let breach = self
+                                .late_breaches
+                                .get(*index)
+                                .ok_or(WatermarkError::InvalidHistory)?;
+                            late_breaches.push(*breach);
+                        }
+                    }
+                }
+            }
+        } else {
+            // The deliberately simple oracle scans the same receipt vector,
+            // then applies the identical entity/source/interval/knowledge cut.
+            for breach in &self.late_breaches {
+                late_breach_linear_scan_receipts_examined = late_breach_linear_scan_receipts_examined
                     .checked_add(1)
                     .ok_or(WatermarkError::ArithmeticOverflow)?;
-                for indices in receipts_by_time
-                    .range(..=known_at_us)
-                    .map(|(_, indices)| indices)
+                let event = breach.event;
+                let source = SourceKey {
+                    entity_id: event.entity_id,
+                    modality_id: event.modality_id,
+                    source_id: event.source_id,
+                };
+                if breach.recorded_at_us <= known_at_us
+                    && event.entity_id == entity_id
+                    && event.event_time_us >= interval_start_us
+                    && event.event_time_us < interval_end_exclusive_us
+                    && unique.contains(&source)
                 {
-                    for index in indices {
-                        late_breach_candidates_examined = late_breach_candidates_examined
-                            .checked_add(1)
-                            .ok_or(WatermarkError::ArithmeticOverflow)?;
-                        let breach = self
-                            .late_breaches
-                            .get(*index)
-                            .ok_or(WatermarkError::InvalidHistory)?;
-                        late_breaches.push(*breach);
-                    }
+                    late_breaches.push(*breach);
                 }
             }
         }
@@ -648,6 +716,7 @@ impl SourceWatermarkLedger {
             late_breaches,
             late_breach_index_buckets_examined,
             late_breach_candidates_examined,
+            late_breach_linear_scan_receipts_examined,
         })
     }
 
@@ -1025,6 +1094,43 @@ mod tests {
                 _ => unreachable!(),
             }
         );
+    }
+
+    #[test]
+    fn indexed_completeness_matches_full_query_linear_scan_reference() {
+        let mut ledger = SourceWatermarkLedger::default();
+        ledger
+            .append_batch([
+                progress(1, 1, 1, 1, 10, 100, false),
+                progress(2, 2, 1, 1, 10, 120, false),
+            ])
+            .unwrap();
+        ledger
+            .record_event_arrival(event(1, 1, 50, 20), 20)
+            .unwrap();
+        ledger
+            .record_event_arrival(event(2, 2, 60, 30), 30)
+            .unwrap();
+        ledger
+            .record_event_arrival(event(3, 1, 150, 40), 40)
+            .unwrap();
+
+        let indexed = ledger.completeness(1, &[source(1), source(2)], 0, 100, 40).unwrap();
+        let scanned = ledger
+            .completeness_linear_scan_reference(1, &[source(1), source(2)], 0, 100, 40)
+            .unwrap();
+
+        assert_eq!(indexed.interval_start_us, scanned.interval_start_us);
+        assert_eq!(indexed.interval_end_exclusive_us, scanned.interval_end_exclusive_us);
+        assert_eq!(indexed.known_at_us, scanned.known_at_us);
+        assert_eq!(indexed.verdict, scanned.verdict);
+        assert_eq!(indexed.sources, scanned.sources);
+        assert_eq!(indexed.blocked_sources, scanned.blocked_sources);
+        assert_eq!(indexed.late_breaches, scanned.late_breaches);
+        assert_eq!(indexed.late_breach_linear_scan_receipts_examined, 0);
+        assert_eq!(scanned.late_breach_index_buckets_examined, 0);
+        assert_eq!(scanned.late_breach_candidates_examined, 0);
+        assert_eq!(scanned.late_breach_linear_scan_receipts_examined, 3);
     }
 
     #[test]
