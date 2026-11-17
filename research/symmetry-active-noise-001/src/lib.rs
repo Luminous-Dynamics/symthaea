@@ -776,6 +776,7 @@ pub fn replay_bounded_intervals(
 ) -> Result<BoundedIntervalReceiptV1, NoiseErrorV1> {
     problem.validate()?;
     let mut observed_by_probe: BTreeMap<usize, FixedIntervalV1> = BTreeMap::new();
+    let mut model_consistent = true;
     let mut snapshots = Vec::with_capacity(observations.len() + 1);
     snapshots.push(bounded_interval_snapshot(problem, &observed_by_probe, 0));
 
@@ -784,43 +785,33 @@ pub fn replay_bounded_intervals(
             return Err(NoiseErrorV1::InvalidInterval);
         }
         let probe_index = resolve_probe(&problem.probes, &observation.probe_id)?;
-        if let Some(existing) = observed_by_probe.get_mut(&probe_index) {
-            let Some(intersection) = existing.intersection(observation.observed) else {
-                // Empty accumulated observation interval is an explicit
-                // model/measurement contradiction, not an invalid record.
-                observed_by_probe.remove(&probe_index);
-                snapshots.push(IntervalSurvivorSnapshotV1 {
-                    after_observation_count: observation_index + 1,
-                    active_hypothesis_ids: Vec::new(),
-                    model_consistent: false,
-                });
-                // Keep a contradiction latch: no later observation can
-                // restore a previously empty intersection.
-                for remaining in observations.iter().skip(observation_index + 1) {
-                    if remaining.observed.lower > remaining.observed.upper {
-                        return Err(NoiseErrorV1::InvalidInterval);
-                    }
-                    resolve_probe(&problem.probes, &remaining.probe_id)?;
+        if model_consistent {
+            if let Some(existing) = observed_by_probe.get(&probe_index).copied() {
+                if let Some(intersection) = existing.intersection(observation.observed) {
+                    observed_by_probe.insert(probe_index, intersection);
+                } else {
+                    // Once repeated readings have an empty intersection, a
+                    // later reading cannot repair the campaign's evidence.
+                    model_consistent = false;
+                    observed_by_probe.remove(&probe_index);
                 }
-                let final_active_hypothesis_ids = Vec::new();
-                return Ok(BoundedIntervalReceiptV1 {
-                    schema_version: 1,
-                    problem_id: problem.problem_id.clone(),
-                    problem_contract_bytes: problem.canonical_bytes(),
-                    observation_contract_bytes: interval_observation_bytes(observations),
-                    snapshots,
-                    final_active_hypothesis_ids,
-                });
-            };
-            *existing = intersection;
-        } else {
-            observed_by_probe.insert(probe_index, observation.observed);
+            } else {
+                observed_by_probe.insert(probe_index, observation.observed);
+            }
         }
-        snapshots.push(bounded_interval_snapshot(
-            problem,
-            &observed_by_probe,
-            observation_index + 1,
-        ));
+        if model_consistent {
+            snapshots.push(bounded_interval_snapshot(
+                problem,
+                &observed_by_probe,
+                observation_index + 1,
+            ));
+        } else {
+            snapshots.push(IntervalSurvivorSnapshotV1 {
+                after_observation_count: observation_index + 1,
+                active_hypothesis_ids: Vec::new(),
+                model_consistent: false,
+            });
+        }
     }
 
     let final_active_hypothesis_ids = snapshots
