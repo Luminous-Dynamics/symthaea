@@ -125,6 +125,25 @@ Sources:
 
 Luminous's competitive contribution should be judged on fewer experiments to a qualified process envelope, lower false attribution of equipment degradation as material physics, more accepted simulated/physical product per end-to-end resource, and reproducibility across labs—not on claiming higher excavation or oxygen production before running a physical campaign.
 
+### 5.1 Coupled material–optical campaign execution
+
+The standalone `coupled_campaign.rs` module now composes the material-regime and optical-health models into a single pulse transaction.
+
+Causal order:
+1. Inspect current source-reference, process-path, witness and QCM state.
+2. Apply the health decision gate.
+3. Read current process-optic transmission at the selected process band.
+4. Apply the pulse using that current transmission.
+5. Convert simulated material emissions into a deposition event.
+6. Apply independently declared transfer factors to process optic, witness and QCM.
+7. Commit material and optical states together only if every step validates.
+
+The material and optical models are cloned into staged state. If material processing or the subsequent deposition event fails, neither state is committed. A later pulse therefore sees the contamination caused by earlier pulses, not a static clean-optic assumption. The integration emits simulation-only receipts and cannot mint physical calibration, custody, assay or authority evidence.
+
+Regression cases cover progressive attenuation of the next pulse, distinct witness/QCM/process-optic observations, wet-purge analyzer bias without extra captured water, and rollback when the deposition/metrology stage rejects the event.
+
+This is a first coupled surrogate, not a validated transport model. In particular, the material model's estimated areal emission load and the optical model's transfer factors/extinction coefficients are calibration parameters. They must be fitted from representative geometry, temperature, species and wavelength measurements before any physical prediction claim.
+
 ## 6. Paradigm shifts to prioritize
 
 ### A. Joint material–apparatus inference
@@ -206,6 +225,9 @@ The dedicated workflow compiles and tests standalone Rust references with pinned
 
     rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/material_regime.rs -o /tmp/isru-material-regime
     /tmp/isru-material-regime
+
+    rustc --edition=2021 --test research/asteroid-optical-isru-v0.2/coupled_campaign.rs -o /tmp/isru-coupled
+    /tmp/isru-coupled
 
 Current regression tests cover asynchronous out-of-order completion, lock contention, stage prerequisites, holdout access, calibration expiry, instrument maintenance, failures, resource/time budgets, deterministic replay, noise moments, optical reference normalization, QCM/witness/process-optic separation, spectral dependence, cleaning residuals, monotonic metrology chronology, post-clean requalification, spallation/melt regime changes, equal-energy pulsed versus continuous delivery, purge-moisture interference, optical-deposition estimates and sample-inventory exhaustion.
 
