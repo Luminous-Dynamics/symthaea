@@ -451,3 +451,9 @@ The STGI reference is now represented as the eighth benchmark catalog entry in t
 ## 23. Registry and audit contract update
 
 The registry now contains 12 sources, 8 candidate/material records and 8 benchmark catalogs. The Rust registry auditor's exact count assertions have been updated to 12 / 8 / 8. All candidate and benchmark source IDs must resolve to the unique source register; measured, calculated and predicted Tc values remain in separate fields.
+
+### Licensing clarification
+
+The GuidedMatDiffusion root directory was inspected: it contains a LICENSE file with the MIT text and a copyright notice naming Rui Jiao; its README is built on DiffCSP. This is stronger than relying on the README badge, but it still requires checking attribution and third-party component scope. The model checkpoint and dataset have independent terms that remain unresolved.
+
+The NEMAD model-index repository root was also inspected: it lists README.md and inference.py but no LICENSE file. The absence of a visible repository license means we should not infer reuse rights for code, model adapters or the underlying dataset. The public repository and model links are useful for reproduction discovery, not a license grant.
