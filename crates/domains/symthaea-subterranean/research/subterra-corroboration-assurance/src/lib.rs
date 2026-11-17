@@ -119,7 +119,9 @@ pub struct ExpectedCorroborationContext {
     pub dependency_graph_digest: String,
     pub fault_domain_profile_digest: String,
     pub assessment_digest: String,
+    pub verifier_id: String,
     pub verifier_receipt_digest: String,
+    pub purpose: EvidencePurpose,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -360,8 +362,14 @@ pub fn admit_corroboration_portfolio(
     );
     add_if(
         &mut reasons,
-        assessment.verifier.verifier_id != expected.verifier_id,
+        assessment.verifier.verifier_id != expected.verifier_id
+            || assessment.verifier_id != expected.verifier_id,
         RejectionReason::VerifierIdentityMismatch,
+    );
+    add_if(
+        &mut reasons,
+        assessment.purpose != expected.purpose,
+        RejectionReason::RightsPurposeMismatch,
     );
     add_if(
         &mut reasons,
@@ -797,7 +805,9 @@ mod tests {
             dependency_graph_digest: "sha256:graph".into(),
             fault_domain_profile_digest: "sha256:profile".into(),
             assessment_digest: "sha256:assessment".into(),
+            verifier_id: "verifier-7".into(),
             verifier_receipt_digest: "sha256:portfolio-verifier".into(),
+            purpose: EvidencePurpose::AssetConditionInspection,
             evaluated_at_unix_ms: NOW - 100,
             valid_until_unix_ms: NOW + 10_000,
             inventory: InventoryDisposition::CompleteWithinDeclaredScope,
@@ -916,6 +926,38 @@ mod tests {
             item.sources[0].observation_receipt_digest.clone();
         let report = admit_corroboration_portfolio(&item, &expected(), policy());
         assert!(report.rejection_reasons.contains(&RejectionReason::DuplicateObservationReceipt));
+    }
+
+    #[test]
+    fn each_source_rights_and_calibration_validity_must_hold() {
+        let mut rights = candidate();
+        rights.sources[1].rights_disposition = RightsDisposition::Denied;
+        let report = admit_corroboration_portfolio(&rights, &expected(), policy());
+        assert!(report.rejection_reasons.contains(&RejectionReason::RightsDenied));
+
+        let mut expired_rights = candidate();
+        expired_rights.sources[1].rights_valid_until_unix_ms = NOW;
+        let report = admit_corroboration_portfolio(&expired_rights, &expected(), policy());
+        assert!(report.rejection_reasons.contains(&RejectionReason::RightsExpired));
+
+        let mut expired_calibration = candidate();
+        expired_calibration.sources[1].calibration_valid_until_unix_ms = NOW;
+        let report = admit_corroboration_portfolio(&expired_calibration, &expected(), policy());
+        assert!(report.rejection_reasons.contains(&RejectionReason::CalibrationExpired));
+    }
+
+    #[test]
+    fn expected_verifier_identity_and_purpose_are_pinned() {
+        let mut item = candidate();
+        item.assessment.verifier_id = "different-verifier".into();
+        item.assessment.verifier.verifier_id = "different-verifier".into();
+        let report = admit_corroboration_portfolio(&item, &expected(), policy());
+        assert!(report.rejection_reasons.contains(&RejectionReason::VerifierIdentityMismatch));
+
+        let mut wrong_purpose = candidate();
+        wrong_purpose.assessment.purpose = EvidencePurpose::ResearchEvaluation;
+        let report = admit_corroboration_portfolio(&wrong_purpose, &expected(), policy());
+        assert!(report.rejection_reasons.contains(&RejectionReason::RightsPurposeMismatch));
     }
 
     #[test]
