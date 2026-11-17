@@ -194,8 +194,8 @@ fn run_case(
     // on every semantic result field. Only the breach-selection strategy and
     // its diagnostic counters differ.
     let warm = query().map_err(|error| format!("warm indexed query: {error}"))?;
-    let scanned = linear_scan_query()
-        .map_err(|error| format!("warm linear-scan query: {error}"))?;
+    let scanned =
+        linear_scan_query().map_err(|error| format!("warm linear-scan query: {error}"))?;
     let verified = verified_query().map_err(|error| format!("warm verified query: {error}"))?;
     if !same_completeness_semantics(&warm, &scanned)
         || !same_completeness_semantics(&warm, verified.report())
@@ -227,9 +227,8 @@ fn run_case(
     let mut scan_samples = Vec::with_capacity(SCAN_REPETITIONS);
     for _ in 0..SCAN_REPETITIONS {
         let started = Instant::now();
-        let report = black_box(
-            linear_scan_query().map_err(|error| format!("linear-scan query: {error}"))?,
-        );
+        let report =
+            black_box(linear_scan_query().map_err(|error| format!("linear-scan query: {error}"))?);
         black_box((report.verdict, report.late_breaches.len()));
         scan_samples.push(started.elapsed());
     }
