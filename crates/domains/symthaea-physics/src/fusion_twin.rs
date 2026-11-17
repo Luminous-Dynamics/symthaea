@@ -26,8 +26,8 @@ use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use crate::plasma_hdc_encoder::{PlasmaReading, PlasmaSensorType};
 
 // ── FEP Action Thresholds (unified) ────────────────────────────────────────
-/// Free energy thresholds for PlasmaFepAction selection AND DisruptionRisk
-/// classification. Single source of truth — never duplicate these values.
+/// Prototype reference-surprise thresholds for heuristic action labels and risk buckets.
+/// These values are not machine-calibrated operating limits.
 const FE_EMERGENCY: f64 = 0.7;
 const FE_SOFT_LANDING: f64 = 0.5;
 const FE_INJECT_GAS: f64 = 0.3;
@@ -229,17 +229,17 @@ impl symthaea_core::temporal::TemporalPredictor for PlasmaMultiScalePredictor {
 /// Discrete actions the plasma FEP agent can take to avoid disruptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum PlasmaFepAction {
-    /// Everything within tolerance — no intervention.
+    /// Lowest-severity research label; not a facility operating command.
     MaintainState,
-    /// Gradually reduce heating power.
+    /// Research label for a heating-reduction hypothesis; not a command.
     ReduceHeating,
-    /// Adjust magnetic field coils for MHD stability.
+    /// Research label for a magnetic-field adjustment hypothesis; not a command.
     AdjustMagneticField,
-    /// Inject impurity gas for radiative cooling.
+    /// Research label for an impurity-injection hypothesis; not a command.
     InjectGas,
-    /// Controlled ramp-down to avoid runaway electrons.
+    /// Research label for a soft-landing hypothesis; not a command.
     TriggerSoftLanding,
-    /// Immediate shutdown — last resort.
+    /// High-severity research label; it does not initiate a shutdown.
     EmergencyShutdown,
 }
 
@@ -367,13 +367,13 @@ impl Default for PlasmaFepAgent {
 /// Uncalibrated heuristic bucket derived from the reference-surprise proxy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum DisruptionRisk {
-    /// Normal operation.
+    /// Lowest heuristic bucket.
     Green,
-    /// Elevated monitoring — minor deviations detected.
+    /// Elevated heuristic bucket; monitoring semantics are not calibrated.
     Yellow,
-    /// Active intervention required.
+    /// Higher heuristic bucket; does not establish an intervention requirement.
     Orange,
-    /// Imminent disruption — emergency procedures.
+    /// Highest heuristic bucket; not a validated imminent-disruption forecast.
     Red,
 }
 
