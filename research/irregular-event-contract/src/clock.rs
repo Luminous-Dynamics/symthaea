@@ -771,11 +771,13 @@ mod tests {
         let watermark = clock.map_exclusive_watermark(1_000, 100).unwrap();
         let equal = compare_event_time_to_exclusive_watermark(equal_event, watermark).unwrap();
         assert_eq!(equal.ordering(), EventWatermarkOrdering::DefinitelyNotLate);
-        assert_eq!(equal.event_time().calibration_sha256(), watermark.calibration_sha256());
+        assert_eq!(
+            equal.event_time().calibration_sha256(),
+            watermark.calibration_sha256()
+        );
 
         let earlier_event = clock.map_time(ClockDomainId(1), 999, 100).unwrap();
-        let earlier =
-            compare_event_time_to_exclusive_watermark(earlier_event, watermark).unwrap();
+        let earlier = compare_event_time_to_exclusive_watermark(earlier_event, watermark).unwrap();
         assert_eq!(earlier.ordering(), EventWatermarkOrdering::DefinitelyLate);
     }
 
