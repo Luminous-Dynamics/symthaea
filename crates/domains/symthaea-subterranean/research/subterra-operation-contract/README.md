@@ -24,6 +24,16 @@ A failed postcondition enters `ReworkReview`. The work scope remains locked unti
 
 Transition history retains typed events and evidence references, with a hard per-attempt event cap. At the cap, the attempt remains locked; the registry does not discard history to make progress.
 
+The operation specification also pins:
+- the source dependency-graph digest;
+- the canonical fault-domain/correlation profile digest;
+- the exact common-cause assessment receipt digest;
+- the assessment's declared inventory-completeness disposition.
+
+The verifier receipt must reference the same assessment digest. An `Incomplete` or `Unknown` dependency inventory forces `InsufficientEvidence`, even if the verifier's declared domain list has no overlap. This prevents an incomplete dependency census from being interpreted as proof of independence.
+
+These are exact-reference and fail-closed checks. This crate does not authenticate Mycelix signer signatures, prove that the source graph is complete, or establish real-world causal independence. The intended dependency owner is Mycelix #5762, reusing its LEX-NET-030 source graph and QUAL-001E fault-domain profiles.
+
 ## Independent verifier boundary
 
 The reference contract requires:
