@@ -136,6 +136,7 @@ impl MaterialParameters {
 pub struct MaterialState {
     pub ambient_temperature_k: f64,
     pub surface_temperature_k: f64,
+    /// Total remaining bulk sample mass, including volatile inventories.
     pub remaining_solid_kg: f64,
     pub remaining_water_kg: f64,
     pub remaining_organic_kg: f64,
@@ -373,13 +374,12 @@ impl MaterialRegimeModel {
         let melt_suppression =
             (1.0 - melt_layer_fraction).powf(self.parameters.melt_suppression_exponent);
         let unrefreshed_surface = 1.0 - self.state.surface_depletion_fraction;
-        let spalled_mass = (thermal_mass
+        let proposed_spalled_mass = thermal_mass
             * self.parameters.spallation_yield_per_pulse
             * spall_temperature_factor
             * ductile_factor
             * melt_suppression
-            * unrefreshed_surface)
-            .min(self.state.remaining_solid_kg);
+            * unrefreshed_surface;
 
         let volatile_release_fraction = ((peak_temperature
             - self.parameters.volatile_release_onset_k)
@@ -400,6 +400,13 @@ impl MaterialRegimeModel {
         let released_water = available_water * volatile_release_fraction;
         let released_organic = available_organic * volatile_release_fraction;
         let released_salt = available_salt * volatile_release_fraction;
+        let released_volatile_mass = released_water + released_organic + released_salt;
+        // Keep the bulk inventory as total remaining sample mass. Volatiles
+        // leave that inventory as vapour, while spalled solid leaves as
+        // particles; the two sinks must never exceed remaining bulk mass.
+        let available_for_spallation =
+            (self.state.remaining_solid_kg - released_volatile_mass).max(0.0);
+        let spalled_mass = proposed_spalled_mass.min(available_for_spallation);
         let captured_water = released_water * gas.trap_capture_efficiency;
         let purge_moisture =
             gas.purge_gas_flow_kg_s * pulse.on_duration_seconds * gas.purge_gas_water_mass_fraction;
@@ -442,7 +449,8 @@ impl MaterialRegimeModel {
             .ok_or(RegimeError::TimeOverflow)?;
 
         self.state.surface_temperature_k = end_temperature;
-        self.state.remaining_solid_kg = (self.state.remaining_solid_kg - spalled_mass).max(0.0);
+        self.state.remaining_solid_kg =
+            (self.state.remaining_solid_kg - spalled_mass - released_volatile_mass).max(0.0);
         self.state.remaining_water_kg = (self.state.remaining_water_kg - released_water).max(0.0);
         self.state.remaining_organic_kg =
             (self.state.remaining_organic_kg - released_organic).max(0.0);
@@ -653,6 +661,21 @@ mod tests {
             .unwrap();
         assert!(result.surface_refresh_fraction > 0.0);
         assert!(value.state().surface_depletion_fraction < before + 0.1);
+    }
+
+    #[test]
+    fn volatile_release_and_spallation_conserve_bulk_sample_mass() {
+        let mut value = model();
+        let initial_mass = value.state().remaining_solid_kg;
+        let result = value
+            .apply_pulse(&pulse(100.0, 1.0, 0.0, 1.0), &trap())
+            .unwrap();
+        let removed_mass = result.spalled_solid_mass_kg
+            + result.released_water_vapor_kg
+            + result.released_organic_vapor_kg
+            + result.released_salt_vapor_kg;
+        let remaining_mass = value.state().remaining_solid_kg;
+        assert!((initial_mass - remaining_mass - removed_mass).abs() < 1.0e-12);
     }
 
     #[test]
