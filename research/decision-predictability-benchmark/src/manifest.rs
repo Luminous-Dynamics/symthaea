@@ -565,12 +565,17 @@ fn validate_axis_groups(axis: &SplitAxis) -> Result<(), ManifestError> {
         SplitPolicy::HeldOutObservationProcess => axis.axis == SplitAxisKind::ObservationProcess,
     };
     if !policy_matches {
-        return Err(ManifestError::InvalidField("split policy is incompatible with its axis"));
+        return Err(ManifestError::InvalidField(
+            "split policy is incompatible with its axis",
+        ));
     }
     let lists = [
         (&axis.train_group_ids, SplitRole::Train),
         (&axis.validation_group_ids, SplitRole::Validation),
-        (&axis.confirmatory_test_group_ids, SplitRole::ConfirmatoryTest),
+        (
+            &axis.confirmatory_test_group_ids,
+            SplitRole::ConfirmatoryTest,
+        ),
         (&axis.negative_control_group_ids, SplitRole::NegativeControl),
         (&axis.positive_control_group_ids, SplitRole::PositiveControl),
     ];
@@ -581,7 +586,9 @@ fn validate_axis_groups(axis: &SplitAxis) -> Result<(), ManifestError> {
         for id in ids {
             validate_opaque_id(id, "split_axes.group_id")?;
             if !local.insert(id.as_str()) {
-                return Err(ManifestError::DuplicateValue("split_axes group ID within role"));
+                return Err(ManifestError::DuplicateValue(
+                    "split_axes group ID within role",
+                ));
             }
             if seen.insert(id.as_str(), role).is_some() {
                 return Err(ManifestError::GroupRoleOverlap {
@@ -596,10 +603,14 @@ fn validate_axis_groups(axis: &SplitAxis) -> Result<(), ManifestError> {
         || axis.validation_group_ids.is_empty()
         || axis.confirmatory_test_group_ids.is_empty()
     {
-        return Err(ManifestError::EmptyCollection("train/validation/confirmatory groups"));
+        return Err(ManifestError::EmptyCollection(
+            "train/validation/confirmatory groups",
+        ));
     }
     if total > MAX_GROUPS_PER_AXIS {
-        return Err(ManifestError::InvalidField("split axis exceeds maximum group count"));
+        return Err(ManifestError::InvalidField(
+            "split axis exceeds maximum group count",
+        ));
     }
     Ok(())
 }
@@ -611,8 +622,13 @@ fn validate_repository(value: &str) -> Result<(), ManifestError> {
             if !owner.is_empty()
                 && !name.is_empty()
                 && owner.chars().all(is_repo_char)
-                && name.chars().all(is_repo_char) => Ok(()),
-        _ => Err(ManifestError::InvalidField("generator.repository must be owner/name")),
+                && name.chars().all(is_repo_char) =>
+        {
+            Ok(())
+        }
+        _ => Err(ManifestError::InvalidField(
+            "generator.repository must be owner/name",
+        )),
     }
 }
 
@@ -658,7 +674,11 @@ fn is_lower_hex(value: u8) -> bool {
 fn validate_timestamp(value: &str) -> Result<(), ManifestError> {
     // Accept the UTC RFC3339 subset YYYY-MM-DDTHH:MM:SS[.fraction]Z.
     // Validate calendar and clock ranges rather than checking punctuation only.
-    let invalid = || ManifestError::InvalidField("freeze.protocol_frozen_at must be a valid UTC RFC3339 timestamp");
+    let invalid = || {
+        ManifestError::InvalidField(
+            "freeze.protocol_frozen_at must be a valid UTC RFC3339 timestamp",
+        )
+    };
     let bytes = value.as_bytes();
     if bytes.len() < 20
         || bytes.get(4) != Some(&b'-')
@@ -724,13 +744,21 @@ fn sha256_hex(bytes: &[u8]) -> String {
     output
 }
 
-fn write_canonical_json(value: &serde_json::Value, output: &mut Vec<u8>) -> Result<(), ManifestError> {
+fn write_canonical_json(
+    value: &serde_json::Value,
+    output: &mut Vec<u8>,
+) -> Result<(), ManifestError> {
     match value {
         serde_json::Value::Null => output.extend_from_slice(b"null"),
-        serde_json::Value::Bool(value) => output.extend_from_slice(if *value { &b"true"[..] } else { &b"false"[..] }),
-        serde_json::Value::Number(number) => output.extend_from_slice(number.to_string().as_bytes()),
+        serde_json::Value::Bool(value) => {
+            output.extend_from_slice(if *value { &b"true"[..] } else { &b"false"[..] })
+        }
+        serde_json::Value::Number(number) => {
+            output.extend_from_slice(number.to_string().as_bytes())
+        }
         serde_json::Value::String(value) => {
-            let encoded = serde_json::to_string(value).map_err(|_| ManifestError::CanonicalizationFailure)?;
+            let encoded =
+                serde_json::to_string(value).map_err(|_| ManifestError::CanonicalizationFailure)?;
             output.extend_from_slice(encoded.as_bytes());
         }
         serde_json::Value::Array(values) => {
@@ -749,7 +777,8 @@ fn write_canonical_json(value: &serde_json::Value, output: &mut Vec<u8>) -> Resu
                 if index > 0 {
                     output.push(b',');
                 }
-                let encoded = serde_json::to_string(key).map_err(|_| ManifestError::CanonicalizationFailure)?;
+                let encoded = serde_json::to_string(key)
+                    .map_err(|_| ManifestError::CanonicalizationFailure)?;
                 output.extend_from_slice(encoded.as_bytes());
                 output.push(b':');
                 write_canonical_json(value, output)?;
@@ -800,14 +829,20 @@ mod tests {
             r#""schema":"luminous.decision-transfer.split-manifest.v1","schema":"luminous.decision-transfer.split-manifest.v1","#,
             1,
         );
-        assert!(matches!(parse_and_validate(duplicate.as_bytes()), Err(ManifestError::InvalidJson(_))));
+        assert!(matches!(
+            parse_and_validate(duplicate.as_bytes()),
+            Err(ManifestError::InvalidJson(_))
+        ));
 
         let unknown = VALID.replacen(
             r#""schema":"luminous.decision-transfer.split-manifest.v1","#,
             r#""schema":"luminous.decision-transfer.split-manifest.v1","unreviewed":true,"#,
             1,
         );
-        assert!(matches!(parse_and_validate(unknown.as_bytes()), Err(ManifestError::InvalidJson(_))));
+        assert!(matches!(
+            parse_and_validate(unknown.as_bytes()),
+            Err(ManifestError::InvalidJson(_))
+        ));
     }
 
     #[test]
@@ -816,28 +851,41 @@ mod tests {
             "22222222222222222222222222222222",
             "11111111111111111111111111111111",
         );
-        assert!(matches!(parse_and_validate(overlapping.as_bytes()), Err(ManifestError::GroupRoleOverlap { .. })));
+        assert!(matches!(
+            parse_and_validate(overlapping.as_bytes()),
+            Err(ManifestError::GroupRoleOverlap { .. })
+        ));
     }
 
     #[test]
     fn rejects_scenario_assigned_to_wrong_role() {
         let mismatched = VALID.replace(r#""split_role":"validation""#, r#""split_role":"train""#);
-        assert!(matches!(parse_and_validate(mismatched.as_bytes()), Err(ManifestError::GroupRoleMismatch { .. })));
+        assert!(matches!(
+            parse_and_validate(mismatched.as_bytes()),
+            Err(ManifestError::GroupRoleMismatch { .. })
+        ));
     }
 
     #[test]
     fn rejects_missing_axis_membership() {
         let needle = r#",{"axis":"trajectory","group_id":"77777777777777777777777777777777"}"#;
         let missing = VALID.replace(needle, "");
-        assert!(matches!(parse_and_validate(missing.as_bytes()), Err(ManifestError::MissingAxisMembership { .. })));
+        assert!(matches!(
+            parse_and_validate(missing.as_bytes()),
+            Err(ManifestError::MissingAxisMembership { .. })
+        ));
     }
 
     #[test]
     fn rejects_scenario_group_not_declared_for_role() {
         let needle = r#"{"axis":"parameter_cell","group_id":"44444444444444444444444444444444"}"#;
-        let replacement = r#"{"axis":"parameter_cell","group_id":"abababababababababababababababab"}"#;
+        let replacement =
+            r#"{"axis":"parameter_cell","group_id":"abababababababababababababababab"}"#;
         let missing = VALID.replacen(needle, replacement, 1);
-        assert!(matches!(parse_and_validate(missing.as_bytes()), Err(ManifestError::MissingDeclaredGroup { .. })));
+        assert!(matches!(
+            parse_and_validate(missing.as_bytes()),
+            Err(ManifestError::MissingDeclaredGroup { .. })
+        ));
     }
 
     #[test]
@@ -846,7 +894,10 @@ mod tests {
             r#""train_group_ids":["11111111111111111111111111111111"]"#,
             r#""train_group_ids":["11111111111111111111111111111111","abababababababababababababababab"]"#,
         );
-        assert!(matches!(parse_and_validate(extra.as_bytes()), Err(ManifestError::UnreferencedDeclaredGroup { .. })));
+        assert!(matches!(
+            parse_and_validate(extra.as_bytes()),
+            Err(ManifestError::UnreferencedDeclaredGroup { .. })
+        ));
     }
 
     #[test]
@@ -855,26 +906,38 @@ mod tests {
             r#""minimum_independent_units_per_role":1"#,
             r#""minimum_independent_units_per_role":2"#,
         );
-        assert!(matches!(parse_and_validate(too_few.as_bytes()), Err(ManifestError::InsufficientIndependentUnits { .. })));
+        assert!(matches!(
+            parse_and_validate(too_few.as_bytes()),
+            Err(ManifestError::InsufficientIndependentUnits { .. })
+        ));
     }
 
     #[test]
     fn rejects_bad_opaque_ids_and_digests() {
         let bad_id = VALID.replace("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1", "scenario-1");
-        assert!(matches!(parse_and_validate(bad_id.as_bytes()), Err(ManifestError::InvalidIdentifier(_))));
+        assert!(matches!(
+            parse_and_validate(bad_id.as_bytes()),
+            Err(ManifestError::InvalidIdentifier(_))
+        ));
 
         let bad_digest = VALID.replace(
             "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
             "sha256:abc",
         );
-        assert!(matches!(parse_and_validate(bad_digest.as_bytes()), Err(ManifestError::InvalidDigest(_))));
+        assert!(matches!(
+            parse_and_validate(bad_digest.as_bytes()),
+            Err(ManifestError::InvalidDigest(_))
+        ));
     }
 
     #[test]
     fn rejects_unsupported_schema_and_empty_input() {
         assert_eq!(parse_and_validate(b""), Err(ManifestError::EmptyInput));
         let unsupported = VALID.replace(SCHEMA_V1, "luminous.decision-transfer.split-manifest.v2");
-        assert!(matches!(parse_and_validate(unsupported.as_bytes()), Err(ManifestError::UnsupportedSchema(_))));
+        assert!(matches!(
+            parse_and_validate(unsupported.as_bytes()),
+            Err(ManifestError::UnsupportedSchema(_))
+        ));
     }
 
     #[test]
@@ -886,11 +949,8 @@ mod tests {
         );
         let without_schema = VALID.replacen(schema_line, "", 1);
         let generator_line = concat!("      ", r#""generator":"#, "\n");
-        let reordered = without_schema.replacen(
-            generator_line,
-            &format!("{schema_line}{generator_line}"),
-            1,
-        );
+        let reordered =
+            without_schema.replacen(generator_line, &format!("{schema_line}{generator_line}"), 1);
         let left = parse_and_validate(VALID.as_bytes()).unwrap();
         let right = parse_and_validate(reordered.as_bytes()).unwrap();
         assert_eq!(left.canonical_sha256(), right.canonical_sha256());
@@ -928,16 +988,16 @@ mod tests {
             "not-a-time",
         ] {
             let changed = VALID.replace("2026-11-17T12:00:00Z", timestamp);
-            assert!(matches!(
-                parse_and_validate(changed.as_bytes()),
-                Err(ManifestError::InvalidField(_))
-            ), "expected invalid timestamp to be rejected: {timestamp}");
+            assert!(
+                matches!(
+                    parse_and_validate(changed.as_bytes()),
+                    Err(ManifestError::InvalidField(_))
+                ),
+                "expected invalid timestamp to be rejected: {timestamp}"
+            );
         }
 
-        let fractional = VALID.replace(
-            "2026-11-17T12:00:00Z",
-            "2026-11-17T12:00:00.123456Z",
-        );
+        let fractional = VALID.replace("2026-11-17T12:00:00Z", "2026-11-17T12:00:00.123456Z");
         assert!(parse_and_validate(fractional.as_bytes()).is_ok());
     }
 
@@ -962,13 +1022,18 @@ mod tests {
         let bytes = serde_json::to_vec(&value).unwrap();
         assert!(matches!(
             parse_and_validate(&bytes),
-            Err(ManifestError::InvalidField("split policy is incompatible with its axis"))
+            Err(ManifestError::InvalidField(
+                "split policy is incompatible with its axis"
+            ))
         ));
     }
 
     #[test]
     fn rejects_manifest_size_limit_before_deserialization() {
         let oversized = vec![b' '; MAX_MANIFEST_BYTES + 1];
-        assert!(matches!(parse_and_validate(&oversized), Err(ManifestError::InputTooLarge { .. })));
+        assert!(matches!(
+            parse_and_validate(&oversized),
+            Err(ManifestError::InputTooLarge { .. })
+        ));
     }
 }
