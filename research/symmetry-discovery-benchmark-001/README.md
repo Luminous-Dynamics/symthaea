@@ -147,3 +147,15 @@ The deterministic corpus is regenerated from the manifest's D4 matrices using xo
     python3 -I research/symmetry-discovery-benchmark-001/tools/generate_d4_pointsets.py --write
 
 The validator checks that the frozen 150 generated cases exactly match the generator output before computing their stabilizers. The workflow runs these checks against the exact triggering revision and is guarded against draft PR execution. This is fixture qualification only; no external learner baseline is run by it.
+
+
+## Fixture arithmetic preflight (independent, not CI)
+
+An independent deterministic replay of the current v0.1 manifest checked:
+- all 150 generated point sets reproduce byte-for-byte from the declared seeds/attempt sequence and are unique;
+- each generated set's exact D4 stabilizer equals its declared target subgroup (D4, C4, half-turn C2, reflection C2 or C1);
+- the D4 matrix multiplication table is closed and every element has a two-sided inverse;
+- the three hand-authored geometric labels (D4, C4, C1) match exact point-set stabilizers;
+- the D4 and C4 polynomial targets have exactly their declared stabilizers under symbolic integer expansion.
+
+This is a local fixture arithmetic preflight only. The exact-head CI fixture validator, full baseline adapters, holdout splits and benchmark runs remain separate gates. No accuracy or performance result is inferred from these fixture checks.
