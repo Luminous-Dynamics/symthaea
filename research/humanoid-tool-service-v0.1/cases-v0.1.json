@@ -1,0 +1,775 @@
+{
+  "schema_version": "0.1.0",
+  "programme_id": "HUM-TOOL-SERVICE-001",
+  "status": "protocol_only",
+  "evidence_class": "synthetic_protocol_specification",
+  "source_subject": {
+    "repository": "Luminous-Dynamics/symthaea",
+    "base_ref": "main",
+    "base_sha": "d67bb3ea4824fde5e95c721dd28dc9cc2b064bd9",
+    "branch": "research/humanoid-tool-service-v0-1"
+  },
+  "benchmark_anchor": {
+    "name": "HumanoidToolBench",
+    "paper": "https://arxiv.org/abs/2610.02089",
+    "paper_date": "2026-10-01",
+    "task_cell_count": 18,
+    "scenario_order": [
+      "BallMove",
+      "BallRetrieve",
+      "IceBreak"
+    ],
+    "execution_levels": [
+      "L0",
+      "L1",
+      "L2"
+    ],
+    "tool_set_modes": [
+      "standard",
+      "decoy"
+    ],
+    "note": "Published protocol reference only; no upstream source, checkpoint, license, or execution has been verified by this manifest."
+  },
+  "published_task_cells": [
+    {
+      "case_id": "HTB-BALLMOVE-L0-STANDARD",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallMove",
+      "execution_level": "L0",
+      "execution_contract": "tool_selection_and_pickup",
+      "tool_set_mode": "standard",
+      "description": "Select a suitable candidate from the permitted tool set and establish a secure pickup.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official standard-set composition and scoring."
+    },
+    {
+      "case_id": "HTB-BALLMOVE-L0-DECOY",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallMove",
+      "execution_level": "L0",
+      "execution_contract": "tool_selection_and_pickup",
+      "tool_set_mode": "decoy",
+      "description": "Select a suitable candidate from the permitted tool set and establish a secure pickup.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+    },
+    {
+      "case_id": "HTB-BALLMOVE-L1-STANDARD",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallMove",
+      "execution_level": "L1",
+      "execution_contract": "stationary_tool_use",
+      "tool_set_mode": "standard",
+      "description": "Use the selected tool from a stationary stance to produce the required task effect.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official standard-set composition and scoring."
+    },
+    {
+      "case_id": "HTB-BALLMOVE-L1-DECOY",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallMove",
+      "execution_level": "L1",
+      "execution_contract": "stationary_tool_use",
+      "tool_set_mode": "decoy",
+      "description": "Use the selected tool from a stationary stance to produce the required task effect.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+    },
+    {
+      "case_id": "HTB-BALLMOVE-L2-STANDARD",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallMove",
+      "execution_level": "L2",
+      "execution_contract": "mobile_tool_use",
+      "tool_set_mode": "standard",
+      "description": "Navigate/reposition and use the tool while coordinating whole-body locomotion and manipulation.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation",
+        "locomotion",
+        "whole_body_coordination"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official standard-set composition and scoring."
+    },
+    {
+      "case_id": "HTB-BALLMOVE-L2-DECOY",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallMove",
+      "execution_level": "L2",
+      "execution_contract": "mobile_tool_use",
+      "tool_set_mode": "decoy",
+      "description": "Navigate/reposition and use the tool while coordinating whole-body locomotion and manipulation.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation",
+        "locomotion",
+        "whole_body_coordination"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+    },
+    {
+      "case_id": "HTB-BALLRETRIEVE-L0-STANDARD",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallRetrieve",
+      "execution_level": "L0",
+      "execution_contract": "tool_selection_and_pickup",
+      "tool_set_mode": "standard",
+      "description": "Select a suitable candidate from the permitted tool set and establish a secure pickup.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official standard-set composition and scoring."
+    },
+    {
+      "case_id": "HTB-BALLRETRIEVE-L0-DECOY",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallRetrieve",
+      "execution_level": "L0",
+      "execution_contract": "tool_selection_and_pickup",
+      "tool_set_mode": "decoy",
+      "description": "Select a suitable candidate from the permitted tool set and establish a secure pickup.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+    },
+    {
+      "case_id": "HTB-BALLRETRIEVE-L1-STANDARD",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallRetrieve",
+      "execution_level": "L1",
+      "execution_contract": "stationary_tool_use",
+      "tool_set_mode": "standard",
+      "description": "Use the selected tool from a stationary stance to produce the required task effect.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official standard-set composition and scoring."
+    },
+    {
+      "case_id": "HTB-BALLRETRIEVE-L1-DECOY",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallRetrieve",
+      "execution_level": "L1",
+      "execution_contract": "stationary_tool_use",
+      "tool_set_mode": "decoy",
+      "description": "Use the selected tool from a stationary stance to produce the required task effect.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+    },
+    {
+      "case_id": "HTB-BALLRETRIEVE-L2-STANDARD",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallRetrieve",
+      "execution_level": "L2",
+      "execution_contract": "mobile_tool_use",
+      "tool_set_mode": "standard",
+      "description": "Navigate/reposition and use the tool while coordinating whole-body locomotion and manipulation.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation",
+        "locomotion",
+        "whole_body_coordination"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official standard-set composition and scoring."
+    },
+    {
+      "case_id": "HTB-BALLRETRIEVE-L2-DECOY",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "BallRetrieve",
+      "execution_level": "L2",
+      "execution_contract": "mobile_tool_use",
+      "tool_set_mode": "decoy",
+      "description": "Navigate/reposition and use the tool while coordinating whole-body locomotion and manipulation.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation",
+        "locomotion",
+        "whole_body_coordination"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+    },
+    {
+      "case_id": "HTB-ICEBREAK-L0-STANDARD",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "IceBreak",
+      "execution_level": "L0",
+      "execution_contract": "tool_selection_and_pickup",
+      "tool_set_mode": "standard",
+      "description": "Select a suitable candidate from the permitted tool set and establish a secure pickup.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official standard-set composition and scoring."
+    },
+    {
+      "case_id": "HTB-ICEBREAK-L0-DECOY",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "IceBreak",
+      "execution_level": "L0",
+      "execution_contract": "tool_selection_and_pickup",
+      "tool_set_mode": "decoy",
+      "description": "Select a suitable candidate from the permitted tool set and establish a secure pickup.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+    },
+    {
+      "case_id": "HTB-ICEBREAK-L1-STANDARD",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "IceBreak",
+      "execution_level": "L1",
+      "execution_contract": "stationary_tool_use",
+      "tool_set_mode": "standard",
+      "description": "Use the selected tool from a stationary stance to produce the required task effect.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official standard-set composition and scoring."
+    },
+    {
+      "case_id": "HTB-ICEBREAK-L1-DECOY",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "IceBreak",
+      "execution_level": "L1",
+      "execution_contract": "stationary_tool_use",
+      "tool_set_mode": "decoy",
+      "description": "Use the selected tool from a stationary stance to produce the required task effect.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+    },
+    {
+      "case_id": "HTB-ICEBREAK-L2-STANDARD",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "IceBreak",
+      "execution_level": "L2",
+      "execution_contract": "mobile_tool_use",
+      "tool_set_mode": "standard",
+      "description": "Navigate/reposition and use the tool while coordinating whole-body locomotion and manipulation.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation",
+        "locomotion",
+        "whole_body_coordination"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official standard-set composition and scoring."
+    },
+    {
+      "case_id": "HTB-ICEBREAK-L2-DECOY",
+      "source": "HumanoidToolBench-v1",
+      "scenario": "IceBreak",
+      "execution_level": "L2",
+      "execution_contract": "mobile_tool_use",
+      "tool_set_mode": "decoy",
+      "description": "Navigate/reposition and use the tool while coordinating whole-body locomotion and manipulation.",
+      "required_capability_domains": [
+        "tool_selection",
+        "manipulation",
+        "locomotion",
+        "whole_body_coordination"
+      ],
+      "evidence_class": "benchmark_protocol_only",
+      "episode_plan": {
+        "simulation_episodes_per_policy": 100,
+        "physical_trials": null,
+        "training_seeds_target": 5
+      },
+      "primary_outcomes": [
+        "tool_selection",
+        "secure_grasp",
+        "correct_contact",
+        "task_effect",
+        "verified_task_success"
+      ],
+      "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity."
+    }
+  ],
+  "extension_strata": {
+    "held_out_tool_instances": true,
+    "held_out_tool_families": true,
+    "task_tool_recombination": true,
+    "unseen_environment_and_work_surface": true,
+    "irrelevant_and_contradictory_instructions": true,
+    "friction_payload_occlusion_and_lighting_variation": true,
+    "tool_damage_and_wear": true,
+    "sensor_dropout_delay_saturation_and_clock_skew": true,
+    "interruption_and_recovery": true,
+    "separate_version_required": true
+  },
+  "service_loop_cases": [
+    {
+      "case_id": "SVC-01",
+      "task": "replace_nonstructural_cable_guide",
+      "subject": "passive cable guide or protective cover",
+      "energy_class": "passive_or_low_energy",
+      "required_capability_domains": [
+        "inspection",
+        "tool_selection",
+        "manipulation",
+        "task_planning",
+        "postcondition_verification"
+      ],
+      "independent_verifier": "independent fit and retention inspection",
+      "preconditions": [
+        "exact fixture identity known",
+        "tool and part revision known",
+        "permitted workspace confirmed",
+        "required isolation proven where relevant"
+      ],
+      "acceptance": "independent verifier accepts the declared postcondition; otherwise quarantine or refuse return-to-service",
+      "evidence_class": "synthetic_protocol_only",
+      "actuator_authority": false,
+      "human_contact": false
+    },
+    {
+      "case_id": "SVC-02",
+      "task": "replace_sensor_mount",
+      "subject": "accessible passive sensor mount or bracket",
+      "energy_class": "passive_or_low_energy",
+      "required_capability_domains": [
+        "inspection",
+        "tool_selection",
+        "manipulation",
+        "task_planning",
+        "postcondition_verification"
+      ],
+      "independent_verifier": "dimensional and mounting-orientation inspection",
+      "preconditions": [
+        "exact fixture identity known",
+        "tool and part revision known",
+        "permitted workspace confirmed",
+        "required isolation proven where relevant"
+      ],
+      "acceptance": "independent verifier accepts the declared postcondition; otherwise quarantine or refuse return-to-service",
+      "evidence_class": "synthetic_protocol_only",
+      "actuator_authority": false,
+      "human_contact": false
+    },
+    {
+      "case_id": "SVC-03",
+      "task": "install_remove_non_load_bearing_clamp",
+      "subject": "non-load-bearing clamp or fixture",
+      "energy_class": "passive_or_low_energy",
+      "required_capability_domains": [
+        "inspection",
+        "tool_selection",
+        "manipulation",
+        "task_planning",
+        "postcondition_verification"
+      ],
+      "independent_verifier": "position and retention inspection",
+      "preconditions": [
+        "exact fixture identity known",
+        "tool and part revision known",
+        "permitted workspace confirmed",
+        "required isolation proven where relevant"
+      ],
+      "acceptance": "independent verifier accepts the declared postcondition; otherwise quarantine or refuse return-to-service",
+      "evidence_class": "synthetic_protocol_only",
+      "actuator_authority": false,
+      "human_contact": false
+    },
+    {
+      "case_id": "SVC-04",
+      "task": "replace_passive_finger_pad",
+      "subject": "passive end-effector finger pad",
+      "energy_class": "passive_or_low_energy",
+      "required_capability_domains": [
+        "inspection",
+        "tool_selection",
+        "manipulation",
+        "task_planning",
+        "postcondition_verification"
+      ],
+      "independent_verifier": "surface, alignment and retention inspection",
+      "preconditions": [
+        "exact fixture identity known",
+        "tool and part revision known",
+        "permitted workspace confirmed",
+        "required isolation proven where relevant"
+      ],
+      "acceptance": "independent verifier accepts the declared postcondition; otherwise quarantine or refuse return-to-service",
+      "evidence_class": "synthetic_protocol_only",
+      "actuator_authority": false,
+      "human_contact": false
+    },
+    {
+      "case_id": "SVC-05",
+      "task": "assemble_fastener_bracket_fixture",
+      "subject": "simple fastener-and-bracket fixture",
+      "energy_class": "passive_or_low_energy",
+      "required_capability_domains": [
+        "inspection",
+        "tool_selection",
+        "manipulation",
+        "task_planning",
+        "postcondition_verification"
+      ],
+      "independent_verifier": "independent dimensional and assembly inspection",
+      "preconditions": [
+        "exact fixture identity known",
+        "tool and part revision known",
+        "permitted workspace confirmed",
+        "required isolation proven where relevant"
+      ],
+      "acceptance": "independent verifier accepts the declared postcondition; otherwise quarantine or refuse return-to-service",
+      "evidence_class": "synthetic_protocol_only",
+      "actuator_authority": false,
+      "human_contact": false
+    },
+    {
+      "case_id": "SVC-06",
+      "task": "correct_misassembled_passive_mechanism",
+      "subject": "deliberately misassembled passive mechanism",
+      "energy_class": "passive_or_low_energy",
+      "required_capability_domains": [
+        "inspection",
+        "tool_selection",
+        "manipulation",
+        "task_planning",
+        "postcondition_verification"
+      ],
+      "independent_verifier": "independent mechanism function and geometry check",
+      "preconditions": [
+        "exact fixture identity known",
+        "tool and part revision known",
+        "permitted workspace confirmed",
+        "required isolation proven where relevant"
+      ],
+      "acceptance": "independent verifier accepts the declared postcondition; otherwise quarantine or refuse return-to-service",
+      "evidence_class": "synthetic_protocol_only",
+      "actuator_authority": false,
+      "human_contact": false
+    },
+    {
+      "case_id": "SVC-07",
+      "task": "post_repair_fit_inspection",
+      "subject": "bounded dimensional/fit inspection after reassembly",
+      "energy_class": "passive_or_low_energy",
+      "required_capability_domains": [
+        "inspection",
+        "tool_selection",
+        "manipulation",
+        "task_planning",
+        "postcondition_verification"
+      ],
+      "independent_verifier": "reference-gauge or independent measurement result",
+      "preconditions": [
+        "exact fixture identity known",
+        "tool and part revision known",
+        "permitted workspace confirmed",
+        "required isolation proven where relevant"
+      ],
+      "acceptance": "independent verifier accepts the declared postcondition; otherwise quarantine or refuse return-to-service",
+      "evidence_class": "synthetic_protocol_only",
+      "actuator_authority": false,
+      "human_contact": false
+    },
+    {
+      "case_id": "SVC-08",
+      "task": "reject_damaged_or_wrong_revision_part",
+      "subject": "deliberately damaged or revision-mismatched replacement",
+      "energy_class": "passive_or_low_energy",
+      "required_capability_domains": [
+        "inspection",
+        "tool_selection",
+        "manipulation",
+        "task_planning",
+        "postcondition_verification"
+      ],
+      "independent_verifier": "correct quarantine/refusal disposition",
+      "preconditions": [
+        "exact fixture identity known",
+        "tool and part revision known",
+        "permitted workspace confirmed",
+        "required isolation proven where relevant"
+      ],
+      "acceptance": "independent verifier accepts the declared postcondition; otherwise quarantine or refuse return-to-service",
+      "evidence_class": "synthetic_protocol_only",
+      "actuator_authority": false,
+      "human_contact": false
+    }
+  ],
+  "negative_controls": [
+    "no_tool_present",
+    "wrong_tool",
+    "plausible_decoy_tool",
+    "shuffled_tool_name_geometry_binding",
+    "irrelevant_instruction",
+    "instruction_task_contradiction",
+    "target_moves_after_planning",
+    "stale_or_mismatched_calibration",
+    "tactile_missing_stale_saturated_or_contradictory",
+    "tool_geometry_changed_without_profile_update",
+    "damaged_or_out_of_envelope_tool",
+    "wrong_part_revision",
+    "evaluator_ground_truth_feature_probe",
+    "simple_scripted_shortcut_probe",
+    "no_op_or_frozen_policy"
+  ],
+  "evaluation_policy": {
+    "paired_evaluation_seeds": true,
+    "independent_training_seeds_target": 5,
+    "simulation_episodes_per_cell_policy_target": 100,
+    "confidence_intervals_required": true,
+    "report_per_task_stratum": true,
+    "retain_timeouts_abstentions_interventions_and_indeterminate": true,
+    "no_aggregate_humanoid_score": true,
+    "hard_safety_constraints_non_compensable": true
+  },
+  "claim_boundary": {
+    "actuator_authority": false,
+    "human_contact_authority": false,
+    "physical_qualification": false,
+    "benchmark_execution_claimed": false,
+    "training_claimed": false,
+    "simulator_run_claimed": false,
+    "ci_pass_claimed": false
+  }
+}
