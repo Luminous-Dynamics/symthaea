@@ -132,7 +132,7 @@ impl Rng {
 }
 
 fn generated_worlds(clusters: u64) -> Vec<Case> {
-    let mut cases = Vec::with_capacity(clusters as usize * 8);
+    let mut cases = Vec::with_capacity(clusters as usize * 11);
     let baseline = Scope {
         regime: Regime::Baseline,
         objective: Objective::Quality,
@@ -192,6 +192,25 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             true,
         ));
 
+        let speed = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Speed,
+        };
+        let cost = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Cost,
+        };
+        cases.push(case(
+            cluster,
+            "objective_shift",
+            pair(speed, id + 20, family + 8, 0.93, 0.31),
+            cost,
+            0.12,
+            0.88,
+            None,
+            true,
+        ));
+
         let mut retracted = pair(baseline, id + 30, family + 12, 0.95, 0.42);
         for item in retracted.iter_mut().filter(|x| x.action == Action::A) {
             item.source_retracted = true;
@@ -215,6 +234,21 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             cluster,
             "unreconciled_success",
             unreconciled,
+            baseline,
+            0.10,
+            0.90,
+            None,
+            true,
+        ));
+
+        let mut delayed = pair(baseline, id + 45, family + 8, 0.96, 0.40);
+        for item in delayed.iter_mut().filter(|x| x.action == Action::A) {
+            item.delayed_horizon_complete = false;
+        }
+        cases.push(case(
+            cluster,
+            "delayed_horizon_incomplete",
+            delayed,
             baseline,
             0.10,
             0.90,
@@ -265,6 +299,23 @@ fn generated_worlds(clusters: u64) -> Vec<Case> {
             cluster,
             "correlated_echo",
             correlated,
+            baseline,
+            0.10,
+            0.90,
+            None,
+            true,
+        ));
+
+        let alias_memory = vec![
+            exp(id + 90, family + 1, baseline, Action::A, 0.99),
+            exp(id + 90, family + 2, baseline, Action::A, 0.99),
+            exp(id + 91, family + 3, baseline, Action::B, 0.65),
+            exp(id + 92, family + 4, baseline, Action::B, 0.68),
+        ];
+        cases.push(case(
+            cluster,
+            "event_identity_alias",
+            alias_memory,
             baseline,
             0.10,
             0.90,
@@ -455,6 +506,27 @@ fn report(cases: &[Case]) {
             score.unsupported_a
         );
     }
+    println!("qualified_policy_by_scenario_family");
+    println!("family,count,accuracy_pct,mean_utility,mean_regret,unsupported_A");
+    let mut groups: BTreeMap<&str, Vec<&Case>> = BTreeMap::new();
+    for item in cases {
+        groups.entry(item.family).or_default().push(item);
+    }
+    for (family, items) in groups {
+        let family_cases: Vec<Case> = items.iter().map(|item| (*item).clone()).collect();
+        let score = evaluate(Policy::CausalQualified, &family_cases);
+        let n = f64::from(score.count.max(1));
+        println!(
+            "{},{},{:.2},{:.4},{:.4},{}",
+            family,
+            score.count,
+            100.0 * f64::from(score.correct) / n,
+            score.utility_sum / n,
+            score.regret_sum / n,
+            score.unsupported_a
+        );
+    }
+
     println!(
         concat!(
             "paired_utility_lift_vs_no_memory,mean,",
@@ -498,7 +570,7 @@ mod tests {
         let first = generated_worlds(8);
         let second = generated_worlds(8);
         assert_eq!(format!("{first:?}"), format!("{second:?}"));
-        assert_eq!(first.len(), 64);
+        assert_eq!(first.len(), 88);
         assert_eq!(first[0].cluster, 1);
         assert_eq!(first[8].cluster, 2);
         assert_ne!(
@@ -508,10 +580,24 @@ mod tests {
     }
 
     #[test]
+    fn generated_duplicate_event_identity_is_rejected_even_with_family_aliases() {
+        let cases = generated_worlds(1);
+        let item = cases
+            .iter()
+            .find(|case| case.family == "event_identity_alias")
+            .unwrap();
+        let frequency = decide(Policy::FrequencyOnly, &item.memory, item.query);
+        let qualified = decide(Policy::CausalQualified, &item.memory, item.query);
+        assert_eq!(frequency.action, Some(Action::A));
+        assert_eq!(qualified.action, Some(Action::B));
+        assert_eq!(qualified.evidence_ids.len(), 2);
+    }
+
+    #[test]
     fn qualified_policy_has_no_generated_fixture_overclaims_or_invalid_reuse() {
         let cases = generated_worlds(16);
         let score = evaluate(Policy::CausalQualified, &cases);
-        assert_eq!(score.count, 128);
+        assert_eq!(score.count, 176);
         assert_eq!(score.overclaims, 0);
         assert_eq!(score.invalid_refs, 0);
         assert_eq!(score.unsupported_a, 0);

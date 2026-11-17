@@ -171,6 +171,7 @@ pub fn is_qualified(item: &Experience, query: Query) -> bool {
 #[derive(Clone, Debug, Default)]
 struct QualifiedGroup {
     source_families: BTreeSet<u16>,
+    source_events: BTreeSet<u32>,
     sum: f64,
     count: usize,
     evidence_ids: Vec<u32>,
@@ -178,6 +179,9 @@ struct QualifiedGroup {
 
 impl QualifiedGroup {
     fn add(&mut self, item: &Experience) {
+        if !self.source_events.insert(item.event_id) {
+            return;
+        }
         self.source_families.insert(item.source_family);
         self.sum += item.observed_utility;
         self.count += 1;
@@ -197,14 +201,22 @@ impl QualifiedGroup {
     }
 
     fn is_qualified(&self) -> bool {
-        self.independent_support() >= 2 && self.count >= 2
+        self.independent_support() >= 2
+            && self.source_events.len() >= 2
+            && self.count >= 2
     }
 }
 
 fn causal_qualified_policy(memory: &[Experience], query: Query) -> Decision {
-    let mut groups: BTreeMap<Action, QualifiedGroup> = BTreeMap::new();
+    let mut event_frequency: BTreeMap<u32, usize> = BTreeMap::new();
+    for item in memory {
+        *event_frequency.entry(item.event_id).or_default() += 1;
+    }
 
-    for item in memory.iter().filter(|item| is_qualified(item, query)) {
+    let mut groups: BTreeMap<Action, QualifiedGroup> = BTreeMap::new();
+    for item in memory.iter().filter(|item| {
+        event_frequency.get(&item.event_id) == Some(&1) && is_qualified(item, query)
+    }) {
         groups.entry(item.action).or_default().add(item);
     }
 
@@ -294,6 +306,26 @@ mod tests {
             Query { scope },
         );
         assert_eq!(decision.action, None);
+    }
+
+    #[test]
+    fn same_event_with_two_claimed_source_families_is_not_independent_support() {
+        let scope = Scope {
+            regime: Regime::Baseline,
+            objective: Objective::Quality,
+        };
+        let memory = vec![
+            sample(7, 10, Action::A, 0.99, scope),
+            sample(7, 11, Action::A, 0.99, scope),
+            sample(8, 20, Action::B, 0.65, scope),
+            sample(9, 21, Action::B, 0.68, scope),
+        ];
+        let frequency = decide(Policy::FrequencyOnly, &memory, Query { scope });
+        let qualified = decide(Policy::CausalQualified, &memory, Query { scope });
+
+        assert_eq!(frequency.action, Some(Action::A));
+        assert_eq!(qualified.action, Some(Action::B));
+        assert_eq!(qualified.evidence_ids, vec![8, 9]);
     }
 
     #[test]

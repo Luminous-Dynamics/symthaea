@@ -108,7 +108,7 @@ Do not pool percentages across these tasks. Reproduce each official protocol sep
 
 ## Generated stress tranche (MACE v0.2 development)
 
-A second evaluator binary adds **256 deterministic clusters × 8 scenario families = 2,048 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime shift, source retraction, unreconciled tool success, untrusted poison, correlated duplicates and qualified negative experience.
+A second evaluator binary adds **256 deterministic clusters × 11 scenario families = 2,816 generated cases**. It rotates source-family and event identities and varies identifiable positive-control effects. Each cluster includes confounding, regime shift, objective shift, source retraction, unreconciled tool success, untrusted poison, incomplete delayed outcomes, correlated duplicates, event-identity aliasing and qualified negative experience.
 
 Run it independently:
 
@@ -117,6 +117,6 @@ cargo run --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p 
 cargo test --manifest-path research/broca-mace-transfer-bench-v0-1/Cargo.toml -p broca-mace-evaluator --bin mace_generated_stress
 ```
 
-The runner reports per-policy utility, regret, abstention, causal overclaims and invalid-evidence reuse. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
+The candidate gate requires at least two unique event IDs as well as two declared source families; every repeated event ID is excluded from its qualified evidence set, even when assigned multiple family labels. The runner reports aggregate and per-family accuracy, utility, regret, abstention, causal overclaims and invalid-evidence reuse. It also reports paired utility lift versus no-memory with a deterministic **cluster-bootstrap 95% interval**, resampling world clusters rather than individual scenarios, and a Session-B / Session-C known-retraction recovery control.
 
 This is a generated synthetic stress distribution—not an official MemoryArena/AMA-Bench adapter, learned-policy train/test split, sealed external oracle or real-world causal discovery. Source-family IDs vary to expose correlation/identity failures, but independence is not cryptographically attested. Bootstrap intervals quantify variation over these generated clusters only; they do not establish external validity. Session-C corrections are applied as observed source-state updates before the next decision.
