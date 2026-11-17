@@ -24,7 +24,9 @@
         "duration_hours": null
       },
       "geometry_qc_state": "unknown",
-      "geometry_qc_ref": null
+      "geometry_qc_ref": null,
+      "specimen_revision_ref": null,
+      "specimen_configuration_digest": null
     }
   ],
   "test_runs": [
@@ -52,7 +54,9 @@
       "resonance_assessment": "not_assessed",
       "resonance_peaks": [],
       "failure_reason": null,
-      "invalidation_reason": null
+      "invalidation_reason": null,
+      "specimen_revision_ref": null,
+      "specimen_configuration_digest": null
     },
     {
       "run_id": "RUN-IMPACT-001",
@@ -78,7 +82,9 @@
       "resonance_assessment": "not_assessed",
       "resonance_peaks": [],
       "failure_reason": null,
-      "invalidation_reason": null
+      "invalidation_reason": null,
+      "specimen_revision_ref": null,
+      "specimen_configuration_digest": null
     },
     {
       "run_id": "RUN-VIBRATION-001",
@@ -104,7 +110,9 @@
       "resonance_assessment": "not_assessed",
       "resonance_peaks": [],
       "failure_reason": null,
-      "invalidation_reason": null
+      "invalidation_reason": null,
+      "specimen_revision_ref": null,
+      "specimen_configuration_digest": null
     },
     {
       "run_id": "RUN-AIRFLOW-001",
@@ -130,7 +138,9 @@
       "resonance_assessment": "not_assessed",
       "resonance_peaks": [],
       "failure_reason": null,
-      "invalidation_reason": null
+      "invalidation_reason": null,
+      "specimen_revision_ref": null,
+      "specimen_configuration_digest": null
     }
   ],
   "evidence_policy": {
