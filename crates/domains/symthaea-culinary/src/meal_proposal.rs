@@ -830,7 +830,7 @@ mod tests {
                     depends_on: vec![],
                     estimated_duration_min_ms: Some(300_000),
                     estimated_duration_max_ms: Some(600_000),
-                    evidence_refs: vec!["fixture:recipe".to_owned()],
+                    fact_refs: vec!["fixture:recipe".to_owned()],
                 },
                 ProposedTaskV1 {
                     task_id: "cook".to_owned(),
@@ -840,7 +840,7 @@ mod tests {
                     depends_on: vec!["prepare".to_owned()],
                     estimated_duration_min_ms: Some(900_000),
                     estimated_duration_max_ms: Some(1_500_000),
-                    evidence_refs: vec![],
+                    fact_refs: vec![],
                 },
             ],
             facts: vec![],
