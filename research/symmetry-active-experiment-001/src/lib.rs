@@ -674,7 +674,9 @@ mod tests {
             let hypothesis_index = remaining_mask.trailing_zeros() as usize;
             let bit = 1_u64 << hypothesis_index;
             remaining_mask &= remaining_mask - 1;
-            *partitions.entry(probe.outcomes[hypothesis_index]).or_insert(0) |= bit;
+            *partitions
+                .entry(probe.outcomes[hypothesis_index])
+                .or_insert(0) |= bit;
         }
         probe.cost
             + partitions
