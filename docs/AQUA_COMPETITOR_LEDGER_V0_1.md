@@ -31,7 +31,7 @@ A feature-mode percentage is not a whole-service resource result. A sensor estim
 | Orbital Shower | Manufacturer says a long shower can use about 20 L | A second commercial recirculating-shower comparator | The public claim is not normalized here for exact duration, user task, startup, cleaning, purge or service life |
 | Shower drain-water heat recovery | 14-month in-situ study: 66% overall exchanger efficiency after fouling/unsteady effects; 52% overall system efficiency after showerhead-to-drain heat loss; fouling reduced nominal efficiency by 8% | A field-informed comparator for long-term, whole-system thermal recovery | Not a universal device efficiency; result depends on exchanger, geometry, water profile, fouling and installation |
 | CLASP South African sample / WRC 2025 synthesis | Pressure-compensating models averaged ~6.6 L/min at 300 kPa; fixed-orifice models ~24–27 L/min | A locally relevant market benchmark from a 19-product sample and later WRC summary | Not a 2026 exhaustive market census or an exact named-SKU result |
-| Hansgrohe EcoSmart+ family | Manufacturer states ≤6 L/min at 3 bar for certain shower products | Premium local-market flow claim | Family-level manufacturer claim, not an independently matched product test |
+| Hansgrohe Activera Select S 95 2jet EcoSmart, SKU 28087000 | Official SA datasheet: Rain 7.2 L/min and ImpactRain 6.5 L/min at 3 bar; 8 L/min regulator, 0.5 bar minimum flow pressure, FlexPower nozzle adjustment, SafetyStop at 40°C | Exact local-market pressure/flow/spray/temperature-control comparator | Manufacturer datasheet, not independent matched test; this exact SKU supersedes a loose family-level EcoSmart claim for the first physical comparator set |
 | Consumer Reports 2026 test population | Publicly listed top-performing examples include 1.5–1.6 gpm (5.68–6.06 L/min) heads; tests include coverage, force, water use and temperature drop | Global independent consumer-lab comparator | Exact model/market variant and test protocol must be reproduced before head-to-head claims |
 
 ### Sources and evidence class
@@ -185,3 +185,47 @@ For recirculating systems, independent microbiological and aerosol-exposure spec
 - Consumer Reports public showerhead ratings: https://www.consumerreports.org/home-garden/showerheads/c33121/
 - Pérez Guillemette & Albrechtsen (2025), microbial indicators for recirculating shower technology, *Science of the Total Environment* 965, 178610: https://doi.org/10.1016/j.scitotenv.2025.178610
 - Ren et al. (2026), opportunistic pathogens in shower systems, *Journal of Environmental Sciences*, DOI: https://doi.org/10.1016/j.jes.2026.02.034
+
+
+## 6. Exact comparator updates — current vendor documentation
+
+### Hansgrohe South Africa: exact once-through shower system
+
+The Hansgrohe South African Pro datasheet for **Activera Select S Shower system, SKU 28087000** states:
+- 95 mm hand shower, two spray types Rain and ImpactRain;
+- Rain flow 7.2 L/min at 3 bar;
+- ImpactRain flow 6.5 L/min at 3 bar;
+- 8 L/min regulator (with stated tolerance);
+- minimum flow pressure 0.5 bar;
+- FlexPower pressure-responsive nozzle adjustment;
+- ShowerTablet Select 360 thermostat with SafetyStop at 40°C, adjustable hot-water limitation and stated intrinsic backflow protection.
+
+This exact SKU is a better comparator than a generic brand-family claim. The design challenge is now clearer: a 6.0 L/min AQS-1 primary target would be about 8% below this SKU's 6.5 L/min ImpactRain mode, but only a matched coverage / force / temperature / task test can tell whether it is better. Its 7.2 L/min Rain mode is a direct reference for the wider spray profile. Do not treat the datasheet as independent test evidence.
+
+Primary source: [Hansgrohe South Africa product datasheet, SKU 28087000](https://pro.hansgrohe.co.za/download-datasheet?lang=en_ZA&productCode=28087000).
+
+### Orbital Shower: installation and service constraints
+
+Orbital's current support documentation provides a much more specific operational boundary than its approximate 20 L long-shower marketing statement:
+
+- incoming pressure range published as 2–10 bar, with listed system flows of 8.7 L/min at 1.5 bar, 10.2 L/min at 2 bar, 11.7 L/min at 3 bar and 12 L/min at 4 bar and above;
+- hot and cold inlets each require specified supply capacity (e.g. 9 L/min per inlet for a 12 L/min system flow);
+- a 230 VAC, single-phase, 16 A supply is the stated design supply; the core must remain powered even when not in use;
+- the core requires a warm, temperature-controlled service environment and is not to be installed where ambient temperature may fall below 4°C;
+- its maintenance guide describes filter-capsule replacement on average every three months (assuming one shower daily), weekly descaling or when prompted (typically every 20 showers on the cited guide), and monthly drain cleaning (~3 minutes). The product documentation states filter and descaling consumables are provided through its Care / Optimization Plan.
+
+These are manufacturer installation and maintenance instructions, not independently measured reliability or operating-cost data. They nevertheless make several benchmark variables explicit: minimum supply pressure, both inlet capacities, electrical availability/continuous standby, service-space/temperature constraints, recurring consumables, maintenance labor and local support dependence. Aqua must measure these burdens for the exact South African configuration rather than infer them from the advertised water figure.
+
+Primary sources:
+- [Orbital installation requirements](https://support.orbital-systems.com/en/19639-installation-requirements.html)
+- [Orbital Home maintenance intervals](https://support.orbital-systems.com/user-guide/en/16856-maintenance-routines---notifications.html)
+- [Orbital Business maintenance intervals](https://support.orbital-systems.com/user-guide/en/9466-maintenance-overview---notifications.html)
+- [Orbital long-shower water claim](https://www.orbital-systems.com/orbital-shower-hiw)
+
+### Competitive implications for Aqua
+
+1. **Do not compete on one headline litre figure.** Recirculation remains the water-volume frontier, but direct-flow may have a superior deployment envelope where supply pressure, electrical availability, installation footprint, always-on standby, service contract, proprietary consumables or local repair access are limiting.
+2. **Treat the exact local shower as the control.** Test Hansgrohe SKU 28087000 at 150 / 300 kPa and any additional standards / product-specific points. Capture both Rain and ImpactRain; compare like spray profiles rather than averaging the two.
+3. **Make low-pressure operation a first-class differentiator.** Orbital's published 2 bar minimum system inlet pressure is materially above some household supply conditions. Verify on the exact regional installation; do not extrapolate from nominal pressure ratings.
+4. **Count system dependencies.** Recirculating products must be compared with electrical continuity, standby power, source pressure/flow, warm service-space requirements, consumables, cleaning, maintenance, downtime and service response—not only shower-session make-up water.
+5. **Measure serviceability rather than assuming simplicity.** A direct-flow design still needs scale-resistant nozzles, accessible strainers, reliable thermostatic mixing, backflow protection, safe temperatures and a proven cleaning/service path. Fewer parts are not automatically safer or easier to maintain.
