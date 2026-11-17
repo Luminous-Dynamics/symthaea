@@ -770,7 +770,7 @@ fn evaluate_action(
             stop_decision_id: None,
             branches,
         },
-        expected_decision_loss: expected_loss,
+        expected_decision_loss,
         expected_resource_cost_units,
         expected_resources,
         mission_interruption_probability: interruption_probability,
