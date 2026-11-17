@@ -1,6 +1,6 @@
 # MANIP-HLB-BIO M1: deterministic contract fixtures v0.1
 
-**Status:** research/contract scaffold. These fixtures are not yet consumed by a Rust test harness and do not establish a code, simulator, HIL, or physical qualification pass.
+**Status:** research/contract scaffold. A crate-local integration test source validates fixture-set structure and selected fail-closed invariants, but it has not been executed. This does not establish runtime behavior, simulator, HIL, or physical qualification.
 
 **Owner:** [Symthaea #12735](https://github.com/Luminous-Dynamics/symthaea/issues/12735)
 
@@ -64,7 +64,7 @@ Missing, stale, invalid, uncalibrated, wrong-frame, or wrong-configuration evide
 
 ## 5. Known-answer cases
 
-The companion `fixtures.json` contains the normative M1 cases. The first implementation should cover:
+The normative machine-readable cases are in [`crates/domains/symthaea-manipulator/tests/fixtures/hlb_bio_contract_fixtures_v0_1.json`](../../crates/domains/symthaea-manipulator/tests/fixtures/hlb_bio_contract_fixtures_v0_1.json). The structural test source is [`crates/domains/symthaea-manipulator/tests/hlb_bio_contract_fixtures.rs`](../../crates/domains/symthaea-manipulator/tests/hlb_bio_contract_fixtures.rs); it checks schema identity, unique fixture IDs, required fields, declared invariants and selected negative controls. It does not yet test the actual runtime semantics. The first implementation should cover:
 
 1. **Missing vs zero:** absent tactile coverage is not a measured zero-force/no-contact sample.
 2. **Stale observation:** expired tactile/proprioceptive data cannot support a current contact or grasp assertion.
@@ -170,4 +170,4 @@ References:
 
 ## 10. Claim ceiling
 
-This contract scaffold is not a test pass, an implemented sensor/reflex network, a calibrated world model, a biological reproduction, a physical qualification, or evidence of SOTA superiority. A synthetic fixture pass proves only the fixture implementation for its declared cases. In-simulation results remain in-simulation results; HIL and physical evidence require separate instrumentation and qualification.
+This contract scaffold is not an executed Rust test pass, an implemented sensor/reflex network, a calibrated world model, a biological reproduction, a physical qualification, or evidence of SOTA superiority. The added Rust test source is a structural validator only and remains unrun. Even an eventual fixture-suite pass would prove only the fixture implementation for its declared cases. In-simulation results remain in-simulation results; HIL and physical evidence require separate instrumentation and qualification.
