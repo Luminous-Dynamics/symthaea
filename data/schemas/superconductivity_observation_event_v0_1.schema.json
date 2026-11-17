@@ -268,7 +268,75 @@
               "pattern": "^[a-fA-F0-9]{64}$"
             }
           },
-          "additionalProperties": false
+          "additionalProperties": false,
+          "anyOf": [
+            {
+              "required": [
+                "page"
+              ],
+              "properties": {
+                "page": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "section"
+              ],
+              "properties": {
+                "section": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "table"
+              ],
+              "properties": {
+                "table": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "figure"
+              ],
+              "properties": {
+                "figure": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "supplementary_file"
+              ],
+              "properties": {
+                "supplementary_file": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            },
+            {
+              "required": [
+                "row_or_record_id"
+              ],
+              "properties": {
+                "row_or_record_id": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              }
+            }
+          ]
         },
         "rights_scope": {
           "enum": [
