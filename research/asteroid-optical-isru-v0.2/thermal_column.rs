@@ -112,18 +112,13 @@ impl ThermalColumn {
         let initial_temperatures = self.state.temperatures_k.clone();
         let mut temperatures = initial_temperatures.clone();
         let surface_temperature_before_k = temperatures[0];
-        let areal_heat_capacity =
-            parameters.bulk_density_kg_m3
-                * parameters.specific_heat_j_kg_k
-                * parameters.cell_thickness_m;
-        let conductivity_per_length =
-            parameters.conductivity_w_m_k / parameters.cell_thickness_m;
-        let incident_energy_j_m2 =
-            pulse.incident_irradiance_w_m2 * pulse.duration_seconds;
-        let energy_delivered_after_optics_j_m2 =
-            incident_energy_j_m2 * pulse.optical_transmission;
-        let optical_path_loss_j_m2 =
-            incident_energy_j_m2 - energy_delivered_after_optics_j_m2;
+        let areal_heat_capacity = parameters.bulk_density_kg_m3
+            * parameters.specific_heat_j_kg_k
+            * parameters.cell_thickness_m;
+        let conductivity_per_length = parameters.conductivity_w_m_k / parameters.cell_thickness_m;
+        let incident_energy_j_m2 = pulse.incident_irradiance_w_m2 * pulse.duration_seconds;
+        let energy_delivered_after_optics_j_m2 = incident_energy_j_m2 * pulse.optical_transmission;
+        let optical_path_loss_j_m2 = incident_energy_j_m2 - energy_delivered_after_optics_j_m2;
         let total_depth_m = cell_count as f64 * parameters.cell_thickness_m;
         let absorbed_fraction = pulse.surface_absorptivity
             * (1.0 - (-total_depth_m / parameters.optical_absorption_depth_m).exp());
@@ -146,13 +141,11 @@ impl ThermalColumn {
                 * parameters.surface_emissivity
                 * STEFAN_BOLTZMANN_W_M2_K4
                 * surface_temperature.powi(3);
-            let maximum_row_coupling =
-                2.0 * conductivity_per_length + radiative_derivative;
+            let maximum_row_coupling = 2.0 * conductivity_per_length + radiative_derivative;
             if !maximum_row_coupling.is_finite() || maximum_row_coupling <= 0.0 {
                 return Err(ThermalColumnError::NonFiniteIntermediate);
             }
-            let stable_step_seconds =
-                STABILITY_FACTOR * areal_heat_capacity / maximum_row_coupling;
+            let stable_step_seconds = STABILITY_FACTOR * areal_heat_capacity / maximum_row_coupling;
             if !stable_step_seconds.is_finite() || stable_step_seconds <= 0.0 {
                 return Err(ThermalColumnError::NonFiniteIntermediate);
             }
@@ -164,8 +157,7 @@ impl ThermalColumn {
             let radiative_flux_w_m2 = parameters.surface_emissivity
                 * STEFAN_BOLTZMANN_W_M2_K4
                 * (surface_temperature.powi(4) - parameters.ambient_temperature_k.powi(4));
-            let latent_flux_w_m2 =
-                pulse.volatile_mass_flux_kg_m2_s * pulse.latent_heat_j_kg;
+            let latent_flux_w_m2 = pulse.volatile_mass_flux_kg_m2_s * pulse.latent_heat_j_kg;
             if !radiative_flux_w_m2.is_finite() || !latent_flux_w_m2.is_finite() {
                 return Err(ThermalColumnError::NonFiniteIntermediate);
             }
@@ -174,8 +166,7 @@ impl ThermalColumn {
             for cell_index in 0..cell_count {
                 let depth_top_m = cell_index as f64 * parameters.cell_thickness_m;
                 let depth_bottom_m = depth_top_m + parameters.cell_thickness_m;
-                let absorption_fraction = (-depth_top_m
-                    / parameters.optical_absorption_depth_m)
+                let absorption_fraction = (-depth_top_m / parameters.optical_absorption_depth_m)
                     .exp()
                     - (-depth_bottom_m / parameters.optical_absorption_depth_m).exp();
                 let absorbed_power_w_m2 = energy_delivered_after_optics_j_m2
@@ -198,8 +189,7 @@ impl ThermalColumn {
                 };
 
                 let net_power_w_m2 = absorbed_power_w_m2 + conductive_power_w_m2;
-                let temperature_change_k =
-                    net_power_w_m2 * step_seconds / areal_heat_capacity;
+                let temperature_change_k = net_power_w_m2 * step_seconds / areal_heat_capacity;
                 let next_temperature = temperatures[cell_index] + temperature_change_k;
                 if !absorbed_power_w_m2.is_finite()
                     || !next_temperature.is_finite()
@@ -270,9 +260,7 @@ impl ThermalColumn {
     }
 }
 
-fn validate_parameters(
-    parameters: ThermalColumnParameters,
-) -> Result<(), ThermalColumnError> {
+fn validate_parameters(parameters: ThermalColumnParameters) -> Result<(), ThermalColumnError> {
     if !parameters.bulk_density_kg_m3.is_finite()
         || parameters.bulk_density_kg_m3 <= 0.0
         || !parameters.specific_heat_j_kg_k.is_finite()
@@ -385,9 +373,7 @@ mod tests {
             })
             .unwrap();
         assert!(
-            (fouled.absorbed_energy_in_column_j_m2
-                / clean.absorbed_energy_in_column_j_m2
-                - 0.5)
+            (fouled.absorbed_energy_in_column_j_m2 / clean.absorbed_energy_in_column_j_m2 - 0.5)
                 .abs()
                 < 1.0e-9
         );
