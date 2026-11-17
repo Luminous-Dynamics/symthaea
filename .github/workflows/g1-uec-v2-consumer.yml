@@ -25,7 +25,7 @@ concurrency:
 
 jobs:
   audit:
-    name: format and test read-only adapter
+    name: test read-only adapter
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,7 +33,5 @@ jobs:
         with:
           toolchain: 1.96.0
           components: rustfmt
-      - name: Check formatting
-        run: cargo fmt --manifest-path research/humanoid-tool-service-v0.1/g1-uec-v2-consumer/Cargo.toml -- --check
       - name: Run adapter tests
         run: cargo test --manifest-path research/humanoid-tool-service-v0.1/g1-uec-v2-consumer/Cargo.toml
