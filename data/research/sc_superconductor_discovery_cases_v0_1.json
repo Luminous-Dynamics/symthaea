@@ -180,7 +180,8 @@
         "attempts_with_signal_above_4_2k": 9
       },
       "primary_claim_boundary": "773 is a DFT-computed candidate count, not experimental validation. Nine of 18 synthesis attempts showed some signal >4.2 K; intended ordered structures often did not form. Separate signal, target phase, phase purity and bulk confirmation.",
-      "license_status": "GitHub repository README declares MIT; verify exact license files for data, checkpoints and upstream Alexandria / fine-tune datasets separately."
+      "license_status": "Repository root LICENSE is MIT (copyright notice names Rui Jiao, and README is built on DiffCSP); confirm provenance/attribution and any third-party code conditions. Dataset and checkpoint licensing is separately unresolved.",
+      "repository_license_file_sha": "a5a257dc49869363b85aaa7fb41f1953ef7342c2"
     },
     {
       "source_id": "elementsclaw_2026",
@@ -235,7 +236,8 @@
       "reported_record_count_methods": 78204,
       "reported_unique_compositions": 19058,
       "primary_claim_boundary": "Literature-extracted experimental and non-superconductor records with multiple LLM tasks. GNoME Tc>10 K candidates remain predictions. The exact count, row provenance, data license and train/test split require reconciliation.",
-      "repository_readme_blob_sha": "71ec1b961a6231b21c6745b63dc8f774cd7ecbed"
+      "repository_readme_blob_sha": "71ec1b961a6231b21c6745b63dc8f774cd7ecbed",
+      "repository_license_status": "No LICENSE file was listed in inspected repository root; code reuse rights and data/checkpoint terms require author clarification."
     },
     {
       "source_id": "stgi_translation_gap_2026",
