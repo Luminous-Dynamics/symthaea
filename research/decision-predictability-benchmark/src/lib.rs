@@ -1,3 +1,5 @@
+pub mod paired_world;
+
 use std::error::Error;
 use std::fmt;
 
