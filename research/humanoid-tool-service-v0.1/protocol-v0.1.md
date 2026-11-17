@@ -220,6 +220,79 @@ Evaluate three memory types separately:
 
 Count retrieval errors, stale-memory use, harmful transfers, forgotten earlier task families and unsafe actions. A memory-induced performance gain is not acceptable if it silently lowers evidence quality or increases unsafe continuation.
 
+## 3C. Current agentic SOTA audit and reproduction constraints (17 November 2026)
+
+This section supersedes the older single-number framing of AMP1 and RoboDojo. Keep paper results, live leaderboard snapshots, after-practice results and real-robot trials in separate rows.
+
+### AMP1 — paper results and current public comparison
+
+Primary paper: https://arxiv.org/abs/2611.09892 (first posted 6 November 2026). Official project: https://apple-aiml-research.github.io/ml-amp/. Official source repository: https://github.com/apple-aiml-research/ml-amp.
+
+Current project page and paper report:
+- RoboLab-120: 85.6% zero-shot for Gemini 4 Argon on the paper protocol; 82.8% with Claude Opus 5.5. The current NVIDIA RoboLab leaderboard reports AMP1 at 86.0% ± 2.5 percentage points, 2,579/3,000 episodes, 25 episodes/task. The paper and leaderboard snapshots should not be collapsed into one exact figure or denominator.
+- CaP-Gym: 95.2% on LIBERO-PRO (reported as best zero-shot), 100% on the selected robosuite uni-/bimanual suite, and 96.0% on the two BEHAVIOR-1K mobile-manipulation tasks.
+- RoboDojo: 84.1% is explicitly labelled by AMP as the best public number **after practice**, not a zero-shot score. AMP1+ uses memory/practice before evaluation on held-out layouts. The paper separately reports 4.6× lower failure rate on RoboDojo bimanual tasks with carried memory, and an improvement from 26.4% zero-shot to 57.6% after one pass through 42 tasks in its related bimanual analysis.
+- Real-world: 104/108 successful trials across 12 tasks (nine trials each) on a 7-DoF Franka Research 3 with a Robotiq 2F-85 and three cameras. This is an arm benchmark, not a humanoid result. The paper reports 104/108 with recovery; 94/108 without its recovery-from-controller-error functions. Collision, camera-calibration and geometry approximation remain meaningful failure modes.
+
+Sources:
+- Paper: https://arxiv.org/abs/2611.09892
+- Results, harness description and hardware walkthrough: https://apple-aiml-research.github.io/ml-amp/
+- Current NVIDIA RoboLab leaderboard: https://research.nvidia.com/labs/srl/projects/robolab/leaderboard.html?family=all
+- Current RoboDojo simulation leaderboard / Agent Track: https://robodojo-benchmark.com/leaderboard?bench=sim
+
+### Agent Track governance and score comparability
+
+RoboDojo published revised Agent Track rules on 14 November 2026 and marks previously evaluated entries with an asterisk when they do not conform to one or more updated provisions. The 17 November snapshot shows a separate Agent Track, including SOLVE* at 79.50 average / 74.96 success and Q0-Preview* at 73.20 / 67.34, while the standard policy board has a different scale and top standard entry. Do not rank starred pre-rule results as compliant submissions, and do not compare Agent Track averages with standard policy averages, RoboLab percentages or HumanoidToolBench success rates.
+
+The Agent Track's current protocol explicitly separates Generalization, Precision, Long-Horizon and Memory. This decomposition is worth adopting in Symthaea's scorecard rather than using one aggregate completion percentage.
+
+### AMP1 harness mechanisms worth testing—not copying blindly
+
+The official project page describes:
+- a persistent Python interpreter that carries state and generated routines across model turns;
+- active sensing and selectable RGB/depth/point-cloud observations;
+- an editable scene model;
+- timed end-effector waypoints and gripper commands;
+- a `preview` reachability/speed/joint-limit check, collision checks and an execute call that may refuse a motion;
+- generalist-model calls interleaved with environment observations.
+
+The project walkthrough notes the simulation pauses while the model reasons, so only executed motion counts against the depicted motion-time limit. The paper also identifies slow model reasoning and inability to reconsider a trajectory while it is executing as limitations; it proposes faster local feedback controllers and overlapping planning with motion as future directions.
+
+**Important Symthaea opportunity:** use an agentic slow planner to decide *what* to do, but use a qualified local fast loop to monitor contact, slip, collision margin and state transitions continuously. If the physical scene changes while a motion is executing, the local controller must stop/hold/recover without waiting for the next LLM turn. Compare both benchmark-motion time and end-to-end wall-clock time; charge model wait, API cost, retries, compute, energy and intervention to operational utility even when a benchmark pauses simulation during reasoning.
+
+### AMP1 reproduction, licence and compute boundary
+
+The official source repo's `LICENSE` is an Apple custom copyright licence granting a personal, non-exclusive licence; it is not a conventional MIT/Apache-2.0 licence. It contains third-party materials with separate terms. Do not copy AMP source into Symthaea, redistribute a fork, or incorporate it into a Luminous product until the exact licence and third-party terms have been reviewed. The public paper, benchmark protocol and reported results can still be studied and independently implemented without copying protected source.
+
+The official reproduction guide pins third-party source revisions and requires x86_64 Linux, NVIDIA GPU, a provider API key or compatible model server, and the full benchmark stack. Its RoboLab quickstart lists approximately 9 GB VRAM, 15 GB RAM and 40 GB disk; paper simulation results used H100 80 GB GPUs with driver 580.159.03. It reports Python/uv, Isaac Sim and substantial assets. These are not requirements for the small Rust mapping audit, but they are relevant to a full AMP1 reproduction. The known RTX 2070 Laptop 8 GB configuration is below the guide's stated VRAM figure; do not assume it can run the official stack without a separate tested lower-resource path.
+
+Sources:
+- AMP source and licence: https://github.com/apple-aiml-research/ml-amp
+- Reproduction pins: https://github.com/apple-aiml-research/ml-amp/blob/main/docs/reproducibility.md
+- Hardware/setup guide: https://github.com/apple-aiml-research/ml-amp/blob/main/docs/quickstart.md
+- Model/provider guide: https://github.com/apple-aiml-research/ml-amp/blob/main/docs/models.md
+
+### Active tool affordance discovery — an important benchmark gap
+
+New child programme: [HUM-TOOL-DISCOVERY-001 #12701](https://github.com/Luminous-Dynamics/symthaea/issues/12701).
+
+HumanoidToolBench is the immediate published humanoid tool-use anchor: 55 tool assets and approximately 3.1k demonstrations, with selection, stationary tool use, mobile execution and decoys. But selecting among known tools is not the same as identifying what an unfamiliar physical tool can do or learning its operating envelope.
+
+The new discovery track asks whether an agent can:
+1. distinguish visual appearance from causal physical affordance;
+2. choose bounded probes that separate plausible tool-function hypotheses;
+3. infer effective reach, working-end geometry, engagement, compliance and operating limits with uncertainty;
+4. transfer the discovered affordance to a new target/task/tool instance;
+5. refuse when material strength, safe load, interface compatibility or other critical properties remain unknown.
+
+The first synthetic cases cover lever, hook, wedge, rotary driver, clamp and mallet families, with held-out same-family variants, task-transfer variants and visually similar decoys. The 24-case manifest is:
+- `tool-discovery-cases-v0.1.json`
+- `tool-discovery-cases-v0.1.schema.json`
+
+The full file is evaluator-owned: policy context receives only candidate-visible observations and probe budget. Hidden physical parameters, split labels and postcondition oracle must remain sealed from the candidate.
+
+No powered tools, blades, high force, mains voltage, hazardous materials, human-contact tasks or destructive probes are included in v0.1.
+
 ## 4. Matched baseline ladder
 
 Evaluate the following arms only when the exact artifact and interface are available:
@@ -239,6 +312,7 @@ Evaluate the following arms only when the exact artifact and interface are avail
 14. Symthaea + action-conditioned tactile/contact prediction.
 15. Symthaea + uncertainty-aware probing and event-based recovery.
 16. Hybrid agentic planner + Symthaea skill/controller substrate + independent evidence/safety planes.
+17. Active tool-affordance discovery: passive VLM / geometry heuristic / supervised tool labels / agentic probing / causal tool model / tactile-enhanced causal model / oracle-property upper bound. Use HUM-TOOL-DISCOVERY-001 #12701; report probe budget, information gain, held-out task transfer and safe abstention separately.
 
 Unavailable artifacts are “unavailable”, not a zero score. Pin licence, source SHA, checkpoint digest, model/provider/version, reasoning-effort setting, prompt, tool API and route policy, pre/post-processing, robot morphology, actuation semantics, sensor set, training data, memory content/provenance, adaptation budget, inference hardware and evaluation runtime.
 
@@ -427,6 +501,8 @@ Symthaea should be useful before it can physically perform every repair. A relia
 - number and quality of active observations, scene-model corrections and plan revisions;
 - skill synthesis/reuse rate, cross-task transfer, memory retrieval precision and stale/poisoned-memory rejection;
 - task-family retention after memory updates and harmful-transfer rate;
+- repeated-failure rate, recovery success, failure-to-new-skill conversion and negative transfer after memory update;
+- active tool-discovery accuracy, property calibration, information gained per probe, probe cost and held-out task transfer;
 - collisions, object/tool damage, unsafe forces and invalid contact.
 
 ### Service outcome vector
