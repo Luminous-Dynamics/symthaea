@@ -289,8 +289,8 @@ fn parse_factorization_certificates(value: &Value) -> Result<Vec<(String,Factori
 fn calibration_valid(cal: &Calibration, factor_id: &str, observation_time: &DateTime<FixedOffset>, cutoff: &DateTime<FixedOffset>) -> bool {
     cal.authority.trim() != ""
         && cal.factor_ids.contains(factor_id)
-        && cal.valid_from <= *observation_time
-        && *cutoff <= cal.valid_until
+        && &cal.valid_from <= observation_time
+        && cutoff <= &cal.valid_until
         && cal.revoked_at.as_ref().map(|r| observation_time < r && cutoff < r).unwrap_or(true)
 }
 
@@ -317,7 +317,7 @@ fn factorization_valid(
             && cert.groups == groups
             && cert.action_ids.contains(action_id)
             && acquired.iter().all(|f| cert.valid_from <= f.at)
-            && *cutoff <= cert.valid_until
+            && cutoff <= &cert.valid_until
             && cert.revoked_at.as_ref().map(|r| acquired.iter().all(|f| f.at < *r) && cutoff < r).unwrap_or(true)
     })
 }
@@ -344,18 +344,16 @@ fn support_lower_bps(priors: &BTreeMap<String,Bounds>, likelihoods: &BTreeMap<St
     let mut rows: Vec<(String,u64,u64,u64)> = priors.iter().map(|(id,p)| {
         (id.clone(),p.lower,p.upper,likelihoods[id].lower)
     }).collect();
-    let mut mass: u64 = rows.iter().map(|r|r.1).sum();
+    let lower_mass: u64 = rows.iter().map(|r|r.1).sum();
     let mut weighted: u128 = rows.iter().map(|r|r.1 as u128 * r.3 as u128).sum();
     rows.sort_by(|a,b| a.3.cmp(&b.3).then_with(||a.0.cmp(&b.0)));
-    let mut remaining = SCALE - mass;
+    let mut remaining = SCALE - lower_mass;
     for row in rows {
         let take = remaining.min(row.2-row.1);
         weighted += take as u128 * row.3 as u128;
         remaining -= take;
         if remaining == 0 { break; }
     }
-    mass = SCALE;
-    let _ = mass;
     (weighted / SCALE as u128) as u64 // floor: never overstate minimum support
 }
 
@@ -593,13 +591,13 @@ pub fn evaluate_noisy_channel_parts_json(candidate_raw:&str,oracle_raw:&str)->Re
     let actual=required_str(&oracle,"actual_hypothesis_id","oracle")?;
     if !hypothesis_ids.contains(&actual) {return Err("oracle actual_hypothesis_id is unknown".to_owned());}
     let calibrations=parse_calibrations(&oracle)?;
-    for factor in factors.values() {
-        let cal=calibrations.get(&factor.calibration_ref).ok_or_else(||format!("missing calibration {:?}",factor.calibration_ref))?;
-        if !cal.factor_ids.iter().any(|id|id!="" ) || cal.factor_ids.iter().any(|id|!factors.contains_key(id)) {
-            return Err(format!("calibration {:?} has invalid factor scope",factor.calibration_ref));
-        }
-        if !cal.factor_ids.contains(&factors.iter().find(|(_,f)|std::ptr::eq(*f,factor)).map(|(id,_)|id.clone()).unwrap_or_default()) {
-            // Factor-specific scope is checked again at acquisition; this catches no hidden authority override.
+    for (factor_id,factor) in &factors {
+        let cal=calibrations.get(&factor.calibration_ref)
+            .ok_or_else(||format!("missing calibration {:?}",factor.calibration_ref))?;
+        if !cal.factor_ids.contains(factor_id)
+            || cal.factor_ids.iter().any(|id|!factors.contains_key(id))
+        {
+            return Err(format!("calibration {:?} has invalid factor scope for {factor_id:?}",factor.calibration_ref));
         }
     }
     let certificates=parse_factorization_certificates(&oracle)?;
