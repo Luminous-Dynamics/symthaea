@@ -807,6 +807,32 @@ mod tests {
         }
     }
 
+
+    #[test]
+    fn pivoted_linear_solver_matches_known_three_by_three_solution() {
+        let matrix = [
+            [3.0, 2.0, -1.0],
+            [2.0, -2.0, 4.0],
+            [-1.0, 0.5, -1.0],
+        ];
+        let (solution, condition_number) =
+            solve_3x3(matrix, [1.0, -2.0, 0.0], 1.0e-12, 1.0e12).unwrap();
+        assert!((solution[0] - 1.0).abs() < 1.0e-12);
+        assert!((solution[1] + 2.0).abs() < 1.0e-12);
+        assert!((solution[2] + 2.0).abs() < 1.0e-12);
+        assert!(condition_number.is_finite() && condition_number >= 1.0);
+    }
+
+    #[test]
+    fn pivoted_linear_solver_rejects_an_ill_conditioned_matrix() {
+        let matrix = [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0e-14, 0.0],
+            [0.0, 0.0, 1.0],
+        ];
+        assert!(solve_3x3(matrix, [1.0, 1.0, 1.0], 1.0e-10, 1.0e12).is_none());
+    }
+
     #[test]
     fn exact_upright_balance_converges_and_binds_full_solver_configuration() {
         let request = box_request();
