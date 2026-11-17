@@ -85,7 +85,7 @@
       ],
       "notes": "Preserve official standard-set composition and scoring.",
       "upstream_mode_token": "S",
-      "official_environment_id": "humanoidtoolbench/G1BallMove-LL0-S",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-L0-S",
       "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
@@ -120,7 +120,7 @@
       ],
       "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
       "upstream_mode_token": "R",
-      "official_environment_id": "humanoidtoolbench/G1BallMove-LL0-R",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-L0-R",
       "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
@@ -155,7 +155,7 @@
       ],
       "notes": "Preserve official standard-set composition and scoring.",
       "upstream_mode_token": "S",
-      "official_environment_id": "humanoidtoolbench/G1BallMove-LL1-S",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-L1-S",
       "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
@@ -190,7 +190,7 @@
       ],
       "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
       "upstream_mode_token": "R",
-      "official_environment_id": "humanoidtoolbench/G1BallMove-LL1-R",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-L1-R",
       "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
@@ -227,7 +227,7 @@
       ],
       "notes": "Preserve official standard-set composition and scoring.",
       "upstream_mode_token": "S",
-      "official_environment_id": "humanoidtoolbench/G1BallMove-LL2-S",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-L2-S",
       "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
@@ -264,7 +264,7 @@
       ],
       "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
       "upstream_mode_token": "R",
-      "official_environment_id": "humanoidtoolbench/G1BallMove-LL2-R",
+      "official_environment_id": "humanoidtoolbench/G1BallMove-L2-R",
       "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
@@ -299,7 +299,7 @@
       ],
       "notes": "Preserve official standard-set composition and scoring.",
       "upstream_mode_token": "S",
-      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL0-S",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-L0-S",
       "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
@@ -334,7 +334,7 @@
       ],
       "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
       "upstream_mode_token": "R",
-      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL0-R",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-L0-R",
       "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
@@ -369,7 +369,7 @@
       ],
       "notes": "Preserve official standard-set composition and scoring.",
       "upstream_mode_token": "S",
-      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL1-S",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-L1-S",
       "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
@@ -404,7 +404,7 @@
       ],
       "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
       "upstream_mode_token": "R",
-      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL1-R",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-L1-R",
       "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
@@ -441,7 +441,7 @@
       ],
       "notes": "Preserve official standard-set composition and scoring.",
       "upstream_mode_token": "S",
-      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL2-S",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-L2-S",
       "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
@@ -478,7 +478,7 @@
       ],
       "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
       "upstream_mode_token": "R",
-      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-LL2-R",
+      "official_environment_id": "humanoidtoolbench/G1BallRetrieve-L2-R",
       "official_success_predicate": "ball_center_inside_0.12_m_target_ring_for_50_consecutive_steps"
     },
     {
@@ -513,7 +513,7 @@
       ],
       "notes": "Preserve official standard-set composition and scoring.",
       "upstream_mode_token": "S",
-      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL0-S",
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-L0-S",
       "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
@@ -548,7 +548,7 @@
       ],
       "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
       "upstream_mode_token": "R",
-      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL0-R",
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-L0-R",
       "official_success_predicate": "correct_tool_body_lifted_at_least_0.08_m_and_held_for_50_consecutive_steps"
     },
     {
@@ -583,8 +583,8 @@
       ],
       "notes": "Preserve official standard-set composition and scoring.",
       "upstream_mode_token": "S",
-      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL1-S",
-      "official_success_predicate": "both_ice_blocks_broken_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-L1-S",
+      "official_success_predicate": "both_ice_blocks_fractured_after_qualifying_tool_contact_impulse_at_least_0.042_Ns_with_tool_closing_speed_at_least_0.5_m_per_s_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-ICEBREAK-L1-DECOY",
@@ -618,8 +618,8 @@
       ],
       "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
       "upstream_mode_token": "R",
-      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL1-R",
-      "official_success_predicate": "both_ice_blocks_broken_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-L1-R",
+      "official_success_predicate": "both_ice_blocks_fractured_after_qualifying_tool_contact_impulse_at_least_0.042_Ns_with_tool_closing_speed_at_least_0.5_m_per_s_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-ICEBREAK-L2-STANDARD",
@@ -655,8 +655,8 @@
       ],
       "notes": "Preserve official standard-set composition and scoring.",
       "upstream_mode_token": "S",
-      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL2-S",
-      "official_success_predicate": "both_ice_blocks_broken_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-L2-S",
+      "official_success_predicate": "both_ice_blocks_fractured_after_qualifying_tool_contact_impulse_at_least_0.042_Ns_with_tool_closing_speed_at_least_0.5_m_per_s_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
     },
     {
       "case_id": "HTB-ICEBREAK-L2-DECOY",
@@ -692,8 +692,8 @@
       ],
       "notes": "Preserve official decoy-set composition and scoring; separately audit decoy identity.",
       "upstream_mode_token": "R",
-      "official_environment_id": "humanoidtoolbench/G1IceBreak-LL2-R",
-      "official_success_predicate": "both_ice_blocks_broken_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
+      "official_environment_id": "humanoidtoolbench/G1IceBreak-L2-R",
+      "official_success_predicate": "both_ice_blocks_fractured_after_qualifying_tool_contact_impulse_at_least_0.042_Ns_with_tool_closing_speed_at_least_0.5_m_per_s_shards_spread_at_least_0.03_m_and_predicate_held_for_50_consecutive_steps"
     }
   ],
   "extension_strata": {
