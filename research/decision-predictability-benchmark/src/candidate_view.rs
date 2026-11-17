@@ -36,16 +36,36 @@ pub enum CandidateViewError {
 impl fmt::Display for CandidateViewError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidTicket => write!(formatter, "candidate ticket must be 32 lowercase hexadecimal characters"),
-            Self::InvalidDigest => write!(formatter, "task contract digest must be sha256 followed by 64 lowercase hexadecimal characters"),
-            Self::InvalidField(field) => write!(formatter, "invalid candidate packet field: {field}"),
-            Self::DuplicateValue(field) => write!(formatter, "duplicate candidate packet value: {field}"),
+            Self::InvalidTicket => write!(
+                formatter,
+                "candidate ticket must be 32 lowercase hexadecimal characters"
+            ),
+            Self::InvalidDigest => write!(
+                formatter,
+                "task contract digest must be sha256 followed by 64 lowercase hexadecimal characters"
+            ),
+            Self::InvalidField(field) => {
+                write!(formatter, "invalid candidate packet field: {field}")
+            }
+            Self::DuplicateValue(field) => {
+                write!(formatter, "duplicate candidate packet value: {field}")
+            }
             Self::NonFiniteValue(field) => write!(formatter, "{field} must be finite"),
-            Self::NonIncreasingObservationTime => write!(formatter, "observation timestamps must be strictly increasing"),
-            Self::ObservationAfterAsOfTime => write!(formatter, "candidate packet contains an observation after its as-of time"),
-            Self::DuplicateTicket => write!(formatter, "candidate ticket is already bound in this evaluator run"),
-            Self::UnknownScenario => write!(formatter, "scenario ID is not present in the validated manifest"),
-            Self::TaskContractMismatch => write!(formatter, "candidate task contract digest does not match the validated manifest"),
+            Self::NonIncreasingObservationTime => {
+                write!(formatter, "observation timestamps must be strictly increasing")
+            }
+            Self::ObservationAfterAsOfTime => {
+                write!(formatter, "candidate packet contains an observation after its as-of time")
+            }
+            Self::DuplicateTicket => {
+                write!(formatter, "candidate ticket is already bound in this evaluator run")
+            }
+            Self::UnknownScenario => {
+                write!(formatter, "scenario ID is not present in the validated manifest")
+            }
+            Self::TaskContractMismatch => {
+                write!(formatter, "candidate task contract digest does not match the validated manifest")
+            }
         }
     }
 }
@@ -356,14 +376,20 @@ mod tests {
 
         let mut packet = packet(TICKET);
         packet.allowed_action_ids[1] = packet.allowed_action_ids[0].clone();
-        assert_eq!(packet.validate(), Err(CandidateViewError::DuplicateValue("allowed_action_ids")));
+        assert_eq!(
+            packet.validate(),
+            Err(CandidateViewError::DuplicateValue("allowed_action_ids"))
+        );
     }
 
     #[test]
     fn rejects_unknown_candidate_packet_fields() {
         let packet = packet(TICKET);
         let mut value = serde_json::to_value(packet).unwrap();
-        value.as_object_mut().unwrap().insert("split_role".to_owned(), serde_json::json!("confirmatory_test"));
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("split_role".to_owned(), serde_json::json!("confirmatory_test"));
         assert!(serde_json::from_value::<CandidatePacketV1>(value).is_err());
     }
 
@@ -398,7 +424,8 @@ mod tests {
         let manifest = validated_manifest();
         let scenario_id = manifest.manifest().scenarios[2].scenario_id.clone();
         let mut packet = packet(TICKET);
-        packet.task_contract_digest = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
+        packet.task_contract_digest =
+            "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff".to_owned();
         let mut book = EvaluatorTicketBook::default();
         assert_eq!(
             book.bind_from_manifest(&packet, &manifest, &scenario_id),
