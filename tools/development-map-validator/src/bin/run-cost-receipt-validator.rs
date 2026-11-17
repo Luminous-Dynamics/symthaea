@@ -13,11 +13,11 @@ use std::{env,fs,process};
 
 const MAX_RUNS:usize=1000;
 const MAX_ATTEMPTS:usize=4096;
-const CONTEXT_FIELDS:[&str;14]=[
+const CONTEXT_FIELDS:[&str;15]=[
  "repository_full_name","branch","commit_sha","worktree_digest_sha256",
  "model_provider","model_version","model_config_digest_sha256",
  "harness_digest_sha256","toolset_digest_sha256","permissions_digest_sha256",
- "runner_class","hardware_class","runner_image_digest_sha256","region"
+ "runner_class","hardware_class","runner_image_digest_sha256","region","billing_currency"
 ];
 const CLAIM_CEILING:&str="Validates receipt structure, SHA-256 content/event-chain consistency, evaluator-approved execution context, chronology, retry links, and empirical quantiles over complete supplied run trajectories. Hashes do not authenticate the receipt producer or billing provider. It does not validate runner honesty, reconcile external invoices, estimate population tails from small samples, prove agent quality, authorize actions, or establish production reliability.";
 
@@ -165,13 +165,13 @@ fn validate_attempts(
   if let Some(start)=started.as_ref(){
    if start<&event_queued{return Err(format!("{l}.started_at precedes attempt queued_at"));}
    if run_started.as_ref().is_some_and(|x|start<x){return Err(format!("{l}.started_at precedes run_started_at"));}
-   earliest_started=Some(earliest_started.as_ref().map_or(start.clone(),|x|x.min(start.clone())));
+   earliest_started=Some(earliest_started.as_ref().map_or(start.clone(),|x|std::cmp::min(x.clone(),start.clone())));
   }
   if let Some(end)=completed.as_ref(){
    let start=started.as_ref().ok_or_else(||format!("{l}.completed_at requires started_at"))?;
    if end<start{return Err(format!("{l}.completed_at precedes started_at"));}
    if run_finished.as_ref().is_some_and(|x|end>x){return Err(format!("{l}.completed_at follows run_finished_at"));}
-   latest_completed=Some(latest_completed.as_ref().map_or(end.clone(),|x|x.max(end.clone())));
+   latest_completed=Some(latest_completed.as_ref().map_or(end.clone(),|x|std::cmp::max(x.clone(),end.clone())));
    let actual=(end-start).num_milliseconds().max(0) as u64;
    if elapsed!=Some(actual){return Err(format!("{l}.elapsed_ms does not match the timestamp interval"));}
   }else if elapsed.is_some(){return Err(format!("{l}.elapsed_ms must be null when completed_at is null"));}
@@ -270,10 +270,10 @@ fn validate_attempts(
  }
  let cost_micros=if cost_complete{Some(total_cost)}else{None};
  let wall_ms=match(run_started.as_ref(),run_finished.as_ref()){
-  (Some(start),Some(finish)) if wall_complete&&finish>=start=>Some((finish-start).num_milliseconds() as u64),
+  (Some(start),Some(finish)) if wall_complete&&finish>=start=>Some((finish.clone()-start.clone()).num_milliseconds() as u64),
   _=>None
  };
- let queue_delay_ms=run_started.as_ref().map(|start|(start-&receipt_queued_at).num_milliseconds().max(0) as u64);
+ let queue_delay_ms=run_started.as_ref().map(|start|(start.clone()-receipt_queued_at.clone()).num_milliseconds().max(0) as u64);
  Ok(RunMetrics{
   run_id:String::new(),task_family:String::new(),paired_seed:0,
   cost_micros,wall_ms,queue_delay_ms,
@@ -292,6 +292,10 @@ fn evaluate(raw:&str)->Result<Value,String>{
  allowed(oracle,&["approved_context","approved_option_ids"],"oracle")?;
  let context=get(oracle,"approved_context","oracle")?;
  allowed(context,&CONTEXT_FIELDS,"oracle.approved_context")?;
+ let currency=string(context,"billing_currency","oracle.approved_context")?;
+ if currency.len()!=3||!currency.chars().all(|c|c.is_ascii_uppercase()){
+  return Err("oracle.approved_context.billing_currency must be a three-letter uppercase ISO 4217 code".to_owned());
+ }
  let approved_options=get(oracle,"approved_option_ids","oracle")?.as_array().ok_or("oracle.approved_option_ids must be an array")?;
  let mut option_ids=BTreeSet::new();
  for option in approved_options{
@@ -353,6 +357,8 @@ fn evaluate(raw:&str)->Result<Value,String>{
  }
  Ok(json!({
   "adjudication_status":"synthetic_known_answer_run_level_cost_receipt_validation",
+  "billing_currency":currency,
+  "quantile_method":"nearest_rank",
   "run_count":metrics.len(),
   "complete_cost_run_count":complete_cost.len(),
   "complete_wall_run_count":complete_wall.len(),
