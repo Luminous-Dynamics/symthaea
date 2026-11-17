@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-aqua-bench"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+authors = ["Luminous Dynamics"]
+description = "Deterministic whole-service water and energy accounting for Luminous Aqua benchmarks"
+license = "AGPL-3.0-or-later"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+
+[lib]
+path = "src/lib.rs"
