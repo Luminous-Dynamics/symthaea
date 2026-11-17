@@ -4,17 +4,19 @@ on:
   pull_request:
     paths:
       - 'crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**'
+      - 'crates/domains/symthaea-subterranean/research/subterra-survival-planner/**'
       - '.github/workflows/subterra-robust-survival-referee.yml'
   push:
     branches:
       - 'research/subterra-robust-survival-referee-v0-1'
     paths:
       - 'crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/**'
+      - 'crates/domains/symthaea-subterranean/research/subterra-survival-planner/**'
       - '.github/workflows/subterra-robust-survival-referee.yml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   verify:
@@ -29,11 +31,22 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      # Temporary normalization step: persist the formatter's output as an
-      # artifact so the source can be corrected on the branch. The final
-      # workflow returns to a non-mutating --check gate after that commit.
-      - name: Normalize source in ephemeral runner workspace
+      # Temporary normalization: apply rustfmt in the runner and commit the
+      # mechanical result back to this first-party research branch. The final
+      # workflow returns to a non-mutating format --check gate after this pass.
+      - name: Normalize referee source
         run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml
+
+      - name: Commit formatter output to the research branch
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          if ! git diff --quiet -- crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/src/lib.rs; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/src/lib.rs
+            git commit -m 'style(subterra): rustfmt robust survival policy referee'
+            git push origin HEAD:refs/heads/research/subterra-robust-survival-referee-v0-1
+          fi
 
       - name: Confirm normalized formatting
         run: cargo fmt --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml -- --check
@@ -44,15 +57,6 @@ jobs:
       - name: Strict Clippy
         run: cargo clippy --manifest-path crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/Cargo.toml --all-targets -- -D warnings
 
-      - name: Upload rustfmt-normalized source for exact branch update
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: subterra-referee-rustfmt-source
-          path: crates/domains/symthaea-subterranean/research/subterra-robust-survival-referee/src/lib.rs
-          if-no-files-found: error
-          retention-days: 3
-
       - name: Preserve claim ceiling
         if: always()
-        run: echo 'PASS applies only to the standalone finite-model referee tests; it is not physical, analogue, flight or planetary qualification.'
+        run: echo 'A PASS applies only to the standalone finite-model referee tests; it is not physical, analogue, flight or planetary qualification.'
