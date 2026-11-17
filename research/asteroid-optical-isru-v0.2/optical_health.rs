@@ -416,47 +416,11 @@ impl OpticalHealthModel {
         {
             return Err(OpticalHealthError::StaleReading);
         }
-        if thresholds
-            .minimum_process_transmission
-            .iter()
-            .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
-            || thresholds
-                .maximum_witness_loss
-                .iter()
-                .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
-        {
-            return Err(OpticalHealthError::InvalidThreshold("spectral_thresholds"));
-        }
-        if !thresholds.maximum_qcm_mass_ug_cm2.is_finite()
-            || thresholds.maximum_qcm_mass_ug_cm2 < 0.0
-        {
-            return Err(OpticalHealthError::InvalidThreshold("qcm_mass"));
-        }
+        validate_thresholds(thresholds)?;
         if !self.qualified || self.requalification_required {
             return Ok(HealthAction::PauseCampaign);
         }
-
-        let process_below_limit = reading
-            .normalized_process_transmission
-            .iter()
-            .zip(thresholds.minimum_process_transmission.iter())
-            .any(|(observed, minimum)| observed < minimum);
-        if process_below_limit {
-            return Ok(HealthAction::CleanAndRequalify);
-        }
-
-        let witness_loss_exceeded = reading
-            .witness_transmission
-            .iter()
-            .zip(thresholds.maximum_witness_loss.iter())
-            .any(|(observed, maximum_loss)| (1.0 - observed) > *maximum_loss);
-        if witness_loss_exceeded
-            || reading.qcm_areal_mass_ug_cm2 > thresholds.maximum_qcm_mass_ug_cm2
-        {
-            return Ok(HealthAction::RequestIndependentInspection);
-        }
-
-        Ok(HealthAction::Continue)
+        evaluate_health_thresholds(reading, thresholds)
     }
 
     pub fn clean(
@@ -532,29 +496,18 @@ impl OpticalHealthModel {
             return Err(OpticalHealthError::RequalificationNotDue);
         }
         validate_reading(reading)?;
-        if reading.observed_at_seconds < self.last_event_time_seconds {
+        if reading.observed_at_seconds < self.last_event_time_seconds
+            || reading.observed_at_seconds < self.last_observation_time_seconds
+        {
             return Err(OpticalHealthError::StaleReading);
         }
-        let action = self.decide_ignoring_qualification(reading, thresholds)?;
-        if action != HealthAction::Continue {
+        validate_thresholds(thresholds)?;
+        if evaluate_health_thresholds(reading, thresholds)? != HealthAction::Continue {
             return Err(OpticalHealthError::RequalificationFailed);
         }
         self.requalification_required = false;
         self.qualified = true;
         Ok(())
-    }
-
-    fn decide_ignoring_qualification(
-        &self,
-        reading: &OpticalHealthReading,
-        thresholds: &OpticalHealthThresholds,
-    ) -> Result<HealthAction, OpticalHealthError> {
-        // Evaluate the same thresholds while temporarily treating the state
-        // as qualified. The original model is never mutated by this check.
-        let mut clone = self.clone();
-        clone.qualified = true;
-        clone.requalification_required = false;
-        clone.decide(reading, thresholds)
     }
 
     pub fn process_transmission(&self) -> [f64; BAND_COUNT] {
@@ -579,6 +532,55 @@ impl OpticalHealthModel {
     pub fn source_power_w(&self) -> f64 {
         self.source_power_w
     }
+}
+
+fn validate_thresholds(
+    thresholds: &OpticalHealthThresholds,
+) -> Result<(), OpticalHealthError> {
+    if thresholds
+        .minimum_process_transmission
+        .iter()
+        .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
+        || thresholds
+            .maximum_witness_loss
+            .iter()
+            .any(|value| !value.is_finite() || *value < 0.0 || *value > 1.0)
+    {
+        return Err(OpticalHealthError::InvalidThreshold("spectral_thresholds"));
+    }
+    if !thresholds.maximum_qcm_mass_ug_cm2.is_finite()
+        || thresholds.maximum_qcm_mass_ug_cm2 < 0.0
+    {
+        return Err(OpticalHealthError::InvalidThreshold("qcm_mass"));
+    }
+    Ok(())
+}
+
+fn evaluate_health_thresholds(
+    reading: &OpticalHealthReading,
+    thresholds: &OpticalHealthThresholds,
+) -> Result<HealthAction, OpticalHealthError> {
+    let process_below_limit = reading
+        .normalized_process_transmission
+        .iter()
+        .zip(thresholds.minimum_process_transmission.iter())
+        .any(|(observed, minimum)| observed < minimum);
+    if process_below_limit {
+        return Ok(HealthAction::CleanAndRequalify);
+    }
+
+    let witness_loss_exceeded = reading
+        .witness_transmission
+        .iter()
+        .zip(thresholds.maximum_witness_loss.iter())
+        .any(|(observed, maximum_loss)| (1.0 - observed) > *maximum_loss);
+    if witness_loss_exceeded
+        || reading.qcm_areal_mass_ug_cm2 > thresholds.maximum_qcm_mass_ug_cm2
+    {
+        return Ok(HealthAction::RequestIndependentInspection);
+    }
+
+    Ok(HealthAction::Continue)
 }
 
 fn validate_reading(reading: &OpticalHealthReading) -> Result<(), OpticalHealthError> {
@@ -826,7 +828,10 @@ mod tests {
         assert!(receipt.requalification_required);
         assert!(!value.qualified());
         assert_eq!(
-            value.decide(&value.inspect("post-clean", 80, 10).unwrap(), &thresholds()),
+            {
+                let reading = value.inspect("post-clean", 80, 10).unwrap();
+                value.decide(&reading, &thresholds())
+            },
             Ok(HealthAction::PauseCampaign)
         );
     }
