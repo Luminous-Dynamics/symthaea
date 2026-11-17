@@ -16,6 +16,28 @@ The defensible opportunity for Symthaea + Symtropy + Mycelix is to evaluate a co
 
 The novelty claim should remain a hypothesis until a literature and benchmark search confirms no equivalent integrated protocol. The practical target is to publish an unusually rigorous, reproducible benchmark of this loop.
 
+## 1.1 Existing Luminous capabilities to reuse
+
+The repository audit found specialized owners that make the proposed programme more precise:
+
+- **Symtropy #3406 — PHYS-CONTACT-ACTIVE-EXPERIMENT-001:** exact worst-case experiment design to separate declared contact branches using branch-conditioned interval sensitivities, a declared observable/noise/resolution profile, finite-step validity, and explicit NOT_SEPARATED outcomes. Its P0 scope is the two certified double-slide branches in #3365. It does not claim global branch completeness or arbitrary physical parameter identification.
+- **Symthaea #9817 — EDGE-ACTIVE-SENSING-001:** decision-focused value-of-information sampling under a complete resource vector, with hidden outcomes kept from the candidate.
+- **Symthaea #9010 — CMAQ-004:** matched direct-policy versus model-assisted decision utility, including stale-model and shuffled-model controls.
+- **Symtropy #3183 — PHYS-CONTACT-ASSURANCE-BENCH-001** and #3749 — PHYS-VALID-07: contact assurance and physics verification authorities.
+
+D2D must consume these owners rather than creating another local sensitivity optimizer, active-sensing scheduler, contact solver, or physics verifier.
+
+### The key distinction
+
+There are two complementary experiment-selection problems:
+
+1. **Probabilistic decision-focused value of information:** is another observation expected to change the decision enough to justify its resource cost? This is the Symthaea #9817 / existing EVoI line.
+2. **Deterministic certified branch separation:** is there an admissible perturbation for which the entire declared uncertainty-bounded branch outcomes become measurably disjoint? This is the Symtropy #3406 line.
+
+They are not interchangeable. D2D can compare both, but it must never call a heuristic score or probabilistic information gain an exact interval guarantee. If interval sets overlap or noise consumes the gap, the correct result is INCONCLUSIVE / NOT_SEPARATED.
+
+Also preserve the physical correspondence boundary: a local branch-gradient certificate is not itself a finite executed trajectory or a real-world measurement. Finite-step separation requires the branch-tube/remainder path (Symtropy #3386); time-domain rigid-body execution and replay must be evaluated in a separately matched lane.
+
 ## 2. Current external benchmark and industry map
 
 | System / benchmark | Main capability measured | What it does not establish by itself | D2D use |
