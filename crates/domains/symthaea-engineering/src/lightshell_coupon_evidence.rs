@@ -390,13 +390,13 @@ fn validate_executed_run(run: &TestRun, path: &str, findings: &mut Vec<Finding>)
         push(findings, "invalid_raw_data_digest", format!("{path}.raw_data_digest"),
             "Raw data digest must use sha256: followed by 64 hexadecimal characters.");
     }
-    if run.instrument_refs.is_empty() {
+    if run.instrument_refs.is_empty() || run.instrument_refs.iter().any(|value| is_blank(value)) {
         push(findings, "executed_run_missing_instrument", format!("{path}.instrument_refs"),
-            "An executed run requires at least one instrument identity.");
+            "An executed run requires at least one non-empty instrument identity.");
     }
-    if run.calibration_refs.is_empty() {
+    if run.calibration_refs.is_empty() || run.calibration_refs.iter().any(|value| is_blank(value)) {
         push(findings, "executed_run_missing_calibration", format!("{path}.calibration_refs"),
-            "An executed run requires calibration evidence for its instruments.");
+            "An executed run requires non-empty calibration evidence for its instruments.");
     }
     if run.replicate_count == 0 || run.sample_count == 0 {
         push(findings, "executed_run_missing_replication", format!("{path}.replicate_count/sample_count"),
@@ -412,6 +412,15 @@ fn validate_passed_run(run: &TestRun, path: &str, findings: &mut Vec<Finding>) {
         if value.is_none_or(is_blank) {
             push(findings, "passed_run_missing_acceptance_evidence", format!("{path}.{field}"),
                 "A passed run requires reviewer and acceptance-rule references.");
+        }
+    }
+    if run.status == "passed" {
+        match run.family.as_str() {
+            "compression" if run.response_curve.is_none() => push(findings, "passed_compression_without_stress_strain_curve", format!("{path}.response_curve"),
+                "A passed compression run must preserve its stress-strain response curve."),
+            "dynamic_impact" if run.response_curve.is_none() => push(findings, "passed_impact_without_force_time_curve", format!("{path}.response_curve"),
+                "A passed dynamic-impact run must preserve its force-time response curve."),
+            _ => {}
         }
     }
     if run.measurements.is_empty() {
@@ -484,11 +493,23 @@ fn validate_vibration_run(run: &TestRun, path: &str, findings: &mut Vec<Finding>
             _ => push(findings, "invalid_resonance_assessment", format!("{path}.resonance_assessment"),
                 "Unknown vibration resonance assessment."),
         }
-        if run.status == "passed" {
-            match run.response_curve.as_ref() {
-                Some(curve) => validate_response_curve(curve, "frequency_response", "Hz", "ratio", path, findings),
-                None => push(findings, "passed_vibration_without_frequency_response", format!("{path}.response_curve"),
-                    "A passed vibration run must preserve its frequency-response curve."),
+        if let Some(curve) = run.response_curve.as_ref() {
+            validate_response_curve(curve, "frequency_response", "Hz", "ratio", path, findings);
+        }
+        if run.status == "passed" && run.response_curve.is_none() {
+            push(findings, "passed_vibration_without_frequency_response", format!("{path}.response_curve"),
+                "A passed vibration run must preserve its frequency-response curve.");
+        }
+        if run.resonance_assessment == "peaks_reported" {
+            if let Some(curve) = run.response_curve.as_ref() {
+                let min_frequency = curve.points.first().map(|point| point.x).unwrap_or(f64::NAN);
+                let max_frequency = curve.points.last().map(|point| point.x).unwrap_or(f64::NAN);
+                for (index, peak) in run.resonance_peaks.iter().enumerate() {
+                    if peak.frequency_hz < min_frequency || peak.frequency_hz > max_frequency {
+                        push(findings, "resonance_peak_outside_sweep", format!("{path}.resonance_peaks[{index}].frequency_hz"),
+                            "A reported resonance peak must lie within the measured frequency sweep.");
+                    }
+                }
             }
         }
     }
@@ -543,6 +564,10 @@ fn validate_response_curve(
         if previous_x.is_some_and(|previous| point.x <= previous) {
             push(findings, "response_curve_not_strictly_ordered", format!("{path}.response_curve.points[{index}].x"),
                 "Response-curve abscissa values must be strictly increasing.");
+        }
+        if point.x < 0.0 {
+            push(findings, "negative_response_curve_abscissa", format!("{path}.response_curve.points[{index}].x"),
+                "Response-curve abscissa values must be nonnegative.");
         }
         if expected_x_unit == "Hz" && point.x <= 0.0 {
             push(findings, "invalid_frequency_point", format!("{path}.response_curve.points[{index}].x"),
