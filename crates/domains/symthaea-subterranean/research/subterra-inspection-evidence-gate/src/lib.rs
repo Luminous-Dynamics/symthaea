@@ -37,6 +37,7 @@ pub enum SpatialScopeDisposition {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExpectedInspectionContext {
     pub decision_id: String,
+    pub option_id: String,
     pub asset_id: String,
     pub asset_revision: String,
     pub coordinate_frame_digest: String,
@@ -45,6 +46,7 @@ pub struct ExpectedInspectionContext {
     pub likelihood_model_digest: String,
     pub loss_table_digest: String,
     pub evsi_assessment_digest: String,
+    pub source_dataset_digest: String,
     pub purpose: EvidencePurpose,
     /// Frozen by the caller for deterministic, reproducible freshness checks.
     pub evaluation_time_unix_ms: u64,
@@ -56,6 +58,7 @@ pub struct ExpectedInspectionContext {
 pub struct EvidenceManifest {
     pub candidate_id: String,
     pub decision_id: String,
+    pub option_id: String,
     pub asset_id: String,
     pub asset_revision: String,
     pub coordinate_frame_digest: String,
@@ -159,7 +162,7 @@ pub fn admit_candidate(
     if missing(&manifest.candidate_id) {
         reasons.push(RejectionReason::EmptyCandidateId);
     }
-    if missing(&option.id) {
+    if missing(&option.option_id) {
         reasons.push(RejectionReason::EmptyOptionId);
     }
     if !option.external_gate_passed {
@@ -173,6 +176,7 @@ pub fn admit_candidate(
         &expected.likelihood_model_digest,
         &expected.loss_table_digest,
         &expected.evsi_assessment_digest,
+        &expected.source_dataset_digest,
         &manifest.coordinate_frame_digest,
         &manifest.region_scope_digest,
         &manifest.sensor_model_digest,
@@ -192,6 +196,11 @@ pub fn admit_candidate(
             || manifest.decision_id != expected.decision_id
             || option.decision_id != manifest.decision_id,
         RejectionReason::DecisionMismatch,
+    );
+    push_if_mismatch(
+        &mut reasons,
+        manifest.option_id != option.option_id,
+        RejectionReason::EmptyOptionId,
     );
     push_if_mismatch(
         &mut reasons,
@@ -233,6 +242,11 @@ pub fn admit_candidate(
         &mut reasons,
         manifest.evsi_assessment_digest != expected.evsi_assessment_digest,
         RejectionReason::EvsiAssessmentMismatch,
+    );
+    push_if_mismatch(
+        &mut reasons,
+        manifest.source_dataset_digest != expected.source_dataset_digest,
+        RejectionReason::MissingSourceDatasetDigest,
     );
     push_if_mismatch(
         &mut reasons,
@@ -327,6 +341,7 @@ mod tests {
     fn context() -> ExpectedInspectionContext {
         ExpectedInspectionContext {
             decision_id: "support-08".into(),
+            option_id: "support-08-thermal-followup".into(),
             asset_id: "asset-support-08".into(),
             asset_revision: "rev-17".into(),
             coordinate_frame_digest: "sha256:frame".into(),
@@ -335,6 +350,7 @@ mod tests {
             likelihood_model_digest: "sha256:likelihood".into(),
             loss_table_digest: "sha256:loss-table".into(),
             evsi_assessment_digest: "sha256:evsi".into(),
+            source_dataset_digest: "sha256:dataset".into(),
             purpose: EvidencePurpose::AssetConditionInspection,
             evaluation_time_unix_ms: NOW,
             maximum_observation_age_ms: 3_600_000,
@@ -363,6 +379,7 @@ mod tests {
             manifest: EvidenceManifest {
                 candidate_id: "candidate-2026-014".into(),
                 decision_id: "support-08".into(),
+                option_id: "support-08-thermal-followup".into(),
                 asset_id: "asset-support-08".into(),
                 asset_revision: "rev-17".into(),
                 coordinate_frame_digest: "sha256:frame".into(),
