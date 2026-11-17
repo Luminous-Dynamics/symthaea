@@ -1,5 +1,7 @@
 {
   "adjudication_status": "synthetic_known_answer_run_level_cost_receipt_validation",
+  "billing_currency": "USD",
+  "quantile_method": "nearest_rank",
   "run_count": 2,
   "complete_cost_run_count": 2,
   "complete_wall_run_count": 2,
