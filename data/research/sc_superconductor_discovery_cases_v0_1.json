@@ -337,7 +337,13 @@
           "status": "reported_experimental"
         }
       ],
-      "tc_prediction": [
+      "dft_hull_distance_mev_atom": 94,
+      "bulk_thermodynamic_evidence": "Single specific-heat jump; reported DeltaC/(gamma Tc)=1.44, consistent with bulk superconductivity. Authors report sample fully superconducting below approximately 2 K.",
+      "sample_identity_resolution": "Paper links XRD/Rietveld, resistivity and specific-heat characterization to the Be2Hf2Nb sample. Exact physical specimen/batch identifiers and raw data still require supplementary/source audit.",
+      "phase_and_process_notes": "Hf incorporation supported by lattice expansion and Rietveld analysis with Nb/Hf site disorder. Impurity peaks remain; residual resistivity ratio about 1 and no annealing improvement reported.",
+      "engineering_readiness": "new bulk laboratory superconducting material; no conductor, critical-current, high-field, wire/tape, joint or scale qualification",
+      "safety_review": "beryllium-bearing material; any experimental handling requires qualified institutional toxic-material controls; no synthesis procedure included",
+      "tc_calculations": [
         {
           "value_k": 14.9,
           "pressure_gpa": 0,
@@ -350,13 +356,7 @@
           "method": "refined_DFT_Eliashberg_mu_star_0_21",
           "status": "calculated"
         }
-      ],
-      "dft_hull_distance_mev_atom": 94,
-      "bulk_thermodynamic_evidence": "Single specific-heat jump; reported DeltaC/(gamma Tc)=1.44, consistent with bulk superconductivity. Authors report sample fully superconducting below approximately 2 K.",
-      "sample_identity_resolution": "Paper links XRD/Rietveld, resistivity and specific-heat characterization to the Be2Hf2Nb sample. Exact physical specimen/batch identifiers and raw data still require supplementary/source audit.",
-      "phase_and_process_notes": "Hf incorporation supported by lattice expansion and Rietveld analysis with Nb/Hf site disorder. Impurity peaks remain; residual resistivity ratio about 1 and no annealing improvement reported.",
-      "engineering_readiness": "new bulk laboratory superconducting material; no conductor, critical-current, high-field, wire/tape, joint or scale qualification",
-      "safety_review": "beryllium-bearing material; any experimental handling requires qualified institutional toxic-material controls; no synthesis procedure included"
+      ]
     },
     {
       "candidate_id": "SC-EXP-BE2HFNB2-BEENET-2026",
@@ -381,7 +381,13 @@
           "status": "reported_attributed_to_trace_Nb"
         }
       ],
-      "tc_prediction": [
+      "dft_hull_distance_mev_atom": 62,
+      "bulk_thermodynamic_evidence": "Two specific-heat jumps of roughly comparable size indicate a multiphase sample with a superconducting secondary phase; not admitted as an unambiguous single-phase bulk superconducting composition.",
+      "sample_identity_resolution": "Paper links XRD/Rietveld, resistivity and specific-heat characterization to the Be2HfNb2 sample. Exact physical specimen/batch identifiers and phase-to-transition linkage require supplementary/source audit.",
+      "phase_and_process_notes": "Hf/Nb site disorder and impurity peaks reported; authors attribute slight resistivity drop near 9 K to trace Nb. Residual resistivity ratio about 1.",
+      "engineering_readiness": "laboratory multiphase superconducting sample; no phase-pure bulk or conductor qualification",
+      "safety_review": "beryllium-bearing material; any experimental handling requires qualified institutional toxic-material controls; no synthesis procedure included",
+      "tc_calculations": [
         {
           "value_k": 7.5,
           "pressure_gpa": 0,
@@ -394,13 +400,7 @@
           "method": "refined_DFT_Eliashberg_mu_star_0_21",
           "status": "calculated"
         }
-      ],
-      "dft_hull_distance_mev_atom": 62,
-      "bulk_thermodynamic_evidence": "Two specific-heat jumps of roughly comparable size indicate a multiphase sample with a superconducting secondary phase; not admitted as an unambiguous single-phase bulk superconducting composition.",
-      "sample_identity_resolution": "Paper links XRD/Rietveld, resistivity and specific-heat characterization to the Be2HfNb2 sample. Exact physical specimen/batch identifiers and phase-to-transition linkage require supplementary/source audit.",
-      "phase_and_process_notes": "Hf/Nb site disorder and impurity peaks reported; authors attribute slight resistivity drop near 9 K to trace Nb. Residual resistivity ratio about 1.",
-      "engineering_readiness": "laboratory multiphase superconducting sample; no phase-pure bulk or conductor qualification",
-      "safety_review": "beryllium-bearing material; any experimental handling requires qualified institutional toxic-material controls; no synthesis procedure included"
+      ]
     },
     {
       "candidate_id": "SC-EXP-BE2NB3-PARENT-2026",
