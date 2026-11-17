@@ -20,7 +20,8 @@
     "marginal_checks",
     "pairwise_joint_checks",
     "claim_ceiling",
-    "risk_queries"
+    "risk_queries",
+    "decision_voi"
   ],
   "properties": {
     "scenario_id": {
@@ -403,6 +404,130 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "decision_voi": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "query_id",
+          "loss_currency",
+          "loss_unit",
+          "net_value_rounding",
+          "robust_stop_action_id",
+          "robust_stop_loss_micros",
+          "nominal_stop_loss_micros",
+          "recommended_next_step",
+          "recommended_option_id",
+          "best_net_robust_decision_value_micros",
+          "option_evaluations"
+        ],
+        "properties": {
+          "query_id": {
+            "type": "string"
+          },
+          "loss_currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "loss_unit": {
+            "type": "string"
+          },
+          "robust_stop_action_id": {
+            "type": "string"
+          },
+          "robust_stop_loss_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "nominal_stop_loss_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "recommended_next_step": {
+            "enum": [
+              "measure",
+              "stop"
+            ]
+          },
+          "recommended_option_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "best_net_robust_decision_value_micros": {
+            "type": "integer"
+          },
+          "option_evaluations": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "option_id",
+                "measurement_cost_micros",
+                "robust_post_measurement_loss_micros",
+                "nominal_post_measurement_loss_micros",
+                "net_robust_decision_value_micros",
+                "net_nominal_decision_value_micros",
+                "continue_recommended",
+                "decision_rule",
+                "decision_rule_count",
+                "qualified_decision_rule_count"
+              ],
+              "properties": {
+                "option_id": {
+                  "type": "string"
+                },
+                "measurement_cost_micros": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "robust_post_measurement_loss_micros": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "nominal_post_measurement_loss_micros": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "net_robust_decision_value_micros": {
+                  "type": "integer"
+                },
+                "net_nominal_decision_value_micros": {
+                  "type": "integer"
+                },
+                "continue_recommended": {
+                  "type": "boolean"
+                },
+                "decision_rule": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "decision_rule_count": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "qualified_decision_rule_count": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "net_value_rounding": {
+            "type": "string",
+            "minLength": 1
           }
         }
       }

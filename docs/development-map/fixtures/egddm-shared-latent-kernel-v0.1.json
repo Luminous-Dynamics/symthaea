@@ -293,6 +293,81 @@
           "gate-b": "pass"
         }
       }
+    ],
+    "decision_voi_queries": [
+      {
+        "query_id": "gate-target-risk-reduction",
+        "loss_currency": "USD",
+        "prior_bounds": [
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "lower_probability_bps": 5000,
+            "upper_probability_bps": 5000,
+            "nominal_probability_bps": 5000
+          },
+          {
+            "hypothesis_id": "safe-world",
+            "lower_probability_bps": 5000,
+            "upper_probability_bps": 5000,
+            "nominal_probability_bps": 5000
+          }
+        ],
+        "action_losses": [
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "action_id": "release",
+            "loss_micros": 2000
+          },
+          {
+            "hypothesis_id": "safe-world",
+            "action_id": "release",
+            "loss_micros": 0
+          },
+          {
+            "hypothesis_id": "common-cause-hazard",
+            "action_id": "inspect-readonly",
+            "loss_micros": 0
+          },
+          {
+            "hypothesis_id": "safe-world",
+            "action_id": "inspect-readonly",
+            "loss_micros": 2000
+          }
+        ],
+        "option_costs": [
+          {
+            "option_id": "gate-a",
+            "cost_micros": 100
+          },
+          {
+            "option_id": "gate-b",
+            "cost_micros": 200
+          }
+        ],
+        "action_constraints": [
+          {
+            "action_id": "release",
+            "read_only": false,
+            "irreversible": false,
+            "hard_gate": false,
+            "max_residual_risk_bps": 4500,
+            "safe_hypotheses": [
+              "safe-world"
+            ]
+          },
+          {
+            "action_id": "inspect-readonly",
+            "read_only": true,
+            "irreversible": false,
+            "hard_gate": false,
+            "max_residual_risk_bps": 0,
+            "safe_hypotheses": [
+              "common-cause-hazard",
+              "safe-world"
+            ]
+          }
+        ]
+      }
     ]
   }
 }

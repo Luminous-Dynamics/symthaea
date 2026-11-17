@@ -229,6 +229,162 @@
           }
         }
       }
+    },
+    "decision_voi_queries": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "query_id",
+          "loss_currency",
+          "prior_bounds",
+          "action_losses",
+          "action_constraints",
+          "option_costs"
+        ],
+        "properties": {
+          "query_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "loss_currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "prior_bounds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "hypothesis_id",
+                "lower_probability_bps",
+                "upper_probability_bps",
+                "nominal_probability_bps"
+              ],
+              "properties": {
+                "hypothesis_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "lower_probability_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "upper_probability_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "nominal_probability_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                }
+              }
+            }
+          },
+          "action_losses": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 512,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "hypothesis_id",
+                "action_id",
+                "loss_micros"
+              ],
+              "properties": {
+                "hypothesis_id": {
+                  "type": "string"
+                },
+                "action_id": {
+                  "type": "string"
+                },
+                "loss_micros": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000000000
+                }
+              }
+            }
+          },
+          "action_constraints": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "action_id",
+                "read_only",
+                "irreversible",
+                "hard_gate",
+                "max_residual_risk_bps",
+                "safe_hypotheses"
+              ],
+              "properties": {
+                "action_id": {
+                  "type": "string"
+                },
+                "read_only": {
+                  "type": "boolean"
+                },
+                "irreversible": {
+                  "type": "boolean"
+                },
+                "hard_gate": {
+                  "type": "boolean"
+                },
+                "max_residual_risk_bps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 10000
+                },
+                "safe_hypotheses": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 32,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "option_costs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 6,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "option_id",
+                "cost_micros"
+              ],
+              "properties": {
+                "option_id": {
+                  "type": "string"
+                },
+                "cost_micros": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

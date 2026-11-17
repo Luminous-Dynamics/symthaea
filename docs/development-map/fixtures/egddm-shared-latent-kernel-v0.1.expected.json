@@ -365,5 +365,51 @@
       ]
     }
   ],
-  "claim_ceiling": "Validates an evaluator-owned shared latent-weight credal simplex and exact conditional joint outcome distributions for every hypothesis/latent-state pair. It derives cross-hypothesis coupled marginal and pairwise event intervals and checks candidate channel consistency. It does not estimate latent weights from real measurements, prove latent-state completeness, optimize adaptive policies, validate drift, authenticate the evaluator's oracle, or authorize actions."
+  "decision_voi": [
+    {
+      "query_id": "gate-target-risk-reduction",
+      "loss_currency": "USD",
+      "loss_unit": "micro-units of the declared currency",
+      "net_value_rounding": "stop-loss floors to the micro-unit; post-measurement loss ceils to the micro-unit; net robust value is therefore rounded conservatively",
+      "robust_stop_action_id": "inspect-readonly",
+      "robust_stop_loss_micros": 1000,
+      "nominal_stop_loss_micros": 1000,
+      "recommended_next_step": "measure",
+      "recommended_option_id": "gate-a",
+      "best_net_robust_decision_value_micros": 40,
+      "option_evaluations": [
+        {
+          "option_id": "gate-a",
+          "measurement_cost_micros": 100,
+          "robust_post_measurement_loss_micros": 860,
+          "nominal_post_measurement_loss_micros": 850,
+          "net_robust_decision_value_micros": 40,
+          "net_nominal_decision_value_micros": 50,
+          "continue_recommended": true,
+          "decision_rule": {
+            "fail": "inspect-readonly",
+            "pass": "release"
+          },
+          "decision_rule_count": 4,
+          "qualified_decision_rule_count": 2
+        },
+        {
+          "option_id": "gate-b",
+          "measurement_cost_micros": 200,
+          "robust_post_measurement_loss_micros": 860,
+          "nominal_post_measurement_loss_micros": 850,
+          "net_robust_decision_value_micros": -60,
+          "net_nominal_decision_value_micros": -50,
+          "continue_recommended": false,
+          "decision_rule": {
+            "fail": "inspect-readonly",
+            "pass": "release"
+          },
+          "decision_rule_count": 4,
+          "qualified_decision_rule_count": 2
+        }
+      ]
+    }
+  ],
+  "claim_ceiling": "Validates an evaluator-owned shared latent-weight credal simplex and exact conditional joint outcome distributions for every hypothesis/latent-state pair. It derives cross-hypothesis coupled marginal and pairwise event intervals, checks candidate channel consistency, computes evaluator-only posterior-risk probes, and evaluates exact one-step decision value of information over finite outcome-to-action rules under supplied losses and robust action constraints. It does not optimize multi-step adaptive policies, estimate latent weights from real measurements, prove latent-state completeness, validate drift, authenticate the evaluator's oracle, or authorize actions."
 }

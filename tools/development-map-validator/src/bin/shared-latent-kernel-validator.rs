@@ -16,7 +16,7 @@ const MAX_HYPOTHESES:usize=32;
 const MAX_OPTIONS:usize=6;
 const MAX_LATENT_STATES:usize=8;
 const MAX_ROWS:usize=4096;
-const CLAIM_CEILING:&str="Validates an evaluator-owned shared latent-weight credal simplex and exact conditional joint outcome distributions for every hypothesis/latent-state pair. It derives cross-hypothesis coupled marginal and pairwise event intervals and checks candidate channel consistency. It does not estimate latent weights from real measurements, prove latent-state completeness, optimize adaptive policies, validate drift, authenticate the evaluator's oracle, or authorize actions.";
+const CLAIM_CEILING:&str="Validates an evaluator-owned shared latent-weight credal simplex and exact conditional joint outcome distributions for every hypothesis/latent-state pair. It derives cross-hypothesis coupled marginal and pairwise event intervals, checks candidate channel consistency, computes evaluator-only posterior-risk probes, and evaluates exact one-step decision value of information over finite outcome-to-action rules under supplied losses and robust action constraints. It does not optimize multi-step adaptive policies, estimate latent weights from real measurements, prove latent-state completeness, validate drift, authenticate the evaluator's oracle, or authorize actions.";
 
 #[derive(Clone,Debug)]
 struct Bounds{lower:u64,upper:u64,nominal:u64}
@@ -32,6 +32,10 @@ struct JointRow{outcomes:BTreeMap<String,String>,probability:u64}
 struct ConditionalKernel{
  hypothesis_id:String,latent_state_id:String,kernel_id:String,authority:String,
  rows:Vec<JointRow>
+}
+#[derive(Clone,Debug)]
+struct DecisionAction{
+ read_only:bool,irreversible:bool,hard_gate:bool,max_risk:u64,safe_hypotheses:BTreeSet<String>
 }
 
 fn object<'a>(v:&'a Value,label:&str)->Result<&'a serde_json::Map<String,Value>,String>{
@@ -517,12 +521,359 @@ fn parse_risk_queries(
  }
  Ok(reports)
 }
+const MAX_DECISION_VOI_QUERIES:usize=16;
+const MAX_DECISION_RULES:usize=10_000;
+const MAX_LOSS_MICROS:u64=1_000_000_000_000;
+
+fn floor_ratio(numerator:u128,denominator:u128,label:&str)->Result<u64,String>{
+ if denominator==0{return Err(format!("{label} denominator is zero"));}
+ let value=numerator/denominator;
+ u64::try_from(value).map_err(|_|format!("{label} exceeds u64"))
+}
+fn ceil_ratio(numerator:u128,denominator:u128,label:&str)->Result<u64,String>{
+ if denominator==0{return Err(format!("{label} denominator is zero"));}
+ let value=(numerator+denominator-1)/denominator;
+ u64::try_from(value).map_err(|_|format!("{label} exceeds u64"))
+}
+fn signed_net_value(stop_loss:u64,post_loss:u64,cost:u64,label:&str)->Result<i64,String>{
+ let value=stop_loss as i128-post_loss as i128-cost as i128;
+ i64::try_from(value).map_err(|_|format!("{label} exceeds signed 64-bit range"))
+}
+fn enumerate_decision_rules(
+ outcomes:&[String],
+ actions:&[String],
+ index:usize,
+ current:&mut BTreeMap<String,String>,
+ output:&mut Vec<BTreeMap<String,String>>
+)->Result<(),String>{
+ if output.len()>MAX_DECISION_RULES{return Err("decision rule count exceeds evaluator cap".to_owned());}
+ if index==outcomes.len(){output.push(current.clone());return Ok(());}
+ for action in actions{
+  current.insert(outcomes[index].clone(),action.clone());
+  enumerate_decision_rules(outcomes,actions,index+1,current,output)?;
+  current.remove(&outcomes[index]);
+ }
+ Ok(())
+}
+fn robust_stop_loss(
+ priors:&BTreeMap<String,Bounds>,
+ losses:&BTreeMap<String,BTreeMap<String,u64>>,
+ action:&str
+)->Result<u64,String>{
+ let coefficients=losses.iter().map(|(hypothesis,actions)|{
+  Ok((hypothesis.clone(),*actions.get(action).ok_or_else(||format!("loss matrix missing action {action:?}"))? as i128))
+ }).collect::<Result<BTreeMap<_,_>,String>>()?;
+ let worst=prior_extreme(priors,&coefficients,true)?;
+ floor_ratio(worst as u128,SCALE as u128,"robust stop loss")
+}
+fn nominal_stop_loss(
+ priors:&BTreeMap<String,Bounds>,
+ losses:&BTreeMap<String,BTreeMap<String,u64>>,
+ action:&str
+)->Result<u64,String>{
+ let numerator=priors.iter().try_fold(0u128,|sum,(hypothesis,prior)|{
+  let loss=*losses[hypothesis].get(action).ok_or_else(||format!("loss matrix missing action {action:?}"))?;
+  sum.checked_add(prior.nominal as u128*loss as u128).ok_or_else(||"nominal stop loss overflow".to_owned())
+ })?;
+ floor_ratio(numerator,SCALE as u128,"nominal stop loss")
+}
+fn decision_rule_coefficients(
+ hypothesis:&str,
+ vertex:&[u64],
+ latents:&[LatentState],
+ kernels:&BTreeMap<(String,String),ConditionalKernel>,
+ option:&str,
+ rule:&BTreeMap<String,String>,
+ losses:&BTreeMap<String,BTreeMap<String,u64>>
+)->Result<i128,String>{
+ if vertex.len()!=latents.len(){return Err("decision rule latent vertex dimensions differ".to_owned());}
+ let mut total=0i128;
+ for (latent_index,latent) in latents.iter().enumerate(){
+  let kernel=kernels.get(&(hypothesis.to_owned(),latent.id.clone()))
+   .ok_or_else(||format!("missing conditional kernel for {hypothesis:?}/{:?}",latent.id))?;
+  let conditional=kernel.rows.iter().try_fold(0i128,|sum,row|{
+   let outcome=row.outcomes.get(option).ok_or_else(||format!("kernel row lacks option {option:?}"))?;
+   let action=rule.get(outcome).ok_or_else(||format!("decision rule lacks outcome {outcome:?}"))?;
+   let loss=*losses.get(hypothesis).and_then(|x|x.get(action))
+    .ok_or_else(||format!("loss matrix missing {hypothesis:?}/{action:?}"))?;
+   sum.checked_add(row.probability as i128*loss as i128)
+    .ok_or_else(||"conditional decision loss overflow".to_owned())
+  })?;
+  total=total.checked_add(vertex[latent_index] as i128*conditional)
+   .ok_or_else(||"shared latent decision loss overflow".to_owned())?;
+ }
+ Ok(total)
+}
+fn decision_stop_action_qualified(
+ priors:&BTreeMap<String,Bounds>,
+ latents:&[LatentState],
+ constraint:&DecisionAction,
+ hypotheses:&BTreeSet<String>
+)->Result<bool,String>{
+ if constraint.read_only{
+  return Ok(constraint.safe_hypotheses==*hypotheses&&!constraint.irreversible&&!constraint.hard_gate&&constraint.max_risk==0);
+ }
+ let likelihoods=hypotheses.iter().map(|h|(h.clone(),vec![SCALE;latents.len()])).collect::<BTreeMap<_,_>>();
+ let support=shared_support_lower(priors,latents,&likelihoods)?;
+ if support==0{return Ok(false);}
+ let risk=shared_robust_risk(priors,latents,&likelihoods,&constraint.safe_hypotheses)?;
+ Ok(risk<=constraint.max_risk&&(!constraint.hard_gate||risk==0)&&(!constraint.irreversible||risk==0))
+}
+fn decision_rule_action_qualified(
+ priors:&BTreeMap<String,Bounds>,
+ latents:&[LatentState],
+ kernels:&BTreeMap<(String,String),ConditionalKernel>,
+ option:&str,
+ outcome:&str,
+ action:&DecisionAction,
+ hypotheses:&BTreeSet<String>
+)->Result<bool,String>{
+ if action.read_only{
+  return Ok(action.safe_hypotheses==*hypotheses&&!action.irreversible&&!action.hard_gate&&action.max_risk==0);
+ }
+ let mut likelihoods=BTreeMap::new();
+ for hypothesis in hypotheses{
+  let mut by_latent=Vec::new();
+  for latent in latents{
+   let kernel=kernels.get(&(hypothesis.clone(),latent.id.clone()))
+    .ok_or_else(||format!("missing kernel for {hypothesis:?}/{:?}",latent.id))?;
+   let probability=kernel.rows.iter().filter(|row|row.outcomes.get(option).is_some_and(|x|x==outcome))
+    .try_fold(0u64,|sum,row|sum.checked_add(row.probability).ok_or("decision outcome likelihood overflow"))?;
+   by_latent.push(probability);
+  }
+  likelihoods.insert(hypothesis.clone(),by_latent);
+ }
+ let support=shared_support_lower(priors,latents,&likelihoods)?;
+ if support==0{return Ok(false);}
+ let risk=shared_robust_risk(priors,latents,&likelihoods,&action.safe_hypotheses)?;
+ Ok(risk<=action.max_risk&&(!action.hard_gate||risk==0)&&(!action.irreversible||risk==0))
+}
+fn robust_rule_loss(
+ priors:&BTreeMap<String,Bounds>,
+ latents:&[LatentState],
+ kernels:&BTreeMap<(String,String),ConditionalKernel>,
+ option:&str,
+ rule:&BTreeMap<String,String>,
+ losses:&BTreeMap<String,BTreeMap<String,u64>>
+)->Result<u64,String>{
+ let mut worst=i128::MIN;
+ for vertex in simplex_vertices(latents)?{
+  let mut coefficients=BTreeMap::new();
+  for hypothesis in priors.keys(){
+   coefficients.insert(hypothesis.clone(),decision_rule_coefficients(
+    hypothesis,&vertex,latents,kernels,option,rule,losses
+   )?);
+  }
+  worst=worst.max(prior_extreme(priors,&coefficients,true)?);
+ }
+ if worst<0{return Err("robust expected loss became negative".to_owned());}
+ ceil_ratio(worst as u128,(SCALE as u128).pow(3),"robust post-measurement loss")
+}
+fn nominal_rule_loss(
+ priors:&BTreeMap<String,Bounds>,
+ latents:&[LatentState],
+ kernels:&BTreeMap<(String,String),ConditionalKernel>,
+ option:&str,
+ rule:&BTreeMap<String,String>,
+ losses:&BTreeMap<String,BTreeMap<String,u64>>
+)->Result<u64,String>{
+ let vertex:Vec<u64>=latents.iter().map(|z|z.probability.nominal).collect();
+ let numerator=priors.iter().try_fold(0u128,|sum,(hypothesis,prior)|{
+  let conditional=decision_rule_coefficients(hypothesis,&vertex,latents,kernels,option,rule,losses)?;
+  sum.checked_add(prior.nominal as u128*conditional as u128)
+   .ok_or_else(||"nominal post-measurement loss overflow".to_owned())
+ })?;
+ ceil_ratio(numerator,(SCALE as u128).pow(3),"nominal post-measurement loss")
+}
+fn parse_decision_voi_queries(
+ oracle:&Value,
+ hypotheses:&BTreeSet<String>,
+ options:&BTreeMap<String,OptionDef>,
+ factors:&BTreeMap<String,Factor>,
+ latents:&[LatentState],
+ kernels:&BTreeMap<(String,String),ConditionalKernel>
+)->Result<Vec<Value>,String>{
+ let rows=match oracle.get("decision_voi_queries"){
+  None=>return Ok(Vec::new()),
+  Some(v)=>v.as_array().ok_or("oracle.decision_voi_queries must be array")?
+ };
+ if rows.len()>MAX_DECISION_VOI_QUERIES{return Err(format!("decision_voi_queries exceeds {MAX_DECISION_VOI_QUERIES}"));}
+ let mut reports=Vec::new();let mut ids=BTreeSet::new();
+ for (i,query) in rows.iter().enumerate(){
+  let label=format!("oracle.decision_voi_queries[{i}]");
+  allowed(query,&["query_id","loss_currency","prior_bounds","action_losses","action_constraints","option_costs"],&label)?;
+  let query_id=string(query,"query_id",&label)?;
+  if !ids.insert(query_id.clone()){return Err(format!("duplicate decision VOI query {query_id:?}"));}
+  let currency=string(query,"loss_currency",&label)?;
+  if currency.len()!=3||!currency.chars().all(|x|x.is_ascii_uppercase()){
+   return Err(format!("{label}.loss_currency must be a three-letter uppercase ISO 4217 code"));
+  }
+  let prior_rows=get(query,"prior_bounds",&label)?.as_array().ok_or("decision VOI prior_bounds must be array")?;
+  if prior_rows.len()!=hypotheses.len(){return Err(format!("{label}.prior_bounds must cover exact hypothesis set"));}
+  let mut priors=BTreeMap::new();
+  for (j,row) in prior_rows.iter().enumerate(){
+   let pl=format!("{label}.prior_bounds[{j}]");
+   allowed(row,&["hypothesis_id","lower_probability_bps","upper_probability_bps","nominal_probability_bps"],&pl)?;
+   let id=string(row,"hypothesis_id",&pl)?;
+   if !hypotheses.contains(&id){return Err(format!("{pl} references unknown hypothesis"));}
+   let b=Bounds{lower:uint(row,"lower_probability_bps",&pl)?,upper:uint(row,"upper_probability_bps",&pl)?,nominal:uint(row,"nominal_probability_bps",&pl)?};
+   if b.lower>b.nominal||b.nominal>b.upper||b.upper>SCALE{return Err(format!("{pl} violates probability interval ordering"));}
+   if priors.insert(id.clone(),b).is_some(){return Err(format!("{pl} duplicates hypothesis {id:?}"));}
+  }
+  bounded_simplex(&priors.values().cloned().collect::<Vec<_>>(),&format!("{label}.prior_bounds"))?;
+  if priors.keys().cloned().collect::<BTreeSet<_>>()!=*hypotheses{return Err(format!("{label}.prior_bounds must cover exact hypothesis set"));}
+  let raw_losses=get(query,"action_losses",&label)?.as_array().ok_or("action_losses must be array")?;
+  if raw_losses.is_empty()||raw_losses.len()>hypotheses.len().saturating_mul(16){
+   return Err(format!("{label}.action_losses has invalid row count"));
+  }
+  let mut losses:BTreeMap<String,BTreeMap<String,u64>>=BTreeMap::new();
+  for (j,row) in raw_losses.iter().enumerate(){
+   let ll=format!("{label}.action_losses[{j}]");
+   allowed(row,&["hypothesis_id","action_id","loss_micros"],&ll)?;
+   let hypothesis=string(row,"hypothesis_id",&ll)?;
+   let action=string(row,"action_id",&ll)?;
+   if !hypotheses.contains(&hypothesis){return Err(format!("{ll} references unknown hypothesis"));}
+   let value=uint(row,"loss_micros",&ll)?;
+   if value>MAX_LOSS_MICROS{return Err(format!("{ll}.loss_micros exceeds registered bound"));}
+   if losses.entry(hypothesis.clone()).or_default().insert(action.clone(),value).is_some(){
+    return Err(format!("{ll} duplicates hypothesis/action loss"));
+   }
+  }
+  let action_ids=losses.values().flat_map(|x|x.keys().cloned()).collect::<BTreeSet<_>>();
+  if action_ids.is_empty()||action_ids.len()>16{return Err(format!("{label} requires 1..=16 actions"));}
+  if losses.keys().cloned().collect::<BTreeSet<_>>()!=*hypotheses||
+   losses.values().any(|x|x.keys().cloned().collect::<BTreeSet<_>>()!=action_ids){
+   return Err(format!("{label}.action_losses must cover the exact hypothesis x action product"));
+  }
+  let constraint_rows=get(query,"action_constraints",&label)?.as_array().ok_or("action_constraints must be array")?;
+  if constraint_rows.len()!=action_ids.len(){return Err(format!("{label}.action_constraints must cover exact action set"));}
+  let mut action_constraints=BTreeMap::new();let mut read_only_count=0usize;
+  for (j,row) in constraint_rows.iter().enumerate(){
+   let al=format!("{label}.action_constraints[{j}]");
+   allowed(row,&["action_id","read_only","irreversible","hard_gate","max_residual_risk_bps","safe_hypotheses"],&al)?;
+   let id=string(row,"action_id",&al)?;
+   if !action_ids.contains(&id){return Err(format!("{al} references unknown action"));}
+   let read_only=get(row,"read_only",&al)?.as_bool().ok_or("action read_only must be boolean")?;
+   let irreversible=get(row,"irreversible",&al)?.as_bool().ok_or("action irreversible must be boolean")?;
+   let hard=get(row,"hard_gate",&al)?.as_bool().ok_or("action hard_gate must be boolean")?;
+   let max_risk=uint(row,"max_residual_risk_bps",&al)?;
+   if max_risk>SCALE||(hard&&max_risk!=0)||(irreversible&&(!hard||max_risk!=0))||
+    (read_only&&(irreversible||hard||max_risk!=0)){
+    return Err(format!("{al} has inconsistent action safety constraints"));
+   }
+   let raw_safe=get(row,"safe_hypotheses",&al)?.as_array().ok_or("safe_hypotheses must be array")?;
+   let mut safe=BTreeSet::new();
+   for raw in raw_safe{
+    let hypothesis=raw.as_str().filter(|x|!x.trim().is_empty()).ok_or("safe hypothesis must be non-empty string")?;
+    if !hypotheses.contains(hypothesis)||!safe.insert(hypothesis.to_owned()){
+     return Err(format!("{al}.safe_hypotheses has unknown or duplicate hypothesis"));
+    }
+   }
+   if safe.is_empty(){return Err(format!("{al}.safe_hypotheses cannot be empty"));}
+   if read_only{
+    read_only_count+=1;
+    if safe!=*hypotheses{return Err("read-only deferral must be safe under every registered hypothesis".to_owned());}
+   }
+   if action_constraints.insert(id,DecisionAction{read_only,irreversible,hard_gate:hard,max_risk,safe_hypotheses:safe}).is_some(){
+    return Err(format!("{al} duplicates action constraint"));
+   }
+  }
+  if read_only_count!=1||action_constraints.keys().cloned().collect::<BTreeSet<_>>()!=action_ids{
+   return Err(format!("{label} requires exact action constraints and one globally safe read-only defer"));
+  }
+  let cost_rows=get(query,"option_costs",&label)?.as_array().ok_or("option_costs must be array")?;
+  if cost_rows.len()!=options.len(){return Err(format!("{label}.option_costs must cover exact option set"));}
+  let mut option_costs=BTreeMap::new();
+  for (j,row) in cost_rows.iter().enumerate(){
+   let cl=format!("{label}.option_costs[{j}]");
+   allowed(row,&["option_id","cost_micros"],&cl)?;
+   let option=string(row,"option_id",&cl)?;
+   if !options.contains_key(&option){return Err(format!("{cl} references unknown option"));}
+   let cost=uint(row,"cost_micros",&cl)?;
+   if option_costs.insert(option.clone(),cost).is_some(){return Err(format!("{cl} duplicates option"));}
+  }
+  if option_costs.keys().cloned().collect::<BTreeSet<_>>()!=options.keys().cloned().collect(){
+   return Err(format!("{label}.option_costs must cover exact option set"));
+  }
+  let mut stop_scores=Vec::new();
+  for action in &action_ids{
+   let constraint=action_constraints.get(action).ok_or_else(||format!("missing action constraint {action:?}"))?;
+   if !decision_stop_action_qualified(&priors,latents,constraint,hypotheses)?{continue;}
+   let robust=robust_stop_loss(&priors,&losses,action)?;
+   let nominal=nominal_stop_loss(&priors,&losses,action)?;
+   stop_scores.push((robust,nominal,action.clone()));
+  }
+  stop_scores.sort_by(|a,b|a.0.cmp(&b.0).then_with(||a.1.cmp(&b.1)).then_with(||a.2.cmp(&b.2)));
+  let (stop_robust,stop_nominal,stop_action)=stop_scores.first().ok_or("no stop action score")?.clone();
+  let mut option_reports=Vec::new();
+  for (option_id,cost) in &option_costs{
+   let factor_id=&options[option_id].factor_id;
+   let option_outcomes=factors[factor_id].outcomes.iter().cloned().collect::<Vec<_>>();
+   let mut rules=Vec::new();
+   enumerate_decision_rules(&option_outcomes,&action_ids.iter().cloned().collect::<Vec<_>>(),0,&mut BTreeMap::new(),&mut rules)?;
+   if rules.len()>MAX_DECISION_RULES{return Err(format!("{label} decision rules exceed evaluator cap"));}
+   let decision_rule_count=rules.len();
+   let mut scored=Vec::new();
+   for rule in rules{
+    let mut qualified=true;
+    for outcome in &option_outcomes{
+     let action_id=rule.get(outcome).ok_or_else(||format!("decision rule missing outcome {outcome:?}"))?;
+     let constraint=action_constraints.get(action_id).ok_or_else(||format!("decision rule uses unknown action {action_id:?}"))?;
+     if !decision_rule_action_qualified(&priors,latents,kernels,option_id,outcome,constraint,hypotheses)?{
+      qualified=false;break;
+     }
+    }
+    if !qualified{continue;}
+    let robust=robust_rule_loss(&priors,latents,kernels,option_id,&rule,&losses)?;
+    let nominal=nominal_rule_loss(&priors,latents,kernels,option_id,&rule,&losses)?;
+    let canonical=serde_json::to_string(&rule).map_err(|e|format!("decision rule serialization failed: {e}"))?;
+    scored.push((robust,nominal,canonical,rule));
+   }
+   scored.sort_by(|a,b|a.0.cmp(&b.0).then_with(||a.1.cmp(&b.1)).then_with(||a.2.cmp(&b.2)));
+   let qualified_decision_rule_count=scored.len();
+   let (post_robust,post_nominal,_,best_rule)=scored.into_iter().next().ok_or("no safety-qualified decision rule generated")?;
+   let net_robust=signed_net_value(stop_robust,post_robust,*cost,"net robust VOI")?;
+   let net_nominal=signed_net_value(stop_nominal,post_nominal,*cost,"net nominal VOI")?;
+   option_reports.push(json!({
+    "option_id":option_id,"measurement_cost_micros":cost,
+    "robust_post_measurement_loss_micros":post_robust,
+    "nominal_post_measurement_loss_micros":post_nominal,
+    "net_robust_decision_value_micros":net_robust,
+    "net_nominal_decision_value_micros":net_nominal,
+    "continue_recommended":net_robust>0,
+    "decision_rule":best_rule,
+    "decision_rule_count":decision_rule_count,
+    "qualified_decision_rule_count":qualified_decision_rule_count
+   }));
+  }
+  option_reports.sort_by(|a,b|{
+   b["net_robust_decision_value_micros"].as_i64().unwrap_or(i64::MIN)
+    .cmp(&a["net_robust_decision_value_micros"].as_i64().unwrap_or(i64::MIN))
+    .then_with(||a["option_id"].as_str().cmp(&b["option_id"].as_str()))
+  });
+  let recommended=option_reports.first().ok_or("no option report")?;
+  let should_continue=recommended["net_robust_decision_value_micros"].as_i64().unwrap_or(i64::MIN)>0;
+  reports.push(json!({
+   "query_id":query_id,"loss_currency":currency,
+   "loss_unit":"micro-units of the declared currency",
+   "net_value_rounding":"stop-loss floors to the micro-unit; post-measurement loss ceils to the micro-unit; net robust value is therefore rounded conservatively",
+   "robust_stop_action_id":stop_action,
+   "robust_stop_loss_micros":stop_robust,
+   "nominal_stop_loss_micros":stop_nominal,
+   "recommended_next_step":if should_continue{"measure"}else{"stop"},
+   "recommended_option_id":if should_continue{recommended["option_id"].clone()}else{Value::Null},
+   "best_net_robust_decision_value_micros":recommended["net_robust_decision_value_micros"],
+   "option_evaluations":option_reports
+  }));
+ }
+ Ok(reports)
+}
 fn evaluate(raw:&str)->Result<Value,String>{
  let bundle:Value=serde_json::from_str(raw).map_err(|e|format!("invalid JSON: {e}"))?;
  allowed(&bundle,&["candidate_view","oracle"],"bundle")?;
  let candidate=get(&bundle,"candidate_view","bundle")?;
  let oracle=get(&bundle,"oracle","bundle")?;
- allowed(oracle,&["decision_cutoff","latent_states","conditional_kernels","risk_queries"],"oracle")?;
+ allowed(oracle,&["decision_cutoff","latent_states","conditional_kernels","risk_queries","decision_voi_queries"],"oracle")?;
  let (scenario,cutoff,options,factors,hypotheses)=parse_candidate(candidate)?;
  if string(oracle,"decision_cutoff","oracle")?!=cutoff{return Err("candidate and evaluator decision cutoffs differ".to_owned());}
  let latents=parse_latents(oracle,&cutoff)?;
@@ -596,6 +947,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
   "kernel_id":k.kernel_id,"authority":k.authority,"joint_row_count":k.rows.len()
  })).collect::<Vec<_>>();
  let risk_queries=parse_risk_queries(&oracle,&hypotheses,&options,&factors,&latents,&kernels)?;
+ let decision_voi=parse_decision_voi_queries(&oracle,&hypotheses,&options,&factors,&latents,&kernels)?;
  Ok(json!({
   "scenario_id":scenario,
   "adjudication_status":"shared_latent_joint_kernel_validation",
@@ -616,6 +968,7 @@ fn evaluate(raw:&str)->Result<Value,String>{
   "marginal_checks":marginal_checks,
   "pairwise_joint_checks":pairwise_checks,
   "risk_queries":risk_queries,
+  "decision_voi":decision_voi,
   "claim_ceiling":CLAIM_CEILING
  }))
 }
@@ -713,6 +1066,52 @@ mod tests{
   b["oracle"]["risk_queries"][0]["prior_bounds"][0]["upper_probability_bps"]=json!(6000);
   b["oracle"]["risk_queries"][0]["prior_bounds"][0]["nominal_probability_bps"]=json!(6000);
   assert!(evaluate(&b.to_string()).unwrap_err().contains("infeasible"));
+ }
+ #[test]fn target_decision_voi_recommends_only_robust_positive_value_measurement(){
+  let r=report();
+  let q=&r["decision_voi"][0];
+  assert_eq!(q["robust_stop_action_id"],"inspect-readonly");
+  assert_eq!(q["robust_stop_loss_micros"],1000);
+  assert_eq!(q["nominal_stop_loss_micros"],1000);
+  assert_eq!(q["recommended_next_step"],"measure");
+  assert_eq!(q["recommended_option_id"],"gate-a");
+  assert_eq!(q["best_net_robust_decision_value_micros"],40);
+  let a=q["option_evaluations"].as_array().unwrap().iter()
+   .find(|x|x["option_id"]=="gate-a").unwrap();
+  let b=q["option_evaluations"].as_array().unwrap().iter()
+   .find(|x|x["option_id"]=="gate-b").unwrap();
+  assert_eq!(a["robust_post_measurement_loss_micros"],860);
+  assert_eq!(a["nominal_post_measurement_loss_micros"],850);
+  assert_eq!(a["net_robust_decision_value_micros"],40);
+  assert_eq!(a["net_nominal_decision_value_micros"],50);
+  assert_eq!(a["decision_rule"]["pass"],"release");
+  assert_eq!(a["decision_rule"]["fail"],"inspect-readonly");
+  assert_eq!(a["qualified_decision_rule_count"],2);
+  assert_eq!(b["net_robust_decision_value_micros"],-60);
+ }
+ #[test]fn tightening_action_risk_envelope_changes_measure_into_stop(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["oracle"]["decision_voi_queries"][0]["action_constraints"][0]["max_residual_risk_bps"]=json!(4000);
+  let r=evaluate(&b.to_string()).expect("tight robust risk policy falls back to defer");
+  let q=&r["decision_voi"][0];
+  assert_eq!(q["recommended_next_step"],"stop");
+  assert_eq!(q["recommended_option_id"],Value::Null);
+  assert_eq!(q["best_net_robust_decision_value_micros"],-100);
+  let a=q["option_evaluations"].as_array().unwrap().iter()
+   .find(|x|x["option_id"]=="gate-a").unwrap();
+  assert_eq!(a["decision_rule"]["pass"],"inspect-readonly");
+  assert_eq!(a["decision_rule"]["fail"],"inspect-readonly");
+  assert_eq!(a["qualified_decision_rule_count"],1);
+ }
+ #[test]fn decision_voi_cannot_be_injected_by_candidate(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["candidate_view"]["decision_voi_queries"]=b["oracle"]["decision_voi_queries"].clone();
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("unknown field"));
+ }
+ #[test]fn decision_voi_requires_exactly_one_globally_safe_read_only_defer(){
+  let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
+  b["oracle"]["decision_voi_queries"][0]["action_constraints"][1]["safe_hypotheses"]=json!(["safe-world"]);
+  assert!(evaluate(&b.to_string()).unwrap_err().contains("read-only deferral must be safe under every registered hypothesis"));
  }
  #[test]fn candidate_cannot_inject_shared_latent_oracle(){
   let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
