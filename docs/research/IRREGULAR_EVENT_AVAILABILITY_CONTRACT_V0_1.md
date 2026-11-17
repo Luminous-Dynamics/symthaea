@@ -120,7 +120,7 @@ SHA-256 over the exact input bytes.
 
 ## 7. Authored test inventory and limits
 
-The current source contains 81 authored Rust test functions:
+The current source contains 98 authored Rust test functions:
 - 16 event-contract tests in `lib.rs`;
 - 12 bitemporal ledger tests in `lib.rs`;
 - 8 purged-split tests;
