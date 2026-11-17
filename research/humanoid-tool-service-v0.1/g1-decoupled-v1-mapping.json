@@ -303,10 +303,27 @@
     "ordering_evidence": {
       "expected_order_source": "G1Sonic.WHOLE_BODY_JOINTS / G1Sonic.joint_names",
       "source_file": "src/humanoidtoolbench/robots/g1_sonic.py",
-      "source_file_sha256": "9865d7ad4fdac29691f3585d77e194c9cedc43c3",
-      "observed_mechanism": "G1Sonic.setup_control creates the joints dict by iterating self.joint_names; get_robot_qpos returns that dict's values.",
-      "raw_joint_qpos_materialization_verified": false,
-      "caveat": "The exact producer that assembles observation['joint_qpos'] from robot observations is not yet pinned end-to-end in the public evaluator source. The 43-name order is the expected profile mapping; mark the adapter incomplete until the materialization path is independently confirmed."
+      "observed_mechanism": "SonicLocoManip._get_obs constructs joint_qpos as np.asarray(list(self.mujoco.get_robot_qpos().values()), dtype=float32). MujocoEngine.get_robot_qpos delegates to the task robot's get_robot_qpos. G1Sonic.get_robot_qpos iterates self.joints.items(). G1Sonic.setup_control populates self.joints by iterating self.joint_names, which is WHOLE_BODY_JOINTS. Python dict insertion order preserves that exact declared 43-name order.",
+      "raw_joint_qpos_materialization_verified": true,
+      "caveat": "Raw 43-value joint_qpos materialization is source-traced at the pinned upstream commit. This does not establish UEC v2 adapter conformance, simulator episode results, real-G1 hardware semantics, physical calibration or actuation authority.",
+      "source_file_blob_sha": "9865d7ad4fdac29691f3585d77e194c9cedc43c3",
+      "producer_chain": [
+        {
+          "path": "src/humanoidtoolbench/envs/sonic_loco_manip.py",
+          "blob_sha": "512f2b9b2ac6ed59d1673f34b653aac06ba10bec",
+          "role": "_get_obs serializes get_robot_qpos().values() into joint_qpos"
+        },
+        {
+          "path": "src/humanoidtoolbench/engines/mujoco.py",
+          "blob_sha": "d1883abb0e36f76b9d1b52978ed735d153c6aa67",
+          "role": "get_robot_qpos delegates to the task robot"
+        },
+        {
+          "path": "src/humanoidtoolbench/robots/g1_sonic.py",
+          "blob_sha": "9865d7ad4fdac29691f3585d77e194c9cedc43c3",
+          "role": "setup_control fills the ordered joints dict; get_robot_qpos returns its values"
+        }
+      ]
     }
   },
   "policy_input": {
@@ -910,8 +927,8 @@
     "measured_receipt_created": false,
     "actuator_authority": false,
     "live_hardware_backend": false,
-    "raw_qpos_materialization_verified": false,
-    "adapter_conformance_status": "blocked_pending_raw_joint_qpos_materialization_audit_and_UEC_v2_rust_adapter"
+    "raw_qpos_materialization_verified": true,
+    "adapter_conformance_status": "blocked_pending_UEC_v2_Rust_adapter_and_runtime_conformance"
   },
   "invariants": [
     "Do not map G1 joint position targets to Symthaea normalized torque or PWM values.",
