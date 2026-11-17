@@ -34,6 +34,10 @@ exclude = [
     # Retired package shell: only legacy examples remain; no Cargo.toml.
     # Exclude it from the crates/core/* workspace glob until examples are relocated.
     "crates/core/symthaea",
+    # Non-package legacy shells discovered by inventory: tests-only / src-only.
+    # They have no Cargo.toml and must not be selected by the crates/core/* glob.
+    "crates/core/symthaea-iit",
+    "crates/core/symthaea-observation-attestation",
 ]
 default-members = [
     "xtask",
