@@ -17,7 +17,7 @@
 use std::collections::BTreeSet;
 use std::fmt;
 
-use super::{analyze_spectra, PointGroupTemplateV1, SymFpErrorV1, SymFpReceiptV1};
+use super::{PointGroupTemplateV1, SymFpErrorV1, SymFpReceiptV1, analyze_spectra};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NumericalRankIntervalV1 {
@@ -67,10 +67,7 @@ impl fmt::Display for RobustSymFpErrorV1 {
 
 impl std::error::Error for RobustSymFpErrorV1 {}
 
-fn distance_interval(
-    target_rank: usize,
-    observed: NumericalRankIntervalV1,
-) -> (usize, usize) {
+fn distance_interval(target_rank: usize, observed: NumericalRankIntervalV1) -> (usize, usize) {
     let minimum = if target_rank < observed.minimum_rank {
         observed.minimum_rank - target_rank
     } else if target_rank > observed.maximum_rank {
@@ -219,13 +216,14 @@ pub fn classify_rank_templates_with_perturbation_bounds(
 
     let mut not_ruled_out_templates = Vec::new();
     for (index, candidate) in template_distance_intervals.iter().enumerate() {
-        let dominated_by_competitor = template_distance_intervals
-            .iter()
-            .enumerate()
-            .any(|(other_index, other)| {
-                other_index != index
-                    && other.maximum_l1_distance < candidate.minimum_l1_distance
-            });
+        let dominated_by_competitor =
+            template_distance_intervals
+                .iter()
+                .enumerate()
+                .any(|(other_index, other)| {
+                    other_index != index
+                        && other.maximum_l1_distance < candidate.minimum_l1_distance
+                });
         if !dominated_by_competitor {
             not_ruled_out_templates.push(candidate.schoenflies);
         }
@@ -244,9 +242,7 @@ pub fn classify_rank_templates_with_perturbation_bounds(
 
 #[cfg(test)]
 mod tests {
-    use super::super::{
-        analyze_spectra, template_by_name, SpectrumBlockV1, SymFpProfileV1,
-    };
+    use super::super::{SpectrumBlockV1, SymFpProfileV1, analyze_spectra, template_by_name};
     use super::*;
 
     fn receipt_for_rank_template(name: &str, maximum_degree: usize) -> SymFpReceiptV1 {
@@ -281,9 +277,12 @@ mod tests {
         .unwrap();
         assert_eq!(result.guaranteed_nearest_template, Some("C2"));
         assert_eq!(result.not_ruled_out_templates, vec!["C2"]);
-        assert!(result.rank_intervals
-            .iter()
-            .all(|rank| rank.minimum_rank == rank.maximum_rank));
+        assert!(
+            result
+                .rank_intervals
+                .iter()
+                .all(|rank| rank.minimum_rank == rank.maximum_rank)
+        );
     }
 
     #[test]
