@@ -4,43 +4,78 @@
 
 ## Purpose
 
-Evaluate candidate artifact reports against a separately held ground-truth catalogue, using exact source type labels and an explicit 3-D localization tolerance. The evaluator is intentionally separate from the perception/planning path. `parse_ground_truth_tsv` creates deterministic row IDs from the source file identifier and 1-based line number.
+Evaluate candidate artifact reports against a separately held ground-truth catalogue. The evaluator is intentionally separate from the perception/planning path. Two distinct evaluation modes are provided:
 
-The initial target is a compact, rights-aware adapter for the historical DARPA SubT Systems Finals ground-truth CSVs. Source manifest: `DARPA_GROUND_TRUTH_SOURCE_MANIFEST_V0_1.json`.
+1. A generic offline evaluator that uses configurable tolerance and one-to-one maximum-cardinality matching.
+2. A historical DARPA Systems Final stream evaluator that replays the documented report-order, retry, duplicate and budget semantics.
 
-## Contract
+## Data intake and provenance
+
+The source DARPA TSV parser accepts `type<TAB>x<TAB>y<TAB>z`, including the optional trailing empty tab field. It creates deterministic IDs using the source file identifier and 1-based line number. The source-native type label is preserved exactly.
+
+The source manifest `DARPA_GROUND_TRUTH_SOURCE_MANIFEST_V0_1.json` pins the source tree commit and per-file Git blob IDs, byte lengths and row counts. It does not include source dataset binaries. Data redistribution rights remain explicitly unresolved.
+
+## Coordinate contract
+
+Every truth and candidate record has an exact coordinate-frame ID. The evaluation profile must name the expected frame; frame mismatches reject. Coordinates must already be in metres in that exact frame. This evaluator never guesses CRS, axis order, units or transformations.
+
+The historical Systems Final function expects the DARPA reference frame `darpa` (the competition frame aligned at the Starting Gate). Any transform must be a separate, versioned and uncertainty-carrying operation before candidate admission.
+
+## Type labels and the official crosswalk
+
+Two type vocabularies are kept separate:
+
+- Ground-truth CSV labels: e.g. `cellphone`, `fireextinguisher`.
+- Official Final Event report strings from the DARPA Artifacts Specification / ICD: e.g. `Cell Phone`, `Fire Extinguisher`.
+
+The explicit `darpa_final_2021_crosswalk_v0_1()` maps source strings to official report strings. The crosswalk carries a version ID and is validated for duplicate source names, duplicate official names and unsupported official values. No implicit lowercase, whitespace or spelling normalization is performed.
+
+## Evaluation modes
+
+### Generic evaluator — `evaluate_reports`
 
 Inputs:
-- ground-truth artifact ID, exact coordinate-frame ID, original source type string and x/y/z coordinates;
-- candidate report ID, exact coordinate-frame ID, original source type string, x/y/z estimate and caller-provided priority;
-- an expected coordinate-frame ID, explicit localization tolerance and optional maximum report count.
+- ground-truth ID, source label, exact frame ID and x/y/z;
+- candidate report ID, type label, exact frame ID, x/y/z and monotonic submission sequence;
+- an explicit Euclidean 3-D tolerance in metres and optional maximum report count.
 
-All coordinates must already be expressed in the exact expected frame and in metres. Frame mismatches reject; the evaluator never guesses CRS, axis order, units or transforms.
+Reports are selected in submission order, then matched one-to-one to ground truth. It uses deterministic maximum-cardinality bipartite matching so a greedy nearest-neighbour mistake cannot reduce the total match count and duplicate reports cannot claim one truth record twice. This mode is a generic offline evaluator; it is not the historical DARPA command-post state machine.
 
-Evaluation:
-- selects at most the configured report budget, highest priority first, stable lexical ID tie-break;
-- parses the source's tab-separated `type, x, y, z` rows (including its optional trailing empty tab field) without normalizing type names;
-- binds every truth and candidate record to an exact coordinate-frame ID and rejects frame mismatch; no CRS/axis/unit transform is inferred;
-- matches reports one-to-one to ground truth;
-- requires exact type-string equality unless a separately versioned external alias table is supplied in a future extension;
-- computes Euclidean 3-D distance and admits an edge only when distance is within the explicit tolerance;
-- uses deterministic maximum-cardinality bipartite matching, so duplicate reports cannot claim the same truth item twice;
-- reports true positives, false positives, false negatives, precision, recall, per-class counts, matched distances, unselected reports and report-budget exclusions.
+### Historical Systems Final replay — `evaluate_systems_final_stream`
 
-No source type normalization is performed. For example, `cellphone` and `cell_phone` remain distinct strings; any cross-system alias policy must be explicit and independently versioned.
+Pinned rule source: *DARPA Subterranean Challenge — Competition Rules, Final Event, Revision 1, 25 May 2021*, Sections 7.3, 8.3.5, 10.1 and 10.3; artifact report strings are from *Artifacts Specification, Final Event, 1 April 2021* and the corresponding ICD.
 
-## Historical DARPA scoring caveat
+The Systems Final rules define:
+- Preliminary run: 20 artifacts, maximum 25 artifact reports.
+- Prize run: 40 artifacts, maximum 45 artifact reports.
+- One point for an exact official artifact report string and Euclidean 3-D error **less than or equal to 5 m**.
+- An invalid report (wrong type or insufficient accuracy) can be corrected by another report.
+- Once an artifact has been successfully reported, later duplicate reports are invalid and still count against the report allowance.
+- Reports beyond the allowance are rejected.
+- Report time is not a direct score factor, but report times participate in final ranking tie-breakers.
 
-The published challenge used a five-metre location tolerance and a finite report allowance in its artifact-report scoring. This crate's generic configurable evaluator is **not yet an exact reproduction of every round's official scoring rules**. A 5 m setting is a local historical proxy unless the exact round/task rule, report allowance and any artifact-type scoring nuances are pinned against authoritative rules.
+The evaluator replays reports in `submission_sequence` order, first valid report wins per ground-truth item, invalid attempts leave the item available for retry, and reports beyond the round allowance are excluded. It emits points, invalid reports, missed artifacts, processed report count, budget-rejected report IDs and the crosswalk version.
 
-## Data and licensing
+**Deliberate limits:** it does not reproduce the DARPA transport/API, real-time score receipts, time-based tie-break ranking, course-exploration validation, judge decisions or the Virtual Competition's different duplicate-report handling. If multiple unreported ground-truth items of the same class lie within 5 m of one report, v0.1 chooses the nearest (then lexical ID) as a deterministic local tie-break; the rules document does not specify this ambiguous-neighbour case. Do not describe this kernel as a full official command-post clone.
 
-The supplementary repository is:
-https://github.com/subtchallenge/systems_finals_ground_truth
+## Benchmarks and tests
 
-Its source README describes the DARPA coordinate frame, fiducials, round CSVs, point cloud and maps. The repository's API metadata did not expose a clear SPDX licence for dataset redistribution. The manifest pins source commits/blob IDs and row counts but deliberately does not include the dataset files. Confirm data reuse rights before committing data bytes or derived maps.
+The source-authored suite includes:
+- exact type and 3-D Euclidean threshold;
+- vertical error;
+- duplicate reports and one-to-one matching;
+- a nearest-neighbour trap where maximum-cardinality assignment matters;
+- submission-order report budgets;
+- class and distance false positives/negatives;
+- input-order invariance;
+- invalid and non-finite records;
+- frame mismatch;
+- TSV parsing with trailing tab fields and raw class preservation;
+- Systems Preliminary retry-after-invalid / duplicate-after-success;
+- Prize round 45-report cap;
+- exact official report string crosswalk.
 
-The candidate-report generator must never receive ground-truth coordinates, artifact labels or point-cloud truth. Ground truth is evaluator-only.
+These are synthetic conformance fixtures. They do not prove performance on a live robot or re-create the DARPA official score logs.
 
 ## Run
 
@@ -54,4 +89,4 @@ No external crate dependencies are required.
 
 ## Claim ceiling
 
-Passing the synthetic tests establishes only finite evaluator conformance for the defined class/3-D distance/report-budget contract. It does not validate perception, localization, mapping, operator workflow, communication, mission survival, structural/geotechnical safety, mine access or planetary transfer.
+A passing synthetic test suite establishes only the declared evaluator contract. It does not validate perception, localization, map quality, operator workflow, communication, mission survival, structural/geotechnical safety, mine access or planetary transfer.
