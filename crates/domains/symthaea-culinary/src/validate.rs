@@ -9,6 +9,7 @@ use crate::spec::{
     Candy, Coagulation, CulinarySpec, DairyAcidification, DoughClass, Emulsion, Fat, FryingFat,
     Hydration, Pasteurization, Pathogen, Protein, SugarStage,
 };
+use crate::thermal::ThermalTrajectory;
 use crate::thresholds as th;
 
 /// A rejected invariant, with a human-readable, physics-grounded reason.
@@ -67,6 +68,11 @@ pub enum CulinaryViolation {
     AddedSugarExceedsLimit {
         added_sugar_g: f64,
         limit_g: f64,
+    },
+    /// A numeric input cannot safely participate in a physical/nutritional invariant.
+    InvalidNumericInput {
+        field: &'static str,
+        requirement: &'static str,
     },
 }
 
@@ -164,14 +170,95 @@ impl std::fmt::Display for CulinaryViolation {
                 "added sugar {added_sugar_g:.0} g exceeds the FDA Daily Value of {limit_g:.0} g \
                  (<10% of calories on a 2,000-kcal reference diet)"
             ),
+            CulinaryViolation::InvalidNumericInput { field, requirement } => {
+                write!(f, "invalid numeric input for {field}: {requirement}")
+            },
         }
     }
 }
 
 impl std::error::Error for CulinaryViolation {}
 
+/// Broad input-envelope guard for food-core trajectories. This is a numeric/domain
+/// sanity bound (not a recipe setpoint or a food-safety limit) chosen well above
+/// ordinary culinary process temperatures so astronomical finite floats cannot pass.
+const MAX_THERMAL_TRAJECTORY_TEMP_C: f64 = 1_000.0;
+
+/// Reject invalid numerical states before using them in physical calculations.
+fn validate_thermal_trajectory(
+    trajectory: &ThermalTrajectory,
+    field: &'static str,
+) -> Result<(), CulinaryViolation> {
+    if trajectory.points.len() < 2 {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field,
+            requirement: "must contain at least two time-temperature points",
+        });
+    }
+    if trajectory
+        .points
+        .iter()
+        .any(|(time, temp)| !time.is_finite() || !temp.is_finite())
+    {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field,
+            requirement: "all times and temperatures must be finite",
+        });
+    }
+    if trajectory.points.iter().any(|(time, _)| *time < 0.0) {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field,
+            requirement: "process times must be non-negative",
+        });
+    }
+    if trajectory.points.iter().any(|(_, temp)| *temp < -273.15) {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field,
+            requirement: "temperatures cannot be below absolute zero (-273.15 °C)",
+        });
+    }
+    if trajectory
+        .points
+        .iter()
+        .any(|(_, temp)| *temp >= MAX_THERMAL_TRAJECTORY_TEMP_C)
+    {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field,
+            requirement: "food-core trajectory temperature exceeds the 1000 °C input sanity envelope",
+        });
+    }
+    if trajectory.points.windows(2).any(|w| w[1].0 < w[0].0) {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field,
+            requirement: "time values must be nondecreasing",
+        });
+    }
+    let start_time = trajectory.points[0].0;
+    let end_time = trajectory.points[trajectory.points.len() - 1].0;
+    if end_time <= start_time {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field,
+            requirement: "trajectory must have positive duration",
+        });
+    }
+    Ok(())
+}
+
 /// φ ≤ random close packing, else the emulsion inverts/breaks.
 pub fn validate_emulsion(e: &Emulsion) -> Result<(), CulinaryViolation> {
+    let phi = e.dispersed_phase_fraction;
+    if !phi.is_finite() {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "emulsion.dispersed_phase_fraction",
+            requirement: "must be finite",
+        });
+    }
+    if !(0.0..=1.0).contains(&phi) {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "emulsion.dispersed_phase_fraction",
+            requirement: "must be within [0, 1]",
+        });
+    }
     if e.dispersed_phase_fraction > th::RANDOM_CLOSE_PACKING {
         Err(CulinaryViolation::EmulsionBreaks {
             phi: e.dispersed_phase_fraction,
@@ -185,6 +272,7 @@ pub fn validate_emulsion(e: &Emulsion) -> Result<(), CulinaryViolation> {
 /// The trajectory must reach the protein's set point and (for custard) stay below
 /// its curdle point.
 pub fn validate_coagulation(c: &Coagulation) -> Result<(), CulinaryViolation> {
+    validate_thermal_trajectory(&c.trajectory, "coagulation.trajectory")?;
     let peak = c.trajectory.peak_temp();
     let set_c = match c.protein {
         Protein::EggWhite => th::EGG_WHITE_SET_C,
@@ -208,6 +296,15 @@ pub fn validate_coagulation(c: &Coagulation) -> Result<(), CulinaryViolation> {
 
 /// The trajectory must deliver at least the required log-reduction of the pathogen.
 pub fn validate_pasteurization(p: &Pasteurization) -> Result<(), CulinaryViolation> {
+    validate_thermal_trajectory(&p.trajectory, "pasteurization.trajectory")?;
+    if let Some(required) = p.required_log_reduction
+        && (!required.is_finite() || required <= 0.0)
+    {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "pasteurization.required_log_reduction",
+            requirement: "must be finite and greater than zero when provided",
+        });
+    }
     let (d_ref, t_ref, z, default_target) = match p.pathogen {
         Pathogen::SalmonellaPoultry => (
             th::SALMONELLA_D_REF_MIN,
@@ -218,6 +315,12 @@ pub fn validate_pasteurization(p: &Pasteurization) -> Result<(), CulinaryViolati
     };
     let required = p.required_log_reduction.unwrap_or(default_target);
     let delivered = p.trajectory.log_reduction(d_ref, t_ref, z);
+    if !delivered.is_finite() || delivered < 0.0 {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "pasteurization.trajectory",
+            requirement: "computed lethality must be finite and non-negative",
+        });
+    }
     if delivered + 1e-9 < required {
         Err(CulinaryViolation::InsufficientPasteurization {
             delivered_log: delivered,
@@ -230,12 +333,42 @@ pub fn validate_pasteurization(p: &Pasteurization) -> Result<(), CulinaryViolati
 
 /// Baker's-percentage hydration must fall in the dough class's window.
 pub fn validate_hydration(h: &Hydration) -> Result<(), CulinaryViolation> {
+    if !h.flour_g.is_finite() {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "hydration.flour_g",
+            requirement: "must be finite and greater than zero",
+        });
+    }
+    if h.flour_g <= 0.0 {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "hydration.flour_g",
+            requirement: "must be greater than zero",
+        });
+    }
+    if !h.water_g.is_finite() {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "hydration.water_g",
+            requirement: "must be finite and non-negative",
+        });
+    }
+    if h.water_g < 0.0 {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "hydration.water_g",
+            requirement: "must be non-negative",
+        });
+    }
     let (min, max) = match h.dough {
         DoughClass::Bread => (th::BREAD_HYDRATION_MIN, th::BREAD_HYDRATION_MAX),
         DoughClass::Pastry => (th::PASTRY_HYDRATION_MIN, th::PASTRY_HYDRATION_MAX),
         DoughClass::Batter => (th::BATTER_HYDRATION_MIN, th::BATTER_HYDRATION_MAX),
     };
     let ratio = h.ratio();
+    if !ratio.is_finite() {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "hydration.ratio",
+            requirement: "must be finite",
+        });
+    }
     if ratio < min || ratio > max {
         Err(CulinaryViolation::HydrationOutOfRange {
             dough: h.dough,
@@ -262,6 +395,7 @@ pub fn sugar_stage_window(stage: SugarStage) -> (f64, f64) {
 
 /// The trajectory's peak temperature must fall within the target stage's real window.
 pub fn validate_candy(c: &Candy) -> Result<(), CulinaryViolation> {
+    validate_thermal_trajectory(&c.trajectory, "candy.trajectory")?;
     let (min_c, max_c) = sugar_stage_window(c.stage);
     let peak = c.trajectory.peak_temp();
     if peak < min_c {
@@ -284,6 +418,18 @@ pub fn validate_candy(c: &Candy) -> Result<(), CulinaryViolation> {
 /// Whether the recipe's stated intent (curdle or stay smooth) matches what the
 /// pH will actually do at the casein isoelectric point.
 pub fn validate_dairy(d: &DairyAcidification) -> Result<(), CulinaryViolation> {
+    if !d.ph.is_finite() {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "dairy.ph",
+            requirement: "must be finite and within [0, 14]",
+        });
+    }
+    if !(0.0..=14.0).contains(&d.ph) {
+        return Err(CulinaryViolation::InvalidNumericInput {
+            field: "dairy.ph",
+            requirement: "must be within [0, 14]",
+        });
+    }
     let will_curdle = d.ph <= th::CASEIN_ISOELECTRIC_PH;
     if d.should_curdle && !will_curdle {
         Err(CulinaryViolation::DairyWontCurdle {
@@ -312,6 +458,7 @@ pub fn smoke_point_c(fat: Fat) -> f64 {
 
 /// The trajectory's peak temperature must never exceed the fat's smoke point.
 pub fn validate_frying(fr: &FryingFat) -> Result<(), CulinaryViolation> {
+    validate_thermal_trajectory(&fr.trajectory, "frying.trajectory")?;
     let peak = fr.trajectory.peak_temp();
     let smoke = smoke_point_c(fr.fat);
     if peak > smoke {
@@ -333,13 +480,45 @@ pub fn validate_frying(fr: &FryingFat) -> Result<(), CulinaryViolation> {
 /// single call — hence `Vec` rather than a single `Result`.
 pub fn validate_nutrition(n: &NutrientProfile) -> Vec<CulinaryViolation> {
     let mut v = Vec::new();
-    if n.sodium_mg > th::FDA_SODIUM_DAILY_VALUE_MG {
+    for (field, value) in [
+        ("nutrition.protein_g", n.protein_g),
+        ("nutrition.carb_g", n.carb_g),
+        ("nutrition.fat_g", n.fat_g),
+        ("nutrition.alcohol_g", n.alcohol_g),
+        ("nutrition.sodium_mg", n.sodium_mg),
+        ("nutrition.added_sugar_g", n.added_sugar_g),
+    ] {
+        if !value.is_finite() {
+            v.push(CulinaryViolation::InvalidNumericInput {
+                field,
+                requirement: "must be finite",
+            });
+        } else if value < 0.0 {
+            v.push(CulinaryViolation::InvalidNumericInput {
+                field,
+                requirement: "must be non-negative",
+            });
+        }
+    }
+    if !n.energy_kcal().is_finite() {
+        v.push(CulinaryViolation::InvalidNumericInput {
+            field: "nutrition.energy_kcal",
+            requirement: "derived energy must be finite",
+        });
+    }
+    if n.sodium_mg.is_finite()
+        && n.sodium_mg >= 0.0
+        && n.sodium_mg > th::FDA_SODIUM_DAILY_VALUE_MG
+    {
         v.push(CulinaryViolation::SodiumExceedsLimit {
             sodium_mg: n.sodium_mg,
             limit_mg: th::FDA_SODIUM_DAILY_VALUE_MG,
         });
     }
-    if n.added_sugar_g > th::FDA_ADDED_SUGAR_DAILY_VALUE_G {
+    if n.added_sugar_g.is_finite()
+        && n.added_sugar_g >= 0.0
+        && n.added_sugar_g > th::FDA_ADDED_SUGAR_DAILY_VALUE_G
+    {
         v.push(CulinaryViolation::AddedSugarExceedsLimit {
             added_sugar_g: n.added_sugar_g,
             limit_g: th::FDA_ADDED_SUGAR_DAILY_VALUE_G,
