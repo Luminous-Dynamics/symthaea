@@ -72,3 +72,14 @@ The `paired` module closes a provenance gap in the caller-supplied Weyl bounds:
 This improves reproducibility over accepting an unexplained delta value. The exact guarantee is limited to the supplied reference/observed matrix pair and the outward-rounded numerical bound. It does **not** establish that the reference is the true physical representation, that future/noisy samples remain within the same envelope, or that a rank match proves a symmetry. The authority string remains `PAIRED_SPECTRAL_COMPATIBILITY_ONLY_NOT_A_SYMMETRY_CERTIFICATE`.
 
 Tests cover zero-delta exact classification, a known 3-4-5 Frobenius bound, source-matrix mutation, forged-bound rejection, shape mismatch and overflow. The existing caller-supplied-bound API remains available as an explicit assumption-based path; use the paired API when the actual reference and observed representation matrices are available.
+
+
+### Numerical qualification boundary
+
+The paired path replays the reference SVD bit-for-bit and records each degree's normalized off-diagonal residual. It does **not yet propagate a rigorous floating-point SVD error bound** into the Weyl intervals. Accordingly:
+- the Frobenius envelope is outward-rounded for the supplied observed-minus-reference f64 matrix entries;
+- the nearest-template result is explicitly conditional on treating the reproducible reference SVD estimates as its anchor;
+- `reference_svd_error_propagated=false` is carried in the machine-readable paired receipt;
+- no exact-real singular-value guarantee, physical symmetry proof, or pruning authority is claimed.
+
+The next numerical research increment is to derive and verify a conservative singular-value interval that accounts for finite-precision Jacobi rotations and residuals, or to use a separately verified interval-SVD oracle. Until then, the existing Weyl result remains an assumption-qualified spectral compatibility result.
