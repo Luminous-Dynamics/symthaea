@@ -108,10 +108,10 @@ fn weighted_nominal(weights:&[Bounds],coefficients:&[u64])->Result<u64,String>{
  let numerator=weights.iter().zip(coefficients).try_fold(0u128,|sum,(w,c)|{
   sum.checked_add(w.nominal as u128*(*c as u128)).ok_or_else(||"nominal latent expectation overflow".to_owned())
  })?;
- if numerator%(SCALE as u128)!=0{
-  return Err("nominal shared-latent event is not exactly representable in basis points".to_owned());
- }
- Ok((numerator/SCALE as u128) as u64)
+ // The source probabilities are in basis points. Round half-up to the nearest
+ // basis point for the human-readable marginal projection; risk probes retain
+ // the full integer numerator and do not use this rounded value.
+ Ok(((numerator+(SCALE as u128)/2)/SCALE as u128).min(SCALE as u128) as u64)
 }
 fn parse_candidate(candidate:&Value)->Result<(String,String,BTreeMap<String,OptionDef>,BTreeMap<String,Factor>,BTreeSet<String>),String>{
  allowed(candidate,&["scenario_id","decision_cutoff","options","factors"],"candidate_view")?;
@@ -357,8 +357,11 @@ fn shared_nominal_risk(
 )->Result<u64,String>{
  let mut numerator=0u128;let mut denominator=0u128;
  for (hypothesis,prior) in priors{
-  let likelihood=weighted_nominal(&weights.iter().map(|z|z.probability.clone()).collect::<Vec<_>>(),&likelihoods[hypothesis])?;
-  let mass=prior.nominal as u128*likelihood as u128;
+  let likelihood_numerator=shared_likelihood_numerator(
+   &weights.iter().map(|z|z.probability.nominal).collect::<Vec<_>>(),
+   &likelihoods[hypothesis]
+  )?;
+  let mass=prior.nominal as u128*(likelihood_numerator as u128);
   denominator+=mass;if !safe.contains(hypothesis){numerator+=mass;}
  }
  if denominator==0{return Ok(SCALE);}
@@ -479,7 +482,7 @@ fn parse_risk_queries(
    for latent in latents{
     let kernel=&kernels[&(hypothesis.clone(),latent.id.clone())];
     let probability=kernel.rows.iter().filter(|row|{
-     observed.iter().all(|(option,outcome)|row.outcomes.get(option)==outcome.as_str())
+     observed.iter().all(|(option,outcome)|row.outcomes.get(option).map(String::as_str)==Some(outcome.as_str()))
     }).map(|row|row.probability).sum();
     by_latent.push(probability);
    }
@@ -643,6 +646,13 @@ mod tests{
   assert_eq!(r["coupling_model"]["kind"],"one_shared_latent_weight_credal_simplex");
   assert_eq!(r["conditional_kernel_count"],4);
   assert_eq!(r["coupling_model"]["latent_weights"][0]["lower_probability_bps"],4000);
+ }
+ #[test]fn nonrepresentable_nominal_mixture_rounds_without_rejecting(){
+  let rounded=weighted_nominal(
+   &[Bounds{lower:4000,upper:6000,nominal:5000},Bounds{lower:4000,upper:6000,nominal:5000}],
+   &[3333,3334]
+  ).expect("rounding is defined");
+  assert_eq!(rounded,3334);
  }
  #[test]fn common_latent_mixture_marginals_match_candidate_channels(){
   let r=report();
