@@ -108,6 +108,9 @@ pub enum ProcessRealizationAuditError {
     ProcessCellContainsRest {
         event_index: usize,
     },
+    ProcessCellContainsNonPositiveDuration {
+        event_index: usize,
+    },
     CycleStartCountMismatch {
         prefix_count: usize,
         cycle_start_count: usize,
@@ -246,6 +249,11 @@ pub fn verify_additive_process_score_v1(
     for (event_index, note) in process_cell.notes.iter().enumerate() {
         if note.degree.is_none() {
             return Err(ProcessRealizationAuditError::ProcessCellContainsRest { event_index });
+        }
+        if note.duration.num() <= 0 || note.duration.den() <= 0 {
+            return Err(ProcessRealizationAuditError::ProcessCellContainsNonPositiveDuration {
+                event_index,
+            });
         }
     }
     let dynamics_profile = plan
@@ -1015,13 +1023,17 @@ mod tests {
     }
 
     #[test]
-    fn legacy_plan_without_dynamics_profile_is_not_expressive_verified() {
+    fn legacy_plan_without_dynamics_profile_deserializes_but_is_not_expressive_verified() {
         let realization = realize_additive_process(
             &MusicalIntent { seed: 1, ..MusicalIntent::default() },
             &Style::Minimalism.spec(),
         );
-        let mut legacy_plan = realization.plan.clone();
-        legacy_plan.dynamics_profile = None;
+        let mut legacy_json = serde_json::to_value(&realization.plan).unwrap();
+        legacy_json
+            .as_object_mut()
+            .unwrap()
+            .remove("dynamics_profile");
+        let legacy_plan: ProcessPlan = serde_json::from_value(legacy_json).unwrap();
         assert!(matches!(
             verify_additive_process_score_v1(&legacy_plan, &realization.score),
             Err(ProcessRealizationAuditError::MissingDynamicsProfile)
@@ -1156,6 +1168,22 @@ mod tests {
         }
 
         assert_eq!(trajectory_counts, [1024, 1024, 1024, 1024]);
+    }
+
+
+    #[test]
+    fn score_side_audit_rejects_a_zero_duration_source_cell_event() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        realization.plan.process_cell.as_mut().unwrap().notes[0].duration = Duration::zero();
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::ProcessCellContainsNonPositiveDuration {
+                event_index: 0
+            })
+        ));
     }
 
     #[test]
