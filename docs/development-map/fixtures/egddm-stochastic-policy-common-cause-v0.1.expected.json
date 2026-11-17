@@ -68,7 +68,7 @@
         "joint_row_count": 1,
         "nominal_path_probability_bps": 450,
         "nominal_posterior_risk_bps": 0,
-        "worst_case_posterior_risk_bps": 10000,
+        "worst_case_posterior_risk_bps": 0,
         "evidence_support_lower_bps": 0,
         "actual_hypothesis_path_possible": true,
         "action_justified": true,
