@@ -132,3 +132,29 @@ New source records distinguish:
 - field-free stiffness-tensor and resonator kinetic-inductance metrology.
 
 A local gap or ARPES spectral signature does not establish a new Tc. The surface-doped F0223 state is not assigned a Tc in this registry. For stiffness extraction from resonator kinetic inductance, retain geometry, current-distribution and electrodynamic assumptions; do not convert with a universal geometry-free constant.
+
+
+## Same-specimen pairing / phase-coherence comparison
+
+Schema: \`data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json\`.
+
+This comparison contract links one local pairing observation and one bulk/mesoscopic coherence observation while enforcing exact material, material-state, sample and batch identity. It also checks fixed pressure semantics/value, field, doping and strain conditions. It refuses:
+- cross-sample, cross-batch, cross-material or cross-state joins;
+- predicted/calculated values used as observed pairing or coherence evidence;
+- a local pairing signal relabelled as bulk Tc;
+- non-detected or unresolved specimen records;
+- pressure/doping/strain mismatch;
+- conversion of pairing energy in meV to a temperature.
+
+Run the synthetic-only audit:
+
+\`\`\`bash
+cargo test --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_pair_coherence_audit
+cargo run --locked --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_pair_coherence_audit -- \\
+  --comparison-schema data/schemas/superconductivity_pair_coherence_comparison_v0_1.schema.json \\
+  --comparison tools/superconductivity-discovery-harness/fixtures/pair_coherence_comparison_smoke_v0_1.json \\
+  --observation-schema data/schemas/superconductivity_observation_event_v0_1.schema.json \\
+  --observations tools/superconductivity-discovery-harness/fixtures/observation_events_smoke_v0_1.json
+\`\`\`
+
+The fixture uses synthetic local pairing-energy and bulk stiffness observations on one synthetic specimen. It does not represent the Science paper or any physical measurement, and it does not infer a pairing temperature or a new Tc.
