@@ -733,6 +733,25 @@ mod tests{
     fn trace<'a>(value:&'a Value,id:&str)->&'a Value{
         value["traces"].as_array().unwrap().iter().find(|t|t["trace_id"]==id).expect("known trace")
     }
+    #[test]fn frechet_intersection_returns_sharp_two_and_three_channel_bounds(){
+        let make=|id:&str,lo:u64,hi:u64,nom:u64|AcquiredFactor{
+            factor_id:id.to_owned(),
+            at:DateTime::parse_from_rfc3339("2026-11-17T09:40:00Z").unwrap(),
+            likelihoods:BTreeMap::from([("h".to_owned(),Bounds{lower:lo,upper:hi,nominal:nom})]),
+            group:"shared".to_owned(),
+            source_ids:BTreeSet::from([id.to_owned()])
+        };
+        let two=vec![make("a",7000,8000,7500),make("b",6000,9000,8000)];
+        let pair=frechet_intersection(&two.iter().collect::<Vec<_>>(),"h");
+        assert_eq!(pair.lower,3000);
+        assert_eq!(pair.upper,8000);
+        assert_eq!(pair.nominal,6000);
+        let three=vec![make("a",9000,9500,9200),make("b",8000,9000,8500),make("c",7000,8000,7500)];
+        let triple=frechet_intersection(&three.iter().collect::<Vec<_>>(),"h");
+        assert_eq!(triple.lower,4000);
+        assert_eq!(triple.upper,8000);
+        assert_eq!(triple.nominal,5865);
+    }
     #[test]fn point_likelihood_looks_safe_but_robust_channel_risk_rejects(){
         let t=trace(&report(),"noisy-point-estimate-false-safe");
         assert_eq!(t["nominal_posterior_risk_bps"],129);
@@ -743,13 +762,16 @@ mod tests{
         assert_eq!(t["robust_action_justified"],false);
         assert_eq!(t["nominal_false_safe"],true);
     }
-    #[test]fn same_dependence_group_is_not_multiplied(){
+    #[test]fn same_dependence_group_uses_frechet_bounds_not_independence(){
         let t=trace(&report(),"correlated-sensors-not-independent");
         assert_eq!(t["factorization_qualified"],false);
-        assert_eq!(t["evidence_accepted"],false);
-        assert_eq!(t["evidence_status"],"unqualified_dependence_or_factorization");
-        assert_eq!(t["worst_case_posterior_risk_bps"],5000);
-        assert_eq!(t["unsupported_action"],true);
+        assert_eq!(t["evidence_accepted"],true);
+        assert_eq!(t["evidence_status"],"accepted_with_frechet_dependence_bounds");
+        assert_eq!(t["dependence_mode"],"unrestricted_frechet_joint_bounds");
+        assert_eq!(t["nominal_posterior_risk_bps"],12);
+        assert_eq!(t["worst_case_posterior_risk_bps"],1154);
+        assert_eq!(t["evidence_support_lower_bps"],3450);
+        assert_eq!(t["robust_action_justified"],false);
     }
     #[test]fn joint_model_preserves_common_mode_uncertainty_without_false_independence(){
         let t=trace(&report(),"joint-common-mode-model");
@@ -792,10 +814,14 @@ mod tests{
         assert_eq!(t["temporal_valid"],false);
         assert_eq!(t["evidence_accepted"],false);
     }
-    #[test]fn pairwise_certificates_do_not_authorize_three_way_factorization(){
+    #[test]fn pairwise_certificates_do_not_authorize_three_way_product_but_frechet_can(){
         let t=trace(&report(),"three-group-certificate-mismatch");
         assert_eq!(t["factorization_qualified"],false);
-        assert_eq!(t["evidence_accepted"],false);
+        assert_eq!(t["evidence_accepted"],true);
+        assert_eq!(t["evidence_status"],"accepted_with_frechet_dependence_bounds");
+        assert_eq!(t["dependence_mode"],"unrestricted_frechet_joint_bounds");
+        assert_eq!(t["worst_case_posterior_risk_bps"],357);
+        assert_eq!(t["robust_action_justified"],true);
     }
     #[test]fn drift_widened_likelihood_bounds_defeat_nominal_confidence(){
         let t=trace(&report(),"drift-widened-channel-bounds");
