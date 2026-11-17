@@ -3,8 +3,9 @@
 // Commercial licensing: see COMMERCIAL_LICENSE.md at repository root
 //! Engineering reasoning facade for Symthaea.
 
-pub mod robot_garment_compiler;
 #![deny(unsafe_code)]
+
+pub mod robot_garment_compiler;
 
 use serde::{Deserialize, Serialize};
 use symthaea_broca::{BrocaConfig, BrocaGenerator, ThoughtChannels};
