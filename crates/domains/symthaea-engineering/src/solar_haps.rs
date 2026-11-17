@@ -1019,8 +1019,10 @@ mod tests {
         assert!(result.ending_soc_wh >= result.initial_soc_wh);
         assert!(!result.own_service_continuous);
         assert!(!result.export_service_admissible);
-        assert!(result.total_own_load_unserved_wh > 0.0);
-        assert!(result.total_export_source_energy_wh > 0.0);
+        assert!((result.total_own_load_unserved_wh - 1200.0).abs() < 1.0e-8);
+        assert!((result.ending_soc_wh - 1800.0).abs() < 1.0e-8);
+        assert!((result.total_export_source_energy_wh - 2100.0).abs() < 1.0e-8);
+        assert!((result.total_export_receiver_energy_wh - 1680.0).abs() < 1.0e-8);
     }
 
     #[test]
