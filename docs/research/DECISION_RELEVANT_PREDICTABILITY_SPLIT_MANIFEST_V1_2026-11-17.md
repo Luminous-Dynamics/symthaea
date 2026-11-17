@@ -51,6 +51,13 @@ The manifest declares the holdout relation, not just a random row assignment:
 
 No row-wise random split is accepted as evidence of dynamical transfer. If a task intentionally allows a shared axis (for example, same equation family but new parameter region), that is a distinct named track, not an exception silently mixed into a broader claim.
 
+### 3.1 Nested sampling hierarchy
+
+`sampling.nesting` is an ordered outer-to-inner path, such as equation family → parameter cell → trajectory. Every scenario must declare one opaque group identity for every axis in that path, including contextual axes that are not held out. Each child group identity must map to exactly one parent group identity across the manifest. A parameter-cell group cannot silently appear under two equation families, and a trajectory group cannot migrate between parameter cells.
+
+Only axes explicitly listed in `split_axes` impose train/validation/confirmatory group disjointness. Contextual axes may be shared across roles, but their hierarchy must remain coherent. For example, parameter-transfer evaluation can share one equation-family parent while holding out parameter-cell IDs; equation-family transfer holds out the outer family groups as well. This allows separate, interpretable tracks without confusing one kind of generalization with another.
+
+
 ## 4. Manifest fields
 
 A canonical manifest is UTF-8 JSON with deterministic key ordering for digesting. The schema version is explicit. The following logical fields are required; implementation may use JSON, CBOR or another canonical encoding only after defining byte-level canonicalization and cross-language test vectors.
