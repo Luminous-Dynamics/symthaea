@@ -98,7 +98,8 @@ fn parse_worlds(oracle:&Value,ids:&BTreeSet<String>,option_ids:&BTreeSet<String>
   let safe=w["safe_actions"].as_array().ok_or("world.safe_actions must be an array")?;
   let mut safe_set=BTreeSet::new();for a in safe{let a=a.as_str().ok_or("safe action must be string")?;if !actions.contains_key(a){return Err(format!("world references unknown action {a:?}"));}safe_set.insert(a.to_owned());}
   let obs=object(val(w,"observations",&l)?,&format!("{l}.observations"))?;
-  if obs.keys().cloned().collect::<BTreeSet<_>>()!=option_ids.clone(){return Err(format!("world {id:?} observation option set mismatch"));}
+  let observed_options=obs.keys().cloned().collect::<BTreeSet<_>>();
+  if observed_options.len()!=option_ids.len()||!observed_options.is_subset(option_ids){return Err(format!("world {id:?} observation option set mismatch"));}
   let observations=obs.iter().map(|(k,v)|Ok((k.clone(),v.as_str().ok_or("observation must be string")?.to_owned()))).collect::<Result<BTreeMap<_,_>,String>>()?;
   if out.insert(id.clone(),World{safe_actions:safe_set,observations}).is_some(){return Err(format!("duplicate world {id:?}"));}
  }
@@ -129,7 +130,8 @@ fn parse_nodes(tree:&Value,options:&BTreeMap<String,OptionDef>,factor_outcomes:&
    let raw=object(val(v,"branches",&l)?,&format!("{l}.branches"))?;
    let branches=raw.iter().map(|(k,x)|Ok((k.clone(),x.as_str().ok_or("branch target must be string")?.to_owned()))).collect::<Result<BTreeMap<_,_>,String>>()?;
    let factor=factor_outcomes.get(&opt.factor_id).ok_or_else(||format!("missing factor outcome set for {:?}",opt.factor_id))?;
-   if branches.keys().cloned().collect::<BTreeSet<_>>()!=factor.clone(){return Err(format!("{l}.branches must cover every factor outcome exactly"));}
+   let branch_outcomes=branches.keys().cloned().collect::<BTreeSet<_>>();
+   if branch_outcomes.len()!=factor.len()||!branch_outcomes.is_subset(factor){return Err(format!("{l}.branches must cover every factor outcome exactly"));}
    Node{id:id.clone(),kind:kind.clone(),option_id:Some(option),at:Some(at),branches,decision_kind:None,action_id:None,claimed:0}
   }else if kind=="stop"{
    allowed(v,&["node_id","kind","decision_kind","action_id","claimed_residual_risk_bps"],&l)?;
