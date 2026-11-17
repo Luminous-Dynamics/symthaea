@@ -1,0 +1,34 @@
+{
+  "schema_version": "luminous.plasma-experiment-voi.v0",
+  "decision_id": "SYNTHETIC-PLASMA-MEASUREMENT-VOI-001",
+  "evidence_class": "SYNTHETIC",
+  "decision_loss_unit": "SYNTHETIC_DECISION_LOSS_UNITS",
+  "measurement_cost_unit": "SYNTHETIC_DECISION_LOSS_UNITS",
+  "available_budget": 0.20,
+  "states": [
+    {"state_id": "plasma_route_is_better", "prior_probability": 0.5},
+    {"state_id": "non_plasma_incumbent_is_better", "prior_probability": 0.5}
+  ],
+  "actions": [
+    {"action_id": "select_plasma_route", "losses": [0.0, 1.0]},
+    {"action_id": "select_non_plasma_incumbent", "losses": [1.0, 0.0]}
+  ],
+  "measurements": [
+    {
+      "measurement_id": "high_information_measurement",
+      "cost": 0.05,
+      "outcomes": [
+        {"outcome_id": "supports_plasma", "likelihood_by_state": [0.9, 0.1]},
+        {"outcome_id": "supports_incumbent", "likelihood_by_state": [0.1, 0.9]}
+      ]
+    },
+    {
+      "measurement_id": "low_information_measurement",
+      "cost": 0.08,
+      "outcomes": [
+        {"outcome_id": "weak_signal_a", "likelihood_by_state": [0.55, 0.45]},
+        {"outcome_id": "weak_signal_b", "likelihood_by_state": [0.45, 0.55]}
+      ]
+    }
+  ]
+}
