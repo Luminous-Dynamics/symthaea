@@ -43,6 +43,8 @@
         "additionalProperties": false,
         "required": [
           "specimen_id",
+          "specimen_revision_ref",
+          "specimen_configuration_digest",
           "candidate_id",
           "state",
           "material_lot_ref",
@@ -186,6 +188,19 @@
               "string",
               "null"
             ]
+          },
+          "specimen_revision_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "specimen_configuration_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^sha256:[0-9a-fA-F]{64}$"
           }
         }
       },
@@ -199,6 +214,8 @@
         "required": [
           "run_id",
           "specimen_id",
+          "specimen_revision_ref",
+          "specimen_configuration_digest",
           "family",
           "status",
           "protocol_ref",
@@ -529,6 +546,19 @@
               "string",
               "null"
             ]
+          },
+          "specimen_revision_ref": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "specimen_configuration_digest": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^sha256:[0-9a-fA-F]{64}$"
           }
         }
       }
