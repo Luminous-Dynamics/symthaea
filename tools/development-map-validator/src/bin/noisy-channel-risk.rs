@@ -734,10 +734,19 @@ mod tests{
         assert_eq!(t["temporal_valid"],false);
         assert_eq!(t["evidence_accepted"],false);
     }
-    #[test]fn certificate_must_cover_the_exact_observed_group_set(){
+    #[test]fn pairwise_certificates_do_not_authorize_three_way_factorization(){
         let t=trace(&report(),"three-group-certificate-mismatch");
         assert_eq!(t["factorization_qualified"],false);
         assert_eq!(t["evidence_accepted"],false);
+    }
+    #[test]fn drift_widened_likelihood_bounds_defeat_nominal_confidence(){
+        let t=trace(&report(),"drift-widened-channel-bounds");
+        assert_eq!(t["nominal_posterior_risk_bps"],182);
+        assert_eq!(t["prior_only_robust_risk_bps"],639);
+        assert_eq!(t["likelihood_only_robust_risk_bps"],910);
+        assert_eq!(t["worst_case_posterior_risk_bps"],2648);
+        assert_eq!(t["nominal_action_justified"],true);
+        assert_eq!(t["robust_action_justified"],false);
     }
     #[test]fn always_act_and_always_abstain_fail_paired_controls(){
         let r=report();
