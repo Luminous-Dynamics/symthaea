@@ -9,13 +9,15 @@
         "action_id": "release",
         "irreversible": true,
         "hard_gate": true,
-        "max_residual_risk_bps": 0
+        "max_residual_risk_bps": 0,
+        "read_only": false
       },
       {
         "action_id": "inspect-readonly",
         "irreversible": false,
         "hard_gate": false,
-        "max_residual_risk_bps": 0
+        "max_residual_risk_bps": 0,
+        "read_only": true
       }
     ],
     "hypothesis_bounds": [
@@ -254,13 +256,15 @@
         "action_id": "release",
         "irreversible": true,
         "hard_gate": true,
-        "max_residual_risk_bps": 0
+        "max_residual_risk_bps": 0,
+        "read_only": false
       },
       {
         "action_id": "inspect-readonly",
         "irreversible": false,
         "hard_gate": false,
-        "max_residual_risk_bps": 0
+        "max_residual_risk_bps": 0,
+        "read_only": true
       }
     ],
     "hypothesis_bounds": [
