@@ -36,7 +36,10 @@ Freeze exact SKU, market variant, installation and configuration before testing.
 | Arm | Role | Evidence to acquire before test |
 |---|---|---|
 | C0 — premium once-through shower | Quality control | Exact head/valve, flow curve, pressure compensation, installation instructions |
-| C1 — efficient once-through showerhead | Efficiency baseline | WaterSense-labelled model where available or exact local-market equivalent; confirm spray and pressure method |\n| C1-SA — local pressure-compensating showerhead | South African comparator | Reproduce local 150 / 300 kPa test points; CLASP's 2022 sample and 2025 WRC synthesis are context, not substitute for a named SKU test |\n| C1-CR — independent lab-tested direct-flow head | High-performing direct-flow comparator | Freeze an exact 2026-tested model with public measured flow around 1.5–1.6 gpm; use comparable coverage, force and temperature-drop methods |\n| C1-HS — Hansgrohe EcoSmart+ | Premium local-market comparator | Confirm exact model and actual flow curve; the family claim is ≤6 L/min at 3 bar, not independent test evidence |
+| C1 — efficient once-through showerhead | Efficiency baseline | WaterSense-labelled model where available or exact local-market equivalent; confirm spray and pressure method |
+| C1-SA — local pressure-compensating showerhead | South African comparator | Reproduce local 150 / 300 kPa test points; CLASP's 2022 sample and 2025 WRC synthesis are context, not substitute for a named SKU test |
+| C1-CR — independent lab-tested direct-flow head | High-performing direct-flow comparator | Freeze an exact 2026-tested model with public measured flow around 1.5–1.6 gpm; use comparable coverage, force and temperature-drop methods |
+| C1-HS — Hansgrohe EcoSmart+ | Premium local-market comparator | Confirm exact model and actual flow curve; the family claim is ≤6 L/min at 3 bar, not independent test evidence |
 | C2 — KOHLER Anthem EvoCycle | Commercial recirculation frontier | Current installation/operating/cleaning manuals, exact Cycle/Standard mode, base/fixture requirements, service and filter intervals |
 | C3 — Orbital Shower | Commercial recirculation comparator | Exact market model, duration basis for ~20 L statement, cleaning/maintenance, fresh-water and energy boundaries |
 | T0 — Luminous direct-flow test article | Our low-flow architecture | Frozen nozzle/spray geometry and valve/heat-recovery configuration |
@@ -88,7 +91,9 @@ For EPA WaterSense comparability, obtain and follow the applicable test method a
 
 ### Delivered bathing task
 - spray coverage using the chosen repeatable method;
-- spray force / impact distribution using the chosen repeatable method;\n- spray temperature drop at a declared bather-plane distance and ambient condition (Consumer Reports describes a container placed 18 inches from the head);
+- spray force / impact distribution using the chosen repeatable method;
+- spray temperature drop at a declared bather-plane distance and ambient condition (Consumer Reports describes a container positioned 18 inches from the showerhead);
+- spray temperature drop at a declared bather-plane distance and ambient condition (Consumer Reports describes a container placed 18 inches from the head);
 - outlet temperature stability and overshoot;
 - flow variation under the declared pressure envelope;
 - noise and vibration;
@@ -152,7 +157,8 @@ Targets are experimental hypotheses, not product claims.
 
 | Metric | Initial hypothesis |
 |---|---|
-| Direct-flow primary target | ≤6.0 L/min at 300 kPa, while meeting the selected independent spray/pressure criteria and maintaining acceptable performance at 150 kPa |\n| Direct-flow stretch target | ≤4.5 L/min at 300 kPa, with matched spray force, spray coverage, temperature stability and task outcome; stretch target, not a published standard |
+| Direct-flow primary target | ≤6.0 L/min at 300 kPa, while meeting the selected independent spray/pressure criteria and maintaining acceptable performance at 150 kPa |
+| Direct-flow stretch target | ≤4.5 L/min at 300 kPa, with matched spray force, spray coverage, temperature stability and task outcome; stretch target, not a published standard |
 | Recirculation 10-minute service | ≤18 L fresh water including startup, active use, after-session cleaning and purge |
 | Whole-service fresh-water saving | ≥80% against matched 2.5 US gpm once-through control, only when all-in boundary and comfort/hygiene gates pass |
 | System-level drain heat recovery | ≥60% useful recovery after declared fouling/maintenance, with all parasitic energy and upstream losses counted |
@@ -195,7 +201,8 @@ No human recirculation trial is permitted until:
 - an independent specialist defines the exposure assessment and applicable acceptance limits;
 - all water-contact materials and treatment stages have an evidence-backed envelope;
 - sample locations, timing, methods, laboratory competence, detection limits and uncertainty are preregistered;
-- biofilm, aerosol, stagnation, cleaning, post-use disinfection and cross-user carryover are addressed across water, biofilm and aerosol phases and across shower hoses, showerheads and pipes;\n- the risk-based microbiological panel is selected by competent specialists. Published reviews identify fecal indicators (E. coli, total coliforms, enterococci), heterotrophic plate counts, Pseudomonas aeruginosa and Legionella spp. as important candidates; supplementary organisms and viruses/protozoa may be relevant to the specific treatment/exposure question. This list is not a universal pass/fail panel;
+- biofilm, aerosol, stagnation, cleaning, post-use disinfection and cross-user carryover are addressed across water, biofilm and aerosol phases and across shower hoses, showerheads and pipes;
+- the risk-based microbiological panel is selected by competent specialists. Published reviews identify fecal indicators (E. coli, total coliforms, enterococci), heterotrophic plate counts, Pseudomonas aeruginosa and Legionella spp. as important candidates; supplementary organisms and viruses/protozoa may be relevant to the specific treatment/exposure question. This list is not a universal pass/fail panel;
 - fault injection proves no unqualified water reaches the shower outlet;
 - a competent safety review admits the exact tested configuration and operating envelope.
 
