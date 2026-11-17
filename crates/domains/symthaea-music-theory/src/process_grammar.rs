@@ -30,6 +30,25 @@ pub enum ProcessDynamicsProfileV1 {
     PrefixLinear,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessAccompanimentRole {
+    Harmony,
+    Bass,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessAccompanimentField {
+    Onset,
+    Duration,
+    Pitch,
+    Velocity,
+    SectionIntensity,
+    Emphasis,
+    PartIdentity,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ProcessPlan {
     pub trajectory_kind: ProcessTrajectoryKind,
@@ -64,6 +83,8 @@ pub struct ProcessRealizationAuditV1 {
     pub cycle_count: usize,
     pub observed_melody_event_count: usize,
     pub verified_expressive_event_count: usize,
+    pub verified_harmony_event_count: usize,
+    pub verified_bass_event_count: usize,
     pub maximum_prefix_length: usize,
 }
 
@@ -142,6 +163,17 @@ pub enum ProcessRealizationAuditError {
     MelodyEmphasisMismatch {
         cycle_index: usize,
         event_index: usize,
+    },
+    InvalidScoreMeter,
+    AccompanimentEventCountMismatch {
+        role: ProcessAccompanimentRole,
+        expected: usize,
+        actual: usize,
+    },
+    AccompanimentEventMismatch {
+        role: ProcessAccompanimentRole,
+        event_index: usize,
+        field: ProcessAccompanimentField,
     },
     MelodySequenceHasGapOrOverlap {
         previous_event_index: usize,
@@ -372,13 +404,161 @@ pub fn verify_additive_process_score_v1(
         });
     }
 
+    let accompaniment = verify_process_accompaniment_v1(score)?;
+
     Ok(ProcessRealizationAuditV1 {
         schema_version: PROCESS_REALIZATION_AUDIT_SCHEMA_VERSION,
         cycle_count: cycle_events.len(),
         observed_melody_event_count: melody.len(),
         verified_expressive_event_count: melody.len(),
+        verified_harmony_event_count: accompaniment.harmony_event_count,
+        verified_bass_event_count: accompaniment.bass_event_count,
         maximum_prefix_length,
     })
+}
+
+
+/// Independently verify the repeating clock and tonic anchor used by the
+/// current ProcessAdditive realization. These are explicit score semantics,
+/// not claims that the accompaniment is harmonically sophisticated.
+fn verify_process_accompaniment_v1(
+    score: &Score,
+) -> Result<ProcessAccompanimentAuditV1, ProcessRealizationAuditError> {
+    if score.meter == 0 {
+        return Err(ProcessRealizationAuditError::InvalidScoreMeter);
+    }
+    let scale = score.key.scale();
+
+    let harmony: Vec<&ScoreNote> = score
+        .notes
+        .iter()
+        .filter(|note| note.role == VoiceRole::Harmony)
+        .collect();
+    let mut expected_harmony = Vec::new();
+    let mut pulse = Duration::zero();
+    let mut pulse_index = 0usize;
+    let eighth = Duration::eighth();
+    while process_duration_less_than(pulse, score.total_beats) {
+        let nominal_end = pulse + eighth;
+        let duration = if process_duration_less_than(score.total_beats, nominal_end) {
+            score.total_beats.saturating_sub(pulse)
+        } else {
+            eighth
+        };
+        expected_harmony.push((
+            pulse,
+            duration,
+            scale.degree_pitch([1, 5, 8, 5][pulse_index % 4], 4),
+        ));
+        pulse = pulse + duration;
+        pulse_index += 1;
+    }
+
+    if harmony.len() != expected_harmony.len() {
+        return Err(ProcessRealizationAuditError::AccompanimentEventCountMismatch {
+            role: ProcessAccompanimentRole::Harmony,
+            expected: expected_harmony.len(),
+            actual: harmony.len(),
+        });
+    }
+    for (event_index, (note, (onset, duration, pitch))) in
+        harmony.iter().zip(expected_harmony.iter()).enumerate()
+    {
+        let field = if note.onset != *onset {
+            Some(ProcessAccompanimentField::Onset)
+        } else if note.duration != *duration {
+            Some(ProcessAccompanimentField::Duration)
+        } else if note.pitch != *pitch {
+            Some(ProcessAccompanimentField::Pitch)
+        } else if note.velocity.to_bits() != 0.34_f32.to_bits() {
+            Some(ProcessAccompanimentField::Velocity)
+        } else if note.section_intensity.to_bits() != 0.62_f32.to_bits() {
+            Some(ProcessAccompanimentField::SectionIntensity)
+        } else if note.emphasis != Emphasis::Normal {
+            Some(ProcessAccompanimentField::Emphasis)
+        } else if note.part != PartId::UNASSIGNED {
+            Some(ProcessAccompanimentField::PartIdentity)
+        } else {
+            None
+        };
+        if let Some(field) = field {
+            return Err(ProcessRealizationAuditError::AccompanimentEventMismatch {
+                role: ProcessAccompanimentRole::Harmony,
+                event_index,
+                field,
+            });
+        }
+    }
+
+    let bass: Vec<&ScoreNote> = score
+        .notes
+        .iter()
+        .filter(|note| note.role == VoiceRole::Bass)
+        .collect();
+    let bar = Duration::new(score.meter as i64, 1);
+    let mut expected_bass = Vec::new();
+    let mut bass_onset = Duration::zero();
+    while process_duration_less_than(bass_onset, score.total_beats) {
+        let nominal_end = bass_onset + bar;
+        let duration = if process_duration_less_than(score.total_beats, nominal_end) {
+            score.total_beats.saturating_sub(bass_onset)
+        } else {
+            bar
+        };
+        expected_bass.push((
+            bass_onset,
+            duration,
+            scale.degree_pitch(1, 2),
+        ));
+        bass_onset = bass_onset + duration;
+    }
+
+    if bass.len() != expected_bass.len() {
+        return Err(ProcessRealizationAuditError::AccompanimentEventCountMismatch {
+            role: ProcessAccompanimentRole::Bass,
+            expected: expected_bass.len(),
+            actual: bass.len(),
+        });
+    }
+    for (event_index, (note, (onset, duration, pitch))) in
+        bass.iter().zip(expected_bass.iter()).enumerate()
+    {
+        let field = if note.onset != *onset {
+            Some(ProcessAccompanimentField::Onset)
+        } else if note.duration != *duration {
+            Some(ProcessAccompanimentField::Duration)
+        } else if note.pitch != *pitch {
+            Some(ProcessAccompanimentField::Pitch)
+        } else if note.velocity.to_bits() != 0.43_f32.to_bits() {
+            Some(ProcessAccompanimentField::Velocity)
+        } else if note.section_intensity.to_bits() != 0.58_f32.to_bits() {
+            Some(ProcessAccompanimentField::SectionIntensity)
+        } else if note.emphasis != Emphasis::Normal {
+            Some(ProcessAccompanimentField::Emphasis)
+        } else if note.part != PartId::UNASSIGNED {
+            Some(ProcessAccompanimentField::PartIdentity)
+        } else {
+            None
+        };
+        if let Some(field) = field {
+            return Err(ProcessRealizationAuditError::AccompanimentEventMismatch {
+                role: ProcessAccompanimentRole::Bass,
+                event_index,
+                field,
+            });
+        }
+    }
+
+    Ok(ProcessAccompanimentAuditV1 {
+        harmony_event_count: harmony.len(),
+        bass_event_count: bass.len(),
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ProcessAccompanimentAuditV1 {
+    harmony_event_count: usize,
+    bass_event_count: usize,
 }
 
 /// A separately implemented definition of the four declared prefix contours.
@@ -826,6 +1006,70 @@ mod tests {
         assert!(matches!(
             verify_additive_process_score_v1(&legacy_plan, &realization.score),
             Err(ProcessRealizationAuditError::MissingDynamicsProfile)
+        ));
+    }
+
+
+    #[test]
+    fn score_side_audit_rejects_a_harmony_clock_pitch_mutation() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let note = realization.score.notes
+            .iter_mut()
+            .find(|note| note.role == VoiceRole::Harmony)
+            .unwrap();
+        note.pitch = note.pitch.transpose(1);
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::AccompanimentEventMismatch {
+                role: ProcessAccompanimentRole::Harmony,
+                field: ProcessAccompanimentField::Pitch,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn score_side_audit_rejects_a_bass_clock_duration_mutation() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let note = realization.score.notes
+            .iter_mut()
+            .find(|note| note.role == VoiceRole::Bass)
+            .unwrap();
+        note.duration = note.duration + Duration::eighth();
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::AccompanimentEventMismatch {
+                role: ProcessAccompanimentRole::Bass,
+                field: ProcessAccompanimentField::Duration,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn score_side_audit_rejects_invented_accompaniment_part_identity() {
+        let mut realization = realize_additive_process(
+            &MusicalIntent { seed: 1, ..MusicalIntent::default() },
+            &Style::Minimalism.spec(),
+        );
+        let note = realization.score.notes
+            .iter_mut()
+            .find(|note| note.role == VoiceRole::Harmony)
+            .unwrap();
+        note.part = PartId(1);
+        assert!(matches!(
+            verify_additive_process_score_v1(&realization.plan, &realization.score),
+            Err(ProcessRealizationAuditError::AccompanimentEventMismatch {
+                role: ProcessAccompanimentRole::Harmony,
+                field: ProcessAccompanimentField::PartIdentity,
+                ..
+            })
         ));
     }
 
