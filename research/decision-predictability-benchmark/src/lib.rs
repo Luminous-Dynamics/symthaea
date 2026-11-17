@@ -1,3 +1,4 @@
+pub mod decision_horizon;
 pub mod paired_world;
 
 use std::error::Error;
