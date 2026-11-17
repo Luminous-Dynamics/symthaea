@@ -94,7 +94,9 @@
         "nominal_expected_cost_micros",
         "worst_case_expected_cost_micros",
         "budget_micros",
-        "leaf_reports"
+        "leaf_reports",
+        "justified_action_coverage_bounds_bps",
+        "unsafe_action_mass_bounds_bps"
       ],
       "properties": {
         "policy_feasible": {
@@ -273,6 +275,58 @@
                   }
                 ]
               }
+            }
+          }
+        },
+        "justified_action_coverage_bounds_bps": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "nominal",
+            "upper"
+          ],
+          "properties": {
+            "lower": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "nominal": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "upper": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            }
+          }
+        },
+        "unsafe_action_mass_bounds_bps": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "lower",
+            "nominal",
+            "upper"
+          ],
+          "properties": {
+            "lower": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "nominal": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
+            },
+            "upper": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10000
             }
           }
         }
