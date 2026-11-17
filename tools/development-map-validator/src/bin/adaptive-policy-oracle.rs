@@ -200,7 +200,9 @@ fn parse_candidate_oracle(candidate:&Value,oracle:&Value)->Result<(BTreeMap<Stri
  let cutoff=s(candidate,"decision_cutoff","candidate_view")?;if cutoff!=s(oracle,"decision_cutoff","oracle")?{return Err("candidate cutoff differs from oracle".to_owned());}
  let budget=u(candidate,"budget_micros","candidate_view")?;if budget!=u(oracle,"budget_micros","oracle")?{return Err("candidate budget differs from evaluator budget".to_owned());}
  for k in ["actions","hypothesis_bounds","options","factors"]{if candidate[k]!=oracle[k]{return Err(format!("candidate {k} differ from evaluator-authoritative copies"));}}
- let max_depth=u(candidate,"max_depth","candidate_view")? as usize;if max_depth==0||max_depth>MAX_DEPTH{return Err("max_depth must be 1..=5".to_owned());}
+ let max_depth_raw=u(candidate,"max_depth","candidate_view")?;
+ if max_depth_raw==0||max_depth_raw>MAX_DEPTH as u64{return Err("max_depth must be 1..=5".to_owned());}
+ let max_depth=max_depth_raw as usize;
  let bounds=parse_world_bounds(candidate)?;let actions=parse_actions(candidate)?;let options=parse_options(candidate,oracle)?;
  let ids=bounds.keys().cloned().collect::<BTreeSet<_>>();let option_ids=options.keys().cloned().collect::<BTreeSet<_>>();
  let worlds=parse_worlds(oracle,&ids,&option_ids,&actions)?;
@@ -384,8 +386,10 @@ fn enumerate_policies(
   }
  }
  if depth>=candidate["max_depth"].as_u64().unwrap_or(0) as usize||remaining.is_empty(){*total_generated+=output.len();return Ok(output);}
+ let cutoff_raw=s(candidate,"decision_cutoff","candidate_view")?;
+ let cutoff=parse_time(&cutoff_raw,"candidate decision cutoff")?;
  for (option_id,opt) in options{
-  if used.contains(option_id)||opt.available_at>parse_time(candidate["decision_cutoff"].as_str().unwrap(),"cutoff")?{continue;}
+  if used.contains(option_id)||opt.available_at>cutoff{continue;}
   let names=outcomes.get(&opt.factor_id).ok_or("missing factor outcomes")?;
   let mut partitions:BTreeMap<String,Vec<String>>=names.iter().map(|o|(o.clone(),Vec::new())).collect();
   for world_id in remaining{let observed=&worlds[world_id].observations[option_id];partitions.get_mut(observed).ok_or("world observation outside factor outcomes")?.push(world_id.clone());}
@@ -488,7 +492,7 @@ pub fn evaluate_adaptive_policy_json(raw:&str)->Result<Value,String>{
    "nominal_expected_cost_bound_micros":optimal.nominal_expected_cost,
    "worst_case_path_cost_bound_micros":optimal.max_path_cost,
    "full_revalidation_comparator":{
-    "acquisition_count":options.values().filter(|option|option.available_at<=parse_time(candidate["decision_cutoff"].as_str().unwrap(),"cutoff").unwrap()).count(),
+    "acquisition_count":options.values().filter(|option|option.available_at<=cutoff).count(),
     "cost_bound_micros":full_revalidation_cost,
     "nominal_expected_cost_bound_micros":full_revalidation_cost,
     "worst_case_expected_cost_bound_micros":full_revalidation_cost,
@@ -558,7 +562,15 @@ mod tests{
  }
  #[test]fn world_outcomes_with_zero_registered_likelihood_are_rejected(){
   let mut b:Value=serde_json::from_str(FIXTURE).unwrap();
-  for root in [&mut b["candidate_view"],&mut b["oracle"]]{ 
+  {
+   let root=&mut b["candidate_view"];
+   let row=root["factors"][0]["likelihoods"].as_array_mut().unwrap().iter_mut()
+    .find(|x|x["hypothesis_id"]=="safe").unwrap();
+   row["outcomes"]["pass"]=json!({"lower_likelihood_bps":0,"upper_likelihood_bps":0,"nominal_likelihood_bps":0});
+   row["outcomes"]["fail"]=json!({"lower_likelihood_bps":10000,"upper_likelihood_bps":10000,"nominal_likelihood_bps":10000});
+  }
+  {
+   let root=&mut b["oracle"];
    let row=root["factors"][0]["likelihoods"].as_array_mut().unwrap().iter_mut()
     .find(|x|x["hypothesis_id"]=="safe").unwrap();
    row["outcomes"]["pass"]=json!({"lower_likelihood_bps":0,"upper_likelihood_bps":0,"nominal_likelihood_bps":0});
