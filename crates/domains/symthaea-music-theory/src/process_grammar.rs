@@ -311,11 +311,12 @@ pub fn verify_additive_process_score_v1(
     let scale = score.key.scale();
     for (cycle_index, events) in cycle_events.iter().enumerate() {
         let prefix_length = plan.prefix_lengths[cycle_index];
-        let normalized_prefix = prefix_length as f32 / maximum_prefix_length as f32;
         let (expected_velocity, expected_intensity) = match dynamics_profile {
+            // Preserve the generator's specified f32 operation order exactly:
+            // multiply by the prefix count, then divide by the source-cell size.
             ProcessDynamicsProfileV1::PrefixLinear => (
-                0.46 + 0.24 * normalized_prefix,
-                0.42 + 0.44 * normalized_prefix,
+                0.46 + 0.24 * prefix_length as f32 / maximum_prefix_length as f32,
+                0.42 + 0.44 * prefix_length as f32 / maximum_prefix_length as f32,
             ),
         };
         for (event_index, (_, observed)) in events.iter().enumerate() {
