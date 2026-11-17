@@ -9,6 +9,7 @@ pub mod full_envelope;
 pub mod loft;
 pub mod section;
 pub mod sectional_reference;
+pub mod static_attitude;
 
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, VecDeque};

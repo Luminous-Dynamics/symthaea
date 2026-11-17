@@ -197,3 +197,46 @@ This is evidence provenance, not a change to the physical scope of the solver. I
 ### Next: static trim/heel equilibrium
 
 The distinct follow-on specification is [MARINE-STATIC-ATTITUDE-EQUILIBRIUM-001 #12498](https://github.com/Luminous-Dynamics/symthaea/issues/12498). It will solve offset + pitch + roll using explicit CG, density, a body-frame oblique waterplane, force balance and two independent moment residuals. It is not the same as the WAPS manoeuvring/leeway 3-DOF programme and is not a GZ or stability approval. See `docs/research/marine/MARINE-FULL-ENVELOPE-G2F-A.md` for the equations, fixtures and current SOTA comparison.
+
+
+### Static attitude A0/A1 — oblique waterplane evaluation
+
+The next static-equilibrium increment is available in the `static_attitude` module. It evaluates a **trial** sinkage/pitch/roll state using the full G2f cross-section, including its explicit deck profile. With the body frame x-forward/y-starboard/z-down and the declared rotation convention `R_body_to_world = R_y(pitch) * R_x(roll)`, world-down gravity becomes:
+
+```text
+g_body = (-sin(pitch), sin(roll) cos(pitch), cos(roll) cos(pitch))
+```
+
+The horizontal world waterplane is represented in body coordinates by:
+
+```text
+g_body · r_body = waterplane_offset_m
+```
+
+At station x, the submerged section is clipped against:
+
+```text
+g_y y + g_z z >= waterplane_offset_m - g_x x
+```
+
+The code then integrates section area and first moments longitudinally to produce displacement, displaced mass and body-frame centre of buoyancy. It calculates:
+- displaced mass minus declared total mass (tonnes);
+- two independent physical buoyancy moment components about the caller-supplied CG (N m), projected into an orthonormal basis perpendicular to gravity.
+
+The request and BLAKE3 receipt bind the exact full-envelope source, load-case ID, mass, CG, density, gravity, trial attitude, geometry tolerance, output properties and residuals. Receipt verification recomputes the complete result from the exact request.
+
+CLI:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-static-attitude-evaluate -- docs/research/marine/fixtures/marine-static-attitude-box-001.json --output /tmp/marine-static-attitude-receipt.json
+
+Fresh independent replay:
+
+    cargo run --locked -p symthaea-marine-geometry --bin marine-static-attitude-evaluate -- docs/research/marine/fixtures/marine-static-attitude-box-001.json --verify /tmp/marine-static-attitude-receipt.json
+
+Exit codes: 0 evaluated/verified, 1 typed validation or integrity rejection, 2 CLI/I/O/parse failure.
+
+The current A0/A1 domain is bounded to absolute pitch and roll of at most 0.5235987756 rad (30°). Every station must be intersected by the oblique waterplane; unsupported openings or a waterplane outside a section are rejected. The section polygon uses the supplied deck profile, rather than closing with a straight sheer-to-sheer chord. Port geometry remains explicit for asymmetric hulls.
+
+Synthetic box-hull A0/A1 known answer at upright attitude: displacement 12,000 m³, displaced mass 12,300 tonnes at 1,025 kg/m³, CB (50, 0, 3) m and zero mass/moment residual for CG (50, 0, 3) m. Additional analytic pure-roll and pure-pitch checks verify oblique section clipping and longitudinal integration. These are mathematical fixtures, not vessel measurements.
+
+**Scope boundary:** A0/A1 evaluates a trial pose; it does not solve the three-variable equilibrium root. A zero mass/moment residual at one trial pose is not proof of stable equilibrium. No GM/GZ, free-surface, tank, downflooding, intact/damage stability, class or seaworthiness claim is made. The safeguarded offset/pitch/roll solver belongs to A2, with independent receipt verification A3 and Maxsurf/NAPA plus G2c polyhedral comparisons A4.
