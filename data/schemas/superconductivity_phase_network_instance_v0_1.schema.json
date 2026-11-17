@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Luminous-Dynamics/symthaea/blob/main/data/schemas/superconductivity_phase_network_instance_v0_1.schema.json",
+  "title": "Superconductivity Phase-Network Instance",
+  "description": "A condition-bound classical XY/Josephson phase-network input. This contract describes a model instance, not an experimental material observation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "instance_id",
+    "fixture_only",
+    "model",
+    "graph",
+    "boundary_conditions",
+    "coupling_budget",
+    "disorder",
+    "random_seed",
+    "claim_ceiling"
+  ],
+  "properties": {
+    "contract": {
+      "const": "SC-PHASE-NETWORK-0.1"
+    },
+    "instance_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fixture_only": {
+      "type": "boolean"
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "version",
+        "pair_amplitude_mode",
+        "boltzmann_constant_convention",
+        "temperature_unit"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "classical_xy_phase_only",
+            "josephson_phase_network"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pair_amplitude_mode": {
+          "const": "fixed_not_simulated"
+        },
+        "boltzmann_constant_convention": {
+          "const": "kB_equals_1"
+        },
+        "temperature_unit": {
+          "const": "coupling_energy_units"
+        },
+        "notes": {
+          "type": "string"
+        }
+      }
+    },
+    "graph": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spatial_dimension",
+        "topology_family",
+        "nodes",
+        "edges"
+      ],
+      "properties": {
+        "spatial_dimension": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "topology_family": {
+          "type": "string",
+          "minLength": 1
+        },
+        "embedding": {
+          "enum": [
+            "physical_coordinates",
+            "abstract_graph"
+          ]
+        },
+        "nodes": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "node_id"
+            ],
+            "properties": {
+              "node_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "position": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 3,
+                "items": {
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "edges": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "edge_id",
+              "source",
+              "target",
+              "coupling_energy",
+              "gauge_link_phase_rad"
+            ],
+            "properties": {
+              "edge_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source": {
+                "type": "string",
+                "minLength": 1
+              },
+              "target": {
+                "type": "string",
+                "minLength": 1
+              },
+              "coupling_energy": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              "gauge_link_phase_rad": {
+                "type": "number"
+              },
+              "physical_edge_length": {
+                "type": [
+                  "number",
+                  "null"
+                ],
+                "minimum": 0
+              },
+              "edge_class": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "boundary_conditions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "periodic_axes",
+        "twist_angle_rad"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "periodic",
+            "open",
+            "mixed"
+          ]
+        },
+        "periodic_axes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "uniqueItems": true
+        },
+        "twist_angle_rad": {
+          "type": "number"
+        }
+      }
+    },
+    "coupling_budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "normalization",
+        "total_coupling_energy",
+        "per_node_coupling_budget"
+      ],
+      "properties": {
+        "normalization": {
+          "const": "sum_edge_couplings_divided_by_node_count"
+        },
+        "total_coupling_energy": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "per_node_coupling_budget": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "declared_nonlocal_edge_cost": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "disorder": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "family",
+        "strength",
+        "spatial_correlation"
+      ],
+      "properties": {
+        "family": {
+          "enum": [
+            "none",
+            "independent_random",
+            "clustered",
+            "correlated",
+            "hyperuniform",
+            "custom"
+          ]
+        },
+        "strength": {
+          "type": "number",
+          "minimum": 0
+        },
+        "spatial_correlation": {
+          "type": [
+            "string",
+            "number",
+            "null"
+          ]
+        },
+        "generator_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "random_seed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "source_references": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "uri"
+      }
+    },
+    "claim_ceiling": {
+      "const": "Model input only; not a solved state, measured Tc, or experimental material result."
+    }
+  }
+}
