@@ -35,7 +35,7 @@ impl Assignment {
 
     fn is_same_end(self) -> bool {
         let occupied: Vec<usize> = self.slots.iter().enumerate()
-            .filter_map(|(slot, value)| value.map(|_| slot))
+            .filter_map(|(slot, value)| (*value).map(|_| slot))
             .collect();
         occupied.len() == 2 && occupied[0] % 2 == occupied[1] % 2
     }
@@ -43,13 +43,13 @@ impl Assignment {
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SectorCounts {
-    /// (+1,+1): odd same-end products plus one member of each mixed-end orbit.
+    /// (+1,+1): X/Y non-survival sector in the author's sign convention.
     pub plus_plus: usize,
-    /// (+1,-1): the other eigenvector from each mixed-end exchange orbit.
+    /// (+1,-1): mixed-end records surviving the Y exchange.
     pub plus_minus: usize,
-    /// (-1,+1): even/fixed same-end products.
+    /// (-1,+1): same-end records surviving the X exchange.
     pub minus_plus: usize,
-    /// (-1,-1): qubit commutator records.
+    /// (-1,-1): qubit commutator records (both exchanges survive with the record sign).
     pub minus_minus: usize,
 }
 
@@ -154,15 +154,17 @@ pub fn qutrit_qubit_record_counts()
             orbits.fixed_same_end_assignments += 1;
         } else if assignment < image {
             if assignment.is_same_end() {
-                // The pair p <-> Xp gives one antisymmetric (X-even sign)
-                // and one symmetric (X-odd sign) eigen-record. Y does not
-                // move a same-end occupied set.
+                // The pair p <-> Xp gives p-Xp (not surviving X, so
+                // sigX=+1) and p+Xp (surviving X, so sigX=-1). Y does not
+                // move a same-end occupied set. These are the author's
+                // exchange-weight signs, not the ordinary eigenvalues.
                 sectors.add(1, 1, 1);
                 sectors.add(-1, 1, 1);
                 orbits.same_end_nonfixed_orbits += 1;
             } else {
                 // For mixed-end products, the read-link exchange moves the
-                // far qubit. Its even/odd combinations split between Y signs.
+                // far qubit. The p-Xp combination does not survive Y
+                // (sigY=+1); p+Xp does survive (sigY=-1).
                 sectors.add(1, 1, 1);
                 sectors.add(1, -1, 1);
                 orbits.mixed_end_orbits += 1;
