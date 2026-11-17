@@ -42,6 +42,17 @@ jobs:
       - name: Test registry auditor and negative controls
         run: cargo test --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit
 
+      - name: Test deterministic top-K metrics and negative controls
+        run: cargo test --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics
+
+      - name: Run metrics runner on synthetic plumbing fixture
+        run: |
+          cargo run --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics -- \
+            --predictions tools/superconductivity-discovery-harness/fixtures/discovery_metrics_smoke_v0_1.json \
+            --budgets 1,3,6 \
+            --out "$RUNNER_TEMP/sc-discovery-metrics-smoke.json"
+          cat "$RUNNER_TEMP/sc-discovery-metrics-smoke.json"
+
       - name: Run exact-input registry audit
         run: |
           cargo run --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- \
@@ -50,5 +61,7 @@ jobs:
             --out "$RUNNER_TEMP/sc-discovery-registry-receipt.json"
           cat "$RUNNER_TEMP/sc-discovery-registry-receipt.json"
 
-      - name: Clippy isolated auditor
-        run: cargo clippy --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- -D warnings
+      - name: Clippy isolated auditors
+        run: |
+          cargo clippy --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_registry_audit -- -D warnings
+          cargo clippy --manifest-path tools/superconductivity-discovery-harness/Cargo.toml --bin sc_discovery_metrics -- -D warnings
