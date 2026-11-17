@@ -325,9 +325,7 @@ impl BenchmarkRun {
         }
         if let Some(elapsed) = self.discovery.elapsed_seconds_to_threshold {
             if !elapsed.is_finite() || elapsed < 0.0 {
-                return Err(ContractError::InvalidMetric(
-                    "elapsed_seconds_to_threshold",
-                ));
+                return Err(ContractError::InvalidMetric("elapsed_seconds_to_threshold"));
             }
         }
         if let Some(correlation) = self.learning.held_out_rank_correlation {
@@ -366,9 +364,9 @@ impl BenchmarkRun {
                 self.trust.lineage_compatible_partial_work_salvage,
             ),
         ] {
-            if value.is_some_and(|fraction| {
-                !fraction.is_finite() || !(0.0..=1.0).contains(&fraction)
-            }) {
+            if value
+                .is_some_and(|fraction| !fraction.is_finite() || !(0.0..=1.0).contains(&fraction))
+            {
                 return Err(ContractError::InvalidMetric(name));
             }
         }
@@ -691,9 +689,7 @@ mod tests {
         invalid_coverage.learning.predictive_interval_coverage = Some(1.2);
         assert_eq!(
             invalid_coverage.validate(),
-            Err(ContractError::InvalidMetric(
-                "predictive_interval_coverage"
-            ))
+            Err(ContractError::InvalidMetric("predictive_interval_coverage"))
         );
 
         let mut invalid_trust = run(Algorithm::LuminousWorkflowPlanner, "policy");
