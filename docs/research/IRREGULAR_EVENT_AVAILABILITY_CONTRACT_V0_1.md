@@ -129,11 +129,16 @@ The current source contains 100 authored Rust test functions:
 - 27 source-watermark/completeness tests.
 - 17 clock-calibration tests.
 
-No Cargo build, rustfmt, Clippy, unit test, dataset adapter execution or
-benchmark has run in this environment. The source and fixture inventory is
-not evidence of passing tests. The Time-IMM sample metadata records the
-repository's released file shape, but the Rust parser has not been executed
-against the files. No real-data performance result or SOTA claim is made.
+No local Cargo/Rust toolchain is available in this authoring environment.
+Hosted validation has passed the pinned rustfmt and dependency-resolution steps
+on recent exact heads and has reached full-crate compilation. Earlier attempts
+exposed four type errors, all fixed; the next attempt exposed a
+VerifiedCompletenessReport accessor mismatch in the benchmark binary, now fixed
+through its .report() API. The current exact-head PR run is in progress. The
+100-test suite, release scaling benchmark and Clippy have not yet completed, so
+no test pass, benchmark result or SOTA claim is reported. The Time-IMM sample
+metadata records the released file shape, but the Rust parser has not yet been
+executed against the files.
 
 
 ## 9. Source progress watermarks and qualified absence
