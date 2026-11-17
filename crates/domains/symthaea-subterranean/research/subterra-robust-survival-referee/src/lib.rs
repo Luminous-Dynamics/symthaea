@@ -1610,8 +1610,7 @@ mod tests {
 
         assert_eq!(report.model_count, 2);
         assert!(
-            report.per_model[0].expected_decision_loss
-                < report.per_model[1].expected_decision_loss
+            report.per_model[0].expected_decision_loss < report.per_model[1].expected_decision_loss
         );
         assert_eq!(
             report.worst_case_expected_total_value,
